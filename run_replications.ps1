@@ -171,6 +171,56 @@ for ($i = $Start; $i -le $End; $i++) {
     Start-Sleep -Seconds 2
 }
 
+# --- Automatic Retry/Repair Phase ---
+function Invoke-RetryAndRepair {
+    param(
+        [string]$TargetDir
+    )
+    Write-Host "`n================================================================================" -ForegroundColor Magenta
+    Write-Host "### AUTO-REPAIR: Scanning for and retrying failed sessions... ###" -ForegroundColor Magenta
+    Write-Host "================================================================================" -ForegroundColor Magenta
+
+    # Run the retry script and capture its output
+    $retryOutput = python src/retry_failed_sessions.py --parent_dir $TargetDir 2>&1 | Tee-Object -Variable retryOutputString
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "!!! Auto-repair script failed to execute. Please check logs. !!!" -ForegroundColor Red
+        return $false # Indicate failure
+    }
+    
+    # Check the output to see if failures were found and if they were all fixed.
+    if ($retryOutputString -match "No failed sessions found") {
+        Write-Host "Auto-repair check complete: No failures found." -ForegroundColor Green
+        return $true # Indicate success (no failures)
+    } elseif ($retryOutputString -match "Retry Phase Complete: \d+ successful, 0 failed") {
+        Write-Host "Auto-repair successful: All detected failures were fixed." -ForegroundColor Green
+        return $true # Indicate success (all failures fixed)
+    } else {
+        Write-Host "!!! Auto-repair finished, but some failures may remain. Check logs above. !!!" -ForegroundColor Yellow
+        return $false # Indicate potential remaining failures
+    }
+}
+
+$maxRepairAttempts = 3
+$repairAttempt = 1
+$repairSuccessful = $false
+
+while ($repairAttempt -le $maxRepairAttempts -and -not $repairSuccessful) {
+    Write-Host "`n--- Starting automatic repair attempt $repairAttempt of $maxRepairAttempts... ---"
+    $repairSuccessful = Invoke-RetryAndRepair -TargetDir $outputDir
+    if (-not $repairSuccessful -and $repairAttempt -lt $maxRepairAttempts) {
+        Write-Host "Retrying repair in 5 seconds..."
+        Start-Sleep -Seconds 5
+    }
+    $repairAttempt++
+}
+
+if (-not $repairSuccessful) {
+    Write-Host "`n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
+    Write-Host "!!! CRITICAL: Automatic repair failed after $maxRepairAttempts attempts.            !!!"
+    Write-Host "!!! Please review the logs and run 'python src/retry_failed_sessions.py' manually. !!!"
+    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
+}
+
 # --- Final Compilation and Summary ---
 Write-Host "`n================================================================================" -ForegroundColor Yellow
 Write-Host "### BATCH RUN COMPLETE - COMPILING FINAL RESULTS ###" -ForegroundColor Yellow

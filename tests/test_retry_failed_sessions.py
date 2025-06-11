@@ -35,10 +35,13 @@ class TestRetryFailedSessions(unittest.TestCase):
         self.original_sys_path = list(sys.path)
         sys.path.insert(0, self.src_dir)
 
-        # --- Copy the REAL retry script into the test environment ---
+        # --- Copy the REAL retry script AND its dependencies into the test environment ---
         real_retry_script_path = os.path.join(REAL_SRC_DIR, "retry_failed_sessions.py")
         self.test_retry_script_path = os.path.join(self.src_dir, "retry_failed_sessions.py")
         shutil.copy2(real_retry_script_path, self.test_retry_script_path)
+
+        real_reprocess_script_path = os.path.join(REAL_SRC_DIR, "reprocess_runs.py")
+        shutil.copy2(real_reprocess_script_path, os.path.join(self.src_dir, "reprocess_runs.py"))
 
         # --- Create a mock directory structure with failures ---
         # Run A: Has one success and one failure

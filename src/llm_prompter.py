@@ -111,66 +111,79 @@ def animate_spinner(stop_event, query_identifier: str):
     sys.stderr.flush()
 
 # --- Helper: LLM API Call ---
+# --- Helper: LLM API Call ---
 def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endpoint: str,
                         referer: str, timeout_seconds: int, query_identifier: str,
                         max_tokens: Optional[int] = None, temperature: Optional[float] = None,
-                        quiet: bool = False  # --- MODIFICATION START ---
+                        quiet: bool = False
                        ) -> Tuple[Optional[Dict[str, Any]], float]:
+
+    result_container = {"data": None, "duration": 0.0, "exception": None}
+
+    def _api_worker():
+        """This function runs in a separate thread to make the blocking API call."""
+        api_start_time = time.time()
+        try:
+            messages = [{"role": "user", "content": query_text}]
+            payload: Dict[str, Any] = {"model": model_name, "messages": messages}
+            if max_tokens is not None: payload["max_tokens"] = max_tokens
+            if temperature is not None: payload["temperature"] = temperature
+
+            headers = {"Authorization": f"Bearer {api_key}", "HTTP-Referer": referer, "Content-Type": "application/json"}
+            logging.debug(f"API Request Payload for Query {query_identifier}: {json.dumps(payload, indent=2, ensure_ascii=False)}")
+            
+            logging.info(f"  Query {query_identifier}: Calling API with model='{model_name}', "
+                         f"max_tokens={payload.get('max_tokens')}, temperature={payload.get('temperature')}")
+
+            response = requests.post(api_endpoint, headers=headers, json=payload, timeout=timeout_seconds)
+            response.raise_for_status()
+            result_container["data"] = response.json()
+            logging.info(f"  Query {query_identifier}: API call successful.")
+
+        except Exception as e:
+            # Capture any exception to be re-raised in the main thread
+            result_container["exception"] = e
+        finally:
+            # Always record the duration
+            result_container["duration"] = time.time() - api_start_time
+
+    # --- Threading setup ---
     stop_event = threading.Event()
     spinner_thread = threading.Thread(target=animate_spinner, args=(stop_event, query_identifier))
-    # --- MODIFICATION END ---
-    response_json_data: Optional[Dict[str, Any]] = None
-    api_duration = 0.0
-    api_start_time = time.time()
+    api_thread = threading.Thread(target=_api_worker, daemon=True)
 
-    try:
-        messages = [{"role": "user", "content": query_text}]
-        payload: Dict[str, Any] = {"model": model_name, "messages": messages}
-        if max_tokens is not None: payload["max_tokens"] = max_tokens
-        if temperature is not None: payload["temperature"] = temperature
+    # Start threads
+    if not quiet:
+        spinner_thread.start()
+    api_thread.start()
 
-        headers = {"Authorization": f"Bearer {api_key}", "HTTP-Referer": referer, "Content-Type": "application/json"}
-        logging.debug(f"API Request Payload for Query {query_identifier}: {json.dumps(payload, indent=2, ensure_ascii=False)}")
-        logging.debug(f"API Request Headers for Query {query_identifier}: {headers}")
+    # --- Interruptible wait loop ---
+    # The main thread now waits in this loop, which can be interrupted by Ctrl+C.
+    while api_thread.is_alive():
+        api_thread.join(timeout=0.1)
 
-        logging.info(f"  Query {query_identifier}: Calling API with model='{model_name}', "
-                     f"max_tokens={payload.get('max_tokens')}, temperature={payload.get('temperature')}")
-        
-        api_start_time = time.time()
-        # --- MODIFICATION START ---
-        if not quiet:
-            spinner_thread.start()
-        # --- MODIFICATION END ---
-        response = requests.post(api_endpoint, headers=headers, json=payload, timeout=timeout_seconds)
-        api_duration = time.time() - api_start_time
-        response.raise_for_status() 
-        response_json_data = response.json()
-        logging.info(f"  Query {query_identifier}: API call successful. Duration: {api_duration:.2f}s")
-        return response_json_data, api_duration
-    except requests.exceptions.Timeout:
-        api_duration = time.time() - api_start_time
-        logging.error(f"  Query {query_identifier}: API request timed out after {api_duration:.2f}s (timeout_setting={timeout_seconds}s).")
-        return None, api_duration
-    except requests.exceptions.HTTPError as http_err:
-        api_duration = time.time() - api_start_time
-        logging.error(f"  Query {query_identifier}: API request failed with HTTP error: {http_err}")
-        if http_err.response is not None: logging.error(f"  Response content: {http_err.response.text}")
-        return None, api_duration
-    except requests.RequestException as req_err:
-        api_duration = time.time() - api_start_time
-        logging.error(f"  Query {query_identifier}: API request failed with general error: {req_err}")
-        return None, api_duration
-    except Exception as e:
-        api_duration = time.time() - api_start_time
-        logging.exception(f"  Query {query_identifier}: Unexpected error in call_openrouter_api: {e}")
-        return None, api_duration
-    finally:
-        # --- MODIFICATION START ---
-        if not quiet:
-            stop_event.set()
-            if spinner_thread.is_alive(): spinner_thread.join(timeout=1.0)
-            time.sleep(CLEANUP_DELAY)
-        # --- MODIFICATION END ---
+    # --- Cleanup and return results ---
+    if not quiet:
+        stop_event.set()
+        if spinner_thread.is_alive():
+            spinner_thread.join()
+        time.sleep(CLEANUP_DELAY)
+
+    # Handle exceptions that occurred in the worker thread
+    if result_container["exception"]:
+        exc = result_container["exception"]
+        duration = result_container['duration']
+        if isinstance(exc, requests.exceptions.Timeout):
+            logging.error(f"  Query {query_identifier}: API request timed out after {duration:.2f}s (timeout_setting={timeout_seconds}s).")
+        elif isinstance(exc, requests.exceptions.HTTPError):
+            logging.error(f"  Query {query_identifier}: API request failed with HTTP error: {exc}")
+            if exc.response is not None: logging.error(f"  Response content: {exc.response.text}")
+        else:
+            logging.exception(f"  Query {query_identifier}: An unexpected error occurred in the API worker thread: {exc}")
+        return None, duration
+
+    # Return successful data
+    return result_container["data"], result_container["duration"]
 
 def main():
     parser = argparse.ArgumentParser(description="Worker/Standalone Test: Sends a single query to LLM.")

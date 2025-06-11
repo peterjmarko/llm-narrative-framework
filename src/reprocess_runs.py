@@ -35,6 +35,14 @@ import glob
 import subprocess
 import logging
 from datetime import datetime
+import re
+import os
+
+try:
+    from config_loader import APP_CONFIG, get_config_value
+except ImportError:
+    print("FATAL: Could not import from config_loader.py. Ensure it is in the same directory as reprocess_runs.py.")
+    sys.exit(1)
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO,
@@ -43,14 +51,9 @@ logging.basicConfig(level=logging.INFO,
 
 def main():
     parser = argparse.ArgumentParser(description="Re-process and re-analyze completed LLM experiment runs.")
-    parser.add_argument("--parent_dir", required=True,
-                        help="The path to the parent directory containing the 'run_*' folders.")
+    parser.add_argument("--target_dir", default="output",
+                        help="Path to the directory to process. Can be a parent containing multiple 'run_*' folders, or a single 'run_*' folder. Defaults to 'output'.")
     args = parser.parse_args()
-
-    parent_dir = os.path.abspath(args.parent_dir)
-    if not os.path.isdir(parent_dir):
-        logging.error(f"Error: Provided parent directory does not exist: {parent_dir}")
-        sys.exit(1)
 
     # Find the location of the scripts relative to this script
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -62,14 +65,30 @@ def main():
         logging.error(f"Error: Could not find one or more required scripts (processor, analyzer, compiler) in the directory: {script_dir}")
         sys.exit(1)
 
-    # Find all run directories to process
-    run_directories = sorted(glob.glob(os.path.join(parent_dir, "run_*")))
+    # Determine which directories to process
+    target_dir = os.path.abspath(args.target_dir)
+    if not os.path.isdir(target_dir):
+        logging.error(f"Error: Target directory does not exist: {target_dir}")
+        sys.exit(1)
+
+    run_directories = []
+    parent_dir_for_compilation = None
+
+    # Check if the target_dir is a run directory itself or a parent of run directories
+    if os.path.basename(target_dir).startswith("run_"):
+        run_directories.append(target_dir)
+        parent_dir_for_compilation = None # Do not recompile master summary for a single run
+        logging.info(f"Processing single specified run directory: {target_dir}")
+    else:
+        run_directories = sorted(glob.glob(os.path.join(target_dir, "run_*")))
+        parent_dir_for_compilation = target_dir
+        logging.info(f"Found {len(run_directories)} run directories to re-process in parent: {target_dir}")
+
     if not run_directories:
-        logging.warning(f"No 'run_*' directories found in {parent_dir}. Nothing to do.")
+        logging.warning(f"No 'run_*' directories found to process in '{target_dir}'. Nothing to do.")
         sys.exit(0)
 
     total_runs = len(run_directories)
-    logging.info(f"Found {total_runs} run directories to re-process in: {parent_dir}")
     
     success_count = 0
     fail_count = 0
@@ -97,7 +116,7 @@ def main():
             logging.info(f"  Analyzer finished successfully. Captured report output.")
             
             # === Step 3: Find and overwrite the replication report ===
-            logging.info(f"  (3/3) Overwriting replication report...")
+            logging.info(f"  (3/3) Re-generating replication report...")
             report_pattern = os.path.join(run_path, "replication_report_*.txt")
             existing_reports = glob.glob(report_pattern)
             
@@ -106,12 +125,44 @@ def main():
                 if len(existing_reports) > 1:
                     logging.warning(f"    Multiple reports found for {run_name}. Overwriting the first one: {report_path}")
             else:
+                # If no report exists, create one with a new timestamp.
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 report_path = os.path.join(run_path, f"replication_report_{timestamp}.txt")
                 logging.warning(f"    No existing report found for {run_name}. Creating a new one: {report_path}")
 
+            # --- Reconstruct the full report content ---
+            # Get static parameters from config file
+            personalities_file = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', 'N/A')
+            llm_model = get_config_value(APP_CONFIG, 'LLM', 'model_name', 'N/A')
+            
+            # Extract dynamic parameters from the run directory name
+            k_match = re.search(r"sbj-(\d+)", run_name)
+            m_match = re.search(r"trl-(\d+)", run_name)
+            k_val = k_match.group(1) if k_match else "N/A"
+            m_val = m_match.group(1) if m_match else "N/A"
+
+            header = f"""
+================================================================================
+ REPLICATION RUN REPORT (Re-processed on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+================================================================================
+Date:            {run_name.split('_')[1]}
+Final Status:    COMPLETED
+Run Directory:   {run_name}
+Validation Status: OK (Re-processed run)
+Report File:     {os.path.basename(report_path)}
+
+--- Run Parameters ---
+Num Iterations (m): {m_val}
+Items per Query (k): {k_val}
+Personalities Source: {personalities_file}
+LLM Model:       {llm_model}
+Run Notes:       This report was regenerated by reprocess_runs.py.
+================================================================================
+
+{analysis_output}
+"""
             with open(report_path, 'w', encoding='utf-8') as f_report:
-                f_report.write(analysis_output)
+                f_report.write(header.strip())
             
             logging.info(f"  Successfully updated report file: {report_path}")
             success_count += 1
@@ -127,12 +178,13 @@ def main():
             fail_count += 1
 
     # === Final Step: Re-compile the master results CSV ===
-    if success_count > 0:
+    # Only run the compiler if we processed a whole parent directory
+    if success_count > 0 and parent_dir_for_compilation:
         logging.info(f"\n--- Re-compiling master results file ---")
         try:
-            logging.info(f"  (Final Step) Calling compile_results.py for parent directory: {parent_dir}...")
+            logging.info(f"  (Final Step) Calling compile_results.py for parent directory: {target_dir}...")
             compiler_result = subprocess.run(
-                [sys.executable, compiler_script_path, parent_dir],
+                [sys.executable, compiler_script_path, target_dir],
                 capture_output=True, text=True, check=True
             )
             # The compiler prints its own success message, so we can just log that it's done.

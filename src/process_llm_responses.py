@@ -227,68 +227,58 @@ def get_core_name(name_with_details):
 
 def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_ordered_from_query, is_rank_based=False):
     """
-    Parses the LLM response text, assuming it's a tab-delimited table with:
-    - An optional header row.
-    - A first column for List A item names (used for row mapping).
-    - k subsequent columns for scores/ranks for List B items.
+    Parses the LLM response text, intelligently handling either tab-delimited or
+    Markdown table formats.
+    - An optional header row is detected and skipped.
+    - Markdown separator lines (`|---|`) are skipped.
+    - The first column is assumed to contain List A item names, which are used for
+      row mapping and stripped from the final score matrix.
+    - k subsequent columns are parsed as scores/ranks for List B items.
     """
     lines = response_text.strip().split('\n')
-    score_matrix = np.full((k_value, k_value), 0.0) # Default to 0.0 for any unassigned cells
-    
-    # Map core names from query's List A to their 0-based row index
+    score_matrix = np.full((k_value, k_value), 0.0) # Default to 0.0
     query_list_a_core_names_map = {get_core_name(name): i for i, name in enumerate(list_a_names_ordered_from_query)}
-    
-    # Track which query List A rows have been filled to detect duplicates or use sequential if names fail
     filled_row_indices = [False] * k_value
-    
-    header_skipped = False
     parsed_data_rows_count = 0
 
-    for line_idx, line_content in enumerate(lines):
+    for line_content in lines:
         stripped_line = line_content.strip()
         if not stripped_line:
-            continue # Skip empty lines
+            continue
 
-        parts = stripped_line.split('\t')
+        # This block is enhanced to handle complex formats.
+        parts = []
+        is_markdown = stripped_line.startswith('|')
+
+        if is_markdown:
+            if '---' in stripped_line: continue  # Skip markdown separator
+            parts = [p.strip() for p in stripped_line.strip('|').split('|')]
+        else:
+            parts = stripped_line.split('\t')
+
+        if not parts or not any(parts): continue
         
-        if not header_skipped:
-            # Heuristic to detect header:
-            # Check if first cell is non-numeric (like "Name", "Person") OR
-            # if any of the cells from the second onwards contain "ID" (case-insensitive).
-            # This assumes data rows won't start with such strings for scores.
+        # --- Heuristic to identify and skip header row ---
+        try:
+            # A data row will have a numeric second column (the first score).
+            # A header row will likely have a non-numeric string like "ID 1".
+            float(parts[1])
             is_header = False
-            if parts:
-                if not parts[0].replace('.', '', 1).isdigit() and parts[0].strip().lower() in ["name", "person", "item", "names"]:
-                    is_header = True
-                elif len(parts) > 1 and any(re.search(r'id', p, re.IGNORECASE) for p in parts[1:]):
-                     is_header = True
-                elif len(parts) == k_value + 1 and any(re.search(r'id', p, re.IGNORECASE) for p in parts): # Header might include name col
-                     is_header = True
+        except (ValueError, IndexError):
+            is_header = True
 
-
-            if is_header:
-                logging.debug(f"  Skipping detected header: '{stripped_line}'")
-                header_skipped = True
-                # Basic validation of header structure against k_value
-                expected_cols_in_header = k_value + 1 # Name + k IDs
-                if len(parts) != expected_cols_in_header:
-                    logging.warning(f"  Header row has {len(parts)} columns, expected {expected_cols_in_header} (Name + {k_value} IDs). Line: '{stripped_line}'")
-                continue
-            else:
-                # If it's the first line and not detected as header, assume it's data.
-                # Or, if users guarantee NO header, this check is not needed.
-                # To be safe, we can just proceed assuming it might be data if not clearly a header.
-                header_skipped = True # Assume if it's not a header, we are into data or malformed header
-                logging.debug(f"  No clear header detected or already skipped. Processing line as data: '{stripped_line}'")
-
-
+        if is_header:
+            logging.debug(f"  Skipping detected header: '{stripped_line}'")
+            continue
+        
         # --- Process as a data row ---
         if parsed_data_rows_count >= k_value:
             logging.warning(f"  Already parsed {k_value} data rows. Ignoring extra line: '{stripped_line}'")
-            continue # Stop processing if we already have k rows of data
+            continue
 
+        # Expect k+1 columns (Name + k scores)
         if len(parts) != k_value + 1:
-            logging.warning(f"  Data row has {len(parts)} columns, expected {k_value + 1} (Name + {k_value} scores). Row: '{stripped_line}'. Skipping.")
+            logging.warning(f"  Data row has {len(parts)} columns, expected {k_value + 1}. Row: '{stripped_line}'. Skipping.")
             continue
             
         llm_person_name_raw = parts[0].strip()
@@ -300,37 +290,32 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
         if core_llm_name in query_list_a_core_names_map:
             matrix_row_idx = query_list_a_core_names_map[core_llm_name]
             if filled_row_indices[matrix_row_idx]:
-                logging.warning(f"  Duplicate List A item name '{llm_person_name_raw}' (core: '{core_llm_name}') found in LLM response. Overwriting previous data for this item.")
-                # Or, decide on a strategy: skip, average, etc. For now, overwrite.
+                logging.warning(f"  Duplicate List A item name '{llm_person_name_raw}' found. Overwriting previous data.")
         else:
-            # Try to find an unfilled row sequentially if name matching fails
-            # This is a fallback and assumes LLM mostly keeps order if names are off
             unfilled_indices = [i for i, filled in enumerate(filled_row_indices) if not filled]
             if unfilled_indices:
-                matrix_row_idx = unfilled_indices[0] # Take the first available empty slot
-                logging.warning(f"  LLM person name '{llm_person_name_raw}' (core: '{core_llm_name}') not matched to query List A. Assigning sequentially to matrix row {matrix_row_idx}.")
+                matrix_row_idx = unfilled_indices[0]
+                logging.warning(f"  LLM name '{llm_person_name_raw}' not matched. Assigning sequentially to matrix row {matrix_row_idx}.")
             else:
-                logging.error(f"  LLM person name '{llm_person_name_raw}' not matched and no sequential rows available. Skipping this data row.")
+                logging.error(f"  LLM name '{llm_person_name_raw}' not matched and no sequential rows available. Skipping.")
                 continue
         
         try:
             numerical_scores = [float(s.strip()) for s in score_strings]
             if is_rank_based:
-                # Ranks: 1 is best (score k), k is worst (score 1)
                 processed_scores = [float(k_value - rank + 1) if 1 <= rank <= k_value else 0.0 for rank in numerical_scores]
             else:
-                # Direct scores: ensure they are floats
                 processed_scores = numerical_scores
             
             score_matrix[matrix_row_idx, :] = processed_scores
             filled_row_indices[matrix_row_idx] = True
             parsed_data_rows_count += 1
         except ValueError as e:
-            logging.warning(f"  Could not parse scores in data row as numbers: '{score_strings}'. Error: {e}. Skipping for '{llm_person_name_raw}'.")
-            continue # Skip this row
+            logging.warning(f"  Could not parse scores as numbers: '{score_strings}'. Error: {e}. Skipping row for '{llm_person_name_raw}'.")
+            continue
             
     if parsed_data_rows_count < k_value:
-        logging.warning(f"  Parsed and mapped only {parsed_data_rows_count} data rows for a k={k_value} matrix. Unmapped query List A items will have default scores (0.0).")
+        logging.warning(f"  Parsed only {parsed_data_rows_count} data rows for a k={k_value} matrix. Unmapped rows will have default scores.")
         
     return score_matrix
 

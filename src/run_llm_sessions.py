@@ -130,8 +130,9 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     # --- Arguments ---
-    parser.add_argument("--start_index", type=int, default=1)
-    parser.add_argument("--end_index", type=int, default=None)
+    parser.add_argument("--start_index", type=int, default=1, help="The starting index for processing query files.")
+    parser.add_argument("--end_index", type=int, default=None, help="The ending index for processing query files.")
+    parser.add_argument("--indices", type=int, nargs='+', default=None, help="A specific list of indices to run, overriding start/end.")
     parser.add_argument("--continue-run", action="store_true", help="Resume a session, skipping queries that already have a response file.")
     parser.add_argument("--force-rerun", action="store_true", help="Force re-running a query, deleting any existing response or error file. Used for retrying failed sessions.")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity level (-v for INFO, -vv for DEBUG). Propagates to worker.")
@@ -181,7 +182,7 @@ def main():
         logging.info(f"Writing responses to: {response_dir_abs}")
         logging.info(f"API timing log will be written to: {api_times_log_path_abs}")
 
-    if not args.continue_run:
+    if not args.continue_run and not args.force_rerun:
         logging.info("--- Starting fresh run: Clearing all previous response files. ---")
         clear_response_files_for_fresh_run(response_dir_abs, api_times_log_path_abs)
         
@@ -213,18 +214,46 @@ def main():
 
 
     query_files_pattern = os.path.join(query_dir_abs, "llm_query_[0-9][0-9][0-9].txt")
-    query_files = sorted(glob.glob(query_files_pattern))
-    if not query_files:
+    all_query_files = sorted(glob.glob(query_files_pattern))
+    if not all_query_files:
         logging.info(f"No query files matching '{query_files_pattern}' found in '{query_dir_abs}'. Nothing to do."); return
 
-    logging.info(f"Found {len(query_files)} query files. Processing from index {args.start_index} up to {args.end_index if args.end_index is not None else 'last available'}.")
+    # --- Filter which query files to process ---
+    query_files_to_process = []
+    if args.indices:
+        logging.info(f"Targeting specific indices provided via --indices flag: {args.indices}")
+        indices_set = set(args.indices)
+        for qf in all_query_files:
+            try:
+                index_str = os.path.basename(qf).replace("llm_query_", "").replace(".txt", "")
+                if int(index_str) in indices_set:
+                    query_files_to_process.append(qf)
+            except (ValueError, TypeError):
+                continue
+    else:
+        # Fallback to original start/end index logic
+        logging.info(f"Processing from index {args.start_index} up to {args.end_index if args.end_index is not None else 'last available'}.")
+        for qf in all_query_files:
+            try:
+                index_str = os.path.basename(qf).replace("llm_query_", "").replace(".txt", "")
+                current_index = int(index_str)
+                if current_index >= args.start_index and (args.end_index is None or current_index <= args.end_index):
+                    query_files_to_process.append(qf)
+            except (ValueError, TypeError):
+                continue
+
+    if not query_files_to_process:
+        logging.warning("After filtering, no query files remain to be processed.")
+        return
+
+    logging.info(f"Found {len(query_files_to_process)} query file(s) to process for this session.")
     
     successful_sessions = 0; failed_sessions = 0; skipped_sessions = 0
     total_elapsed_time = 0.0
-    total_trials = len(query_files)
+    total_trials = len(query_files_to_process)
 
     try:
-        for query_filepath_src in query_files:
+        for query_filepath_src in query_files_to_process:
             filename_src = os.path.basename(query_filepath_src)
             current_index = -1
             try:

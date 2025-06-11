@@ -76,7 +76,7 @@ class TestReprocessRuns(unittest.TestCase):
 
         # Act
         # Call the imported main function directly, with mocked sys.argv
-        cli_args = ['reprocess_runs.py', '--parent_dir', self.output_dir]
+        cli_args = ['reprocess_runs.py', '--target_dir', self.output_dir]
         with patch.object(sys, 'argv', cli_args):
             reprocess_main()
 
@@ -100,7 +100,9 @@ class TestReprocessRuns(unittest.TestCase):
         self.assertTrue(os.path.exists(self.stale_report_path))
         with open(self.stale_report_path, 'r') as f:
             report_content = f.read()
-        self.assertEqual(report_content, fresh_analysis_output)
+        # The new report should contain the generated header AND the new analysis output.
+        self.assertIn("REPLICATION RUN REPORT (Re-processed on", report_content)
+        self.assertIn(fresh_analysis_output, report_content)
 
 if __name__ == '__main__':
     unittest.main()
