@@ -1,0 +1,46 @@
+# --- Python ---
+# Python virtual environment folders
+.venv/
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Project-Specific ---
+# Ignore the entire output directory, which contains all generated data and reports.
+# This ensures the repository only contains the source code and configuration.
+/output/
+
+# Ignore the archives directory, as requested.
+/archives/
+
+# Ignore temporary files created by the pipeline scripts within the src folder.
+/src/temp/
+
+# Ignore standalone outputs from the query generator.
+/qgen_standalone_output/
+
+# --- Secrets ---
+# Ignore the .env file, which should contain sensitive API keys.
+# A .env.example file should be created and committed instead.
+.env
+
+# --- Testing ---
+# Ignore pytest cache and coverage reports.
+.pytest_cache/
+.coverage
+
+# --- Operating System & Editor Files ---
+# Ignore macOS-specific files
+.DS_Store
+
+# Ignore Windows-specific files
+Thumbs.db
+
+# Ignore IDE-specific folders
+.idea/
+.vscode/

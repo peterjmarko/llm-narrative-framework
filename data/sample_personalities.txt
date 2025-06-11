@@ -1,0 +1,103 @@
+Index	Name	BirthYear	DescriptionText
+101	John Doe	1980	A very interesting person indeed, often found contemplating complex problems with a quiet demeanor.
+102	Jane Smith	1992	Loves to code and explore new tech, always eager for the next challenge and innovation.
+103	Peter Pan	1904	Never wants to grow up, lives in Neverland, embodies eternal youth and adventure.
+104	Alice Wonderland	1862	Curious and follows white rabbits, her journeys often defy logic and embrace the surreal.
+105	Sherlock Holmes	1854	A brilliant detective with keen observation skills, solves mysteries through deduction.
+106	Dr. Watson	1852	Loyal companion and chronicler of Holmes, provides a grounded perspective to extraordinary cases.
+107	Captain Nemo	1820	Mysterious captain of the Nautilus, a scientific genius with a reclusive and vengeful streak.
+108	Elizabeth Bennet	1796	Witty and independent, values intelligence and character over societal expectations.
+109	Mr. Darcy	1788	Initially perceived as proud and aloof, possesses a strong sense of integrity and loyalty.
+110	Frodo Baggins	2968	A hobbit of humble origins tasked with a world-saving quest, showing immense courage. (TA)
+111	Gandalf the Grey	0	A wise and powerful wizard, guides and aids those fighting against evil. (TA)
+112	Atticus Finch	1890	A lawyer of unwavering moral integrity, defends the innocent against prejudice.
+113	Scout Finch	1926	Observant and precocious child, learns about justice and empathy in a segregated South.
+114	Jay Gatsby	1890	Enigmatic millionaire pursuing a lost love, embodies the American Dream's allure and tragedy.
+115	Daisy Buchanan	1899	Charming and superficial, represents the allure and emptiness of the upper class.
+116	Holden Caulfield	1933	Cynical and disillusioned teenager, struggles with phoniness and the transition to adulthood.
+117	Willy Wonka	1920	Eccentric and reclusive chocolatier, known for his fantastical inventions and moral tests.
+118	Charlie Bucket	1955	Kind-hearted and impoverished boy, wins a tour of a magical chocolate factory through honesty.
+119	Hermione Granger	1979	Intelligent, resourceful, and fiercely loyal witch, a key member of her adventurous trio.
+120	Harry Potter	1980	The "Boy Who Lived," destined to confront a dark wizard, known for bravery and resilience.
+121	Ron Weasley	1980	Loyal and humorous best friend, often provides comic relief and steadfast support.
+122	Darth Vader	-41	Once a heroic Jedi, seduced by the dark side, embodies power, tragedy, and eventual redemption. (BBY)
+123	Luke Skywalker	-19	Farmboy destined to become a Jedi Master, fights for freedom in a galactic civil war. (BBY)
+124	Princess Leia Organa	-19	Strong-willed leader of the Rebel Alliance, a diplomat and warrior. (BBY)
+125	Indiana Jones	1899	Adventurous archaeologist and professor, known for his whip, fedora, and fear of snakes.
+126	James Bond	1920	Suave and resourceful secret agent (007), serves his country with sophisticated gadgets.
+127	Wonder Woman	-3000	Amazonian princess and demigoddess, fights for justice, love, peace, and gender equality. (Ancient)
+128	Superman (Clark Kent)	1938	Alien from Krypton with extraordinary powers, champions truth, justice, and the American way. (Comic Book Origin Year)
+129	Batman (Bruce Wayne)	1939	Vigilante crime-fighter driven by childhood trauma, uses intellect, wealth, and technology. (Comic Book Origin Year)
+130	Katniss Everdeen	~2980	Resourceful and resilient tribute in a dystopian death match, becomes a symbol of rebellion. (Future)
+131	Dr. Jekyll (Mr. Hyde)	1850	A brilliant scientist struggling with a dual personality, one good, one purely evil.
+132	Rip Van Winkle	1750	A colonial villager known for his aversion to profitable labor; famously slept for twenty years.
+133	Ichabod Crane	1790	A lanky, superstitious schoolmaster with an insatiable appetite and a belief in local ghost stories.
+134	Don Quixote	1550	An idealistic nobleman who reads too many chivalric romances and sets out to revive knight-errantry.
+135	Sancho Panza	1560	The pragmatic and loyal squire to Don Quixote, often providing a down-to-earth counterpoint.
+136	King Arthur	480	Legendary British leader who, according to medieval histories, defended Britain against Saxon invaders.
+137	Merlin	450	A powerful wizard and advisor to King Arthur, known for his wisdom, magic, and mysterious origins.
+138	Guinevere	490	Queen consort of King Arthur, famed for her beauty and her tragic love affair with Lancelot.
+139	Lancelot du Lac	490	One of the Knights of the Round Table, renowned for his chivalry and skill in combat, and his love for Guinevere.
+140	Robin Hood	1160	A heroic outlaw in English folklore, skilled archer and swordsman, known for "robbing from the rich and giving to the poor."
+141	Maid Marian	1170	The love interest of Robin Hood, often depicted as a noblewoman of courage and independence.
+142	Little John	1165	Robin Hood's chief lieutenant and second-in-command of the Merry Men; ironically named for his large stature.
+143	Friar Tuck	1170	A jovial, ale-loving friar and another of Robin Hood's companions, providing spiritual (and often physical) support.
+144	Count Dracula	1431	A Transylvanian nobleman and centuries-old vampire, known for his charm, cruelty, and supernatural powers.
+145	Professor Van Helsing	1840	A Dutch doctor with a wide range of interests and accomplishments, Dracula's arch-nemesis.
+146	Frankenstein's Monster	1797	An artificially created, sentient creature in Mary Shelley's novel, often misunderstood and seeking acceptance.
+147	Victor Frankenstein	1770	The ambitious young scientist who creates the monster, then recoils in horror from his creation.
+148	Captain Ahab	1800	The obsessive captain of the Pequod, driven by a monomaniacal desire for revenge against a white whale.
+149	Ishmael	1820	The narrator of Moby Dick, a sailor who joins the crew of the Pequod and survives its fateful voyage.
+150	Moby Dick	Unknown	A giant white sperm whale of legendary cunning and ferocity, the object of Captain Ahab's relentless pursuit.
+151	Ebenezer Scrooge	1786	A miserly, cold-hearted old man who despises Christmas, until he is visited by three ghosts.
+152	Bob Cratchit	1805	Scrooge's overworked and underpaid clerk, a kind and humble family man.
+153	Tiny Tim	1835	Bob Cratchit's young, crippled son, whose optimistic spirit touches Scrooge.
+154	Oliver Twist	1828	An orphan boy who endures a miserable existence in a workhouse before falling in with a gang of pickpockets.
+155	Artful Dodger (Jack Dawkins)	1825	A charismatic and skilled young pickpocket in Fagin's gang, who befriends Oliver.
+156	Fagin	1790	An elderly criminal who teaches orphaned boys to pick pockets and commit other crimes in exchange for shelter.
+157	Nancy	1815	A young woman in Fagin's gang, sympathetic to Oliver, whose loyalty ultimately leads to her tragic end.
+158	Bill Sikes	1800	A brutal professional burglar and Fagin's associate, known for his violent temper.
+159	Miss Havisham	1786	An eccentric wealthy spinster who was jilted at the altar and wears her wedding dress for the rest of her life.
+160	Estella Havisham	1810	Miss Havisham's beautiful and cold-hearted adopted daughter, raised to break men's hearts.
+161	Pip (Philip Pirrip)	This line is intentionally misformatted; it doesn't have enough tabs and the year is not an integer.
+Index	Name	BirthYear	DescriptionText
+162	Pip (Philip Pirrip)	1812	An orphan boy who rises from humble beginnings, with great expectations shaped by mysterious benefactors.
+163	Joe Gargery	1800	Pip's kind-hearted brother-in-law and childhood guardian, a simple and honest blacksmith.
+164	Abel Magwitch	1780	An escaped convict who becomes Pip's secret benefactor, driven by a rough sense of gratitude.
+165	Robinson Crusoe	1632	A mariner who spends twenty-eight years shipwrecked on a remote tropical island.
+166	Friday	1660	A Caribbean native rescued by Robinson Crusoe, becoming his loyal servant and companion.
+167	Lemuel Gulliver	1661	A ship's surgeon and traveler who embarks on extraordinary voyages to fantastical lands like Lilliput and Brobdingnag.
+168	Captain Long John Silver	1700	A charismatic and cunning one-legged pirate, serves as the cook aboard the Hispaniola.
+169	Jim Hawkins	1740	A young boy who finds a treasure map and embarks on an adventure aboard the Hispaniola.
+170	Dr. Livesey	1710	A calm, resourceful, and courageous doctor and magistrate who accompanies Jim on the treasure hunt.
+171	Ben Gunn	1700	A former pirate marooned for three years on Treasure Island, eccentric but helpful.
+172	Tom Sawyer	1835	A mischievous and imaginative boy living in a small town on the Mississippi River.
+173	Huckleberry Finn	1835	Tom Sawyer's best friend, an adventurous and independent boy escaping an abusive father.
+174	Becky Thatcher	1836	Tom Sawyer's sweetheart, known for her charm and participation in some of Tom's adventures.
+175	Aunt Polly	1790	Tom Sawyer's stern but loving aunt and guardian, constantly trying to civilize him.
+176	The Moomins	1940	A family of white, round, hippo-like trolls from Moominvalley, known for their gentle and adventurous nature. (Figurative "birth year")
+177	Snufkin	1940	A philosophical wanderer and Moomintroll's best friend, values freedom and nature. (Figurative "birth year")
+178	Little My	1940	A small, fiercely independent, and mischievous Mymble girl, often brutally honest. (Figurative "birth year")
+179	Pippi Longstocking	1940	An unconventional and super-strong nine-year-old girl living alone with a horse and a monkey. (Figurative "birth year")
+180	Draculaura	1600	A friendly and optimistic vampire, daughter of Dracula, known for her veganism and fashion sense. (Monster High)
+181	Frankie Stein	15	Daughter of Frankenstein's monster, clumsy, kind, and eager to learn about the world. (Monster High, age in days when introduced)
+182	Clawdeen Wolf	15	Daughter of the Werewolf, fierce, confident, and fashion-forward with a large family. (Monster High)
+183	Lagoona Blue	15	Daughter of the Sea Monster, laid-back, friendly, and an advocate for ocean conservation. (Monster High)
+184	Ghoulia Yelps	16	Daughter of the Zombies, the smartest ghoul in school, speaks only in moans and groans. (Monster High, zombie years)
+185	Cleo De Nile	5842	Daughter of the Mummy, a royal princess known for her confidence, leadership, and sometimes bossy attitude. (Monster High)
+186	Optimus Prime	-9000000	Leader of the Autobots, a noble and courageous transforming robot dedicated to peace and protecting life. (Transformers, approx. age)
+187	Megatron	-9000000	Leader of the Decepticons, a ruthless and power-hungry transforming robot seeking galactic domination. (Transformers, approx. age)
+188	Bumblebee	-4000000	A young, brave, and friendly Autobot scout, often serves as a bridge between humans and Transformers. (Transformers, approx. age)
+189	Starscream	-9000000	Megatron's ambitious and treacherous second-in-command, constantly scheming to usurp leadership. (Transformers, approx. age)
+190	SpongeBob SquarePants	1986	An eternally optimistic and energetic sea sponge, works as a fry cook at the Krusty Krab. (Character's "birth year" based on driver's license in show)
+191	Patrick Star	1986	SpongeBob's best friend, a dim-witted but lovable pink starfish. (Figurative)
+192	Squidward Tentacles	1977	SpongeBob's cynical and искусство-loving neighbor and coworker, an octopus who craves peace and quiet. (Figurative)
+193	Mr. Krabs (Eugene H. Krabs)	1942	The greedy, money-obsessed owner of the Krusty Krab, a crab who is SpongeBob's boss. (Figurative)
+194	Sandy Cheeks	1987	A thrill-seeking and intelligent squirrel from Texas living underwater in a treedome, a scientist and inventor. (Figurative)
+195	WALL-E	2100	A solitary waste allocation load lifter robot left on a deserted Earth, develops sentience and falls in love. (Approx. operational start)
+196	EVE (Extraterrestrial Vegetation Evaluator)	2805	A sleek, advanced probe robot sent to Earth to search for signs of sustainable life. (Approx. activation year)
+197	Forrest Gump	1944	A kind-hearted man with a low IQ who inadvertently participates in many defining historical moments.
+198	Jenny Curran	1945	Forrest Gump's childhood friend and lifelong love, leads a troubled and nomadic life.
+199	Lieutenant Dan Taylor	1940	Forrest Gump's platoon leader in Vietnam, initially bitter after losing his legs but finds peace.
+200	Bubba Blue (Benjamin Buford Blue)	1944	Forrest Gump's best friend in the army, dreams of starting a shrimping business.
+201	Master Yoda	-896	Ancient and powerful Jedi Master, known for his wisdom, unique syntax, and connection to the Force. (BBY)

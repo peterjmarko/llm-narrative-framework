@@ -1,0 +1,10 @@
+List A below contains the name and birth year of k={k} famous people in random order. List B contains k={k} independently-derived personality descriptions in random order. Assess the similarity between the biography of each person in List A to each personality description in List B (for a total of {k_squared} comparisons). You are expected to source the biographies of and any other relevant information about the {k} named people.
+
+Please provide your answer *only* in the format of a table with {k_plus_1} columns and {k_plus_1} rows, where k is the number of items in each list:
+- The first row MUST be a header row.
+- The first column MUST contain the person's name (and year) exactly as it appeared in List A.
+- The subsequent {k} columns MUST be headed 'ID 1', 'ID 2', ..., 'ID {k}'.
+
+Each cell in the scores part of the table (rows 2 to {k_plus_1}, columns 2 to {k_plus_1}) should contain a numerical score from 0.00 to 1.00 (to two decimal places) indicating how similar the Person in that row is the Description ID in that column. A score of 1.00 indicates the highest possible similarity. 
+
+Separate all items in each row (including the header row) with a single tab character. Do not include any other text, explanations, or introductions before or after this table.

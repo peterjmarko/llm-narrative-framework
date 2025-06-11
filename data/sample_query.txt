@@ -1,0 +1,2 @@
+BaseQueryText
+This is a sample instruction to the LLM.
