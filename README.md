@@ -7,8 +7,8 @@ This project provides a fully automated and reproducible pipeline for testing a 
 -   **Automated Pipeline**: A single command can run dozens of experimental replications, each with hundreds of trials.
 -   **Reproducibility**: Uses deterministic seeding to ensure that the random selection of personalities and the shuffling of query items are repeatable.
 -   **Self-Contained Runs**: Each experimental run is stored in a unique, timestamped, and descriptively named directory, containing all queries, responses, logs, and analysis results for complete traceability.
--   **Data Validation**: The pipeline includes multiple validation steps to ensure data integrity between the query generation, response processing, and final analysis stages.
--   **Robust Error Handling**: Includes tools to automatically find, retry, and re-analyze runs that suffer from intermittent API or network failures.
+-   **Data Validation**: Includes multiple validation steps to ensure data integrity between the query generation, response processing, and final analysis stages.
+-   **Robust Error Handling**: The main batch runner features a multi-attempt, automatic repair cycle to recover from intermittent API or network failures.
 -   **Configurable**: Key parameters (LLM model, temperature, number of trials, etc.) are easily managed through a central `config.ini` file.
 
 ## Project Structure
@@ -32,7 +32,7 @@ This project provides a fully automated and reproducible pipeline for testing a 
 │   ├── llm_prompter.py         # Worker script called by run_llm_sessions.
 │   ├── query_generator.py      # Worker script called by build_queries.
 │   ├── compile_results.py      # Utility: Compiles all run reports into one CSV.
-│   ├── reprocess_runs.py       # Utility: Re-runs analysis on all existing runs.
+│   ├── reprocess_runs.py       # Utility: Re-runs analysis on existing runs.
 │   └── retry_failed_sessions.py# Utility: Finds and retries failed API calls.
 │
 ├── tests/                      # Unit and integration tests for the pipeline.
@@ -59,6 +59,7 @@ The primary entry point for running a full study is the `run_replications.ps1` P
     ```powershell
     .\run_replications.ps1
     ```
+    *   The script will first run all experiments. Afterwards, it will automatically enter a repair phase, attempting to re-run any failed trials up to 3 times before finally compiling the results.
 
 3.  **Review**:
     *   Monitor the progress in the console.
@@ -67,22 +68,23 @@ The primary entry point for running a full study is the `run_replications.ps1` P
 
 ## Post-Run Utilities
 
-These scripts are designed to be run from the project root after an initial batch run is complete.
+These scripts are designed for manual intervention or re-analysis if needed.
 
-### Fixing Failed API Calls
+### Manually Retrying Failures
 
-If some LLM queries failed due to network errors, you don't need to re-run the entire batch. The `retry_failed_sessions.py` script can automatically find and fix them.
+If the automatic repair cycle fails, or if you want to manually re-run a specific trial (even a successful one), you can use `retry_failed_sessions.py`.
 
 ```bash
-# This command will scan all subdirectories in 'output',
-# find queries without successful responses, re-run them,
-# and update all analysis files and reports.
-python src/retry_failed_sessions.py
+# Automatically find and fix all failures across all runs
+python src/retry_failed_sessions.py --parent_dir output
+
+# Manually re-run specific trials (e.g., 22 and 45) in a single run directory
+python src/retry_failed_sessions.py --run_dir path/to/run_dir --indices 22 45
 ```
 
 ### Re-running Analysis
 
-If you discover a bug in your analysis script (`analyze_performance.py`) or want to add a new metric, you can re-run the analysis on all existing raw data without querying the LLM again.
+If you discover a bug in your analysis logic or want to add a new metric, you can re-run the analysis on all existing raw data without querying the LLM again.
 
 ```bash
 # This command re-runs the processing and analysis stages for every

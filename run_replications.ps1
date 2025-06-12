@@ -1,6 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Filename: run_replications.ps1
+
 <#
 .SYNOPSIS
-    Runs a batch of N experimental replications and compiles the final results.
+    Runs a batch of N experimental replications, automatically attempts to repair
+    failures, and compiles the final results.
 
 .DESCRIPTION
     This master script calls the main Python orchestrator multiple times to conduct a
@@ -9,8 +14,9 @@
     It logs the outcome of each replication to `output/batch_run_log.csv`.
 
     This script is the primary entry point for conducting a definitive study. It runs
-    quietly by default, showing trial-level progress and a summary after each
-    replication. After all replications are complete, it automatically calls the
+    quietly by default. After all replications are complete, it automatically
+    initiates a multi-attempt repair cycle that calls 'retry_failed_sessions.py'
+    to fix any runs that failed due to intermittent errors. Finally, it calls the
     compiler script to generate a final summary CSV.
 
 .PARAMETER Start
@@ -45,6 +51,9 @@
     # Run the second half of a 30-rep study, with custom k and m values.
     .\run_replications.ps1 -Start 16 -End 30 -Trials 50 -GroupSize 8
 #>
+
+# === Start of run_replications.ps1 ===
+
 param(
     [int]$Start = 1,
     [int]$End = 30,
@@ -249,3 +258,5 @@ Write-Host "Total duration: $finalTotalDuration"
 Write-Host "Successful replications: $completedReplications"
 Write-Host "Failed replications: $errorsEncountered"
 Write-Host "See $($batchLogPath) for a detailed log of the batch run."
+
+# === End of run_replications.ps1 ===

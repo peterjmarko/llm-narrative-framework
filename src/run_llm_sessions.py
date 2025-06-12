@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 # Filename: src/run_llm_sessions.py
 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Filename: src/run_llm_sessions.py
+
 """
 LLM Session Runner (run_llm_sessions.py)
 
@@ -10,30 +14,26 @@ This script orchestrates the process of sending multiple pre-generated queries
 to a Large Language Model (LLM). It finds query files within a specific run
 directory and invokes the `llm_prompter.py` worker script for each one.
 
-Workflow (when called by orchestrator):
+It can run in several modes:
+- Default: Processes a range of queries specified by --start_index and --end_index.
+- Targeted: Processes a specific list of queries provided via the --indices flag.
+- Continue: Skips queries that already have a successful response file.
+- Force Rerun: Deletes existing response/error files for a query before re-running it.
+
+Workflow (when called by orchestrator or retry script):
 1.  Receives the path to a unique run directory via the `--run_output_dir` argument.
 2.  Locates the `session_queries` subdirectory inside the run directory.
-3.  Creates a `session_responses` subdirectory inside the run directory.
-4.  For each `llm_query_XXX.txt` file found, it invokes `llm_prompter.py`.
+3.  Creates a `session_responses` subdirectory if it doesn't exist.
+4.  For each targeted query file, it invokes `llm_prompter.py`.
 5.  Saves the LLM's text response to `llm_response_XXX.txt` and the full raw
-    JSON response to `llm_response_XXX_full.json` inside the run-specific
-    `session_responses` directory.
+    JSON response to `llm_response_XXX_full.json`.
 
-Input Files (within the provided `<run_output_dir>`):
-- `<run_output_dir>/session_queries/llm_query_XXX.txt`
-- `<run_output_dir>/session_queries/llm_query_XXX_full.json`
+Command-Line Usage:
+    # Run all queries in a directory
+    python src/run_llm_sessions.py --run_output_dir <path_to_run_dir>
 
-Output Files (within the provided `<run_output_dir>`):
-- `<run_output_dir>/session_responses/llm_response_XXX.txt`
-- `<run_output_dir>/session_responses/llm_response_XXX_full.json`
-- `<run_output_dir>/session_responses/llm_response_XXX.error.txt`
-
-Command-Line Usage (for orchestrated runs):
-    python src/run_llm_sessions.py --run_output_dir <path_to_run_dir> [options]
-
-Required Argument for Orchestrated Runs:
-    --run_output_dir      The absolute path to the self-contained output
-                          directory for this specific run.
+    # Manually retry specific failed queries (e.g., 12 and 37)
+    python src/run_llm_sessions.py --run_output_dir <path_to_run_dir> --indices 12 37 --force-rerun
 """
 
 # === Start of src/run_llm_sessions.py ===
