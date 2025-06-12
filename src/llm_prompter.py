@@ -96,9 +96,8 @@ logging.basicConfig(level=numeric_log_level_prompter,
                     datefmt='%Y-%m-%d %H:%M:%S')
 DOTENV_PATH = ".env"
 
-# Force stdout and stderr to use UTF-8 encoding to prevent UnicodeEncodeError on Windows
+# Force stdout to use UTF-8 encoding to prevent UnicodeEncodeError on Windows when piping JSON
 sys.stdout.reconfigure(encoding='utf-8')
-sys.stderr.reconfigure(encoding='utf-8')
 
 # --- Helper: Spinner Animation ---
 def animate_spinner(stop_event, query_identifier: str):
@@ -375,9 +374,14 @@ def main():
         with open(os.path.abspath(err_file_path), 'w', encoding='utf-8') as f_err: f_err.write("Processing interrupted by user (Ctrl+C).")
         sys.exit(1)
     except Exception as e:
-        logging.exception(f"  LLM Prompter: Unhandled error processing query {args.query_identifier}: {e}")
+        # Immediately write the specific error to the error file for the orchestrator to find.
         err_file_path = args.output_error_file if args.output_error_file else os.path.join(script_dir_worker, INTERACTIVE_TEST_ERROR_FILE)
-        with open(os.path.abspath(err_file_path), 'w', encoding='utf-8') as f_err: f_err.write(f"Unhandled error: {e}")
+        full_err_path = os.path.abspath(err_file_path)
+        err_message = f"Unhandled error in llm_prompter.py for query {args.query_identifier}: {type(e).__name__}: {e}"
+        with open(full_err_path, 'w', encoding='utf-8') as f_err:
+            f_err.write(err_message)
+        # Also log it for console visibility.
+        logging.exception(f"  LLM Prompter: {err_message}")
         sys.exit(1)
 
 if __name__ == "__main__":

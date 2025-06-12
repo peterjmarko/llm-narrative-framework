@@ -328,10 +328,14 @@ def main():
             
             try:
                 start_time = time.time()
-                # stderr is set to None so worker's stderr (including spinner) prints to console
+                # The worker's stdout now contains JSON, and stderr has the spinner/logs.
+                # We need to capture both as UTF-8.
+                # stderr is set to None so worker's stderr (including spinner) prints to console.
+                # stdout is captured as it contains the JSON data.
                 process_worker = subprocess.run(
-                    worker_cmd, check=False, text=True, cwd=worker_cwd, encoding='utf-8', errors='replace',
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    worker_cmd, check=False, cwd=worker_cwd,
+                    stdout=subprocess.PIPE, stderr=None,
+                    text=True, encoding='utf-8', errors='replace'
                 )
                 call_duration = time.time() - start_time
                 
@@ -389,6 +393,9 @@ def main():
                                 logging.info(f"  Saved full JSON debug data to '{os.path.basename(debug_json_filename)}'.")
                         else:
                             logging.warning(f"  Could not find JSON delimiters in worker stdout for index {current_index}.")
+                            # Also log the stderr from the worker to see if it provides clues.
+                            if process_worker.stderr:
+                                logging.warning(f"  Worker stderr for index {current_index}:\n---\n{process_worker.stderr}\n---")
                     except Exception as e_json:
                         logging.warning(f"  Could not extract or save full JSON from worker stdout: {e_json}")
 
@@ -400,7 +407,11 @@ def main():
                         logging.info(f"  Moved worker error file to '{os.path.basename(final_error_filepath_abs)}'.")
                     else:
                         with open(final_error_filepath_abs, 'w', encoding='utf-8') as f_err_orch:
-                            f_err_orch.write(f"Orchestrator noted worker script failed with exit code: {process_worker.returncode}.\nCheck console output above for worker's specific error logs.")
+                            f_err_orch.write(f"Orchestrator noted worker script failed with exit code: {process_worker.returncode}.\n\n")
+                            if process_worker.stdout:
+                                f_err_orch.write(f"WORKER STDOUT:\n{process_worker.stdout}\n\n")
+                            if process_worker.stderr:
+                                f_err_orch.write(f"WORKER STDERR:\n{process_worker.stderr}\n")
                         logging.info(f"  Created orchestrator error file: '{os.path.basename(final_error_filepath_abs)}'.")
 
             except Exception as e_subproc: 

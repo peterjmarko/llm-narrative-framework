@@ -53,6 +53,10 @@ param(
     [switch]$Verbose = $false
 )
 
+# Set the output encoding for this script session to UTF-8 to prevent Unicode errors
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
+
 # --- Initialization ---
 $batchStartTime = Get-Date
 $completedReplications = 0
