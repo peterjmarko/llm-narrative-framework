@@ -331,7 +331,7 @@ def main():
                 # stderr is set to None so worker's stderr (including spinner) prints to console
                 process_worker = subprocess.run(
                     worker_cmd, check=False, text=True, cwd=worker_cwd, encoding='utf-8', errors='replace',
-                    stdout=subprocess.PIPE, stderr=None 
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
                 )
                 call_duration = time.time() - start_time
                 

@@ -96,6 +96,10 @@ logging.basicConfig(level=numeric_log_level_prompter,
                     datefmt='%Y-%m-%d %H:%M:%S')
 DOTENV_PATH = ".env"
 
+# Force stdout and stderr to use UTF-8 encoding to prevent UnicodeEncodeError on Windows
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
 # --- Helper: Spinner Animation ---
 def animate_spinner(stop_event, query_identifier: str):
     start_time = time.time()
