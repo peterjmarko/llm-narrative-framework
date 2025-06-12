@@ -227,95 +227,90 @@ def get_core_name(name_with_details):
 
 def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_ordered_from_query, is_rank_based=False):
     """
-    Parses the LLM response text, intelligently handling either tab-delimited or
-    Markdown table formats.
-    - An optional header row is detected and skipped.
-    - Markdown separator lines (`|---|`) are skipped.
-    - The first column is assumed to contain List A item names, which are used for
-      row mapping and stripped from the final score matrix.
-    - k subsequent columns are parsed as scores/ranks for List B items.
+    Parses LLM response text, handling various table formats including tab-separated,
+    pipe-delimited (Markdown), and backslash-delimited, with or without headers
+    and optional code fences.
     """
-    lines = response_text.strip().split('\n')
-    score_matrix = np.full((k_value, k_value), 0.0) # Default to 0.0
+    table_text = response_text
+    code_block_match = re.search(r"```(?:[a-zA-Z]+\n)?(.*?)```", response_text, re.DOTALL)
+    if code_block_match:
+        logging.debug("  Found a fenced code block. Parsing content within it.")
+        table_text = code_block_match.group(1).strip()
+
+    lines = [line.strip() for line in table_text.strip().split('\n') if line.strip()]
+    if not lines: return np.full((k_value, k_value), 0.0)
+
+    # Detect delimiter
+    delimiter = '\t' # Default
+    if '|' in lines[0] and len(lines[0].split('|')) > k_value / 2:
+        delimiter = '|'
+    elif '\\' in lines[0] and len(lines[0].split('\\')) > k_value / 2:
+        delimiter = '\\'
+
+    score_matrix = np.full((k_value, k_value), 0.0)
     query_list_a_core_names_map = {get_core_name(name): i for i, name in enumerate(list_a_names_ordered_from_query)}
     filled_row_indices = [False] * k_value
-    parsed_data_rows_count = 0
-
-    for line_content in lines:
-        stripped_line = line_content.strip()
-        if not stripped_line:
-            continue
-
-        # This block is enhanced to handle complex formats.
-        parts = []
-        is_markdown = stripped_line.startswith('|')
-
-        if is_markdown:
-            if '---' in stripped_line: continue  # Skip markdown separator
-            parts = [p.strip() for p in stripped_line.strip('|').split('|')]
-        else:
-            parts = stripped_line.split('\t')
-
-        if not parts or not any(parts): continue
+    
+    data_lines = []
+    header_found = False
+    for line in lines:
+        if '---' in line and delimiter == '|': continue
         
-        # --- Heuristic to identify and skip header row ---
+        # A simple header check: does it contain "ID" and not start with a number?
+        is_header = "ID" in line and not line.lstrip(' |').strip()[0].isdigit()
+        if is_header and not header_found:
+            header_found = True
+            continue
+        data_lines.append(line)
+
+    for line_content in data_lines:
+        if len(filled_row_indices) == sum(filled_row_indices): break # Matrix is full
+
+        parts = [p.strip() for p in line_content.strip(' |').split(delimiter)]
+        
+        # Determine if the row starts with a name label or just scores
         try:
-            # A data row will have a numeric second column (the first score).
-            # A header row will likely have a non-numeric string like "ID 1".
-            float(parts[1])
-            is_header = False
+            float(parts[0])
+            has_name_label = False
+            score_strings = parts
         except (ValueError, IndexError):
-            is_header = True
-
-        if is_header:
-            logging.debug(f"  Skipping detected header: '{stripped_line}'")
+            has_name_label = True
+            llm_person_name_raw = parts[0]
+            score_strings = parts[1:]
+        
+        if len(score_strings) != k_value:
+            logging.warning(f"  Row has {len(score_strings)} scores, expected {k_value}. Skipping row: '{line_content}'")
             continue
         
-        # --- Process as a data row ---
-        if parsed_data_rows_count >= k_value:
-            logging.warning(f"  Already parsed {k_value} data rows. Ignoring extra line: '{stripped_line}'")
-            continue
-
-        # Expect k+1 columns (Name + k scores)
-        if len(parts) != k_value + 1:
-            logging.warning(f"  Data row has {len(parts)} columns, expected {k_value + 1}. Row: '{stripped_line}'. Skipping.")
-            continue
-            
-        llm_person_name_raw = parts[0].strip()
-        score_strings = parts[1:]
-        
-        core_llm_name = get_core_name(llm_person_name_raw)
-        
+        # Find the correct row in the matrix to place the scores
         matrix_row_idx = -1
-        if core_llm_name in query_list_a_core_names_map:
-            matrix_row_idx = query_list_a_core_names_map[core_llm_name]
-            if filled_row_indices[matrix_row_idx]:
-                logging.warning(f"  Duplicate List A item name '{llm_person_name_raw}' found. Overwriting previous data.")
+        unfilled_indices = [i for i, filled in enumerate(filled_row_indices) if not filled]
+        if not unfilled_indices: continue
+
+        if has_name_label:
+            core_llm_name = get_core_name(llm_person_name_raw)
+            if core_llm_name in query_list_a_core_names_map:
+                matrix_row_idx = query_list_a_core_names_map[core_llm_name]
+                if filled_row_indices[matrix_row_idx]:
+                    logging.warning(f"  Duplicate List A item name '{llm_person_name_raw}' found. Skipping row.")
+                    continue
+            else:
+                matrix_row_idx = unfilled_indices[0] # Fallback to sequential
+                logging.warning(f"  LLM name '{llm_person_name_raw}' not matched. Assigning sequentially.")
         else:
-            unfilled_indices = [i for i, filled in enumerate(filled_row_indices) if not filled]
-            if unfilled_indices:
-                matrix_row_idx = unfilled_indices[0]
-                logging.warning(f"  LLM name '{llm_person_name_raw}' not matched. Assigning sequentially to matrix row {matrix_row_idx}.")
-            else:
-                logging.error(f"  LLM name '{llm_person_name_raw}' not matched and no sequential rows available. Skipping.")
-                continue
-        
-        try:
-            numerical_scores = [float(s.strip()) for s in score_strings]
-            if is_rank_based:
-                processed_scores = [float(k_value - rank + 1) if 1 <= rank <= k_value else 0.0 for rank in numerical_scores]
-            else:
-                processed_scores = numerical_scores
+            matrix_row_idx = unfilled_indices[0] # No name, must be sequential
             
+        try:
+            numerical_scores = [float(s) for s in score_strings]
+            processed_scores = [float(k_value - r + 1) if 1 <= r <= k_value else 0.0 for r in numerical_scores] if is_rank_based else numerical_scores
             score_matrix[matrix_row_idx, :] = processed_scores
             filled_row_indices[matrix_row_idx] = True
-            parsed_data_rows_count += 1
-        except ValueError as e:
-            logging.warning(f"  Could not parse scores as numbers: '{score_strings}'. Error: {e}. Skipping row for '{llm_person_name_raw}'.")
+        except (ValueError, IndexError) as e:
+            logging.warning(f"  Could not parse scores in row: '{score_strings}'. Error: {e}. Skipping.")
             continue
             
-    if parsed_data_rows_count < k_value:
-        logging.warning(f"  Parsed only {parsed_data_rows_count} data rows for a k={k_value} matrix. Unmapped rows will have default scores.")
+    if sum(filled_row_indices) < k_value:
+        logging.warning(f"  Parsed only {sum(filled_row_indices)} data rows for a k={k_value} matrix.")
         
     return score_matrix
 
@@ -451,6 +446,10 @@ def main():
         logging.error(f"Error writing successful indices file to {successful_indices_path}: {e}")
 
     logging.info(f"Processing complete. Successfully processed: {processed_count}, Errors/Skipped: {error_count}")
+
+    # Add a machine-readable summary for the orchestrator to capture.
+    # Format: <<<PARSER_SUMMARY:processed_count:total_files_found>>>
+    print(f"\n<<<PARSER_SUMMARY:{processed_count}:{len(response_files)}>>>\n")
 
 if __name__ == "__main__":
     main()

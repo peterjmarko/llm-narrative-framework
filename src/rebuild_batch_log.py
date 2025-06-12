@@ -71,7 +71,7 @@ def parse_run_directory(dir_path):
 
 def get_report_metrics(run_dir_path):
     """Finds and robustly parses the report file for metrics and EndTime."""
-    data = {'EndTime': "N/A", 'MeanMRR': "N/A", 'MeanTop1Acc': "N/A", 'ErrorMessage': "N/A", 'Status': 'UNKNOWN'}
+    data = {'EndTime': "N/A", 'ParsingStatus': "N/A", 'MeanMRR': "N/A", 'MeanTop1Acc': "N/A", 'ErrorMessage': "N/A", 'Status': 'UNKNOWN'}
 
     try:
         # Since run_dir_path is already absolute, we can directly list its contents.
@@ -111,6 +111,10 @@ def get_report_metrics(run_dir_path):
             content = f.read()
 
         data['Status'] = "COMPLETED"
+
+        parsing_match = re.search(r"Parsing Status:\s*(.*)", content)
+        if parsing_match:
+            data['ParsingStatus'] = parsing_match.group(1).strip()
 
         time_match = re.search(r'_(\d{8}-\d{6})\.txt$', report_filename)
         if time_match:
@@ -220,7 +224,7 @@ def main():
     all_run_data.sort(key=lambda x: x.get('ReplicationNum', 9999))
     
     batch_log_path = os.path.join(base_dir, "batch_run_log_rebuilt.csv")
-    fieldnames = ["ReplicationNum", "Status", "StartTime", "EndTime", "Duration", "MeanMRR", "MeanTop1Acc", "RunDirectory", "ErrorMessage"]
+    fieldnames = ["ReplicationNum", "Status", "StartTime", "EndTime", "Duration", "ParsingStatus", "MeanMRR", "MeanTop1Acc", "RunDirectory", "ErrorMessage"]
     
     try:
         with open(batch_log_path, 'w', newline='', encoding='utf-8') as f:

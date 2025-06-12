@@ -212,6 +212,7 @@ def main():
     final_analysis_output = ""
     pipeline_status = "UNKNOWN"
     validation_status_report = "Validation checks did not run or were inconclusive."
+    parsing_status_report = "N/A"
 
     # --- Generate Descriptive Run Directory Name ---
     logging.info("Gathering parameters for descriptive run directory name...")
@@ -271,6 +272,13 @@ def main():
         if args.quiet: cmd3.append("--quiet")
         output3 = run_script(cmd3, "3. Process LLM Responses")
         all_stage_outputs.append(output3)
+        
+        # Check for the parser summary in the output of stage 3
+        parser_summary_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+)>>>", output3)
+        if parser_summary_match:
+            processed_count = parser_summary_match.group(1)
+            total_count = parser_summary_match.group(2)
+            parsing_status_report = f"{processed_count}/{total_count} responses parsed"
 
         # Stage 4: Analyze Performance (passing the unique run directory and --quiet)
         cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path]
@@ -316,6 +324,7 @@ def main():
 Date:            {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 Final Status:    {pipeline_status}
 Run Directory:   {os.path.basename(run_specific_dir_path)}
+Parsing Status:  {parsing_status_report}
 Validation Status: {validation_status_report}
 Report File:     {report_filename}
 

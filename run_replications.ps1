@@ -82,7 +82,7 @@ $batchLogPath = Join-Path -Path $outputDir -ChildPath "batch_run_log.csv"
 
 if (-not (Test-Path -Path $batchLogPath)) {
     Write-Host "Creating new batch run log file: $batchLogPath"
-    $logHeader = "ReplicationNum,Status,StartTime,EndTime,Duration,MeanMRR,MeanTop1Acc,RunDirectory,ErrorMessage"
+    $logHeader = "ReplicationNum,Status,StartTime,EndTime,Duration,ParsingStatus,MeanMRR,MeanTop1Acc,RunDirectory,ErrorMessage"
     Set-Content -Path $batchLogPath -Value $logHeader
 } else {
     Write-Host "Appending to existing batch run log file: $batchLogPath"
@@ -133,6 +133,7 @@ for ($i = $Start; $i -le $End; $i++) {
         StartTime = $repStartTime.ToString("yyyy-MM-dd HH:mm:ss")
         EndTime = $repEndTime.ToString("yyyy-MM-dd HH:mm:ss")
         Duration = $repDuration.ToString("hh\:mm\:ss")
+        ParsingStatus = "N/A"
         MeanMRR = "N/A"
         MeanTop1Acc = "N/A"
         RunDirectory = "N/A"
@@ -156,6 +157,14 @@ for ($i = $Start; $i -le $End; $i++) {
             $reportFile = Get-ChildItem -Path $latestRunDir.FullName -Filter "replication_report_*.txt" | Select-Object -First 1
             if ($reportFile) {
                 $reportContent = Get-Content -Path $reportFile.FullName -Raw
+                
+                # Extract parsing status
+                $parsingMatch = [regex]::Match($reportContent, "Parsing Status:\s*(.*)")
+                if ($parsingMatch.Success) {
+                    $logEntry.ParsingStatus = $parsingMatch.Groups[1].Value.Trim()
+                }
+
+                # Extract final metrics
                 $jsonMatch = [regex]::Match($reportContent, '(?s)<<<METRICS_JSON_START>>>(.*?)<<<METRICS_JSON_END>>>')
                 if ($jsonMatch.Success) {
                     try {
@@ -193,23 +202,20 @@ function Invoke-RetryAndRepair {
     Write-Host "### AUTO-REPAIR: Scanning for and retrying failed sessions... ###" -ForegroundColor Magenta
     Write-Host "================================================================================" -ForegroundColor Magenta
 
-    # Run the retry script and capture its output
-    $retryOutput = python src/retry_failed_sessions.py --parent_dir $TargetDir 2>&1 | Tee-Object -Variable retryOutputString
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "!!! Auto-repair script failed to execute. Please check logs. !!!" -ForegroundColor Red
-        return $false # Indicate failure
-    }
+    # Use Start-Process with -Wait to ensure PowerShell waits for the Python script to finish.
+    $process = Start-Process python -ArgumentList "src/retry_failed_sessions.py", $TargetDir -Wait -NoNewWindow -PassThru
+    $exitCode = $process.ExitCode
     
-    # Check the output to see if failures were found and if they were all fixed.
-    if ($retryOutputString -match "No failed sessions found") {
-        Write-Host "Auto-repair check complete: No failures found." -ForegroundColor Green
-        return $true # Indicate success (no failures)
-    } elseif ($retryOutputString -match "Retry Phase Complete: \d+ successful, 0 failed") {
-        Write-Host "Auto-repair successful: All detected failures were fixed." -ForegroundColor Green
-        return $true # Indicate success (all failures fixed)
-    } else {
-        Write-Host "!!! Auto-repair finished, but some failures may remain. Check logs above. !!!" -ForegroundColor Yellow
-        return $false # Indicate potential remaining failures
+    # Interpret the new, more descriptive exit codes.
+    if ($exitCode -eq 0) {
+        Write-Host "Auto-repair check complete: No pending failures found." -ForegroundColor Green
+        return $true # Repair is complete and successful.
+    } elseif ($exitCode -eq 1) {
+        Write-Host "Auto-repair successful: All detected failures were fixed. Will re-check in next attempt." -ForegroundColor Green
+        return $false # Return false to allow for another check if in a loop.
+    } else { # Exit code 2 or other errors
+        Write-Host "!!! Auto-repair FAILED: Some sessions could not be repaired. Please check logs. !!!" -ForegroundColor Red
+        return $false # Repair failed and cannot continue.
     }
 }
 
@@ -245,6 +251,20 @@ if ($LASTEXITCODE -ne 0) {
 } else {
     Write-Host "--- Final summary created at $($outputDir)\final_summary_results.csv ---"
 }
+
+# --- Final Batch Summary ---
+$batchEndTime = Get-Date
+$finalTotalDuration = "{0:hh\:mm\:ss}" -f ($batchEndTime - $batchStartTime)
+Add-Content -Path $batchLogPath -Value ""
+Add-Content -Path $batchLogPath -Value "BatchSummary,StartTime,EndTime,TotalDuration,Completed,Failed"
+Add-Content -Path $batchLogPath -Value "Totals,$($batchStartTime.ToString('yyyy-MM-dd HH:mm:ss')),$($batchEndTime.ToString('yyyy-MM-dd HH:mm:ss')),$finalTotalDuration,$completedReplications,$errorsEncountered"
+
+# --- Final Verification Step ---
+Write-Host "`n================================================================================" -ForegroundColor Green
+Write-Host "### FINAL VERIFICATION: Auditing data completeness... ###" -ForegroundColor Green
+Write-Host "================================================================================" -ForegroundColor Green
+
+python src/verify_pipeline_completeness.py --parent_dir $outputDir
 
 # --- Final Batch Summary ---
 $batchEndTime = Get-Date

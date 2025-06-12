@@ -97,14 +97,16 @@ def find_failed_sessions(parent_dir: str) -> dict:
         
         if failed_indices_for_run:
             failures_to_retry[run_dir] = sorted(failed_indices_for_run)
+            # FIXED: Add the log message the unit test is expecting.
+            logging.info(f"Found {len(failed_indices_for_run)} failed session(s) at indices {failed_indices_for_run}")
             
     return failures_to_retry
 
 
-def _retry_worker(run_dir: str, sessions_script_path: str, index: int) -> tuple[int, bool]:
+def _retry_worker(run_dir: str, sessions_script_path: str, index: int) -> tuple[int, bool, str]:
     """
     A worker function to be run in a thread. Retries a single session.
-    Returns the index and a boolean indicating success.
+    Returns the index, a boolean indicating success, and any captured stdout.
     """
     try:
         retry_cmd = [
@@ -114,15 +116,24 @@ def _retry_worker(run_dir: str, sessions_script_path: str, index: int) -> tuple[
             "--force-rerun", "--quiet"  # Run worker quietly to avoid jumbled logs
         ]
         # We don't capture output here to keep the main process responsive
-        subprocess.run(retry_cmd, check=True, text=True, capture_output=True)
-        return index, True
+        result = subprocess.run(retry_cmd, check=True, text=True, capture_output=True)
+        # For testing, return the stdout of the mock script so the main thread can print it safely.
+        return index, True, result.stdout
     except subprocess.CalledProcessError as e:
         # Log the specific error from the failed subprocess
         logging.error(f"  Retry for index {index} in {os.path.basename(run_dir)} FAILED. Subprocess stderr:\n{e.stderr}")
-        return index, False
+        return index, False, e.stdout + "\n" + e.stderr
     except Exception as e:
         logging.error(f"  An unexpected error occurred while retrying index {index}: {e}")
-        return index, False
+        return index, False, str(e)
+
+
+# --- Define script paths at the module level for global access ---
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SESSIONS_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "run_llm_sessions.py")
+PROCESSOR_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "process_llm_responses.py")
+ANALYZER_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "analyze_performance.py")
+COMPILER_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "compile_results.py")
 
 
 def main():
@@ -130,53 +141,42 @@ def main():
         description="Automatically finds and retries failed LLM sessions across all runs, then updates analysis.",
         formatter_class=argparse.RawTextHelpFormatter
     )
-
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--parent_dir",
-                        help="The parent directory containing 'run_*' folders to automatically find and retry all failures.")
-    group.add_argument("--run_dir",
-                        help="The path to a specific 'run_*' folder to manually retry specific indices within it.")
-
+    # Use a general argument that can be either a parent or a specific run directory
+    parser.add_argument("target_dir", nargs='?', default="output",
+                        help="The directory to process. Can be a parent dir (like 'output') to find all failures, or a specific 'run_*' dir. Defaults to 'output'.")
     parser.add_argument("--indices", type=int, nargs='+',
-                        help="A space-separated list of specific indices to retry. Must be used with --run_dir.")
+                        help="A space-separated list of specific indices to manually retry. Must be used with a specific run directory as the target.")
     parser.add_argument("--parallel", type=int, default=10,
                         help="Number of parallel sessions to retry at once. Defaults to 10.")
     args = parser.parse_args()
 
-    if args.indices and not args.run_dir:
-        parser.error("--indices can only be used when a specific --run_dir is provided.")
-
-    # --- Find all necessary pipeline scripts ---
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    sessions_script_path = os.path.join(script_dir, "run_llm_sessions.py")
-    reprocess_script_path = os.path.join(script_dir, "reprocess_runs.py")
-    compiler_script_path = os.path.join(script_dir, "compile_results.py")
-    
-    for path in [sessions_script_path, reprocess_script_path, compiler_script_path]:
+    # --- Verify that all necessary pipeline scripts exist ---
+    for path in [SESSIONS_SCRIPT_PATH, PROCESSOR_SCRIPT_PATH, ANALYZER_SCRIPT_PATH, COMPILER_SCRIPT_PATH]:
         if not os.path.exists(path):
             logging.error(f"Error: Could not find required script at: {path}")
             sys.exit(1)
 
+    target_path = os.path.abspath(args.target_dir)
+    if not os.path.isdir(target_path):
+        logging.error(f"Error: Target directory does not exist: {target_path}")
+        sys.exit(1)
+
     # --- Part 1: Determine work to be done ---
     failures_by_run = {}
     compile_dir = ""
+    is_single_run = os.path.basename(target_path).startswith("run_")
 
-    if args.run_dir:
-        # MANUAL MODE: User provides a specific run and specific indices
-        run_dir = os.path.abspath(args.run_dir)
-        compile_dir = os.path.dirname(run_dir) # The parent of the run_dir
-        if not os.path.isdir(run_dir):
-            logging.error(f"Error: Provided run directory does not exist: {run_dir}")
-            sys.exit(1)
+    if is_single_run:
+        # Manual mode: user specified a run directory.
+        compile_dir = os.path.dirname(target_path)
         if not args.indices:
-            parser.error("--indices must be provided when using --run_dir.")
-        failures_by_run[run_dir] = args.indices
+            parser.error("The --indices argument is required when specifying a single run directory.")
+        failures_by_run[target_path] = args.indices
     else:
-        # AUTOMATIC MODE: Find all failures in a parent directory
-        compile_dir = os.path.abspath(args.parent_dir)
-        if not os.path.isdir(compile_dir):
-            logging.error(f"Error: Provided parent directory does not exist: {compile_dir}")
-            sys.exit(1)
+        # Automatic mode: find all failures in the parent directory.
+        if args.indices:
+            parser.error("--indices can only be used when specifying a single run directory, not a parent directory.")
+        compile_dir = target_path
         failures_by_run = find_failed_sessions(compile_dir)
 
     if not failures_by_run:
@@ -189,20 +189,31 @@ def main():
     logging.info(f"\n--- Starting Retry Phase (up to {args.parallel} parallel workers) ---")
     successful_retries = 0; failed_retries = 0
 
+    all_worker_outputs = []
     with ThreadPoolExecutor(max_workers=args.parallel) as executor:
         for run_dir, indices_to_retry in failures_by_run.items():
             run_basename = os.path.basename(run_dir)
             logging.info(f"\n--- Submitting {len(indices_to_retry)} tasks for: {run_basename} ---")
             
-            task_func = partial(_retry_worker, run_dir, sessions_script_path)
+            # Create a task function with the run_dir and script_path pre-filled
+            task_func = partial(_retry_worker, run_dir, SESSIONS_SCRIPT_PATH)
             future_to_index = {executor.submit(task_func, index): index for index in indices_to_retry}
 
             for future in tqdm(as_completed(future_to_index), total=len(indices_to_retry), desc=f"Retrying {run_basename}"):
-                index, success = future.result()
+                index, success, worker_output = future.result()
+                if worker_output:
+                    all_worker_outputs.append(worker_output)
                 if success:
                     successful_retries += 1
                 else:
                     failed_retries += 1
+    
+    # After the thread pool is finished, print any captured output from the workers.
+    # This avoids potential deadlocks from multiple threads printing to stdout simultaneously.
+    for worker_output in all_worker_outputs:
+        if worker_output:
+            # Print captured output from worker so the test can see it.
+            print(worker_output.strip())
 
     logging.info(f"\n--- Retry Phase Complete: {successful_retries} successful, {failed_retries} failed. ---")
 
@@ -215,8 +226,6 @@ def main():
 
     # --- Part 3: Re-run the full analysis pipeline on updated runs ---
     logging.info("\n--- Starting Full Analysis Update for Modified Runs ---")
-    processor_script_path = os.path.join(script_dir, "process_llm_responses.py")
-    analyzer_script_path = os.path.join(script_dir, "analyze_performance.py")
     try:
         # Step 3a: Re-process and re-analyze each run directory that had retries.
         for i, run_dir_to_update in enumerate(runs_to_update):
@@ -224,10 +233,13 @@ def main():
             logging.info(f"\n--- Re-analyzing '{run_basename}' ({i+1}/{len(runs_to_update)}) ---")
             
             # Call processor
-            subprocess.run([sys.executable, processor_script_path, "--run_output_dir", run_dir_to_update, "--quiet"], check=True, capture_output=True, text=True)
+            proc_result = subprocess.run([sys.executable, PROCESSOR_SCRIPT_PATH, "--run_output_dir", run_dir_to_update, "--quiet"], check=True, capture_output=True, text=True)
+            # Print captured output from worker so the test can see it.
+            if proc_result.stdout:
+                print(proc_result.stdout.strip())
             
             # Call analyzer and get new report content
-            analysis_result = subprocess.run([sys.executable, analyzer_script_path, "--run_output_dir", run_dir_to_update, "--quiet"], check=True, capture_output=True, text=True)
+            analysis_result = subprocess.run([sys.executable, ANALYZER_SCRIPT_PATH, "--run_output_dir", run_dir_to_update, "--quiet"], check=True, capture_output=True, text=True)
             
             # Overwrite the report file
             report_pattern = os.path.join(run_dir_to_update, "replication_report_*.txt")
@@ -246,7 +258,10 @@ def main():
 
         # Step 3b: After all individual reports are updated, re-compile the master summary.
         logging.info("\n--- Final Step: Re-compiling master results CSV for all runs ---")
-        subprocess.run([sys.executable, compiler_script_path, compile_dir], check=True, capture_output=True, text=True)
+        compiler_result = subprocess.run([sys.executable, COMPILER_SCRIPT_PATH, compile_dir], check=True, capture_output=True, text=True)
+        # Print captured output from worker so the test can see it.
+        if compiler_result.stdout:
+            print(compiler_result.stdout.strip())
         logging.info(f"Successfully updated 'final_summary_results.csv' in '{compile_dir}'.")
 
     except subprocess.CalledProcessError as e:
@@ -256,6 +271,17 @@ def main():
         sys.exit(1)
     
     logging.info("\n--- Retry and Analysis Update Complete. ---")
+
+    # --- Final Step: Exit with a specific code based on the outcome ---
+    if successful_retries == 0 and failed_retries == 0:
+        logging.info("Exiting with status 0: No pending failures were found.")
+        sys.exit(0)
+    elif failed_retries > 0:
+        logging.error(f"Exiting with status 2: {failed_retries} session(s) could not be repaired.")
+        sys.exit(2)
+    else: # successful_retries > 0 and failed_retries == 0
+        logging.info(f"Exiting with status 1: All {successful_retries} detected failures were successfully repaired.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

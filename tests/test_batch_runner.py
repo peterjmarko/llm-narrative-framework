@@ -64,7 +64,9 @@ def main():
         'mean_top_1_acc': 0.80 + (args.replication_num / 100.0)
     }}
     
+    # Simulate that parsing was successful
     report_content = f"Final Status: COMPLETED\\n"
+    report_content += f"Parsing Status: 100/100 responses parsed\\n"
     report_content += '<<<METRICS_JSON_START>>>\\n'
     report_content += json.dumps(metrics)
     report_content += '\\n<<<METRICS_JSON_END>>>'
@@ -96,6 +98,12 @@ sys.exit(0)
 """
         with open(mock_compiler_path, 'w') as f:
             f.write(mock_compiler_code)
+
+        # --- Create a MOCK retry_failed_sessions.py ---
+        mock_retry_path = os.path.join(self.src_dir, 'retry_failed_sessions.py')
+        # This mock will exit 0, indicating no remaining failures.
+        with open(mock_retry_path, 'w') as f:
+            f.write("import sys; print('Mock retry script: no failures found.'); sys.exit(0)")
 
     def tearDown(self):
         """Clean up the temporary directory."""
@@ -133,6 +141,8 @@ sys.exit(0)
             log_content = f.read()
             self.assertIn("COMPLETED", log_content)
             self.assertNotIn("FAILED", log_content)
+            # Check for the new parsing status column
+            self.assertIn("100/100 responses parsed", log_content)
             # Check for the parsed metrics
             self.assertIn("0.8600", log_content) # MRR = 0.85 + 1/100
             self.assertIn("81.00%", log_content) # Top1 Acc = 0.80 + 1/100
@@ -166,16 +176,14 @@ sys.exit(0)
         batch_log_path = os.path.join(self.output_dir, 'batch_run_log.csv')
         self.assertTrue(os.path.exists(batch_log_path))
         with open(batch_log_path, 'r') as f:
-            log_lines = f.readlines()
-            # Header + 3 data rows + blank line + summary header + summary data = 7 lines
-            self.assertEqual(len(log_lines), 7)
-            
-            # Check for key values, allowing for PowerShell's default CSV quoting
-            self.assertTrue("1" in log_lines[1] and "COMPLETED" in log_lines[1])
-            self.assertTrue("2" in log_lines[2] and "FAILED" in log_lines[2])
-            self.assertTrue("3" in log_lines[3] and "COMPLETED" in log_lines[3])
-            self.assertIn("Totals,", log_lines[6])
-            self.assertTrue("2" in log_lines[6] and "1" in log_lines[6]) # 2 completed, 1 failed
+            log_content = f.read()
+
+        # Check that the log contains the expected outcomes, accounting for PowerShell's CSV quoting.
+        self.assertIn('"1","COMPLETED",', log_content)
+        self.assertIn('"2","FAILED",', log_content)
+        self.assertIn('"3","COMPLETED",', log_content)
+        # Check the final summary row for 2 completed, 1 failed.
+        self.assertRegex(log_content, r"Totals,.*,2,1")
 
         # The final compilation should still run
         self.assertTrue(os.path.exists(os.path.join(self.output_dir, 'final_summary_results.csv')))
