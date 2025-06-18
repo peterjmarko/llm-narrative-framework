@@ -3,16 +3,17 @@
 # Filename: src/compile_results.py
 
 """
-Compile All Experiment Results (compile_results.py)
+Compile Batch Results (compile_results.py)
 
 Purpose:
-This script scans a base output directory for all individual run folders
-(e.g., 'run_*'), parses the 'replication_report_...txt' from each to find a
-machine-readable JSON block, and aggregates the key parameters and final
-performance metrics into a single, master CSV file.
+This script scans a directory for all individual run folders (e.g., 'run_*'),
+parses the 'replication_report_...txt' from each to find a machine-readable JSON
+block, and aggregates the key parameters and final performance metrics into a
+single summary CSV (typically `final_summary_results.csv`).
 
-This is the final step after all experimental replications are complete,
-creating a tidy dataset ready for statistical comparison and plotting.
+This script is intended to be called automatically at the end of a batch process
+(like `run_replications.ps1`) to summarize all runs within that batch. The final,
+cross-batch aggregation is now handled by `run_anova.py`.
 """
 
 import os

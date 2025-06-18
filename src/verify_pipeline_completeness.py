@@ -109,7 +109,7 @@ def main():
         # 2. Count actual query and response files generated
         queries_path = os.path.join(run_dir, "session_queries")
         responses_path = os.path.join(run_dir, "session_responses")
-        num_query_files = len(glob.glob(os.path.join(queries_path, "llm_query_*.txt")))
+        num_query_files = len(glob.glob(os.path.join(queries_path, "llm_query_[0-9][0-9][0-9].txt")))
         num_response_files = len(glob.glob(os.path.join(responses_path, "llm_response_*.txt")))
 
 

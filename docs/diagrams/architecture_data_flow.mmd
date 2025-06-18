@@ -1,0 +1,41 @@
+graph TD
+    subgraph "Input Data"
+        A1(personalities_db_1-5000.txt)
+        A2(base_query.txt)
+    end
+
+    subgraph "Stage 1: Query Generation"
+        B(build_queries.py)
+        B --> C
+    end
+    
+    subgraph "Stage 2: LLM Interaction"
+        D(run_llm_sessions.py)
+        C --> D
+        D --> E
+    end
+    
+    subgraph "Stage 3: Response Processing"
+        F(process_llm_responses.py)
+        E --> F
+        F --> G[all_scores.txt]
+        F --> H[all_mappings.txt]
+    end
+    
+    subgraph "Stage 4: Final Analysis & Aggregation"
+        J(run_anova.py)
+        I(final_summary_results.csv)
+        G & H --> I
+        I --> J
+        J --> K[MASTER_ANOVA_DATASET.csv]
+        J --> L((Plots & Log))
+    end
+    
+    A1 & A2 --> B
+    C[llm_query_XXX.txt]
+    E[llm_response_XXX.txt]
+
+    classDef Data fill:#e6f3ff,stroke:#007bff
+    classDef Script fill:#fff0e6,stroke:#ff7f0e
+    class A1,A2,C,E,G,H,I,K,L Data
+    class B,D,F,J Script

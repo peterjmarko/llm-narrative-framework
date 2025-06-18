@@ -1,0 +1,53 @@
+graph TD;
+
+    %% --- Style Definitions ---
+    classDef BatchOrchestrator fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef Stage fill:#ff7f0e,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef Worker fill:#2ca02c,stroke:#333,stroke-width:1px,color:#fff;
+    classDef Utility fill:#d62728,stroke:#333,stroke-width:1px,color:#fff;
+
+    %% --- Node Definitions ---
+    subgraph "Batch Orchestration"
+        run_rep["run_replications.ps1<br/><i>(Main Entry Point)</i>"]:::BatchOrchestrator;
+    end
+
+    subgraph "Utilities & Final Analysis"
+        retry["retry_failed_sessions.py"]:::BatchOrchestrator;
+        compile["compile_results.py"]:::Utility;
+        anova["run_anova.py"]:::Utility;
+        verify["verify_pipeline_completeness.py"]:::Utility;
+        rebuild_log["rebuild_batch_log.py"]:::Utility;
+    end
+
+    subgraph "Single Replication Pipeline (Python Scripts)"
+        direction LR;
+        orch["orchestrate_experiment.py<br/><i>(Single Run Manager)</i>"]:::Stage;
+        subgraph "Stage 1: Query Generation"
+            build["build_queries.py"]:::Stage;
+            qgen["query_generator.py"]:::Worker;
+        end
+        subgraph "Stage 2: LLM Interaction"
+            sessions["run_llm_sessions.py"]:::Stage;
+            prompter["llm_prompter.py"]:::Worker;
+        end
+        subgraph "Stage 3 & 4: Analysis"
+            process["process_llm_responses.py"]:::Stage;
+            analyze["analyze_performance.py"]:::Stage;
+        end
+    end
+
+    %% --- Connection Definitions ---
+    run_rep --> |"Calls in loop (x30)"| orch;
+    run_rep --> |"Calls for auto-repair"| retry;
+    run_rep --> |"Calls to summarize batch"| compile;
+    orch --> |"Calls"| build;
+    build --> |"Calls worker in loop (x100)"| qgen;
+    orch --> |"Calls"| sessions;
+    sessions --> |"Calls worker in loop (x100)"| prompter;
+    orch --> |"Calls"| process;
+    orch --> |"Calls"| analyze;
+    retry --> |"Calls to re-run specific queries"| sessions;
+    retry --> |"Re-runs after fixes"| process;
+    retry --> |"Re-runs after fixes"| analyze;
+    retry --> |"Re-runs after fixes"| compile;
+    compile -.-> |"[Data Flow]"| anova;

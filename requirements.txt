@@ -1,0 +1,22 @@
+# Core data handling and scientific computing
+numpy
+pandas
+scipy
+statsmodels
+networkx
+
+# HTTP requests for API calls
+requests
+
+# Environment variable loading
+python-dotenv
+
+# Progress bars for user feedback
+tqdm
+
+# Plotting and visualization
+seaborn
+matplotlib
+
+# Testing framework
+pytest

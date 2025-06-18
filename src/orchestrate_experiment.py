@@ -6,42 +6,43 @@
 Single Experiment Orchestrator (orchestrate_experiment.py)
 
 Purpose:
-This master script is the main entry point for conducting a **single, complete
-experimental run**. It is designed to be called repeatedly by a higher-level
-batch script (e.g., `run_replications.ps1`) to execute multiple, seeded replications.
+This master script is the main entry point for conducting or re-analyzing a
+**single, complete experimental run**. It is designed to be called repeatedly by a
+higher-level batch script (e.g., `run_replications.ps1`).
 
-The script manages the entire personality matching pipeline in sequence:
-1.  build_queries.py
-2.  run_llm_sessions.py
-3.  process_llm_responses.py
-4.  analyze_performance.py
+The script has two primary modes:
+1.  **New Run Mode (Default):** Manages the entire personality matching pipeline:
+    -   1. build_queries.py
+    -   2. run_llm_sessions.py
+    -   3. process_llm_responses.py
+    -   4. analyze_performance.py
+2.  **Reprocess Mode (`--reprocess`):** Skips query generation and LLM calls,
+    instead re-running only the data processing and analysis stages
+    (3 and 4) on an existing run directory.
 
-Its most important function is to create a unique, self-contained, and
-self-documenting directory for the experimental run. It passes the path to this
-unique directory to each pipeline stage, ensuring all inputs and outputs for
-the run are isolated.
+Its most important function is to create a unique, self-contained directory
+for new runs, ensuring all artifacts are isolated.
 
 Output:
 A unique, descriptively named directory. For example:
 'run_20250609_140000_rep-01_claude-3-opus_tmp-0.20_personalities_sbj-10_trl-100/'
-This directory contains:
--   All generated queries, manifests, and mappings.
--   All raw LLM responses and the API timing log.
--   All processed data and metric distribution files.
--   A final, comprehensive `replication_report_...txt` file summarizing the run's
-    parameters, status, validation checks, and performance metrics.
+This directory contains all queries, responses, logs, and a final,
+comprehensive `replication_report_...txt` file summarizing the run.
 
 Command-Line Usage (called from a batch script):
+    # For a new run
     python src/orchestrate_experiment.py [options]
+
+    # To re-process an existing run
+    python src/orchestrate_experiment.py --reprocess --run_output_dir <path_to_run>
 
 Key Arguments:
     --replication_num     Identifier for this specific replication run.
-    -m, --num_iterations  Number of unique query sets (trials) to generate.
-    -k, --k_per_query     Number of items (k) per query set.
-    --base_seed           Seed for selecting personalities from the master list.
-    --qgen_base_seed      Seed for shuffling within the query generator.
-    --notes "..."         Optional notes for the report header.
-    --quiet               Run all pipeline stages in quiet mode to reduce console output.
+    -m, --num_iterations  Number of trials to generate (new runs).
+    -k, --k_per_query     Number of items (k) per query (new runs).
+    --reprocess           Activates re-processing mode.
+    --run_output_dir      Required for re-processing mode.
+    --quiet               Run all pipeline stages in quiet mode.
 
 Dependencies:
     - All other pipeline scripts in the `src/` directory.
@@ -58,6 +59,8 @@ import subprocess
 import logging
 import re
 import shutil
+import json
+import glob
 
 # --- Setup ---
 # Setup basic logging for the master script itself
@@ -68,8 +71,16 @@ logging.basicConfig(level=logging.INFO,
 try:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 except ImportError:
-    logging.error("FATAL: Could not import from config_loader.py. Ensure it is in the same directory.")
-    sys.exit(1)
+    # This fallback allows the script to be run from different locations
+    # by ensuring the 'src' directory is in the Python path.
+    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_script_dir not in sys.path:
+        sys.path.insert(0, current_script_dir)
+    try:
+        from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
+    except ImportError as e:
+        logging.error(f"FATAL: Could not import from config_loader.py even after path adjustment. Error: {e}")
+        sys.exit(1)
 
 def run_script(command, title, is_interactive=False):
     """
@@ -179,26 +190,30 @@ def main():
     default_m = get_config_value(APP_CONFIG, 'General', 'default_build_iterations', fallback=5, value_type=int)
 
     parser = argparse.ArgumentParser(
-        description="Runs the full personality matching pipeline and generates a summary report.",
+        description="Runs or re-processes the full personality matching pipeline.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("-m", "--num_iterations", type=int, default=default_m,
-                        help="Number of unique query sets to generate. Overrides config.")
+                        help="Number of unique query sets to generate (for new runs).")
     parser.add_argument("-k", "--k_per_query", type=int, default=default_k,
-                        help="Number of items (k) per query set. Overrides config.")
+                        help="Number of items (k) per query set (for new runs).")
     parser.add_argument("--notes", type=str, default="N/A",
-                        help="Optional notes to include in the report header for this run.")
+                        help="Optional notes to include in the report header (for new runs).")
     
     parser.add_argument("--replication_num", type=int, default=1,
-                        help="The replication number for this specific run (for naming the output directory).")
+                        help="The replication number for this specific run (for new runs).")
     parser.add_argument("--base_seed", type=int, default=None,
-                        help="The base random seed for personality selection in build_queries.")
+                        help="The base random seed for personality selection (for new runs).")
     parser.add_argument("--qgen_base_seed", type=int, default=None,
-                        help="The base random seed for shuffling within query_generator.")
-    # --- MODIFICATION START ---
+                        help="The base random seed for shuffling (for new runs).")
     parser.add_argument("--quiet", action="store_true", 
-                        help="Run all pipeline stages in quiet mode to reduce console output.")
-    # --- MODIFICATION END ---
+                        help="Run all pipeline stages in quiet mode.")
+    
+    # New arguments for reprocessing mode
+    parser.add_argument("--reprocess", action="store_true",
+                        help="Skip query building and LLM calls; re-process existing responses.")
+    parser.add_argument("--run_output_dir", type=str, default=None,
+                        help="Path to a specific run output directory. Used for --reprocess mode.")
     
     args = parser.parse_args()
 
@@ -214,27 +229,59 @@ def main():
     validation_status_report = "Validation checks did not run or were inconclusive."
     parsing_status_report = "N/A"
 
-    # --- Generate Descriptive Run Directory Name ---
-    logging.info("Gathering parameters for descriptive run directory name...")
-    model_name_raw = get_config_value(APP_CONFIG, 'LLM', 'model_name', fallback="unknown_model")
-    temp_raw = get_config_value(APP_CONFIG, 'LLM', 'temperature', fallback=0.0, value_type=float)
-    personalities_db_raw = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="unknown_db.txt")
-    
-    run_dir_name = generate_run_dir_name(
-        model_name=model_name_raw,
-        temperature=temp_raw,
-        num_iterations=args.num_iterations,
-        k_per_query=args.k_per_query,
-        personalities_db=personalities_db_raw,
-        replication_num=args.replication_num
-    )
-    
-    base_output_dir_cfg = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback="output")
-    resolved_base_output_dir = os.path.join(PROJECT_ROOT, base_output_dir_cfg)
-    
-    run_specific_dir_path = os.path.join(resolved_base_output_dir, run_dir_name)
-    os.makedirs(run_specific_dir_path, exist_ok=True)
-    logging.info(f"Created unique output directory for this run: {run_specific_dir_path}")
+    # --- Determine Run Directory Path ---
+    if args.reprocess:
+        if not args.run_output_dir:
+            logging.error("FATAL: --run_output_dir is required when using --reprocess mode.")
+            sys.exit(1)
+        if not os.path.isdir(args.run_output_dir):
+            logging.error(f"FATAL: The specified run directory for reprocessing does not exist: {args.run_output_dir}")
+            sys.exit(1)
+        run_specific_dir_path = args.run_output_dir
+        logging.info(f"--- REPROCESS MODE ACTIVATED for directory: {os.path.basename(run_specific_dir_path)} ---")
+        
+        # In reprocess mode, discover k and m from the directory name to ensure the report is accurate,
+        # overriding any defaults that may have been loaded from config.ini.
+        dir_basename = os.path.basename(run_specific_dir_path)
+        k_match = re.search(r'_sbj-(\d+)', dir_basename)
+        m_match = re.search(r'_trl-(\d+)', dir_basename)
+
+        if k_match:
+            discovered_k = int(k_match.group(1))
+            if args.k_per_query != discovered_k:
+                logging.info(f"Discovered k={discovered_k} from directory name, overriding default {args.k_per_query}.")
+                args.k_per_query = discovered_k
+        else:
+            logging.warning("Could not discover 'k' (sbj-XX) from directory name during reprocess.")
+
+        if m_match:
+            discovered_m = int(m_match.group(1))
+            if args.num_iterations != discovered_m:
+                logging.info(f"Discovered m={discovered_m} from directory name, overriding default {args.num_iterations}.")
+                args.num_iterations = discovered_m
+        else:
+            logging.warning("Could not discover 'm' (trl-XXX) from directory name during reprocess.")
+            
+    else:
+        # --- Generate Descriptive Run Directory Name (Normal Mode) ---
+        logging.info("Gathering parameters for descriptive run directory name...")
+        model_name_raw = get_config_value(APP_CONFIG, 'LLM', 'model_name', fallback="unknown_model")
+        temp_raw = get_config_value(APP_CONFIG, 'LLM', 'temperature', fallback=0.0, value_type=float)
+        personalities_db_raw = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="unknown_db.txt")
+        
+        run_dir_name = generate_run_dir_name(
+            model_name=model_name_raw,
+            temperature=temp_raw,
+            num_iterations=args.num_iterations,
+            k_per_query=args.k_per_query,
+            personalities_db=personalities_db_raw,
+            replication_num=args.replication_num
+        )
+        base_output_dir_cfg = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback="output")
+        resolved_base_output_dir = os.path.join(PROJECT_ROOT, base_output_dir_cfg)
+        run_specific_dir_path = os.path.join(resolved_base_output_dir, run_dir_name)
+        os.makedirs(run_specific_dir_path, exist_ok=True)
+        logging.info(f"Created unique output directory for this run: {run_specific_dir_path}")
 
 
     # --- Define Script Paths ---
@@ -245,28 +292,31 @@ def main():
     analyze_script = os.path.join(src_dir, 'analyze_performance.py')
 
     try:
-        # Stage 1: Build Queries (passing the unique run directory)
-        cmd1 = [sys.executable, build_script, "-m", str(args.num_iterations), "-k", str(args.k_per_query), "--mode", "new", "--quiet-worker", "--run_output_dir", run_specific_dir_path]
-        if args.quiet: cmd1.append("--quiet")
-        if args.base_seed is not None:
-            cmd1.extend(["--base_seed", str(args.base_seed)])
-        if args.qgen_base_seed is not None:
-            cmd1.extend(["--qgen_base_seed", str(args.qgen_base_seed)])
-        output1 = run_script(cmd1, "1. Build Queries")
-        all_stage_outputs.append(output1)
-        
-        # Stage 2: Run LLM Sessions (passing the unique run directory)
-        # We now always run this stage interactively to see progress,
-        # but the script itself will be quiet or verbose based on the flag.
-        cmd2 = [sys.executable, run_sessions_script, "--run_output_dir", run_specific_dir_path]
-        if args.quiet:
-            cmd2.append("--quiet")
-        else:
-            # Only add verbose flag if not in quiet mode
-            cmd2.append("-v")
-        output2 = run_script(cmd2, "2. Run LLM Sessions", is_interactive=True)
-        all_stage_outputs.append(output2)
+        if not args.reprocess:
+            # Stage 1: Build Queries (passing the unique run directory)
+            cmd1 = [sys.executable, build_script, "-m", str(args.num_iterations), "-k", str(args.k_per_query), "--mode", "new", "--quiet-worker", "--run_output_dir", run_specific_dir_path]
+            if args.quiet: cmd1.append("--quiet")
+            if args.base_seed is not None:
+                cmd1.extend(["--base_seed", str(args.base_seed)])
+            if args.qgen_base_seed is not None:
+                cmd1.extend(["--qgen_base_seed", str(args.qgen_base_seed)])
+            output1 = run_script(cmd1, "1. Build Queries")
+            all_stage_outputs.append(output1)
             
+            # Stage 2: Run LLM Sessions (passing the unique run directory)
+            # We now always run this stage interactively to see progress,
+            # but the script itself will be quiet or verbose based on the flag.
+            cmd2 = [sys.executable, run_sessions_script, "--run_output_dir", run_specific_dir_path]
+            if args.quiet:
+                cmd2.append("--quiet")
+            else:
+                # Only add verbose flag if not in quiet mode
+                cmd2.append("-v")
+            output2 = run_script(cmd2, "2. Run LLM Sessions", is_interactive=True)
+            all_stage_outputs.append(output2)
+        else:
+            logging.info("Skipping Stage 1 (Build Queries) and Stage 2 (Run LLM Sessions) due to --reprocess flag.")
+
         # Stage 3: Process Responses (passing the unique run directory)
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]
         if args.quiet: cmd3.append("--quiet")
@@ -307,16 +357,46 @@ def main():
             error_text = e.stdout + "\n" + e.stderr if hasattr(e, 'stdout') else e.output
             all_stage_outputs.append(error_text)
     
+    # --- Clean up old reports before creating a new one ---
+    # This is crucial for reprocess mode to prevent duplicate entries in final compilations.
+    logging.info(f"Searching for and removing old report files in {os.path.basename(run_specific_dir_path)}...")
+    old_reports = glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt'))
+    if old_reports:
+        for report in old_reports:
+            try:
+                os.remove(report)
+                logging.info(f"Removed old report: {os.path.basename(report)}")
+            except OSError as e:
+                logging.warning(f"Could not remove old report {os.path.basename(report)}: {e}")
+    else:
+        logging.info("No old reports found to remove.")
+
     # --- Write the Final Report (inside the new run-specific directory) ---
     timestamp_for_file = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     report_filename = f"replication_report_{timestamp_for_file}.txt"
     report_path = os.path.join(run_specific_dir_path, report_filename)
-    # The "Writing final report..." log message has been removed.
 
     with open(report_path, 'w', encoding='utf-8') as report_file:
         personalities_file = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', 'N/A')
-        llm_model = get_config_value(APP_CONFIG, 'LLM', 'model_name', 'N/A')
         
+        if args.reprocess:
+            # For reprocessing, the model name must be discovered from the run's artifacts
+            # to ensure accuracy, as config.ini may have changed.
+            llm_model = "Unknown (Reprocess)" # Default value
+            query_json_path = os.path.join(run_specific_dir_path, 'session_queries', 'llm_query_001_full.json')
+            try:
+                with open(query_json_path, 'r', encoding='utf-8') as f:
+                    query_data = json.load(f)
+                    llm_model = query_data.get('model', 'Unknown (key not in JSON)')
+                logging.info(f"Discovered model name for report: {llm_model}")
+            except FileNotFoundError:
+                logging.warning(f"Could not find '{os.path.basename(query_json_path)}' to determine model name. Report will show a fallback value.")
+            except (json.JSONDecodeError, KeyError) as e:
+                logging.warning(f"Error parsing model name from '{os.path.basename(query_json_path)}': {e}. Report will show a fallback value.")
+        else:
+            # For a new run, the model name comes from the current configuration.
+            llm_model = get_config_value(APP_CONFIG, 'LLM', 'model_name', 'N/A')
+
         header = f"""
 ================================================================================
  REPLICATION RUN REPORT

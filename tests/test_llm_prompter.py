@@ -61,12 +61,6 @@ class TestLLMPrompterEndToEnd(unittest.TestCase):
         self.input_query_file = os.path.join(self.test_run_dir, "test_query_input.txt")
         self.output_response_file = os.path.join(self.test_run_dir, "test_response_output.txt")
         self.output_error_file = os.path.join(self.test_run_dir, "test_error_output.txt")
-        # Define the path where the test expects the log file to be created.
-        self.api_times_log_file = os.path.join(self.test_run_dir, "api_times_test.log")
-        self.api_times_log_expected_base_dir = os.path.join(self.test_run_dir, "output")
-        self.api_times_log_expected_responses_subdir = os.path.join(self.api_times_log_expected_base_dir, "session_responses_test_dir")
-        os.makedirs(self.api_times_log_expected_responses_subdir, exist_ok=True)
-        self.api_times_log_file = os.path.join(self.api_times_log_expected_responses_subdir, "api_times.log")
 
         with open(self.config_file, "w", encoding='utf-8') as f:
             f.write(MOCK_CONFIG_INI_CONTENT)
@@ -124,9 +118,6 @@ class TestLLMPrompterEndToEnd(unittest.TestCase):
         with open(self.output_response_file, "r", encoding='utf-8') as f:
             self.assertEqual(f.read(), mock_response_content_for_test)
         self.assertFalse(os.path.exists(self.output_error_file), "Error file should not exist on success.")
-        
-        # Prompter is no longer responsible for this log file.
-        self.assertFalse(os.path.exists(self.api_times_log_file))
 
     def test_llm_prompter_api_failure_scenario(self):
         query_content = "This query will simulate an API failure (mocked)."
@@ -145,9 +136,6 @@ class TestLLMPrompterEndToEnd(unittest.TestCase):
         self.assertFalse(os.path.exists(self.output_response_file))
         with open(self.output_error_file, "r", encoding='utf-8') as f:
             self.assertIn("LLM API call returned None or failed", f.read())
-        
-        # Prompter is no longer responsible for this log file.
-        self.assertFalse(os.path.exists(self.api_times_log_file))
 
 
     def test_llm_prompter_input_file_not_found(self):

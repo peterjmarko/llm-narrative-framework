@@ -21,59 +21,7 @@ The project's architecture can be understood through three different views: the 
 This diagram shows how the scripts in the pipeline call one another, illustrating the hierarchy of control from the main batch runner down to the individual worker scripts.
 
 ```mermaid
-graph TD;
-
-    %% --- Style Definitions ---
-    classDef BatchOrchestrator fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef Stage fill:#ff7f0e,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef Worker fill:#2ca02c,stroke:#333,stroke-width:1px,color:#fff;
-    classDef Utility fill:#d62728,stroke:#333,stroke-width:1px,color:#fff;
-
-    %% --- Node Definitions ---
-    subgraph "Batch Orchestration"
-        run_rep["run_replications.ps1<br/><i>(Main Entry Point)</i>"]:::BatchOrchestrator;
-    end
-
-    subgraph "Utilities & Final Analysis"
-        retry["retry_failed_sessions.py"]:::BatchOrchestrator;
-        compile["compile_results.py"]:::Utility;
-        anova["run_anova.py"]:::Utility;
-        verify["verify_pipeline_completeness.py"]:::Utility;
-        rebuild_log["rebuild_batch_log.py"]:::Utility;
-    end
-
-    subgraph "Single Replication Pipeline (Python Scripts)"
-        direction LR;
-        orch["orchestrate_experiment.py<br/><i>(Single Run Manager)</i>"]:::Stage;
-        subgraph "Stage 1: Query Generation"
-            build["build_queries.py"]:::Stage;
-            qgen["query_generator.py"]:::Worker;
-        end
-        subgraph "Stage 2: LLM Interaction"
-            sessions["run_llm_sessions.py"]:::Stage;
-            prompter["llm_prompter.py"]:::Worker;
-        end
-        subgraph "Stage 3 & 4: Analysis"
-            process["process_llm_responses.py"]:::Stage;
-            analyze["analyze_performance.py"]:::Stage;
-        end
-    end
-
-    %% --- Connection Definitions ---
-    run_rep --> |"Calls in loop (x30)"| orch;
-    run_rep --> |"Calls for auto-repair"| retry;
-    run_rep --> |"Calls to summarize batch"| compile;
-    orch --> |"Calls"| build;
-    build --> |"Calls worker in loop (x100)"| qgen;
-    orch --> |"Calls"| sessions;
-    sessions --> |"Calls worker in loop (x100)"| prompter;
-    orch --> |"Calls"| process;
-    orch --> |"Calls"| analyze;
-    retry --> |"Calls to re-run specific queries"| sessions;
-    retry --> |"Re-runs after fixes"| process;
-    retry --> |"Re-runs after fixes"| analyze;
-    retry --> |"Re-runs after fixes"| compile;
-    compile -.-> |"[Data Flow]"| anova;
+{{docs/diagrams/architecture_code.mmd}}
 ```
 
 ### 2. Data Flow Diagram
@@ -81,47 +29,7 @@ graph TD;
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts, tracing the data from its source to the final outputs.
 
 ```mermaid
-graph TD
-    subgraph "Input Data"
-        A1(personalities_db_1-5000.txt)
-        A2(base_query.txt)
-    end
-
-    subgraph "Stage 1: Query Generation"
-        B(build_queries.py)
-        B --> C
-    end
-    
-    subgraph "Stage 2: LLM Interaction"
-        D(run_llm_sessions.py)
-        C --> D
-        D --> E
-    end
-    
-    subgraph "Stage 3: Response Processing"
-        F(process_llm_responses.py)
-        E --> F
-        F --> G[all_scores.txt]
-        F --> H[all_mappings.txt]
-    end
-    
-    subgraph "Stage 4: Final Analysis & Aggregation"
-        J(run_anova.py)
-        I(final_summary_results.csv)
-        G & H --> I
-        I --> J
-        J --> K[MASTER_ANOVA_DATASET.csv]
-        J --> L((Plots & Log))
-    end
-    
-    A1 & A2 --> B
-    C[llm_query_XXX.txt]
-    E[llm_response_XXX.txt]
-
-    classDef Data fill:#e6f3ff,stroke:#007bff
-    classDef Script fill:#fff0e6,stroke:#ff7f0e
-    class A1,A2,C,E,G,H,I,K,L Data
-    class B,D,F,J Script
+{{docs/diagrams/architecture_data_flow.mmd}}
 ```
 
 ### 3. Experimental Logic Flowchart
@@ -129,33 +37,7 @@ graph TD
 This diagram illustrates the scientific methodology for a single replication run, explaining the conceptual flow of the experiment from sampling to final analysis.
 
 ```mermaid
-graph TD
-    A[Start: Pool of 5000 Personalities] --> B{Sample 100 sets of k=10};
-    
-    B --> C{For each of the 100 sets...};
-    
-    subgraph "Single Trial (Repeated 100 times)"
-        direction LR
-        D["Shuffle 10 Names<br/>(List A)"];
-        E["Shuffle 10 Descriptions<br/>(List B)"];
-        F((LLM Task: Score Similarity));
-        G[Receive 10x10 Score Matrix];
-        H{"Calculate Trial Metrics<br/>(MRR, Top-1 Acc, etc.)"};
-        D & E --> F;
-        F --> G;
-        G --> H;
-    end
-
-    C --> D;
-    C --> E;
-    H --> I[Collect 100 sets of trial metrics];
-    I --> J{"Aggregate Metrics<br/>(e.g., Mean of 100 MRRs)"};
-    J --> K(["Final Data Point<br/>for one Replication"]);
-
-    classDef step fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef final fill:#d4edda,stroke:#155724;
-    class A,B,C,D,E,F,G,H,I,J step;
-    class K final;
+{{docs/diagrams/architecture_experimental_logic.mmd}}
 ```
 
 ## Setup and Installation

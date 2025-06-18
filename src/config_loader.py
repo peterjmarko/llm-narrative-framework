@@ -1,4 +1,6 @@
-# src/config_loader.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Filename: src/config_loader.py
 
 """
 Configuration Loader (config_loader.py)
@@ -43,6 +45,8 @@ Error Handling:
   allowing scripts to proceed with fallbacks or default behaviors.
 - `get_config_value` logs warnings for type conversion errors and uses fallbacks.
 """
+
+# === Start of src/config_loader.py ===
 
 import configparser
 import os
@@ -202,6 +206,8 @@ def get_config_value(config: configparser.ConfigParser, section: str, key: str,
 # Global config object, loaded once
 APP_CONFIG = load_app_config()
 ENV_LOADED = load_env_vars() # Load .env once globally as well
+
+# === End of src/config_loader.py ===
 
 # Example of how scripts might use this:
 # from config_loader import APP_CONFIG, ENV_LOADED, get_config_value, PROJECT_ROOT

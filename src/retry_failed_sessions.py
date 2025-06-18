@@ -79,7 +79,7 @@ def find_failed_sessions(parent_dir: str) -> dict:
         if not os.path.isdir(queries_path) or not os.path.isdir(responses_path):
             continue
 
-        query_files = glob.glob(os.path.join(queries_path, "llm_query_*.txt"))
+        query_files = glob.glob(os.path.join(queries_path, "llm_query_[0-9][0-9][0-9].txt"))
         indices_to_check = []
         for qf in query_files:
             try:

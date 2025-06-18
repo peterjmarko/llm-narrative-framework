@@ -42,9 +42,6 @@ class TestBuildQueries(unittest.TestCase):
         self.cfg_base_output_dir_name = "output"
         self.cfg_queries_subdir_name = "session_queries_bq"
         
-        self.final_queries_output_dir = os.path.join(
-            self.test_project_root, self.cfg_base_output_dir_name, self.cfg_queries_subdir_name
-        )
         # This is the directory that will be passed to the --run_output_dir argument
         self.test_run_dir = os.path.join(self.test_project_root, self.cfg_base_output_dir_name, "run_test_build_queries")
 

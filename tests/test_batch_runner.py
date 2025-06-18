@@ -37,14 +37,16 @@ import sys, os, datetime, json, argparse
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--replication_num', required=True, type=int)
+    # [FIX] Changed replication_num to not be required, matching the real script.
+    # This allows the --reprocess mode to be called without it.
+    parser.add_argument('--replication_num', required=False, type=int, default=1)
     # Add other args to prevent "unrecognized arguments" error
     parser.add_argument('-m', type=int)
     parser.add_argument('-k', type=int)
     parser.add_argument('--base_seed', type=int)
     parser.add_argument('--qgen_base_seed', type=int)
     parser.add_argument('--quiet', action='store_true')
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args() # Use parse_known_args for flexibility in tests
 
     # --- SIMULATE FAILURE for a specific replication number ---
     if args.replication_num == 2:
@@ -104,6 +106,11 @@ sys.exit(0)
         # This mock will exit 0, indicating no remaining failures.
         with open(mock_retry_path, 'w') as f:
             f.write("import sys; print('Mock retry script: no failures found.'); sys.exit(0)")
+            
+        # --- Create a MOCK verify_pipeline_completeness.py ---
+        mock_verify_path = os.path.join(self.src_dir, 'verify_pipeline_completeness.py')
+        with open(mock_verify_path, 'w') as f:
+            f.write("import sys; print('Mock verify script ran.'); sys.exit(0)")
 
     def tearDown(self):
         """Clean up the temporary directory."""
@@ -170,6 +177,7 @@ sys.exit(0)
         self.assertIn("RUNNING GLOBAL REPLICATION 1", result.stdout)
         self.assertIn("RUNNING GLOBAL REPLICATION 2", result.stdout)
         self.assertIn("RUNNING GLOBAL REPLICATION 3", result.stdout)
+        # Check for the warning message instead of the test-specific one
         self.assertIn("Orchestrator failed on replication 2", result.stdout)
 
         # Check batch log file for correct status
@@ -187,6 +195,48 @@ sys.exit(0)
 
         # The final compilation should still run
         self.assertTrue(os.path.exists(os.path.join(self.output_dir, 'final_summary_results.csv')))
+
+    def test_reprocess_mode_calls_orchestrator_correctly(self):
+        """Tests that using -Reprocess calls the orchestrator with the right flags."""
+        # Arrange
+        # Create two mock run directories that the script should find and reprocess
+        run1_path = os.path.join(self.test_project_root, "run_dir_1")
+        run2_path = os.path.join(self.test_project_root, "run_dir_2")
+        os.makedirs(run1_path)
+        os.makedirs(run2_path)
+        
+        # We need to add '--reprocess' to our mock orchestrator so it doesn't fail
+        mock_orchestrator_path = os.path.join(self.src_dir, 'orchestrate_experiment.py')
+        with open(mock_orchestrator_path, 'r') as f:
+            code = f.read()
+        # Use parse_known_args() and add the args to prevent failure
+        code = code.replace("args, _ = parser.parse_known_args()", 
+                            "parser.add_argument('--reprocess', action='store_true')\n    parser.add_argument('--run_output_dir', type=str)\n    args, _ = parser.parse_known_args()")
+        with open(mock_orchestrator_path, 'w') as f:
+            f.write(code)
+
+        # Act
+        result = subprocess.run(
+            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", self.test_ps1_path, "-Reprocess", "-TargetDirectory", self.test_project_root],
+            cwd=self.test_project_root,
+            capture_output=True,
+            text=True
+        )
+
+        # Assert
+        self.assertEqual(result.returncode, 0, f"PowerShell script failed in reprocess mode. STDERR:\n{result.stderr}")
+        
+        # Check that the script identified the correct mode and found the directories
+        self.assertIn("REPROCESS MODE ACTIVATED", result.stdout)
+        self.assertIn("Found 2 run directories to re-process", result.stdout)
+        
+        # Check that the orchestrator was called with the correct arguments
+        self.assertIn("RE-PROCESSING: run_dir_1", result.stdout)
+        self.assertIn("RE-PROCESSING: run_dir_2", result.stdout)
+        
+        # Check that the final compilation step was triggered for the target directory
+        self.assertIn("COMPILING FINAL RESULTS", result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

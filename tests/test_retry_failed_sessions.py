@@ -26,7 +26,7 @@ class TestRetryFailedSessions(unittest.TestCase):
         
         # Create minimal, working mocks for all scripts called by the retry script
         scripts_to_mock = [
-            "run_llm_sessions.py", "reprocess_runs.py", "compile_results.py",
+            "run_llm_sessions.py", "compile_results.py",
             "process_llm_responses.py", "analyze_performance.py"
         ]
         for script_name in scripts_to_mock:

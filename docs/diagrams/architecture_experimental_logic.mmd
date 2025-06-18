@@ -1,0 +1,27 @@
+graph TD
+    A[Start: Pool of 5000 Personalities] --> B{Sample 100 sets of k=10};
+    
+    B --> C{For each of the 100 sets...};
+    
+    subgraph "Single Trial (Repeated 100 times)"
+        direction LR
+        D["Shuffle 10 Names<br/>(List A)"];
+        E["Shuffle 10 Descriptions<br/>(List B)"];
+        F((LLM Task: Score Similarity));
+        G[Receive 10x10 Score Matrix];
+        H{"Calculate Trial Metrics<br/>(MRR, Top-1 Acc, etc.)"};
+        D & E --> F;
+        F --> G;
+        G --> H;
+    end
+
+    C --> D;
+    C --> E;
+    H --> I[Collect 100 sets of trial metrics];
+    I --> J{"Aggregate Metrics<br/>(e.g., Mean of 100 MRRs)"};
+    J --> K(["Final Data Point<br/>for one Replication"]);
+
+    classDef step fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef final fill:#d4edda,stroke:#155724;
+    class A,B,C,D,E,F,G,H,I,J step;
+    class K final;

@@ -1,0 +1,131 @@
+# Filename: generate_architecture_diagram.py
+
+import os
+
+def generate_mermaid_diagram():
+    """
+    Generates and prints the Mermaid.js syntax for the pipeline architecture diagram.
+    """
+    
+    # Define all the scripts in the pipeline
+    scripts = [
+        # Top-Level Orchestrators
+        {'id': 'run_rep', 'name': 'run_replications.ps1', 'type': 'BatchOrchestrator', 'desc': 'Main entry point to run multiple replications'},
+        {'id': 'retry', 'name': 'retry_failed_sessions.py', 'type': 'BatchOrchestrator', 'desc': 'Finds & re-runs failed API calls across all runs'},
+
+        # Core Pipeline Stages (called by orchestrate_experiment)
+        {'id': 'orch', 'name': 'orchestrate_experiment.py', 'type': 'Stage', 'desc': 'Manages a single, complete replication run'},
+        {'id': 'build', 'name': 'build_queries.py', 'type': 'Stage', 'desc': 'Generates all query files for a run'},
+        {'id': 'sessions', 'name': 'run_llm_sessions.py', 'type': 'Stage', 'desc': 'Sends all queries to the LLM API'},
+        {'id': 'process', 'name': 'process_llm_responses.py', 'type': 'Stage', 'desc': 'Parses raw LLM text responses'},
+        {'id': 'analyze', 'name': 'analyze_performance.py', 'type': 'Stage', 'desc': 'Calculates final metrics for a single run'},
+
+        # Worker Scripts (called by stages)
+        {'id': 'qgen', 'name': 'query_generator.py', 'type': 'Worker', 'desc': 'Worker: Creates one shuffled query set'},
+        {'id': 'prompter', 'name': 'llm_prompter.py', 'type': 'Worker', 'desc': 'Worker: Sends one query to the API'},
+        
+        # Standalone Utilities
+        {'id': 'compile', 'name': 'compile_results.py', 'type': 'Utility', 'desc': 'Utility: Compiles reports into a summary CSV'},
+        {'id': 'anova', 'name': 'run_anova.py', 'type': 'Utility', 'desc': 'Utility: Aggregates summaries & runs final statistics'},
+        {'id': 'verify', 'name': 'verify_pipeline_completeness.py', 'type': 'Utility', 'desc': 'Utility: Audits output for missing data'},
+        {'id': 'rebuild_log', 'name': 'rebuild_batch_log.py', 'type': 'Utility', 'desc': 'Utility: Re-creates batch log from folders'},
+    ]
+
+    # Define the connections between the scripts
+    connections = [
+        ('run_rep', 'orch', 'Calls in loop (x30)'),
+        ('run_rep', 'retry', 'Calls for auto-repair'),
+        ('run_rep', 'compile', 'Calls to summarize batch'),
+
+        ('orch', 'build', 'Calls'),
+        ('build', 'qgen', 'Calls worker in loop (x100)'),
+
+        ('orch', 'sessions', 'Calls'),
+        ('sessions', 'prompter', 'Calls worker in loop (x100)'),
+
+        ('orch', 'process', 'Calls'),
+        ('orch', 'analyze', 'Calls'),
+        
+        ('retry', 'sessions', 'Calls to re-run specific queries'),
+        ('retry', 'process', 'Re-runs after fixes'),
+        ('retry', 'analyze', 'Re-runs after fixes'),
+        ('retry', 'compile', 'Re-runs after fixes'),
+        
+        ('compile', 'anova', '[Data Flow]'),
+    ]
+
+    # --- Generate Mermaid Code ---
+    mermaid_code = ["graph TD;"]
+
+    # Define styles for different script types
+    mermaid_code.append("\n    %% --- Style Definitions ---")
+    mermaid_code.append("    classDef BatchOrchestrator fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;")
+    mermaid_code.append("    classDef Stage fill:#ff7f0e,stroke:#fff,stroke-width:2px,color:#fff;")
+    mermaid_code.append("    classDef Worker fill:#2ca02c,stroke:#333,stroke-width:1px,color:#fff;")
+    mermaid_code.append("    classDef Utility fill:#d62728,stroke:#333,stroke-width:1px,color:#fff;")
+
+    # Define script nodes within subgraphs
+    mermaid_code.append("\n    %% --- Node Definitions ---")
+    
+    # Main Batch Runner
+    mermaid_code.append('    subgraph "Batch Orchestration"')
+    mermaid_code.append('        run_rep["run_replications.ps1<br/><i>(Main Entry Point)</i>"]:::BatchOrchestrator;')
+    mermaid_code.append('    end')
+
+    # Utilities & Final Analysis (Defined first to appear on the right)
+    mermaid_code.append('\n    subgraph "Utilities & Final Analysis"')
+    mermaid_code.append('        retry["retry_failed_sessions.py"]:::BatchOrchestrator;')
+    mermaid_code.append('        compile["compile_results.py"]:::Utility;')
+    mermaid_code.append('        anova["run_anova.py"]:::Utility;')
+    mermaid_code.append('        verify["verify_pipeline_completeness.py"]:::Utility;')
+    mermaid_code.append('        rebuild_log["rebuild_batch_log.py"]:::Utility;')
+    mermaid_code.append('    end')
+
+    # Core Pipeline (Defined second to appear on the left)
+    mermaid_code.append('\n    subgraph "Single Replication Pipeline (Python Scripts)"')
+    mermaid_code.append('        direction LR;')
+    mermaid_code.append('        orch["orchestrate_experiment.py<br/><i>(Single Run Manager)</i>"]:::Stage;')
+    mermaid_code.append('        subgraph "Stage 1: Query Generation"')
+    mermaid_code.append('            build["build_queries.py"]:::Stage;')
+    mermaid_code.append('            qgen["query_generator.py"]:::Worker;')
+    mermaid_code.append('        end')
+    mermaid_code.append('        subgraph "Stage 2: LLM Interaction"')
+    mermaid_code.append('            sessions["run_llm_sessions.py"]:::Stage;')
+    mermaid_code.append('            prompter["llm_prompter.py"]:::Worker;')
+    mermaid_code.append('        end')
+    mermaid_code.append('        subgraph "Stage 3 & 4: Analysis"')
+    mermaid_code.append('            process["process_llm_responses.py"]:::Stage;')
+    mermaid_code.append('            analyze["analyze_performance.py"]:::Stage;')
+    mermaid_code.append('        end')
+    mermaid_code.append('    end')
+
+    # Define connections
+    mermaid_code.append("\n    %% --- Connection Definitions ---")
+    for caller, callee, label in connections:
+        if label == '[Data Flow]':
+            mermaid_code.append(f"    {caller} -.-> |\"{label}\"| {callee};")
+        else:
+            mermaid_code.append(f"    {caller} --> |\"{label}\"| {callee};")
+
+    # Final output
+    final_diagram_text = "\n".join(mermaid_code)
+    
+    print("--- Mermaid.js Diagram Code ---")
+    print("Copy the text below and paste it into a Mermaid renderer (e.g., https://mermaid.live, or a GitHub README.md).")
+    print("```mermaid")
+    print(final_diagram_text)
+    print("```")
+    
+    # Save to the correct artifact file for the README build process
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    output_dir = os.path.join(project_root, 'docs', 'diagrams')
+    os.makedirs(output_dir, exist_ok=True)
+    output_filepath = os.path.join(output_dir, "architecture_code.mmd")
+    
+    with open(output_filepath, 'w', encoding='utf-8') as f:
+        f.write(final_diagram_text)
+    print(f"\nDiagram code also saved to: {output_filepath}")
+
+
+if __name__ == "__main__":
+    generate_mermaid_diagram()
