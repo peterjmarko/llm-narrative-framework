@@ -186,17 +186,11 @@ def generate_run_dir_name(model_name, temperature, num_iterations, k_per_query, 
 
 def main():
     # --- Argparse ---
-    default_k = get_config_value(APP_CONFIG, 'General', 'default_k', fallback=6, value_type=int)
-    default_m = get_config_value(APP_CONFIG, 'General', 'default_build_iterations', fallback=5, value_type=int)
-
     parser = argparse.ArgumentParser(
         description="Runs or re-processes the full personality matching pipeline.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("-m", "--num_iterations", type=int, default=default_m,
-                        help="Number of unique query sets to generate (for new runs).")
-    parser.add_argument("-k", "--k_per_query", type=int, default=default_k,
-                        help="Number of items (k) per query set (for new runs).")
+    # K and M are now read from config, so they are no longer CLI arguments.
     parser.add_argument("--notes", type=str, default="N/A",
                         help="Optional notes to include in the report header (for new runs).")
     
@@ -216,6 +210,11 @@ def main():
                         help="Path to a specific run output directory. Used for --reprocess mode.")
     
     args = parser.parse_args()
+    
+    # --- Load main study parameters from config.ini ---
+    args.num_iterations = get_config_value(APP_CONFIG, 'Study', 'num_trials', fallback=100, value_type=int)
+    args.k_per_query = get_config_value(APP_CONFIG, 'Study', 'group_size', fallback=10, value_type=int)
+
 
     # --- Configure Logging Level ---
     # The orchestrator's INFO logs are the primary progress indicators,

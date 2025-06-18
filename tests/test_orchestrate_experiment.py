@@ -137,12 +137,15 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
     def _create_mock_config_ini(self):
         """Creates a mock config.ini file for the test run."""
         self.mock_config = configparser.ConfigParser()
+        # Add the new [Study] section with parameters for the tests
+        self.mock_config['Study'] = {
+            'num_replications': '30',
+            'num_trials': '1', # Use small values for tests
+            'group_size': '3'  # Use small values for tests
+        }
         self.mock_config['General'] = {
             'default_log_level': 'INFO',
             'base_output_dir': 'output',
-            'reports_subdir': 'reports', # This key is now unused by the orchestrator but might be used elsewhere
-            'default_k': '6',
-            'default_build_iterations': '5',
         }
         self.mock_config['Filenames'] = {
             'personalities_src': 'personalities.txt',
@@ -221,7 +224,8 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         mock_subprocess_run.side_effect = self._mock_run_success
 
         test_notes = "Happy path test run."
-        orchestrator_args = ['orchestrate_experiment.py', '-m', '1', '-k', '3', '--notes', test_notes]
+        # The orchestrator now reads k and m from config, so we remove them from the args.
+        orchestrator_args = ['orchestrate_experiment.py', '--notes', test_notes]
         
         with patch.object(sys, 'argv', orchestrator_args):
             self.orchestrator_main()

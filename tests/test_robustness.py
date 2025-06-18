@@ -95,7 +95,10 @@ class TestPipelineRobustness(unittest.TestCase):
         mock_run_script.return_value = "Mocked success"
         
         # --- Run the orchestrator ---
-        orchestrator_args = ['orchestrate_experiment.py', '-m', '1', '-k', '1']
+        # The orchestrator now reads k and m from config, so we add them here
+        # and remove the obsolete command-line arguments.
+        self.mock_config['Study'] = {'num_trials': '1', 'group_size': '1'}
+        orchestrator_args = ['orchestrate_experiment.py']
         with patch.object(sys, 'argv', orchestrator_args):
             self.orchestrator_main()
 
@@ -122,7 +125,10 @@ class TestPipelineRobustness(unittest.TestCase):
         mock_run_script.return_value = "Mocked success"
         
         # --- Run the orchestrator ---
-        orchestrator_args = ['orchestrate_experiment.py', '-m', '1', '-k', '1']
+        # The orchestrator now reads k and m from config, so we add them here
+        # and remove the obsolete command-line arguments.
+        self.mock_config['Study'] = {'num_trials': '1', 'group_size': '1'}
+        orchestrator_args = ['orchestrate_experiment.py']
         with patch.object(sys, 'argv', orchestrator_args):
             self.orchestrator_main()
 
