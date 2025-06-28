@@ -435,10 +435,8 @@ def main():
         # The orchestrator is now responsible for printing the final newline.
         # This script must not print a newline, so the orchestrator can overwrite its last status message.
         total_processed_this_run = successful_sessions + failed_sessions
-        # Use print() for the final summary so it appears even in quiet mode.
-        # The leading newline ensures it doesn't overwrite the final spinner status.
-        print("\nLLM session orchestration complete or terminated.")
-        print(f"Summary for this run: {successful_sessions} sessions got responses, {failed_sessions} resulted in errors. {skipped_sessions} were skipped (pre-existing).")
+        logging.info("\nLLM session orchestration complete or terminated.")
+        logging.info(f"Summary for this run: {successful_sessions} sessions got responses, {failed_sessions} resulted in errors. {skipped_sessions} were skipped (pre-existing).")
 
 if __name__ == "__main__":
     main()

@@ -93,8 +93,7 @@ DEFAULT_LOG_LEVEL_STR_PROMPTER = get_config_value(APP_CONFIG, 'General', 'defaul
 numeric_log_level_prompter = getattr(logging, DEFAULT_LOG_LEVEL_STR_PROMPTER.upper(), logging.INFO)
 logging.basicConfig(level=numeric_log_level_prompter,
                     format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    stream=sys.stdout) # Send logs to stdout, leaving stderr for the spinner
+                    datefmt='%Y-%m-%d %H:%M:%S')
 DOTENV_PATH = ".env"
 
 # Force stdout to use UTF-8 encoding to prevent UnicodeEncodeError on Windows when piping JSON
@@ -228,8 +227,7 @@ def main():
     logging.basicConfig(level=numeric_log_level,
                         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S',
-                        force=True,
-                        stream=sys.stdout) # Send logs to stdout, leaving stderr for the spinner
+                        force=True)
 
     # --- Now continue with the rest of the script ---
     script_dir_worker = os.path.dirname(os.path.abspath(__file__))

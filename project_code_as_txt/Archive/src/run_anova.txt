@@ -10,15 +10,22 @@ This script performs a full analysis pipeline:
 1.  Loads data by either accepting a direct path to a master CSV file or by
     scanning a directory to find and aggregate all `final_summary_results.csv`
     files into a new master dataset.
-2.  Performs an Analysis of Variance (ANOVA) to test for significant effects.
-3.  Calculates effect size (Eta Squared) to determine the magnitude of the findings.
-4.  Generates formatted, report-ready tables for Descriptive Statistics and ANOVA results.
-5.  Runs post-hoc tests and generates a simplified "Performance Tiers" table.
-6.  Generates and saves publication-quality box plots with visual legends.
-7.  Optionally creates diagnostic plots (Q-Q plots) to check statistical assumptions.
-8.  Saves all statistical output from the console to a detailed log file.
+2.  Reads 'config.ini' to map OpenRouter model IDs to user-friendly
+    'Display Names' for all reports and plots.
+3.  Performs an Analysis of Variance (ANOVA) to test for significant effects.
+4.  Calculates effect size (Eta Squared) to determine the magnitude of the findings.
+5.  Generates formatted, report-ready tables for Descriptive Statistics and ANOVA results.
+6.  Runs post-hoc tests and generates a simplified "Performance Tiers" table.
+7.  Generates and saves publication-quality box plots with visual legends, using
+    the model Display Names.
+8.  Optionally creates diagnostic plots (Q-Q plots) to check statistical assumptions.
+9.  Saves all statistical output from the console to a detailed log file, which
+    includes a legend mapping Display Names back to their OpenRouter model IDs.
+10. Saves all generated tabular data (Descriptive Stats, ANOVA, Post-Hoc, Tiers)
+    into separate CSV files for easy reuse.
 
-Plots and logs are saved in the same directory as the input path.
+All outputs (plots, logs, and CSVs) are saved into a dedicated 'anova'
+subdirectory within the same directory as the input path.
 """
 
 import argparse
@@ -32,6 +39,7 @@ import sys
 import logging
 import warnings
 import glob
+import configparser
 
 try:
     import matplotlib
@@ -47,12 +55,12 @@ except ImportError:
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-def aggregate_and_load_data(search_dir, output_dir, output_filename):
+def aggregate_and_load_data(base_dir, output_filename):
     """
     Finds, aggregates, and saves summary CSVs, then returns the master DataFrame.
     This function contains the logic from the original aggregate_summaries.py.
     """
-    search_pattern = os.path.join(search_dir, '**', 'final_summary_results.csv')
+    search_pattern = os.path.join(base_dir, '**', 'final_summary_results.csv')
     logging.info(f"AGGREGATION MODE: Searching for files matching: {search_pattern}")
     csv_files = glob.glob(search_pattern, recursive=True)
 
@@ -78,7 +86,7 @@ def aggregate_and_load_data(search_dir, output_dir, output_filename):
         return None, None
         
     master_df = pd.concat(all_dfs, ignore_index=True)
-    final_output_path = os.path.join(output_dir, output_filename)
+    final_output_path = os.path.join(base_dir, output_filename)
     
     master_df.to_csv(final_output_path, index=False)
     logging.info(f"\nSuccessfully aggregated {len(master_df)} rows into: {final_output_path}\n")
@@ -102,7 +110,7 @@ def calculate_eta_squared(anova_table):
 
 
 def generate_performance_tiers(df, metric, tukey_result):
-    """Groups models into performance tiers based on Tukey HSD results."""
+    """Groups models into performance tiers and returns the resulting DataFrame."""
     logging.info("\n--- Performance Tiers (Models in the same tier are not statistically different) ---")
     
     G = nx.Graph()
@@ -126,10 +134,11 @@ def generate_performance_tiers(df, metric, tukey_result):
     
     tier_data = []
     for i, (median_val, tier_models) in enumerate(sorted_tiers):
-        tier_data.append([f"Tier {i+1}", f"{median_val:.4f}", ", ".join(tier_models)])
+        tier_data.append([f"Tier {i+1}", f"{median_val:.4f}", ", ".join(sorted(list(tier_models)))])
     
     tier_df = pd.DataFrame(tier_data, columns=["Performance Tier", "Median Score", "Models"])
     logging.info(f"\n{tier_df.to_string(index=False)}")
+    return tier_df
 
 
 def create_diagnostic_plot(model, metric, output_dir):
@@ -250,15 +259,22 @@ def create_and_save_plot(df, metric, factor, p_value, output_dir):
 
 
 def perform_analysis(df, metric, all_possible_factors, output_dir):
-    """Performs ANOVA, post-hoc analysis, and plotting for a single metric."""
+    """
+    Performs ANOVA and post-hoc analysis, returning all tabular data as DataFrames.
+    Also handles logging and plotting for the specified metric.
+    """
     logging.info("\n" + "="*80)
     logging.info(f" ANALYSIS FOR METRIC: '{metric}'")
     logging.info("="*80)
+    
+    # Initialize return values
+    desc_stats_df, anova_summary_df, tukey_results_df, tiers_df = None, None, None, None
 
     active_factors = [f for f in all_possible_factors if df[f].nunique() > 1]
     if not active_factors:
         logging.info("INFO: Only one experimental group found. No analysis possible.")
-        return
+        return desc_stats_df, anova_summary_df, tukey_results_df, tiers_df
+        
     logging.info(f"Detected {len(active_factors)} active factor(s) with variation: {', '.join(active_factors)}")
 
     logging.info("\n--- Descriptive Statistics by Model ---")
@@ -266,15 +282,16 @@ def perform_analysis(df, metric, all_possible_factors, output_dir):
         columns={'count': 'N', 'mean': 'Mean', 'std': 'Std. Dev.'}
     )
     logging.info(f"\n{desc_stats.to_string(float_format='%.4f')}")
-    
-    # Check if ANOVA is possible (at least 2 groups with >1 data point each)
+    desc_stats_df = desc_stats.reset_index()
+    desc_stats_df.insert(0, 'metric', metric)
+
     can_run_anova = not any(count <= 1 for count in desc_stats['N'])
-    significant_factors_clean = []
     anova_table = None
 
     if not can_run_anova:
         logging.warning("\nWARNING: At least one group has only one data point. ANOVA and post-hoc tests will be skipped.")
     else:
+        # Perform Levene's test and ANOVA
         grouped_data = [group[metric].values for name, group in df.groupby(active_factors)]
         stat, p_levene = levene(*grouped_data)
         logging.info(f"\n--- Assumption Check: Homogeneity of Variances (Levene's Test) ---")
@@ -288,11 +305,10 @@ def perform_analysis(df, metric, all_possible_factors, output_dir):
         
         try:
             model = ols(formula, data=df).fit()
-
             create_diagnostic_plot(model, metric, output_dir)
-
             anova_table = sm.stats.anova_lm(model, typ=2)
             
+            # Create ANOVA Summary DataFrame
             eta_sq = calculate_eta_squared(anova_table)
             f_value = anova_table.loc[anova_table.index[0], 'F']
             p_value = anova_table.loc[anova_table.index[0], 'PR(>F)']
@@ -306,43 +322,59 @@ def perform_analysis(df, metric, all_possible_factors, output_dir):
                 'p-value': format_p_value(p_value).replace("p ", ""),
                 'Eta Squared (η²)': f"{eta_sq:.2f}"
             }
-            summary_df = pd.DataFrame([summary_data]).set_index('Metric')
-            
+            anova_summary_df = pd.DataFrame([summary_data])
             logging.info(f"\n--- Formatted ANOVA Summary ---")
-            logging.info(f"\n{summary_df.to_string()}")
+            logging.info(f"\n{anova_summary_df.set_index('Metric').to_string()}")
             
             logging.info("\n--- Raw ANOVA Table (for reference) ---")
             logging.info(f"\n{anova_table.to_string()}")
             
+            # Post-Hoc Analysis
             significant_factors_raw = anova_table[anova_table['PR(>F)'] < 0.05].index.tolist()
             significant_factors_clean = [f.replace("C(", "").replace(")", "") for f in significant_factors_raw]
 
             if significant_factors_clean:
                 logging.info(f"\nConclusion: Significant effect found for factor(s): {', '.join(significant_factors_clean)}")
+                
+                all_tukey_dfs = []
+                all_tiers_dfs = []
+                
                 logging.info("\n--- Post-Hoc Analysis (Tukey's HSD) ---")
                 for factor in significant_factors_clean:
                     logging.info(f"\nComparing levels for factor: '{factor}'")
                     tukey_result = pairwise_tukeyhsd(endog=df[metric], groups=df[factor], alpha=0.05)
                     logging.info(f"\n{tukey_result}")
                     
+                    # Create Tukey DataFrame for CSV export
+                    tukey_df = pd.DataFrame(data=tukey_result._results_table.data[1:], columns=tukey_result._results_table.data[0])
+                    tukey_df.insert(0, 'metric', metric)
+                    tukey_df.insert(1, 'factor', factor)
+                    all_tukey_dfs.append(tukey_df)
+
                     if factor == 'model':
-                        generate_performance_tiers(df, metric, tukey_result)
+                        tier_df = generate_performance_tiers(df, metric, tukey_result)
+                        tier_df.insert(0, 'metric', metric)
+                        all_tiers_dfs.append(tier_df)
+                        
+                if all_tukey_dfs:
+                    tukey_results_df = pd.concat(all_tukey_dfs, ignore_index=True)
+                if all_tiers_dfs:
+                    tiers_df = pd.concat(all_tiers_dfs, ignore_index=True)
+
             else:
                 logging.info("\nConclusion: No factors had a statistically significant effect on this metric.")
                         
         except Exception as e:
             logging.error(f"\nERROR: Could not perform ANOVA. Reason: {e}")
 
-    # --- Plotting Section (runs regardless of ANOVA success) ---
-    # Simplified: Always plot all active factors for complete visualization.
-    factors_to_plot = active_factors
-    if factors_to_plot:
+    # --- Plotting Section ---
+    if active_factors:
         logging.info("\n--- Generating Performance Plots ---")
-    
-    for factor in factors_to_plot:
-        # If ANOVA was run, use the specific p-value. Otherwise, use NaN.
-        plot_p_value = anova_table.loc[f'C({factor})', 'PR(>F)'] if anova_table is not None else float('nan')
-        create_and_save_plot(df, metric, factor, plot_p_value, output_dir)
+        for factor in active_factors:
+            plot_p_value = anova_table.loc[f'C({factor})', 'PR(>F)'] if anova_table is not None and f'C({factor})' in anova_table.index else float('nan')
+            create_and_save_plot(df, metric, factor, plot_p_value, output_dir)
+
+    return desc_stats_df, anova_summary_df, tukey_results_df, tiers_df
 
 
 def main():
@@ -358,8 +390,8 @@ def main():
     )
     args = parser.parse_args()
 
-    # Setup logging first to capture all messages, including aggregation steps
-    log_filepath = None # Will be set later
+    # Setup logging first
+    log_filepath = None
     logger = logging.getLogger()
     if logger.hasHandlers():
         logger.handlers.clear()
@@ -369,50 +401,84 @@ def main():
     ch.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(ch)
 
-    # --- Determine input type and load data ---
-    df = None
-    master_csv_path = None
-    
-    # --- Define output paths based on user's request ---
-    # 1. Determine the base target directory from the input path.
-    if os.path.isdir(args.input_path):
-        # If input is a directory, that is our base.
-        base_dir = os.path.abspath(args.input_path)
-    elif os.path.isfile(args.input_path):
-        # If input is a file, its parent directory is our base.
-        base_dir = os.path.dirname(os.path.abspath(args.input_path))
-    else:
-        logging.error(f"Error: The provided input path is not a valid file or directory: {args.input_path}")
-        return
-        
-    # 2. Create the 'anova' subdirectory within the base directory. This will be the destination for all output.
-    output_dir = os.path.join(base_dir, 'anova')
-    os.makedirs(output_dir, exist_ok=True)
-    logging.info(f"All analysis output will be saved to: {output_dir}")
+    df, master_csv_path, output_dir = None, None, None
 
     if os.path.isdir(args.input_path):
-        # When input is a directory, search it for CSVs but save the aggregated file to the 'anova' subdirectory.
-        search_dir = os.path.abspath(args.input_path)
-        df, master_csv_path = aggregate_and_load_data(search_dir, output_dir, args.master_filename)
-        if df is None: # Aggregation failed
-            return 
+        output_dir = os.path.abspath(args.input_path)
+        df, master_csv_path = aggregate_and_load_data(output_dir, args.master_filename)
+        if df is None: return 
     elif os.path.isfile(args.input_path):
         logging.info(f"FILE MODE: Loading data directly from {args.input_path}")
+        output_dir = os.path.dirname(os.path.abspath(args.input_path))
         master_csv_path = args.input_path
         try:
             df = pd.read_csv(master_csv_path)
         except FileNotFoundError:
             logging.error(f"Error: The file was not found at '{master_csv_path}'")
             return
+    else:
+        logging.error(f"Error: The provided input path is not a valid file or directory: {args.input_path}")
+        return
 
-    # --- Setup file-based logging now that we have the output path ---
+    # --- Apply Model Display Names from config.ini ---
+    config = configparser.ConfigParser()
+    config_path = 'config.ini'
+    display_names_map = {}
+    if os.path.exists(config_path):
+        config.read(config_path)
+        if 'ModelFriendlyNames' in config:
+            display_names_map = dict(config['ModelFriendlyNames'])
+            logging.info(f"\nLoaded {len(display_names_map)} model display names from {config_path}.")
+            # Replace model IDs with display names. If a name is not in the map, keep the OpenRouter ID.
+            df['model'] = df['model'].apply(lambda x: display_names_map.get(x, x))
+        else:
+            logging.warning("\nWarning: [ModelFriendlyNames] section not found in config.ini. Using OpenRouter model IDs.")
+    else:
+        logging.warning("\nWarning: config.ini not found. Using OpenRouter model IDs for reports and plots.")
+
+
+    # Create a dedicated subdirectory for all ANOVA outputs and set up logging there
+    anova_output_dir = os.path.join(output_dir, 'anova')
+    os.makedirs(anova_output_dir, exist_ok=True)
+
     log_filename = os.path.basename(master_csv_path).replace('.csv', '_analysis_log.txt')
-    log_filepath = os.path.join(output_dir, log_filename) # Log file goes into 'anova' subdirectory
+    log_filepath = os.path.join(anova_output_dir, log_filename)
     fh = logging.FileHandler(log_filepath, mode='w', encoding='utf-8')
     fh.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(fh)
     logging.info(f"Full analysis log is being saved to: {log_filepath}")
 
+    if display_names_map:
+        logging.info("\n" + "="*80)
+        logging.info(" MODEL DISPLAY NAME LEGEND")
+        logging.info("="*80)
+        logging.info("The following display names are used in this report for clarity.\n")
+        
+        display_name_header = "Display Name"
+        id_header = "OpenRouter Model ID"
+        
+        # Determine column widths for nice formatting
+        col1_width = max(len(name) for name in display_names_map.values())
+        col1_width = max(col1_width, len(display_name_header))
+        
+        col2_width = max(len(id) for id in display_names_map.keys())
+        col2_width = max(col2_width, len(id_header))
+        
+        header = f"{display_name_header:<{col1_width}} | {id_header:<{col2_width}}"
+        logging.info(header)
+        logging.info("-" * len(header))
+
+        # Sort by display name for consistent output
+        sorted_items = sorted(display_names_map.items(), key=lambda item: item[1])
+        
+        for model_id, display_name in sorted_items:
+            logging.info(f"{display_name:<{col1_width}} | {model_id:<{col2_width}}")
+
+    # Initialize lists to hold DataFrames from each analysis loop
+    all_desc_stats = []
+    all_anova_summaries = []
+    all_tukey_results = []
+    all_performance_tiers = []
 
     # --- Proceed with Analysis ---
     factors = ['model', 'temperature', 'k', 'm']
@@ -424,17 +490,50 @@ def main():
 
     metrics = [
         'mean_mrr', 'mean_top_1_acc', 'mean_top_3_acc', 
-        'mean_effect_size_r', 'mwu_stouffer_z', 'mwu_fisher_chi2'
+        'mean_effect_size_r', 'mwu_stouffer_z', 'mwu_fisher_chi2',
+        # NEW: Normalized metrics
+        'mean_normalized_mrr',
+        'mean_normalized_top_1_acc',
+        'mean_normalized_top_3_acc' # Assuming default top_k_acc is 3
     ]
 
     for metric in metrics:
         if metric in df.columns:
-            # Pass the dedicated 'anova' subdirectory path for all plots and diagnostics.
-            perform_analysis(df, metric, factors, output_dir)
+            # Perform analysis and get tabular data back
+            desc_df, anova_df, tukey_df, tiers_df = perform_analysis(df, metric, factors, anova_output_dir)
+            
+            # Append returned DataFrames to our master lists
+            if desc_df is not None: all_desc_stats.append(desc_df)
+            if anova_df is not None: all_anova_summaries.append(anova_df)
+            if tukey_df is not None: all_tukey_results.append(tukey_df)
+            if tiers_df is not None: all_performance_tiers.append(tiers_df)
         else:
             logging.warning(f"\nWarning: Metric column '{metric}' not found in the CSV file. Skipping.")
 
-    # Properly close the file handler to release the lock on the log file
+    # --- Consolidate and Save All Tabular Data to CSVs ---
+    logging.info("\n" + "="*80)
+    logging.info("SAVING TABULAR RESULTS TO CSV FILES")
+    logging.info("="*80)
+
+    output_files = {}
+    if all_desc_stats:
+        output_files['descriptive_stats'] = pd.concat(all_desc_stats, ignore_index=True)
+    if all_anova_summaries:
+        output_files['anova_summaries'] = pd.concat(all_anova_summaries, ignore_index=True)
+    if all_tukey_results:
+        output_files['tukey_hsd_results'] = pd.concat(all_tukey_results, ignore_index=True)
+    if all_performance_tiers:
+        output_files['performance_tiers'] = pd.concat(all_performance_tiers, ignore_index=True)
+
+    for name, df_to_save in output_files.items():
+        base_name = os.path.basename(master_csv_path).replace('.csv', '')
+        csv_path = os.path.join(anova_output_dir, f"{base_name}_{name}.csv")
+        try:
+            df_to_save.to_csv(csv_path, index=False)
+            logging.info(f"-> Successfully saved: {csv_path}")
+        except Exception as e:
+            logging.error(f"-> FAILED to save {csv_path}. Reason: {e}")
+
     if fh:
         logger.removeHandler(fh)
         fh.close()

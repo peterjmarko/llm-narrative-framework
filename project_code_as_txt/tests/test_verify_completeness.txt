@@ -1,0 +1,119 @@
+import unittest
+from unittest.mock import patch
+import os
+import sys
+import tempfile
+import pytest
+from verify_pipeline_completeness import count_matrices_in_file, count_lines_in_file
+
+# Add src directory to path to allow importing the script under test
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+from verify_pipeline_completeness import main as verify_main, count_matrices_in_file, count_lines_in_file
+
+class TestVerifyPipelineCompleteness(unittest.TestCase):
+
+    def setUp(self):
+        self.test_dir_obj = tempfile.TemporaryDirectory(prefix="test_verify_")
+        self.test_dir = self.test_dir_obj.name
+        self.original_sys_argv = list(sys.argv)
+
+        # We'll create 2 complete run directories for this test
+        self.num_expected_runs = 2
+        self.expected_queries_per_run = 5 # Example: 5 queries per run per run_dir
+        self.k_group_size = 2 # Matches 'sbj-2' in run_dir name
+
+        for i in range(1, self.num_expected_runs + 1):
+            # Create a run directory name that verify_pipeline_completeness.py can parse
+            run_dir = os.path.join(self.test_dir, f"run_repl-{i}_trl-{self.expected_queries_per_run}_sbj-{self.k_group_size}")
+            os.makedirs(os.path.join(run_dir, "session_queries"))
+            os.makedirs(os.path.join(run_dir, "session_responses"))
+            analysis_path = os.path.join(run_dir, "analysis_inputs")
+            os.makedirs(analysis_path)
+
+            # Create dummy files to simulate completeness
+            for j in range(self.expected_queries_per_run):
+                with open(os.path.join(run_dir, "session_queries", f"llm_query_{j:03d}.txt"), "w") as f:
+                    f.write(f"query {j}")
+                with open(os.path.join(run_dir, "session_responses", f"llm_response_{j:03d}.txt"), "w") as f:
+                    f.write(f"response {j}")
+            
+            # Create dummy all_scores.txt (for count_matrices_in_file)
+            with open(os.path.join(analysis_path, "all_scores.txt"), "w") as f:
+                for _ in range(self.expected_queries_per_run):
+                    f.write("Matrix: Some Matrix ID\n") # Start of a matrix
+                    for _ in range(self.k_group_size): # k lines for each matrix
+                        f.write("dummy matrix data line\n")
+            
+            # Create dummy all_mappings.txt (for count_lines_in_file)
+            with open(os.path.join(analysis_path, "all_mappings.txt"), "w") as f:
+                f.write("header\n") # For skip_header=True
+                for _ in range(self.expected_queries_per_run):
+                    f.write("dummy mapping line\n")
+
+    def tearDown(self):
+        self.test_dir_obj.cleanup()
+        sys.argv = self.original_sys_argv
+
+    def test_helper_functions(self):
+        """Test the file counting helper functions directly."""
+        # Use one of the dummy run directories created in setUp
+        # Let's use the first one: run_repl-1_trl-5_sbj-2
+        first_run_dir = os.path.join(self.test_dir, f"run_repl-1_trl-{self.expected_queries_per_run}_sbj-{self.k_group_size}")
+        analysis_path = os.path.join(first_run_dir, "analysis_inputs")
+
+        # Test count_matrices_in_file
+        scores_path = os.path.join(analysis_path, "all_scores.txt")
+        # The setUp creates self.expected_queries_per_run (5) matrices, each with self.k_group_size (2) lines of data
+        num_matrices_counted = count_matrices_in_file(scores_path, self.k_group_size)
+        self.assertEqual(num_matrices_counted, self.expected_queries_per_run) # Expect 5 matrices
+
+        # Test count_lines_in_file
+        mappings_path = os.path.join(analysis_path, "all_mappings.txt")
+        # The setUp creates 1 header line + self.expected_queries_per_run (5) data lines
+        num_mappings_counted = count_lines_in_file(mappings_path, skip_header=True)
+        self.assertEqual(num_mappings_counted, self.expected_queries_per_run) # Expect 5 mappings (excluding header)
+
+        # Test with empty file
+        empty_file_path = os.path.join(self.test_dir, "empty.txt")
+        with open(empty_file_path, "w") as f:
+            pass
+        self.assertEqual(count_lines_in_file(empty_file_path), 0)
+        self.assertEqual(count_matrices_in_file(empty_file_path, self.k_group_size), 0)
+
+        # Test with non-existent file
+        self.assertEqual(count_lines_in_file("non_existent.txt"), 0)
+        self.assertEqual(count_matrices_in_file("non_existent.txt", self.k_group_size), 0)
+
+    @patch('verify_pipeline_completeness.get_config_value')
+    def test_main_verification_logic(self, mock_get_config_value):
+        """Test the main script logic for finding and reporting completeness."""
+        # Arrange: mock the command-line arguments and the logger
+        cli_args = ['verify_pipeline_completeness.py', '--parent_dir', self.test_dir]
+
+        # Mock get_config_value to return the expected number of replications
+        mock_get_config_value.return_value = self.num_expected_runs # Should match number of dummy run_dirs created
+
+        with patch('logging.info') as mock_log_info, \
+             patch.object(sys, 'argv', cli_args):
+            # Act & Assert: Expect SystemExit with code 0 (success)
+            with pytest.raises(SystemExit) as excinfo:
+                verify_main()
+            
+            self.assertEqual(excinfo.value.code, 0) # Assert that the exit code was 0
+
+            # Assert that the script reported success and completeness messages
+            mock_log_info.assert_any_call(f"--- Verifying Data Completeness for {self.num_expected_runs} Runs in '{self.test_dir}' ---\n")
+            
+            # Check for specific completion messages for each dummy run
+            for i in range(1, self.num_expected_runs + 1):
+                run_name = f"run_repl-{i}_trl-{self.expected_queries_per_run}_sbj-{self.k_group_size}"
+                mock_log_info.assert_any_call(
+                    f"{run_name:<100} \x1b[92mCOMPLETE    \x1b[0m {self.expected_queries_per_run}/{self.expected_queries_per_run} trials processed."
+                )
+            
+            mock_log_info.assert_any_call("Overall Pipeline Completeness: 100.00%")
+            mock_log_info.assert_any_call("\nVerification PASSED: All runs are complete.")
+
+
+if __name__ == '__main__':
+    unittest.main()

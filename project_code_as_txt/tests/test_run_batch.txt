@@ -1,0 +1,119 @@
+import unittest
+import os
+import sys
+import shutil
+import tempfile
+from unittest.mock import patch, MagicMock
+import pytest # Import pytest for pytest.raises
+
+# Add src directory to path to allow importing the script under test
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+# Import the module so we can patch its functions and call its main
+import run_batch
+# We don't need to import config_loader directly here to patch it,
+# we'll patch it via its path within run_batch.
+
+class TestRunBatch(unittest.TestCase):
+
+    def setUp(self):
+        # Create a temporary directory for the test
+        self.test_dir_obj = tempfile.TemporaryDirectory(prefix="test_run_batch_")
+        self.test_dir = self.test_dir_obj.name
+
+        # Create the 'output' directory that run_batch.py expects
+        # This is the directory where batch_run_log.csv will be created
+        self.mock_output_dir = os.path.join(self.test_dir, 'output')
+        os.makedirs(self.mock_output_dir)
+
+        # Store original sys.argv
+        self.original_sys_argv = list(sys.argv)
+
+        # Store a reference to the run_batch module
+        self.run_batch_module = run_batch
+
+        # Define REAL_SRC_DIR for use in assertions about subprocess calls
+        # This should point to the actual src directory
+        self.REAL_SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+
+    def tearDown(self):
+        # Clean up the temporary directory
+        self.test_dir_obj.cleanup()
+        # Restore original sys.argv
+        sys.argv = self.original_sys_argv
+
+    @patch('run_batch.subprocess.run')
+    @patch('run_batch.get_config_value')
+    def test_run_batch_happy_path(self, mock_get_config_value, mock_subprocess_run):
+        """
+        Tests that run_batch.py reads config, loops correctly, and calls
+        all required downstream scripts with the correct arguments.
+        """
+        # Arrange: Mock a successful subprocess run for all calls
+        mock_subprocess_run.return_value = MagicMock(returncode=0)
+
+        # Configure the mocked get_config_value to return specific values
+        def mock_config_values(config_obj, section, key, fallback=None, value_type=str):
+            if section == 'Study':
+                if key == 'num_replications':
+                    return 2 # We want to test with 2 replications
+                elif key == 'num_trials_per_replication':
+                    return 5
+                elif key == 'k_group_size':
+                    return 2
+            elif section == 'General':
+                if key == 'base_output_dir':
+                    # Ensure this returns the path to the *created* mock_output_dir
+                    return self.mock_output_dir
+            return fallback
+
+        mock_get_config_value.side_effect = mock_config_values
+
+        # Mock sys.argv for argparse.ArgumentParser
+        with patch.object(sys, 'argv', ['run_batch.py']):
+            # Act: Run the main function of run_batch.py
+            with pytest.raises(SystemExit) as excinfo:
+                self.run_batch_module.main()
+
+            # Assert that the script exited with code 0 (success)
+            self.assertEqual(excinfo.value.code, 0)
+
+            # --- Assertions about mock_subprocess_run calls ---
+            # Total calls should be 2 (orchestrator) + 4 (post-replication scripts) = 6
+            self.assertEqual(mock_subprocess_run.call_count, 6) # <--- CORRECTED ASSERTION HERE
+
+            orchestrator_script_path = os.path.join(self.REAL_SRC_DIR, "orchestrate_experiment.py")
+            retry_script_path = os.path.join(self.REAL_SRC_DIR, "retry_failed_sessions.py")
+            verifier_script_path = os.path.join(self.REAL_SRC_DIR, "verify_pipeline_completeness.py")
+            rebuild_log_script_path = os.path.join(self.REAL_SRC_DIR, "rebuild_batch_log.py")
+            compile_script_path = os.path.join(self.REAL_SRC_DIR, "compile_results.py")
+
+            expected_calls_args = []
+            for i in range(1, 3): # For replication 1 and 2
+                base_seed = 1000 * i
+                qgen_seed = base_seed + 500
+                expected_calls_args.append([
+                    sys.executable, orchestrator_script_path,
+                    "--replication_num", str(i),
+                    "--base_seed", str(base_seed),
+                    "--qgen_base_seed", str(qgen_seed),
+                    "--quiet" # This flag is added by run_batch.py
+                ])
+            
+            # Post-replication calls
+            expected_calls_args.append([sys.executable, retry_script_path, self.mock_output_dir])
+            expected_calls_args.append([sys.executable, verifier_script_path, "--parent_dir", self.mock_output_dir])
+            expected_calls_args.append([sys.executable, rebuild_log_script_path, self.mock_output_dir])
+            expected_calls_args.append([sys.executable, compile_script_path, self.mock_output_dir])
+
+            actual_calls_args = [list(call.args[0]) for call in mock_subprocess_run.call_args_list]
+            
+            # This is a robust way to check if all expected calls are present, regardless of order
+            # Convert lists to tuples for set comparison
+            expected_calls_set = {tuple(x) for x in expected_calls_args}
+            actual_calls_set = {tuple(x) for x in actual_calls_args}
+
+            self.assertEqual(expected_calls_set, actual_calls_set, "Mismatch in subprocess calls")
+
+if __name__ == '__main__':
+    unittest.main()

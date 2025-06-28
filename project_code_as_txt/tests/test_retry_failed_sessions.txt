@@ -1,0 +1,301 @@
+import unittest
+import os
+import sys
+import shutil
+import tempfile
+import subprocess
+from unittest.mock import patch, MagicMock
+import time # Import time for unique coverage file names
+
+# Define path to the real 'src' directory where the script under test resides
+REAL_SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+PROJECT_ROOT_TEST = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+# Path to the actual retry_failed_sessions.py script
+RETRY_SCRIPT_PATH = os.path.join(REAL_SRC_DIR, "retry_failed_sessions.py")
+
+class TestRetryFailedSessions(unittest.TestCase):
+
+    def setUp(self):
+        """Set up a temporary project environment for the retry script test."""
+        self.test_project_root_obj = tempfile.TemporaryDirectory(prefix="test_retry_")
+        self.test_project_root = self.test_project_root_obj.name
+
+        # Create mock directories and output directory within the temporary project root
+        self.src_dir_for_mocks = os.path.join(self.test_project_root, 'src')
+        self.output_dir = os.path.join(self.test_project_root, 'output')
+        os.makedirs(self.src_dir_for_mocks)
+        os.makedirs(self.output_dir)
+
+        # --- CRUCIAL: Copy the REAL retry script into the temporary src_dir_for_mocks ---
+        # This ensures it finds and uses the mock dependencies created below.
+        self.copied_retry_script_path = os.path.join(self.src_dir_for_mocks, "retry_failed_sessions.py")
+        shutil.copy2(RETRY_SCRIPT_PATH, self.copied_retry_script_path)
+        
+        # --- Create MOCK versions of its dependencies in the temporary src_dir_for_mocks ---
+        # These mocks will now be found by the copied retry_failed_sessions.py
+        scripts_to_mock = [
+            "run_llm_sessions.py", "compile_results.py",
+            "process_llm_responses.py", "analyze_performance.py"
+        ]
+        for script_name in scripts_to_mock:
+            mock_path = os.path.join(self.src_dir_for_mocks, script_name)
+            with open(mock_path, "w") as f:
+                # The mock just needs to print something and exit successfully.
+                # It's important that these mocks are executable Python scripts.
+                f.write(f"#!/usr/bin/env python3\nimport sys\nprint('Mock {script_name} ran with args: {{sys.argv[1:]}}')\nsys.exit(0)")
+
+        # --- Create a mock directory structure with failures ---
+        self.run_a_dir = os.path.join(self.output_dir, "run_A_with_failure")
+        run_a_queries = os.path.join(self.run_a_dir, "session_queries")
+        run_a_responses = os.path.join(self.run_a_dir, "session_responses")
+        os.makedirs(run_a_queries); os.makedirs(run_a_responses)
+        with open(os.path.join(run_a_queries, "llm_query_001.txt"), "w") as f: f.write("q1")
+        with open(os.path.join(run_a_queries, "llm_query_002.txt"), "w") as f: f.write("q2")
+        with open(os.path.join(run_a_responses, "llm_response_001.txt"), "w") as f: f.write("r1")
+
+        self.run_b_dir = os.path.join(self.output_dir, "run_B_all_success")
+        run_b_queries = os.path.join(self.run_b_dir, "session_queries")
+        run_b_responses = os.path.join(self.run_b_dir, "session_responses")
+        os.makedirs(run_b_queries); os.makedirs(run_b_responses)
+        with open(os.path.join(run_b_queries, "llm_query_001.txt"), "w") as f: f.write("q1")
+        with open(os.path.join(run_b_responses, "llm_response_001.txt"), "w") as f: f.write("r1")
+
+    def tearDown(self):
+        """Clean up the temporary directory."""
+        self.test_project_root_obj.cleanup()
+
+    def _run_retry_script_with_coverage(self, *args):
+        """Helper to run retry_failed_sessions.py under coverage."""
+        coverage_config_path = os.path.join(PROJECT_ROOT_TEST, 'pytest.ini')
+        
+        # The command to run the COPIED retry_failed_sessions.py under coverage
+        cmd = [
+            sys.executable,
+            '-m', 'coverage', 'run',
+            '--parallel-mode', # Essential for pytest-cov to combine data later
+            '--rcfile', coverage_config_path, # Tell coverage where to find its config
+            self.copied_retry_script_path # Run the copied script
+        ]
+        cmd.extend(args) # Add the script's arguments
+
+        # Set environment variables for coverage.py in the subprocess
+        env = os.environ.copy()
+        # REMOVED: Do NOT set COVERAGE_FILE here. Let coverage.py manage this automatically.
+        # env['COVERAGE_FILE'] = os.path.join(PROJECT_ROOT_TEST, f'.coverage.{os.getpid()}.{time.time_ns()}')
+        
+        # The CWD for the subprocess should be the temporary project root,
+        # so it can find the mock scripts and output directories.
+        return subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=self.test_project_root, # Subprocess CWD
+            encoding='utf-8',
+            env=env # Pass the modified environment
+        )
+
+    def test_retry_script_finds_and_fixes_failures(self):
+        """
+        Tests that the retry script correctly identifies specific failures,
+        and calls the appropriate worker scripts.
+        """
+        # Arrange
+        script_args = [self.output_dir] # Scan the whole output directory for failures
+        
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        # Script should exit 1 if it found and successfully repaired failures.
+        self.assertEqual(result.returncode, 1, f"Script should exit 1 after repairs. Stderr:\n{result.stderr}")
+        
+        output = result.stdout
+        self.assertIn("Found 1 failed session(s) at indices [2]", output)
+        self.assertIn("Submitting 1 tasks for: run_A_with_failure", output)
+        self.assertIn("Retry Phase Complete: 1 successful, 0 failed.", output)
+        self.assertIn("Re-analyzing 'run_A_with_failure'", output)
+        # Check that the mock scripts were called.
+        self.assertIn("Mock run_llm_sessions.py ran", output)
+        self.assertIn("Mock process_llm_responses.py ran", output)
+        self.assertIn("Mock compile_results.py ran", output)
+
+    def test_manual_retry_rejects_invalid_args(self):
+        """
+        Tests that the script exits when --indices is used incorrectly.
+        """
+        # Arrange: try to use --indices with a parent directory, which is not allowed.
+        script_args = [
+            self.output_dir,
+            '--indices', '1', '2'
+        ]
+
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("error: --indices can only be used when specifying a single run directory, not a parent directory.", result.stderr)
+
+    def test_no_failures_found(self):
+        """
+        Test the scenario where no failures are found.
+        This test will target the parent output directory after ensuring it contains no failures.
+        """
+        # Arrange: Clear the output directory to ensure no failures are found.
+        # This will remove run_A_with_failure and run_B_all_success from setUp.
+        shutil.rmtree(self.output_dir)
+        os.makedirs(self.output_dir) # Recreate empty output dir
+
+        script_args = [self.output_dir] # Scan the now empty/clean output directory
+        
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        # Script should exit 0 if no failures were found at all.
+        self.assertEqual(result.returncode, 0, f"Script should exit 0 if no failures found. Stderr:\n{result.stderr}")
+        self.assertIn("--- Discovery Complete: No sessions to retry. Nothing to do. ---", result.stdout)
+        self.assertNotIn("Mock run_llm_sessions.py ran", result.stdout) # No retries should happen
+
+    def test_script_exits_on_missing_dependency(self):
+        """
+        Test that the script exits with an error if a required dependency script is missing.
+        """
+        # Arrange: Remove one of the mock dependency scripts
+        os.remove(os.path.join(self.src_dir_for_mocks, "run_llm_sessions.py"))
+        
+        script_args = [self.output_dir]
+
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        self.assertEqual(result.returncode, 1, f"Script should exit 1 on missing dependency. Stderr:\n{result.stderr}")
+        # Error message now goes to stderr due to logging config change in retry_failed_sessions.py
+        self.assertIn("Error: Could not find required script at:", result.stderr)
+        self.assertIn("run_llm_sessions.py", result.stderr)
+
+    def test_api_timeout_in_retry(self):
+        """
+        Tests that if a retry fails (simulated by a mock script exiting non-zero),
+        it's reported as a failed retry.
+        """
+        # Arrange: Make run_llm_sessions.py mock script fail
+        mock_path = os.path.join(self.src_dir_for_mocks, "run_llm_sessions.py")
+        with open(mock_path, "w") as f:
+            f.write(f"#!/usr/bin/env python3\nimport sys\nprint('Mock run_llm_sessions.py FAILED')\nsys.exit(1)") # Exit with error
+
+        script_args = [self.output_dir]
+
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        # The script should exit with status 2 because some sessions still failed.
+        self.assertEqual(result.returncode, 2, f"Script should exit 2 if retries fail. Stderr:\n{result.stderr}")
+        self.assertIn("Retry Phase Complete: 0 successful, 1 failed.", result.stdout) # 1 failed from run_A
+        self.assertIn("sessions still failed to retry.", result.stdout)
+        self.assertIn("Mock run_llm_sessions.py FAILED", result.stdout) # Check mock output
+
+    def test_script_exits_if_no_successful_retries(self):
+        """
+        Tests that the script exits if no sessions were successfully retried,
+        even if some failures were found.
+        """
+        # Arrange: Configure run_llm_sessions.py mock to always fail
+        mock_path = os.path.join(self.src_dir_for_mocks, "run_llm_sessions.py")
+        with open(mock_path, "w") as f:
+            f.write(f"#!/usr/bin/env python3\nimport sys\nsys.exit(1)") # Always fail
+
+        script_args = [self.output_dir]
+
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        # If retries were attempted but none succeeded, and some failed, it should exit with 2.
+        self.assertEqual(result.returncode, 2, f"Script should exit 2 if no successful retries but failures found. Stderr:\n{result.stderr}")
+        self.assertIn("Retry Phase Complete: 0 successful, 1 failed.", result.stdout)
+        self.assertIn("sessions still failed to retry.", result.stdout) # This implies exit code 2
+        # The message "No sessions were successfully retried. Halting before re-analysis." is removed from script.
+
+    def test_target_dir_does_not_exist(self):
+        """
+        Tests that the script exits with an error if the target directory does not exist.
+        """
+        # Arrange: Use a non-existent directory
+        non_existent_dir = os.path.join(self.test_project_root, "non_existent_dir_xyz") # Ensure it's truly non-existent
+        script_args = [non_existent_dir]
+
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        self.assertEqual(result.returncode, 1, f"Script should exit 1 if target dir not found. Stderr:\n{result.stderr}")
+        # Error message now goes to stderr due to logging config change in retry_failed_sessions.py
+        self.assertIn("Error: Target directory does not exist:", result.stderr)
+        self.assertIn(non_existent_dir, result.stderr)
+
+    def test_successful_retry_and_analysis_update(self):
+        """
+        Tests the full successful path: retry, process, analyze, compile.
+        """
+        # Arrange: Initial setup already has one failure in run_A_with_failure.
+        # The default mock scripts will succeed when called.
+        script_args = [self.output_dir]
+
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        self.assertEqual(result.returncode, 1, f"Script should exit 1 on full success. Stderr:\n{result.stderr}")
+        self.assertIn("Retry Phase Complete: 1 successful, 0 failed.", result.stdout)
+        self.assertIn("Starting Full Analysis Update for Modified Runs", result.stdout)
+        self.assertIn("Re-analyzing 'run_A_with_failure'", result.stdout)
+        self.assertIn("Successfully updated 'final_summary_results.csv'", result.stdout)
+        self.assertIn("--- Retry and Analysis Update Complete. ---", result.stdout)
+        
+        # Verify that the mock scripts for processing/analyzing/compiling were called
+        self.assertIn("Mock process_llm_responses.py ran", result.stdout)
+        self.assertIn("Mock analyze_performance.py ran", result.stdout) # Now correctly printed to stdout
+        self.assertIn("Mock compile_results.py ran", result.stdout)
+
+    def test_partial_retry_success_with_remaining_failures(self):
+        """
+        Tests scenario where some retries succeed, but others fail, leading to exit code 2.
+        """
+        # Arrange: Create two failures. One will succeed, one will fail.
+        self.run_c_dir = os.path.join(self.output_dir, "run_C_mixed_failure")
+        run_c_queries = os.path.join(self.run_c_dir, "session_queries")
+        run_c_responses = os.path.join(self.run_c_dir, "session_responses")
+        os.makedirs(run_c_queries); os.makedirs(run_c_responses)
+        with open(os.path.join(run_c_queries, "llm_query_001.txt"), "w") as f: f.write("q1")
+        with open(os.path.join(run_c_queries, "llm_query_002.txt"), "w") as f: f.write("q2")
+        with open(os.path.join(run_c_queries, "llm_query_003.txt"), "w") as f: f.write("q3")
+        with open(os.path.join(run_c_responses, "llm_response_001.txt"), "w") as f: f.write("r1") # q2 and q3 are failures
+
+        # Make run_llm_sessions.py mock fail for index 3, succeed for index 2
+        mock_path = os.path.join(self.src_dir_for_mocks, "run_llm_sessions.py")
+        with open(mock_path, "w") as f:
+            f.write(f"#!/usr/bin/env python3\nimport sys\n")
+            f.write(f"if '3' in sys.argv:\n    print('Mock run_llm_sessions.py FAILED for index 3')\n    sys.exit(1)\n")
+            f.write(f"else:\n    print('Mock run_llm_sessions.py ran successfully')\n    sys.exit(0)\n")
+
+        script_args = [self.output_dir]
+
+        # Act
+        result = self._run_retry_script_with_coverage(*script_args)
+
+        # Assert
+        # Expected exit code 2 (some failed, some succeeded)
+        self.assertEqual(result.returncode, 2, f"Script should exit 2 for mixed success/failure. Stderr:\n{result.stderr}")
+        self.assertIn("Retry Phase Complete: 2 successful, 1 failed.", result.stdout) # 1 from A, 1 from C (index 2), 1 failed from C (index 3)
+        self.assertIn("sessions still failed to retry.", result.stdout)
+        self.assertIn("Exiting with status 2: 1 session(s) could not be repaired.", result.stdout)
+        self.assertIn("Mock run_llm_sessions.py FAILED for index 3", result.stdout)
+        self.assertIn("Mock run_llm_sessions.py ran successfully", result.stdout)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -7,8 +7,8 @@ Single Experiment Orchestrator (orchestrate_experiment.py)
 
 Purpose:
 This master script is the main entry point for conducting or re-analyzing a
-**single, complete experimental run**. It is designed to be called repeatedly by a
-higher-level batch script (e.g., `run_replications.ps1`).
+**single, complete experimental run**. It is designed to be called repeatedly by the
+main Python batch runner (`run_batch.py`).
 
 The script has two primary modes:
 1.  **New Run Mode (Default):** Manages the entire personality matching pipeline:
@@ -82,14 +82,13 @@ except ImportError:
         logging.error(f"FATAL: Could not import from config_loader.py even after path adjustment. Error: {e}")
         sys.exit(1)
 
-def run_script(command, title, is_interactive=False, quiet=False):
+def run_script(command, title, is_interactive=False):
     """
     Helper to run a script as a subprocess.
     In interactive mode, it lets the subprocess write directly to the console.
     In normal mode, it captures all output robustly for the report.
     """
-    # Always print the high-level stage to the console, independent of logging.
-    print(f"--- Running Stage: {title} ---")
+    logging.info(f"--- Running Stage: {title} ---")
 
     header = (
         f"\n\n{'='*80}\n"
@@ -102,8 +101,7 @@ def run_script(command, title, is_interactive=False, quiet=False):
         if is_interactive:
             # For the LLM runner stage, let it take over the console to show the spinner.
             # We will not capture its output for the final report to ensure the spinner works.
-            if not quiet:
-                logging.info("Running interactive stage, output will appear directly on console...")
+            logging.info("Running interactive stage, output will appear directly on console...")
             subprocess.run(
                 command,
                 check=True,
@@ -114,8 +112,7 @@ def run_script(command, title, is_interactive=False, quiet=False):
             return header + "[Interactive stage output was displayed on the console and not captured in this report.]\n"
         else:
             # For all other stages, use the most robust capture method.
-            if not quiet:
-                logging.info("Capturing all output for report...")
+            logging.info("Capturing all output for report...")
             result = subprocess.run(
                 command,
                 capture_output=True, # This captures both stdout and stderr
@@ -160,10 +157,16 @@ def generate_run_dir_name(model_name, temperature, num_iterations, k_per_query, 
     db_base = os.path.splitext(os.path.basename(personalities_db))[0] if personalities_db else "unknown_db"
     
     # 5. Format Group Size (k) with "sbj-" prefix and zero-padding
-    subjects_str = f"sbj-{k_per_query:02d}"
+    try:
+        subjects_str = f"sbj-{int(k_per_query):02d}"
+    except (ValueError, TypeError):
+        subjects_str = "sbj-XX" # Fallback for non-numeric k_per_query
     
     # 6. Format Number of Trials (m) with "trl-" prefix and zero-padding
-    trials_str = f"trl-{num_iterations:03d}"
+    try:
+        trials_str = f"trl-{int(num_iterations):03d}"
+    except (ValueError, TypeError):
+        trials_str = "trl-XXX" # Fallback for non-numeric num_iterations
 
     # 7. Format Replication Number with "rep-" prefix and zero-padding
     replication_str = f"rep-{replication_num:02d}"
@@ -218,6 +221,14 @@ def main():
     args.num_iterations = get_config_value(APP_CONFIG, 'Study', 'num_trials', fallback=100, value_type=int)
     args.k_per_query = get_config_value(APP_CONFIG, 'Study', 'group_size', fallback=10, value_type=int)
 
+    # Validate loaded study parameters
+    if not isinstance(args.num_iterations, int) or args.num_iterations <= 0:
+        logging.error(f"FATAL: Invalid 'num_trials' in config.ini: {args.num_iterations}. Must be a positive integer.")
+        sys.exit(1)
+    if not isinstance(args.k_per_query, int) or args.k_per_query <= 0:
+        logging.error(f"FATAL: Invalid 'group_size' in config.ini: {args.k_per_query}. Must be a positive integer.")
+        sys.exit(1)
+
 
     # --- Configure Logging Level ---
     # The orchestrator's INFO logs are the primary progress indicators,
@@ -266,8 +277,7 @@ def main():
             
     else:
         # --- Generate Descriptive Run Directory Name (Normal Mode) ---
-        if not args.quiet:
-            logging.info("Gathering parameters for descriptive run directory name...")
+        logging.info("Gathering parameters for descriptive run directory name...")
         model_name_raw = get_config_value(APP_CONFIG, 'LLM', 'model_name', fallback="unknown_model")
         temp_raw = get_config_value(APP_CONFIG, 'LLM', 'temperature', fallback=0.0, value_type=float)
         personalities_db_raw = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="unknown_db.txt")
@@ -284,8 +294,7 @@ def main():
         resolved_base_output_dir = os.path.join(PROJECT_ROOT, base_output_dir_cfg)
         run_specific_dir_path = os.path.join(resolved_base_output_dir, run_dir_name)
         os.makedirs(run_specific_dir_path, exist_ok=True)
-        if not args.quiet:
-            logging.info(f"Created unique output directory for this run: {run_specific_dir_path}")
+        logging.info(f"Created unique output directory for this run: {run_specific_dir_path}")
 
 
     # --- Define Script Paths ---
@@ -304,7 +313,7 @@ def main():
                 cmd1.extend(["--base_seed", str(args.base_seed)])
             if args.qgen_base_seed is not None:
                 cmd1.extend(["--qgen_base_seed", str(args.qgen_base_seed)])
-            output1 = run_script(cmd1, "1. Build Queries", quiet=args.quiet)
+            output1 = run_script(cmd1, "1. Build Queries")
             all_stage_outputs.append(output1)
             
             # Stage 2: Run LLM Sessions (passing the unique run directory)
@@ -316,7 +325,7 @@ def main():
             else:
                 # Only add verbose flag if not in quiet mode
                 cmd2.append("-v")
-            output2 = run_script(cmd2, "2. Run LLM Sessions", is_interactive=True, quiet=args.quiet)
+            output2 = run_script(cmd2, "2. Run LLM Sessions", is_interactive=True)
             all_stage_outputs.append(output2)
         else:
             logging.info("Skipping Stage 1 (Build Queries) and Stage 2 (Run LLM Sessions) due to --reprocess flag.")
@@ -324,7 +333,7 @@ def main():
         # Stage 3: Process Responses (passing the unique run directory)
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]
         if args.quiet: cmd3.append("--quiet")
-        output3 = run_script(cmd3, "3. Process LLM Responses", quiet=args.quiet)
+        output3 = run_script(cmd3, "3. Process LLM Responses")
         all_stage_outputs.append(output3)
         
         # Check for the parser summary in the output of stage 3
@@ -337,7 +346,7 @@ def main():
         # Stage 4: Analyze Performance (passing the unique run directory and --quiet)
         cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path]
         if args.quiet: cmd4.append("--quiet")
-        output4 = run_script(cmd4, "4. Analyze Performance", quiet=args.quiet)
+        output4 = run_script(cmd4, "4. Analyze Performance")
         all_stage_outputs.append(output4)
         final_analysis_output = output4
         
@@ -433,39 +442,28 @@ Run Notes:       {args.notes}
         report_file.write("\n-------------------------------\n")
 
         # --- Final Analysis Summary Section ---
+        # Add the high-level header the user wants.
         report_file.write("\n\n================================================================================\n")
         report_file.write("### OVERALL META-ANALYSIS RESULTS ###\n")
         report_file.write("================================================================================\n\n")
 
         if final_analysis_output:
-            # Part A: Write the human-readable summary for review.
-            summary_start_tag = "<<<ANALYSIS_SUMMARY_START>>>"
-            summary_start_index = final_analysis_output.find(summary_start_tag)
+            # Define the unique tag to look for in the analyzer's output.
+            start_tag = "<<<ANALYSIS_SUMMARY_START>>>"
+            
+            # Find the position of the tag in the captured output.
+            summary_start_index = final_analysis_output.find(start_tag)
             
             if summary_start_index != -1:
-                analysis_summary_text = final_analysis_output[summary_start_index + len(summary_start_tag):].strip()
+                # If the tag is found, extract everything *after* the tag.
+                analysis_summary_text = final_analysis_output[summary_start_index + len(start_tag):].strip()
                 report_file.write(analysis_summary_text)
-                report_file.write("\n")
+                report_file.write("\n") # Add a final newline for spacing
             else:
-                report_file.write("Could not find human-readable analysis summary section in the script output.\n")
+                # Fallback if the tag isn't found, indicating a problem.
+                report_file.write("Could not find analysis summary section in the script output.\n")
                 report_file.write("Full log from analysis stage is included below for debugging:\n\n")
                 report_file.write(final_analysis_output)
-
-            # Part B: Write the machine-readable JSON block for compilation.
-            # This is the critical fix.
-            json_start_tag = "<<<METRICS_JSON_START>>>"
-            json_end_tag = "<<<METRICS_JSON_END>>>"
-            
-            json_start_index = final_analysis_output.find(json_start_tag)
-            json_end_index = final_analysis_output.find(json_end_tag)
-
-            if json_start_index != -1 and json_end_index != -1:
-                # Extract the entire block, including the tags, and write it to the report.
-                json_block = final_analysis_output[json_start_index : json_end_index + len(json_end_tag)]
-                report_file.write("\n\n" + json_block + "\n")
-            else:
-                # This warning is important for debugging if the analyzer ever fails to produce the block.
-                report_file.write("\n\nWARNING: Machine-readable metrics JSON block was not found in the analyzer output.\n")
         else:
             report_file.write("Analysis stage did not complete successfully or was not run.\n")
 
