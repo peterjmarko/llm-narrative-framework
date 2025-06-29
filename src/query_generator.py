@@ -361,6 +361,7 @@ def main():
     # 1. Setup Argparse (using config values for defaults)
     default_k_cfg = get_config_value(APP_CONFIG, 'General', 'default_k', fallback=6, value_type=int)
     default_qgen_prefix_cfg = get_config_value(APP_CONFIG, 'Filenames', 'qgen_temp_prefix', fallback="", value_type=str)
+    default_mapping_strategy_cfg = get_config_value(APP_CONFIG, 'Study', 'mapping_strategy', fallback='correct')
 
     parser = argparse.ArgumentParser(
         description="Generates LLM query files and mappings from a source personalities file.",
@@ -368,6 +369,8 @@ def main():
     )
     parser.add_argument("-k", type=int, default=default_k_cfg, help="Number of people/descriptions for the query.")
     parser.add_argument("--seed", type=int, default=None, help="Optional random seed for reproducibility.")
+    parser.add_argument("--mapping_strategy", default=default_mapping_strategy_cfg, choices=['correct', 'random'],
+                        help="The ground truth mapping strategy to use. Overrides config.ini.")
     parser.add_argument("--personalities_file", default=DEFAULT_PERSONALITIES_SRC_FN, help=f"Filename of the source personalities file (expected in data/ dir relative to project root). Default: {DEFAULT_PERSONALITIES_SRC_FN}")
     parser.add_argument("--base_query_file", default=DEFAULT_BASE_QUERY_SRC_FN, help=f"Filename of the base query file (expected in data/ dir relative to project root). Default: {DEFAULT_BASE_QUERY_SRC_FN}")
     parser.add_argument("--output_basename_prefix", default=default_qgen_prefix_cfg, help="Prefix for all output filenames. Can include relative path components from this script's location (e.g., 'temp_outputs/iter_001_'). Default is from config or empty string.")
@@ -498,16 +501,42 @@ def main():
 
     logging.info(f"Loaded {len(selected_items)} items for processing.")
 
+    # Determine mapping strategy from args (which defaults to config value)
+    mapping_strategy = args.mapping_strategy
+    logging.info(f"Using mapping strategy: {mapping_strategy}")
+
+    # By default, the items for names and descriptions are the same, ensuring a correct map.
+    name_items = selected_items
+    description_items = selected_items
+
+    if mapping_strategy == 'random':
+        logging.warning("Applying 'random' mapping strategy. The ground truth will be a random permutation.")
+        
+        # Get the list of original internal reference IDs.
+        original_ref_ids = [item['internal_ref_id'] for item in selected_items]
+        
+        # Shuffle these reference IDs using the script's seeded random state.
+        random.shuffle(original_ref_ids)
+        
+        # Create a new list of items for the descriptions. Each original item
+        # is now paired with a RANDOMLY chosen reference ID. This breaks the
+        # original name-to-description link while keeping the sets of names and descriptions identical.
+        description_items = []
+        for i, item in enumerate(selected_items):
+            new_item = item.copy()
+            new_item['internal_ref_id'] = original_ref_ids[i]
+            description_items.append(new_item)
+
     logging.info("Writing intermediate files...")
-    names_data_rows = [[i + 1, item['name'], item['year']] for i, item in enumerate(selected_items)]
+    names_data_rows = [[i + 1, item['name'], item['year']] for i, item in enumerate(name_items)]
     write_tab_separated_file(names_out_filepath, "Seq\tName\tBirthYear", names_data_rows)
     
-    descriptions_data_rows = [[i + 1, item['description']] for i, item in enumerate(selected_items)]
+    descriptions_data_rows = [[i + 1, item['description']] for i, item in enumerate(description_items)]
     write_tab_separated_file(descriptions_out_filepath, "Seq\tDescriptionText", descriptions_data_rows)
 
     logging.info("Creating shuffled files, mapping, and manifest file...")
-    shuffled_name_year_list = create_shuffled_names_file(selected_items, shuffled_names_out_filepath)
-    shuffled_description_list = create_shuffled_descriptions_file(selected_items, shuffled_descriptions_out_filepath, k_value)
+    shuffled_name_year_list = create_shuffled_names_file(name_items, shuffled_names_out_filepath)
+    shuffled_description_list = create_shuffled_descriptions_file(description_items, shuffled_descriptions_out_filepath, k_value)
     create_mapping_file(shuffled_name_year_list, shuffled_description_list, mapping_out_filepath, k_value)
     create_manifest_file(shuffled_name_year_list, shuffled_description_list, manifest_out_filepath, k_value) # ADD THIS
 

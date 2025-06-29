@@ -401,6 +401,9 @@ def main():
             # For a new run, the model name comes from the current configuration.
             llm_model = get_config_value(APP_CONFIG, 'LLM', 'model_name', 'N/A')
 
+        # Get the mapping strategy from the config to include in the report
+        mapping_strategy = get_config_value(APP_CONFIG, 'Study', 'mapping_strategy', fallback='unknown')
+
         header = f"""
 ================================================================================
  REPLICATION RUN REPORT
@@ -415,6 +418,7 @@ Report File:     {report_filename}
 --- Run Parameters ---
 Num Iterations (m): {args.num_iterations}
 Items per Query (k): {args.k_per_query}
+Mapping Strategy: {mapping_strategy}
 Personalities Source: {personalities_file}
 LLM Model:       {llm_model}
 Run Notes:       {args.notes}

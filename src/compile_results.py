@@ -33,6 +33,7 @@ def parse_report_header(report_content):
 
     params['run_directory'] = extract(r"Run Directory:\s*(.*)", report_content)
     params['model'] = extract(r"LLM Model:\s*(.*)", report_content)
+    params['mapping_strategy'] = extract(r"Mapping Strategy:\s*(.*)", report_content)
     params['k'] = extract(r"Items per Query \(k\):\s*(\d+)", report_content)
     params['m'] = extract(r"Num Iterations \(m\):\s*(\d+)", report_content)
     params['db'] = extract(r"Personalities Source:\s*(.*)", report_content)
@@ -112,12 +113,12 @@ def main():
         all_keys = set().union(*(d.keys() for d in all_results))
         # This order exactly matches the user's specification.
         preferred_order = [
-            'run_directory', 'replication', 'model', 'temperature', 'k', 'm', 'db',
-            'mwu_stouffer_z', 'mwu_stouffer_p', 'mwu_fisher_chi2', 'mwu_fisher_p',
-            'mean_effect_size_r', 'effect_size_r_p',
-            'mean_mrr', 'mrr_p',
-            'mean_top_1_acc', 'top_1_acc_p',
-            'mean_top_3_acc', 'top_3_acc_p'
+        'run_directory', 'replication', 'model', 'mapping_strategy', 'temperature', 'k', 'm', 'db',
+        'mwu_stouffer_z', 'mwu_stouffer_p', 'mwu_fisher_chi2', 'mwu_fisher_p',
+        'mean_effect_size_r', 'effect_size_r_p',
+        'mean_mrr', 'mrr_p',
+        'mean_top_1_acc', 'top_1_acc_p',
+        'mean_top_3_acc', 'top_3_acc_p'
         ]
         # Sort headers by preferred order, then alphabetically for any unexpected keys.
         # This handles dynamic keys like 'mean_top_5_acc' if the analysis was run with a different K.

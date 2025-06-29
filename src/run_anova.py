@@ -261,8 +261,8 @@ def perform_analysis(df, metric, all_possible_factors, output_dir):
         return
     logging.info(f"Detected {len(active_factors)} active factor(s) with variation: {', '.join(active_factors)}")
 
-    logging.info("\n--- Descriptive Statistics by Model ---")
-    desc_stats = df.groupby('model')[metric].agg(['count', 'mean', 'std']).rename(
+    logging.info(f"\n--- Descriptive Statistics by {', '.join(active_factors)} ---")
+    desc_stats = df.groupby(active_factors)[metric].agg(['count', 'mean', 'std']).rename(
         columns={'count': 'N', 'mean': 'Mean', 'std': 'Std. Dev.'}
     )
     logging.info(f"\n{desc_stats.to_string(float_format='%.4f')}")
@@ -415,7 +415,7 @@ def main():
 
 
     # --- Proceed with Analysis ---
-    factors = ['model', 'temperature', 'k', 'm']
+    factors = ['model', 'mapping_strategy', 'temperature', 'k', 'm']
     for factor in list(factors):
         if factor not in df.columns:
             factors.remove(factor)
