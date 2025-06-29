@@ -65,8 +65,7 @@ import glob
 # --- Setup ---
 # Setup basic logging for the master script itself
 logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(filename)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
+                    format='%(message)s')
 
 try:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT

@@ -19,16 +19,32 @@
 #>
 
 [CmdletBinding()]
-param()
+param(
+    # Optional starting replication number.
+    [Parameter(Mandatory=$false)]
+    [int]$StartRep,
+
+    # Optional ending replication number.
+    [Parameter(Mandatory=$false)]
+    [int]$EndRep
+)
 
 # Ensure console output uses UTF-8 to correctly display any special characters.
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "--- Launching Python Batch Runner ---" -ForegroundColor Green
 
-# Execute the main Python batch script.
-# All complex logic (looping, error handling, etc.) is now within run_batch.py.
-& python src/run_batch.py
+# Build the argument list for the Python script dynamically.
+$pythonArgs = @("src/run_batch.py")
+if ($PSBoundParameters.ContainsKey('StartRep')) {
+    $pythonArgs += "--start-rep", $StartRep
+}
+if ($PSBoundParameters.ContainsKey('EndRep')) {
+    $pythonArgs += "--end-rep", $EndRep
+}
+
+# Execute the main Python batch script with the specified arguments.
+& python $pythonArgs
 
 # Check the exit code from the Python script.
 if ($LASTEXITCODE -ne 0) {
