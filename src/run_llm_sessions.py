@@ -2,41 +2,40 @@
 # -*- coding: utf-8 -*-
 # Filename: src/run_llm_sessions.py
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# Filename: src/run_llm_sessions.py
-
 """
 LLM Session Runner (run_llm_sessions.py)
 
 Purpose:
-This script orchestrates the process of sending multiple pre-generated queries
-to a Large Language Model (LLM). It finds query files within a specific run
-directory and invokes the `llm_prompter.py` worker script for each one.
+This script orchestrates sending multiple pre-generated queries to an LLM by
+invoking the `llm_prompter.py` worker script for each query.
 
-It can run in several modes:
-- Default: Processes a range of queries specified by --start_index and --end_index.
-- Targeted: Processes a specific list of queries provided via the --indices flag.
-- Continue: Skips queries that already have a successful response file.
-- Force Rerun: Deletes existing response/error files for a query before re-running it.
+Console Output Modes:
+-   **Default (Verbose) Mode**: When run directly, the script provides detailed,
+    real-time logging of each query being orchestrated, including worker output.
+    This is useful for debugging a specific run.
 
-Workflow (when called by orchestrator or retry script):
-1.  Receives the path to a unique run directory via the `--run_output_dir` argument.
-2.  Locates the `session_queries` subdirectory inside the run directory.
-3.  Creates a `session_responses` subdirectory if it doesn't exist.
-4.  For each targeted query file, it invokes `llm_prompter.py`.
-5.  Saves the LLM's text response to `llm_response_XXX.txt` and the full raw
+-   **Quiet Mode (`--quiet`)**: When the `--quiet` flag is used (typically by an
+    orchestrator like `orchestrate_replication.py`), the script suppresses all
+    detailed logs. Instead, it displays a single, updating status line on the
+    console showing the overall progress, duration of the last trial, total
+    elapsed time, and the estimated time remaining (ETR).
+
+Workflow (when called by an orchestrator):
+1.  Receives the path to a unique run directory via `--run_output_dir`.
+2.  Locates the `session_queries` and creates `session_responses` subdirectories.
+3.  For each targeted query file, it invokes `llm_prompter.py`.
+4.  Saves the LLM's text response to `llm_response_XXX.txt` and the full raw
     JSON response to `llm_response_XXX_full.json`.
+5.  Logs detailed progress to a file (`llm_sessions.log`) inside the run
+    directory, regardless of whether quiet mode is active.
 
 Command-Line Usage:
-    # Run all queries in a directory
-    python src/run_llm_sessions.py --run_output_dir <path_to_run_dir>
+    # Run all queries in a directory with full verbose output
+    python src/run_llm_sessions.py --run_output_dir <path_to_run_dir> -v
 
     # Manually retry specific failed queries (e.g., 12 and 37)
     python src/run_llm_sessions.py --run_output_dir <path_to_run_dir> --indices 12 37 --force-rerun
 """
-
-# === Start of src/run_llm_sessions.py ===
 
 import argparse
 import os

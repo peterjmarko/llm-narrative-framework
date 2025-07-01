@@ -1,0 +1,19 @@
+[run]
+parallel = true
+concurrency = multiprocessing
+disable_warnings = no-data-collected, module-not-imported
+data_file = .coverage
+include =
+    src/*
+    utilities/*
+
+[paths]
+source =
+    .
+    src
+
+[report]
+ignore_errors = True
+omit =
+    */.venv/*
+    */tests/*

@@ -203,6 +203,16 @@ def get_config_value(config: configparser.ConfigParser, section: str, key: str,
         logger.warning(f"Config: Value for [{section}]/{key} was not a string: '{raw_value}'. Using fallback.")
         return fallback
 
+def get_config_list(config, section, key, fallback=None):
+    """
+    Retrieves a comma-separated string from the config and returns it as a list
+    of cleaned strings.
+    """
+    value_str = get_config_value(config, section, key, fallback=None)
+    if value_str:
+        return [item.strip() for item in value_str.split(',')]
+    return fallback if fallback is not None else []
+
 # Global config object, loaded once
 APP_CONFIG = load_app_config()
 ENV_LOADED = load_env_vars() # Load .env once globally as well

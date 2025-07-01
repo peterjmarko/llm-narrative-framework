@@ -59,7 +59,7 @@ SRC_DIR_REAL = os.path.join(PROJECT_ROOT_FOR_TEST, 'src')
 PIPELINE_SCRIPTS = [
     "config_loader.py", "query_generator.py", "build_queries.py",
     "llm_prompter.py", "run_llm_sessions.py", "process_llm_responses.py",
-    "analyze_performance.py", "orchestrate_experiment.py"
+    "analyze_performance.py", "orchestrate_replication.py"
 ]
 
 class TestEndToEndSmoke(unittest.TestCase):

@@ -1,4 +1,30 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # Filename: src/log_manager.py
+
+"""
+Provides a command-line interface to manage the experiment's batch run log.
+
+This script centralizes all interactions with `batch_run_log.csv`, ensuring that
+logging is robust and maintainable. It is called by the main replication manager
+to handle the state of the log file at different stages of the experiment.
+
+Modes of Operation:
+-   'start': Prepares for a new experiment. It safely archives any existing log
+    file and creates a new, empty `batch_run_log.csv` with only a header.
+
+-   'update': Appends a single entry to the log from a completed replication's
+    report file. This provides a real-time record of progress.
+
+-   'rebuild': Safely rebuilds the log to ensure integrity when resuming a run.
+    It backs up the original log, then creates a new, clean version by parsing all
+    existing replication reports. This ensures the log is in a clean, appendable
+    state.
+
+-   'finalize': Appends a summary footer to the log, calculating total run time
+    and counts of completed/failed replications. This is called after the entire
+    batch is finished.
+"""
 
 import os
 import sys
@@ -119,12 +145,16 @@ def main():
     parser = argparse.ArgumentParser(description="A tool to update, rebuild, or finalize the batch run log.")
     subparsers = parser.add_subparsers(dest='mode', required=True, help="The operation to perform")
 
+    # --- 'start' command (NEW) ---
+    parser_start = subparsers.add_parser('start', help="Start a new batch, backing up any old log and creating a fresh one.")
+    parser_start.add_argument('output_dir', type=str, help="Path to the base output directory.")
+
     # --- 'update' command ---
     parser_update = subparsers.add_parser('update', help="Append a single replication's data to the log.")
     parser_update.add_argument('report_file', type=str, help="Path to the single replication_report.txt file.")
 
     # --- 'rebuild' command ---
-    parser_rebuild = subparsers.add_parser('rebuild', help="Recreate the entire log from all existing reports.")
+    parser_rebuild = subparsers.add_parser('rebuild', help="Recreate the entire log from all existing reports, backing up the original.")
     parser_rebuild.add_argument('output_dir', type=str, help="Path to the base output directory containing all run folders.")
 
     # --- 'finalize' command ---
@@ -136,29 +166,55 @@ def main():
     # --- Define shared variables ---
     fieldnames = ["ReplicationNum", "Status", "StartTime", "EndTime", "Duration", "ParsingStatus", "MeanMRR", "MeanTop1Acc", "RunDirectory", "ErrorMessage"]
     
-    if args.mode == 'update':
+    if args.mode == 'start':
+        log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
+        if os.path.exists(log_file_path):
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            backup_path = f"{log_file_path}.{timestamp}.bak"
+            try:
+                # Back up the old log by moving it
+                os.rename(log_file_path, backup_path)
+                print(f"Archived existing log to: {os.path.basename(backup_path)}")
+            except OSError as e:
+                print(f"Error: Could not back up existing log file: {e}", file=sys.stderr)
+                sys.exit(1)
+        # Create a new, empty log with only a header
+        write_log_row(log_file_path, {}, fieldnames) # Pass empty dict to just write header
+        # The write_log_row needs a slight modification to handle this
+        print("Initialized new batch run log with header.")
+
+    elif args.mode == 'update':
         if not os.path.exists(args.report_file):
             print(f"Error: Report file not found at '{args.report_file}'", file=sys.stderr)
             sys.exit(1)
         log_entry = parse_report_file(args.report_file)
-        # Assume the log is in the parent of the parent of the report file (output/run_.../report.txt -> output)
         log_file_path = os.path.join(os.path.dirname(os.path.dirname(args.report_file)), "batch_run_log.csv")
         write_log_row(log_file_path, log_entry, fieldnames)
         print(f"Updated {os.path.basename(log_file_path)} for replication {log_entry['ReplicationNum']}")
 
     elif args.mode == 'rebuild':
         log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
+        # --- MODIFICATION: Back up instead of deleting ---
         if os.path.exists(log_file_path):
-            os.remove(log_file_path)
-            print(f"Removed old log file for clean rebuild: {os.path.basename(log_file_path)}")
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            backup_path = f"{log_file_path}.{timestamp}.bak"
+            try:
+                os.rename(log_file_path, backup_path)
+                print(f"Backed up existing log to {os.path.basename(backup_path)} before rebuild.")
+            except OSError as e:
+                print(f"Error: Could not back up existing log file: {e}", file=sys.stderr)
+                sys.exit(1)
+        # --- END MODIFICATION ---
         
         report_files = glob.glob(os.path.join(args.output_dir, "run_*", "replication_report_*.txt"))
-        # Sort reports by creation time to ensure correct order in the log
-        report_files.sort(key=os.path.getmtime)
-
         if not report_files:
-            print("No report files found to rebuild the log.", file=sys.stderr)
-            sys.exit(1)
+            print("No report files found. Creating empty log.", file=sys.stderr)
+            # Still create an empty log so the pipeline doesn't fail
+            write_log_row(log_file_path, {}, fieldnames)
+            sys.exit(0)
+
+        # Sort reports by replication number from the filename to ensure correct order
+        report_files.sort(key=lambda p: int(re.search(r'rep-(\d+)', os.path.basename(os.path.dirname(p))).group(1)))
 
         for report_path in report_files:
             log_entry = parse_report_file(report_path)
@@ -169,5 +225,20 @@ def main():
         log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
         finalize_log(log_file_path)
 
+# You will also need to slightly modify write_log_row to handle the empty dict case for 'start'
+# Find the 'write_log_row' function and replace it with this:
+def write_log_row(log_file_path, log_entry, fieldnames):
+    """Appends a single row to the CSV, writing a header if needed."""
+    file_exists = os.path.exists(log_file_path)
+    with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        # Only write the row if the entry is not empty
+        if log_entry:
+            writer.writerow(log_entry)
+
 if __name__ == "__main__":
     main()
+
+# === End of src/log_manager.py ===

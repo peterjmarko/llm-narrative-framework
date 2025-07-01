@@ -1,76 +1,31 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Filename: utilities/convert_py_to_txt.py
 
 """
-Generates text (.txt) versions of specified script files (e.g., .py, .ps1)
-within a project and maintains an archive of previously generated text files.
+Python to Text Conversion Utility (convert_py_to_txt.py)
 
 Purpose:
-This script serves two main purposes:
-1.  Archiving: Before generating new .txt files, it copies the current contents
-    of the `project_code_as_txt` directory (excluding its 'Archive' subfolder)
-    into the `project_code_as_txt/Archive` subfolder. This process merges
-    and overwrites existing files/folders in the 'Archive' subfolder if they
-    share the same name as items in `project_code_as_txt`. Items unique to
-    the 'Archive' (e.g., older versions or files no longer present in the main
-    .py codebase) are preserved. This effectively creates a versioned backup
-    of the generated text files.
-2.  Conversion: It scans the project directory (excluding specified folders)
-    for all Python (.py) and PowerShell (.ps1) files. Each found script file is then copied and
-    renamed with a .txt extension into a designated output directory
-    (by default, 'project_code_as_txt' at the project root), preserving
-    the original directory structure.
+This script scans a directory structure for Python (`.py`) files and creates
+a text (`.txt`) copy of each file in the same directory. This is useful for
+preparing project files for analysis by language models that may not handle
+`.py` files directly.
 
-Key Features:
--   **Automated Archiving**: Preserves the state of `project_code_as_txt`
-    before each new conversion run.
--   **Recursive Script Scan**: Finds .py and .ps1 files in subdirectories.
--   **Directory Structure Preservation**: Replicates the source directory
-    structure in the output .txt directory.
--   **Configurable Exclusions**: Allows specifying directories to skip during
-    the script file scan (e.g., .venv, __pycache__, the output directory itself).
--   **Configurable Output and Archive Names**: The names of the main output
-    directory for .txt files and its archive subfolder can be customized
-    via constants.
+Workflow:
+1.  Accepts a target directory to scan for `.py` files.
+2.  The scan depth is controlled by the --depth argument.
+3.  For each `.py` file found, it creates a copy with a `.txt` extension.
+4.  Optionally, it can delete the original `.py` files after conversion.
 
-Configuration (at the top of the script):
--   `EXCLUDE_SCAN_DIRS`: A set of directory names (relative to project root)
-    to exclude from the script file search.
--   `TXT_OUTPUT_SUBDIR_NAME`: The name of the subdirectory (at project root)
-    where .txt files will be stored (default: "project_code_as_txt").
--   `ARCHIVE_SUBDIR_NAME`: The name of the sub-subdirectory within
-    `TXT_OUTPUT_SUBDIR_NAME` used for archiving (default: "Archive").
+Command-Line Usage:
+    # Convert .py files in the 'src' directory (depth 0)
+    python src/convert_py_to_txt.py src
 
-Execution:
-The script is intended to be run from the command line. It attempts to deduce
-the project's root directory assuming it is located in a 'utilities' folder
-directly under the project root (e.g., `my_project/utilities/convert_py_to_txt.py`).
-If this deduction fails, it falls back to using the parent of the current
-working directory, and then the current working directory itself, issuing warnings.
+    # Convert files in 'src' and its immediate subdirectories
+    python src/convert_py_to_txt.py src --depth 1
 
-Example Usage:
-    python utilities/convert_py_to_txt.py
-
-Dependencies:
--   Python 3.8 or newer is required for the `shutil.copytree(..., dirs_exist_ok=True)`
-    functionality used in the archiving process.
-
-Assumed Directory Structure (for default configuration):
-    project_root/
-    ├── utilities/
-    │   └── convert_py_to_txt.py  (this script)
-    ├── project_code_as_txt/      (output directory for .txt files)
-    │   ├── Archive/              (archive of previous .txt files)
-    │   │   └── ...
-    │   └── (current .txt files mirroring script structure)
-    │       └── some_module.txt
-    │       └── sub_package/
-    │           └── another_module.txt
-    ├── some_module.py
-    ├── run_scripts.ps1
-    ├── sub_package/
-    │   └── another_module.py
-    └── ... (other project files and folders)
+    # Convert recursively and delete the original .py files
+    python src/convert_py_to_txt.py src --depth -1 --delete_originals
 """
 
 # === Start of utilities/convert_py_to_txt.py ===
@@ -78,6 +33,7 @@ Assumed Directory Structure (for default configuration):
 import pathlib
 import shutil
 import os
+import argparse
 
 # --- Configuration ---
 # Directories to explicitly exclude from the search for script files (relative to project root)
@@ -175,21 +131,20 @@ def archive_previous_txt_versions(project_root_path: pathlib.Path,
     print("--- End Archiving ---")
 
 
-def convert_scripts_to_txt(project_root_path, output_subdir_name, exclude_dirs):
+def convert_scripts_to_txt(project_root_path, output_subdir_name, exclude_dirs, depth):
     """
-    Copies all .py and .ps1 files from the project directory and its subdirectories
-    (excluding specified ones) into a new subdirectory, renaming them to .txt.
+    Copies all .py and .ps1 files from the project directory, respecting recursion depth,
+    into a new subdirectory, renaming them to .txt.
 
     Args:
-        project_root_path (pathlib.Path): The root path of the project.
-        output_subdir_name (str): The name of the subdirectory to create for .txt files.
+        project_root_path (pathlib.Path): The root path of the project to scan.
+        output_subdir_name (str): The name of the subdirectory for .txt files.
         exclude_dirs (set): A set of directory names to exclude from scanning.
+        depth (int): The recursion depth to scan for files.
     """
     output_dir = project_root_path / output_subdir_name
-
-    if output_dir.exists():
-        print(f"Output directory '{output_dir.resolve()}' already exists. Files will be added/overwritten.")
-    else:
+    
+    if not output_dir.exists():
         try:
             output_dir.mkdir(parents=True, exist_ok=True)
             print(f"Created output directory: {output_dir.resolve()}")
@@ -197,90 +152,107 @@ def convert_scripts_to_txt(project_root_path, output_subdir_name, exclude_dirs):
             print(f"Error: Could not create output directory '{output_dir.resolve()}': {e}")
             return
 
-    print(f"\nScanning for .py and .ps1 files in: {project_root_path.resolve()}")
+    print(f"\nScanning for .py and .ps1 files in: {project_root_path.resolve()} with depth={depth}")
     print(f"Excluding directories: {', '.join(sorted(list(exclude_dirs))) if exclude_dirs else 'None'}")
 
     copied_count = 0
-    skipped_count = 0
     error_count = 0
     
-    # Create a combined list of all .py and .ps1 files
-    script_files = list(project_root_path.glob('**/*.py')) + list(project_root_path.glob('**/*.ps1'))
+    source_root_str = str(project_root_path.resolve())
+    base_depth = source_root_str.count(os.sep)
 
-    for script_file_path in script_files:
-        if not script_file_path.is_file():
-            continue
+    for root, dirs, files in os.walk(source_root_str, topdown=True):
+        # Prune excluded directories before descending into them
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
 
-        is_excluded = False
-        try:
-            relative_to_project = script_file_path.relative_to(project_root_path)
-            path_parts = list(relative_to_project.parts[:-1])
+        # Prune directories based on depth
+        if depth != -1:
+            current_depth = root.count(os.sep) - base_depth
+            if current_depth >= depth:
+                dirs[:] = []  # Clear subdirectories to prevent further descent
 
-            if any(part in exclude_dirs for part in path_parts):
-                is_excluded = True
-        except ValueError:
-            print(f"Warning: Could not determine relative path for {script_file_path.resolve()}. Skipping.")
-            skipped_count +=1
-            continue
+        for filename in files:
+            if not (filename.endswith(".py") or filename.endswith(".ps1")):
+                continue
 
-        if is_excluded:
-            skipped_count += 1
-            continue
+            script_file_path = pathlib.Path(root) / filename
+            try:
+                relative_path = script_file_path.relative_to(project_root_path)
+            except ValueError:
+                print(f"Error: Could not make '{script_file_path}' relative to '{project_root_path}'. Skipping.")
+                error_count += 1
+                continue
 
-        try:
-            relative_path = script_file_path.relative_to(project_root_path)
-        except ValueError:
-            print(f"Error: Could not make '{script_file_path.resolve()}' relative to '{project_root_path.resolve()}'. Skipping.")
-            error_count += 1
-            continue
+            target_txt_dir = output_dir / relative_path.parent
+            try:
+                target_txt_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                print(f"Error: Could not create target subdirectory '{target_txt_dir}': {e}")
+                error_count += 1
+                continue
 
-        target_txt_dir = output_dir / relative_path.parent
-        try:
-            target_txt_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            print(f"Error: Could not create target subdirectory '{target_txt_dir.resolve()}': {e}")
-            error_count += 1
-            continue
+            txt_filename = script_file_path.stem + ".txt"
+            target_txt_path = target_txt_dir / txt_filename
 
-        txt_filename = script_file_path.stem + ".txt"
-        target_txt_path = target_txt_dir / txt_filename
-
-        try:
-            shutil.copy2(script_file_path, target_txt_path)
-            copied_count += 1
-        except Exception as e:
-            print(f"Error: Could not copy '{script_file_path.resolve()}' to '{target_txt_path.resolve()}': {e}")
-            error_count += 1
+            try:
+                shutil.copy2(script_file_path, target_txt_path)
+                copied_count += 1
+            except Exception as e:
+                print(f"Error: Could not copy '{script_file_path}' to '{target_txt_path}': {e}")
+                error_count += 1
 
     print("\n--- Conversion Summary ---")
     print(f"Script files (.py, .ps1) found and copied as .txt: {copied_count}")
-    print(f"Files skipped (e.g., in excluded directories): {skipped_count}")
     print(f"Errors during copy/directory creation: {error_count}")
     if error_count > 0:
         print("Please review error messages above.")
     print(f"Output directory: {output_dir.resolve()}")
 
 
-if __name__ == "__main__":
-    try:
-        script_file_path = pathlib.Path(__file__).resolve()
-        project_directory = script_file_path.parent.parent
-    except NameError:
-        print("Warning: __file__ not defined. Assuming script is run from 'utilities' under project root.")
-        project_directory = pathlib.Path.cwd().parent # Assumes 'utilities' is a direct child of project root
+def main():
+    """
+    Main function to parse arguments and drive the archiving and conversion process.
+    """
+    parser = argparse.ArgumentParser(
+        description="Archive old and generate new .txt versions of .py and .ps1 files.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument(
+        "project_dir",
+        nargs='?',
+        default=os.getcwd(),
+        help="The root directory of the project to scan. Defaults to the current working directory."
+    )
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=0,
+        help="Recursion depth for scanning script files.\n"
+             "  0: Target folder only (default).\n"
+             " -1: Infinite recursion.\n"
+             " >0: Descend N levels deep."
+    )
+    args = parser.parse_args()
+
+    project_directory = pathlib.Path(args.project_dir).resolve()
 
     if not project_directory.is_dir():
-        print(f"Error: Deduced project directory '{project_directory.resolve()}' seems invalid (e.g. does not exist or is not a directory).")
-        project_directory = pathlib.Path.cwd()
-        print(f"Warning: Using current working directory as project root: {project_directory.resolve()}")
+        print(f"Error: The specified project directory does not exist or is not a directory: '{project_directory}'")
+        return
+
+    print(f"Using project root: {project_directory}")
 
     # --- Archiving Step ---
-    print(f"Starting archiving process for TXT files in: {project_directory.resolve() / TXT_OUTPUT_SUBDIR_NAME}")
+    print(f"Starting archiving process for TXT files in: {project_directory / TXT_OUTPUT_SUBDIR_NAME}")
     archive_previous_txt_versions(project_directory, TXT_OUTPUT_SUBDIR_NAME, ARCHIVE_SUBDIR_NAME)
 
     # --- Conversion Step ---
-    print(f"\nStarting script to TXT conversion for project: {project_directory.resolve()}")
-    convert_scripts_to_txt(project_directory, TXT_OUTPUT_SUBDIR_NAME, EXCLUDE_SCAN_DIRS)
+    print(f"\nStarting script to TXT conversion for project: {project_directory}")
+    convert_scripts_to_txt(project_directory, TXT_OUTPUT_SUBDIR_NAME, EXCLUDE_SCAN_DIRS, args.depth)
     print("\nConversion process finished.")
 
-    # === End of script ===
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
+
+# === End of utilities/convert_py_to_txt.py ===

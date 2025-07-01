@@ -2,17 +2,19 @@ graph TD
     subgraph "Input Data"
         A1(personalities_db_1-5000.txt)
         A2(base_query.txt)
+        A3(config.ini)
     end
 
     subgraph "Stage 1: Query Generation"
         B(build_queries.py)
-        B --> C
+        A1 & A2 --> B
+        B --> C[llm_query_XXX.txt]
     end
     
     subgraph "Stage 2: LLM Interaction"
         D(run_llm_sessions.py)
         C --> D
-        D --> E
+        D --> E[llm_response_XXX.txt]
     end
     
     subgraph "Stage 3: Response Processing"
@@ -22,20 +24,25 @@ graph TD
         F --> H[all_mappings.txt]
     end
     
-    subgraph "Stage 4: Final Analysis & Aggregation"
+    subgraph "Stage 4: Analysis & Aggregation"
+        I(compile_results.py)
         J(run_anova.py)
-        I(final_summary_results.csv)
-        G & H --> I
-        I --> J
-        J --> K[MASTER_ANOVA_DATASET.csv]
-        J --> L((Plots & Log))
+        
+        G & H --> M(replication_report.txt)
+        M --> I
+        I --> K(final_summary_results.csv)
+        K --> J
+        J --> L[MASTER_ANOVA_DATASET.csv]
+        J --> N((Plots & Log))
     end
     
-    A1 & A2 --> B
-    C[llm_query_XXX.txt]
-    E[llm_response_XXX.txt]
+    %% This shows that the config is archived early in the process
+    A3 --> O(config.ini.archived):::Data
+    
+    %% This shows the archived config is now a primary input for compilation
+    O --> I
 
     classDef Data fill:#e6f3ff,stroke:#007bff
     classDef Script fill:#fff0e6,stroke:#ff7f0e
-    class A1,A2,C,E,G,H,I,K,L Data
-    class B,D,F,J Script
+    class A1,A2,A3,C,E,G,H,K,L,M,N,O Data
+    class B,D,F,I,J Script

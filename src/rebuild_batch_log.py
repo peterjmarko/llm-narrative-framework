@@ -3,23 +3,34 @@
 # Filename: src/rebuild_batch_log.py
 
 """
-Rebuild Batch Run Log (rebuild_batch_log.py)
+Rebuild Batch Log Utility (rebuild_batch_log.py)
 
 Purpose:
-This utility script reverse-engineers a 'batch_run_log.csv' file by parsing
-the data from existing replication run directories (e.g., 'run_*'). It is
-useful for creating a summary log after the fact if the original was lost or
-if the batch runner was executed without this logging capability.
+This script reconstructs a comprehensive batch run log by scanning a directory
+for 'run_*' subdirectories and extracting metadata and results from various
+log files within each run. It is a recovery tool for when the original
+'batch_run_log.csv' is missing or incomplete.
 
-The script iterates through each run directory, extracting metrics from various
-source files:
--   Replication Number, Start Time: From the run directory name.
--   End Time, Mean MRR, Mean Top-1 Acc: From the 'replication_report_...txt' file,
-  with a fallback to parsing the text summary if the JSON block is missing.
--   Duration: From the final 'Total_Elapsed_s' value in 'api_times.log'.
+Workflow:
+1.  Scans a target directory for 'run_*' subdirectories.
+2.  The scan depth is controlled by the --depth argument.
+3.  For each run, it extracts:
+    - Run parameters (model, temp, etc.) from the directory name.
+    - Start and end timestamps from 'api_times.log'.
+    - Performance metrics (MRR, Top-K) from the JSON block in 'report.txt'.
+    - If JSON fails, it falls back to regex parsing on 'report.txt'.
+4.  It compiles this information into a new CSV file named 'batch_run_log_rebuilt.csv'.
+5.  A summary of total runs and time elapsed is appended to the CSV.
 
-It then compiles all this information into a new 'batch_run_log_rebuilt.csv' file in
-the specified output directory.
+Command-Line Usage:
+    # Rebuild log from the './output' directory (depth 0)
+    python src/rebuild_batch_log.py ./output
+
+    # Rebuild from a directory and its immediate subdirectories
+    python src/rebuild_batch_log.py /path/to/batch --depth 1
+
+    # Rebuild from an entire directory tree recursively
+    python src/rebuild_batch_log.py /path/to/batch --depth -1
 """
 
 import os
@@ -30,6 +41,8 @@ import json
 import csv
 from datetime import datetime
 import fnmatch
+import pathlib
+import argparse
 
 def format_seconds_to_mm_ss(seconds: float) -> str:
     """Formats total seconds into MM:SS string."""
@@ -177,8 +190,13 @@ def get_duration_from_api_log(run_dir_path):
     return last_elapsed_seconds
 
 def main():
-    if len(sys.argv) > 1:
-        base_dir = sys.argv[1]
+    parser = argparse.ArgumentParser(description="Rebuilds a 'batch_run_log.csv' from existing run directories.")
+    parser.add_argument("target_dir", nargs='?', default=None, help="The top-level directory to scan. Defaults to the project's 'output' directory.")
+    parser.add_argument("--depth", type=int, default=0, help="Directory scan depth. 0 for target dir only, N for N levels deep, -1 for infinite recursion.")
+    args = parser.parse_args()
+
+    if args.target_dir:
+        base_dir = args.target_dir
     else:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
@@ -192,7 +210,32 @@ def main():
         print(f"Error: Specified directory '{base_dir}' does not exist.")
         sys.exit(1)
 
-    run_dirs = sorted(glob.glob(os.path.join(base_dir, "run_*")))
+    run_dirs = []
+    if args.depth == -1:
+        # Infinite recursion
+        glob_path = os.path.join(base_dir, "**", "run_*")
+        run_dirs = sorted(glob.glob(glob_path, recursive=True))
+    else:
+        # Controlled depth from 0 to N.
+        # We collect all dirs at each level up to the specified depth.
+        
+        # Level 0 (the base_dir itself)
+        path_pattern = os.path.join(base_dir, "run_*")
+        run_dirs.extend(glob.glob(path_pattern))
+        
+        # Levels 1 to N
+        current_pattern = base_dir
+        for i in range(args.depth):
+            current_pattern = os.path.join(current_pattern, "*")
+            path_pattern = os.path.join(current_pattern, "run_*")
+            run_dirs.extend(glob.glob(path_pattern))
+            
+    # Filter out any paths that are not directories, which can happen with glob.
+    run_dirs = [d for d in run_dirs if os.path.isdir(d)]
+    
+    # Using set to remove duplicates and then sorting.
+    run_dirs = sorted(list(set(run_dirs)))
+
     if not run_dirs:
         print(f"No 'run_*' directories found in '{base_dir}'.")
         return
@@ -201,7 +244,9 @@ def main():
     print(f"Found {len(run_dirs)} run directories. Processing...")
 
     for run_dir in run_dirs:
-        print(f"  - Processing {os.path.basename(run_dir)}...")
+        # Use relpath for cleaner logging in recursive mode
+        relative_path = os.path.relpath(run_dir, base_dir)
+        print(f"  - Processing {relative_path}...")
         
         run_data = parse_run_directory(run_dir)
         report_data = get_report_metrics(run_dir)

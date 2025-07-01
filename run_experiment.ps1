@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Filename: run_replications.ps1
+
+# --- (Preamble and comments are unchanged) ---
+
+#!/usr/bin/env pwsh
+# -*-
+# Filename: run_replications.ps1
+
+<#
+.SYNOPSIS
+    Main entry point for the experiment pipeline. Runs a full batch of replications
+    with clean, high-level output by default.
+
+.DESCRIPTION
+    This script is the main entry point for running a full experimental batch. It calls
+    the `replication_manager.py` script, which contains the core logic for the run.
+
+    By default, this launcher runs in a "quiet" mode, showing only major progress
+    headers and a final summary for each replication. This is ideal for standard runs.
+
+    Use the -Verbose switch to see detailed, real-time logs from all underlying
+    Python scripts, which is useful for debugging.
+
+.PARAMETER StartRep
+    Optional. The starting replication number (inclusive). Defaults to 1.
+
+.PARAMETER EndRep
+    Optional. The ending replication number (inclusive). Defaults to the value
+    in config.ini.
+
+.PARAMETER Verbose
+    Optional. Use this switch to enable verbose output, showing detailed logs
+    from all child scripts.
+
+.EXAMPLE
+    # Run the full batch with standard (quiet) output
+    .\run_experiment.ps1
+
+.EXAMPLE
+    # Run the full batch with detailed logging for debugging
+    .\run_experiment.ps1 -Verbose
+
+.EXAMPLE
+    # Run only replications 5 through 10
+    .\run_experiment.ps1 -StartRep 5 -EndRep 10
+#>
+
+[CmdletBinding()]
+param(
+    # Optional starting replication number.
+    [Parameter(Mandatory=$false)]
+    [int]$StartRep,
+
+    # Optional ending replication number.
+    [Parameter(Mandatory=$false)]
+    [int]$EndRep
+)
+
+# Ensure console output uses UTF-8 to correctly display any special characters.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+Write-Host "--- Launching Python Batch Runner ---" -ForegroundColor Green
+
+# Build the argument list for the Python script dynamically.
+$pythonArgs = @("src/replication_manager.py")
+if ($PSBoundParameters.ContainsKey('StartRep')) {
+    $pythonArgs += "--start-rep", $StartRep
+}
+if ($PSBoundParameters.ContainsKey('EndRep')) {
+    $pythonArgs += "--end-rep", $EndRep
+}
+
+# Invert the logic: Add --quiet by default UNLESS the built-in -Verbose switch is used.
+# We check for the presence of 'Verbose' in the automatic $PSBoundParameters variable.
+if (-not $PSBoundParameters.ContainsKey('Verbose')) {
+    $pythonArgs += "--quiet"
+}
+
+# Execute the main Python batch script with the specified arguments.
+& python $pythonArgs
+
+# Check the exit code from the Python script.
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "`n!!! The Python batch runner exited with an error. Check the output above. !!!" -ForegroundColor Red
+} else {
+    Write-Host "`n--- PowerShell launcher script finished. ---"
+}

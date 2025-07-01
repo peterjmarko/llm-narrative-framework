@@ -3,33 +3,34 @@
 # Filename: src/retry_failed_sessions.py
 
 """
-Auto-Retry Failed LLM Sessions and Update Analysis
+Retry Failed Sessions Utility (retry_failed_sessions.py)
 
 Purpose:
-This script provides an automated way to find and re-run specific, failed
-LLM queries across an entire batch of experimental runs. It is the primary tool
-for recovering from intermittent network errors or API failures without having
-to re-run entire replications.
+This script automates the process of identifying and retrying failed trials
+from a batch of experimental runs. A trial is considered "failed" if a query
+was generated but a corresponding response was not successfully saved.
 
 Workflow:
-1.  Scans all 'run_*' subdirectories within a given parent directory (e.g., 'output').
-2.  For each run, it identifies "failed" sessions by checking for the existence of
-    a query file (`llm_query_XXX.txt`) that does *not* have a corresponding successful
-    response file (`llm_response_XXX.txt`).
-3.  For each failed session found, it calls `run_llm_sessions.py` with a special
-    `--force-rerun` flag. This deletes any old error file and re-sends the query.
-4.  After all retries are complete, it re-runs the full analysis pipeline
-    (`process_llm_responses.py`, `analyze_performance.py`) only for the run
-    directories that were modified.
-5.  Finally, it calls `compile_results.py` to update the master
-    `final_summary_results.csv` with the newly corrected data.
+1.  Scans a parent directory for 'run_*' subdirectories.
+2.  The scan depth is controlled by the --depth argument.
+3.  For each run, it compares the list of generated query files against the
+    list of saved response files.
+4.  If a query file exists without a matching response file, it is marked as a
+    failed trial.
+5.  The script reads the content of the failed query file.
+6.  It re-submits the query to the specified language model API.
+7.  The new response is saved to the correct location, completing the trial.
+8.  Provides a summary of how many failures were found and retried for each run.
 
 Command-Line Usage:
-    # Scan the default 'output' directory for failures and fix them
-    python src/retry_failed_sessions.py
+    # Scan the './output' directory for failures (depth 0)
+    python src/retry_failed_sessions.py ./output
 
-    # Scan a different directory
-    python src/retry_failed_sessions.py --parent_dir /path/to/my/experiments
+    # Scan a specific directory and its immediate subdirectories
+    python src/retry_failed_sessions.py /path/to/batch --depth 1
+
+    # Scan an entire directory tree recursively
+    python src/retry_failed_sessions.py /path/to/batch --depth -1
 """
 
 import argparse
@@ -38,6 +39,7 @@ import sys
 import glob
 import subprocess
 import logging
+import pathlib
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
@@ -58,9 +60,9 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     stream=sys.stdout)
 
-def find_failed_sessions(parent_dir: str) -> dict:
+def find_failed_sessions(parent_dir: str, depth: int) -> dict:
     """
-    Scans all run directories to find sessions that need to be retried.
+    Scans run directories to find sessions that need to be retried, respecting scan depth.
 
     A session is considered failed if the query file exists but the corresponding
     successful response file does not.
@@ -68,11 +70,30 @@ def find_failed_sessions(parent_dir: str) -> dict:
     Returns:
         A dictionary mapping run directory paths to a list of integer indices to retry.
     """
-    logging.info(f"Scanning for failed sessions in subdirectories of: {parent_dir}")
+    scan_mode = "infinitely" if depth == -1 else f"to a depth of {depth} level(s)"
+    logging.info(f"Scanning for failed sessions in subdirectories of '{parent_dir}' ({scan_mode})")
+    
     failures_to_retry = {}
-    run_dirs = sorted(glob.glob(os.path.join(parent_dir, "run_*")))
+    run_dirs = []
+    
+    # Use controlled os.walk to find run directories based on depth
+    base_path = pathlib.Path(parent_dir)
+    for root, dirs, _ in os.walk(parent_dir):
+        current_path = pathlib.Path(root)
+        current_depth = len(current_path.relative_to(base_path).parts) if current_path != base_path else 0
 
-    for run_dir in run_dirs:
+        # Add any 'run_*' directories found at the current level
+        for d in dirs:
+            if d.startswith("run_"):
+                run_dirs.append(os.path.join(root, d))
+        
+        # Prune the search if max depth is reached (and not infinite)
+        if depth != -1 and current_depth >= depth:
+            dirs[:] = [] # This stops os.walk from going deeper down this path
+
+    logging.info(f"Found {len(run_dirs)} 'run_*' directories to inspect.")
+
+    for run_dir in sorted(run_dirs):
         queries_path = os.path.join(run_dir, "session_queries")
         responses_path = os.path.join(run_dir, "session_responses")
 
@@ -83,7 +104,6 @@ def find_failed_sessions(parent_dir: str) -> dict:
         indices_to_check = []
         for qf in query_files:
             try:
-                # Extract numeric index from filename like 'llm_query_033.txt'
                 index_str = os.path.basename(qf).replace("llm_query_", "").replace(".txt", "")
                 indices_to_check.append(int(index_str))
             except (ValueError, TypeError):
@@ -97,8 +117,7 @@ def find_failed_sessions(parent_dir: str) -> dict:
         
         if failed_indices_for_run:
             failures_to_retry[run_dir] = sorted(failed_indices_for_run)
-            # FIXED: Add the log message the unit test is expecting.
-            logging.info(f"Found {len(failed_indices_for_run)} failed session(s) at indices {failed_indices_for_run}")
+            logging.info(f"Found {len(failed_indices_for_run)} failed session(s) in {os.path.basename(run_dir)} at indices {failed_indices_for_run}")
             
     return failures_to_retry
 
@@ -146,6 +165,8 @@ def main():
                         help="The directory to process. Can be a parent dir (like 'output') to find all failures, or a specific 'run_*' dir. Defaults to 'output'.")
     parser.add_argument("--indices", type=int, nargs='+',
                         help="A space-separated list of specific indices to manually retry. Must be used with a specific run directory as the target.")
+    parser.add_argument("--depth", type=int, default=0,
+                        help="Directory scan depth. 0 for target dir only, N for N levels deep, -1 for infinite recursion.")
     parser.add_argument("--parallel", type=int, default=10,
                         help="Number of parallel sessions to retry at once. Defaults to 10.")
     args = parser.parse_args()
@@ -177,7 +198,7 @@ def main():
         if args.indices:
             parser.error("--indices can only be used when specifying a single run directory, not a parent directory.")
         compile_dir = target_path
-        failures_by_run = find_failed_sessions(compile_dir)
+        failures_by_run = find_failed_sessions(compile_dir, args.depth)
 
     if not failures_by_run:
         logging.info("--- Discovery Complete: No sessions to retry. Nothing to do. ---")

@@ -2,57 +2,31 @@
 # Filename: utilities/list_project_files.py
 
 """
-A utility script to scan a project directory, generate a report of its structure,
-and list key files. This script is designed to be placed in a `utilities/`
-subdirectory of the project it is intended to analyze.
+Project File Lister (list_project_files.py)
 
-Features:
-- Automatically determines the project root, assuming the script is located in
-  `project_root/utilities/`.
-- Allows exclusion of common directories (e.g., .venv, __pycache__, .git),
-  specific file names (e.g., .DS_Store), and file extensions (e.g., .pyc, .log).
-- Generates a hierarchical, tree-like representation of the project's directory
-  structure. The depth of file listing within this tree is configurable.
-- Produces summaries of all Python (.py) scripts found within the project
-  (excluding specified directories/files), including their line counts and a total.
-- Produces a summary of other predefined key files located at the project root
-  (e.g., config.py, requirements.txt, README.md).
-- Writes the generated report to a text file, by default named
-  `project_structure_report.txt`, in the same directory as this script.
+Purpose:
+This script scans a directory structure and generates a single text file,
+`all_project_files.txt`, which contains the concatenated content of all specified
+source code files. It's designed to create a comprehensive snapshot of a
+project for analysis or archival.
 
-Configuration:
-The script's behavior can be customized by modifying the following constants
-at the top of the file:
-- `EXCLUDE_DIRS_SET`: A set of directory names to completely exclude from the scan.
-- `EXCLUDE_FILES_SET`: A set of specific file names to exclude.
-- `EXCLUDE_EXTENSIONS_SET`: A set of file extensions to exclude.
-- `OUTPUT_FILENAME`: The name of the file where the report will be saved.
-- `MAX_RECURSION_DEPTH_DISPLAY`: Controls how many levels deep individual files
-  are listed in the hierarchical structure view. Directories are always listed.
+Workflow:
+1.  Accepts a root directory to scan.
+2.  The scan depth is controlled by the --depth argument.
+3.  Finds all files with specified extensions (e.g., .py, .md, .txt).
+4.  Excludes files from specified directories (e.g., .venv, __pycache__).
+5.  Concatenates the content of all found files into one output file.
+6.  Each file's content is preceded by a header indicating its original path.
 
-Main Functions:
-- `get_project_root()`: Determines the project's root directory.
-- `should_exclude_path(path_item, project_root)`: Checks if a given path should be
-  excluded based on the configuration.
-- `generate_file_listing(outfile, current_path, project_root, indent_level)`:
-  Recursively generates the hierarchical file and directory listing.
-- `main()`: Orchestrates the scanning process, data collection, and report generation.
+Command-Line Usage:
+    # Scan the current project directory '.' (depth 0)
+    python src/list_project_files.py .
 
-Usage:
-1. Place this script in a `utilities/` directory within your project.
-   Example: `my_project/utilities/list_project_files.py`
-2. Ensure the configuration constants (exclusion sets, output filename, etc.) are
-   set as desired.
-3. Run the script from the command line:
-   `python utilities/list_project_files.py`
-   (Or `python path/to/your/project/utilities/list_project_files.py` if run from
-   elsewhere, though running from within the project or its `utilities` dir is typical).
-4. The report will be generated in the `utilities/` directory (e.g.,
-   `my_project/utilities/project_structure_report.txt`).
+    # Scan the project directory and its immediate subdirectories
+    python src/list_project_files.py . --depth 1
 
-The script aims to provide a clear overview of a project's layout, which can be
-useful for documentation, onboarding new team members, or preparing context for
-sharing with others (e.g., LLMs).
+    # Scan the entire project directory tree recursively
+    python src/list_project_files.py . --depth -1
 """
 
 # === Start of utilities/list_project_files.py ===
@@ -62,6 +36,7 @@ import sys
 import os # Keep os for os.stat if needed, though pathlib usually suffices
 from datetime import datetime
 import traceback # For detailed error logging if needed
+import argparse
 
 # --- Configuration ---
 # Directories to completely exclude from the scan (names, not paths)
@@ -77,7 +52,7 @@ EXCLUDE_FILES_SET = {".DS_Store", "Thumbs.db", "*.pyc", "*.pyo", "*.pyd"}
 EXCLUDE_EXTENSIONS_SET = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp"} # Add more as needed
 
 OUTPUT_FILENAME = "project_structure_report.txt"
-MAX_RECURSION_DEPTH_DISPLAY = 5 # How deep to show full file listing in structure view
+REPORT_SUBDIR = "project_reports" # Subdirectory within 'output' for these reports
 # --- End Configuration ---
 
 def get_project_root():
@@ -140,11 +115,10 @@ def should_exclude_path(path_item: pathlib.Path, project_root: pathlib.Path):
     return False
 
 
-def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pathlib.Path, indent_level=0):
+def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pathlib.Path, indent_level=0, scan_depth=0):
     """
     Recursively generates a file listing for the output file.
-    Respects MAX_RECURSION_DEPTH_DISPLAY for how deep to list individual files.
-    Always lists directories.
+    Respects scan_depth for how deep to list contents.
     """
     indent = "  " * indent_level
     prefix_dir = "📁 "
@@ -152,11 +126,9 @@ def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pat
 
     try:
         items_in_dir = sorted(list(current_path.iterdir()), key=lambda x: (x.is_file(), x.name.lower()))
-    except PermissionError:
-        outfile.write(f"{indent}{prefix_dir}{current_path.name}/  (Permission Denied)\n")
-        return
-    except FileNotFoundError:
-        outfile.write(f"{indent}{prefix_dir}{current_path.name}/  (Not Found During Scan)\n")
+    except (PermissionError, FileNotFoundError):
+        # This part remains the same, handles directories that can't be read.
+        outfile.write(f"{indent}{prefix_dir}{current_path.name}/  (Cannot Access)\n")
         return
 
     for item in items_in_dir:
@@ -165,13 +137,11 @@ def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pat
 
         if item.is_dir():
             outfile.write(f"{indent}{prefix_dir}{item.name}/\n")
-            if indent_level < MAX_RECURSION_DEPTH_DISPLAY -1:
-                generate_file_listing(outfile, item, project_root, indent_level + 1)
-            elif indent_level == MAX_RECURSION_DEPTH_DISPLAY -1:
-                 outfile.write(f"{indent}  (... files not listed beyond depth {MAX_RECURSION_DEPTH_DISPLAY} ...)\n")
+            # CORRECTED LOGIC: Recurse only if depth is infinite (-1) or not yet reached.
+            if scan_depth == -1 or indent_level < scan_depth:
+                generate_file_listing(outfile, item, project_root, indent_level + 1, scan_depth)
         elif item.is_file():
-            if indent_level < MAX_RECURSION_DEPTH_DISPLAY:
-                outfile.write(f"{indent}{prefix_file}{item.name}\n")
+            outfile.write(f"{indent}{prefix_file}{item.name}\n")
 
 def count_lines_in_file(file_path: pathlib.Path) -> int:
     """Counts non-empty lines in a text file."""
@@ -183,9 +153,42 @@ def count_lines_in_file(file_path: pathlib.Path) -> int:
         return 0 # Or some indicator of error, like -1
 
 def main():
-    project_root = get_project_root()
-    script_dir = pathlib.Path(__file__).resolve().parent
-    output_file_path = script_dir / OUTPUT_FILENAME
+    parser = argparse.ArgumentParser(
+        description="Generates a report of the project's file structure.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    # NEW: Add an optional argument for the target directory
+    parser.add_argument(
+        "target_directory",
+        nargs='?',
+        default=None,
+        help="The path to the project directory to scan. If not provided, auto-detects the project root."
+    )
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=0,
+        help="Directory scan depth for collecting files. 0 for root dir only, -1 for infinite, N for N levels."
+    )
+    args = parser.parse_args()
+
+    # CORRECTED: Use the argument if provided, otherwise auto-detect
+    if args.target_directory:
+        project_root = pathlib.Path(args.target_directory).resolve()
+    else:
+        project_root = get_project_root()
+    
+    # Define the dedicated output directory for reports
+    report_output_dir = project_root / "output" / REPORT_SUBDIR
+    
+    # Ensure the output directory exists, creating it if necessary
+    try:
+        report_output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        print(f"Error: Could not create output directory '{report_output_dir}': {e}")
+        sys.exit(1)
+        
+    output_file_path = report_output_dir / OUTPUT_FILENAME
 
     if not project_root.exists() or not project_root.is_dir():
         print(f"Error: Determined project directory not found or invalid: {project_root}")
@@ -198,7 +201,34 @@ def main():
     py_scripts_with_lines = []
     other_key_files_summary = []
 
-    for item in project_root.rglob('*'):
+    # --- MODIFIED FOR DEPTH CONTROL ---
+    all_items_to_process = []
+    if args.depth == -1:
+        print("Scanning with infinite depth.")
+        all_items_to_process = project_root.rglob('*')
+    else:
+        print(f"Scanning to a maximum depth of {args.depth} level(s).")
+        # Use a queue for a breadth-first search, which is ideal for depth-limiting
+        queue = [(project_root, 0)]
+        visited_dirs = {project_root}
+        
+        while queue:
+            current_dir, current_depth = queue.pop(0)
+            
+            try:
+                for item in current_dir.iterdir():
+                    all_items_to_process.append(item)
+                    
+                    # If it's a directory and we can go deeper, add it to the queue
+                    if item.is_dir() and item not in visited_dirs and current_depth < args.depth:
+                        visited_dirs.add(item)
+                        queue.append((item, current_depth + 1))
+            except (PermissionError, FileNotFoundError):
+                # Silently skip directories we cannot access
+                continue
+    # --- END MODIFICATION ---
+
+    for item in all_items_to_process:
         if not should_exclude_path(item, project_root):
             if item.is_file():
                 if item.suffix.lower() == '.py':
@@ -229,12 +259,12 @@ def main():
             outfile.write(f"Excluded Directory Names: {', '.join(sorted(list(EXCLUDE_DIRS_SET)))}\n")
             outfile.write(f"Excluded File Names: {', '.join(sorted(list(EXCLUDE_FILES_SET)))}\n")
             outfile.write(f"Excluded File Extensions: {', '.join(sorted(list(EXCLUDE_EXTENSIONS_SET)))}\n")
-            outfile.write(f"Max Display Depth for Files in Structure: {MAX_RECURSION_DEPTH_DISPLAY}\n")
+            outfile.write(f"File Collection Scan Depth: {'Infinite (recursive)' if args.depth == -1 else args.depth}\n")
             outfile.write("="*70 + "\n\n")
 
             outfile.write("--- Hierarchical Directory Structure ---\n")
             outfile.write(f"{project_root.name}/\n")
-            generate_file_listing(outfile, project_root, project_root, indent_level=0)
+            generate_file_listing(outfile, project_root, project_root, indent_level=0, scan_depth=args.depth)
 
             outfile.write("\n\n" + "="*70 + "\n")
             outfile.write("--- Summary: Python Scripts (.py) ---\n")

@@ -3,32 +3,35 @@
 # Filename: src/verify_pipeline_completeness.py
 
 """
-Verify Pipeline Completeness Utility
+Verify Pipeline Completeness Utility (verify_pipeline_completeness.py)
 
 Purpose:
-This script audits the entire output directory to verify that every query in
-every replication run was successfully processed and included in the final
-analysis data. It provides a definitive, high-level summary of data integrity.
+This script audits an entire output directory structure to verify that every
+query in every replication run was successfully processed and included in the
+final analysis data. It provides a definitive, high-level summary of data
+integrity across multiple experimental batches.
 
 Workflow:
-1.  Scans a parent directory (e.g., 'output') for all `run_*` subdirectories.
-2.  For each run, it compares three key counts:
+1.  Scans a parent directory for all `run_*` subdirectories.
+2.  The scan depth is controlled by the --depth argument.
+3.  For each run found, it compares three key counts:
     a. The number of query files (`llm_query_*.txt`) generated.
     b. The number of score matrices parsed into `all_scores.txt`.
     c. The number of ground-truth mappings in `all_mappings.txt`.
-3.  A run is marked "COMPLETE" only if all three counts are equal.
-4.  It prints a summary table with the status of each run and a final
+4.  A run is marked "COMPLETE" only if all three counts are equal.
+5.  It prints a summary table with the status of each run and a final
     overall completeness percentage.
 
 Command-Line Usage:
-    # Audit the default 'output' directory
+    # Audit the default 'output' directory (depth 0)
     python src/verify_pipeline_completeness.py
 
-    # Audit a specific directory
-    python src/verify_pipeline_completeness.py --parent_dir /path/to/my/experiments
-"""
+    # Audit a specific directory and its immediate subdirectories
+    python src/verify_pipeline_completeness.py /path/to/my/experiments --depth 1
 
-# === Start of src/verify_pipeline_completeness.py ===
+    # Audit an entire directory tree recursively
+    python src/verify_pipeline_completeness.py /path/to/my/experiments --depth -1
+"""
 
 import os
 import glob
@@ -70,8 +73,10 @@ def count_lines_in_file(filepath: str, skip_header: bool = True) -> int:
 
 def main():
     parser = argparse.ArgumentParser(description="Verify data completeness across all experiment runs.")
-    parser.add_argument("--parent_dir", default="output",
+    parser.add_argument("parent_dir", nargs='?', default="output",
                         help="The parent directory containing 'run_*' folders. Defaults to 'output'.")
+    parser.add_argument("--depth", type=int, default=0,
+                        help="Directory scan depth. 0 for target dir only, N for N levels deep, -1 for infinite recursion.")
     args = parser.parse_args()
 
     parent_dir = os.path.abspath(args.parent_dir)
@@ -79,20 +84,46 @@ def main():
         logging.error(f"Error: Directory not found at '{parent_dir}'")
         sys.exit(1)
 
-    run_dirs = sorted(glob.glob(os.path.join(parent_dir, "run_*")))
+    run_dirs = []
+    if args.depth == -1:
+        # Infinite recursion
+        glob_path = os.path.join(parent_dir, "**", "run_*")
+        run_dirs = sorted(glob.glob(glob_path, recursive=True))
+    else:
+        # Controlled depth from 0 to N.
+        
+        # Level 0 (the parent_dir itself)
+        path_pattern = os.path.join(parent_dir, "run_*")
+        run_dirs.extend(glob.glob(path_pattern))
+        
+        # Levels 1 to N
+        current_pattern = parent_dir
+        for i in range(args.depth):
+            current_pattern = os.path.join(current_pattern, "*")
+            path_pattern = os.path.join(current_pattern, "run_*")
+            run_dirs.extend(glob.glob(path_pattern))
+            
+    # Filter out any paths that are not directories, which can happen with glob.
+    run_dirs = [d for d in run_dirs if os.path.isdir(d)]
+    
+    # Using set to remove duplicates and then sorting.
+    run_dirs = sorted(list(set(run_dirs)))
+
     if not run_dirs:
         logging.info(f"No 'run_*' directories found in '{parent_dir}'. Nothing to verify.")
         return
 
-    logging.info(f"--- Verifying Data Completeness for {len(run_dirs)} Runs in '{parent_dir}' ---\n")
+    logging.info(f"--- Verifying Data Completeness for {len(run_dirs)} Runs in '{parent_dir}' (Depth: {args.depth}) ---\n")
     
     all_runs_data = []
     total_expected_queries = 0
     total_actual_queries = 0
 
     for run_dir in run_dirs:
+        # To make the output cleaner, show the path relative to the parent directory
+        relative_run_dir = os.path.relpath(run_dir, parent_dir)
         run_name = os.path.basename(run_dir)
-        run_data = {"name": run_name, "status": "INCOMPLETE", "details": ""}
+        run_data = {"name": relative_run_dir, "status": "INCOMPLETE", "details": ""}
 
         # 1. Get expected number of queries (m) and group size (k) from the run name
         m_match = re.search(r"trl-(\d+)", run_name)
@@ -141,13 +172,14 @@ def main():
         all_runs_data.append(run_data)
 
     # Print summary table
-    logging.info(f"{'Run Directory Name':<100} {'Status':<12} {'Details'}")
-    logging.info(f"{'-'*100} {'-'*12} {'-'*20}")
+    max_name_len = max(len(run['name']) for run in all_runs_data) if all_runs_data else 100
+    logging.info(f"{'Run Directory Path':<{max_name_len}} {'Status':<12} {'Details'}")
+    logging.info(f"{'-'*max_name_len} {'-'*12} {'-'*20}")
 
     for run in all_runs_data:
         status_color = "\033[92m" if run['status'] == "COMPLETE" else "\033[91m"
         end_color = "\033[0m"
-        logging.info(f"{run['name']:<100} {status_color}{run['status']:<12}{end_color} {run['details']}")
+        logging.info(f"{run['name']:<{max_name_len}} {status_color}{run['status']:<12}{end_color} {run['details']}")
 
     # Print final summary
     if total_expected_queries > 0:

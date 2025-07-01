@@ -1,4 +1,32 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # Filename: src/inject_metadata.py
+
+"""
+Metadata Injection Utility (inject_metadata.py)
+
+Purpose:
+This script scans a directory for text files and injects the file's path and
+name as a header into the file's content. This is essential for providing
+context to language models that process file content without knowing its origin.
+
+Workflow:
+1.  Accepts a target directory to scan.
+2.  The scan depth is controlled by the --depth argument.
+3.  Identifies all files with a '.txt' extension.
+4.  For each file, it prepends a header block containing the filename and path.
+5.  The script is idempotent; it will not inject a header if one already exists.
+
+Command-Line Usage:
+    # Inject metadata into .txt files in the 'src' directory (depth 0)
+    python src/inject_metadata.py src
+
+    # Inject metadata into 'src' and its immediate subdirectories
+    python src/inject_metadata.py src --depth 1
+
+    # Inject metadata recursively throughout the entire 'src' tree
+    python src/inject_metadata.py src --depth -1
+"""
 
 import argparse
 import os
@@ -57,6 +85,12 @@ def main():
     parser.add_argument("target_directory", help="The path to the directory containing the run folders (e.g., 'output/.../map-correct').")
     parser.add_argument("--key", required=True, help="The metadata key to inject (e.g., 'Mapping Strategy').")
     parser.add_argument("--value", required=True, help="The metadata value to inject (e.g., 'correct').")
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=0,
+        help="Directory traversal depth. 0 for target dir only, -1 for infinite, N for N levels."
+    )
     args = parser.parse_args()
 
     if not os.path.isdir(args.target_directory):
@@ -66,8 +100,21 @@ def main():
     logging.info(f"\nScanning for run directories in: '{args.target_directory}'")
     logging.info(f"Will inject -> {args.key}: {args.value}")
 
-    # Find all run directories inside the target directory
-    run_dirs = glob.glob(os.path.join(args.target_directory, 'run_*'))
+    # Find all 'run_*' directories based on the specified depth.
+    if args.depth == -1:
+        logging.info("Searching with infinite depth (recursive).")
+        run_dirs = glob.glob(os.path.join(args.target_directory, '**', 'run_*'), recursive=True)
+    else:
+        logging.info(f"Searching to a maximum depth of {args.depth} level(s).")
+        # Find run_* dirs in the root target_directory (depth 0)
+        run_dirs = glob.glob(os.path.join(args.target_directory, 'run_*'))
+        
+        # Find run_* dirs in subdirectories up to the specified depth
+        if args.depth > 0:
+            pattern = args.target_directory
+            for i in range(args.depth):
+                pattern = os.path.join(pattern, '*')
+                run_dirs.extend(glob.glob(os.path.join(pattern, 'run_*')))
     
     if not run_dirs:
         logging.error("No 'run_*' directories found to process.")
@@ -79,7 +126,7 @@ def main():
         if not os.path.isdir(run_dir):
             continue
         
-        logging.info(f"\nProcessing directory: {os.path.basename(run_dir)}")
+        logging.info(f"\nProcessing directory: {os.path.relpath(run_dir, args.target_directory)}")
         
         # Find the report file within the run directory
         report_files = glob.glob(os.path.join(run_dir, 'replication_report_*.txt'))
@@ -98,3 +145,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# === End src/inject_metadata.py ===

@@ -3,53 +3,25 @@
 # Filename: src/orchestrate_experiment.py
 
 """
-Single Experiment Orchestrator (orchestrate_experiment.py)
+Orchestrates the execution of a single, complete replication of the experiment.
 
-Purpose:
-This master script is the main entry point for conducting or re-analyzing a
-**single, complete experimental run**. It is designed to be called repeatedly by a
-higher-level batch script (e.g., `run_replications.ps1`).
+This script manages the four sequential stages required to run one replication,
+from generating queries to analyzing the final results. It is called by the
+`replication_manager.py` for each replication in a batch run.
 
-The script has two primary modes:
-1.  **New Run Mode (Default):** Manages the entire personality matching pipeline:
-    -   1. build_queries.py
-    -   2. run_llm_sessions.py
-    -   3. process_llm_responses.py
-    -   4. analyze_performance.py
-2.  **Reprocess Mode (`--reprocess`):** Skips query generation and LLM calls,
-    instead re-running only the data processing and analysis stages
-    (3 and 4) on an existing run directory.
+When the `--quiet` flag is received from the manager, this script passes it down
+to each of the four stage scripts it calls. This ensures that the console output
+remains clean and high-level during a standard run, suppressing detailed logs
+from the child processes.
 
-Its most important function is to create a unique, self-contained directory
-for new runs, ensuring all artifacts are isolated.
+A single replication consists of:
+1.  **Stage 1: Build Queries**: Generates trial queries.
+2.  **Stage 2: Run LLM Sessions**: Sends queries to the LLM.
+3.  **Stage 3: Process LLM Responses**: Parses raw text into structured data.
+4.  **Stage 4: Analyze Performance**: Calculates metrics and generates a report.
 
-Output:
-A unique, descriptively named directory. For example:
-'run_20250609_140000_rep-01_claude-3-opus_tmp-0.20_personalities_sbj-10_trl-100/'
-This directory contains all queries, responses, logs, and a final,
-comprehensive `replication_report_...txt` file summarizing the run.
-
-Command-Line Usage (called from a batch script):
-    # For a new run
-    python src/orchestrate_experiment.py [options]
-
-    # To re-process an existing run
-    python src/orchestrate_experiment.py --reprocess --run_output_dir <path_to_run>
-
-Key Arguments:
-    --replication_num     Identifier for this specific replication run.
-    -m, --num_iterations  Number of trials to generate (new runs).
-    -k, --k_per_query     Number of items (k) per query (new runs).
-    --reprocess           Activates re-processing mode.
-    --run_output_dir      Required for re-processing mode.
-    --quiet               Run all pipeline stages in quiet mode.
-
-Dependencies:
-    - All other pipeline scripts in the `src/` directory.
-    - src/config_loader.py
+All artifacts for the replication are saved into a unique, descriptive directory.
 """
-
-# === Start of src/orchestrate_experiment.py ===
 
 import argparse
 import os
@@ -286,6 +258,19 @@ def main():
         if not args.quiet:
             logging.info(f"Created unique output directory for this run: {run_specific_dir_path}")
 
+        try:
+            source_config_path = os.path.join(PROJECT_ROOT, 'config.ini')
+            dest_config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
+            shutil.copy2(source_config_path, dest_config_path)
+            if not args.quiet:
+                logging.info(f"Successfully archived config file to: {os.path.basename(dest_config_path)}")
+        except FileNotFoundError:
+            logging.error(f"FATAL: Could not find config.ini at '{source_config_path}' to archive it. Halting run.")
+            sys.exit(1)
+        except Exception as e:
+            logging.error(f"FATAL: An unexpected error occurred while archiving config.ini. Error: {e}")
+            sys.exit(1)
+
 
     # --- Define Script Paths ---
     src_dir = os.path.join(PROJECT_ROOT, 'src')
@@ -441,12 +426,23 @@ Run Notes:       {args.notes}
         report_file.write("================================================================================\n\n")
 
         if final_analysis_output:
-            # Part A: Write the human-readable summary for review.
+            # Define all relevant tags
             summary_start_tag = "<<<ANALYSIS_SUMMARY_START>>>"
+            json_start_tag = "<<<METRICS_JSON_START>>>"
+            json_end_tag = "<<<METRICS_JSON_END>>>"
+
+            # Find the positions of the summary and JSON blocks
             summary_start_index = final_analysis_output.find(summary_start_tag)
-            
+            json_start_index = final_analysis_output.find(json_start_tag)
+
+            # --- Part A: Write the human-readable summary ONLY ---
             if summary_start_index != -1:
-                analysis_summary_text = final_analysis_output[summary_start_index + len(summary_start_tag):].strip()
+                # The summary text ends where the JSON block begins.
+                # If the JSON block isn't found, take everything to the end.
+                summary_end_index = json_start_index if json_start_index != -1 else len(final_analysis_output)
+                
+                # Extract the text ONLY between the summary start and the JSON start.
+                analysis_summary_text = final_analysis_output[summary_start_index + len(summary_start_tag) : summary_end_index].strip()
                 report_file.write(analysis_summary_text)
                 report_file.write("\n")
             else:
@@ -454,20 +450,17 @@ Run Notes:       {args.notes}
                 report_file.write("Full log from analysis stage is included below for debugging:\n\n")
                 report_file.write(final_analysis_output)
 
-            # Part B: Write the machine-readable JSON block for compilation.
-            # This is the critical fix.
-            json_start_tag = "<<<METRICS_JSON_START>>>"
-            json_end_tag = "<<<METRICS_JSON_END>>>"
-            
-            json_start_index = final_analysis_output.find(json_start_tag)
-            json_end_index = final_analysis_output.find(json_end_tag)
-
-            if json_start_index != -1 and json_end_index != -1:
-                # Extract the entire block, including the tags, and write it to the report.
-                json_block = final_analysis_output[json_start_index : json_end_index + len(json_end_tag)]
-                report_file.write("\n\n" + json_block + "\n")
-            else:
-                # This warning is important for debugging if the analyzer ever fails to produce the block.
+            # --- Part B: Write the machine-readable JSON block ---
+            if json_start_index != -1:
+                json_end_index = final_analysis_output.find(json_end_tag, json_start_index)
+                if json_end_index != -1:
+                    # Extract the entire block, including the tags, and write it to the report.
+                    json_block = final_analysis_output[json_start_index : json_end_index + len(json_end_tag)]
+                    report_file.write("\n\n" + json_block + "\n")
+                else:
+                    report_file.write(f"\n\nWARNING: Found '{json_start_tag}' but not its corresponding end tag.\n")
+            # Only show this warning if a summary was present but the JSON was not.
+            elif summary_start_index != -1:
                 report_file.write("\n\nWARNING: Machine-readable metrics JSON block was not found in the analyzer output.\n")
         else:
             report_file.write("Analysis stage did not complete successfully or was not run.\n")

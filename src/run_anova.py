@@ -9,7 +9,8 @@ Purpose:
 This script performs a full analysis pipeline:
 1.  Loads data by either accepting a direct path to a master CSV file or by
     scanning a directory to find and aggregate all `final_summary_results.csv`
-    files into a new master dataset.
+    files into a new master dataset. The scan depth is controlled by the
+    --depth argument when in aggregation mode.
 2.  Performs an Analysis of Variance (ANOVA) to test for significant effects.
 3.  Calculates effect size (Eta Squared) to determine the magnitude of the findings.
 4.  Generates formatted, report-ready tables for Descriptive Statistics and ANOVA results.
@@ -18,7 +19,17 @@ This script performs a full analysis pipeline:
 7.  Optionally creates diagnostic plots (Q-Q plots) to check statistical assumptions.
 8.  Saves all statistical output from the console to a detailed log file.
 
-Plots and logs are saved in the same directory as the input path.
+Plots and logs are saved in a new 'anova' subdirectory within the input path's base directory.
+
+Command-Line Usage:
+    # Aggregate results from './output' (depth 0) and run analysis
+    python src/run_anova.py ./output
+
+    # Aggregate results recursively from './output' and run analysis
+    python src/run_anova.py ./output --depth -1
+
+    # Run analysis on a pre-aggregated file
+    python src/run_anova.py /path/to/my/MASTER_ANOVA_DATASET.csv
 """
 
 import argparse
@@ -32,6 +43,7 @@ import sys
 import logging
 import warnings
 import glob
+from config_loader import APP_CONFIG, get_config_list
 
 try:
     import matplotlib
@@ -47,14 +59,33 @@ except ImportError:
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-def aggregate_and_load_data(search_dir, output_dir, output_filename):
+def aggregate_and_load_data(search_dir, output_dir, output_filename, depth):
     """
     Finds, aggregates, and saves summary CSVs, then returns the master DataFrame.
     This function contains the logic from the original aggregate_summaries.py.
     """
-    search_pattern = os.path.join(search_dir, '**', 'final_summary_results.csv')
-    logging.info(f"AGGREGATION MODE: Searching for files matching: {search_pattern}")
-    csv_files = glob.glob(search_pattern, recursive=True)
+    logging.info(f"AGGREGATION MODE: Searching for 'final_summary_results.csv' with depth={depth}.")
+    csv_files = []
+    if depth == -1:
+        # Infinite recursion
+        search_pattern = os.path.join(search_dir, '**', 'final_summary_results.csv')
+        csv_files = glob.glob(search_pattern, recursive=True)
+    else:
+        # Controlled depth from 0 to N.
+        
+        # Level 0 (the search_dir itself)
+        path_pattern = os.path.join(search_dir, 'final_summary_results.csv')
+        csv_files.extend(glob.glob(path_pattern))
+        
+        # Levels 1 to N
+        current_pattern = search_dir
+        for i in range(depth):
+            current_pattern = os.path.join(current_pattern, '*')
+            path_pattern = os.path.join(current_pattern, 'final_summary_results.csv')
+            csv_files.extend(glob.glob(path_pattern))
+            
+    # Using set to remove duplicates and then sorting.
+    csv_files = sorted(list(set(csv_files)))
 
     if not csv_files:
         logging.error("ERROR: No 'final_summary_results.csv' files found. Cannot proceed.")
@@ -356,6 +387,12 @@ def main():
         default="MASTER_ANOVA_DATASET.csv",
         help="Filename for the aggregated CSV (used only when input_path is a directory)."
     )
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=0,
+        help="Directory scan depth for aggregation. 0 for target dir only, N for N levels deep, -1 for infinite recursion."
+    )
     args = parser.parse_args()
 
     # Setup logging first to capture all messages, including aggregation steps
@@ -393,7 +430,7 @@ def main():
     if os.path.isdir(args.input_path):
         # When input is a directory, search it for CSVs but save the aggregated file to the 'anova' subdirectory.
         search_dir = os.path.abspath(args.input_path)
-        df, master_csv_path = aggregate_and_load_data(search_dir, output_dir, args.master_filename)
+        df, master_csv_path = aggregate_and_load_data(search_dir, output_dir, args.master_filename, args.depth)
         if df is None: # Aggregation failed
             return 
     elif os.path.isfile(args.input_path):
@@ -415,18 +452,28 @@ def main():
 
 
     # --- Proceed with Analysis ---
-    factors = ['model', 'mapping_strategy', 'temperature', 'k', 'm']
+    # Load schema from the central config file, replacing the hardcoded lists.
+    factors = get_config_list(APP_CONFIG, 'Schema', 'factors')
+    metrics = get_config_list(APP_CONFIG, 'Schema', 'metrics')
+
+    # Add a fatal error check if the schema can't be loaded from config.
+    if not factors or not metrics:
+        logging.error("FATAL: Could not load 'factors' or 'metrics' from the [Schema] section of your config file. Aborting.")
+        # Properly close the file handler before exiting if it exists
+        if 'fh' in locals() and fh:
+            logger.removeHandler(fh)
+            fh.close()
+        return # Exit the main function
+
+    # Check which of the configured factors are actually present in the loaded data
+    # and ensure they are treated as categorical strings for the analysis.
     for factor in list(factors):
         if factor not in df.columns:
             factors.remove(factor)
         else:
             df[factor] = df[factor].astype(str)
 
-    metrics = [
-        'mean_mrr', 'mean_top_1_acc', 'mean_top_3_acc', 
-        'mean_effect_size_r', 'mwu_stouffer_z', 'mwu_fisher_chi2'
-    ]
-
+    # Iterate through each metric defined in the config and perform the analysis.
     for metric in metrics:
         if metric in df.columns:
             # Pass the dedicated 'anova' subdirectory path for all plots and diagnostics.
