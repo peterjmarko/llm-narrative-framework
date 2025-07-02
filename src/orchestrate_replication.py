@@ -68,32 +68,38 @@ def run_script(command, title, quiet=False):
         f"{'='*80}\n\n"
     )
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            check=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace'
-        )
-        captured_output = result.stdout + result.stderr
-        
+        # For Stage 2, let stderr pass through for the spinner. For all other stages, capture it.
+        if title == "2. Run LLM Sessions":
+            result = subprocess.run(
+                command, stdout=subprocess.PIPE, stderr=None, check=True,
+                text=True, encoding='utf-8', errors='replace'
+            )
+            captured_output = result.stdout
+        else:
+            result = subprocess.run(
+                command, capture_output=True, check=True,
+                text=True, encoding='utf-8', errors='replace'
+            )
+            captured_output = result.stdout + result.stderr
+
         lines = captured_output.splitlines()
         filtered_lines = [line for line in lines if "RuntimeWarning" not in line]
         filtered_output = "\n".join(filtered_lines)
 
-        if not quiet:
+        if not quiet and title != "2. Run LLM Sessions":
+            # Don't re-print output for Stage 2, as it has no meaningful stdout.
             print(filtered_output)
             
         return header + filtered_output
 
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        # Error details will now appear on the console in real-time for Stage 2.
+        # For other stages, they are captured and logged here.
+        error_details = "See console for real-time error from this stage."
+        if hasattr(e, 'stdout') and e.stdout:
+            error_details = f"STDOUT: {e.stdout}"
         if hasattr(e, 'stderr') and e.stderr:
-            error_details = e.stderr
-        elif hasattr(e, 'output') and e.output:
-            error_details = e.output
-        else:
-            error_details = "No error output captured."
+            error_details += f"\nSTDERR: {e.stderr}"
         
         error_message = (
             f"\n\n--- FAILED STAGE: {title} ---\n"
@@ -125,6 +131,7 @@ def main():
     parser.add_argument("--quiet", action="store_true", help="Run all stages in quiet mode.")
     parser.add_argument("--reprocess", action="store_true", help="Re-process existing responses.")
     parser.add_argument("--run_output_dir", type=str, default=None, help="Path to a specific run output directory for reprocessing.")
+    parser.add_argument("--base_output_dir", type=str, default=None, help="The base directory where the new run folder should be created.")
     
     args = parser.parse_args()
     
@@ -156,7 +163,14 @@ def main():
         args.k_per_query = get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int)
         
         run_dir_name = generate_run_dir_name(model_name, temp, args.num_iterations, args.k_per_query, db_file, args.replication_num)
-        base_output_dir = os.path.join(PROJECT_ROOT, get_config_value(APP_CONFIG, 'General', 'base_output_dir'))
+
+        # Use the provided base_output_dir if available, otherwise fall back to the config setting
+        if args.base_output_dir:
+            base_output_dir = args.base_output_dir
+        else:
+            # Fallback for standalone runs: use the path from config.ini
+            base_output_dir = os.path.join(PROJECT_ROOT, get_config_value(APP_CONFIG, 'General', 'base_output_dir'))
+
         run_specific_dir_path = os.path.join(base_output_dir, run_dir_name)
         os.makedirs(run_specific_dir_path, exist_ok=True)
         logging.info(f"Created unique output directory: {run_specific_dir_path}")

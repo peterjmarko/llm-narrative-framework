@@ -91,7 +91,8 @@ def find_run_dirs_by_depth(base_dir, depth):
 
 def main():
     parser = argparse.ArgumentParser(description="Main batch runner for experiments.")
-    parser.add_argument('target_dir', help="The target directory for the operation.")
+    parser.add_argument('target_dir', nargs='?', default=None, 
+                    help="Optional. The target directory for the operation. If not provided, a unique directory will be created.")
     parser.add_argument('--start-rep', type=int, default=1)
     parser.add_argument('--end-rep', type=int, default=None)
     parser.add_argument('--reprocess', action='store_true', help='Run in reprocessing mode.')
@@ -102,9 +103,30 @@ def main():
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
     log_manager_script = os.path.join(current_dir, "log_manager.py")
     compile_script = os.path.join(current_dir, "compile_results.py")
-    final_output_dir = os.path.abspath(args.target_dir)
+    if args.target_dir:
+        final_output_dir = os.path.abspath(args.target_dir)
+    else:
+        # Create a default, unique directory name
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        # Use the get_config_value function with the correct 'fallback' keyword
+        model_name = get_config_value(APP_CONFIG, 'LLM', 'model_identifier', value_type=str, fallback='llm')
+        
+        safe_model_name = re.sub(r'[<>:"/\\|?*]', '-', model_name) # Sanitize for path
+        
+        # Assume project root is two levels up from this script (src/ -> project_root)
+        project_root = os.path.dirname(current_dir)
+        base_output_path = os.path.join(project_root, 'output')
+        
+        study_dir_name = f"study_{timestamp}_{safe_model_name}"
+        final_output_dir = os.path.join(base_output_path, study_dir_name)
+        print(f"{C_CYAN}No target directory specified. Using default: {final_output_dir}{C_RESET}")
 
     if args.reprocess:
+    # Reprocessing logic requires a target_dir
+        if not args.target_dir:
+            print("ERROR: Reprocessing mode requires a target directory to be specified.", file=sys.stderr)
+            sys.exit(1)
         print(f"--- Starting Batch Reprocess on: {final_output_dir} (Depth: {args.depth}) ---")
         dirs_to_reprocess = find_run_dirs_by_depth(final_output_dir, args.depth)
         if not dirs_to_reprocess:
@@ -126,6 +148,11 @@ def main():
                 logging.error(f"!!! Reprocessing failed or was interrupted for {os.path.basename(run_dir)}. Continuing... !!!")
                 if isinstance(e, KeyboardInterrupt): sys.exit(1)
     else:
+    # Ensure the final output directory exists before any operations
+        if not os.path.exists(final_output_dir):
+            os.makedirs(final_output_dir)
+            print(f"Created target directory: {final_output_dir}")
+
         config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int)
         end_rep = args.end_rep if args.end_rep is not None else config_num_reps
         completed_reps = get_completed_replications(final_output_dir)
@@ -148,7 +175,9 @@ def main():
                 print("\n" + "="*80)
                 print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
                 print("="*80)
-                cmd = [sys.executable, orchestrator_script, "--replication_num", str(rep_num)]
+                cmd = [sys.executable, orchestrator_script, 
+                    "--replication_num", str(rep_num),
+                    "--base_output_dir", final_output_dir]
                 if args.quiet: cmd.append("--quiet")
                 try:
                     subprocess.run(cmd, check=True)

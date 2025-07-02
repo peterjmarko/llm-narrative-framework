@@ -198,8 +198,8 @@ def clear_output_files_for_fresh_run(output_dir, aggregate_mappings_filepath, us
 
 def main():
     # Get defaults for argparse from module-level constants (which were loaded from config)
-    default_k_arg = get_config_value(APP_CONFIG, 'General', 'default_k', fallback=6, value_type=int)
-    default_iter_arg = get_config_value(APP_CONFIG, 'General', 'default_build_iterations', fallback=5, value_type=int)
+    default_k_arg = get_config_value(APP_CONFIG, 'Study', 'group_size', fallback=10, value_type=int)
+    default_iter_arg = get_config_value(APP_CONFIG, 'Study', 'num_trials', fallback=100, value_type=int)
 
     parser = argparse.ArgumentParser(
         description="Generates multiple unique LLM query sets and a consolidated mapping file.",
@@ -209,11 +209,11 @@ def main():
                         help="Number of unique query sets to generate in this run.")
     parser.add_argument("-k", "--k_per_query", type=int, default=default_k_arg,
                         help="Number of items (k) per individual query set.")
-    parser.add_argument("--master_personalities_file", default=DEFAULT_MASTER_PERSONALITIES_FN, # Use module const
+    parser.add_argument("--master_personalities_file", default=DEFAULT_MASTER_PERSONALITIES_FN,
                         help=f"Filename of the master personalities file (expected in PROJECT_ROOT/data/). Default: {DEFAULT_MASTER_PERSONALITIES_FN}")
-    parser.add_argument("--base_output_dir", default=DEFAULT_BASE_OUTPUT_DIR_CFG, # Use module const
+    parser.add_argument("--base_output_dir", default=DEFAULT_BASE_OUTPUT_DIR_CFG,
                         help=f"Base directory for all pipeline outputs. Default: {DEFAULT_BASE_OUTPUT_DIR_CFG}")
-    parser.add_argument("--queries_subdir", default=DEFAULT_QUERIES_SUBDIR_CFG, # Use module const
+    parser.add_argument("--queries_subdir", default=DEFAULT_QUERIES_SUBDIR_CFG,
                         help=f"Subdirectory under base_output_dir for generated query sets and mappings. Default: {DEFAULT_QUERIES_SUBDIR_CFG}")
     parser.add_argument("--base_seed", type=int, default=None,
                         help="Base random seed for personality selection. Iteration seed: base_seed + global_iteration_index -1.")
@@ -221,8 +221,6 @@ def main():
                         help="Base random seed for query_generator.py internal shuffles. Iteration seed: qgen_base_seed + global_iteration_index -1.")
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="Increase verbosity level (-v for INFO, -vv for DEBUG).")
-    parser.add_argument("--mode", choices=['new', 'continue'], default=None,
-                        help="Run mode ('new' or 'continue'). If provided, skips the interactive prompt.")
     parser.add_argument("--quiet-worker", action="store_true",
                         help="Suppress the detailed stdout/stderr from the query_generator.py worker during the run.")
     parser.add_argument("--run_output_dir", required=True,
@@ -246,25 +244,11 @@ def main():
         for handler_curr in root_logger.handlers: handler_curr.setLevel(numeric_final_log_level)
     logging.info(f"Build Queries log level set to: {log_level_final_build}")
 
-    # --- Get run_mode from user input ---
-    run_mode = 'new'
-    if args.mode:
-        run_mode = args.mode
-    else:
-        try:
-            run_mode_input = input("Is this a New run or a Continued run? ([Enter/N/n] for New, [C/c] for Continued): ").strip().lower()
-            if run_mode_input in ['c', 'continue']: run_mode = 'continue'
-            elif run_mode_input in ['', 'n', 'new', 'fresh']: run_mode = 'new'
-            else: logging.warning("Invalid input for run mode. Assuming 'new' run.")
-        except KeyboardInterrupt: logging.info("\nOperation cancelled by user during run mode selection. Exiting."); sys.exit(0)
-    logging.info(f"Selected run mode: {run_mode}")
-
     # --- Validate k and iterations ---
     if args.num_iterations <= 0: logging.error("Number of iterations must be positive."); sys.exit(1)
     if args.k_per_query <= 0: logging.error("k per query must be a positive integer."); sys.exit(1)
 
     # --- Resolve Paths ---
-    # script_dir is src/
     script_dir = os.path.dirname(os.path.abspath(__file__)) 
     query_generator_path = os.path.join(script_dir, QUERY_GENERATOR_SCRIPT_NAME)
     if not os.path.exists(query_generator_path):
@@ -272,9 +256,7 @@ def main():
 
     # The --run_output_dir is now the single source of truth for all outputs for this stage.
     resolved_base_output_dir = args.run_output_dir
-
     final_queries_output_dir = os.path.join(resolved_base_output_dir, args.queries_subdir)
-    # The os.makedirs call ensures the subdirectory (e.g., 'session_queries') exists inside the run_... directory.
     if not os.path.exists(final_queries_output_dir):
         try:
             os.makedirs(final_queries_output_dir, exist_ok=True)
@@ -285,10 +267,15 @@ def main():
     else:
         logging.info(f"Using queries subdirectory: {final_queries_output_dir}")
 
+    # --- Automatically determine run_mode ---
+    if not glob.glob(os.path.join(final_queries_output_dir, "llm_query_*.txt")):
+        run_mode = 'new'
+    else:
+        run_mode = 'continue'
+    logging.info(f"Automatically determined run mode: {run_mode}")
+    
     used_indices_filepath = os.path.join(final_queries_output_dir, DEFAULT_USED_INDICES_FN)
     aggregate_mappings_filepath = os.path.join(final_queries_output_dir, DEFAULT_AGGREGATE_MAPPINGS_FN)
-    
-    # Temporary input file for query_generator.py will be in src/
     temp_subset_qgen_input_path = os.path.join(script_dir, DEFAULT_TEMP_SUBSET_FN) 
     
     newly_used_indices_this_batch = set()
@@ -319,12 +306,8 @@ def main():
 
         logging.info(f"Total available *unused* personalities: {len(available_personalities_df)}")
 
-        # Add a warning if the available pool is getting low
-        # Rule of thumb: warn if available pool is less than 5x the items needed for the run.
         if len(available_personalities_df) < 5 * total_needed_for_this_run:
-            logging.warning(f"Caution: The pool of {len(available_personalities_df)} available personalities is getting low "
-                            f"compared to the {total_needed_for_this_run} required for this batch. "
-                            f"The diversity of later queries may be reduced.")
+            logging.warning(f"Caution: The pool of {len(available_personalities_df)} available personalities is getting low.")
         logging.info(f"Generating {args.num_iterations} query sets, each with k={args.k_per_query}, starting from global index {start_index}.\n")
 
         if run_mode == 'new' or not os.path.exists(aggregate_mappings_filepath) or os.path.getsize(aggregate_mappings_filepath) == 0:
@@ -351,12 +334,7 @@ def main():
             current_selection_seed = None
             if args.base_seed is not None:
                 current_selection_seed = args.base_seed + current_global_iteration_index - 1
-                if not args.quiet:
-                    logging.info(f"  Using deterministic seed {current_selection_seed} for personality selection.")
-            else:
-                if not args.quiet:
-                    logging.info("  No base_seed provided; selecting personalities randomly.")
-
+            
             selected_subset_df = available_personalities_df.sample(n=args.k_per_query, random_state=current_selection_seed)
             current_iter_indices = selected_subset_df['Index'].tolist()
             
@@ -366,8 +344,7 @@ def main():
             with open(temp_subset_qgen_input_path, 'w', encoding='utf-8') as f_temp:
                 f_temp.write(original_master_header + "\n") 
                 df_to_write.to_csv(f_temp, sep='\t', index=False, header=False, encoding='utf-8')
-            logging.debug(f"  Created temporary input for query_generator: {temp_subset_qgen_input_path}")
-
+            
             qgen_base_query_filename = get_config_value(APP_CONFIG, 'Filenames', 'base_query_src', fallback="base_query.txt")
 
             cmd = [
@@ -386,16 +363,12 @@ def main():
                 iteration_qgen_seed_value = random.randint(0, 2**32 - 1)
             cmd.extend(["--seed", str(iteration_qgen_seed_value)])
             
-            if not args.quiet:
-                logging.info(f"  Running query_generator.py (output prefix target: '{qgen_output_prefix_for_arg}')...")
             logging.debug(f"  QGEN Command: {' '.join(cmd)}")
             
             try:
                 process_qgen = subprocess.run(cmd, check=True, capture_output=True, text=True, cwd=script_dir, encoding='utf-8')
                 if not args.quiet_worker and process_qgen.stderr:
                     logging.warning(f"  query_generator.py stderr:\n{process_qgen.stderr.strip()}")
-                if not args.quiet:
-                    logging.info("  query_generator.py completed successfully.")
                 
                 newly_used_indices_this_batch.update(current_iter_indices)
                 available_personalities_df = available_personalities_df.drop(selected_subset_df.index)
@@ -407,38 +380,12 @@ def main():
                 dest_query_filename_base = f"llm_query_{current_global_iteration_index:03d}"
                 dest_query_txt_path = os.path.join(final_queries_output_dir, f"{dest_query_filename_base}.txt")
                 
-                query_text_content = ""
-                if os.path.exists(src_full_query_path):
-                    shutil.copy2(src_full_query_path, dest_query_txt_path)
-                    if not args.quiet:
-                        logging.info(f"  Copied '{os.path.basename(src_full_query_path)}' to '{dest_query_txt_path}'")
-                    with open(src_full_query_path, 'r', encoding='utf-8') as f_q:
-                        query_text_content = f_q.read()
-                else:
-                    logging.warning(f"  Source query text file not found in {qgen_iter_temp_dir_abs}.")
-
-                if query_text_content:
-                    import json
-                    request_payload = {"model": get_config_value(APP_CONFIG, 'LLM', 'model_name', fallback=""), "messages": [{"role": "user", "content": query_text_content}]}
-                    max_tokens = get_config_value(APP_CONFIG, 'LLM', 'max_tokens', fallback=None, value_type=int)
-                    if max_tokens is not None: request_payload['max_tokens'] = max_tokens
-                    temperature = get_config_value(APP_CONFIG, 'LLM', 'temperature', fallback=None, value_type=float)
-                    if temperature is not None: request_payload['temperature'] = temperature
-                    dest_query_json_path = os.path.join(final_queries_output_dir, f"{dest_query_filename_base}_full.json")
-                    with open(dest_query_json_path, 'w', encoding='utf-8') as f_json:
-                        json.dump(request_payload, f_json, indent=2, ensure_ascii=False)
-                    if not args.quiet:
-                        logging.info(f"  Saved full LLM request payload to '{os.path.basename(dest_query_json_path)}'")
-                else: logging.warning(f"  Source '{os.path.basename(src_full_query_path)}' not found in {qgen_iter_temp_dir_abs}.")
-
+                shutil.copy2(src_full_query_path, dest_query_txt_path)
+                
                 if os.path.exists(src_manifest_path):
                     dest_manifest_path = os.path.join(final_queries_output_dir, f"{dest_query_filename_base}_manifest.txt")
                     shutil.copy2(src_manifest_path, dest_manifest_path)
-                    if not args.quiet:
-                        logging.info(f"  Copied audit manifest to '{os.path.basename(dest_manifest_path)}'")
-                else:
-                    logging.warning(f"  Source manifest file not found in {qgen_iter_temp_dir_abs}.")
-
+                
                 if os.path.exists(src_mapping_path):
                     with open(src_mapping_path, 'r', encoding='utf-8') as f_qgen_map:
                         qgen_map_lines = f_qgen_map.readlines()
@@ -446,17 +393,12 @@ def main():
                             mapping_data_line = qgen_map_lines[1].strip()
                             with open(aggregate_mappings_filepath, 'a', encoding='utf-8') as f_map_agg:
                                 f_map_agg.write(mapping_data_line + "\n")
-                            if not args.quiet:
-                                logging.info(f"  Appended mapping for set {current_global_iteration_index} to {os.path.basename(aggregate_mappings_filepath)}")
-                        else: logging.warning(f"  qgen mapping file ('{os.path.basename(src_mapping_path)}') empty/no data.")
-                else: logging.warning(f"  qgen mapping file ('{os.path.basename(src_mapping_path)}') not found in {qgen_iter_temp_dir_abs}.")
                 
             except subprocess.CalledProcessError as e:
-                logging.error(f"query_generator.py failed for set index {current_global_iteration_index}."); raise 
+                logging.error(f"query_generator.py failed for set index {current_global_iteration_index}. Stderr:\n{e.stderr}"); raise 
             finally: 
                 if os.path.exists(qgen_iter_temp_dir_abs):
-                    try: shutil.rmtree(qgen_iter_temp_dir_abs); logging.debug(f"Cleaned up temp qgen output dir: {qgen_iter_temp_dir_abs}")
-                    except OSError as e_rm: logging.warning(f"Could not remove temp qgen output dir {qgen_iter_temp_dir_abs}: {e_rm}")
+                    shutil.rmtree(qgen_iter_temp_dir_abs)
             
             if not args.quiet:
                 logging.info(f"--- Set (Global Index {current_global_iteration_index}) Generation Complete ---\n")
@@ -470,8 +412,7 @@ def main():
             append_used_indices(used_indices_filepath, newly_used_indices_this_batch)
 
         if os.path.exists(temp_subset_qgen_input_path):
-            try: os.remove(temp_subset_qgen_input_path); logging.info(f"Cleaned up temporary subset input file: {temp_subset_qgen_input_path}")
-            except OSError as e: logging.warning(f"Could not remove temp subset input file {temp_subset_qgen_input_path}: {e}")
+            os.remove(temp_subset_qgen_input_path)
         
         logging.info(f"Batch query generation finished or was terminated. Output files are in: {final_queries_output_dir}")
 

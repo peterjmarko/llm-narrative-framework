@@ -314,10 +314,9 @@ def main():
             ]
             
             # --- MODIFICATION START ---
-            # Propagate quiet flag correctly. It takes precedence over verbose.
-            if args.quiet:
-                worker_cmd.append("--quiet")
-            elif args.verbose >= 2:
+            # Only propagate verbosity flags for logging purposes in the worker.
+            # The spinner's visibility is handled by the worker itself.
+            if args.verbose >= 2:
                 worker_cmd.append("-vv")
             elif args.verbose == 1:
                 worker_cmd.append("-v")
