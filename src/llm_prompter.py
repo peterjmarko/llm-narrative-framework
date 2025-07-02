@@ -153,7 +153,7 @@ def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endp
 
     # --- Threading setup ---
     stop_event = threading.Event()
-    spinner_thread = threading.Thread(target=animate_spinner, args=(stop_event, query_identifier))
+    spinner_thread = threading.Thread(target=animate_spinner, args=(stop_event, query_identifier), daemon=True)
     api_thread = threading.Thread(target=_api_worker, daemon=True)
 
     # Start threads
