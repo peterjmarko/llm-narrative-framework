@@ -68,7 +68,7 @@ The workflow is designed to be fully automated. Each experiment run produces sel
 
 ### Phase 1: Running Experiments
 
-The main entry point for executing a complete experiment (e.g., all 30 replications for a single LLM) is the `run_experiment.ps1` PowerShell script.
+The main entry point for executing a complete experiment (e.g., all 30 replications for a single LLM) is the `run_experiment.ps1` PowerShell script, which acts as a wrapper around `replication_manager.py`.
 
 1.  **Configure**:
     *   Ensure your environment is set up and your API key is in the `.env` file.
@@ -96,9 +96,9 @@ After running all experiments, this phase aggregates all data and performs the f
 
 1.  **Compile All Results**: Use `compile_results.py` and point it at the parent directory containing all your experiment folders (e.g., `output/reports`). The script will automatically:
     *   Scan the entire directory structure from the bottom up.
-    *   Create a `final_summary_results.csv` inside every single run folder, containing key metrics like MRR and Top-1 Accuracy.
+    *   Create a `final_summary_results.csv` inside every single run folder.
     *   Create aggregated `final_summary_results.csv` files at each higher level.
-    *   Finally, create a single **master summary file** at the top level you specified.
+    *   Finally, create a single **master summary file** at the top level you specified (`output/reports/final_summary_results.csv`).
     ```powershell
     # Compile all results within the 'reports' folder into a master dataset
     python src/compile_results.py output/reports
@@ -110,27 +110,28 @@ After running all experiments, this phase aggregates all data and performs the f
     python src/run_anova.py output/reports
     ```
 
-3.  **Review Final Artifacts**: In the analysis directory (`output/reports/`), you will now find:
-    *   Hierarchical `final_summary_results.csv` files at every level.
-    *   `MASTER_ANOVA_DATASET.csv`: The aggregated data used for the final analysis.
-    *   Publication-quality **box plot `*.png` images**.
-    *   A complete `MASTER_ANOVA_DATASET_analysis_log.txt` with all statistical tables (ANOVA, Tukey's HSD, etc.).
+3.  **Review Final Artifacts**: In the top-level analysis directory (`output/reports/anova/`), you will now find:
+    *   Publication-quality **box plot `*.png` images** for each metric.
+    *   A complete `final_summary_results_analysis_log.txt` with all statistical tables (ANOVA, Tukey's HSD, etc.).
 
 ## Maintenance and Utility Scripts
 
 The project includes several scripts for maintenance, diagnostics, and handling historical data.
 
-*   **`replication_manager.py --reprocess`**:
-    *   The main runner can be invoked in a reprocessing mode to fix or update the analysis for existing runs without re-running the expensive LLM sessions.
-    *   Usage: `python src/replication_manager.py --reprocess path/to/experiment --depth 1`
+*   **`replication_manager.py`**:
+    *   The main batch runner for managing multiple replications. Can be invoked in a reprocessing mode (`--reprocess`) to fix or update the analysis for existing runs without re-running expensive LLM sessions.
+    *   Usage: `python src/replication_manager.py path/to/experiment --reprocess --depth 1`
+
+*   **`rebuild_reports.py`**:
+    *   A powerful utility to regenerate complete `replication_report.txt` files from the ground-truth archived config. Useful for applying fixes to the processing or analysis stages across an entire study.
+    *   Usage: `python src/rebuild_reports.py path/to/study`
 
 *   **`patch_old_runs.py`**:
     *   **Utility for historical data.** Scans a directory for old experiment runs that are missing a `config.ini.archived` file and generates one for each by reverse-engineering the `replication_report.txt`. Supports recursive scanning with `--depth`.
     *   Usage: `python src/patch_old_runs.py "path/to/old/experiments" --depth -1`
 
 *   **`log_manager.py`**:
-    *   The core utility for automated log management. It is called by the main runner with commands like `start`, `rebuild`, and `finalize`.
-    *   Can be run manually for maintenance, for example, to safely rebuild a log from existing reports: `python src/log_manager.py rebuild "path/to/experiment/folder"`
+    *   The core utility for automated log management. It is called by the main runner with commands like `start`, `rebuild`, and `finalize`. Can be run manually for maintenance.
 
 *   **`retry_failed_sessions.py`**:
     *   Used automatically by the main runner for the repair cycle. Can be run manually to fix failed API calls in a specific run.

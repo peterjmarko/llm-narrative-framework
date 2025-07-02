@@ -2,6 +2,32 @@
 # -*- coding: utf-8 -*-
 # Filename: src/compile_results.py
 
+"""
+Compiles All Experiment Results into a Master Summary CSV.
+
+This script recursively scans a directory structure to find all individual
+replication reports and aggregates their data into a master CSV file named
+`final_summary_results.csv`.
+
+It operates in a hierarchical, bottom-up fashion:
+1.  It starts from the deepest directories in the specified path.
+2.  In each directory, it looks for `replication_report_*.txt` files and
+    any `final_summary_results.csv` files from subdirectories.
+3.  It parses the metrics (from a JSON block) and parameters (from the
+    archived config) for each replication.
+4.  It combines all found data into a new `final_summary_results.csv` at
+    the current directory level.
+5.  This process repeats up the directory tree, with each parent directory
+    aggregating the summaries from its children.
+
+The final result is a master CSV at the top level of the specified base
+directory, containing the complete data for the entire study, ready for
+statistical analysis.
+
+Usage:
+    python src/compile_results.py /path/to/study_output_dir
+"""
+
 import os
 import sys
 import pandas as pd

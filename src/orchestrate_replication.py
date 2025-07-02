@@ -2,6 +2,39 @@
 # -*- coding: utf-8 -*-
 # Filename: src/orchestrate_replication.py
 
+"""
+Orchestrator for a Single Experimental Replication.
+
+This script is the engine for executing or reprocessing a single, self-contained
+experimental run. It calls the various pipeline stages (build queries, run LLM,
+process, analyze) in sequence as subprocesses.
+
+It operates in two modes:
+1.  **New Run Mode (default):**
+    -   Creates a new, unique run directory.
+    -   Archives the `config.ini` for reproducibility.
+    -   Executes the full pipeline:
+        -   Stage 1: `build_queries.py`
+        -   Stage 2: `run_llm_sessions.py`
+        -   Stage 3: `process_llm_responses.py`
+        -   Stage 4: `analyze_performance.py`
+2.  **Reprocess Mode (`--reprocess`):**
+    -   Operates on an existing `run_output_dir`.
+    -   Skips Stages 1 and 2 (query building and LLM interaction).
+    -   Re-runs only Stage 3 (processing) and Stage 4 (analysis). This is
+        useful for fixing bugs in the analysis code without re-running the
+        expensive LLM calls.
+
+Finally, it compiles all captured output from the subprocesses into a single,
+comprehensive `replication_report.txt` within the run directory.
+
+Usage (for a new run, typically called by replication_manager.py):
+    python src/orchestrate_replication.py --replication_num 1
+
+Usage (for reprocessing an existing run):
+    python src/orchestrate_replication.py --reprocess --run_output_dir /path/to/run_dir
+"""
+
 import argparse
 import os
 import sys

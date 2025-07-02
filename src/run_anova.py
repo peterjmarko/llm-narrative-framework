@@ -2,6 +2,36 @@
 # -*- coding: utf-8 -*-
 # Filename: src/run_anova.py
 
+"""
+Performs a two-way Analysis of Variance (ANOVA) on compiled experimental results.
+
+This script automates the statistical analysis of performance metrics from a master
+CSV file. It is designed to identify which experimental factors (e.g., model, 
+mapping strategy) have a statistically significant effect on various performance
+metrics.
+
+Key Workflow Steps:
+1.  Loads data from a master CSV file specified via command-line arguments.
+2.  Performs a critical data cleaning step to unify known data integrity issues
+    (e.g., different names for the same database file).
+3.  Normalizes model names for consistent display using a provided config file.
+4.  For each specified performance metric, it conducts a two-way ANOVA.
+5.  Generates a Q-Q plot to diagnose the normality of residuals, a key
+    assumption for ANOVA.
+6.  If the ANOVA reveals significant effects, it performs a post-hoc Tukey HSD
+    (Honestly Significant Difference) test to determine which specific groups
+    (e.g., which models) are different from each other.
+7.  Summarizes the post-hoc results into clear "Performance Tiers".
+8.  Generates and saves boxplots visualizing the performance of each factor on
+    the metric, annotated with the corresponding ANOVA p-value.
+
+All output, including a detailed analysis log and all generated plots, is saved
+to a specified output directory.
+
+Usage:
+    python src/run_anova.py --input /path/to/results.csv --output /path/to/report_dir --config /path/to/config.ini
+"""
+
 import argparse
 import pandas as pd
 import statsmodels.api as sm
@@ -108,6 +138,29 @@ def create_and_save_plot(df, metric, factor, p_value, output_dir):
     plt.close(fig)
 
 def perform_analysis(df, metric, all_possible_factors, output_dir, display_name_map):
+    """
+    Performs a full statistical analysis for a single metric.
+
+    This function orchestrates the entire analysis pipeline for a given
+    performance metric, including:
+    - Printing descriptive statistics.
+    - Running a two-way ANOVA.
+    - Generating and saving a Q-Q diagnostic plot.
+    - If significant factors are found, running and reporting on a
+      post-hoc Tukey HSD test and creating performance tiers.
+    - Calling the plotting function to generate summary boxplots.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the complete, cleaned data.
+        metric (str): The name of the column to be treated as the dependent variable.
+        active_factors (list): A list of column names to be used as independent variables.
+        output_dir (str): The path to the directory where plots and logs are saved.
+    
+    Side Effects:
+        - Prints all statistical results to standard output.
+        - Saves a Q-Q plot (`diagnostic_qqplot_{metric}.png`) to the output directory.
+        - Saves performance boxplots for each factor to the output directory.
+    """
     logging.info("\n" + "="*80)
     logging.info(f" ANALYSIS FOR METRIC: '{metric}'")
     logging.info("="*80)
@@ -162,6 +215,20 @@ def perform_analysis(df, metric, all_possible_factors, output_dir, display_name_
         logging.error(f"\nERROR: Could not perform ANOVA for metric '{metric}'. Reason: {e}")
 
 def main():
+    """
+    Main entry point for the ANOVA analysis script.
+
+    Orchestrates the entire process:
+    1. Parses command-line arguments for input file, output directory, and config.
+    2. Sets up structured logging to file and console.
+    3. Loads the master results CSV into a pandas DataFrame.
+    4. **Performs a critical data cleaning step** to unify database names,
+       correcting for known inconsistencies in the source data.
+    5. Normalizes model names for display purposes based on the config file.
+    6. Determines which metrics and factors to analyze.
+    7. Iterates through each metric, calling perform_analysis to conduct the
+       full statistical analysis and generate outputs.
+    """
     parser = argparse.ArgumentParser(description="Perform ANOVA on experiment results.")
     parser.add_argument("input_path", help="Path to the top-level experiment directory.")
     args = parser.parse_args()

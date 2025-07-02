@@ -2,6 +2,30 @@
 # -*- coding: utf-8 -*-
 # Filename: src/replication_manager.py
 
+"""
+Main Batch Runner for Managing Multiple Replications.
+
+This script is the primary user-facing tool for managing large-scale experiments.
+It automates the process of running many replications or reprocessing entire
+studies by calling the single-run orchestrator (`orchestrate_replication.py`)
+in a loop.
+
+Key Features:
+-   **Batch Execution:** Runs a specified range of new replications, automatically
+    skipping any that are already complete. Provides progress and ETA.
+-   **Batch Reprocessing:** Scans a directory for existing run folders and
+    re-runs the analysis stages (3 and 4) on all of them.
+-   **Post-Processing:** After all tasks are complete, it automatically calls the
+    `compile_results.py` script to generate the final statistical summary for
+    the entire study.
+
+Usage (to run replications 1 through 30):
+    python src/replication_manager.py /path/to/study_output_dir --end-rep 30
+
+Usage (to reprocess all runs in a directory):
+    python src/replication_manager.py /path/to/study_output_dir --reprocess
+"""
+
 import sys
 import os
 import subprocess
