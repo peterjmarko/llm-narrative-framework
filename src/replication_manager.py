@@ -175,12 +175,18 @@ def main():
                 print("\n" + "="*80)
                 print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
                 print("="*80)
+                
                 cmd = [sys.executable, orchestrator_script, 
                     "--replication_num", str(rep_num),
                     "--base_output_dir", final_output_dir]
                 if args.quiet: cmd.append("--quiet")
+                
+                status = "UNKNOWN" # Initialize status for this run
+
                 try:
                     subprocess.run(cmd, check=True)
+                    status = "SUCCESS" # Set status on success
+                    
                     newly_completed_count += 1
                     elapsed = time.time() - batch_start_time
                     avg_time = elapsed / newly_completed_count
@@ -188,9 +194,25 @@ def main():
                     eta = datetime.datetime.now() + datetime.timedelta(seconds=remaining_reps * avg_time)
                     print(f"\n--- Replication {rep_num} Finished ({newly_completed_count}/{len(reps_to_run)}) ---")
                     print(f"{C_GREEN}Time Elapsed: {format_seconds(elapsed)} | Remaining: {format_seconds(remaining_reps * avg_time)} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
+                
                 except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
+                    status = "FAILED" # Set status on failure
                     logging.error(f"!!! Replication {rep_num} failed or was interrupted. Continuing... !!!")
                     if isinstance(e, KeyboardInterrupt): sys.exit(1)
+                
+                finally:
+                    # --- THIS IS THE TRIVIAL FIX ---
+                    # Always call the log manager to update the status for this replication.
+                    if status != "UNKNOWN":
+                        try:
+                            log_update_cmd = [
+                                sys.executable, log_manager_script, "update", final_output_dir,
+                                "--rep", str(rep_num),
+                                "--status", status
+                            ]
+                            subprocess.run(log_update_cmd, check=True, capture_output=True)
+                        except Exception as log_e:
+                            logging.warning(f"  - Could not update batch log for replication {rep_num}: {log_e}")
 
     print("\n" + "="*80)
     print("### ALL TASKS COMPLETE. BEGINNING POST-PROCESSING. ###")

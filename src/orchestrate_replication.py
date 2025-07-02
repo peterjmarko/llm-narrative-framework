@@ -239,7 +239,6 @@ def main():
         personalities_file_path = get_robust(['General', 'Filenames'], ['personalities_db_path', 'personalities_src'])
         personalities_file = os.path.basename(personalities_file_path) if personalities_file_path != 'N/A' else 'N/A'
         
-        # We also need to get k and m for the report header
         k_val = get_robust(['Study'], ['k_per_query', 'num_subjects', 'group_size'])
         m_val = get_robust(['Study'], ['num_iterations', 'num_trials'])
         
@@ -265,10 +264,28 @@ LLM Model:       {llm_model}
 Run Notes:       {args.notes}
 ================================================================================
 """
-        report_file.write(header)
-        report_file.write("".join(all_stage_outputs))
+        # Write the "front end" of the report
+        report_file.write(header.strip())
+
+        # --- THIS IS THE MODIFIED BLOCK ---
+        # If the pipeline completed successfully, write only the "back end" analysis summary.
+        # Otherwise, write all the detailed logs for debugging purposes.
+        if pipeline_status == "COMPLETED":
+            analysis_summary_start_index = output4.find("<<<ANALYSIS_SUMMARY_START>>>")
+            if analysis_summary_start_index != -1:
+                # Extract just the analysis part from the Stage 4 output
+                analysis_summary = output4[analysis_summary_start_index:]
+                report_file.write("\n\n" + analysis_summary.strip())
+            else:
+                # Fallback in case the analysis summary tag is missing
+                report_file.write("\n\n--- ANALYSIS SUMMARY NOT FOUND IN STAGE 4 OUTPUT ---")
+                report_file.write("".join(all_stage_outputs)) # Write full log as a fallback
+        else:
+            # For FAILED or INTERRUPTED runs, write the full, detailed logs.
+            report_file.write("".join(all_stage_outputs))
     
     logging.info(f"Replication run finished. Report saved in directory: {os.path.basename(run_specific_dir_path)}")
+
 
 if __name__ == "__main__":
     main()
