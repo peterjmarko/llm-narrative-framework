@@ -127,29 +127,38 @@ def load_env_vars():
 
 
 def get_config_value(config: configparser.ConfigParser, section: str, key: str, 
-                     fallback=None, value_type=str):
+                     fallback=None, value_type=str, fallback_key=None):
     """
     Helper to get a typed value from a configparser.ConfigParser object,
     with a fallback, type conversion, and stripping of common inline comments.
+    Tries the primary 'key' first, then the 'fallback_key' if provided.
 
     Args:
         config (configparser.ConfigParser): The loaded config object.
         section (str): The section name in the INI file.
-        key (str): The key name in the section.
-        fallback: The value to return if the key is not found or conversion fails.
+        key (str): The primary key name in the section.
+        fallback: The value to return if no key is found or conversion fails.
         value_type (type): The expected type (str, int, float, bool).
+        fallback_key (str, optional): An alternative key to try if the primary key is not found.
 
     Returns:
         The configured value converted to value_type, or the fallback.
     """
     if not config.has_section(section):
-        # logger.debug(f"Config: Section [{section}] not found, using fallback for key '{key}': {fallback}")
         return fallback
-    if not config.has_option(section, key):
-        # logger.debug(f"Config: Key '{key}' not found in section [{section}], using fallback: {fallback}")
-        return fallback
+
+    keys_to_try = [key]
+    if fallback_key:
+        keys_to_try.append(fallback_key)
+
+    raw_value = None
+    for k in keys_to_try:
+        if config.has_option(section, k):
+            raw_value = config.get(section, k)
+            break # Found a valid key, exit the loop
     
-    raw_value = config.get(section, key) # Get the raw string value
+    if raw_value is None:
+        return fallback # Neither key was found
 
     if isinstance(raw_value, str):
         # Strip common inline comment characters (;#) and surrounding whitespace
@@ -212,6 +221,14 @@ def get_config_list(config, section, key, fallback=None):
     if value_str:
         return [item.strip() for item in value_str.split(',')]
     return fallback if fallback is not None else []
+
+def get_config_section_as_dict(config, section):
+    """
+    Reads an entire section from the config and returns it as a dictionary.
+    """
+    if config.has_section(section):
+        return dict(config.items(section))
+    return {}
 
 # Global config object, loaded once
 APP_CONFIG = load_app_config()

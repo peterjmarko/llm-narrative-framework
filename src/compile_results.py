@@ -2,260 +2,158 @@
 # -*- coding: utf-8 -*-
 # Filename: src/compile_results.py
 
-"""
-Compile Results Utility (compile_results.py)
-
-Purpose:
-This script scans a directory for 'run_*' subdirectories and compiles key
-performance metrics from each run's 'report.txt' file into a single,
-aggregated CSV file named 'final_summary_results.csv'.
-
-It is designed to be run at the batch level, processing all runs within a
-single experimental batch directory.
-
-Workflow:
-1.  Scans a target directory for subdirectories matching the 'run_*' pattern.
-2.  The scan depth is controlled by the --depth argument.
-3.  For each 'run_*' directory, it reads the 'report.txt' file.
-4.  Parses key metrics (MRR, Top-K Accuracy, etc.) from the report.
-5.  Parses run parameters (model, temperature, etc.) from the directory name.
-6.  Appends a summary row for the run to a master list.
-7.  Saves the compiled list as 'final_summary_results.csv' in the target directory.
-8.  Calculates and prints summary statistics (mean, median, std) for key metrics.
-
-Command-Line Usage:
-    # Scan the './output' directory (default, depth 0)
-    python src/compile_results.py
-
-    # Scan a specific directory with a depth of 1
-    python src/compile_results.py /path/to/my/batch --depth 1
-
-    # Scan a directory recursively
-    python src/compile_results.py /path/to/my/batch --depth -1
-"""
-
 import os
 import sys
-import glob
-import re
+import pandas as pd
+import logging
 import json
-import csv
+import re
 import configparser
 import argparse
-from config_loader import APP_CONFIG, get_config_list
+import glob
 
-# --- Helper Functions ---
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+try:
+    from config_loader import APP_CONFIG, get_config_list
+except ImportError:
+    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_script_dir not in sys.path:
+        sys.path.insert(0, current_script_dir)
+    from config_loader import APP_CONFIG, get_config_list
+
+def parse_metrics_json(report_content):
+    json_start_tag = "<<<METRICS_JSON_START>>>"
+    json_end_tag = "<<<METRICS_JSON_END>>>"
+    try:
+        match = re.search(f"{re.escape(json_start_tag)}(.*?){re.escape(json_end_tag)}", report_content, re.DOTALL)
+        if match:
+            json_str = match.group(1).strip()
+            return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        logging.warning(f"  - Warning: Failed to parse JSON in report. Error: {e}")
+    return None
 
 def parse_config_params(config_path):
     """
-    Reads parameters from a config.ini.archived file and normalizes the keys
-    to the standard schema for consistent output.
+    Robustly parses key parameters from a config.ini.archived file.
+    It checks for multiple possible section and key names to handle all config versions.
     """
-    config = configparser.ConfigParser()
-    config.read(config_path)
-    
-    raw_params = {}
-    for section in config.sections():
-        for key, value in config.items(section):
-            raw_params[key] = value
-            
-    # --- Key Normalization ---
-    # Maps all possible legacy keys to the single, standard key.
-    key_map = {
-        'model_name': 'model',
-        'model': 'model',
-        
-        'group_size': 'k',
-        'k_per_query': 'k',
-        
-        'num_trials': 'm',
-        'num_iterations': 'm',
-        
-        'personalities_src': 'db'
-    }
-    
-    normalized_params = {}
-    for key, value in raw_params.items():
-        # Find the standard key from the map; if not found, use the original key.
-        standard_key = key_map.get(key)
-        if standard_key:
-            normalized_params[standard_key] = value
-        else:
-            # Keep keys that don't need mapping (like 'temperature', 'replication', etc.)
-            normalized_params[key] = value
-            
-    return normalized_params
-
-def parse_metrics_json(report_content):
-    """Extracts the JSON block from the report content."""
-    match = re.search(r'<<<METRICS_JSON_START>>>(.*?)<<<METRICS_JSON_END>>>', report_content, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1).strip())
-        except json.JSONDecodeError:
-            return None
-    return None
-
-def write_summary_csv(output_path, results_data):
-    """Writes a list of result dictionaries to a CSV file with sorted headers."""
-    if not results_data:
-        return
-        
-    # Load the standard header order directly from the central config file.
-    # This list IS the definitive header for the CSV file.
-    fieldnames = get_config_list(APP_CONFIG, 'Schema', 'csv_header_order')
-
-    if not fieldnames:
-        # This is a critical failure. The script cannot proceed without a defined schema.
-        print("  -> FATAL ERROR: 'csv_header_order' not found in the [Schema] section of config.ini. Cannot write CSV.")
-        return
-
+    params = {}
+    config = configparser.ConfigParser(allow_no_value=True)
     try:
-        with open(output_path, 'w', newline='', encoding='utf-8') as f_csv:
-            writer = csv.DictWriter(f_csv, fieldnames=fieldnames, extrasaction='ignore')
-            writer.writeheader()
-            writer.writerows(results_data)
-        print(f"  -> Generated summary: {output_path} ({len(results_data)} rows)")
-    except IOError as e:
-        print(f"  -> Warning: Could not write summary to {output_path}. Error: {e}")
+        config.read(config_path)
 
-# --- Mode-Specific Logic ---
+        def get_robust(section_keys, key_keys, value_type=str, default=None):
+            """Internal helper to find a value across multiple sections and keys."""
+            for section in section_keys:
+                if config.has_section(section):
+                    for key in key_keys:
+                        if config.has_option(section, key):
+                            try:
+                                if value_type == int: return config.getint(section, key)
+                                if value_type == float: return config.getfloat(section, key)
+                                if value_type == bool: return config.getboolean(section, key)
+                                return config.get(section, key)
+                            except (ValueError, TypeError):
+                                continue
+            return default
+
+        # --- TRULY ROBUST PARAMETER EXTRACTION ---
+        params['model'] = get_robust(['Model', 'LLM'], ['model_name', 'model'], default='unknown_model')
+        params['mapping_strategy'] = get_robust(['Study'], ['mapping_strategy'], default='unknown_strategy')
+        params['temperature'] = get_robust(['Model', 'LLM'], ['temperature'], value_type=float, default=0.0)
+        params['k'] = get_robust(['Study'], ['k_per_query', 'num_subjects', 'group_size'], value_type=int, default=0)
+        params['m'] = get_robust(['Study'], ['num_iterations', 'num_trials'], value_type=int, default=0)
+        
+        db_path = get_robust(['General', 'Filenames'], ['personalities_db_path', 'personalities_src'], default='unknown_db.file')
+        params['db'] = os.path.basename(db_path)
+
+    except Exception as e:
+        logging.warning(f"  - Could not fully parse config {os.path.basename(config_path)}. Error: {e}")
+    return params
+
+def write_summary_csv(output_path, results_list):
+    if not results_list:
+        logging.warning(f"No results to write to {output_path}.")
+        return
+    
+    fieldnames = get_config_list(APP_CONFIG, 'Schema', 'csv_header_order')
+    if not fieldnames:
+        logging.error("FATAL: 'csv_header_order' not found in config.ini. Cannot write CSV.")
+        return
+
+    df = pd.DataFrame(results_list)
+    for col in fieldnames:
+        if col not in df.columns:
+            df[col] = pd.NA
+    
+    df = df[fieldnames]
+    df.to_csv(output_path, index=False)
+    logging.info(f"  -> Generated summary: {output_path} ({len(df)} rows)")
 
 def run_hierarchical_mode(base_dir):
-    """Generates summaries at every level of the directory tree."""
-    print(f"Running in hierarchical mode on: {base_dir}")
-    # Walk the directory tree from the bottom up
+    logging.info(f"Running in hierarchical mode on: {base_dir}")
     for current_dir, subdirs, files in os.walk(base_dir, topdown=False):
         print(f"\nProcessing directory: {current_dir}")
         level_results = []
         
-        # 1. Process individual run reports in the current directory
-        report_files = [f for f in files if f.startswith('replication_report') and f.endswith('.txt')]
-        for report_file in report_files:
+        report_files = glob.glob(os.path.join(current_dir, 'replication_report_*.txt'))
+        if report_files and os.path.basename(current_dir).startswith('run_'):
             run_dir_name = os.path.basename(current_dir)
-            print(f"  - Found report in run folder: {run_dir_name}")
-            
+            logging.info(f"  - Found report in run folder: {run_dir_name}")
+            report_path = report_files[0]
             config_path = os.path.join(current_dir, 'config.ini.archived')
+
             if not os.path.exists(config_path):
-                print(f"    - Warning: 'config.ini.archived' not found. Skipping.")
+                logging.warning(f"    - Warning: 'config.ini.archived' not found in {run_dir_name}. Skipping.")
                 continue
 
-            with open(os.path.join(current_dir, report_file), 'r', encoding='utf-8') as f:
+            with open(report_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
             metrics = parse_metrics_json(content)
             if not metrics:
-                print(f"    - Warning: Could not parse metrics from {report_file}. Skipping.")
+                logging.warning(f"    - Warning: Could not parse metrics from {os.path.basename(report_path)}. Skipping.")
                 continue
             
-            run_data = parse_config_params(config_path)
-            run_data['run_directory'] = run_dir_name
+            run_params = parse_config_params(config_path)
+            rep_match = re.search(r'rep-(\d+)', run_dir_name)
+            run_params['replication'] = int(rep_match.group(1)) if rep_match else 0
+            
+            run_data = {'run_directory': run_dir_name}
+            run_data.update(run_params)
             run_data.update(metrics)
             level_results.append(run_data)
 
-        # 2. Aggregate results from immediate subdirectories
         for subdir_name in subdirs:
             summary_path = os.path.join(current_dir, subdir_name, 'final_summary_results.csv')
             if os.path.exists(summary_path):
-                print(f"  - Aggregating results from: {subdir_name}/final_summary_results.csv")
-                with open(summary_path, 'r', newline='', encoding='utf-8') as f_csv:
-                    reader = csv.DictReader(f_csv)
-                    level_results.extend(list(reader))
+                logging.info(f"  - Aggregating results from: {os.path.join(subdir_name, 'final_summary_results.csv')}")
+                try:
+                    df_sub = pd.read_csv(summary_path)
+                    if not df_sub.empty:
+                        level_results.extend(df_sub.to_dict('records'))
+                except pd.errors.EmptyDataError:
+                    logging.warning(f"    - Warning: {summary_path} is empty. Skipping.")
+                except Exception as e:
+                    logging.warning(f"    - Warning: Could not read or process {summary_path}. Error: {e}")
 
-        # 3. Write the summary for the current level
         if level_results:
             output_csv_path = os.path.join(current_dir, "final_summary_results.csv")
             write_summary_csv(output_csv_path, level_results)
 
-def find_files_by_depth(base_dir, pattern, depth):
-    """Finds files matching a pattern up to a specified depth. (Used in flat mode)."""
-    if depth < -1: depth = -1
-    if depth == -1:
-        # This correctly finds the pattern anywhere recursively
-        search_pattern = os.path.join(base_dir, '**', pattern)
-        return sorted(glob.glob(search_pattern, recursive=True))
-
-    all_paths = set()
-    # 'd' represents the number of intermediate directories.
-    for d in range(depth + 1):
-        # The path needs 'd' wildcards for intermediate folders, plus one more
-        # wildcard for the run_* folder itself.
-        wildcards = ['*'] * (d + 1)
-        path_parts = [base_dir] + wildcards + [pattern]
-        current_pattern = os.path.join(*path_parts)
-        all_paths.update(glob.glob(current_pattern))
-    return sorted([p for p in all_paths if os.path.isfile(p)])
-
-def run_flat_mode(base_dir, depth):
-    """Generates one master summary and individual run summaries."""
-    print(f"Running in flat mode on: {base_dir} (Depth: {depth})")
-    report_files = find_files_by_depth(base_dir, "replication_report_*.txt", depth)
-    
-    if not report_files:
-        print(f"No report files found in '{base_dir}' at depth {depth}.")
-        return
-
-    all_results = []
-    print(f"Found {len(report_files)} report files. Processing...")
-
-    for report_path in report_files:
-        run_dir = os.path.dirname(report_path)
-        run_dir_name = os.path.basename(run_dir)
-        print(f"\nProcessing: {run_dir_name}")
-        
-        config_path = os.path.join(run_dir, 'config.ini.archived')
-        if not os.path.exists(config_path):
-            print(f"  - Warning: 'config.ini.archived' not found in {run_dir}. Skipping.")
-            continue
-        
-        with open(report_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            
-        metrics = parse_metrics_json(content)
-        if metrics:
-            run_data = parse_config_params(config_path)
-            run_data['run_directory'] = run_dir_name
-            run_data.update(metrics)
-            
-            # Write individual summary inside the run folder
-            write_summary_csv(os.path.join(run_dir, "final_summary_results.csv"), [run_data])
-            all_results.append(run_data)
-        else:
-            print(f"  - Warning: Could not find or parse metrics JSON in {os.path.basename(report_path)}")
-
-    if not all_results:
-        print("\nNo valid results were compiled.")
-        return
-
-    # Write the single master summary file at the top level
-    master_csv_path = os.path.join(base_dir, "final_summary_results.csv")
-    print(f"\nWriting master summary file...")
-    write_summary_csv(master_csv_path, all_results)
-
-# --- Main Execution ---
-
 def main():
-    parser = argparse.ArgumentParser(description="Compile experiment results into summary CSV files.")
-    parser.add_argument("target_dir", nargs='?', default=".",
-                        help="The target directory to scan. Defaults to the current directory.")
-    parser.add_argument("--mode", choices=['hierarchical', 'flat'], default='hierarchical',
-                        help="'hierarchical' for multi-level summaries (default), 'flat' for a single master summary.")
-    parser.add_argument("--depth", type=int, default=0,
-                        help="Recursion depth for 'flat' mode. 0=target dir only, -1=infinite.")
+    parser = argparse.ArgumentParser(description="Compile experiment results into a master CSV.")
+    parser.add_argument("base_dir", help="The base directory to start the compilation from.")
+    parser.add_argument("--mode", choices=['hierarchical'], default='hierarchical', help="Compilation mode.")
     args = parser.parse_args()
 
-    target_dir_abs = os.path.abspath(args.target_dir)
-    if not os.path.isdir(target_dir_abs):
-        print(f"Error: Specified target directory '{target_dir_abs}' does not exist.")
-        sys.exit(1)
+    if not os.path.isdir(args.base_dir):
+        logging.error(f"Error: The specified directory does not exist: {args.base_dir}")
+        return
 
-    if args.mode == 'hierarchical':
-        if args.depth != 0:
-            print("Warning: --depth argument is ignored in 'hierarchical' mode.")
-        run_hierarchical_mode(target_dir_abs)
-    elif args.mode == 'flat':
-        run_flat_mode(target_dir_abs, args.depth)
-
+    run_hierarchical_mode(args.base_dir)
     print("\nCompilation process finished.")
 
 if __name__ == "__main__":

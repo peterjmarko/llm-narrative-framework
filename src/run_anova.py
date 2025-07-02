@@ -2,289 +2,119 @@
 # -*- coding: utf-8 -*-
 # Filename: src/run_anova.py
 
-"""
-Statistical Analysis and Visualization (run_anova.py)
-
-Purpose:
-This script performs a full analysis pipeline:
-1.  Loads data by either accepting a direct path to a master CSV file or by
-    scanning a directory to find and aggregate all `final_summary_results.csv`
-    files into a new master dataset. The scan depth is controlled by the
-    --depth argument when in aggregation mode.
-2.  Performs an Analysis of Variance (ANOVA) to test for significant effects.
-3.  Calculates effect size (Eta Squared) to determine the magnitude of the findings.
-4.  Generates formatted, report-ready tables for Descriptive Statistics and ANOVA results.
-5.  Runs post-hoc tests and generates a simplified "Performance Tiers" table.
-6.  Generates and saves publication-quality box plots with visual legends.
-7.  Optionally creates diagnostic plots (Q-Q plots) to check statistical assumptions.
-8.  Saves all statistical output from the console to a detailed log file.
-
-Plots and logs are saved in a new 'anova' subdirectory within the input path's base directory.
-
-Command-Line Usage:
-    # Aggregate results from './output' (depth 0) and run analysis
-    python src/run_anova.py ./output
-
-    # Aggregate results recursively from './output' and run analysis
-    python src/run_anova.py ./output --depth -1
-
-    # Run analysis on a pre-aggregated file
-    python src/run_anova.py /path/to/my/MASTER_ANOVA_DATASET.csv
-"""
-
 import argparse
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
-from scipy.stats import levene
 import os
 import sys
 import logging
 import warnings
-import glob
-from config_loader import APP_CONFIG, get_config_list
+
+try:
+    from config_loader import APP_CONFIG, get_config_list, get_config_section_as_dict
+except ImportError:
+    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_script_dir not in sys.path:
+        sys.path.insert(0, current_script_dir)
+    from config_loader import APP_CONFIG, get_config_list
 
 try:
     import matplotlib
-    matplotlib.use('Agg')  # Use a non-interactive backend for servers or tests
+    matplotlib.use('Agg')
     import seaborn as sns
     import matplotlib.pyplot as plt
     import networkx as nx
 except ImportError:
-    logging.error("\nERROR: Plotting or graph libraries not found. Please run:")
-    logging.error("pip install seaborn matplotlib networkx")
+    logging.error("ERROR: Plotting libraries not found. Run: pip install seaborn matplotlib networkx")
     sys.exit(1)
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-
-def aggregate_and_load_data(search_dir, output_dir, output_filename, depth):
-    """
-    Finds, aggregates, and saves summary CSVs, then returns the master DataFrame.
-    This function contains the logic from the original aggregate_summaries.py.
-    """
-    logging.info(f"AGGREGATION MODE: Searching for 'final_summary_results.csv' with depth={depth}.")
-    csv_files = []
-    if depth == -1:
-        # Infinite recursion
-        search_pattern = os.path.join(search_dir, '**', 'final_summary_results.csv')
-        csv_files = glob.glob(search_pattern, recursive=True)
-    else:
-        # Controlled depth from 0 to N.
-        
-        # Level 0 (the search_dir itself)
-        path_pattern = os.path.join(search_dir, 'final_summary_results.csv')
-        csv_files.extend(glob.glob(path_pattern))
-        
-        # Levels 1 to N
-        current_pattern = search_dir
-        for i in range(depth):
-            current_pattern = os.path.join(current_pattern, '*')
-            path_pattern = os.path.join(current_pattern, 'final_summary_results.csv')
-            csv_files.extend(glob.glob(path_pattern))
-            
-    # Using set to remove duplicates and then sorting.
-    csv_files = sorted(list(set(csv_files)))
-
-    if not csv_files:
-        logging.error("ERROR: No 'final_summary_results.csv' files found. Cannot proceed.")
-        return None, None
-
-    logging.info(f"\nFound {len(csv_files)} summary files to aggregate.")
-    all_dfs = []
-    for file_path in csv_files:
-        try:
-            df = pd.read_csv(file_path)
-            # Clean the data: The provided CSV shows blank lines or summary rows
-            # from compile_results.py. We only want rows with run data.
-            df.dropna(subset=['run_directory'], inplace=True)
-            if not df.empty:
-                all_dfs.append(df)
-        except Exception as e:
-            logging.warning(f"Warning: Could not read or process file {file_path}. Error: {e}")
-
-    if not all_dfs:
-        logging.error("ERROR: Although files were found, none could be successfully read or contained data. Aborting.")
-        return None, None
-        
-    master_df = pd.concat(all_dfs, ignore_index=True)
-    final_output_path = os.path.join(output_dir, output_filename)
-    
-    master_df.to_csv(final_output_path, index=False)
-    logging.info(f"\nSuccessfully aggregated {len(master_df)} rows into: {final_output_path}\n")
-    return master_df, final_output_path
-
+def find_master_csv(search_dir):
+    """Finds the top-level summary CSV in a directory."""
+    search_path = os.path.join(search_dir, 'final_summary_results.csv')
+    if os.path.exists(search_path):
+        return search_path
+    logging.error(f"ERROR: No 'final_summary_results.csv' found directly in {search_dir}.")
+    return None
 
 def format_p_value(p_value):
-    """Formats a p-value for display on a plot title."""
-    if p_value < 0.001:
-        return "p < 0.001"
-    else:
-        return f"p = {p_value:.3f}"
+    if pd.isna(p_value): return "p = nan"
+    return "p < 0.001" if p_value < 0.001 else f"p = {p_value:.3f}"
 
-
-def calculate_eta_squared(anova_table):
-    """Calculates Eta Squared (η²) effect size from an ANOVA table."""
-    ss_effect = anova_table.loc[anova_table.index[0], 'sum_sq']
-    ss_residual = anova_table.loc['Residual', 'sum_sq']
-    eta_squared = ss_effect / (ss_effect + ss_residual)
-    return eta_squared
-
-
-def generate_performance_tiers(df, metric, tukey_result):
-    """Groups models into performance tiers based on Tukey HSD results."""
+def generate_performance_tiers(df, metric, tukey_result, display_name_map):
     logging.info("\n--- Performance Tiers (Models in the same tier are not statistically different) ---")
-    
     G = nx.Graph()
-    models = df['model'].unique()
+    # Use the friendly display names for the graph nodes
+    models = df['model_display'].unique()
     G.add_nodes_from(models)
     
     tukey_df = pd.DataFrame(data=tukey_result._results_table.data[1:], columns=tukey_result._results_table.data[0])
     
     for _, row in tukey_df.iterrows():
+        # Tukey results use sanitized internal names; map them back to display names
+        group1_display = display_name_map.get(row['group1'].replace('_', '-'), row['group1'])
+        group2_display = display_name_map.get(row['group2'].replace('_', '-'), row['group2'])
         if not row['reject']:
-            G.add_edge(row['group1'], row['group2'])
+            G.add_edge(group1_display, group2_display)
             
     tiers = list(nx.connected_components(G))
+    tier_medians = sorted([(df[df['model_display'].isin(tier)][metric].median(), tier) for tier in tiers], key=lambda x: x[0], reverse=True)
     
-    tier_medians = []
-    for tier in tiers:
-        tier_median = df[df['model'].isin(tier)][metric].median()
-        tier_medians.append((tier_median, tier))
-        
-    sorted_tiers = sorted(tier_medians, key=lambda x: x[0], reverse=True)
-    
-    tier_data = []
-    for i, (median_val, tier_models) in enumerate(sorted_tiers):
-        tier_data.append([f"Tier {i+1}", f"{median_val:.4f}", ", ".join(tier_models)])
-    
+    tier_data = [[f"Tier {i+1}", f"{median_val:.4f}", ", ".join(sorted(list(tier_models)))] for i, (median_val, tier_models) in enumerate(tier_medians)]
     tier_df = pd.DataFrame(tier_data, columns=["Performance Tier", "Median Score", "Models"])
     logging.info(f"\n{tier_df.to_string(index=False)}")
 
-
 def create_diagnostic_plot(model, metric, output_dir):
-    """Creates and saves a Q-Q plot of the ANOVA residuals to check for normality."""
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111)
-    
     sm.qqplot(model.resid, line='s', ax=ax)
     ax.grid(True, linestyle='--', alpha=0.6)
-    
     ax.set_title(f"Q-Q Plot of Residuals for '{metric}'")
-    
     plot_filename = f"diagnostic_qqplot_{metric}.png"
     full_plot_path = os.path.join(output_dir, plot_filename)
-    
-    try:
-        plt.savefig(full_plot_path)
-        logging.info(f"-> Diagnostic plot saved successfully to: {full_plot_path}")
-    except Exception as e:
-        logging.error(f"-> ERROR: Could not save diagnostic plot. Reason: {e}")
-    
+    plt.savefig(full_plot_path)
+    logging.info(f"-> Diagnostic plot saved successfully to: {full_plot_path}")
     plt.close(fig)
 
-
-def draw_visual_legend(fig):
-    """Draws a detailed, graphical legend as an inset on the figure."""
-    legend_ax = fig.add_axes([0.798, 0.02, 0.18, 0.15])
-    
-    legend_ax.set_facecolor('#f7f7f7')
-    for spine in legend_ax.spines.values():
-        spine.set_edgecolor('gray')
-        spine.set_linewidth(0.5)
-
-    y_center = 0.5
-    box_left, median, box_right = [0.25, 0.4, 0.55]
-    whisker_left, whisker_right = [0.05, 0.75]
-    outlier = 0.95
-
-    legend_ax.add_patch(plt.Rectangle((box_left, y_center-0.1), box_right-box_left, 0.2, 
-                                      fill=True, facecolor='#a9a9a9', edgecolor='black', lw=1))
-    legend_ax.plot([median, median], [y_center-0.1, y_center+0.1], color='black', lw=1.5)
-    
-    legend_ax.plot([whisker_left, box_left], [y_center, y_center], color='black', lw=1)
-    legend_ax.plot([box_right, whisker_right], [y_center, y_center], color='black', lw=1)
-    
-    legend_ax.plot(outlier, y_center, 'o', mec='black', mfc='white', markersize=5)
-
-    text_color = '#222222'
-    
-    legend_ax.annotate('Median', xy=(median, y_center+0.1), xytext=(median, 0.95),
-                       ha='center', va='top', fontsize=8, color=text_color,
-                       arrowprops=dict(arrowstyle='->', facecolor='black', shrinkB=5))
-    
-    legend_ax.annotate('Middle 50%\n(Interquartile Range)', xy=(median, y_center-0.1), xytext=(median, 0.05),
-                       ha='center', va='bottom', fontsize=8, color=text_color,
-                       arrowprops=dict(arrowstyle='->', facecolor='black', shrinkB=5))
-    
-    legend_ax.annotate('Typical Range', xy=(whisker_right, y_center), xytext=(whisker_right, 0.95),
-                       ha='center', va='top', fontsize=8, color=text_color,
-                       arrowprops=dict(arrowstyle='->', facecolor='black', shrinkB=5))
-    
-    legend_ax.annotate('Outlier', xy=(outlier, y_center), xytext=(outlier, 0.05),
-                       ha='center', va='bottom', fontsize=8, color=text_color,
-                       arrowprops=dict(arrowstyle='->', facecolor='black', shrinkB=5))
-
-    legend_ax.set_xticks([])
-    legend_ax.set_yticks([])
-    legend_ax.set_xlim(0, 1.1)
-    legend_ax.set_ylim(0, 1.1)
-
-
 def create_and_save_plot(df, metric, factor, p_value, output_dir):
-    """Generates and saves a sorted box plot, annotated with a p-value and a visual legend."""
     fig = plt.figure(figsize=(12, 8))
     ax = plt.gca()
     
-    try:
-        # Group data by the factor and sort groups by median value for ordered plotting
-        grouped = df.groupby(factor)
-        sorted_groups = sorted(grouped, key=lambda x: x[1][metric].median(), reverse=True)
-        sorted_labels = [name for name, _ in sorted_groups]
-        data_to_plot = [group[metric].dropna().values for _, group in sorted_groups]
-    except Exception as e:
-        logging.error(f"Could not prepare data for plotting: {e}")
-        plt.close(fig)
-        return
-
-    # Create the boxplot directly with Matplotlib, using the modern API to avoid warnings.
-    ax.boxplot(data_to_plot, orientation='horizontal', tick_labels=sorted_labels, patch_artist=True,
-               boxprops=dict(facecolor='lightblue', color='black'),
-               medianprops=dict(color='black'))
-
-    ax.invert_yaxis()  # Reverse the order to show the best model on top
+    # If we are plotting by model, use the friendly display names instead
+    plot_factor = 'model_display' if factor == 'model' else factor
+    
+    order = df.groupby(plot_factor)[metric].median().sort_values(ascending=False).index
+    sns.boxplot(ax=ax, y=plot_factor, x=metric, data=df, order=order, orient='h', palette="coolwarm")
 
     p_value_str = format_p_value(p_value)
+    # Use the original factor name for the title for consistency
     title = f'Performance Comparison for: {metric}\n(Grouped by {factor}, ANOVA {p_value_str})'
     
     ax.set_title(title, fontsize=16)
     ax.set_xlabel(f'Metric: {metric}', fontsize=12)
-    ax.set_ylabel(f'Factor: {factor}', fontsize=12)
+    # Label the axis with the friendly name 'Model' or the original factor name
+    ylabel = 'Model' if factor == 'model' else factor
+    ax.set_ylabel(ylabel, fontsize=12)
     ax.grid(axis='x', linestyle='--', alpha=0.7)
     
-    # Adjust layout before drawing the legend. The `rect` right boundary is set
-    # to extend the main plot area underneath the legend's position.
-    plt.tight_layout(rect=[0, 0, 0.99, 1])
-    draw_visual_legend(fig)
-    
+    plt.tight_layout()
     plot_filename = f"{metric}_by_{factor}_boxplot.png"
     full_plot_path = os.path.join(output_dir, plot_filename)
-    
-    try:
-        plt.savefig(full_plot_path)
-        logging.info(f"-> Plot with visual legend saved successfully to: {full_plot_path}")
-    except Exception as e:
-        logging.error(f"-> ERROR: Could not save plot. Reason: {e}")
-    
+    plt.savefig(full_plot_path)
+    logging.info(f"-> Plot saved successfully to: {full_plot_path}")
     plt.close(fig)
 
-
-def perform_analysis(df, metric, all_possible_factors, output_dir):
-    """Performs ANOVA, post-hoc analysis, and plotting for a single metric."""
+def perform_analysis(df, metric, all_possible_factors, output_dir, display_name_map):
     logging.info("\n" + "="*80)
     logging.info(f" ANALYSIS FOR METRIC: '{metric}'")
     logging.info("="*80)
+
+    if df[metric].var() == 0:
+        logging.warning(f"WARNING: Metric '{metric}' has zero variance. Skipping all analysis for this metric.")
+        return
 
     active_factors = [f for f in all_possible_factors if df[f].nunique() > 1]
     if not active_factors:
@@ -293,198 +123,134 @@ def perform_analysis(df, metric, all_possible_factors, output_dir):
     logging.info(f"Detected {len(active_factors)} active factor(s) with variation: {', '.join(active_factors)}")
 
     logging.info(f"\n--- Descriptive Statistics by {', '.join(active_factors)} ---")
-    desc_stats = df.groupby(active_factors)[metric].agg(['count', 'mean', 'std']).rename(
-        columns={'count': 'N', 'mean': 'Mean', 'std': 'Std. Dev.'}
-    )
+    desc_stats = df.groupby(active_factors)[metric].agg(['count', 'mean', 'std']).rename(columns={'count': 'N', 'mean': 'Mean', 'std': 'Std. Dev.'})
     logging.info(f"\n{desc_stats.to_string(float_format='%.4f')}")
     
-    # Check if ANOVA is possible (at least 2 groups with >1 data point each)
-    can_run_anova = not any(count <= 1 for count in desc_stats['N'])
-    significant_factors_clean = []
-    anova_table = None
-
-    if not can_run_anova:
-        logging.warning("\nWARNING: At least one group has only one data point. ANOVA and post-hoc tests will be skipped.")
-    else:
-        grouped_data = [group[metric].values for name, group in df.groupby(active_factors)]
-        stat, p_levene = levene(*grouped_data)
-        logging.info(f"\n--- Assumption Check: Homogeneity of Variances (Levene's Test) ---")
-        logging.info(f"Levene's Test Statistic: {stat:.4f}, p-value: {p_levene:.4f}")
-        if p_levene < 0.05:
-            logging.warning("WARNING: The assumption of equal variances is violated. Interpret ANOVA results with caution.")
-        else:
-            logging.info("OK: The assumption of equal variances is met.")
-
-        formula = f"{metric} ~ {' + '.join([f'C({factor})' for factor in active_factors])}"
-        
-        try:
-            model = ols(formula, data=df).fit()
-
-            create_diagnostic_plot(model, metric, output_dir)
-
-            anova_table = sm.stats.anova_lm(model, typ=2)
-            
-            eta_sq = calculate_eta_squared(anova_table)
-            f_value = anova_table.loc[anova_table.index[0], 'F']
-            p_value = anova_table.loc[anova_table.index[0], 'PR(>F)']
-            df_effect = int(anova_table.loc[anova_table.index[0], 'df'])
-            df_residual = int(anova_table.loc['Residual', 'df'])
-
-            summary_data = {
-                'Metric': metric,
-                'F-statistic': f"{f_value:.2f}",
-                'df': f"({df_effect}, {df_residual})",
-                'p-value': format_p_value(p_value).replace("p ", ""),
-                'Eta Squared (η²)': f"{eta_sq:.2f}"
-            }
-            summary_df = pd.DataFrame([summary_data]).set_index('Metric')
-            
-            logging.info(f"\n--- Formatted ANOVA Summary ---")
-            logging.info(f"\n{summary_df.to_string()}")
-            
-            logging.info("\n--- Raw ANOVA Table (for reference) ---")
-            logging.info(f"\n{anova_table.to_string()}")
-            
-            significant_factors_raw = anova_table[anova_table['PR(>F)'] < 0.05].index.tolist()
-            significant_factors_clean = [f.replace("C(", "").replace(")", "") for f in significant_factors_raw]
-
-            if significant_factors_clean:
-                logging.info(f"\nConclusion: Significant effect found for factor(s): {', '.join(significant_factors_clean)}")
-                logging.info("\n--- Post-Hoc Analysis (Tukey's HSD) ---")
-                for factor in significant_factors_clean:
-                    logging.info(f"\nComparing levels for factor: '{factor}'")
-                    tukey_result = pairwise_tukeyhsd(endog=df[metric], groups=df[factor], alpha=0.05)
-                    logging.info(f"\n{tukey_result}")
-                    
-                    if factor == 'model':
-                        generate_performance_tiers(df, metric, tukey_result)
-            else:
-                logging.info("\nConclusion: No factors had a statistically significant effect on this metric.")
-                        
-        except Exception as e:
-            logging.error(f"\nERROR: Could not perform ANOVA. Reason: {e}")
-
-    # --- Plotting Section (runs regardless of ANOVA success) ---
-    # Simplified: Always plot all active factors for complete visualization.
-    factors_to_plot = active_factors
-    if factors_to_plot:
-        logging.info("\n--- Generating Performance Plots ---")
+    formula = f"{metric} ~ {' + '.join([f'C({f})' for f in active_factors])}"
     
-    for factor in factors_to_plot:
-        # If ANOVA was run, use the specific p-value. Otherwise, use NaN.
-        plot_p_value = anova_table.loc[f'C({factor})', 'PR(>F)'] if anova_table is not None else float('nan')
-        create_and_save_plot(df, metric, factor, plot_p_value, output_dir)
+    try:
+        model = ols(formula, data=df).fit()
+        create_diagnostic_plot(model, metric, output_dir)
+        anova_table = sm.stats.anova_lm(model, typ=2)
+        
+        logging.info(f"\n--- ANOVA Summary for {metric} ---")
+        logging.info(f"\n{anova_table.to_string()}")
+        
+        significant_factors = [f.replace('C(', '').replace(')', '') for f in anova_table.index if anova_table.loc[f, 'PR(>F)'] < 0.05 and 'Residual' not in f]
 
+        if significant_factors:
+            logging.info(f"\nConclusion: Significant effect found for factor(s): {', '.join(significant_factors)}")
+            logging.info("\n--- Post-Hoc Analysis (Tukey's HSD) ---")
+            for factor in significant_factors:
+                if factor == 'Residual': continue
+                logging.info(f"\nComparing levels for factor: '{factor}'")
+                tukey_result = pairwise_tukeyhsd(endog=df[metric], groups=df[factor], alpha=0.05)
+                logging.info(f"\n{tukey_result}")
+                if factor == 'model':
+                    generate_performance_tiers(df, metric, tukey_result, display_name_map)
+        else:
+            logging.info("\nConclusion: No factors had a statistically significant effect on this metric.")
+            
+        logging.info("\n--- Generating Performance Plots ---")
+        for factor in active_factors:
+            # Construct the correct key to look up the p-value from the ANOVA table's index
+            key = f"C({factor})"
+            p_val = anova_table.loc[key, 'PR(>F)'] if key in anova_table.index else float('nan')
+            create_and_save_plot(df, metric, factor, p_val, output_dir)
+            
+    except Exception as e:
+        logging.error(f"\nERROR: Could not perform ANOVA for metric '{metric}'. Reason: {e}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Aggregate summaries and/or perform ANOVA on experiment results.")
-    parser.add_argument(
-        "input_path", 
-        help="Path to a directory to aggregate, or to a pre-aggregated master CSV file."
-    )
-    parser.add_argument(
-        "--master_filename",
-        default="MASTER_ANOVA_DATASET.csv",
-        help="Filename for the aggregated CSV (used only when input_path is a directory)."
-    )
-    parser.add_argument(
-        "--depth",
-        type=int,
-        default=0,
-        help="Directory scan depth for aggregation. 0 for target dir only, N for N levels deep, -1 for infinite recursion."
-    )
+    parser = argparse.ArgumentParser(description="Perform ANOVA on experiment results.")
+    parser.add_argument("input_path", help="Path to the top-level experiment directory.")
     args = parser.parse_args()
 
-    # Setup logging first to capture all messages, including aggregation steps
-    log_filepath = None # Will be set later
-    logger = logging.getLogger()
-    if logger.hasHandlers():
-        logger.handlers.clear()
-    logger.setLevel(logging.INFO)
-    
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setFormatter(logging.Formatter('%(message)s'))
-    logger.addHandler(ch)
-
-    # --- Determine input type and load data ---
-    df = None
-    master_csv_path = None
-    
-    # --- Define output paths based on user's request ---
-    # 1. Determine the base target directory from the input path.
-    if os.path.isdir(args.input_path):
-        # If input is a directory, that is our base.
-        base_dir = os.path.abspath(args.input_path)
-    elif os.path.isfile(args.input_path):
-        # If input is a file, its parent directory is our base.
-        base_dir = os.path.dirname(os.path.abspath(args.input_path))
-    else:
-        logging.error(f"Error: The provided input path is not a valid file or directory: {args.input_path}")
-        return
-        
-    # 2. Create the 'anova' subdirectory within the base directory. This will be the destination for all output.
+    base_dir = os.path.abspath(args.input_path)
     output_dir = os.path.join(base_dir, 'anova')
     os.makedirs(output_dir, exist_ok=True)
-    logging.info(f"All analysis output will be saved to: {output_dir}")
+    
+    master_csv_path = find_master_csv(base_dir)
+    if not master_csv_path:
+        return
 
-    if os.path.isdir(args.input_path):
-        # When input is a directory, search it for CSVs but save the aggregated file to the 'anova' subdirectory.
-        search_dir = os.path.abspath(args.input_path)
-        df, master_csv_path = aggregate_and_load_data(search_dir, output_dir, args.master_filename, args.depth)
-        if df is None: # Aggregation failed
-            return 
-    elif os.path.isfile(args.input_path):
-        logging.info(f"FILE MODE: Loading data directly from {args.input_path}")
-        master_csv_path = args.input_path
-        try:
-            df = pd.read_csv(master_csv_path)
-        except FileNotFoundError:
-            logging.error(f"Error: The file was not found at '{master_csv_path}'")
-            return
-
-    # --- Setup file-based logging now that we have the output path ---
     log_filename = os.path.basename(master_csv_path).replace('.csv', '_analysis_log.txt')
-    log_filepath = os.path.join(output_dir, log_filename) # Log file goes into 'anova' subdirectory
-    fh = logging.FileHandler(log_filepath, mode='w', encoding='utf-8')
-    fh.setFormatter(logging.Formatter('%(message)s'))
-    logger.addHandler(fh)
+    log_filepath = os.path.join(output_dir, log_filename)
+    
+    logging.basicConfig(level=logging.INFO,
+                        format='%(message)s',
+                        handlers=[logging.FileHandler(log_filepath, mode='w', encoding='utf-8'),
+                                  logging.StreamHandler(sys.stdout)])
+    
     logging.info(f"Full analysis log is being saved to: {log_filepath}")
+    
+    try:
+        df = pd.read_csv(master_csv_path)
+        logging.info(f"Successfully loaded {len(df)} rows from {master_csv_path}")
+    except Exception as e:
+        logging.error(f"FATAL: Could not load master CSV file. Error: {e}")
+        return
 
+    # --- DATA CLEANING (CRITICAL FIX) ---
+    # Correct known data integrity issues in the source CSV.
+    if 'db' in df.columns:
+        original_db_values = df['db'].unique()
+        df['db'] = df['db'].replace('personalities_db_1-5000.jsonl', 'personalities_db_1-5000.txt')
+        cleaned_db_values = df['db'].unique()
+        if len(original_db_values) > len(cleaned_db_values):
+            logging.info("Performed data cleaning on 'db' column to unify values.")
+            logging.info(f" -> Original unique values: {original_db_values}")
+            logging.info(f" -> Cleaned unique values:  {cleaned_db_values}\n")
 
-    # --- Proceed with Analysis ---
-    # Load schema from the central config file, replacing the hardcoded lists.
+    # --- Load Normalization and Display Mappings from Config ---
+    normalization_map = get_config_section_as_dict(APP_CONFIG, 'ModelNormalization')
+    display_name_map = get_config_section_as_dict(APP_CONFIG, 'ModelDisplayNames')
+
+    # Build a reverse map for efficient lookup: {keyword -> canonical_name}
+    keyword_to_canonical_map = {}
+    if normalization_map:
+        for canonical, keywords in normalization_map.items():
+            for keyword in keywords.split(','):
+                keyword_to_canonical_map[keyword.strip()] = canonical
+
+    # --- UNIFY AND SANITIZE MODEL NAMES (CRITICAL FIX) ---
+    if 'model' in df.columns and keyword_to_canonical_map:
+        logging.info("Normalizing model names for consistency based on config...")
+        
+        def normalize_name(raw_name):
+            if not isinstance(raw_name, str): return raw_name
+            for keyword, canonical in keyword_to_canonical_map.items():
+                if keyword in raw_name:
+                    return canonical
+            return raw_name # Return original if no keyword matches
+
+        df['model'] = df['model'].apply(normalize_name)
+        logging.info("Model name normalization complete.")
+
+        # Create a new column for display names to be used in plots
+        df['model_display'] = df['model'].map(display_name_map).fillna(df['model'])
+        logging.info("Created 'model_display' column for plots.")
+
+        # Perform final sanitization on the canonical name for formula compatibility
+        df['model'] = df['model'].str.replace('/', '_', regex=False).str.replace('-', '_', regex=False).str.replace('.', '_', regex=False)
+        logging.info("Sanitized canonical model names for formula compatibility.\n")
+
     factors = get_config_list(APP_CONFIG, 'Schema', 'factors')
     metrics = get_config_list(APP_CONFIG, 'Schema', 'metrics')
 
-    # Add a fatal error check if the schema can't be loaded from config.
     if not factors or not metrics:
-        logging.error("FATAL: Could not load 'factors' or 'metrics' from the [Schema] section of your config file. Aborting.")
-        # Properly close the file handler before exiting if it exists
-        if 'fh' in locals() and fh:
-            logger.removeHandler(fh)
-            fh.close()
-        return # Exit the main function
+        logging.error("FATAL: Could not load 'factors' or 'metrics' from config.ini.")
+        return
 
-    # Check which of the configured factors are actually present in the loaded data
-    # and ensure they are treated as categorical strings for the analysis.
-    for factor in list(factors):
-        if factor not in df.columns:
-            factors.remove(factor)
-        else:
+    for factor in factors:
+        if factor in df.columns:
             df[factor] = df[factor].astype(str)
 
-    # Iterate through each metric defined in the config and perform the analysis.
     for metric in metrics:
         if metric in df.columns:
-            # Pass the dedicated 'anova' subdirectory path for all plots and diagnostics.
-            perform_analysis(df, metric, factors, output_dir)
+            perform_analysis(df, metric, factors, output_dir, display_name_map)
         else:
-            logging.warning(f"\nWarning: Metric column '{metric}' not found in the CSV file. Skipping.")
-
-    # Properly close the file handler to release the lock on the log file
-    if fh:
-        logger.removeHandler(fh)
-        fh.close()
+            logging.warning(f"\nWarning: Metric column '{metric}' not found. Skipping analysis.")
 
 if __name__ == "__main__":
     main()

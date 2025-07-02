@@ -48,6 +48,8 @@ import logging
 import re
 import numpy as np
 import shutil
+import pandas as pd
+from io import StringIO
 
 try:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
@@ -227,92 +229,61 @@ def get_core_name(name_with_details):
 
 def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_ordered_from_query, is_rank_based=False):
     """
-    Parses LLM response text, handling various table formats including tab-separated,
-    pipe-delimited (Markdown), and backslash-delimited, with or without headers
-    and optional code fences.
+    Robustly parses LLM response text into a score matrix.
+    This version aggressively cleans the input before attempting to create a matrix.
     """
-    table_text = response_text
-    code_block_match = re.search(r"```(?:[a-zA-Z]+\n)?(.*?)```", response_text, re.DOTALL)
-    if code_block_match:
-        logging.debug("  Found a fenced code block. Parsing content within it.")
-        table_text = code_block_match.group(1).strip()
+    try:
+        # 1. Isolate the table text, removing markdown fences
+        table_text = response_text
+        code_block_match = re.search(r"```(?:[a-zA-Z]+\n)?(.*?)```", response_text, re.DOTALL)
+        if code_block_match:
+            table_text = code_block_match.group(1).strip()
 
-    lines = [line.strip() for line in table_text.strip().split('\n') if line.strip()]
-    if not lines: return np.full((k_value, k_value), 0.0)
+        # 2. Use pandas to read the table. This is highly robust to formatting quirks.
+        #    The separator regex handles tabs, spaces, and markdown pipes.
+        df = pd.read_csv(StringIO(table_text), sep=r'[\s\t|]+', engine='python', header=None, skip_blank_lines=True, index_col=False)
 
-    # Detect delimiter
-    delimiter = '\t' # Default
-    if '|' in lines[0] and len(lines[0].split('|')) > k_value / 2:
-        delimiter = '|'
-    elif '\\' in lines[0] and len(lines[0].split('\\')) > k_value / 2:
-        delimiter = '\\'
+        # 3. Aggressively convert everything to numeric. 'coerce' turns any non-numeric
+        #    text (like headers or names) into NaN (Not a Number) without crashing.
+        df_numeric = df.apply(pd.to_numeric, errors='coerce')
 
-    score_matrix = np.full((k_value, k_value), 0.0)
-    query_list_a_core_names_map = {get_core_name(name): i for i, name in enumerate(list_a_names_ordered_from_query)}
-    filled_row_indices = [False] * k_value
-    
-    data_lines = []
-    header_found = False
-    for line in lines:
-        if '---' in line and delimiter == '|': continue
+        # 4. Drop any rows or columns that are *entirely* NaN. This is key to removing
+        #    text-based headers, markdown separators (`|---|`), and other junk.
+        df_numeric.dropna(how='all', axis=0, inplace=True)
+        df_numeric.dropna(how='all', axis=1, inplace=True)
+        df_numeric.reset_index(drop=True, inplace=True)
         
-        # A simple header check: does it contain "ID" and not start with a number?
-        is_header = "ID" in line and not line.lstrip(' |').strip()[0].isdigit()
-        if is_header and not header_found:
-            header_found = True
-            continue
-        data_lines.append(line)
+        # 5. Check if the first column looks like a simple index (e.g., 1, 2, 3...)
+        #    and drop it if it does, as it's not part of the score data.
+        if df_numeric.shape[1] > k_value and (df_numeric.iloc[:, 0].values == np.arange(1, len(df_numeric) + 1)).all():
+             df_numeric = df_numeric.iloc[:, 1:]
 
-    for line_content in data_lines:
-        if len(filled_row_indices) == sum(filled_row_indices): break # Matrix is full
+        # 6. Now we should have a relatively clean block of numbers.
+        #    Take the top-left k x k block to ensure the correct shape.
+        scores = df_numeric.iloc[:k_value, :k_value].to_numpy()
 
-        parts = [p.strip() for p in line_content.strip(' |').split(delimiter)]
+        # 7. Create a clean, final k x k matrix filled with zeros.
+        final_scores = np.full((k_value, k_value), 0.0)
         
-        # Determine if the row starts with a name label or just scores
-        try:
-            float(parts[0])
-            has_name_label = False
-            score_strings = parts
-        except (ValueError, IndexError):
-            has_name_label = True
-            llm_person_name_raw = parts[0]
-            score_strings = parts[1:]
+        # 8. Fill the clean matrix with the scores we parsed, handling cases where
+        #    parsing resulted in a smaller-than-expected matrix.
+        h, w = scores.shape
+        final_scores[:min(h, k_value), :min(w, k_value)] = scores[:min(h, k_value), :min(w, k_value)]
         
-        if len(score_strings) != k_value:
-            logging.warning(f"  Row has {len(score_strings)} scores, expected {k_value}. Skipping row: '{line_content}'")
-            continue
-        
-        # Find the correct row in the matrix to place the scores
-        matrix_row_idx = -1
-        unfilled_indices = [i for i, filled in enumerate(filled_row_indices) if not filled]
-        if not unfilled_indices: continue
+        # 9. Replace any remaining NaNs (from partial rows/cols) with 0.
+        #    This is the step that was previously crashing. It will now work
+        #    because the data is guaranteed to be numeric.
+        final_scores = np.nan_to_num(final_scores, nan=0.0)
 
-        if has_name_label:
-            core_llm_name = get_core_name(llm_person_name_raw)
-            if core_llm_name in query_list_a_core_names_map:
-                matrix_row_idx = query_list_a_core_names_map[core_llm_name]
-                if filled_row_indices[matrix_row_idx]:
-                    logging.warning(f"  Duplicate List A item name '{llm_person_name_raw}' found. Skipping row.")
-                    continue
-            else:
-                matrix_row_idx = unfilled_indices[0] # Fallback to sequential
-                logging.warning(f"  LLM name '{llm_person_name_raw}' not matched. Assigning sequentially.")
-        else:
-            matrix_row_idx = unfilled_indices[0] # No name, must be sequential
-            
-        try:
-            numerical_scores = [float(s) for s in score_strings]
-            processed_scores = [float(k_value - r + 1) if 1 <= r <= k_value else 0.0 for r in numerical_scores] if is_rank_based else numerical_scores
-            score_matrix[matrix_row_idx, :] = processed_scores
-            filled_row_indices[matrix_row_idx] = True
-        except (ValueError, IndexError) as e:
-            logging.warning(f"  Could not parse scores in row: '{score_strings}'. Error: {e}. Skipping.")
-            continue
-            
-    if sum(filled_row_indices) < k_value:
-        logging.warning(f"  Parsed only {sum(filled_row_indices)} data rows for a k={k_value} matrix.")
-        
-    return score_matrix
+        # 10. Handle rank conversion if needed.
+        if is_rank_based:
+            final_scores = np.where((final_scores >= 1) & (final_scores <= k_value), k_value - final_scores + 1, 0.0)
+
+        return final_scores
+
+    except Exception as e:
+        logging.error(f"  A critical error occurred during pandas parsing: {e}. Returning zero matrix.")
+        return np.full((k_value, k_value), 0.0)
 
 
 def main():
