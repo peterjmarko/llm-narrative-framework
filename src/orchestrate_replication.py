@@ -83,7 +83,7 @@ def run_script(command, title, quiet=False):
             captured_output = result.stdout + result.stderr
 
         lines = captured_output.splitlines()
-        filtered_lines = [line for line in lines if "RuntimeWarning" not in line]
+        filtered_lines = [line for line in lines if "RuntimeWarning" not in line and "UserWarning" not in line]
         filtered_output = "\n".join(filtered_lines)
 
         if not quiet and title != "2. Run LLM Sessions":

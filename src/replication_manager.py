@@ -103,27 +103,20 @@ def main():
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
     log_manager_script = os.path.join(current_dir, "log_manager.py")
     compile_script = os.path.join(current_dir, "compile_results.py")
+    
     if args.target_dir:
         final_output_dir = os.path.abspath(args.target_dir)
     else:
-        # Create a default, unique directory name
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        
-        # Use the get_config_value function with the correct 'fallback' keyword
         model_name = get_config_value(APP_CONFIG, 'LLM', 'model_identifier', value_type=str, fallback='llm')
-        
-        safe_model_name = re.sub(r'[<>:"/\\|?*]', '-', model_name) # Sanitize for path
-        
-        # Assume project root is two levels up from this script (src/ -> project_root)
+        safe_model_name = re.sub(r'[<>:"/\\|?*]', '-', model_name)
         project_root = os.path.dirname(current_dir)
         base_output_path = os.path.join(project_root, 'output')
-        
         study_dir_name = f"study_{timestamp}_{safe_model_name}"
         final_output_dir = os.path.join(base_output_path, study_dir_name)
         print(f"{C_CYAN}No target directory specified. Using default: {final_output_dir}{C_RESET}")
 
     if args.reprocess:
-    # Reprocessing logic requires a target_dir
         if not args.target_dir:
             print("ERROR: Reprocessing mode requires a target directory to be specified.", file=sys.stderr)
             sys.exit(1)
@@ -148,7 +141,6 @@ def main():
                 logging.error(f"!!! Reprocessing failed or was interrupted for {os.path.basename(run_dir)}. Continuing... !!!")
                 if isinstance(e, KeyboardInterrupt): sys.exit(1)
     else:
-    # Ensure the final output directory exists before any operations
         if not os.path.exists(final_output_dir):
             os.makedirs(final_output_dir)
             print(f"Created target directory: {final_output_dir}")
@@ -169,6 +161,7 @@ def main():
             batch_start_time = time.time()
             newly_completed_count = 0
             os.system('')
+            interrupted = False
 
             for i, rep_num in enumerate(reps_to_run):
                 header_text = f" RUNNING REPLICATION {rep_num} of {end_rep} "
@@ -181,48 +174,54 @@ def main():
                     "--base_output_dir", final_output_dir]
                 if args.quiet: cmd.append("--quiet")
                 
-                status = "UNKNOWN" # Initialize status for this run
-
                 try:
                     subprocess.run(cmd, check=True)
-                    status = "SUCCESS" # Set status on success
-                    
                     newly_completed_count += 1
                     elapsed = time.time() - batch_start_time
                     avg_time = elapsed / newly_completed_count
-                    remaining_reps = len(reps_to_run) - newly_completed_count
+                    remaining_reps = len(reps_to_run) - (i + 1)
                     eta = datetime.datetime.now() + datetime.timedelta(seconds=remaining_reps * avg_time)
                     print(f"\n--- Replication {rep_num} Finished ({newly_completed_count}/{len(reps_to_run)}) ---")
                     print(f"{C_GREEN}Time Elapsed: {format_seconds(elapsed)} | Remaining: {format_seconds(remaining_reps * avg_time)} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
                 
-                except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
-                    status = "FAILED" # Set status on failure
-                    logging.error(f"!!! Replication {rep_num} failed or was interrupted. Continuing... !!!")
-                    if isinstance(e, KeyboardInterrupt): sys.exit(1)
+                except subprocess.CalledProcessError:
+                    logging.error(f"!!! Replication {rep_num} failed. Check its report for details. Continuing... !!!")
+                except KeyboardInterrupt:
+                    logging.warning(f"\n!!! Batch run interrupted by user during replication {rep_num}. Halting... !!!")
+                    interrupted = True
                 
-                finally:
-                    # --- THIS IS THE TRIVIAL FIX ---
-                    # Always call the log manager to update the status for this replication.
-                    if status != "UNKNOWN":
-                        try:
-                            log_update_cmd = [
-                                sys.executable, log_manager_script, "update", final_output_dir,
-                                "--rep", str(rep_num),
-                                "--status", status
-                            ]
-                            subprocess.run(log_update_cmd, check=True, capture_output=True)
-                        except Exception as log_e:
-                            logging.warning(f"  - Could not update batch log for replication {rep_num}: {log_e}")
+                if interrupted:
+                    break
+            
+            # --- THIS IS THE NEW LOGIC BLOCK ---
+            # It runs once after the entire replication loop is finished or interrupted.
+            print("\n" + "="*80)
+            print("### REPLICATION PHASE COMPLETE. REBUILDING BATCH LOG. ###")
+            print("="*80)
+            try:
+                # Rebuild the entire log from the completed reports in one go.
+                subprocess.run([sys.executable, log_manager_script, "rebuild", final_output_dir], check=True)
+                print("Batch run log successfully rebuilt.")
+            except Exception as e:
+                logging.error(f"An error occurred while rebuilding the batch run log: {e}")
 
+    # --- Post-Processing Stage ---
     print("\n" + "="*80)
     print("### ALL TASKS COMPLETE. BEGINNING POST-PROCESSING. ###")
     print("="*80)
     print("\n--- Compiling final statistical summary... ---")
     try:
-        subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True)
+        subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True, capture_output=True, text=True)
     except Exception as e:
         logging.error(f"An error occurred while running the final compilation script: {e}")
     
+    # Call the existing 'finalize' command in log_manager.py to append the summary.
+    print("\n--- Finalizing batch log with summary... ---")
+    try:
+        subprocess.run([sys.executable, log_manager_script, "finalize", final_output_dir], check=True, capture_output=True, text=True)
+    except Exception as e:
+        logging.error(f"An error occurred while finalizing the batch log: {e}")
+        
     print("\n--- Batch Run Finished ---")
 
 if __name__ == "__main__":
