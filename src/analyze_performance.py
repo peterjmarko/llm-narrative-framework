@@ -148,12 +148,16 @@ def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, t
     
     reciprocal_ranks = [1.0/rank if rank > 0 else 0.0 for rank in valid_ranks]
     mean_reciprocal_rank = np.mean(reciprocal_ranks) if reciprocal_ranks else 0.0
+
+    # --- FIX: Calculate and add the mean rank of the correct ID ---
+    mean_rank_of_correct_id = np.mean(valid_ranks) if valid_ranks else np.nan
     
     return {
         'k_val': k_val, 'p_value_mwu': p_value_mwu, 'effect_size_r': effect_size_r,
         'mrr': mean_reciprocal_rank, 'top_1_accuracy': top_1_accuracy,
         f'top_{top_k_value_for_accuracy}_accuracy': top_k_accuracy_val,
         'u_statistic': u_statistic,
+        'mean_rank_of_correct_id': mean_rank_of_correct_id # Add the new metric
     }
 
 # --- II. Meta-Analysis Functions ---
@@ -774,6 +778,16 @@ def main():
     top_k_analysis = analyze_metric_distribution(top_k_accs, top_k_chance, f"Top-{args.top_k_acc} Accuracy")
     print_metric_analysis(top_k_analysis, f"5. Overall Ranking Performance (Top-{args.top_k_acc} Accuracy)", "%.2%%")
 
+    # --- FIX: Add analysis for the mean rank of the correct ID ---
+    mean_ranks = [res['mean_rank_of_correct_id'] for res in all_test_results if res.get('mean_rank_of_correct_id') is not None]
+    # For rank, chance is the average of ranks 1 through k
+    mean_rank_chance = (k_to_use + 1) / 2.0
+    mean_rank_analysis = analyze_metric_distribution(mean_ranks, mean_rank_chance, "Mean Rank of Correct ID")
+    # For rank, lower is better, so the alternative hypothesis for the test is 'less'
+    mean_rank_analysis['wilcoxon_signed_rank_p'] = wilcoxon(np.array(mean_ranks) - mean_rank_chance, alternative='less')[1] if mean_ranks else None
+    print_metric_analysis(mean_rank_analysis, "6. Overall Ranking Performance (Mean Rank of Correct ID)", "%.2f")
+
+
     print("\nAnalysis complete.")
 
     # --- Saving Section ---
@@ -787,6 +801,8 @@ def main():
     save_metric_distribution(mrrs, data_output_dir, f"mrr_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(top_1_accs, data_output_dir, f"top_1_accuracy_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(top_k_accs, data_output_dir, f"top_{args.top_k_acc}_accuracy_distribution_k{k_to_use}.txt", quiet=args.quiet)
+    # --- FIX: Save the mean rank distribution ---
+    save_metric_distribution(mean_ranks, data_output_dir, f"mean_rank_distribution_k{k_to_use}.txt", quiet=args.quiet)
 
     if not args.quiet:
         print("---------------------------------------\n")
@@ -811,6 +827,9 @@ def main():
         # Top-K Accuracy (renamed to reflect the default K=3 from args)
         f'mean_top_{args.top_k_acc}_acc': top_k_analysis.get('mean'),
         f'top_{args.top_k_acc}_acc_p': top_k_analysis.get('wilcoxon_signed_rank_p'),
+        # --- FIX: Add the mean rank metric and its p-value ---
+        'mean_rank_of_correct_id': mean_rank_analysis.get('mean'),
+        'rank_of_correct_id_p': mean_rank_analysis.get('wilcoxon_signed_rank_p'),
     }
 
     # Embed the number of valid responses into the results dictionary
