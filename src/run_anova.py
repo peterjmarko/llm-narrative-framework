@@ -176,7 +176,19 @@ def perform_analysis(df, metric, all_possible_factors, output_dir, display_name_
     logging.info(f"Detected {len(active_factors)} active factor(s) with variation: {', '.join(active_factors)}")
 
     logging.info(f"\n--- Descriptive Statistics by {', '.join(active_factors)} ---")
-    desc_stats = df.groupby(active_factors)[metric].agg(['count', 'mean', 'std']).rename(columns={'count': 'N', 'mean': 'Mean', 'std': 'Std. Dev.'})
+    # MODIFIED: Use n_valid_responses for a more accurate sample size count (N).
+    # 'count' now represents the number of replications, while 'N' is the total number of trials.
+    if 'n_valid_responses' in df.columns:
+        desc_stats = df.groupby(active_factors).agg(
+            replications=('model', 'size'),
+            N=('n_valid_responses', 'sum'),
+            Mean=(metric, 'mean'),
+            StdDev=(metric, 'std')
+        ).rename(columns={'replications': 'Replications', 'N': 'Total Trials (N)', 'StdDev': 'Std. Dev.'})
+    else:
+        # Fallback for older data that doesn't have the new column
+        desc_stats = df.groupby(active_factors)[metric].agg(['count', 'mean', 'std']).rename(columns={'count': 'Replications (N)', 'mean': 'Mean', 'std': 'Std. Dev.'})
+    
     logging.info(f"\n{desc_stats.to_string(float_format='%.4f')}")
     
     formula = f"{metric} ~ {' + '.join([f'C({f})' for f in active_factors])}"

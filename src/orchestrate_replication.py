@@ -48,8 +48,6 @@ import glob
 import configparser
 
 # --- Setup ---
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-
 try:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 except ImportError:
@@ -59,7 +57,12 @@ except ImportError:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 
 def run_script(command, title, quiet=False):
-    """Helper to run a script as a subprocess and capture its output."""
+    """
+    Helper to run a script as a subprocess and capture its output.
+    Returns a tuple: (full_output_string, return_code, error_object_if_any)
+    The error_object_if_any will be a CalledProcessError if the subprocess
+    returned a non-zero exit code.
+    """
     print(f"--- Running Stage: {title} ---")
     header = (
         f"\n\n{'='*80}\n"
@@ -67,47 +70,63 @@ def run_script(command, title, quiet=False):
         f"COMMAND: {' '.join(command)}\n"
         f"{'='*80}\n\n"
     )
+    
+    result = None
+    captured_stdout = ""
+    captured_stderr = ""
+    
     try:
-        # For Stage 2, let stderr pass through for the spinner. For all other stages, capture it.
+        # Always run with check=False to capture all output regardless of exit code
         if title == "2. Run LLM Sessions":
             result = subprocess.run(
-                command, stdout=subprocess.PIPE, stderr=None, check=True,
+                command, stdout=subprocess.PIPE, stderr=None, check=False,
                 text=True, encoding='utf-8', errors='replace'
             )
-            captured_output = result.stdout
+            captured_stdout = result.stdout
         else:
             result = subprocess.run(
-                command, capture_output=True, check=True,
+                command, capture_output=True, check=False,
                 text=True, encoding='utf-8', errors='replace'
             )
-            captured_output = result.stdout + result.stderr
+            captured_stdout = result.stdout
+            captured_stderr = result.stderr
 
-        lines = captured_output.splitlines()
-        filtered_lines = [line for line in lines if "RuntimeWarning" not in line and "UserWarning" not in line]
-        filtered_output = "\n".join(filtered_lines)
-
-        if not quiet and title != "2. Run LLM Sessions":
-            # Don't re-print output for Stage 2, as it has no meaningful stdout.
-            print(filtered_output)
-            
-        return header + filtered_output
-
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        # Error details will now appear on the console in real-time for Stage 2.
-        # For other stages, they are captured and logged here.
-        error_details = "See console for real-time error from this stage."
-        if hasattr(e, 'stdout') and e.stdout:
-            error_details = f"STDOUT: {e.stdout}"
-        if hasattr(e, 'stderr') and e.stderr:
-            error_details += f"\nSTDERR: {e.stderr}"
-        
+    except FileNotFoundError as e:
         error_message = (
             f"\n\n--- FAILED STAGE: {title} ---\n"
             f"Error: {e}\n"
-            f"Details:\n{error_details}\n"
+            f"Details: Script not found or executable: {' '.join(command)}\n"
         )
-        e.full_log = header + error_message
-        raise e
+        # For FileNotFoundError, there's no subprocess result, so we return a synthetic error
+        return header + error_message, 1, e # Return code 1 for FileNotFoundError
+    
+    # Combine stdout and stderr for general processing and display
+    full_captured_output = captured_stdout + captured_stderr
+
+    lines = full_captured_output.splitlines()
+    filtered_lines = [line for line in lines if "RuntimeWarning" not in line and "UserWarning" not in line]
+    filtered_output = "\n".join(filtered_lines)
+
+    # The orchestrator should only print the subprocess's output if it's NOT in quiet mode
+    # and the subprocess itself is not handling its own output (e.g., Stage 2).
+    # For quiet mode, the orchestrator should capture but not print.
+    if not quiet:
+        # For Stage 2, output is already streamed, so we don't print the captured stdout again.
+        # For other stages, print the captured and filtered output.
+        if title != "2. Run LLM Sessions":
+            print(filtered_output)
+
+    # The returned output should contain the header and the filtered output
+    final_output_string = header + filtered_output
+    
+    # Return the full output, the return code, and the CalledProcessError if applicable
+    if result.returncode != 0:
+        # Manually create a CalledProcessError to attach the full captured output
+        err = subprocess.CalledProcessError(result.returncode, command, output=captured_stdout, stderr=captured_stderr)
+        err.full_log = final_output_string # Attach the complete output for inspection
+        return final_output_string, result.returncode, err
+    else:
+        return final_output_string, 0, None # Success, no error object
 
 def generate_run_dir_name(model_name, temperature, num_iterations, k_per_query, personalities_db, replication_num):
     """Generates a descriptive, sanitized directory name."""
@@ -136,7 +155,7 @@ def main():
     args = parser.parse_args()
     
     all_stage_outputs = []
-    pipeline_status = "UNKNOWN"
+    pipeline_status = "FAILED" # Default to FAILED, changed to COMPLETED only on full success
     output3, output4 = "", ""
 
     if args.reprocess:
@@ -184,36 +203,98 @@ def main():
 
     try:
         if not args.reprocess:
-            cmd1 = [sys.executable, build_script, "--run_output_dir", run_specific_dir_path]
+            cmd1 = [sys.executable, build_script, "--run_output_dir", run_specific_dir_path] # ADDED --run_output_dir
             if args.quiet: cmd1.append("--quiet")
             if args.base_seed: cmd1.extend(["--base_seed", str(args.base_seed)])
             if args.qgen_base_seed: cmd1.extend(["--qgen_base_seed", str(args.qgen_base_seed)])
-            all_stage_outputs.append(run_script(cmd1, "1. Build Queries", quiet=args.quiet))
             
-            cmd2 = [sys.executable, run_sessions_script, "--run_output_dir", run_specific_dir_path]
+            output1, return_code1, error_obj1 = run_script(cmd1, "1. Build Queries", quiet=args.quiet)
+            all_stage_outputs.append(output1)
+            if return_code1 != 0: raise error_obj1 # Propagate error if not clean exit
+            
+            cmd2 = [sys.executable, run_sessions_script, "--run_output_dir", run_specific_dir_path] # ADDED --run_output_dir
             if args.quiet: cmd2.append("--quiet")
-            all_stage_outputs.append(run_script(cmd2, "2. Run LLM Sessions", quiet=args.quiet))
+            output2, return_code2, error_obj2 = run_script(cmd2, "2. Run LLM Sessions", quiet=args.quiet)
+            all_stage_outputs.append(output2)
+            if return_code2 != 0: raise error_obj2 # Propagate error if not clean exit
+
         else:
             logging.info("Skipping Stage 1 (Build Queries) and Stage 2 (Run LLM Sessions) due to --reprocess flag.")
 
-        cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]
+        # Stage 3: Process LLM Responses
+        cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path] # Changed to named argument
         if args.quiet: cmd3.append("--quiet")
-        output3 = run_script(cmd3, "3. Process LLM Responses", quiet=args.quiet)
+        
+        output3, return_code3, error_obj3 = run_script(cmd3, "3. Process LLM Responses", quiet=args.quiet)
         all_stage_outputs.append(output3)
-        
-        cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path]
-        if args.quiet: cmd4.append("--quiet")
-        output4 = run_script(cmd4, "4. Analyze Performance", quiet=args.quiet)
-        all_stage_outputs.append(output4)
-        
-        pipeline_status = "COMPLETED"
+
+        stage3_successful = False
+        if return_code3 == 0: # Process exited cleanly
+            stage3_successful = True
+        else: # Process exited with non-zero code
+            # Check if this failure is tolerable (partial success)
+            if "PROCESSOR_VALIDATION_SUCCESS" in output3: # Check the full captured output
+                summary_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+):", output3)
+                if summary_match:
+                    processed_count = int(summary_match.group(1))
+                    if processed_count > 0:
+                        logging.warning(f"Stage 3 (Process LLM Responses) returned non-zero exit code, but successfully processed {processed_count} responses. Tolerating this partial success.")
+                        stage3_successful = True # Mark as successful for pipeline continuation
+                    else:
+                        logging.error(f"Stage 3 (Process LLM Responses) returned non-zero exit code and processed 0 responses. This is a true failure.")
+                        raise error_obj3 # Re-raise if no responses were processed
+                else:
+                    logging.error(f"Stage 3 (Process LLM Responses) returned non-zero exit code, but PARSER_SUMMARY is missing. This is a true failure.")
+                    raise error_obj3 # Re-raise if PARSER_SUMMARY is missing
+            else:
+                logging.error(f"Stage 3 (Process LLM Responses) returned non-zero exit code and PROCESSOR_VALIDATION_SUCCESS is missing. This is a true failure.")
+                raise error_obj3 # Re-raise if PROCESSOR_VALIDATION_SUCCESS is missing
+
+        # Proceed to Stage 4 only if Stage 3 was successful (fully or tolerated)
+        if stage3_successful:
+            # --- NEW: Extract parser summary to pass to Stage 4 ---
+            n_valid_responses = -1 # Default to -1 to indicate not found
+            parser_summary_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+)", output3)
+            if parser_summary_match:
+                n_valid_responses = int(parser_summary_match.group(1))
+
+            cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path]
+            if args.quiet: cmd4.append("--quiet")
+            # --- NEW: Pass the number of valid responses to the analyzer ---
+            if n_valid_responses != -1:
+                cmd4.extend(["--num_valid_responses", str(n_valid_responses)])
+
+            output4, return_code4, error_obj4 = run_script(cmd4, "4. Analyze Performance", quiet=args.quiet)
+            all_stage_outputs.append(output4)
+            if return_code4 != 0: raise error_obj4 # Propagate error if not clean exit
+            
+            pipeline_status = "COMPLETED" # All stages completed (or tolerated)
+        else:
+            # This 'else' block should ideally not be reached if exceptions are raised correctly
+            # The outer except block will catch the re-raised error_obj3
+            pass
+
     except KeyboardInterrupt:
         pipeline_status = "INTERRUPTED BY USER"
         logging.warning(f"\n\n--- {pipeline_status} ---")
     except subprocess.CalledProcessError as e:
         pipeline_status = "FAILED"
         logging.error(f"\n\n--- {pipeline_status} ---")
-        all_stage_outputs.append(e.full_log)
+        # e.full_log should be set by the modified run_script function
+        if hasattr(e, 'full_log'):
+            all_stage_outputs.append(e.full_log)
+        else:
+            # Fallback if full_log wasn't set (e.g., FileNotFoundError before run_script could set it)
+            error_details = f"STDOUT: {e.stdout}\nSTDERR: {e.stderr}" if hasattr(e, 'stdout') else "No captured output."
+            logging.error(f"Error object did not contain full_log. Details: {error_details}")
+            all_stage_outputs.append(f"\n\n--- FAILED STAGE UNKNOWN ---\nError: {e}\nDetails:\n{error_details}\n")
+    except Exception as e: # Catch any other unexpected errors
+        pipeline_status = "FAILED"
+        logging.error(f"\n\n--- UNEXPECTED ERROR ---")
+        logging.error(f"Error: {e}")
+        import traceback
+        logging.error(traceback.format_exc())
+        all_stage_outputs.append(f"\n\n--- UNEXPECTED ERROR ---\n{traceback.format_exc()}")
     
     for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
         os.remove(old_report)
@@ -242,8 +323,16 @@ def main():
         k_val = get_robust(['Study'], ['k_per_query', 'num_subjects', 'group_size'])
         m_val = get_robust(['Study'], ['num_iterations', 'num_trials'])
         
-        parser_summary_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+)>>>", output3)
-        parsing_status_report = f"{parser_summary_match.group(1)}/{parser_summary_match.group(2)} responses parsed" if parser_summary_match else "N/A"
+        parser_summary_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+):warnings=(\d+)>>>", output3)
+        if parser_summary_match:
+            parsed_count = parser_summary_match.group(1)
+            total_count = parser_summary_match.group(2)
+            warnings_count = parser_summary_match.group(3)
+            parsing_status_report = f"{parsed_count}/{total_count} responses parsed ({warnings_count} warnings)"
+        else:
+            # Fallback for older reports or if parsing fails
+            fallback_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+)>>>", output3)
+            parsing_status_report = f"{fallback_match.group(1)}/{fallback_match.group(2)} responses parsed" if fallback_match else "N/A"
 
         header = f"""
 ================================================================================

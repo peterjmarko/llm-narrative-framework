@@ -67,13 +67,6 @@ except ImportError:
     PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     def get_config_value(cfg, section, key, fallback=None, value_type=str): return fallback
 
-# --- Basic Logging Setup ---
-# Configure logger to write to stdout to be captured by the orchestrator.
-logging.basicConfig(level=logging.INFO,
-                    format='%(levelname)s (analyze_performance): %(message)s',
-                    stream=sys.stdout)
-
-
 # --- I. Per-Test Evaluation Function (Enhanced) ---
 def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, top_k_value_for_accuracy=3):
     matrix = np.array(score_matrix) 
@@ -585,10 +578,11 @@ def save_metric_distribution(metric_values, output_dir, filename, quiet=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Performs statistical analysis on LLM matching scores.")
-    parser.add_argument("scores_file", nargs='?', default="all_scores.txt", 
-                        help="Path to the scores file (default: all_scores.txt).")
-    parser.add_argument("mappings_file", nargs='?', default="all_mappings.txt",
-                        help="Path to the mappings file (default: all_mappings.txt).")
+    # Make run_output_dir a required argument for analyze_performance.py
+    parser.add_argument("--run_output_dir", required=True,
+                        help="The absolute path to the self-contained output directory for this specific run.")
+    
+    # Removed scores_file and mappings_file as direct arguments, they will be derived from run_output_dir
     parser.add_argument("-k", "--k_value", type=int, default=None,
                         help="The dimension 'k'. If not provided, it's deduced from mappings_file.")
     parser.add_argument("-d", "--delimiter", type=str, default=None,
@@ -597,32 +591,32 @@ def main():
                              "If unset, auto-detection is used. (default: None, for auto-detect).")
     parser.add_argument("--top_k_acc", type=int, default=3,
                         help="The 'K' for Top-K accuracy calculation (default: 3).")
+    parser.add_argument("--num_valid_responses", type=int, default=None, 
+                        help="The number of successfully parsed responses, passed by the orchestrator.")
     parser.add_argument("--verbose_per_test", action='store_true',
                         help="Print detailed results for each individual test.")
     parser.add_argument("--quiet", action='store_true',
                         help="Suppress verbose progress and info messages, showing only the final summary.")
-    parser.add_argument("--run_output_dir",
-                        help="The absolute path to the self-contained output directory for this specific run.")
 
     args = parser.parse_args()
 
+    # Set logging level based on --quiet flag
+    log_level = logging.WARNING if args.quiet else logging.INFO
+    logging.basicConfig(level=log_level,
+                        format='%(levelname)s (analyze_performance): %(message)s',
+                        stream=sys.stdout)
+
     # --- Path Resolution Logic ---
-    # When called by the orchestrator, --run_output_dir will be provided.
-    if args.run_output_dir:
-        analysis_inputs_subdir_cfg = get_config_value(APP_CONFIG, 'General', 'analysis_inputs_subdir', fallback="analysis_inputs")
-        analysis_inputs_dir = os.path.join(args.run_output_dir, analysis_inputs_subdir_cfg)
-        scores_filepath_abs = os.path.join(analysis_inputs_dir, args.scores_file)
-        mappings_filepath_abs = os.path.join(analysis_inputs_dir, args.mappings_file)
-    else:
-        # Fallback for standalone execution (maintains original behavior)
-        logging.warning("Executing in standalone mode without --run_output_dir. Using default paths.")
-        
-        base_output_dir_cfg = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback="output")
-        analysis_inputs_subdir_cfg = get_config_value(APP_CONFIG, 'General', 'analysis_inputs_subdir', fallback="analysis_inputs")
-        default_base_path = os.path.join(PROJECT_ROOT, base_output_dir_cfg, analysis_inputs_subdir_cfg)
-        
-        scores_filepath_abs = args.scores_file if os.path.isabs(args.scores_file) else os.path.join(default_base_path, args.scores_file)
-        mappings_filepath_abs = args.mappings_file if os.path.isabs(args.mappings_file) else os.path.join(default_base_path, args.mappings_file)
+    # Since --run_output_dir is now required, we can directly use it.
+    analysis_inputs_subdir_cfg = get_config_value(APP_CONFIG, 'General', 'analysis_inputs_subdir', fallback="analysis_inputs")
+    analysis_inputs_dir = os.path.join(args.run_output_dir, analysis_inputs_subdir_cfg)
+    
+    # Define the filenames directly, as they are no longer command-line arguments
+    scores_filename = get_config_value(APP_CONFIG, 'Filenames', 'all_scores_file', fallback="all_scores.txt")
+    mappings_filename = get_config_value(APP_CONFIG, 'Filenames', 'all_mappings_file', fallback="all_mappings.txt")
+
+    scores_filepath_abs = os.path.join(analysis_inputs_dir, scores_filename)
+    mappings_filepath_abs = os.path.join(analysis_inputs_dir, mappings_filename)
 
     actual_delimiter_for_parsing = None
     if args.delimiter is not None:
@@ -818,6 +812,14 @@ def main():
         f'mean_top_{args.top_k_acc}_acc': top_k_analysis.get('mean'),
         f'top_{args.top_k_acc}_acc_p': top_k_analysis.get('wilcoxon_signed_rank_p'),
     }
+
+    # Embed the number of valid responses into the results dictionary
+    if args.num_valid_responses is not None:
+        summary_data['n_valid_responses'] = args.num_valid_responses
+    else:
+        # Fallback for backward compatibility: count the loaded mappings
+        summary_data['n_valid_responses'] = len(mappings_list) if mappings_list is not None else 0
+
     print("\n<<<METRICS_JSON_START>>>")
     print(json.dumps(summary_data))
     print("<<<METRICS_JSON_END>>>")

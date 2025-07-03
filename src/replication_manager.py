@@ -97,12 +97,14 @@ def main():
     parser.add_argument('--end-rep', type=int, default=None)
     parser.add_argument('--reprocess', action='store_true', help='Run in reprocessing mode.')
     parser.add_argument('--depth', type=int, default=0, help="Recursion depth for finding run folders.")
-    parser.add_argument('--quiet', action='store_true', help='Suppress per-replication status updates.')
+    # MODIFIED: Changed --quiet to --verbose and inverted the logic. Default is now quiet.
+    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose per-replication status updates.')
     args = parser.parse_args()
 
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
     log_manager_script = os.path.join(current_dir, "log_manager.py")
     compile_script = os.path.join(current_dir, "compile_results.py")
+    positional_bias_script = os.path.join(current_dir, "analyze_positional_bias.py")
     
     if args.target_dir:
         final_output_dir = os.path.abspath(args.target_dir)
@@ -127,6 +129,7 @@ def main():
             return
         print(f"Found {len(dirs_to_reprocess)} replication directories to reprocess.")
         os.system('')
+        failed_reps = [] # Track failed replications
 
         for i, run_dir in enumerate(dirs_to_reprocess):
             header_text = f" RE-PROCESSING {os.path.basename(run_dir)} ({i+1}/{len(dirs_to_reprocess)}) "
@@ -134,11 +137,13 @@ def main():
             print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
             print("="*80)
             cmd = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", run_dir]
-            if args.quiet: cmd.append("--quiet")
+            # MODIFIED: Pass --quiet to the orchestrator unless --verbose is specified.
+            if not args.verbose: cmd.append("--quiet")
             try:
                 subprocess.run(cmd, check=True)
             except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
                 logging.error(f"!!! Reprocessing failed or was interrupted for {os.path.basename(run_dir)}. Continuing... !!!")
+                failed_reps.append(os.path.basename(run_dir)) # Add failed run to the list
                 if isinstance(e, KeyboardInterrupt): sys.exit(1)
     else:
         if not os.path.exists(final_output_dir):
@@ -172,7 +177,8 @@ def main():
                 cmd = [sys.executable, orchestrator_script, 
                     "--replication_num", str(rep_num),
                     "--base_output_dir", final_output_dir]
-                if args.quiet: cmd.append("--quiet")
+                # MODIFIED: Pass --quiet to the orchestrator unless --verbose is specified.
+                if not args.verbose: cmd.append("--quiet")
                 
                 try:
                     subprocess.run(cmd, check=True)
@@ -209,20 +215,40 @@ def main():
     print("\n" + "="*80)
     print("### ALL TASKS COMPLETE. BEGINNING POST-PROCESSING. ###")
     print("="*80)
+    
+    # Call compile_results.py
     print("\n--- Compiling final statistical summary... ---")
     try:
         subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True, capture_output=True, text=True)
     except Exception as e:
         logging.error(f"An error occurred while running the final compilation script: {e}")
     
+    # NEW: Call analyze_positional_bias.py
+    print("\n--- Analyzing positional biases across all replications... ---")
+    try:
+        subprocess.run([sys.executable, positional_bias_script, final_output_dir], check=True, capture_output=True, text=True)
+        print("Positional bias analysis complete. Check 'bias_analysis_plots' in the study directory.")
+    except Exception as e:
+        logging.error(f"An error occurred while running the positional bias analysis script: {e}")
+
     # Call the existing 'finalize' command in log_manager.py to append the summary.
     print("\n--- Finalizing batch log with summary... ---")
     try:
         subprocess.run([sys.executable, log_manager_script, "finalize", final_output_dir], check=True, capture_output=True, text=True)
     except Exception as e:
         logging.error(f"An error occurred while finalizing the batch log: {e}")
-        
-    print("\n--- Batch Run Finished ---")
+
+    # NEW: Add a summary of any failures at the very end.
+    if failed_reps:
+        print("\n" + "="*80)
+        print(f"### BATCH RUN COMPLETE WITH {len(failed_reps)} FAILURE(S) ###")
+        print("The following replications failed and should be investigated:")
+        for rep in failed_reps:
+            print(f"  - {rep}")
+        print("Check the 'replication_report.txt' inside each failed directory for details.")
+        print("="*80)
+    else:
+        print("\n--- Batch Run Finished Successfully ---")
 
 if __name__ == "__main__":
     main()
