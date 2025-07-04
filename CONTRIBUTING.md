@@ -4,52 +4,47 @@ We welcome contributions to this project! This document provides guidelines for 
 
 ## Getting Started: Development Environment Setup
 
-This guide will walk you through setting up a standard Python development environment for this project.
+This project uses **PDM** for dependency and environment management. It simplifies setup and guarantees reproducible environments.
 
 ### 1. Essential Tools
 
 Before you begin, ensure you have the following installed on your system:
 *   **Python**: Version 3.8 or higher is recommended. You can download it from [python.org](https://www.python.org/downloads/).
 *   **Git**: For version control. You can download it from [git-scm.com](https://git-scm.com/downloads).
-*   **Visual Studio Code (VS Code)**: Our recommended code editor. You can download it from [code.visualstudio.com](https://code.visualstudio.com/).
-
-### 2. Creating a Virtual Environment
-
-A virtual environment is a self-contained directory that holds a specific Python interpreter and all the libraries required for a project. This prevents conflicts between different projects' dependencies.
-
-1.  **Open a terminal** in the project's root directory.
-2.  **Create the virtual environment**:
+*   **PDM**: The Python dependency manager. Install it once with pip (if you haven't already):
     ```bash
-    python -m venv .venv
+    # It's best to run this from a terminal *outside* of any virtual environment.
+    pip install --user pdm
     ```
-    This creates a folder named `.venv` in your project directory, which is already ignored by Git.
 
-3.  **Activate the virtual environment**: You must do this every time you open a new terminal to work on the project.
-    *   On Windows (PowerShell):
-        ```powershell
-        .venv\Scripts\Activate.ps1
-        ```
-    *   On macOS/Linux:
-        ```bash
-        source .venv/bin/activate
-        ```
-    When activated, your terminal prompt will usually show `(.venv)` at the beginning.
+### 2. Project Installation
 
-### 3. Installing Dependencies
-
-Once your virtual environment is activated, you can install all the necessary packages with a single command.
+With PDM installed, setting up the entire project environment is a single command. From the project's root directory, run:
 
 ```bash
-pip install -r requirements.txt
+pdm install -G dev
 ```
+This command will automatically:
+1.  Create a local virtual environment inside the project's `.venv` folder.
+2.  Install all required packages from the `pdm.lock` file.
+3.  Install all development packages (like `pytest` and `pre-commit`).
+4.  Install the pre-commit hooks into your Git configuration.
 
-If your contribution requires a new library, please install it and then update the `requirements.txt` file:
-```bash
-# Install the new package
-pip install new-package-name
+To activate the virtual environment manually for use with your IDE, you can still use the standard command:
+*   On Windows (PowerShell): `.venv\Scripts\Activate.ps1`
+*   On macOS/Linux: `source .venv/bin/activate`
 
-# Update the requirements file with the new package list
-pip freeze > requirements.txt```
+If your contribution requires a new library, please add its name directly to `requirements.txt` and then run `pip install -r requirements.txt`. Do not use `pip freeze`.
+
+### 4. Set Up Pre-commit Hooks
+
+This project uses `pre-commit` to automatically format code, check for style violations, and build the README file before each commit. This ensures all contributions meet our quality standards automatically.
+
+1.  **Install the hooks**: After installing the requirements, run this one-time setup command from the project root:
+    ```bash
+    pre-commit install
+    ```
+2.  **That's it!** Now, every time you run `git commit`, the hooks will run automatically.
 
 ## Contribution Workflow
 
@@ -67,57 +62,41 @@ git checkout -b fix/correct-data-parsing-error
 
 ### 2. Make Your Changes
 
-Write your code, following the style guidelines below.
+Write your code and update documentation as needed.
 
-#### Code Style and Quality
-
-To maintain a clean and consistent codebase, we adhere to the following standards.
-
-*   **Code Formatting**: All Python code must be formatted with **Black**. Before committing, please run Black on any files you've changed:
-    ```bash
-    # Install black if you haven't already
-    pip install black
-
-    # Format all files in the src directory
-    black src/ tests/
-    ```
-*   **Linting**: We use **Flake8** to check for logical errors and style violations according to PEP 8.
-    ```bash
-    # Install flake8 if you haven't already
-    pip install flake8
-
-    # Run the linter
-    flake8 src/ tests/
-    ```
-*   **Docstrings**: All new functions, classes, and modules should have clear, well-written docstrings explaining their purpose, arguments, and return values.
+*   **Code**: Modify the Python files in `src/` or `tests/`. The pre-commit hooks will automatically handle formatting (Black) and linting (Flake8).
+*   **Documentation**: To edit the main README, modify `README.template.md` or the diagram files in `docs/diagrams/`. The `build-readme` hook will automatically generate the final `README.md`. **Do not edit `README.md` directly.**
 
 ### 3. Run the Test Suite
 
-This project includes a suite of unit and integration tests located in the `/tests` directory.
+The pre-commit hooks do not run the test suite automatically. You must still run the tests manually to ensure your changes haven't broken anything.
 
 **All tests must pass before a pull request will be merged.**
+```bash
+pytest -v
+```
 
-The testing framework used is `pytest`. To run the tests:
-1.  Make sure your virtual environment is activated.
-2.  From the project's **root directory**, run the following command:
-    ```bash
-    pytest -v
-    ```
-
-### 4. Update Documentation (If Necessary)
-
-This project uses a "docs-as-code" approach. **Do not edit `README.md` directly.**
-
-1.  **To Edit Text**: Modify `README.template.md`.
-2.  **To Edit Diagrams**: Modify the relevant `.mmd` file in `docs/diagrams/`.
-3.  **Build the Final README**: After making changes, run the build script to assemble the final `README.md`:
-    ```bash
-    python src/build_readme.py
-    ```
-
-### 5. Commit Your Changes
+### 4. Commit Your Changes
 
 Use clear and descriptive commit messages. We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
+
+**Important: The Two-Stage Commit Process**
+
+Because our pre-commit hooks can modify files (like formatting code or rebuilding the README), you may sometimes need to commit twice. This is the expected and correct behavior.
+
+1.  **First Attempt**: Run `git commit` as you normally would.
+    ```bash
+    git commit -m "feat(analysis): Add support for chi-squared test"
+    ```
+    If a hook modifies a file, the commit will be aborted with a message like "`files were modified by this hook`". This is a safety feature that gives you a chance to review the automatic changes.
+
+2.  **Review and Re-commit**:
+    *   Review the changes made by the hook (e.g., `git diff`).
+    *   If the changes are correct, add them to the staging area:
+        ```bash
+        git add .
+        ```
+    *   Run the **exact same `git commit` command again**. This time, the hooks will find no issues and your commit will succeed.
 
 *   **Format**: `type(scope): short description`
 *   **Examples**:

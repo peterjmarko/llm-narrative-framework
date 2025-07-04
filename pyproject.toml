@@ -1,0 +1,43 @@
+[project]
+name = "llm-personality-matching"
+version = "1.0.0"
+description = "A reproducible pipeline for LLM personality matching experiments."
+authors = [
+    {name = "Peter Marko", email = "peter.j.marko@gmail.com"},
+]
+requires-python = ">=3.8"
+readme = "README.md"
+license = {text = "MIT"}
+
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "statsmodels",
+    "networkx",
+    "requests",
+    "python-dotenv",
+    "tqdm",
+    "seaborn",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pre-commit",
+]
+
+[tool.pdm]
+# This tells PDM to use a virtual environment located in the project's .venv folder.
+venv.in-project = true
+
+[tool.pdm.scripts]
+# Development and testing shortcuts
+test = "pytest -v"
+lint = "pre-commit run --all-files"
+readme = "python src/build_readme.py"
+
+# Main workflow shortcuts
+run-exp = "powershell -ExecutionPolicy Bypass -File .\\run_experiment.ps1"
+process-study = "powershell -ExecutionPolicy Bypass -File .\\process_study.ps1"
