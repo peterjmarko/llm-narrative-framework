@@ -125,6 +125,41 @@ def load_env_vars():
         logger.info(f".env file not found at {dotenv_path}. API keys/secrets must be set as environment variables.")
         return False
 
+def get_config_compatibility_map(config):
+    """
+    Parses the [ConfigCompatibility] section of the config file.
+
+    This section allows mapping a canonical parameter name to a list of
+    potential (section, key) locations, providing a fallback mechanism for
+    reading legacy configuration formats.
+
+    Args:
+        config (configparser.ConfigParser): The loaded config object.
+
+    Returns:
+        dict: A dictionary where keys are canonical parameter names and
+              values are lists of (section, key) tuples to try in order.
+              Returns an empty dict if the section doesn't exist.
+    """
+    compat_map = {}
+    if not config.has_section('ConfigCompatibility'):
+        return compat_map
+
+    for canonical_name, locations_str in config.items('ConfigCompatibility'):
+        locations_list = []
+        # Split by comma to get individual 'section:key' pairs
+        for loc_pair in locations_str.split(','):
+            try:
+                section, key = loc_pair.strip().split(':', 1)
+                locations_list.append((section.strip(), key.strip()))
+            except ValueError:
+                # Handle potential malformed entries gracefully
+                print(f"Warning: Malformed entry in [ConfigCompatibility] for '{canonical_name}': '{loc_pair}'")
+                continue
+        if locations_list:
+            compat_map[canonical_name] = locations_list
+            
+    return compat_map
 
 def get_config_value(config: configparser.ConfigParser, section: str, key: str, 
                      fallback=None, value_type=str, fallback_key=None):

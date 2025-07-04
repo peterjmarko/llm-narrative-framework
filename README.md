@@ -2,11 +2,14 @@
 
 This project provides a fully automated and reproducible pipeline for testing a Large Language Model's (LLM) ability to solve a "who's who" personality matching task. It handles everything from data preparation and query generation to LLM interaction, response parsing, and final statistical analysis.
 
+## Research Question
+This project investigates whether large language models can perform a personality-matching task above chance level and how performance varies by model and experimental conditions.
+
 ## Key Features
 
 -   **Automated Experiment Runner**: A single command executes an entire experiment, running dozens of replications, each with hundreds of trials.
 -   **Guaranteed Reproducibility**: Each replication automatically archives the `config.ini` file used for that run, permanently linking the results to the exact parameters that generated them.
--   **Robust Error Handling & Resumption**: The pipeline is designed for resilience. Interrupted runs can be safely resumed. The system automatically backs up the old log and rebuilds a clean version from existing reports, ensuring data integrity.
+-   **Robust Error Handling & Resumption**: The pipeline is designed for resilience. Interrupted runs can be safely resumed. The `rebuild` command ensures data integrity after an interruption, and the `finalize` command is idempotent, automatically cleaning up corrupted summary data before writing a correct final version.
 -   **Advanced Artifact Management**:
     -   **Reprocessing Engine**: The main runner has a `--reprocess` mode to re-run the analysis stages on existing experimental data, with a `--depth` parameter for recursive scanning.
     -   **Configuration Restoration**: Includes utilities to reverse-engineer and archive `config.ini` files for historical data that was generated before the auto-archiving feature was implemented.
@@ -46,7 +49,7 @@ graph TD;
             compile["compile_results.py"]:::Utility;
             anova["run_anova.py"]:::Utility;
             verify["verify_pipeline_completeness.py"]:::Utility;
-            rebuild_log["rebuild_batch_log.py"]:::Utility;
+            log_man["log_manager.py"]:::Utility;
         end
         subgraph "Historical Data Patching"
             patcher["patch_old_runs.py"]:::Utility;
@@ -203,6 +206,30 @@ graph TD
     *   Create a file named `.env` in the project root.
     *   Add your API key: `OPENROUTER_API_KEY=sk-or-your-key`.
 
+## Configuration (`config.ini`)
+
+The `config.ini` file is the central hub for defining all parameters for your experiments. Before running a new experiment, you should review and adjust the settings in this file. The pipeline is designed so that this configuration is automatically archived with the results for guaranteed reproducibility.
+
+Below are some of the most critical settings.
+
+### Experiment Settings (`[Experiment]`)
+
+-   **`num_replications`**: The number of times the experiment will be repeated (e.g., `30`).
+-   **`mapping_strategy`**: A key experimental variable. Can be `correct` (names are mapped to their true descriptions) or `random` (names are shuffled).
+-   **`prompt_strategy`**: Defines which prompt template from `prompts.json` to use for the LLM queries.
+
+### LLM Settings (`[LLM]`)
+
+-   **`model`**: Specifies the API identifier for the Large Language Model to be tested (e.g., `mistralai/mistral-7b-instruct`). This is a primary independent variable.
+
+### Analysis Settings (`[Analysis]`)
+
+The `[Analysis]` section controls the behavior of the final study processing script (`process_study.ps1`).
+
+-   **`min_valid_response_threshold`**: Sets the minimum average number of valid responses (`n_valid_responses`) a model's experiment must have to be included in the final analysis. This is crucial for automatically excluding unreliable models that failed to produce consistent output, preventing them from skewing the statistical results.
+    -   A value of `25` is a reasonable default for an experiment with 100 trials per replication.
+    -   Set to `0` to disable this filter and include all models regardless of their response rate.
+
 ## Standard Workflow
 
 The workflow is designed to be fully automated. Each experiment run produces self-documenting output, which simplifies the final analysis.
@@ -231,29 +258,85 @@ The main entry point for executing a complete experiment (e.g., all 30 replicati
     *   Run once with `mapping_strategy = correct` and save the output to a folder like `output/reports/exp_mistral_correct_map`.
     *   Run again with `mapping_strategy = random` and save to `output/reports/exp_mistral_random_map`.
 
-### Phase 2: Compiling Results and Final Analysis
+### Phase 2: Processing the Study
 
-After running all experiments, this phase aggregates all data and performs the final statistical analysis. This is now a streamlined two-step process.
+After running all individual experiments, this phase uses a single command to aggregate all data and perform the final statistical analysis across the entire study.
 
-1.  **Compile All Results**: Use `compile_results.py` and point it at the parent directory containing all your experiment folders (e.g., `output/reports`). The script will automatically:
-    *   Scan the entire directory structure from the bottom up.
-    *   Create a `final_summary_results.csv` inside every single run folder.
-    *   Create aggregated `final_summary_results.csv` files at each higher level.
-    *   Finally, create a single **master summary file** at the top level you specified (`output/reports/final_summary_results.csv`).
+1.  **Run Study Processor**: Execute the `process_study.ps1` script, pointing it at the top-level directory that contains all your experiment folders (e.g., `output/reports`).
     ```powershell
-    # Compile all results within the 'reports' folder into a master dataset
-    python src/compile_results.py output/reports
+    # Process the entire study located in the 'output/reports' directory
+    .\process_study.ps1 -StudyDirectory "output/reports"
     ```
+    This script automates the two critical post-processing stages:
+    *   **Compilation**: It first runs `compile_results.py` to scan the entire directory tree, aggregating all data into a single master `final_summary_results.csv` file at the top of your study directory.
+    *   **Analysis**: It then runs `run_anova.py` on the newly created master dataset, performing a full statistical analysis (ANOVA, Tukey's HSD).
 
-2.  **Run Final Analysis**: Now, run `run_anova.py` on the **same directory**. It will automatically find the master summary CSV created in the previous step and use it as its data source.
-    ```powershell
-    # Analyze the master dataset created by compile_results.py
-    python src/run_anova.py output/reports
-    ```
-
-3.  **Review Final Artifacts**: In the top-level analysis directory (`output/reports/anova/`), you will now find:
+2.  **Review Final Artifacts**: In the top-level analysis directory (`output/reports/anova/`), you will now find:
     *   Publication-quality **box plot `*.png` images** for each metric.
-    *   A complete `final_summary_results_analysis_log.txt` with all statistical tables (ANOVA, Tukey's HSD, etc.).
+    *   A complete `STUDY_analysis_log.txt` with all statistical tables (ANOVA, Tukey's HSD, Performance Groups, etc.).
+    *   An `archive/` subdirectory containing the results from the previous analysis run, providing a simple backup.
+
+## Migrating Old Experiment Data
+
+Due to updates in the reporting format and data processing pipeline, experiment data generated before a certain version may be incompatible with the latest analysis tools. A one-time migration process is required to upgrade these old data directories.
+
+This process will:
+1.  Archive old `config.ini` files.
+2.  Rebuild individual `replication_report.txt` files into the modern format.
+3.  Clean up legacy artifacts.
+4.  Perform a final reprocessing to regenerate all summary files and create a clean data set.
+
+#### Migration Steps
+
+Ensure your Python environment is activated before running these commands from the project root directory.
+
+**A. Manual Steps**
+
+You can run the migration manually by executing these four steps in order. Replace `<path_to_old_experiment_dir>` with the actual path (e.g., `output/reports/6_Study_4`).
+
+1.  **Patch Configs:** This archives the `config.ini` file in each `run_*` subdirectory.
+    ```bash
+    python src/patch_old_runs.py "<path_to_old_experiment_dir>"
+    ```
+
+2.  **Rebuild Reports:** This uses the archived configs to regenerate each `replication_report.txt` with a modern structure and a valid `METRICS_JSON` block.
+    ```bash
+    python src/rebuild_reports.py "<path_to_old_experiment_dir>"
+    ```
+
+3.  **Clean Artifacts:** Manually delete the following old files and directories from within the `<path_to_old_experiment_dir>`:
+    - The top-level `final_summary_results.csv`
+    - The top-level `batch_run_log.csv`
+    - The `analysis_inputs` directory inside *each* `run_*` subdirectory.
+    - All `*.txt.corrupted` files inside *each* `run_*` subdirectory.
+
+4.  **Final Reprocess:** This will regenerate the summary CSV files, logs, and all analysis artifacts using the modern, rebuilt reports.
+    ```bash
+    python src/replication_manager.py --reprocess "<path_to_old_experiment_dir>"
+    ```
+
+**B. Automated Scripts**
+
+Scripts are provided to automate all four steps for Windows environments. Choose the one that matches your preferred terminal.
+
+-   **Using PowerShell (Recommended for Windows 10/11):**
+    The PowerShell script offers more robust error handling and detailed output.
+    ```powershell
+    # If script execution is restricted, you can bypass the policy for this single command:
+    PowerShell.exe -ExecutionPolicy Bypass -File .\migrate_old_experiment.ps1 "<path_to_old_experiment_dir>"
+
+    # Or, if your execution policy allows it, run directly:
+    .\migrate_old_experiment.ps1 "<path_to_old_experiment_dir>"
+    ```
+
+-   **Using Command Prompt (Legacy):**
+    ```batch
+    migrate_old_experiment.bat "<path_to_old_experiment_dir>"
+    ```
+
+After the chosen script completes, the data in the target directory will be fully migrated and compatible with the latest version of the toolkit.
+
+---
 
 ## Maintenance and Utility Scripts
 
@@ -272,7 +355,10 @@ The project includes several scripts for maintenance, diagnostics, and handling 
     *   Usage: `python src/patch_old_runs.py "path/to/old/experiments" --depth -1`
 
 *   **`log_manager.py`**:
-    *   The core utility for automated log management. It is called by the main runner with commands like `start`, `rebuild`, and `finalize`. Can be run manually for maintenance.
+    *   The core utility for automated log management, operating in several modes. It is called by the main runner but can also be used manually for maintenance.
+    *   `start`: Archives any old log and creates a new, empty one with a header.
+    *   `rebuild`: Recreates the log from scratch by parsing all existing replication reports in a directory, ensuring a clean state.
+    *   `finalize`: Intelligently cleans any existing summary from the log, recalculates a correct summary from the clean data, and appends it. This command is safe to re-run on a corrupted or finalized log.
 
 *   **`retry_failed_sessions.py`**:
     *   Used automatically by the main runner for the repair cycle. Can be run manually to fix failed API calls in a specific run.
@@ -282,6 +368,8 @@ The project includes several scripts for maintenance, diagnostics, and handling 
 
 *   **`inject_metadata.py`**:
     *   **LEGACY UTILITY:** This script is no longer part of the standard workflow. It should only be used in rare cases for one-off data labeling where the standard `config.ini` archiving is not feasible.
+
+---
 
 ## Testing
 

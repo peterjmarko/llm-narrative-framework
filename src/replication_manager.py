@@ -119,6 +119,8 @@ def main():
         final_output_dir = os.path.join(base_output_path, study_dir_name)
         print(f"{C_CYAN}No target directory specified. Using default: {final_output_dir}{C_RESET}")
 
+    failed_reps = [] # Initialize for all modes
+
     if args.reprocess:
         if not args.target_dir:
             print("ERROR: Reprocessing mode requires a target directory to be specified.", file=sys.stderr)
@@ -130,7 +132,7 @@ def main():
             return
         print(f"Found {len(dirs_to_reprocess)} replication directories to reprocess.")
         os.system('')
-        failed_reps = [] # Track failed replications
+        # failed_reps = [] # <-- This line is now removed from here
 
         for i, run_dir in enumerate(dirs_to_reprocess):
             header_text = f" RE-PROCESSING {os.path.basename(run_dir)} ({i+1}/{len(dirs_to_reprocess)}) "
@@ -199,6 +201,7 @@ def main():
                 
                 except subprocess.CalledProcessError:
                     logging.error(f"!!! Replication {rep_num} failed. Check its report for details. Continuing... !!!")
+                    failed_reps.append(rep_num) # Add the failed replication number to our list
                 except KeyboardInterrupt:
                     logging.warning(f"\n!!! Batch run interrupted by user during replication {rep_num}. Halting... !!!")
                     interrupted = True

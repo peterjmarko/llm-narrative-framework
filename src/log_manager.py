@@ -21,9 +21,10 @@ Modes of Operation:
     existing replication reports. This ensures the log is in a clean, appendable
     state.
 
--   'finalize': Appends a summary footer to the log, calculating total run time
-    and counts of completed/failed replications. This is called after the entire
-    batch is finished.
+-   'finalize': Ccleans and finalizes the log. It first removes any existing summary
+    blocks from the end of the file, then recalculates a fresh summary from the
+    remaining clean data rows and appends it. This ensures the log always has a
+    single, correct summary footer, making the command safe to re-run.
 """
 
 import os
@@ -33,6 +34,7 @@ import json
 import csv
 import glob
 import argparse
+import io
 from datetime import datetime
 
 # --- Core Logic Functions (Shared by all modes) ---
@@ -106,37 +108,61 @@ def write_log_row(log_file_path, log_entry, fieldnames):
         writer.writerow(log_entry)
 
 def finalize_log(log_file_path):
-    """Reads the generated log and appends a summary footer."""
+    """Reads the log, cleans any old summary, and appends a new, correct summary."""
     if not os.path.exists(log_file_path): return
-    with open(log_file_path, 'r', newline='', encoding='utf-8') as f:
-        rows = list(csv.DictReader(f))
+
+    # Step 1: Read all lines and find where any previous summary starts
+    with open(log_file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    data_lines = lines
+    for i, line in enumerate(lines):
+        # The summary starts with this header. We truncate the file here.
+        if line.strip().startswith('BatchSummary'):
+            data_lines = lines[:i]
+            break
+    
+    # Remove any trailing blank lines from the data to prevent parsing errors
+    while data_lines and not data_lines[-1].strip():
+        data_lines.pop()
+
+    clean_csv_content = "".join(data_lines)
+    if not clean_csv_content.strip() or not data_lines:
+        print("Warning: Log file contains no valid data rows. Cannot finalize.")
+        return
+
+    # Step 2: Parse only the cleaned CSV data in-memory
+    rows = list(csv.DictReader(io.StringIO(clean_csv_content)))
     if not rows: return
 
+    # Step 3: Perform calculations on the clean data (this logic is now safe)
     summary_start_time = rows[0]['StartTime']
     summary_end_time = rows[-1]['EndTime']
     total_duration_str = "N/A"
     try:
-        # The format string for both start and end times must be identical
         time_format = '%Y-%m-%d %H:%M:%S'
         start_dt = datetime.strptime(summary_start_time, time_format)
-        end_dt = datetime.strptime(summary_end_time, time_format) # <-- This line is now corrected
+        end_dt = datetime.strptime(summary_end_time, time_format)
         
         total_seconds = (end_dt - start_dt).total_seconds()
         hours, rem = divmod(total_seconds, 3600)
         minutes, secs = divmod(rem, 60)
         total_duration_str = f"{int(hours):02d}:{int(minutes):02d}:{int(round(secs)):02d}"
     except (ValueError, TypeError) as e:
-        # Added a print statement for better debugging in the future
         print(f"Warning: Could not calculate total duration. Error: {e}", file=sys.stderr)
     
     completed_count = sum(1 for r in rows if r["Status"] == "COMPLETED")
     failed_count = len(rows) - completed_count
     
-    with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
+    # Step 4: Atomically write the clean data AND the new summary back to the file
+    with open(log_file_path, 'w', newline='', encoding='utf-8') as f:
+        # Write back the original, clean data rows
+        f.writelines(data_lines)
+        # Append the new summary
         f.write('\n')
         f.write('BatchSummary,StartTime,EndTime,TotalDuration,Completed,Failed\n')
         f.write(f'Totals,{summary_start_time},{summary_end_time},{total_duration_str},{completed_count},{failed_count}\n')
-    print(f"Appended batch summary to {os.path.basename(log_file_path)}")
+    print(f"Cleaned and appended batch summary to {os.path.basename(log_file_path)}")
 
 # --- Main Execution ---
 

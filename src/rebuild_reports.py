@@ -42,7 +42,7 @@ logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 # This allows the script to find config_loader for PROJECT_ROOT
 try:
-    from config_loader import PROJECT_ROOT
+    from config_loader import PROJECT_ROOT, load_config, get_config_compatibility_map
 except ImportError:
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     if current_script_dir not in sys.path:
@@ -72,8 +72,8 @@ def run_script(command, title):
         # Return the captured error output so it can be logged in the final report if needed
         return f"STAGE FAILED: {title}\n{error_output}"
 
-def rebuild_report_for_run(run_dir):
-    """Rebuilds the report for a single run directory with high fidelity."""
+def rebuild_report_for_run(run_dir, compat_map):
+    """Rebuilds the report for a single run directory using a compatibility map."""
     dir_basename = os.path.basename(run_dir)
     logging.info(f"--- Processing: {dir_basename} ---")
 
@@ -82,18 +82,30 @@ def rebuild_report_for_run(run_dir):
         logging.warning(f"Skipping: No 'config.ini.archived' found. Please run patcher first.")
         return False
 
-    # --- 1. Load ground-truth parameters from the archived config ---
-    config = configparser.ConfigParser()
-    config.read(archive_path)
+    archived_config = configparser.ConfigParser()
+    archived_config.read(archive_path)
+
+    def get_param(param_name):
+        """Finds a parameter in the archived config using the compatibility map."""
+        locations = compat_map.get(param_name)
+        if not locations:
+            raise configparser.NoOptionError(f"'{param_name}' is not defined in the compatibility map.", "N/A")
+        
+        for section, key in locations:
+            if archived_config.has_option(section, key):
+                return archived_config.get(section, key)
+        
+        raise configparser.NoOptionError(f"Could not find '{param_name}' in any of its expected locations.", "N/A")
+
     try:
         params = {
-            'model_name': config.get('Model', 'model_name'),
-            'num_iterations': config.get('Study', 'num_trials'),
-            'k_per_query': config.get('Study', 'num_subjects'),
-            'mapping_strategy': config.get('Study', 'mapping_strategy'),
-            'personalities_file': os.path.basename(config.get('General', 'personalities_db_path'))
+            'model_name':         get_param('model_name'),
+            'num_iterations':     get_param('num_trials'),
+            'k_per_query':        get_param('num_subjects'),
+            'mapping_strategy':   get_param('mapping_strategy'),
+            'personalities_file': os.path.basename(get_param('personalities_db_path'))
         }
-    except (configparser.NoSectionError, configparser.NoOptionError) as e:
+    except configparser.NoOptionError as e:
         logging.error(f"Skipping {dir_basename}: Archived config is incomplete. Error: {e}")
         return False
 
@@ -101,7 +113,8 @@ def rebuild_report_for_run(run_dir):
     process_script = os.path.join(PROJECT_ROOT, 'src', 'process_llm_responses.py')
     analyze_script = os.path.join(PROJECT_ROOT, 'src', 'analyze_performance.py')
     
-    cmd3 = [sys.executable, process_script, "--run_output_dir", run_dir, "--quiet"]
+    # NOTE: Removed --quiet from Stage 3 to ensure its summary line is captured.
+    cmd3 = [sys.executable, process_script, "--run_output_dir", run_dir]
     output3 = run_script(cmd3, "Process LLM Responses")
 
     cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_dir, "--quiet"]
@@ -109,9 +122,15 @@ def rebuild_report_for_run(run_dir):
 
     # --- 3. Extract status information from the fresh script outputs ---
     parsing_status = "N/A"
-    parser_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+)>>>", output3)
+    # New regex to catch the detailed parser summary from Stage 3
+    parser_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+):(\d+)>>>", output3)
     if parser_match:
-        parsing_status = f"{parser_match.group(1)}/{parser_match.group(2)} responses parsed"
+        parsed_count = int(parser_match.group(1))
+        total_count = int(parser_match.group(2))
+        warning_count = int(parser_match.group(3))
+        parsing_status = f"{parsed_count}/{total_count} responses parsed"
+        if warning_count > 0:
+            parsing_status += f" ({warning_count} warnings)"
 
     validation_status = "UNKNOWN"
     if "PROCESSOR VALIDATION FAILED" in output3:
@@ -136,6 +155,16 @@ def rebuild_report_for_run(run_dir):
     timestamp_for_file = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     report_filename = f"replication_report_{timestamp_for_file}.txt"
     report_path = os.path.join(run_dir, report_filename)
+    
+    # Extract original run date from directory name for the report header.
+    original_run_date = "N/A"
+    date_match = re.search(r'run_(\d{8})_(\d{6})', dir_basename)
+    if date_match:
+        try:
+            date_str = f"{date_match.group(1)}{date_match.group(2)}"
+            original_run_date = datetime.datetime.strptime(date_str, "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            pass # Keep "N/A" if parsing fails
 
     with open(report_path, 'w', encoding='utf-8') as report_file:
         # Header Section
@@ -143,7 +172,7 @@ def rebuild_report_for_run(run_dir):
 ================================================================================
  REPLICATION RUN REPORT (REBUILT ON {datetime.datetime.now().strftime("%Y-%m-%d")})
 ================================================================================
-Date:            {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Date:            {original_run_date}
 Final Status:    COMPLETED
 Run Directory:   {dir_basename}
 Parsing Status:  {parsing_status}
@@ -162,7 +191,7 @@ Run Notes:       N/A (Original notes cannot be recovered)
         report_file.write(header.strip() + "\n\n")
 
         # Base Query Prompt Section
-        base_query_filename = config.get('Filenames', 'base_query_src', fallback='base_query.txt')
+        base_query_filename = archived_config.get('Filenames', 'base_query_src', fallback='base_query.txt')
         base_query_path = os.path.join(PROJECT_ROOT, 'data', base_query_filename)
         report_file.write("\n--- Base Query Prompt Used ---\n")
         try:
@@ -173,15 +202,49 @@ Run Notes:       N/A (Original notes cannot be recovered)
         report_file.write("\n-------------------------------\n\n")
 
         # Full Analysis Output Section
-        report_file.write(output4)
+        analysis_header = (
+            "================================================================================\n"
+            "### OVERALL META-ANALYSIS RESULTS ###\n"
+            "================================================================================\n\n"
+        )
+        report_file.write(analysis_header)
+
+        text_match = re.search(r'<<<ANALYSIS_SUMMARY_START>>>(.*?)<<<METRICS_JSON_START>>>', output4, re.DOTALL)
+        json_match = re.search(r'(<<<METRICS_JSON_START>>>.*?<<<METRICS_JSON_END>>>)', output4, re.DOTALL)
+
+        if text_match:
+            analysis_text = text_match.group(1).strip()
+            report_file.write(analysis_text + "\n\n")
+        
+        if json_match:
+            json_block = json_match.group(1).strip()
+            report_file.write(json_block + "\n")
+
+        if not text_match and not json_match:
+            logging.warning("Could not find analysis markers in Stage 4 output. Writing raw output.")
+            report_file.write(output4)
 
     logging.info(f"  -> Successfully rebuilt report: {report_filename}")
     return True
+
 
 def main():
     parser = argparse.ArgumentParser(description="Rebuilds replication reports to their original high-fidelity format.")
     parser.add_argument('base_dir', help="The base directory to scan for experiment runs (e.g., 'output/reports/6_Study_4').")
     args = parser.parse_args()
+
+        # --- Load the main config and the compatibility map ONCE ---
+    try:
+        # Import the globally loaded config and the map parser function
+        from config_loader import APP_CONFIG, get_config_compatibility_map
+
+        compat_map = get_config_compatibility_map(APP_CONFIG)
+        if not compat_map:
+            logging.warning("No [ConfigCompatibility] map found in config.ini. Assuming all configs are modern.")
+
+    except Exception as e:
+        logging.error(f"Could not load main config or compatibility map. Error: {e}")
+        sys.exit(1)
 
     if not os.path.isdir(args.base_dir):
         logging.error(f"Error: Provided directory does not exist: {args.base_dir}")
@@ -199,7 +262,8 @@ def main():
     for run_dir in run_dirs:
         if os.path.isdir(run_dir):
             total_count += 1
-            if rebuild_report_for_run(run_dir):
+            # --- Pass the map to the worker function ---
+            if rebuild_report_for_run(run_dir, compat_map):
                 success_count += 1
 
     logging.info(f"\nReport rebuilding complete. Successfully processed {success_count}/{total_count} directories.")
