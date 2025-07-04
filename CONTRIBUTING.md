@@ -34,7 +34,17 @@ To activate the virtual environment manually for use with your IDE, you can stil
 *   On Windows (PowerShell): `.venv\Scripts\Activate.ps1`
 *   On macOS/Linux: `source .venv/bin/activate`
 
-If your contribution requires a new library, please add its name directly to `requirements.txt` and then run `pip install -r requirements.txt`. Do not use `pip freeze`.
+### 3. Adding New Dependencies
+
+If your contribution requires a new package, add it with PDM. This will update both `pyproject.toml` and `pdm.lock` automatically.
+
+```bash
+# Add a new core dependency
+pdm add new-package-name
+
+# Add a new development-only dependency
+pdm add -G dev new-dev-package-name
+```
 
 ### 4. Set Up Pre-commit Hooks
 

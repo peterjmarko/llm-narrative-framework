@@ -48,3 +48,10 @@ Thumbs.db
 # Ignore IDE-specific folders
 .idea/
 .vscode/
+
+# --- Build & Dependency Management ---
+# Ignore setuptools build artifacts
+*.egg-info/
+
+# Ignore PDM-specific cache and configuration files
+.pdm-python
