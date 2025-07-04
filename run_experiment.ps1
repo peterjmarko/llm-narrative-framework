@@ -72,10 +72,10 @@ if ($PSBoundParameters.ContainsKey('EndRep')) {
     $pythonArgs += "--end-rep", $EndRep
 }
 
-# Invert the logic: Add --quiet by default UNLESS the built-in -Verbose switch is used.
-# We check for the presence of 'Verbose' in the automatic $PSBoundParameters variable.
-if (-not $PSBoundParameters.ContainsKey('Verbose')) {
-    $pythonArgs += "--quiet"
+# Pass the --verbose flag to the Python script only if the PowerShell -Verbose switch is used.
+# This aligns with replication_manager.py, which is quiet by default.
+if ($PSBoundParameters.ContainsKey('Verbose')) {
+    $pythonArgs += "--verbose"
 }
 
 # Execute the main Python batch script with the specified arguments.

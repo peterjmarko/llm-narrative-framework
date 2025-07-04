@@ -104,7 +104,8 @@ def main():
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
     log_manager_script = os.path.join(current_dir, "log_manager.py")
     compile_script = os.path.join(current_dir, "compile_results.py")
-    positional_bias_script = os.path.join(current_dir, "analyze_positional_bias.py")
+    # Correctly point to the new per-replication bias analysis script
+    bias_analysis_script = os.path.join(current_dir, "run_bias_analysis.py")
     
     if args.target_dir:
         final_output_dir = os.path.abspath(args.target_dir)
@@ -141,6 +142,12 @@ def main():
             if not args.verbose: cmd.append("--quiet")
             try:
                 subprocess.run(cmd, check=True)
+
+                # --- ADDED: Run the new per-replication bias analysis stage ---
+                cmd_bias = [sys.executable, bias_analysis_script, run_dir]
+                subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
+                # --- END OF ADDED BLOCK ---
+
             except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
                 logging.error(f"!!! Reprocessing failed or was interrupted for {os.path.basename(run_dir)}. Continuing... !!!")
                 failed_reps.append(os.path.basename(run_dir)) # Add failed run to the list
@@ -223,14 +230,6 @@ def main():
     except Exception as e:
         logging.error(f"An error occurred while running the final compilation script: {e}")
     
-    # NEW: Call analyze_positional_bias.py
-    print("\n--- Analyzing positional biases across all replications... ---")
-    try:
-        subprocess.run([sys.executable, positional_bias_script, final_output_dir], check=True, capture_output=True, text=True)
-        print("Positional bias analysis complete. Check 'bias_analysis_plots' in the study directory.")
-    except Exception as e:
-        logging.error(f"An error occurred while running the positional bias analysis script: {e}")
-
     # Call the existing 'finalize' command in log_manager.py to append the summary.
     print("\n--- Finalizing batch log with summary... ---")
     try:

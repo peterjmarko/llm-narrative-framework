@@ -15,8 +15,12 @@ __pycache__/
 # This ensures the repository only contains the source code and configuration.
 /output/
 
-# Ignore the archives directory, as requested.
+# Ignore the archives directory.
 /archives/
+
+# Ignore text versions of project code.
+/project_code_as_txt/
+
 
 # Ignore temporary files created by the pipeline scripts within the src folder.
 /src/temp/

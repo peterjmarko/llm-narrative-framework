@@ -48,13 +48,14 @@ Optional Arguments:
 # === Start of src/analyze_performance.py ===
 
 import numpy as np
-from scipy.stats import mannwhitneyu, norm, chi2, ttest_1samp, wilcoxon, rankdata
+from scipy.stats import mannwhitneyu, norm, chi2, ttest_1samp, wilcoxon, rankdata, linregress
 import argparse
 import math
 import os
 import sys
 import logging
 import json
+from collections import Counter
 
 try:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
@@ -83,11 +84,13 @@ def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, t
     correct_scores = []
     incorrect_scores = []
     ranks_of_correct_ids = []
+    chosen_positions = []
 
     for person_idx in range(k_val):
         try:
             correct_id_idx_0_based = correct_mapping_indices_1_based[person_idx] - 1
             person_scores = matrix[person_idx, :] 
+            chosen_positions.append(np.argmax(person_scores))
 
             for id_idx_0_based in range(k_val): 
                 score = person_scores[id_idx_0_based]
@@ -157,7 +160,10 @@ def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, t
         'mrr': mean_reciprocal_rank, 'top_1_accuracy': top_1_accuracy,
         f'top_{top_k_value_for_accuracy}_accuracy': top_k_accuracy_val,
         'u_statistic': u_statistic,
-        'mean_rank_of_correct_id': mean_rank_of_correct_id # Add the new metric
+        'mean_rank_of_correct_id': mean_rank_of_correct_id, # Add the new metric
+        'raw_correct_scores': correct_scores,
+        'raw_incorrect_scores': incorrect_scores,
+        'raw_chosen_positions': chosen_positions
     }
 
 # --- II. Meta-Analysis Functions ---
@@ -369,6 +375,39 @@ def read_mappings_and_deduce_k(filepath, k_override=None, specified_delimiter_ke
         return None, final_k_to_use, actual_delimiter_to_parse_with
 
     return mappings_list, final_k_to_use, actual_delimiter_to_parse_with
+
+
+def calculate_positional_bias(performance_scores):
+    """
+    Performs a linear regression on a list of performance scores over time (trials).
+
+    Args:
+        performance_scores (list of float): A list of performance metrics (e.g., MRR, rank)
+                                            for each trial in chronological order.
+
+    Returns:
+        dict: A dictionary containing the slope, intercept, p-value, and r-value
+              of the linear regression. Returns NaNs if input is insufficient.
+    """
+    if not performance_scores or len(performance_scores) < 2:
+        return {
+            'bias_slope': np.nan,
+            'bias_intercept': np.nan,
+            'bias_p_value': np.nan,
+            'bias_r_value': np.nan
+        }
+
+    trials = np.arange(len(performance_scores))
+    # Note: linregress is imported from scipy.stats at the top of the file
+    slope, intercept, r_value, p_value, std_err = linregress(trials, performance_scores)
+
+    return {
+        'bias_slope': slope,
+        'bias_intercept': intercept,
+        'bias_p_value': p_value,
+        'bias_r_value': r_value,
+        'bias_std_err': std_err
+    }
 
 
 def read_score_matrices(filepath, expected_k, delimiter_char=None):
@@ -709,6 +748,9 @@ def main():
         print(f"Starting analysis with k={k_to_use}, Top-K Accuracy for K={args.top_k_acc}\n")
 
     all_test_results = []
+    all_correct_scores_flat = []
+    all_incorrect_scores_flat = []
+    all_chosen_positions_flat = []
     for i in range(num_tests_loaded):
         if not args.quiet:
             print(f"Processing Test {i+1}/{num_tests_loaded}...")
@@ -723,6 +765,9 @@ def main():
 
         if results_single_test:
             all_test_results.append(results_single_test)
+            all_correct_scores_flat.extend(results_single_test.get('raw_correct_scores', []))
+            all_incorrect_scores_flat.extend(results_single_test.get('raw_incorrect_scores', []))
+            all_chosen_positions_flat.extend(results_single_test.get('raw_chosen_positions', []))
             if args.verbose_per_test:
                 # ... (verbose printing logic remains the same) ...
                 p_val_mwu = results_single_test.get('p_value_mwu')
@@ -809,6 +854,17 @@ def main():
 
     # --- Final Machine-Readable Summary ---
     # This JSON line is for easy parsing by the final results compiler.
+
+    # Calculate the final aggregate metrics that were missing
+    true_false_score_diff = np.mean(all_correct_scores_flat) - np.mean(all_incorrect_scores_flat) if all_correct_scores_flat and all_incorrect_scores_flat else np.nan
+    position_counts = Counter(all_chosen_positions_flat)
+    counts_for_std = [position_counts.get(i, 0) for i in range(k_to_use)]
+    top1_pred_bias_std = np.std(counts_for_std) if counts_for_std else np.nan
+    
+    # Calculate performance trend over trials for positional bias metrics
+    performance_over_time = [res['mean_rank_of_correct_id'] for res in all_test_results]
+    positional_bias_metrics = calculate_positional_bias(performance_over_time)
+
     summary_data = {
         # Combined Significance
         'mwu_stouffer_z': stouffer_z,
@@ -824,12 +880,20 @@ def main():
         # Top-1 Accuracy
         'mean_top_1_acc': top_1_analysis.get('mean'),
         'top_1_acc_p': top_1_analysis.get('wilcoxon_signed_rank_p'),
-        # Top-K Accuracy (renamed to reflect the default K=3 from args)
+        # Top-K Accuracy
         f'mean_top_{args.top_k_acc}_acc': top_k_analysis.get('mean'),
         f'top_{args.top_k_acc}_acc_p': top_k_analysis.get('wilcoxon_signed_rank_p'),
-        # --- FIX: Add the mean rank metric and its p-value ---
+        # Mean Rank
         'mean_rank_of_correct_id': mean_rank_analysis.get('mean'),
         'rank_of_correct_id_p': mean_rank_analysis.get('wilcoxon_signed_rank_p'),
+        # Newly added metrics
+        'top1_pred_bias_std': top1_pred_bias_std,
+        'true_false_score_diff': true_false_score_diff,
+        'bias_slope': positional_bias_metrics.get('bias_slope'),
+        'bias_intercept': positional_bias_metrics.get('bias_intercept'),
+        'bias_r_value': positional_bias_metrics.get('bias_r_value'),
+        'bias_p_value': positional_bias_metrics.get('bias_p_value'),
+        'bias_std_err': positional_bias_metrics.get('bias_std_err')
     }
 
     # Embed the number of valid responses into the results dictionary

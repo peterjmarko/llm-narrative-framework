@@ -49,13 +49,28 @@ except ImportError:
     from config_loader import APP_CONFIG, get_config_list
 
 def parse_metrics_json(report_content):
+    """
+    Parses the JSON block from a report, finds the nested 'positional_bias_metrics',
+    and flattens it into the top-level dictionary.
+    """
     json_start_tag = "<<<METRICS_JSON_START>>>"
     json_end_tag = "<<<METRICS_JSON_END>>>"
     try:
         match = re.search(f"{re.escape(json_start_tag)}(.*?){re.escape(json_end_tag)}", report_content, re.DOTALL)
         if match:
             json_str = match.group(1).strip()
-            return json.loads(json_str)
+            data = json.loads(json_str)
+
+            # Check for the nested bias metrics dictionary and flatten it
+            if 'positional_bias_metrics' in data and isinstance(data['positional_bias_metrics'], dict):
+                # Remove the nested dictionary from the main data
+                bias_metrics = data.pop('positional_bias_metrics')
+                # Add its items to the main data, with a prefix to avoid name collisions
+                for key, value in bias_metrics.items():
+                    data[f"bias_{key}"] = value # e.g., creates 'bias_slope'
+
+            return data
+
     except json.JSONDecodeError as e:
         logging.warning(f"  - Warning: Failed to parse JSON in report. Error: {e}")
     return None

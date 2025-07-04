@@ -638,9 +638,30 @@ def analyze_positional_bias(run_output_dir):
     logging.info("\nSummary Statistics for LLM Assigned Scores:")
     logging.info(f"  True Matches (N={len(true_match_scores)}): Mean={true_match_scores.mean():.4f}, Std={true_match_scores.std():.4f}")
     logging.info(f"  False Matches (N={len(false_match_scores)}): Mean={false_match_scores.mean():.4f}, Std={false_match_scores.std():.4f}")
-    
+
     if true_match_scores.mean() < false_match_scores.mean():
         logging.warning("  WARNING: Average score for TRUE matches is LOWER than for FALSE matches. This indicates anti-correlation.")
+
+    # 4. Performance Trend Over Trials (Linear Regression)
+    logging.info("Analyzing performance trend over trials...")
+    
+    # Calculate Mean Reciprocal Rank for each trial
+    mrr_per_trial = df_analysis.groupby('trial_id').apply(
+        lambda trial_df: 1.0 / trial_df.loc[trial_df['is_true_match'], 'llm_assigned_score'].rank(ascending=False).iloc[0] if trial_df['is_true_match'].any() else 0
+    ).sort_index()
+    
+    # Ensure we have a list of MRRs in the order of trials
+    performance_over_time = mrr_per_trial.values
+    
+    # Perform linear regression
+    positional_bias_metrics = calculate_positional_bias(performance_over_time)
+    
+    logging.info("\nSummary of Performance Trend (Positional Bias over time):")
+    logging.info(f"  Linear Regression on MRR across {len(performance_over_time)} trials:")
+    logging.info(f"    Slope: {positional_bias_metrics['bias_slope']:.6f}")
+    logging.info(f"    Intercept: {positional_bias_metrics['bias_intercept']:.4f}")
+    logging.info(f"    p-value: {positional_bias_metrics['bias_p_value']:.4g}")
+    logging.info(f"    R-squared: {positional_bias_metrics['bias_r_value']**2:.4f}")
 
     logging.info("\nAnalysis complete. Check the 'bias_analysis_plots' directory for visualizations.")
 
