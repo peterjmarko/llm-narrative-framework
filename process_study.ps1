@@ -1,32 +1,87 @@
 <#
 .SYNOPSIS
-    Automates the final analysis of a full study.
+    Automates the final compilation and statistical analysis of a full study.
 
 .DESCRIPTION
-    This script runs the two main post-processing steps on a completed study,
-    which consists of one or more experiment directories.
-    1.  It calls `compile_results.py` to recursively scan all subdirectories,
-        aggregating results into a single master 'final_summary_results.csv' file
-        at the top level of the study directory.
-    2.  It then calls `run_anova.py` to perform a full statistical analysis (ANOVA,
-        Tukey's HSD) on that master CSV, generating final plots and logs.
+    This script provides a user-friendly wrapper for the two main post-processing stages.
+    By default, it intelligently parses the output of the underlying Python scripts
+    to provide a clean, high-level summary of the process.
+
+    1.  It calls `compile_results.py` to aggregate all results into a master 'STUDY_results.csv'.
+    2.  It then calls `run_anova.py` to perform a full statistical analysis on that
+        master CSV, generating final plots and logs.
+
+    For detailed, real-time output from the Python scripts, use the -Verbose switch.
 
 .PARAMETER StudyDirectory
     The path to the top-level study directory containing one or more experiment
     directories to be compiled and analyzed (e.g., 'output/reports').
 
 .EXAMPLE
-    # Run by providing the path as a positional argument (recommended):
+    # Run with standard (summarized) output:
     .\process_study.ps1 "output/reports"
 
-    # Alternatively, run using the named parameter for added clarity:
-    .\process_study.ps1 -StudyDirectory "output/reports"
+    # Run with full, detailed output for debugging:
+    .\process_study.ps1 -StudyDirectory "output/reports" -Verbose
 #>
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the top-level study directory.")]
     [string]$StudyDirectory
 )
+
+# --- Load and parse model display names from config.ini ---
+$modelNameMap = @{}
+try {
+    # Assume config.ini is in the project root (where the script is).
+    $configPath = Join-Path $PSScriptRoot "config.ini"
+    if (-not (Test-Path $configPath)) {
+        throw "config.ini not found at '$configPath'"
+    }
+    $configContent = Get-Content -Path $configPath -Raw
+
+    # Use [regex]::Match to correctly extract the section content as a string.
+    $normalizationSection = ([regex]::Match($configContent, '(?msi)^\[ModelNormalization\]\r?\n(.*?)(?=\r?\n^\[)')).Groups[1].Value
+    $displaySection = ([regex]::Match($configContent, '(?msi)^\[ModelDisplayNames\]\r?\n(.*?)(?=\r?\n^\[)')).Groups[1].Value
+
+    if ([string]::IsNullOrWhiteSpace($normalizationSection) -or [string]::IsNullOrWhiteSpace($displaySection)) {
+        throw "Could not find or parse [ModelNormalization] or [ModelDisplayNames] sections."
+    }
+
+    # Build map from canonical name to display name
+    $displayNameMap = @{}
+    $displaySection -split '\r?\n' | ForEach-Object {
+        # Ignore comments and blank lines
+        if ($_ -match "^\s*([^=\s#][^=]*?)\s*=\s*(.+?)\s*$") {
+            $canonical = $matches[1].Trim()
+            $display = $matches[2].Trim()
+            $displayNameMap[$canonical] = $display
+        }
+    }
+
+    # Build final map from keyword to display name
+    $normalizationSection -split '\r?\n' | ForEach-Object {
+        # Ignore comments and blank lines
+        if ($_ -match "^\s*([^=\s#][^=]*?)\s*=\s*(.+?)\s*$") {
+            $canonical = $matches[1].Trim()
+            $keywords = $matches[2].Split(',') | ForEach-Object { $_.Trim() }
+            if ($displayNameMap.ContainsKey($canonical)) {
+                $displayName = $displayNameMap[$canonical]
+                foreach ($keyword in $keywords) {
+                    $modelNameMap[$keyword] = $displayName
+                }
+            }
+        }
+    }
+
+    if ($modelNameMap.Count -eq 0) {
+        throw "Model name map was created but is empty. Check config.ini formatting."
+    }
+}
+catch {
+    Write-Warning "Could not read or parse model names from config.ini. Full paths will be shown instead. Error: $($_.Exception.Message)"
+    $modelNameMap = @{} # Ensure it's an empty hashtable on failure
+}
 
 # --- Function to execute a Python script and check for errors ---
 function Invoke-PythonScript {
@@ -35,17 +90,96 @@ function Invoke-PythonScript {
         [string]$ScriptName,
         [string[]]$Arguments
     )
-    
+
     Write-Host "[${StepName}] Executing: python ${ScriptName} ${Arguments}"
-    
-    # Execute the Python script
-    python $ScriptName $Arguments
-    
-    # Check the exit code of the last command
+
+    # Execute the Python script, capturing all standard and error output streams
+    $output = & python $ScriptName $Arguments 2>&1
+
+    # Check the exit code of the last command immediately
     if ($LASTEXITCODE -ne 0) {
+        Write-Host "`n--- Full script output on failure ---" -ForegroundColor Yellow
+        $output | Write-Host
         throw "ERROR: Step '${StepName}' failed with exit code ${LASTEXITCODE}. Aborting."
     }
-    
+
+    if ($PSBoundParameters.ContainsKey('Verbose')) {
+        $output | Write-Host
+    }
+    else {
+                # By default, parse the output and show a clean, high-level summary.
+        if ($ScriptName -like "*compile_results.py*") {
+            $processedExperiments = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            $outputBlock = $output -join "`n"
+            $uniqueDisplayNames = $script:modelNameMap.Values | Get-Unique
+
+            foreach ($line in $output) {
+                if ($line -match "-> Generated summary:.*EXPERIMENT_results\.csv") {
+                    $experimentDirName = (Split-Path -Path $line -Parent | Split-Path -Leaf)
+
+                    $foundDisplayName = $null
+                    # Find the display name by checking which one matches the folder structure
+                    foreach ($displayName in $uniqueDisplayNames) {
+                        # Convert "Grok 3 Mini" to "Grok_3_Mini" to match folder name style
+                        $folderSearchString = $displayName.Replace(' ', '_')
+                        if ($experimentDirName -match $folderSearchString) {
+                            $foundDisplayName = $displayName
+                            break
+                        }
+                    }
+
+                    if ($foundDisplayName) {
+                        $mappingStrategy = "unknown"
+                        if ($experimentDirName -match 'map=(correct|random)') {
+                            $mappingStrategy = $matches[1]
+                        }
+                        $uniqueExperimentId = "$foundDisplayName-$mappingStrategy"
+
+                        if (-not $processedExperiments.Contains($uniqueExperimentId)) {
+                            Write-Host "  - Compiling: $foundDisplayName ($($mappingStrategy) map)"
+                            [void]$processedExperiments.Add($uniqueExperimentId)
+                        }
+                    }
+                }
+            }
+            
+            # After the loop, print the final overall summary line
+            $finalSummaryMatch = [regex]::Match($outputBlock, "-> Generated summary:\s*(.*final_summary_results\.csv.*)")
+            if ($finalSummaryMatch.Success) {
+                $finalSummaryLine = $finalSummaryMatch.Groups[1].Value.Trim()
+                Write-Host "  - Generated final study summary: $finalSummaryLine"
+            }
+
+            $output | Select-String -Pattern "Compilation process finished" | ForEach-Object { $_.Line }
+
+        }
+        elseif ($ScriptName -like "*run_anova.py*") {
+            $metricName = $null
+            $conclusion = $null
+
+            $output | Select-String -Pattern "^Full analysis log", "^Applying filter", "^Excluding", "^Analysis will proceed" | ForEach-Object { "  - $($_.Line)" }
+
+            foreach ($line in $output) {
+                if ($line -match "ANALYSIS FOR METRIC: '(.*)'") {
+                    if ($metricName) {
+                        Write-Host "  - METRIC '$metricName': $conclusion. Plots saved."
+                    }
+                    $metricName = $matches[1]
+                    $conclusion = "summary not found"
+                }
+                elseif ($line -match "^Conclusion: (.*)") {
+                    $conclusion = $matches[1].Trim()
+                }
+            }
+            if ($metricName) {
+                Write-Host "  - METRIC '$metricName': $conclusion. Plots saved."
+            }
+        }
+        else {
+            $output | Write-Host
+        }
+    }
+
     Write-Host "Step '${StepName}' completed successfully."
     Write-Host ""
 }

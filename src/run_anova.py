@@ -7,30 +7,27 @@ Performs a comprehensive statistical analysis on compiled experimental results.
 
 This script automates the post-processing and statistical analysis of performance
 metrics from a study's master CSV file. It identifies which experimental factors
-(e.g., model, mapping strategy) have a statistically significant effect on
-various performance metrics.
+have a statistically significant effect on various performance metrics.
 
 Key Workflow Steps:
-1.  **Archives Previous Results**: Safely moves all contents of the output `anova/`
-    directory to a single-level `anova/archive/` backup.
-2.  **Loads Data**: Reads the master `final_summary_results.csv` from the study
-    directory.
-3.  **Filters Unreliable Models**: Automatically excludes models that fall below a
-    configurable `min_valid_response_threshold` set in `config.ini`. This is
-    critical for ensuring statistical validity by removing outlier models.
-4.  **Cleans and Normalizes Data**: Unifies known data integrity issues and
-    normalizes model names for consistent analysis and display.
+1.  **Archives Previous Results**: Safely moves existing contents of the `anova/`
+    directory to an `anova/archive/` backup.
+2.  **Loads Data**: Searches for and reads the master `STUDY_results.csv` file
+    (or falls back to older names for compatibility).
+3.  **Applies Display Names**: Uses the `[ModelDisplayNames]`, `[FactorDisplayNames]`,
+    and `[MetricDisplayNames]` sections from `config.ini` to produce clean,
+    human-readable plots and console output.
+4.  **Filters Unreliable Models**: Excludes models that fall below a configurable
+    `min_valid_response_threshold` from the analysis.
 5.  **Performs Two-Way ANOVA**: For each performance metric, a two-way ANOVA is
     conducted to test for significant effects from the experimental factors.
     A Q-Q plot is generated to check the normality of residuals.
 6.  **Conducts Post-Hoc Tests**: If ANOVA finds significant effects, a Tukey HSD
-    test is performed to identify which specific factor levels (e.g., which
-    models) differ from one another.
-7.  **Determines Performance Groups**: Summarizes the Tukey HSD results into
-    scientifically robust "Performance Groups" using a clique-finding algorithm.
-    Models in the same group are not statistically different from each other.
+    test is performed to identify which specific factor levels differ.
+7.  **Determines Performance Groups**: Summarizes Tukey HSD results into robust
+    "Performance Groups" using a clique-finding algorithm.
 8.  **Generates Visualizations**: Creates and saves boxplots for each factor and
-    metric, annotated with the ANOVA p-value for quick visual assessment.
+    metric, annotated with the ANOVA p-value.
 
 All output, including a detailed `STUDY_analysis_log.txt` and all generated
 plots, is saved to the `anova/` directory within the specified study path.
@@ -75,11 +72,20 @@ except ImportError:
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 def find_master_csv(search_dir):
-    """Finds the top-level summary CSV in a directory."""
-    search_path = os.path.join(search_dir, 'final_summary_results.csv')
-    if os.path.exists(search_path):
-        return search_path
-    logging.error(f"ERROR: No 'final_summary_results.csv' found directly in {search_dir}.")
+    """Finds the most relevant summary CSV in a directory."""
+    possible_files = [
+        'STUDY_results.csv',          # New standard study-level file
+        'final_summary_results.csv',  # Old study-level for backward compatibility
+        'EXPERIMENT_results.csv'      # Experiment-level if no study file found
+    ]
+    for filename in possible_files:
+        search_path = os.path.join(search_dir, filename)
+        if os.path.exists(search_path):
+            logging.info(f"Found summary file: {filename}")
+            return search_path
+
+    logging.error(f"ERROR: No summary CSV file found in {search_dir}.")
+    logging.error(f"Looked for: {', '.join(possible_files)}")
     return None
 
 def format_p_value(p_value):
@@ -130,65 +136,74 @@ def generate_performance_tiers(df, metric, tukey_result, sanitized_to_display_ma
     group_df = pd.DataFrame(group_data, columns=["Performance Group", "Median Score", "Models"])
     logging.info(f"\n{group_df.to_string(index=False)}")
 
-def create_diagnostic_plot(model, metric, output_dir):
-    """Generates and saves a Q-Q plot for model residuals."""
+def create_diagnostic_plot(model, display_metric_name, output_dir, metric_key):
+    """Generates and saves a Q-Q plot into the 'diagnostics' subdirectory."""
     if hasattr(model, 'resid') and not model.resid.empty:
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         sm.qqplot(model.resid, line='s', ax=ax)
         ax.grid(True, linestyle='--', alpha=0.6)
-        ax.set_title(f"Q-Q Plot of Residuals for '{metric}'")
-        plot_filename = f"diagnostic_qqplot_{metric}.png"
-        full_plot_path = os.path.join(output_dir, plot_filename)
+        ax.set_title(f"Q-Q Plot of Residuals for '{display_metric_name}'")
+
+        diagnostic_subdir = os.path.join(output_dir, 'diagnostics')
+        plot_filename = f"qqplot_{metric_key}.png"
+        full_plot_path = os.path.join(diagnostic_subdir, plot_filename)
+        
         plt.savefig(full_plot_path)
         logging.info(f"-> Diagnostic plot saved successfully to: {full_plot_path}")
         plt.close(fig)
     else:
-        logging.warning(f"-> Could not generate Q-Q plot for '{metric}': No residuals found.")
+        logging.warning(f"-> Could not generate Q-Q plot for '{display_metric_name}': No residuals found.")
 
 
-def create_and_save_plot(df, metric, factor, p_value, output_dir):
-    """Creates and saves a boxplot for a given factor and metric."""
+def create_and_save_plot(df, metric_key, display_metric_name, factor, p_value, output_dir, factor_display_map):
+    """Creates and saves a boxplot into a factor-specific subdirectory."""
     fig = plt.figure(figsize=(12, 8))
     ax = plt.gca()
     
     # Use the friendly display names for the y-axis if plotting by model
     plot_factor = 'model_display' if factor == 'model' else factor
     
-    order = df.groupby(plot_factor)[metric].median().sort_values(ascending=False).index
-    sns.boxplot(ax=ax, y=plot_factor, x=metric, data=df, order=order, orient='h', palette="coolwarm")
+    order = df.groupby(plot_factor)[metric_key].median().sort_values(ascending=False).index
+    sns.boxplot(ax=ax, y=plot_factor, x=metric_key, data=df, order=order, orient='h', palette="coolwarm")
 
     p_value_str = format_p_value(p_value)
-    title = f'Performance Comparison for: {metric}\n(Grouped by {factor}, ANOVA {p_value_str})'
+    display_factor_name = factor_display_map.get(factor, factor.capitalize())
+    title = f'Performance Comparison for: {display_metric_name}\n(Grouped by {display_factor_name}, ANOVA {p_value_str})'
     
     ax.set_title(title, fontsize=16)
-    ax.set_xlabel(f'Metric: {metric}', fontsize=12)
-    ylabel = 'Model' if factor == 'model' else factor
-    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_xlabel(f'Metric: {display_metric_name}', fontsize=12)
+    ax.set_ylabel(display_factor_name, fontsize=12)
     ax.grid(axis='x', linestyle='--', alpha=0.7)
     
     plt.tight_layout()
-    plot_filename = f"{metric}_by_{factor}_boxplot.png"
-    full_plot_path = os.path.join(output_dir, plot_filename)
+    
+    # Save the plot into the correct subdirectory with a cleaner name
+    boxplot_subdir = os.path.join(output_dir, 'boxplots', factor)
+    plot_filename = f"{metric_key}_boxplot.png" # Use the key for a filesystem-safe name
+    full_plot_path = os.path.join(boxplot_subdir, plot_filename)
+
     plt.savefig(full_plot_path)
     logging.info(f"-> Plot saved successfully to: {full_plot_path}")
     plt.close(fig)
 
-def perform_analysis(df, metric, all_possible_factors, output_dir, sanitized_to_display_map):
+def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized_to_display_map, metric_display_map, factor_display_map):
     """Performs a full statistical analysis for a single metric."""
+    display_metric_name = metric_display_map.get(metric_key, metric_key)
+    
     logging.info("\n" + "="*80)
-    logging.info(f" ANALYSIS FOR METRIC: '{metric}'")
+    logging.info(f" ANALYSIS FOR METRIC: '{display_metric_name}'")
     logging.info("="*80)
 
-    if df[metric].var() == 0:
-        logging.warning(f"WARNING: Metric '{metric}' has zero variance. Skipping all analysis.")
+    if df[metric_key].var() == 0:
+        logging.warning(f"WARNING: Metric '{display_metric_name}' has zero variance. Skipping all analysis.")
         return
 
     active_factors = [f for f in all_possible_factors if df[f].nunique() > 1]
     if not active_factors:
         logging.info("INFO: Only one experimental group found. No analysis possible.")
         if df[all_possible_factors[0]].nunique() == 1:
-             create_and_save_plot(df, metric, all_possible_factors[0], float('nan'), output_dir)
+             create_and_save_plot(df, metric_key, display_metric_name, all_possible_factors[0], float('nan'), output_dir)
         return
     
     logging.info(f"Detected {len(active_factors)} active factor(s) with variation: {', '.join(active_factors)}")
@@ -198,23 +213,21 @@ def perform_analysis(df, metric, all_possible_factors, output_dir, sanitized_to_
         desc_stats = df.groupby(active_factors).agg(
             Replications=('model', 'size'),
             N=('n_valid_responses', 'sum'),
-            Mean=(metric, 'mean'),
-            StdDev=(metric, 'std')
+            Mean=(metric_key, 'mean'),
+            StdDev=(metric_key, 'std')
         ).rename(columns={'N': 'Total Trials (N)', 'StdDev': 'Std. Dev.'})
     else:
-        desc_stats = df.groupby(active_factors)[metric].agg(['count', 'mean', 'std']).rename(columns={'count': 'Replications (N)'})
+        desc_stats = df.groupby(active_factors)[metric_key].agg(['count', 'mean', 'std']).rename(columns={'count': 'Replications (N)'})
     logging.info(f"\n{desc_stats.to_string(float_format='%.4f')}")
     
-    # Construct formula for a two-way ANOVA without interaction term
-    # Wrap the standard metric name with Q() to handle special characters.
-    formula = f"Q('{metric}') ~ {' + '.join([f'C({f})' for f in active_factors])}"
+    formula = f"Q('{metric_key}') ~ {' + '.join([f'C({f})' for f in active_factors])}"
 
     try:
         model = ols(formula, data=df).fit()
-        create_diagnostic_plot(model, metric, output_dir)
+        create_diagnostic_plot(model, display_metric_name, output_dir, metric_key)
         anova_table = sm.stats.anova_lm(model, typ=2)
         
-        logging.info(f"\n--- ANOVA Summary for {metric} ---")
+        logging.info(f"\n--- ANOVA Summary for {display_metric_name} ---")
         logging.info(f"\n{anova_table.to_string()}")
         
         significant_factors = [f.replace('C(', '').replace(')', '') for f in anova_table.index if anova_table.loc[f, 'PR(>F)'] < 0.05 and 'Residual' not in f]
@@ -224,24 +237,20 @@ def perform_analysis(df, metric, all_possible_factors, output_dir, sanitized_to_
             logging.info("\n--- Post-Hoc Analysis (Tukey's HSD) ---")
             for factor in significant_factors:
                 if df[factor].nunique() <= 2:
-                    # FIX: For factors with only 2 levels, the ANOVA p-value is the definitive result.
-                    # Showing a Tukey table is redundant and can be confusing if it appears to contradict the main ANOVA.
                     logging.info(f"\nFactor '{factor}' has only two levels and is significant (ANOVA p={anova_table.loc[f'C({factor})', 'PR(>F)']:.4f}). No pairwise table needed.")
                     continue
 
                 logging.info(f"\nComparing levels for factor: '{factor}'")
                 
-                # ADDED: Robust error handling for Tukey's HSD
                 try:
-                    tukey_result = pairwise_tukeyhsd(endog=df[metric], groups=df[factor], alpha=0.05)
-                    # Check if the results contain NaN, which indicates a computational failure
+                    tukey_result = pairwise_tukeyhsd(endog=df[metric_key], groups=df[factor], alpha=0.05)
                     if pd.DataFrame(tukey_result._results_table.data).isnull().values.any():
                         raise ValueError("Tukey HSD result contains NaN values, indicating a computational issue.")
                     
                     logging.info(f"\n{tukey_result}")
 
                     if factor == 'model':
-                        generate_performance_tiers(df, metric, tukey_result, sanitized_to_display_map)
+                        generate_performance_tiers(df, metric_key, tukey_result, sanitized_to_display_map)
 
                 except (ValueError, ZeroDivisionError) as tukey_err:
                     logging.warning(f"\nWARNING: Could not perform post-hoc Tukey HSD test for factor '{factor}'.")
@@ -255,10 +264,10 @@ def perform_analysis(df, metric, all_possible_factors, output_dir, sanitized_to_
         for factor in active_factors:
             key = f"C({factor})"
             p_val = anova_table.loc[key, 'PR(>F)'] if key in anova_table.index else float('nan')
-            create_and_save_plot(df, metric, factor, p_val, output_dir)
+            create_and_save_plot(df, metric_key, display_metric_name, factor, p_val, output_dir, factor_display_map)
             
     except Exception as e:
-        logging.error(f"\nERROR: Could not perform ANOVA for metric '{metric}'. Reason: {e}")
+        logging.error(f"\nERROR: Could not perform ANOVA for metric '{display_metric_name}'. Reason: {e}")
 
 def main():
     """Main entry point for the ANOVA analysis script."""
@@ -268,10 +277,15 @@ def main():
         epilog=dedent("""
         Example Usage:
         --------------
+        # To analyze a full study
         python src/run_anova.py path/to/your/study_folder/
         
-        This will automatically find 'final_summary_results.csv' inside the folder,
-        run the analysis, and save the output to 'path/to/your/study_folder/anova/'.
+        # To analyze a single experiment
+        python src/run_anova.py path/to/your/experiment_folder/
+        
+        The script automatically finds the most relevant summary file 
+        ('final_summary_results.csv' or 'EXPERIMENT_results.csv') in the
+        specified directory and saves output to an 'anova/' subfolder.
         """)
     )
     parser.add_argument("input_path", help="Path to the top-level experiment directory containing the master CSV.")
@@ -316,6 +330,17 @@ def main():
     except Exception as e:
         logging.warning(f"Could not archive previous results. Reason: {e}")
     # --- End of Backup ---
+
+    # --- Create Output Subdirectories ---
+    factors_from_config = get_config_list(APP_CONFIG, 'Schema', 'factors')
+    if factors_from_config:
+        boxplot_base_dir = os.path.join(output_dir, 'boxplots')
+        os.makedirs(boxplot_base_dir, exist_ok=True)
+        for factor in factors_from_config:
+            os.makedirs(os.path.join(boxplot_base_dir, factor), exist_ok=True)
+    
+    os.makedirs(os.path.join(output_dir, 'diagnostics'), exist_ok=True)
+    # --- End of Directory Creation ---
 
     # Now, set up the full logging with the file handler
     root_logger = logging.getLogger()
@@ -369,11 +394,13 @@ def main():
 
     normalization_map = get_config_section_as_dict(APP_CONFIG, 'ModelNormalization')
     display_name_map = get_config_section_as_dict(APP_CONFIG, 'ModelDisplayNames')
+    metric_display_map = get_config_section_as_dict(APP_CONFIG, 'MetricDisplayNames')
+    factor_display_map = get_config_section_as_dict(APP_CONFIG, 'FactorDisplayNames')
     factors = get_config_list(APP_CONFIG, 'Schema', 'factors')
     metrics = get_config_list(APP_CONFIG, 'Schema', 'metrics')
 
-    if not all([normalization_map, display_name_map, factors, metrics]):
-        logging.error("FATAL: Could not load required sections ('ModelNormalization', 'ModelDisplayNames', 'Schema') from config.ini.")
+    if not all([normalization_map, display_name_map, factors, metrics, metric_display_map, factor_display_map]):
+        logging.error("FATAL: Could not load required sections ('ModelNormalization', 'ModelDisplayNames', 'MetricDisplayNames', 'FactorDisplayNames', 'Schema') from config.ini.")
         return
 
     keyword_to_canonical_map = {kw.strip(): can for can, kws in normalization_map.items() for kw in kws.split(',')}
@@ -385,7 +412,6 @@ def main():
         df['model'] = df['model_canonical'].str.replace(r'[/.-]', '_', regex=True) # Sanitize for formula
         logging.info("Model name normalization and sanitization complete.\n")
 
-        # FIX: Create a reliable mapping from sanitized names back to display names for tiering.
         sanitized_to_display = df[['model', 'model_display']].drop_duplicates().set_index('model')['model_display'].to_dict()
 
     for factor in factors:
@@ -393,12 +419,11 @@ def main():
             df[factor] = df[factor].astype(str)
 
     # Perform analysis for each metric
-    for metric in metrics:
-        if metric in df.columns:
-            # Pass the simple, original metric name to the analysis function
-            perform_analysis(df, metric, factors, output_dir, sanitized_to_display)
+    for metric_key in metrics:
+        if metric_key in df.columns:
+            perform_analysis(df, metric_key, factors, output_dir, sanitized_to_display, metric_display_map, factor_display_map)
         else:
-            logging.warning(f"\nWarning: Metric column '{metric}' not found. Skipping analysis.")
+            logging.warning(f"\nWarning: Metric column '{metric_key}' not found. Skipping analysis.")
 
 if __name__ == "__main__":
     main()

@@ -3,26 +3,24 @@
 # Filename: src/compile_results.py
 
 """
-Compiles All Experiment Results into a Master Summary CSV.
+Compiles All Experiment Results into Level-Aware Summary CSVs.
 
 This script recursively scans a directory structure to find all individual
-replication reports and aggregates their data into a master CSV file named
-`final_summary_results.csv`.
+replication reports and aggregates their data into a master CSV file.
 
 It operates in a hierarchical, bottom-up fashion:
 1.  It starts from the deepest directories in the specified path.
-2.  In each directory, it looks for `replication_report_*.txt` files and
-    any `final_summary_results.csv` files from subdirectories.
-3.  It parses the metrics (from a JSON block) and parameters (from the
-    archived config) for each replication.
-4.  It combines all found data into a new `final_summary_results.csv` at
-    the current directory level.
-5.  This process repeats up the directory tree, with each parent directory
+2.  It parses metrics and parameters from `replication_report.txt` and the
+    archived `config.ini.archived` files.
+3.  It generates level-aware summary files:
+    - `REPLICATION_results.csv`: For a single replication run.
+    - `EXPERIMENT_results.csv`: Aggregates all replications in an experiment.
+    - `STUDY_results.csv`: Aggregates all experiments in a study.
+4.  This process repeats up the directory tree, with each parent directory
     aggregating the summaries from its children.
 
-The final result is a master CSV at the top level of the specified base
-directory, containing the complete data for the entire study, ready for
-statistical analysis.
+The final result is a master `STUDY_results.csv` at the top level of the
+specified directory, ready for statistical analysis.
 
 Usage:
     python src/compile_results.py /path/to/study_output_dir
@@ -168,9 +166,16 @@ def run_hierarchical_mode(base_dir):
             level_results.append(run_data)
 
         for subdir_name in subdirs:
-            summary_path = os.path.join(current_dir, subdir_name, 'final_summary_results.csv')
-            if os.path.exists(summary_path):
-                logging.info(f"  - Aggregating results from: {os.path.join(subdir_name, 'final_summary_results.csv')}")
+            summary_path = None
+            # Look for summary files in a specific order, from most specific to most general
+            for filename in ["REPLICATION_results.csv", "EXPERIMENT_results.csv", "final_summary_results.csv"]:
+                path = os.path.join(current_dir, subdir_name, filename)
+                if os.path.exists(path):
+                    summary_path = path
+                    break
+            
+            if summary_path:
+                logging.info(f"  - Aggregating results from: {os.path.join(subdir_name, os.path.basename(summary_path))}")
                 try:
                     df_sub = pd.read_csv(summary_path)
                     if not df_sub.empty:
@@ -181,7 +186,17 @@ def run_hierarchical_mode(base_dir):
                     logging.warning(f"    - Warning: Could not read or process {summary_path}. Error: {e}")
 
         if level_results:
-            output_csv_path = os.path.join(current_dir, "final_summary_results.csv")
+            # Determine output filename based on directory type
+            output_filename = "STUDY_results.csv"  # Default for Study level and above
+            
+            # A directory is a Replication directory if its name starts with 'run_'
+            if os.path.basename(current_dir).startswith('run_'):
+                output_filename = "REPLICATION_results.csv"
+            # A directory is an Experiment directory if it contains 'run_*' subdirectories
+            elif subdirs and any(s.startswith('run_') for s in subdirs):
+                output_filename = "EXPERIMENT_results.csv"
+
+            output_csv_path = os.path.join(current_dir, output_filename)
             write_summary_csv(output_csv_path, level_results)
 
 def main():

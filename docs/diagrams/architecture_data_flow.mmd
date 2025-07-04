@@ -24,16 +24,24 @@ graph TD
         F --> H[all_mappings.txt]
     end
     
-    subgraph "Stage 4: Analysis & Aggregation"
+    subgraph "Stage 4: Hierarchical Analysis"
+        direction TB
         I(compile_results.py)
         J(run_anova.py)
         
-        G & H --> M(replication_report.txt)
-        M --> I
-        I --> K(final_summary_results.csv)
-        K --> J
-        J --> L[MASTER_ANOVA_DATASET.csv]
-        J --> N((Plots & Log))
+        subgraph "Aggregation Loop"
+            direction TB
+            M(replication_report.txt) --> I;
+            I --> K_rep[REPLICATION_results.csv];
+            K_rep --> I;
+            I --> K_exp[EXPERIMENT_results.csv];
+            K_exp --> I;
+            I --> K_final[final_summary_results.csv];
+        end
+
+        K_final --> J;
+        J --> L[MASTER_ANOVA_DATASET.csv];
+        J --> N((Plots & Log));
     end
     
     %% This shows that the config is archived early in the process
@@ -44,5 +52,5 @@ graph TD
 
     classDef Data fill:#e6f3ff,stroke:#007bff
     classDef Script fill:#fff0e6,stroke:#ff7f0e
-    class A1,A2,A3,C,E,G,H,K,L,M,N,O Data
+    class A1,A2,A3,C,E,G,H,K_rep,K_exp,K_final,L,M,N,O Data
     class B,D,F,I,J Script

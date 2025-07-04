@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: utilities/list_project_files.py
+# Filename: src/list_project_files.py
 
 """
 Project File Lister (list_project_files.py)
@@ -53,6 +54,7 @@ EXCLUDE_EXTENSIONS_SET = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp"} # Add 
 
 OUTPUT_FILENAME = "project_structure_report.txt"
 REPORT_SUBDIR = "project_reports" # Subdirectory within 'output' for these reports
+FILE_COUNT_WARNING_THRESHOLD = 10000 # Warn if the number of items to inspect exceeds this.
 # --- End Configuration ---
 
 def get_project_root():
@@ -178,6 +180,20 @@ def main():
     else:
         project_root = get_project_root()
     
+    # --- MODIFICATION START ---
+    # Create a dynamic filename based on the scan depth to avoid overwriting reports.
+    if args.depth == -1:
+        depth_suffix = "all"
+    else:
+        depth_suffix = str(args.depth)
+
+    # Deconstruct the original filename constant to insert the depth suffix.
+    # e.g., "project_structure_report.txt" becomes "project_structure_report_depth_0.txt"
+    base_name = pathlib.Path(OUTPUT_FILENAME).stem
+    extension = pathlib.Path(OUTPUT_FILENAME).suffix
+    dynamic_filename = f"{base_name}_depth_{depth_suffix}{extension}"
+    # --- MODIFICATION END ---
+
     # Define the dedicated output directory for reports
     report_output_dir = project_root / "output" / REPORT_SUBDIR
     
@@ -188,7 +204,8 @@ def main():
         print(f"Error: Could not create output directory '{report_output_dir}': {e}")
         sys.exit(1)
         
-    output_file_path = report_output_dir / OUTPUT_FILENAME
+    # MODIFIED: Use the new dynamic filename instead of the static constant
+    output_file_path = report_output_dir / dynamic_filename
 
     if not project_root.exists() or not project_root.is_dir():
         print(f"Error: Determined project directory not found or invalid: {project_root}")
@@ -204,10 +221,11 @@ def main():
     # --- MODIFIED FOR DEPTH CONTROL ---
     all_items_to_process = []
     if args.depth == -1:
-        print("Scanning with infinite depth.")
-        all_items_to_process = project_root.rglob('*')
+        print("Scanning with infinite depth... (collecting file list, this may take a moment)")
+        # Convert the rglob generator to a list to allow for len() check
+        all_items_to_process = list(project_root.rglob('*'))
     else:
-        print(f"Scanning to a maximum depth of {args.depth} level(s).")
+        print(f"Scanning to a maximum depth of {args.depth} level(s)... (collecting file list, this may take a moment)")
         # Use a queue for a breadth-first search, which is ideal for depth-limiting
         queue = [(project_root, 0)]
         visited_dirs = {project_root}
@@ -227,6 +245,23 @@ def main():
                 # Silently skip directories we cannot access
                 continue
     # --- END MODIFICATION ---
+
+    # Warn the user if the number of items to process is large
+    if len(all_items_to_process) >= FILE_COUNT_WARNING_THRESHOLD:
+        prompt = (
+            f"\nWarning: Found {len(all_items_to_process)} files and directories to inspect. "
+            "This operation could take some time.\n"
+            "Do you want to proceed? (y/n): "
+        )
+        try:
+            response = input(prompt)
+            if response.strip().lower() != 'y':
+                print("Operation cancelled by user.")
+                sys.exit(0)
+        except (KeyboardInterrupt, EOFError):
+            print("\nOperation cancelled by user.")
+            sys.exit(0)
+        print("-" * 20) # Visual separator after prompt
 
     for item in all_items_to_process:
         if not should_exclude_path(item, project_root):
@@ -309,4 +344,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of utilities/list_project_files.py ===
+# === End of src/list_project_files.py ===

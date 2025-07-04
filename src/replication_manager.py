@@ -154,6 +154,17 @@ def main():
                 logging.error(f"!!! Reprocessing failed or was interrupted for {os.path.basename(run_dir)}. Continuing... !!!")
                 failed_reps.append(os.path.basename(run_dir)) # Add failed run to the list
                 if isinstance(e, KeyboardInterrupt): sys.exit(1)
+        
+        # --- ADDED: Log rebuilding for reprocess mode ---
+        print("\n" + "="*80)
+        print("### REPROCESSING PHASE COMPLETE. REBUILDING BATCH LOG. ###")
+        print("="*80)
+        try:
+            subprocess.run([sys.executable, log_manager_script, "rebuild", final_output_dir], check=True)
+            print("Batch run log successfully rebuilt.")
+        except Exception as e:
+            logging.error(f"An error occurred while rebuilding the batch log after reprocessing: {e}")
+
     else:
         if not os.path.exists(final_output_dir):
             os.makedirs(final_output_dir)
