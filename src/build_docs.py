@@ -25,7 +25,7 @@ def render_mermaid_diagram(source_path, output_path, project_root):
 
         # Use the platform-specific executable path
         result = subprocess.run(
-            [mmdc_executable, '-i', source_path, '-o', output_path, '-c', config_path, '-p', puppeteer_config_path],
+            [mmdc_executable, '-i', source_path, '-o', output_path, '-c', config_path, '-p', puppeteer_config_path, '-w', '800'],
             check=True, capture_output=True, text=True, encoding='utf-8'
         )
         return True
@@ -43,8 +43,10 @@ def render_text_diagram(source_path, output_path, project_root):
         print("    - ERROR: 'Pillow' is not installed in the PDM environment.")
         return False
 
-    padding, line_spacing, font_size = 20, 5, 14
-    font = None
+    padding, line_spacing = 20, 4
+    base_font_size = 14
+    scale_factor = 0.7  # Scale down to 70% of original size
+    font_size = int(base_font_size * scale_factor)
     font_paths = ["Consolas", "cour.ttf", "Courier New", "Menlo", "DejaVu Sans Mono"]
     for font_path in font_paths:
         try:
@@ -94,7 +96,7 @@ def main():
             
         alt_text = base_name.replace('_', ' ').title()
         # Add a Pandoc attribute to scale the image width to 90% of the page.
-        image_tag = f"![{alt_text}]({image_rel_path}){{width=90%}}"
+        image_tag = f"![ ]({image_rel_path})"
         final_md_content = final_md_content.replace(placeholder.group(0), image_tag, 1)
 
     if not all_diagrams_ok:
