@@ -4,8 +4,8 @@ This file is generated from README.template.md by the build_readme.py script.
 Any changes made here will be overwritten.
 -->
 
-# LLM Personality Matching Experiment Pipeline
- 
+# LLM Personality Matching Experiment Framework
+
 This project provides a fully automated and reproducible pipeline for testing a Large Language Model's (LLM) ability to solve a "who's who" personality matching task. It handles everything from data preparation and query generation to LLM interaction, response parsing, and final statistical analysis.
 
 ## Research Question
@@ -32,238 +32,59 @@ The project's architecture can be understood through three different views: the 
 
 This diagram shows how the scripts in the pipeline call one another, illustrating the hierarchy of control.
 
-```mermaid
-graph TD;
-
-    %% --- Style Definitions ---
-    classDef ExperimentRunner fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef ReplicationManager fill:#ff7f0e,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef Stage fill:#2ca02c,stroke:#333,stroke-width:1px,color:#fff;
-    classDef Utility fill:#d62728,stroke:#333,stroke-width:1px,color:#fff;
-    classDef Worker fill:#9467bd,stroke:#333,stroke-width:1px,color:#fff;
-    classDef Legacy fill:#8c564b,stroke:#333,stroke-width:1px,color:#fff;
-
-    %% --- Node Definitions ---
-    subgraph "Experiment Execution"
-        run_exp["run_experiment.ps1<br/><i>(Main Entry Point)</i>"]:::ExperimentRunner;
-        rep_man["replication_manager.py<br/><i>(Manages Batch of Replications)</i>"]:::ReplicationManager;
-    end
-
-    subgraph "Utilities & Final Analysis"
-        direction LR
-        subgraph "Standard Utilities"
-            retry["retry_failed_sessions.py"]:::Utility;
-            compile["compile_results.py"]:::Utility;
-            anova["run_anova.py"]:::Utility;
-            verify["verify_pipeline_completeness.py"]:::Utility;
-            log_man["log_manager.py"]:::Utility;
-        end
-        subgraph "Historical Data Patching"
-            patcher["patch_old_runs.py"]:::Utility;
-            restorer["restore_config.py"]:::Worker;
-        end
-        inject["inject_metadata.py<br/><i>(Legacy)</i>"]:::Legacy;
-    end
-
-    subgraph "Single Replication Pipeline (Python Scripts)"
-        direction LR;
-        orch["orchestrate_replication.py<br/><i>(Single Replication Orchestrator)</i>"]:::Stage;
-        subgraph "Stage 1: Query Generation"
-            build["build_queries.py"]:::Stage;
-            qgen["query_generator.py"]:::Worker;
-        end
-        subgraph "Stage 2: LLM Interaction"
-            sessions["run_llm_sessions.py"]:::Stage;
-            prompter["llm_prompter.py"]:::Worker;
-        end
-        subgraph "Stage 3 & 4: Analysis"
-            process["process_llm_responses.py"]:::Stage;
-            analyze["analyze_performance.py"]:::Stage;
-        end
-    end
-
-    %% --- Connection Definitions ---
-    run_exp --> |"Calls"| rep_man;
-    rep_man --> |"Calls in loop (x30)"| orch;
-    run_exp --> |"Calls for auto-repair"| retry;
-    run_exp --> |"Calls to summarize batch"| compile;
-    
-    orch --> |"Calls"| build;
-    build --> |"Calls worker in loop (x100)"| qgen;
-    orch --> |"Calls"| sessions;
-    sessions --> |"Calls worker in loop (x100)"| prompter;
-    orch --> |"Calls"| process;
-    orch --> |"Calls"| analyze;
-    
-    retry --> |"Calls to re-run specific queries"| sessions;
-    retry --> |"Re-runs after fixes"| process;
-    retry --> |"Re-runs after fixes"| analyze;
-    retry --> |"Re-runs after fixes"| compile;
-    
-    compile -.-> |"[Data Flow]"| anova;
-    patcher --> |"Calls in loop"| restorer;
-```
+![Architecture Code](docs/images/architecture_code.png)
 
 ### 2. Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
-```mermaid
-graph TD
-    subgraph "Input Data"
-        A1(personalities_db_1-5000.txt)
-        A2(base_query.txt)
-        A3(config.ini)
-    end
-
-    subgraph "Stage 1: Query Generation"
-        B(build_queries.py)
-        A1 & A2 --> B
-        B --> C[llm_query_XXX.txt]
-    end
-    
-    subgraph "Stage 2: LLM Interaction"
-        D(run_llm_sessions.py)
-        C --> D
-        D --> E[llm_response_XXX.txt]
-    end
-    
-    subgraph "Stage 3: Response Processing"
-        F(process_llm_responses.py)
-        E --> F
-        F --> G[all_scores.txt]
-        F --> H[all_mappings.txt]
-    end
-    
-    subgraph "Stage 4: Hierarchical Analysis"
-        direction TB
-        I(compile_results.py)
-        J(run_anova.py)
-        
-        subgraph "Aggregation Loop"
-            direction TB
-            M(replication_report.txt) --> I;
-            I --> K_rep[REPLICATION_results.csv];
-            K_rep --> I;
-            I --> K_exp[EXPERIMENT_results.csv];
-            K_exp --> I;
-            I --> K_final[final_summary_results.csv];
-        end
-
-        K_final --> J;
-        J --> L[MASTER_ANOVA_DATASET.csv];
-        J --> N((Plots & Log));
-    end
-    
-    %% This shows that the config is archived early in the process
-    A3 --> O(config.ini.archived):::Data
-    
-    %% This shows the archived config is now a primary input for compilation
-    O --> I
-
-    classDef Data fill:#e6f3ff,stroke:#007bff
-    classDef Script fill:#fff0e6,stroke:#ff7f0e
-    class A1,A2,A3,C,E,G,H,K_rep,K_exp,K_final,L,M,N,O Data
-    class B,D,F,I,J Script
-```
+![Architecture Data Flow](docs/images/architecture_data_flow.png)
 
 ### 3. Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-```mermaid
-graph TD
-    A[Start: Pool of 5000 Personalities] --> B{Sample 100 sets of k=10};
-    
-    B --> C{For each of the 100 sets...};
-    
-    subgraph "Single Trial (Repeated 100 times)"
-        direction LR
-        D["Shuffle 10 Names<br/>(List A)"];
-        E["Shuffle 10 Descriptions<br/>(List B)"];
-        F((LLM Task: Score Similarity));
-        G[Receive 10x10 Score Matrix];
-        H{"Calculate Trial Metrics<br/>(MRR, Top-1 Acc, etc.)"};
-        D & E --> F;
-        F --> G;
-        G --> H;
-    end
-
-    C --> D;
-    C --> E;
-    H --> I[Collect 100 sets of trial metrics];
-    I --> J{"Aggregate Metrics<br/>(e.g., Mean of 100 MRRs)"};
-    J --> K(["Final Data Point<br/>for one Replication"]);
-
-    classDef step fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef final fill:#d4edda,stroke:#155724;
-    class A,B,C,D,E,F,G,H,I,J step;
-    class K final;
-```
+![Architecture Experimental Logic](docs/images/architecture_experimental_logic.png)
 
 ## Project Structure
 
 The project's experiments are organized in a logical hierarchy:
 
--   📁 **Study**: The highest-level grouping, representing a major research question (e.g., "Performance on Random vs. Correct Mappings").
--   📁 **Experiment**: A complete set of runs for a single condition within a study (e.g., "Gemini 2.0 Flash with k=10 Subjects").
--   📁 **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
--   📄 **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
+-   **Study**: The highest-level grouping, representing a major research question (e.g., "Performance on Random vs. Correct Mappings").
+-   **Experiment**: A complete set of runs for a single condition within a study (e.g., "Gemini 2.0 Flash with k=10 Subjects").
+-   **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
+-   **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
 
 This logical hierarchy is reflected in the directory structure of the project and its outputs:
 
-```text
-personality_matching/
-├── config.ini                  # Main configuration for experiments
-├── run_experiment.ps1          # Main entry point for running a batch
-├── process_study.ps1           # Main entry point for analysis
-├── .env                        # For storing API keys
-├── README.md                   # You are here!
-├── pyproject.toml              # Project dependencies for PDM
-|
-├── src/                        # All Python source code for the pipeline
-│   ├── replication_manager.py  # Manages batches of replications
-│   ├── orchestrate_replication.py # Runs a single replication
-│   ├── analyze_performance.py  # Calculates performance metrics
-│   └── ...                     # (and all other utility scripts)
-|
-├── data/                       # Source personality databases and query templates
-│   ├── personalities_db_1-5000.txt
-│   └── base_query.txt
-|
-├── output/                     # All generated reports and results
-│   └── reports/
-│       └── <Study_Name>/         # e.g., "6_Study_4"
-│           └── <Experiment_Name>/  # e.g., "Grok_3_Mini_map=random"
-│               └── <Replication_Name>/ # e.g., "run_..._rep-01_..."
-│                   ├── replication_report.txt  # Final, detailed report for this run
-│                   ├── config.ini.archived     # Snapshot of the config used
-│                   ├── analysis_inputs/        # Intermediate data (scores, mappings)
-│                   └── ...
-│
-└── tests/                      # Unit and integration tests for all src/ scripts
-    └── ...
-```
+![Project Structure](docs/images/project_structure.png)
 
 ## Setup and Installation
 
-1.  **Create Virtual Environment**:
+This project uses **PDM** for dependency and environment management, which simplifies setup into a few commands.
+
+1.  **Install PDM (One-Time Setup)**:
+    If you don't have PDM, install it with pip. It's best to run this from a terminal *outside* of any virtual environment.
     ```bash
-    python -m venv .venv
+    pip install --user pdm
     ```
+    > **Note:** If you see a `pdm: The term 'pdm' is not recognized...` error in a new terminal, the most reliable way to run PDM is to use `python -m pdm` instead of just `pdm`.
 
-2.  **Activate Environment**:
-    *   On Windows (PowerShell): `.venv\Scripts\Activate.ps1`
-    *   On macOS/Linux: `source .venv/bin/activate`
-
-3.  **Install Dependencies**:
+2.  **Install Project Dependencies**:
+    From the project's root directory, run the main PDM installation command.
     ```bash
-    pip install -r requirements.txt
+    pdm install
     ```
+    This single command automatically:
+    *   Detects your Python version.
+    *   Creates a local virtual environment in the project's `.venv` folder.
+    *   Installs all required packages from the `pdm.lock` file for a reproducible setup.
 
-4.  **Configure API Key**:
+3.  **Configure API Key**:
     *   Create a file named `.env` in the project root.
     *   Add your API key: `OPENROUTER_API_KEY=sk-or-your-key`.
+
+To run commands within the managed environment, prefix them with `pdm run`. For example: `pdm run python src/some_script.py`.
 
 ## Configuration (`config.ini`)
 
@@ -502,11 +323,13 @@ Scripts are provided to automate all four steps for Windows environments (`migra
 
 ---
 
+
+**With this new section:**
+```markdown
 ## Testing
 
-The project includes a suite of unit and integration tests. To run them, use `pytest`:
+The project includes a suite of unit and integration tests managed by PDM. To run the complete test suite, use the PDM script command:
 
 ```bash
-# Ensure you have pytest installed: pip install pytest
-pytest -v
+pdm run test
 ```

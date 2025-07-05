@@ -1,4 +1,4 @@
-# Contributing to the Project
+# Contributing to the LLM Personality Matching Project
 
 We welcome contributions to this project! This document provides guidelines for setting up your development environment, adhering to project standards, and submitting your work.
 
@@ -11,6 +11,14 @@ This project uses **PDM** for dependency and environment management. It simplifi
 Before you begin, ensure you have the following installed on your system:
 *   **Python**: Version 3.8 or higher is recommended. You can download it from [python.org](https://www.python.org/downloads/).
 *   **Git**: For version control. You can download it from [git-scm.com](https://git-scm.com/downloads).
+*   **Node.js and npm**: Required by the documentation build script to automatically render Mermaid diagrams.
+    *   Download the **LTS** version from [nodejs.org](https://nodejs.org/en/download/).
+    *   During installation, ensure the default **"Add to PATH"** option is enabled. After installing, you may need to restart your computer or terminal for the `npm` command to be recognized.
+*   **Project Dependencies**: Once Node.js is installed, navigate to the project root and install the required Node.js development tools:
+    ```bash
+    npm install
+    ```
+    This reads the `package.json` file and installs dependencies locally into a `node_modules` folder.
 *   **Pandoc**: A universal document converter used to generate RTF and other document formats. You can download it from [pandoc.org](https://pandoc.org/installing.html).
 *   **PDM**: The Python dependency manager. Install it once with pip (if you haven't already):
     ```bash

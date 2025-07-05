@@ -4,8 +4,8 @@ This file is generated from README.template.md by the build_readme.py script.
 Any changes made here will be overwritten.
 -->
 
-# LLM Personality Matching Experiment Pipeline
- 
+# LLM Personality Matching Experiment Framework
+
 This project provides a fully automated and reproducible pipeline for testing a Large Language Model's (LLM) ability to solve a "who's who" personality matching task. It handles everything from data preparation and query generation to LLM interaction, response parsing, and final statistical analysis.
 
 ## Research Question
@@ -32,89 +32,59 @@ The project's architecture can be understood through three different views: the 
 
 This diagram shows how the scripts in the pipeline call one another, illustrating the hierarchy of control.
 
-```mermaid
-{{docs/diagrams/architecture_code.mmd}}
-```
+{{diagram:docs/diagrams/architecture_code.mmd}}
 
 ### 2. Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
-```mermaid
-{{docs/diagrams/architecture_data_flow.mmd}}
-```
+{{diagram:docs/diagrams/architecture_data_flow.mmd}}
 
 ### 3. Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-```mermaid
-{{docs/diagrams/architecture_experimental_logic.mmd}}
-```
+{{diagram:docs/diagrams/architecture_experimental_logic.mmd}}
 
 ## Project Structure
 
 The project's experiments are organized in a logical hierarchy:
 
--   📁 **Study**: The highest-level grouping, representing a major research question (e.g., "Performance on Random vs. Correct Mappings").
--   📁 **Experiment**: A complete set of runs for a single condition within a study (e.g., "Gemini 2.0 Flash with k=10 Subjects").
--   📁 **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
--   📄 **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
+-   **Study**: The highest-level grouping, representing a major research question (e.g., "Performance on Random vs. Correct Mappings").
+-   **Experiment**: A complete set of runs for a single condition within a study (e.g., "Gemini 2.0 Flash with k=10 Subjects").
+-   **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
+-   **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
 
 This logical hierarchy is reflected in the directory structure of the project and its outputs:
 
-```text
-personality_matching/
-├── config.ini                  # Main configuration for experiments
-├── run_experiment.ps1          # Main entry point for running a batch
-├── process_study.ps1           # Main entry point for analysis
-├── .env                        # For storing API keys
-├── README.md                   # You are here!
-├── pyproject.toml              # Project dependencies for PDM
-|
-├── src/                        # All Python source code for the pipeline
-│   ├── replication_manager.py  # Manages batches of replications
-│   ├── orchestrate_replication.py # Runs a single replication
-│   ├── analyze_performance.py  # Calculates performance metrics
-│   └── ...                     # (and all other utility scripts)
-|
-├── data/                       # Source personality databases and query templates
-│   ├── personalities_db_1-5000.txt
-│   └── base_query.txt
-|
-├── output/                     # All generated reports and results
-│   └── reports/
-│       └── <Study_Name>/         # e.g., "6_Study_4"
-│           └── <Experiment_Name>/  # e.g., "Grok_3_Mini_map=random"
-│               └── <Replication_Name>/ # e.g., "run_..._rep-01_..."
-│                   ├── replication_report.txt  # Final, detailed report for this run
-│                   ├── config.ini.archived     # Snapshot of the config used
-│                   ├── analysis_inputs/        # Intermediate data (scores, mappings)
-│                   └── ...
-│
-└── tests/                      # Unit and integration tests for all src/ scripts
-    └── ...
-```
+{{diagram:docs/diagrams/project_structure.txt}}
 
 ## Setup and Installation
 
-1.  **Create Virtual Environment**:
+This project uses **PDM** for dependency and environment management, which simplifies setup into a few commands.
+
+1.  **Install PDM (One-Time Setup)**:
+    If you don't have PDM, install it with pip. It's best to run this from a terminal *outside* of any virtual environment.
     ```bash
-    python -m venv .venv
+    pip install --user pdm
     ```
+    > **Note:** If you see a `pdm: The term 'pdm' is not recognized...` error in a new terminal, the most reliable way to run PDM is to use `python -m pdm` instead of just `pdm`.
 
-2.  **Activate Environment**:
-    *   On Windows (PowerShell): `.venv\Scripts\Activate.ps1`
-    *   On macOS/Linux: `source .venv/bin/activate`
-
-3.  **Install Dependencies**:
+2.  **Install Project Dependencies**:
+    From the project's root directory, run the main PDM installation command.
     ```bash
-    pip install -r requirements.txt
+    pdm install
     ```
+    This single command automatically:
+    *   Detects your Python version.
+    *   Creates a local virtual environment in the project's `.venv` folder.
+    *   Installs all required packages from the `pdm.lock` file for a reproducible setup.
 
-4.  **Configure API Key**:
+3.  **Configure API Key**:
     *   Create a file named `.env` in the project root.
     *   Add your API key: `OPENROUTER_API_KEY=sk-or-your-key`.
+
+To run commands within the managed environment, prefix them with `pdm run`. For example: `pdm run python src/some_script.py`.
 
 ## Configuration (`config.ini`)
 
@@ -353,11 +323,13 @@ Scripts are provided to automate all four steps for Windows environments (`migra
 
 ---
 
+
+**With this new section:**
+```markdown
 ## Testing
 
-The project includes a suite of unit and integration tests. To run them, use `pytest`:
+The project includes a suite of unit and integration tests managed by PDM. To run the complete test suite, use the PDM script command:
 
 ```bash
-# Ensure you have pytest installed: pip install pytest
-pytest -v
+pdm run test
 ```

@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^10.9.0"
+  }
+}

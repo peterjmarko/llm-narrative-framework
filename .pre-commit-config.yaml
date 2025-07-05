@@ -1,10 +1,11 @@
 repos:
--   repo: local
+  - repo: local
     hooks:
-    -   id: build-docs
-        name: Build Docs (MD & RTF)
-        entry: pdm run build-docs
+      - id: build-docs
+        name: Build documentation from template
+        entry: python -m pdm run python src/build_docs.py
         language: system
         pass_filenames: false
-        files: ^(README\.template\.md|CONTRIBUTING\.md|docs/diagrams/.*\.mmd)$
-        stages: [pre-commit]
+        files: ^(README\.template\.md|docs/diagrams/.*)$
+        always_run: true
+        verbose: true

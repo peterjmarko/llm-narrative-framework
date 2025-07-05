@@ -1,0 +1,30 @@
+personality_matching/
+├── config.ini                  # Main configuration for experiments
+├── run_experiment.ps1          # Main entry point for running a batch
+├── process_study.ps1           # Main entry point for analysis
+├── .env                        # For storing API keys
+├── README.md                   # You are here!
+├── pyproject.toml              # Project dependencies for PDM
+|
+├── src/                        # All Python source code for the pipeline
+│   ├── replication_manager.py  # Manages batches of replications
+│   ├── orchestrate_replication.py # Runs a single replication
+│   ├── analyze_performance.py  # Calculates performance metrics
+│   └── ...                     # (and all other utility scripts)
+|
+├── data/                       # Source personality databases and query templates
+│   ├── personalities_db_1-5000.txt
+│   └── base_query.txt
+|
+├── output/                     # All generated reports and results
+│   └── reports/
+│       └── <Study_Name>/         # e.g., "6_Study_4"
+│           └── <Experiment_Name>/  # e.g., "Grok_3_Mini_map=random"
+│               └── <Replication_Name>/ # e.g., "run_..._rep-01_..."
+│                   ├── replication_report.txt  # Final, detailed report for this run
+│                   ├── config.ini.archived     # Snapshot of the config used
+│                   ├── analysis_inputs/        # Intermediate data (scores, mappings)
+│                   └── ...
+│
+└── tests/                      # Unit and integration tests for all src/ scripts
+    └── ...

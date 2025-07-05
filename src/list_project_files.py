@@ -43,7 +43,7 @@ import argparse
 # Directories to completely exclude from the scan (names, not paths)
 EXCLUDE_DIRS_SET = {
     ".venv", "venv", "__pycache__", ".git", ".vscode", ".idea",
-    ".pytest_cache", "node_modules", "build", "dist", "docs",
+    ".pytest_cache", "node_modules", "build", "dist",
     "archive", "instance", "*.egg-info", # Common build/dist/docs/archive folders
     "weather", "project_code_as_txt/weather" # Specific to this project (weather scripts and data)
 }

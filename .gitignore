@@ -47,3 +47,6 @@ Thumbs.db
 
 # Ignore PDM-specific cache and configuration files
 .pdm-python
+
+# Ignore 'npm install' artifacts
+/node_modules

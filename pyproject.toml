@@ -27,6 +27,7 @@ dev = [
     "pytest",
     "pre-commit",
     "pypandoc>=1.15",
+    "pillow>=10.4.0",
 ]
 
 [tool.pdm]
