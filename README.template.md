@@ -5,7 +5,7 @@ Any changes made here will be overwritten.
 -->
 
 # LLM Personality Matching Experiment Pipeline
-
+ 
 This project provides a fully automated and reproducible pipeline for testing a Large Language Model's (LLM) ability to solve a "who's who" personality matching task. It handles everything from data preparation and query generation to LLM interaction, response parsing, and final statistical analysis.
 
 ## Research Question
