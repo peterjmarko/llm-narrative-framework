@@ -1,5 +1,5 @@
 # Contributing to the Project
-
+ 
 We welcome contributions to this project! This document provides guidelines for setting up your development environment, adhering to project standards, and submitting your work.
 
 ## Getting Started: Development Environment Setup
