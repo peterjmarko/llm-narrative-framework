@@ -20,10 +20,6 @@ __pycache__/
 /qgen_standalone_output/
 /project_code_as_txt/
 
-# Generated documentation files
-/README.rtf
-/CONTRIBUTING.rtf
-
 # --- Secrets ---
 # Ignore the .env file, which should contain sensitive API keys.
 # A .env.example file should be created and committed instead.

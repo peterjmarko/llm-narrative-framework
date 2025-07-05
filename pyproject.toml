@@ -37,7 +37,7 @@ venv.in-project = true
 # Development and testing shortcuts
 test = "pytest -v"
 lint = "pre-commit run --all-files"
-readme = "python src/build_readme.py"
+build-docs = "python src/build_docs.py"
 
 # Main workflow shortcuts
 run-exp = "powershell -ExecutionPolicy Bypass -File .\\run_experiment.ps1"
