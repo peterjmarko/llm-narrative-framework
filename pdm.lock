@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:0b1f7644820b3416a47c28eba29c71bbdaae8c8534dc5961c7d19fedff16c495"
+content_hash = "sha256:8e7636a12fe0b947336754011e45681beb03eece65c04883375a608e4a696473"
 
 [[metadata.targets]]
 requires_python = ">=3.8"
@@ -786,6 +786,17 @@ dependencies = [
 files = [
     {file = "pre_commit-3.5.0-py2.py3-none-any.whl", hash = "sha256:841dc9aef25daba9a0238cd27984041fa0467b4199fc4852e27950664919f660"},
     {file = "pre_commit-3.5.0.tar.gz", hash = "sha256:5804465c675b659b0862f07907f96295d490822a450c4c40e747d0b1c6ebcb32"},
+]
+
+[[package]]
+name = "pypandoc"
+version = "1.15"
+requires_python = ">=3.7"
+summary = "Thin wrapper for pandoc."
+groups = ["dev"]
+files = [
+    {file = "pypandoc-1.15-py3-none-any.whl", hash = "sha256:4ededcc76c8770f27aaca6dff47724578428eca84212a31479403a9731fc2b16"},
+    {file = "pypandoc-1.15.tar.gz", hash = "sha256:ea25beebe712ae41d63f7410c08741a3cab0e420f6703f95bc9b3a749192ce13"},
 ]
 
 [[package]]

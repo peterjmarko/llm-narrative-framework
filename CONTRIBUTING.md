@@ -11,6 +11,7 @@ This project uses **PDM** for dependency and environment management. It simplifi
 Before you begin, ensure you have the following installed on your system:
 *   **Python**: Version 3.8 or higher is recommended. You can download it from [python.org](https://www.python.org/downloads/).
 *   **Git**: For version control. You can download it from [git-scm.com](https://git-scm.com/downloads).
+*   **Pandoc**: A universal document converter used to generate RTF and other document formats. You can download it from [pandoc.org](https://pandoc.org/installing.html).
 *   **PDM**: The Python dependency manager. Install it once with pip (if you haven't already):
     ```bash
     # It's best to run this from a terminal *outside* of any virtual environment.
@@ -66,7 +67,7 @@ git checkout -b fix/correct-data-parsing-error
 Write your code and update documentation as needed.
 
 *   **Code**: Modify the Python files in `src/` or `tests/`. The pre-commit hooks will automatically handle formatting (Black) and linting (Flake8).
-*   **Documentation**: To edit the main README, modify `README.template.md` or the diagram files in `docs/diagrams/`. The `build-readme` hook will automatically generate the final `README.md`. **Do not edit `README.md` directly.**
+*   **Documentation**: To edit the main README, modify `README.template.md` and its diagram files. To edit this contribution guide, modify `CONTRIBUTING.md`. The `build-docs` hook will automatically generate the final `README.md`, `README.rtf`, and `CONTRIBUTING.rtf`. **Do not edit generated files directly.**
 
 ### 3. Run the Test Suite
 

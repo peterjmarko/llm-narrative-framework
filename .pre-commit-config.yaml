@@ -1,9 +1,9 @@
 repos:
 -   repo: local
     hooks:
-    -   id: build-readme
-        name: Build README
-        entry: python src/build_readme.py
+    -   id: build-docs
+        name: Build Docs (MD & RTF)
+        entry: python src/build_docs.py
         language: system
-        files: ^(README\.template\.md|docs/diagrams/.*\.mmd)$
+        files: ^(README\.template\.md|CONTRIBUTING\.md|docs/diagrams/.*\.mmd)$
         stages: [pre-commit]
