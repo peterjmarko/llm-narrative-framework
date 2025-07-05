@@ -14,10 +14,11 @@ This project investigates whether large language models can perform a personalit
 ## Key Features
 
 -   **Automated Experiment Runner**: A single command executes an entire experiment, running dozens of replications, each with hundreds of trials.
+-   **Standardized, Reproducible Reporting**: Each replication produces a comprehensive, consistently formatted report that includes run parameters, the base query, a human-readable analysis summary, and a machine-readable JSON block. The format is identical whether running a new experiment or reprocessing an old one.
 -   **Guaranteed Reproducibility**: Each replication automatically archives the `config.ini` file used for that run, permanently linking the results to the exact parameters that generated them.
 -   **Robust Error Handling & Resumption**: The pipeline is designed for resilience. Interrupted runs can be safely resumed. The `rebuild` command ensures data integrity after an interruption, and the `finalize` command is idempotent, automatically cleaning up corrupted summary data before writing a correct final version.
 -   **Advanced Artifact Management**:
-    -   **Reprocessing Engine**: The main runner has a `--reprocess` mode to re-run the analysis stages on existing experimental data, with a `--depth` parameter for recursive scanning.
+    -   **Reprocessing Engine**: The main runner has a `--reprocess` mode to re-run the analysis stages on existing experimental data, with a `--depth` parameter for recursive scanning. You can even add or override run notes during reprocessing.
     -   **Configuration Restoration**: Includes utilities to reverse-engineer and archive `config.ini` files for historical data that was generated before the auto-archiving feature was implemented.
 -   **Hierarchical Analysis**: The `compile_results.py` script performs a bottom-up aggregation of all data. It now generates **level-aware summary files**: `REPLICATION_results.csv` in each replication folder, `EXPERIMENT_results.csv` at the experiment level, and a final master `STUDY_results.csv` at the top study level. This creates a fully auditable and easily navigable research archive.
 -   **Streamlined ANOVA Workflow**: The final statistical analysis is now a simple two-step process. `compile_results.py` first prepares a master dataset, which `run_anova.py` then automatically finds and analyzes, generating tables and publication-quality plots using user-friendly display names for factors and metrics.
@@ -200,6 +201,50 @@ graph TD
     class K final;
 ```
 
+## Project Structure
+
+The project's experiments are organized in a logical hierarchy:
+
+-   📁 **Study**: The highest-level grouping, representing a major research question (e.g., "Performance on Random vs. Correct Mappings").
+-   📁 **Experiment**: A complete set of runs for a single condition within a study (e.g., "Gemini 2.0 Flash with k=10 Subjects").
+-   📁 **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
+-   📄 **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
+
+This logical hierarchy is reflected in the directory structure of the project and its outputs:
+
+```text
+personality_matching/
+├── config.ini                  # Main configuration for experiments
+├── run_experiment.ps1          # Main entry point for running a batch
+├── process_study.ps1           # Main entry point for analysis
+├── .env                        # For storing API keys
+├── README.md                   # You are here!
+├── pyproject.toml              # Project dependencies for PDM
+|
+├── src/                        # All Python source code for the pipeline
+│   ├── replication_manager.py  # Manages batches of replications
+│   ├── orchestrate_replication.py # Runs a single replication
+│   ├── analyze_performance.py  # Calculates performance metrics
+│   └── ...                     # (and all other utility scripts)
+|
+├── data/                       # Source personality databases and query templates
+│   ├── personalities_db_1-5000.txt
+│   └── base_query.txt
+|
+├── output/                     # All generated reports and results
+│   └── reports/
+│       └── <Study_Name>/         # e.g., "6_Study_4"
+│           └── <Experiment_Name>/  # e.g., "Grok_3_Mini_map=random"
+│               └── <Replication_Name>/ # e.g., "run_..._rep-01_..."
+│                   ├── replication_report.txt  # Final, detailed report for this run
+│                   ├── config.ini.archived     # Snapshot of the config used
+│                   ├── analysis_inputs/        # Intermediate data (scores, mappings)
+│                   └── ...
+│
+└── tests/                      # Unit and integration tests for all src/ scripts
+    └── ...
+```
+
 ## Setup and Installation
 
 1.  **Create Virtual Environment**:
@@ -222,96 +267,166 @@ graph TD
 
 ## Configuration (`config.ini`)
 
-The `config.ini` file is the central hub for defining all parameters for your experiments. Before running a new experiment, you should review and adjust the settings in this file. The pipeline is designed so that this configuration is automatically archived with the results for guaranteed reproducibility.
-
-Below are some of the most critical settings.
+The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results for guaranteed reproducibility.
 
 ### Display Name Settings
 
-These sections allow you to map internal names to human-readable names for cleaner reports and plots.
-
--   **`[ModelDisplayNames]`**: Maps sanitized model names (from `[ModelNormalization]`) to friendly names (e.g., `meta-llama-4-maverick = Llama 4 Maverick`).
--   **`[FactorDisplayNames]`**: Maps experimental factor names to friendly names for plot labels (e.g., `mapping_strategy = Mapping Strategy`).
--   **`[MetricDisplayNames]`**: Maps metric column names to friendly names for plot titles and console output (e.g., `mean_mrr = Mean Reciprocal Rank (MRR)`).
+-   **`[ModelDisplayNames]`**: Maps sanitized model names to friendly names (e.g., `meta-llama-4-maverick = Llama 4 Maverick`).
+-   **`[FactorDisplayNames]`**: Maps factor names to plot labels (e.g., `mapping_strategy = Mapping Strategy`).
+-   **`[MetricDisplayNames]`**: Maps metric names to plot titles (e.g., `mean_mrr = Mean Reciprocal Rank (MRR)`).
 
 ### Experiment Settings (`[Study]`)
 
 -   **`num_replications`**: The number of times the experiment will be repeated (e.g., `30`).
--   **`mapping_strategy`**: A key experimental variable. Can be `correct` (names are mapped to their true descriptions) or `random` (names are shuffled).
+-   **`mapping_strategy`**: A key experimental variable. Can be `correct` or `random`.
 
 ### LLM Settings (`[LLM]`)
 
--   **`model_name`**: Specifies the API identifier for the Large Language Model to be tested (e.g., `mistralai/mistral-small-3.1-24b-instruct`). This is a primary independent variable.
+-   **`model_name`**: The API identifier for the LLM to be tested (e.g., `mistralai/mistral-small-3.1-24b-instruct`).
 
 ### Analysis Settings (`[Analysis]`)
 
--   **`min_valid_response_threshold`**: Sets the minimum average number of valid responses (`n_valid_responses`) a model's experiment must have to be included in the final analysis. This is crucial for automatically excluding unreliable models that failed to produce consistent output, preventing them from skewing the statistical results.
-    -   A value of `25` is a reasonable default for an experiment with 100 trials per replication.
-    -   Set to `0` to disable this filter and include all models regardless of their response rate.
+-   **`min_valid_response_threshold`**: Minimum average number of valid responses (`n_valid_responses`) for an experiment to be included in the final analysis. Set to `0` to disable.
 
 ## Standard Workflow
 
-The workflow is designed to be fully automated. Each experiment run produces self-documenting output, which simplifies the final analysis.
+The workflow is designed to be fully automated.
 
 ### Phase 1: Running Experiments
 
-The main entry point for executing a complete experiment (e.g., all 30 replications for a single LLM) is the `run_experiment.ps1` PowerShell script, which acts as a wrapper around `replication_manager.py`.
+The `run_experiment.ps1` PowerShell script is the main entry point for executing a complete experiment.
 
-1.  **Configure**:
-    *   Ensure your environment is set up and your API key is in the `.env` file.
-    *   Adjust experimental parameters in `config.ini`. For example, to run the experiment with a random name-to-description mapping, you would set `mapping_strategy = random`.
+1.  **Configure**: Adjust experimental parameters in `config.ini`.
 
-2.  **Execute**:
-    *   Open a PowerShell terminal (with the virtual environment activated) and run the main experiment script.
+2.  **Execute**: Open a PowerShell terminal (with the virtual environment activated) and run the main script.
     ```powershell
-    # Run with standard (quiet) output
+    # Run with standard output
     .\run_experiment.ps1
+
+    # Add descriptive notes to the report
+    .\run_experiment.ps1 -Notes "First run with random mapping strategy"
 
     # For detailed debugging, run with the -Verbose switch
     .\run_experiment.ps1 -Verbose
     ```
-    *   The script manages the entire batch run. It will first run all replications, then automatically enter a repair phase for any failures.
-    *   **Crucially**, each replication's output directory will now contain a `config.ini.archived` file, making it a self-contained, reproducible artifact.
+    The script manages the entire batch run, including an automatic repair phase for any failures.
 
-3.  **Repeat for All Conditions**: Repeat steps 1-2 for each experimental condition you want to compare. It is best practice to organize the outputs into separate folders.
-    *   Run once with `mapping_strategy = correct` and save the output to a folder like `output/reports/exp_mistral_correct_map`.
-    *   Run again with `mapping_strategy = random` and save to `output/reports/exp_mistral_random_map`.
+3.  **Repeat for All Conditions**: Repeat steps 1-2 for each experimental condition, organizing the outputs into separate folders.
 
 ### Phase 2: Processing the Study
 
-After running all individual experiments, this phase uses a single command to aggregate all data and perform the final statistical analysis across the entire study.
+After running all experiments, this phase aggregates all data and performs the final statistical analysis.
 
-1.  **Run Study Processor**: Execute the `process_study.ps1` script, pointing it at the top-level directory that contains all your experiment folders (e.g., `output/reports`).
+1.  **Run Study Processor**: Execute `process_study.ps1`, pointing it at the top-level directory containing all experiment folders.
     ```powershell
-    # Process the entire study located in the 'output/reports' directory
     .\process_study.ps1 -StudyDirectory "output/reports"
     ```
-    This script automates the two critical post-processing stages:
-    *   **Compilation**: It first runs `compile_results.py` to scan the entire directory tree, creating level-specific summaries (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`) and aggregating them into a single master `STUDY_results.csv` file at the top of your study directory.
-    *   **Analysis**: It then runs `run_anova.py` on the newly created master dataset, performing a full statistical analysis (ANOVA, Tukey's HSD).
+    This automates two stages:
+    *   **Compilation**: Runs `compile_results.py` to scan the directory tree and create level-specific summaries, aggregating them into a master `STUDY_results.csv`.
+    *   **Analysis**: Runs `run_anova.py` on the master dataset to perform a full statistical analysis.
 
-2.  **Review Final Artifacts**: In the top-level analysis directory (`output/reports/anova/`), you will now find:
-    *   Publication-quality **box plot `*.png` images** for each metric and factor.
-    *   A complete `STUDY_analysis_log.txt` with all statistical tables (ANOVA, Tukey's HSD, Performance Groups, etc.).
-    *   An `archive/` subdirectory containing the results from the previous analysis run, providing a simple backup.
+2.  **Review Final Artifacts**: In the top-level analysis directory (`output/reports/anova/`), you will find publication-quality plots (`*.png`), a complete analysis log (`STUDY_analysis_log.txt`), and an `archive/` of previous results.
+
+## Standardized Output
+
+The pipeline now generates a consistent, standardized `replication_report.txt` for every run, whether it's a new experiment or a reprocessed one. This ensures that all output is easily comparable and machine-parsable.
+
+### Replication Report Format
+
+Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
+
+```text
+================================================================================
+ {<Report Title>}
+================================================================================
+Date:            <Run Date>
+Final Status:    <pipeline_status>
+Run Directory:   <run_directory_name>
+Parsing Status:  <parsing_status>
+Validation Status: <validation_status>
+Report File:     <report_filename>
+
+--- Run Parameters ---
+Num Iterations (m): <num_iterations>
+Items per Query (k): <items_per_query>
+Mapping Strategy: <mapping_strategy>
+Personalities Source: <db_filename>
+LLM Model:       <model_name>
+Run Notes:       <run_notes>
+================================================================================
+
+
+--- Base Query Prompt Used ---
+{<base_query_prompt_content>}
+-------------------------------
+
+
+================================================================================
+### OVERALL META-ANALYSIS RESULTS ###
+================================================================================
+
+1. Combined Significance of Score Differentiation (N=<n_valid>):
+   Stouffer's Method: Combined p-value = <p_value>
+   Fisher's Method: Combined p-value = <p_value>
+
+2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r') (vs Chance=0.0000):
+   Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
+
+3. Overall Ranking Performance (MRR) (vs Chance=<chance_val>):
+   Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
+
+4. Overall Ranking Performance (Top-1 Accuracy) (vs Chance=<chance_val>):
+   Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
+
+5. Overall Ranking Performance (Top-3 Accuracy) (vs Chance=<chance_val>):
+   Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
+
+6. Bias and Other Metrics:
+   Top-1 Prediction Bias (StdDev of choice counts): <std_dev>
+   Mean Score Difference (Correct - Incorrect): <score_diff>
+
+
+<<<METRICS_JSON_START>>>
+{
+    "mwu_stouffer_z": <value>, 
+    "mwu_stouffer_p": <value>, 
+    "mwu_fisher_chi2": <value>, 
+    "mwu_fisher_p": <value>, 
+    "mean_effect_size_r": <value>, 
+    "effect_size_r_p": <value>, 
+    "mean_mrr": <value>, 
+    "mrr_p": <value>, 
+    "mean_top_1_acc": <value>, 
+    "top_1_acc_p": <value>, 
+    "mean_top_3_acc": <value>, 
+    "top_3_acc_p": <value>, 
+    "mean_rank_of_correct_id": <value>, 
+    "rank_of_correct_id_p": <value>, 
+    "top1_pred_bias_std": <value>, 
+    "true_false_score_diff": <value>, 
+    "bias_slope": <value>, 
+    "bias_intercept": <value>, 
+    "bias_r_value": <value>, 
+    "bias_p_value": <value>,
+    "bias_std_err": <value>,
+    "n_valid_responses": <value>
+}
+<<<METRICS_JSON_END>>>
+```
+
+**Date Handling by Mode:**
+-   **Normal Mode**: The report title is `REPLICATION RUN REPORT` and the `Date` field shows the time of the original run.
+-   **`--reprocess` Mode**: The report title is `REPLICATION RUN REPORT (YYYY-MM-DD HH:MM:SS)` with the reprocessing timestamp. The `Date` field continues to show the time of the **original** run for clear traceability.
 
 ## Migrating Old Experiment Data
 
-Due to updates in the reporting format and data processing pipeline, experiment data generated before a certain version may be incompatible with the latest analysis tools. A one-time migration process is required to upgrade these old data directories.
-
-This process will:
-1.  Archive old `config.ini` files.
-2.  Rebuild individual `replication_report.txt` files into the modern format.
-3.  Clean up legacy artifacts.
-4.  Perform a final reprocessing to regenerate all summary files and create a clean data set.
+A one-time migration process is required to upgrade older, incompatible data directories.
 
 #### Migration Steps
 
 Ensure your Python environment is activated before running these commands from the project root directory.
 
 **A. Manual Steps**
-
-You can run the migration manually by executing these four steps in order. Replace `<path_to_old_experiment_dir>` with the actual path (e.g., `output/reports/6_Study_4`).
 
 1.  **Patch Configs:** This archives the `config.ini` file in each `run_*` subdirectory.
     ```bash
@@ -329,40 +444,21 @@ You can run the migration manually by executing these four steps in order. Repla
     - The `analysis_inputs` directory inside *each* `run_*` subdirectory.
     - All `*.txt.corrupted` files inside *each* `run_*` subdirectory.
 
-4.  **Final Reprocess:** This will regenerate the summary CSV files, logs, and all analysis artifacts using the modern, rebuilt reports.
+4.  **Final Reprocess:** This will regenerate the summary CSV files, logs, and all analysis artifacts using the modern, rebuilt reports. You can also add notes during this step.
     ```bash
-    python src/replication_manager.py --reprocess "<path_to_old_experiment_dir>"
+    python src/replication_manager.py --reprocess "<path_to_old_experiment_dir>" --notes "Migrated to new format"
     ```
 
 **B. Automated Scripts**
 
-Scripts are provided to automate all four steps for Windows environments. Choose the one that matches your preferred terminal.
-
--   **Using PowerShell (Recommended for Windows 10/11):**
-    The PowerShell script offers more robust error handling and detailed output.
-    ```powershell
-    # If script execution is restricted, you can bypass the policy for this single command:
-    PowerShell.exe -ExecutionPolicy Bypass -File .\migrate_old_experiment.ps1 "<path_to_old_experiment_dir>"
-
-    # Or, if your execution policy allows it, run directly:
-    .\migrate_old_experiment.ps1 "<path_to_old_experiment_dir>"
-    ```
-
--   **Using Command Prompt (Legacy):**
-    ```batch
-    migrate_old_experiment.bat "<path_to_old_experiment_dir>"
-    ```
-
-After the chosen script completes, the data in the target directory will be fully migrated and compatible with the latest version of the toolkit.
+Scripts are provided to automate all four steps for Windows environments (`migrate_old_experiment.ps1` and `.bat`).
 
 ---
 
 ## Maintenance and Utility Scripts
 
-The project includes several scripts for maintenance, diagnostics, and handling historical data.
-
 *   **`replication_manager.py`**:
-    *   The main batch runner for managing multiple replications. Can be invoked in a reprocessing mode (`--reprocess`) to fix or update the analysis for existing runs without re-running expensive LLM sessions.
+    *   The main batch runner for managing multiple replications. Can be invoked in a reprocessing mode (`--reprocess`) to fix or update the analysis for existing runs without re-running expensive LLM sessions. Can also add/override run notes (`--notes`).
     *   Usage: `python src/replication_manager.py path/to/experiment --reprocess --depth 1`
 
 *   **`rebuild_reports.py`**:
@@ -374,10 +470,10 @@ The project includes several scripts for maintenance, diagnostics, and handling 
     *   Usage: `python src/patch_old_runs.py "path/to/old/experiments" --depth -1`
 
 *   **`log_manager.py`**:
-    *   The core utility for automated log management, operating in several modes. It is called by the main runner but can also be used manually for maintenance.
+    *   The core utility for automated log management. Called by the main runner but can also be used manually.
     *   `start`: Archives any old log and creates a new, empty one with a header.
-    *   `rebuild`: Recreates the log from scratch by parsing all existing replication reports in a directory, ensuring a clean state.
-    *   `finalize`: Intelligently cleans any existing summary from the log, recalculates a correct summary from the clean data, and appends it. This command is safe to re-run on a corrupted or finalized log.
+    *   `rebuild`: Recreates the log from scratch by parsing all existing replication reports in a directory.
+    *   `finalize`: Cleans any existing summary from the log, recalculates a correct summary, and appends it.
 
 *   **`retry_failed_sessions.py`**:
     *   Used automatically by the main runner for the repair cycle. Can be run manually to fix failed API calls in a specific run.
@@ -386,26 +482,21 @@ The project includes several scripts for maintenance, diagnostics, and handling 
     *   A diagnostic tool to check for missing files or incomplete stages in a run directory.
 
 *   **`inject_metadata.py`**:
-    *   **LEGACY UTILITY:** This script is no longer part of the standard workflow. It should only be used in rare cases for one-off data labeling where the standard `config.ini` archiving is not feasible.
+    *   **LEGACY UTILITY:** No longer part of the standard workflow.
 
 *   **`compile_results.py`**:
-    *   The core script for hierarchical data aggregation. It recursively scans a directory structure, performing a bottom-up summary.
+    *   The core script for hierarchical data aggregation. Recursively scans a directory structure, performing a bottom-up summary.
     *   **Generates level-aware filenames**: `REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`.
-    *   It is backward-compatible and can aggregate data from older runs that use the legacy `final_summary_results.csv` name at all levels.
     *   Usage: `python src/compile_results.py path/to/study`
 
 *   **`run_anova.py`**:
     *   Performs a comprehensive statistical analysis on a study's master CSV.
-    *   Searches for `STUDY_results.csv` (or falls back to `final_summary_results.csv`) to load data.
-    *   Uses `[ModelDisplayNames]`, `[FactorDisplayNames]`, and `[MetricDisplayNames]` from `config.ini` to produce clean, human-readable plots and logs.
+    *   Uses display names from `config.ini` to produce clean, human-readable plots and logs.
     *   Usage: `python src/run_anova.py path/to/study`
 
 *   **`list_project_files.py`**:
-    *   A powerful diagnostic tool for creating a snapshot of the project's structure. It is not part of the experiment pipeline but is useful for project auditing and understanding its scope.
-    *   It generates a detailed text report in the `output/project_reports/` directory, with a filename that includes the scan depth (e.g., `project_structure_report_depth_1.txt`).
-    *   The report contains a full hierarchical file tree, a summary of all `.py` scripts with their respective line counts, and a list of key project root files.
+    *   A diagnostic tool for creating a snapshot of the project's structure.
     *   Usage for a full recursive scan: `python src/list_project_files.py . --depth -1`
-    *   Usage for a shallow (root + one level deep) scan: `python src/list_project_files.py . --depth 1`
 
 ---
 

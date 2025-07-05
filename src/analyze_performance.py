@@ -783,85 +783,55 @@ def main():
         print("\nNo valid test results to aggregate after individual processing. Exiting.")
         sys.exit(1)
 
-    # --- Overall Meta-Analysis Printing ---
-    num_valid_tests_processed = len(all_test_results)
-    # Print a machine-readable tag that the orchestrator can find to start the summary.
-    print("\n<<<ANALYSIS_SUMMARY_START>>>\n")
-
-    # (The analysis and printing logic is moved from the previous change)
-    # 1. Analyze MWU p-values
+    # --- Data Aggregation for Final JSON ---
     mwu_p_values = [res['p_value_mwu'] for res in all_test_results if res.get('p_value_mwu') is not None and not np.isnan(res.get('p_value_mwu'))]
-    if mwu_p_values:
-        stouffer_z, stouffer_p = combine_p_values_stouffer(mwu_p_values)
-        fisher_chi2, fisher_p = combine_p_values_fisher(mwu_p_values)
-        print("\n1. Combined Significance of Score Differentiation (Mann-Whitney U p-values):")
-        if stouffer_z is not None: print(f"   Stouffer's Method: Combined Z = {stouffer_z:.4f}, Combined p-value = {stouffer_p:.4g} (N={len(mwu_p_values)})")
-        if fisher_chi2 is not None: print(f"   Fisher's Method: Combined Chi2 = {fisher_chi2:.4f}, Combined p-value = {fisher_p:.4g} (N={len(mwu_p_values)})")
-    else: print("\n1. Combined Significance of Score Differentiation: No valid MWU p-values to combine.")
-
-    # 2. Analyze Effect Sizes (r)
+    stouffer_z, stouffer_p = combine_p_values_stouffer(mwu_p_values) if mwu_p_values else (None, None)
+    fisher_chi2, fisher_p = combine_p_values_fisher(mwu_p_values) if mwu_p_values else (None, None)
+    
     effect_sizes_r = [res['effect_size_r'] for res in all_test_results if res.get('effect_size_r') is not None]
     effect_size_analysis = analyze_metric_distribution(effect_sizes_r, 0, "MWU Effect Size r")
-    print_metric_analysis(effect_size_analysis, "2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r')", "%.4f")
-
-    # 3. Analyze MRR
+    
     mrrs = [res['mrr'] for res in all_test_results if res.get('mrr') is not None]
     mrr_chance = calculate_mrr_chance(k_to_use)
     mrr_analysis = analyze_metric_distribution(mrrs, mrr_chance, "Mean Reciprocal Rank (MRR)")
-    print_metric_analysis(mrr_analysis, "3. Overall Ranking Performance (MRR)", "%.4f")
 
-    # 4. Analyze Top-1 Accuracy
     top_1_accs = [res['top_1_accuracy'] for res in all_test_results if res.get('top_1_accuracy') is not None]
     top_1_chance = calculate_top_k_accuracy_chance(1, k_to_use)
     top_1_analysis = analyze_metric_distribution(top_1_accs, top_1_chance, "Top-1 Accuracy")
-    print_metric_analysis(top_1_analysis, "4. Overall Ranking Performance (Top-1 Accuracy)", "%.2%%")
 
-    # 5. Analyze Top-K Accuracy
     top_k_label = f'top_{args.top_k_acc}_accuracy'
     top_k_accs = [res[top_k_label] for res in all_test_results if res.get(top_k_label) is not None]
     top_k_chance = calculate_top_k_accuracy_chance(args.top_k_acc, k_to_use)
     top_k_analysis = analyze_metric_distribution(top_k_accs, top_k_chance, f"Top-{args.top_k_acc} Accuracy")
-    print_metric_analysis(top_k_analysis, f"5. Overall Ranking Performance (Top-{args.top_k_acc} Accuracy)", "%.2%%")
 
-    # --- FIX: Add analysis for the mean rank of the correct ID ---
     mean_ranks = [res['mean_rank_of_correct_id'] for res in all_test_results if res.get('mean_rank_of_correct_id') is not None]
-    # For rank, chance is the average of ranks 1 through k
     mean_rank_chance = (k_to_use + 1) / 2.0
     mean_rank_analysis = analyze_metric_distribution(mean_ranks, mean_rank_chance, "Mean Rank of Correct ID")
     # For rank, lower is better, so the alternative hypothesis for the test is 'less'
-    mean_rank_analysis['wilcoxon_signed_rank_p'] = wilcoxon(np.array(mean_ranks) - mean_rank_chance, alternative='less')[1] if mean_ranks else None
-    print_metric_analysis(mean_rank_analysis, "6. Overall Ranking Performance (Mean Rank of Correct ID)", "%.2f")
-
-
-    print("\nAnalysis complete.")
-
+    if mean_ranks:
+        try:
+            w_stat, w_p = wilcoxon(np.array(mean_ranks) - mean_rank_chance, alternative='less')
+            mean_rank_analysis['wilcoxon_signed_rank_p'] = w_p
+        except ValueError: # Handle cases where wilcoxon fails
+            mean_rank_analysis['wilcoxon_signed_rank_p'] = None
+    else:
+        mean_rank_analysis['wilcoxon_signed_rank_p'] = None
+        
     # --- Saving Section ---
     data_output_dir = os.path.dirname(scores_filepath_abs)
-    if not args.quiet:
-        print(f"\n--- Saving Raw Metric Distributions ---")
-        print(f"Output directory: {data_output_dir}")
-
     save_metric_distribution(mwu_p_values, data_output_dir, f"mwu_p_value_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(effect_sizes_r, data_output_dir, f"effect_size_r_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(mrrs, data_output_dir, f"mrr_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(top_1_accs, data_output_dir, f"top_1_accuracy_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(top_k_accs, data_output_dir, f"top_{args.top_k_acc}_accuracy_distribution_k{k_to_use}.txt", quiet=args.quiet)
-    # --- FIX: Save the mean rank distribution ---
     save_metric_distribution(mean_ranks, data_output_dir, f"mean_rank_distribution_k{k_to_use}.txt", quiet=args.quiet)
 
-    if not args.quiet:
-        print("---------------------------------------\n")
-
     # --- Final Machine-Readable Summary ---
-    # This JSON line is for easy parsing by the final results compiler.
-
-    # Calculate the final aggregate metrics that were missing
     true_false_score_diff = np.mean(all_correct_scores_flat) - np.mean(all_incorrect_scores_flat) if all_correct_scores_flat and all_incorrect_scores_flat else np.nan
     position_counts = Counter(all_chosen_positions_flat)
     counts_for_std = [position_counts.get(i, 0) for i in range(k_to_use)]
     top1_pred_bias_std = np.std(counts_for_std) if counts_for_std else np.nan
     
-    # Calculate performance trend over trials for positional bias metrics
     performance_over_time = [res['mean_rank_of_correct_id'] for res in all_test_results]
     positional_bias_metrics = calculate_positional_bias(performance_over_time)
 

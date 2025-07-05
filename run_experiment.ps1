@@ -49,7 +49,11 @@ param(
 
     # Optional ending replication number.
     [Parameter(Mandatory=$false)]
-    [int]$EndRep
+    [int]$EndRep,
+
+    # Optional notes for the run.
+    [Parameter(Mandatory=$false)]
+    [string]$Notes
 )
 
 # --- Auto-detect execution environment ---
@@ -76,6 +80,9 @@ if ($PSBoundParameters.ContainsKey('StartRep')) {
 }
 if ($PSBoundParameters.ContainsKey('EndRep')) {
     $pythonArgs += "--end-rep", $EndRep
+}
+if ($PSBoundParameters.ContainsKey('Notes')) {
+    $pythonArgs += "--notes", $Notes
 }
 
 # Pass the --verbose flag to the Python script only if the PowerShell -Verbose switch is used.

@@ -302,77 +302,136 @@ def main():
     report_filename = f"replication_report_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
     report_path = os.path.join(run_specific_dir_path, report_filename)
 
+    # Read base query prompt for inclusion in the report
+    base_query_prompt_content = "--- Base query prompt file not found or could not be read. ---"
+    try:
+        base_query_filename = get_config_value(APP_CONFIG, 'Filenames', 'base_query_template')
+        base_query_path = os.path.join(PROJECT_ROOT, base_query_filename)
+        if os.path.exists(base_query_path):
+            with open(base_query_path, 'r', encoding='utf-8') as f:
+                base_query_prompt_content = f.read().strip()
+    except Exception as e:
+        base_query_prompt_content = f"--- Error reading base query prompt: {e} ---"
+
+    # Extract the JSON block from the analyzer's output
+    metrics_json_str = None
+    metrics_data = {}
+    if output4:
+        match = re.search(r'<<<METRICS_JSON_START>>>(.*?)<<<METRICS_JSON_END>>>', output4, re.DOTALL)
+        if match:
+            metrics_json_str = match.group(1).strip()
+            try:
+                metrics_data = json.loads(metrics_json_str)
+            except json.JSONDecodeError:
+                logging.error("Failed to decode metrics JSON from analyzer.")
+                metrics_data = {}
+
+    # Centralized formatting of the analysis summary
+    analysis_summary_text = ""
+    if metrics_data:
+        k_val = int(get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int, fallback=10))
+        top_k_val = 3
+        n_valid = metrics_data.get('n_valid_responses', 0)
+        def format_metric(title, mean_key, p_key, chance_val, is_percent=False):
+            mean_val = metrics_data.get(mean_key)
+            p_val = metrics_data.get(p_key)
+            if mean_val is None: return ""
+            chance_str = f"{chance_val:.2%}" if is_percent else f"{chance_val:.4f}"
+            mean_str = f"{mean_val:.2%}" if is_percent else f"{mean_val:.4f}"
+            p_str = f"p = {p_val:.4g}" if p_val is not None else "p = N/A"
+            return f"{title} (vs Chance={chance_str}):\n   Mean: {mean_str}, Wilcoxon p-value: {p_str}"
+
+        summary_lines = ["\n\n================================================================================",
+                         "### OVERALL META-ANALYSIS RESULTS ###",
+                         "================================================================================"]
+        stouffer_p = metrics_data.get("mwu_stouffer_p")
+        fisher_p = metrics_data.get("mwu_fisher_p")
+        if stouffer_p is not None:
+             summary_lines.append(f"\n1. Combined Significance of Score Differentiation (N={n_valid}):")
+             summary_lines.append(f"   Stouffer's Method: Combined p-value = {stouffer_p:.4g}")
+             if fisher_p is not None:
+                 summary_lines.append(f"   Fisher's Method: Combined p-value = {fisher_p:.4g}")
+
+        summary_lines.append("\n" + format_metric("2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r')", 'mean_effect_size_r', 'effect_size_r_p', 0.0))
+        mrr_chance = (1.0 / k_val) * sum(1.0 / j for j in range(1, k_val + 1))
+        summary_lines.append("\n" + format_metric("3. Overall Ranking Performance (MRR)", 'mean_mrr', 'mrr_p', mrr_chance))
+        summary_lines.append("\n" + format_metric("4. Overall Ranking Performance (Top-1 Accuracy)", 'mean_top_1_acc', 'top_1_acc_p', 1.0/k_val, is_percent=True))
+        summary_lines.append("\n" + format_metric(f"5. Overall Ranking Performance (Top-{top_k_val} Accuracy)", f'mean_top_{top_k_val}_acc', f'top_{top_k_val}_acc_p', float(top_k_val)/k_val, is_percent=True))
+        
+        bias_std = metrics_data.get('top1_pred_bias_std')
+        score_diff = metrics_data.get('true_false_score_diff')
+        if bias_std is not None or score_diff is not None:
+            summary_lines.append(f"\n6. Bias and Other Metrics:")
+            if bias_std is not None:
+                summary_lines.append(f"   Top-1 Prediction Bias (StdDev of choice counts): {bias_std:.4f}")
+            if score_diff is not None:
+                summary_lines.append(f"   Mean Score Difference (Correct - Incorrect): {score_diff:.4f}")
+        analysis_summary_text = "\n".join(summary_lines)
+
     with open(report_path, 'w', encoding='utf-8') as report_file:
         final_config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
         config = configparser.ConfigParser()
         config.read(final_config_path)
 
-        # --- Robust Parameter Reading from Archived Config ---
         def get_robust(section_keys, key_keys):
             for section in section_keys:
                 for key in key_keys:
-                    if config.has_option(section, key):
-                        return config.get(section, key)
+                    if config.has_option(section, key): return config.get(section, key)
             return 'N/A'
+        
+        report_title = "REPLICATION RUN REPORT"
+        run_date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        llm_model = get_robust(['Model', 'LLM'], ['model_name', 'model'])
-        mapping_strategy = get_robust(['Study'], ['mapping_strategy'])
-        personalities_file_path = get_robust(['General', 'Filenames'], ['personalities_db_path', 'personalities_src'])
-        personalities_file = os.path.basename(personalities_file_path) if personalities_file_path != 'N/A' else 'N/A'
-        
-        k_val = get_robust(['Study'], ['k_per_query', 'num_subjects', 'group_size'])
-        m_val = get_robust(['Study'], ['num_iterations', 'num_trials'])
-        
+        if args.reprocess:
+            report_title = f"REPLICATION RUN REPORT ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
+            dir_name = os.path.basename(run_specific_dir_path)
+            match = re.search(r'run_(\d{8}_\d{6})', dir_name)
+            if match:
+                try:
+                    original_dt = datetime.datetime.strptime(match.group(1), '%Y%m%d_%H%M%S')
+                    run_date_str = original_dt.strftime('%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    run_date_str = "Unknown (could not parse from dirname)"
+            else:
+                run_date_str = "Unknown (not found in dirname)"
+
         parser_summary_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+):warnings=(\d+)>>>", output3)
-        if parser_summary_match:
-            parsed_count = parser_summary_match.group(1)
-            total_count = parser_summary_match.group(2)
-            warnings_count = parser_summary_match.group(3)
-            parsing_status_report = f"{parsed_count}/{total_count} responses parsed ({warnings_count} warnings)"
-        else:
-            # Fallback for older reports or if parsing fails
-            fallback_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+)>>>", output3)
-            parsing_status_report = f"{fallback_match.group(1)}/{fallback_match.group(2)} responses parsed" if fallback_match else "N/A"
+        parsing_status_report = f"{parser_summary_match.group(1)}/{parser_summary_match.group(2)} responses parsed ({parser_summary_match.group(3)} warnings)" if parser_summary_match else "N/A"
+        validation_status = "OK (All checks passed)" if "ANALYZER_VALIDATION_SUCCESS" in output4 else "Validation FAILED or was skipped"
 
         header = f"""
 ================================================================================
- REPLICATION RUN REPORT
+ {report_title.strip()}
 ================================================================================
-Date:            {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Date:            {run_date_str}
 Final Status:    {pipeline_status}
 Run Directory:   {os.path.basename(run_specific_dir_path)}
 Parsing Status:  {parsing_status_report}
+Validation Status: {validation_status}
 Report File:     {report_filename}
 
 --- Run Parameters ---
-Num Iterations (m): {m_val}
-Items per Query (k): {k_val}
-Mapping Strategy: {mapping_strategy}
-Personalities Source: {personalities_file}
-LLM Model:       {llm_model}
+Num Iterations (m): {get_robust(['Study'], ['num_iterations', 'num_trials'])}
+Items per Query (k): {get_robust(['Study'], ['k_per_query', 'num_subjects', 'group_size'])}
+Mapping Strategy: {get_robust(['Study'], ['mapping_strategy'])}
+Personalities Source: {os.path.basename(get_robust(['General', 'Filenames'], ['personalities_db_path', 'personalities_src']))}
+LLM Model:       {get_robust(['Model', 'LLM'], ['model_name', 'model'])}
 Run Notes:       {args.notes}
 ================================================================================
-"""
-        # Write the "front end" of the report
-        report_file.write(header.strip())
 
-        # --- THIS IS THE MODIFIED BLOCK ---
-        # If the pipeline completed successfully, write only the "back end" analysis summary.
-        # Otherwise, write all the detailed logs for debugging purposes.
-        if pipeline_status == "COMPLETED":
-            analysis_summary_start_index = output4.find("<<<ANALYSIS_SUMMARY_START>>>")
-            if analysis_summary_start_index != -1:
-                # Extract just the analysis part from the Stage 4 output
-                analysis_summary = output4[analysis_summary_start_index:]
-                report_file.write("\n\n" + analysis_summary.strip())
-            else:
-                # Fallback in case the analysis summary tag is missing
-                report_file.write("\n\n--- ANALYSIS SUMMARY NOT FOUND IN STAGE 4 OUTPUT ---")
-                report_file.write("".join(all_stage_outputs)) # Write full log as a fallback
-        else:
-            # For FAILED or INTERRUPTED runs, write the full, detailed logs.
-            report_file.write("".join(all_stage_outputs))
-    
+
+--- Base Query Prompt Used ---
+{base_query_prompt_content}
+-------------------------------
+"""
+        report_file.write(header.strip())
+        report_file.write(analysis_summary_text)
+
+        if metrics_json_str:
+            report_file.write("\n\n\n<<<METRICS_JSON_START>>>\n")
+            report_file.write(metrics_json_str)
+            report_file.write("\n<<<METRICS_JSON_END>>>")
+
     logging.info(f"Replication run finished. Report saved in directory: {os.path.basename(run_specific_dir_path)}")
 
 

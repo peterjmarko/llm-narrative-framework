@@ -99,6 +99,7 @@ def main():
     parser.add_argument('--depth', type=int, default=0, help="Recursion depth for finding run folders.")
     # MODIFIED: Changed --quiet to --verbose and inverted the logic. Default is now quiet.
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose per-replication status updates.')
+    parser.add_argument('--notes', type=str, help='Optional notes for the report.')
     args = parser.parse_args()
 
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
@@ -140,8 +141,9 @@ def main():
             print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
             print("="*80)
             cmd = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", run_dir]
-            # MODIFIED: Pass --quiet to the orchestrator unless --verbose is specified.
             if not args.verbose: cmd.append("--quiet")
+            if args.notes:
+                cmd.extend(["--notes", args.notes])
             try:
                 subprocess.run(cmd, check=True)
 
@@ -197,11 +199,26 @@ def main():
                 cmd = [sys.executable, orchestrator_script, 
                     "--replication_num", str(rep_num),
                     "--base_output_dir", final_output_dir]
+                if args.notes:
+                    cmd.extend(["--notes", args.notes])
                 # MODIFIED: Pass --quiet to the orchestrator unless --verbose is specified.
                 if not args.verbose: cmd.append("--quiet")
                 
                 try:
                     subprocess.run(cmd, check=True)
+
+                    # --- ADDED: Find the run directory and run bias analysis for consistency ---
+                    search_pattern = os.path.join(final_output_dir, f'run_*_rep-{rep_num:03d}_*')
+                    found_dirs = [d for d in glob.glob(search_pattern) if os.path.isdir(d)]
+                    
+                    if len(found_dirs) == 1:
+                        run_dir = found_dirs[0]
+                        cmd_bias = [sys.executable, bias_analysis_script, run_dir]
+                        subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
+                    else:
+                        logging.warning(f"Could not find unique run directory for rep {rep_num} to run bias analysis. Found: {len(found_dirs)}")
+                    # --- END OF ADDED BLOCK ---
+
                     newly_completed_count += 1
                     elapsed = time.time() - batch_start_time
                     avg_time = elapsed / newly_completed_count
@@ -209,7 +226,7 @@ def main():
                     eta = datetime.datetime.now() + datetime.timedelta(seconds=remaining_reps * avg_time)
                     print(f"\n--- Replication {rep_num} Finished ({newly_completed_count}/{len(reps_to_run)}) ---")
                     print(f"{C_GREEN}Time Elapsed: {format_seconds(elapsed)} | Remaining: {format_seconds(remaining_reps * avg_time)} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
-                
+
                 except subprocess.CalledProcessError:
                     logging.error(f"!!! Replication {rep_num} failed. Check its report for details. Continuing... !!!")
                     failed_reps.append(rep_num) # Add the failed replication number to our list
