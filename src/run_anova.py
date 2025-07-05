@@ -64,12 +64,26 @@ try:
     import seaborn as sns
     import matplotlib.pyplot as plt
     import networkx as nx
+    import pingouin as pg
 except ImportError:
-    logging.error("ERROR: Plotting libraries not found. Run: pip install seaborn matplotlib networkx")
+    logging.error("ERROR: Plotting libraries not found. Run: pip install seaborn matplotlib networkx pingouin")
     sys.exit(1)
+
+import re
 
 # Suppress the FutureWarning from seaborn/pandas
 warnings.simplefilter(action='ignore', category=FutureWarning)
+
+
+class ColorStrippingFormatter(logging.Formatter):
+    """A logging formatter that strips ANSI color codes for file output."""
+    ANSI_ESCAPE_CODE_RE = re.compile(r'\x1b\[[0-9;]*m')
+
+    def format(self, record):
+        # Let the parent formatter do the initial formatting
+        formatted_message = super().format(record)
+        # Strip ANSI codes from the final formatted message
+        return self.ANSI_ESCAPE_CODE_RE.sub('', formatted_message)
 
 def find_master_csv(search_dir):
     """Finds the most relevant summary CSV in a directory."""
@@ -93,12 +107,12 @@ def format_p_value(p_value):
     if pd.isna(p_value): return "p = N/A"
     return "p < 0.001" if p_value < 0.001 else f"p = {p_value:.3f}"
 
-def generate_performance_tiers(df, metric, tukey_result, sanitized_to_display_map):
+def generate_performance_tiers(df, metric, posthoc_df, sanitized_to_display_map):
     """
-    Generates performance groups using a more robust clique-finding algorithm.
-    This avoids the issue of chaining non-significant results across disparate groups.
-    A "clique" is a group where every model is not statistically different from
-    every other model within that same group.
+    Generates performance groups from a post-hoc results DataFrame using a
+    clique-finding algorithm. This avoids the issue of chaining non-significant
+    results across disparate groups. A "clique" is a group where every model is
+    not statistically different from every other model within that same group.
     """
     logging.info("\n--- Performance Groups (Models in the same group are not statistically different from each other) ---")
     G = nx.Graph()
@@ -106,10 +120,8 @@ def generate_performance_tiers(df, metric, tukey_result, sanitized_to_display_ma
     models_display = list(sanitized_to_display_map.values())
     G.add_nodes_from(models_display)
     
-    tukey_df = pd.DataFrame(data=tukey_result._results_table.data[1:], columns=tukey_result._results_table.data[0])
-    
-    for _, row in tukey_df.iterrows():
-        # Get the display names from the sanitized names in the Tukey results
+    for _, row in posthoc_df.iterrows():
+        # Get the display names from the sanitized names in the post-hoc results
         group1_display = sanitized_to_display_map.get(row['group1'], row['group1'])
         group2_display = sanitized_to_display_map.get(row['group2'], row['group2'])
 
@@ -226,36 +238,52 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
         model = ols(formula, data=df).fit()
         create_diagnostic_plot(model, display_metric_name, output_dir, metric_key)
         anova_table = sm.stats.anova_lm(model, typ=2)
+
+        # Add Eta-squared (η²) for effect size
+        ss_total = anova_table['sum_sq'].sum()
+        anova_table['eta_sq'] = anova_table['sum_sq'] / ss_total
         
         logging.info(f"\n--- ANOVA Summary for {display_metric_name} ---")
-        logging.info(f"\n{anova_table.to_string()}")
+        logging.info(f"\n{anova_table.to_string(float_format='%.6f')}")
         
         significant_factors = [f.replace('C(', '').replace(')', '') for f in anova_table.index if anova_table.loc[f, 'PR(>F)'] < 0.05 and 'Residual' not in f]
 
         if significant_factors:
             logging.info(f"\nConclusion: Significant effect found for factor(s): {', '.join(significant_factors)}")
-            logging.info("\n--- Post-Hoc Analysis (Tukey's HSD) ---")
+            logging.info("\n--- Post-Hoc Analysis ---")
             for factor in significant_factors:
                 if df[factor].nunique() <= 2:
-                    logging.info(f"\nFactor '{factor}' has only two levels and is significant (ANOVA p={anova_table.loc[f'C({factor})', 'PR(>F)']:.4f}). No pairwise table needed.")
+                    p_val_str = f"{anova_table.loc[f'C({factor})', 'PR(>F)']:.4f}"
+                    logging.info(f"\nFactor '{factor}' has only two levels and is significant (ANOVA p={p_val_str}). No pairwise table needed.")
                     continue
 
                 logging.info(f"\nComparing levels for factor: '{factor}'")
+                posthoc_df = None
                 
                 try:
+                    # Attempt Tukey HSD first, which assumes equal variance
+                    logging.info("\nAttempting Tukey HSD...")
                     tukey_result = pairwise_tukeyhsd(endog=df[metric_key], groups=df[factor], alpha=0.05)
                     if pd.DataFrame(tukey_result._results_table.data).isnull().values.any():
-                        raise ValueError("Tukey HSD result contains NaN values, indicating a computational issue.")
+                        raise ValueError("Tukey HSD result contains NaN values.")
                     
                     logging.info(f"\n{tukey_result}")
-
-                    if factor == 'model':
-                        generate_performance_tiers(df, metric_key, tukey_result, sanitized_to_display_map)
+                    posthoc_df = pd.DataFrame(data=tukey_result._results_table.data[1:], columns=tukey_result._results_table.data[0])
 
                 except (ValueError, ZeroDivisionError) as tukey_err:
-                    logging.warning(f"\nWARNING: Could not perform post-hoc Tukey HSD test for factor '{factor}'.")
-                    logging.warning(f"  This is often caused by large variance differences between groups (see 'bias_slope' metric).")
-                    logging.warning(f"  Reason: {tukey_err}")
+                    logging.warning(f"  - Tukey HSD failed: {tukey_err}")
+                    logging.info("  - Falling back to Games-Howell test (does not assume equal variance).")
+                    
+                    gh_result = pg.pairwise_gameshowell(data=df, dv=metric_key, between=factor)
+                    logging.info(f"\n{gh_result.to_string()}")
+                    
+                    # Standardize Games-Howell output to match the format needed for tier generation
+                    posthoc_df = gh_result[['A', 'B', 'pval']].copy()
+                    posthoc_df.rename(columns={'A': 'group1', 'B': 'group2'}, inplace=True)
+                    posthoc_df['reject'] = posthoc_df['pval'] < 0.05
+
+                if factor == 'model' and posthoc_df is not None:
+                    generate_performance_tiers(df, metric_key, posthoc_df, sanitized_to_display_map)
 
         else:
             logging.info("\nConclusion: No factors had a statistically significant effect on this metric.")
@@ -342,22 +370,24 @@ def main():
     os.makedirs(os.path.join(output_dir, 'diagnostics'), exist_ok=True)
     # --- End of Directory Creation ---
 
-    # Now, set up the full logging with the file handler
+    # Now, set up the final logging configuration with two distinct handlers.
     root_logger = logging.getLogger()
-    # Remove the temporary stream-only handler
+    # Remove the temporary handler used for initial messages
     root_logger.removeHandler(temp_handler)
-    # Add the final handlers including the file logger
-    root_logger.addHandler(logging.FileHandler(log_filepath, mode='w', encoding='utf-8'))
-    root_logger.addHandler(logging.StreamHandler(sys.stdout))
+
+    # 1. Add a handler for the log file that uses the custom formatter to strip color codes.
+    file_handler = logging.FileHandler(log_filepath, mode='w', encoding='utf-8')
+    file_handler.setFormatter(ColorStrippingFormatter('%(message)s'))
+    root_logger.addHandler(file_handler)
+
+    # 2. Add a handler for the console that uses a standard formatter to preserve color codes.
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter('%(message)s'))
+    root_logger.addHandler(console_handler)
 
     master_csv_path = find_master_csv(base_dir)
     if not master_csv_path:
         sys.exit(1)
-    
-    logging.basicConfig(level=logging.INFO,
-                        format='%(message)s',
-                        handlers=[logging.FileHandler(log_filepath, mode='w', encoding='utf-8'),
-                                  logging.StreamHandler(sys.stdout)])
     
     logging.info(f"Full analysis log is being saved to: {log_filepath}")
     

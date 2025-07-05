@@ -93,7 +93,8 @@ def main():
             all_diagrams_ok = False # Mark failure but continue processing others
             
         alt_text = base_name.replace('_', ' ').title()
-        image_tag = f"![{alt_text}]({image_rel_path})"
+        # Add a Pandoc attribute to scale the image width to 90% of the page.
+        image_tag = f"![{alt_text}]({image_rel_path}){{width=90%}}"
         final_md_content = final_md_content.replace(placeholder.group(0), image_tag, 1)
 
     if not all_diagrams_ok:
@@ -112,7 +113,10 @@ def main():
             if os.path.exists(source_md_path):
                 output_rtf_path = os.path.join(project_root, md_filename.replace('.md', '.rtf'))
                 pypandoc.convert_file(
-                    source_md_path, 'rtf', format='gfm', outputfile=output_rtf_path,
+                    source_md_path, 'rtf',
+                    # Explicitly enable the link_attributes extension
+                    format='markdown+link_attributes',
+                    outputfile=output_rtf_path,
                     extra_args=['--standalone', '--resource-path', project_root]
                 )
                 print(f"Successfully built '{os.path.basename(output_rtf_path)}'!")

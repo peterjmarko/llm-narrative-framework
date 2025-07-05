@@ -20,6 +20,7 @@ dependencies = [
     "tqdm",
     "seaborn",
     "matplotlib",
+    "pingouin>=0.5.5",
 ]
 
 [project.optional-dependencies]
