@@ -1,12 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# Filename: run_replications.ps1
-
-# --- (Preamble and comments are unchanged) ---
-
 #!/usr/bin/env pwsh
 # -*-
-# Filename: run_replications.ps1
+# Filename: run_experiment.ps1
 
 <#
 .SYNOPSIS
@@ -58,6 +52,18 @@ param(
     [int]$EndRep
 )
 
+# --- Auto-detect execution environment ---
+$executable = "python"
+$prefixArgs = @()
+if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    Write-Host "PDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    $executable = "pdm"
+    $prefixArgs = "run", "python"
+}
+else {
+    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+}
+
 # Ensure console output uses UTF-8 to correctly display any special characters.
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
@@ -78,8 +84,11 @@ if ($PSBoundParameters.ContainsKey('Verbose')) {
     $pythonArgs += "--verbose"
 }
 
-# Execute the main Python batch script with the specified arguments.
-& python $pythonArgs
+# Combine prefix arguments with the script and its arguments
+$finalArgs = $prefixArgs + $pythonArgs
+
+# Execute the command with its final argument list
+& $executable $finalArgs
 
 # Check the exit code from the Python script.
 if ($LASTEXITCODE -ne 0) {
@@ -87,3 +96,5 @@ if ($LASTEXITCODE -ne 0) {
 } else {
     Write-Host "`n--- PowerShell launcher script finished. ---"
 }
+
+# === End of run_experiment.ps1 ===

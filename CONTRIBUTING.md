@@ -16,13 +16,14 @@ Before you begin, ensure you have the following installed on your system:
     # It's best to run this from a terminal *outside* of any virtual environment.
     pip install --user pdm
     ```
+    > **Note for Windows Users:** If you see a `pdm: The term 'pdm' is not recognized...` error in a new terminal, it means the install location is not in your system's PATH. The most reliable way to run PDM is to use `python -m pdm` instead of just `pdm`. All examples below will use this robust form.
 
 ### 2. Project Installation
 
 With PDM installed, setting up the entire project environment is a single command. From the project's root directory, run:
 
 ```bash
-pdm install -G dev
+python -m pdm install -G dev
 ```
 This command will automatically:
 1.  Create a local virtual environment inside the project's `.venv` folder.
@@ -40,21 +41,11 @@ If your contribution requires a new package, add it with PDM. This will update b
 
 ```bash
 # Add a new core dependency
-pdm add new-package-name
+python -m pdm add new-package-name
 
 # Add a new development-only dependency
-pdm add -G dev new-dev-package-name
+python -m pdm add -G dev new-dev-package-name
 ```
-
-### 4. Set Up Pre-commit Hooks
-
-This project uses `pre-commit` to automatically format code, check for style violations, and build the README file before each commit. This ensures all contributions meet our quality standards automatically.
-
-1.  **Install the hooks**: After installing the requirements, run this one-time setup command from the project root:
-    ```bash
-    pre-commit install
-    ```
-2.  **That's it!** Now, every time you run `git commit`, the hooks will run automatically.
 
 ## Contribution Workflow
 
@@ -79,11 +70,11 @@ Write your code and update documentation as needed.
 
 ### 3. Run the Test Suite
 
-The pre-commit hooks do not run the test suite automatically. You must still run the tests manually to ensure your changes haven't broken anything.
+This project includes tests that must pass before a pull request will be merged. The pre-commit hooks do not run these tests automatically, so you must run them manually.
 
-**All tests must pass before a pull request will be merged.**
+Use the PDM script shortcut:
 ```bash
-pytest -v
+python -m pdm run test
 ```
 
 ### 4. Commit Your Changes

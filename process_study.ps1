@@ -1,3 +1,7 @@
+#!/usr/bin/env pwsh
+# -*-
+# Filename: process_study.ps1
+
 <#
 .SYNOPSIS
     Automates the final compilation and statistical analysis of a full study.
@@ -29,6 +33,18 @@ param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the top-level study directory.")]
     [string]$StudyDirectory
 )
+
+# --- Auto-detect execution environment ---
+$executable = "python"
+$prefixArgs = @()
+if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    Write-Host "PDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    $executable = "pdm"
+    $prefixArgs = "run", "python"
+}
+else {
+    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+}
 
 # --- Load and parse model display names from config.ini ---
 $modelNameMap = @{}
@@ -91,10 +107,14 @@ function Invoke-PythonScript {
         [string[]]$Arguments
     )
 
-    Write-Host "[${StepName}] Executing: python ${ScriptName} ${Arguments}"
+    # Combine prefix arguments with the script and its arguments
+    $finalArgs = $prefixArgs + $ScriptName + $Arguments
 
-    # Execute the Python script, capturing all standard and error output streams
-    $output = & python $ScriptName $Arguments 2>&1
+    # Use -join to correctly format the command for logging
+    Write-Host "[${StepName}] Executing: $executable $($finalArgs -join ' ')"
+
+    # Execute the command with its final argument list, capturing output
+    $output = & $executable $finalArgs 2>&1
 
     # Check the exit code of the last command immediately
     if ($LASTEXITCODE -ne 0) {
@@ -213,3 +233,5 @@ catch {
     # Exit with a non-zero status code to indicate failure to other automation tools
     exit 1
 }
+
+# === End of process_study.ps1 ===

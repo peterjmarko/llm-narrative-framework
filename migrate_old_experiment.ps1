@@ -1,3 +1,7 @@
+#!/usr/bin/env pwsh
+# -*-
+# Filename: migrate_old_experiment.ps1
+
 <#
 .SYNOPSIS
     Automates the 4-step process to upgrade an old experiment directory to be
@@ -23,7 +27,19 @@ param (
     [string]$TargetDirectory
 )
 
-# --- Function to execute a Python script and check for errors ---
+# --- Auto-detect execution environment ---
+$executable = "python"
+$prefixArgs = @()
+if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    Write-Host "PDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    $executable = "pdm"
+    $prefixArgs = "run", "python"
+}
+else {
+    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+}
+
+# --- Function to execute a Python script using the detected executor, and check for errors ---
 function Invoke-PythonScript {
     param (
         [string]$StepName,
@@ -31,10 +47,14 @@ function Invoke-PythonScript {
         [string[]]$Arguments
     )
     
-    Write-Host "[${StepName}] Executing: python ${ScriptName} ${Arguments}"
+    # Combine prefix arguments with the script and its arguments
+    $finalArgs = $prefixArgs + $ScriptName + $Arguments
+
+    # Use -join to correctly format the command for logging
+    Write-Host "[${StepName}] Executing: $executable $($finalArgs -join ' ')"
     
-    # Execute the Python script
-    python $ScriptName $Arguments
+    # Execute the command with its final argument list
+    & $executable $finalArgs
     
     # Check the exit code of the last command
     if ($LASTEXITCODE -ne 0) {
@@ -104,3 +124,5 @@ catch {
     # Exit with a non-zero status code to indicate failure to other automation tools
     exit 1
 }
+
+# === End of migrate_old_experiment.ps1 ===
