@@ -305,13 +305,23 @@ def main():
     # Read base query prompt for inclusion in the report
     base_query_prompt_content = "--- Base query prompt file not found or could not be read. ---"
     try:
+        # Try the new key 'base_query_template' first, then fall back to 'base_query_src' for compatibility.
         base_query_filename = get_config_value(APP_CONFIG, 'Filenames', 'base_query_template')
-        base_query_path = os.path.join(PROJECT_ROOT, base_query_filename)
-        if os.path.exists(base_query_path):
-            with open(base_query_path, 'r', encoding='utf-8') as f:
-                base_query_prompt_content = f.read().strip()
+        if not base_query_filename:
+            base_query_filename = get_config_value(APP_CONFIG, 'Filenames', 'base_query_src')
+
+        if base_query_filename:
+            # Construct the path relative to the project root, inside the 'data' directory.
+            base_query_path = os.path.join(PROJECT_ROOT, "data", base_query_filename)
+            if os.path.exists(base_query_path):
+                with open(base_query_path, 'r', encoding='utf-8') as f:
+                    base_query_prompt_content = f.read().strip()
+            else:
+                base_query_prompt_content = f"--- Base query prompt file '{base_query_filename}' specified in config but not found at '{base_query_path}'. ---"
+        else:
+            base_query_prompt_content = "--- Neither 'base_query_template' nor 'base_query_src' key found in config.ini [Filenames] section. ---"
     except Exception as e:
-        base_query_prompt_content = f"--- Error reading base query prompt: {e} ---"
+        base_query_prompt_content = f"--- Error processing base query prompt: {e} ---"
 
     # Extract the JSON block from the analyzer's output
     metrics_json_str = None
@@ -427,8 +437,18 @@ Run Notes:       {args.notes}
         report_file.write(header.strip())
         report_file.write(analysis_summary_text)
 
-        if metrics_json_str:
+        # If the metrics data was successfully parsed into a dictionary,
+        # write it back out as a nicely formatted JSON block.
+        if metrics_data:
             report_file.write("\n\n\n<<<METRICS_JSON_START>>>\n")
+            # Use json.dumps with indent=4 for pretty-printing
+            pretty_json_str = json.dumps(metrics_data, indent=4)
+            report_file.write(pretty_json_str)
+            report_file.write("\n<<<METRICS_JSON_END>>>")
+        elif metrics_json_str:
+            # Fallback for debugging: if we have a string but couldn't parse it, write it as-is
+            report_file.write("\n\n\n<<<METRICS_JSON_START>>>\n")
+            report_file.write("--- WARNING: The following JSON block was unparseable ---\n")
             report_file.write(metrics_json_str)
             report_file.write("\n<<<METRICS_JSON_END>>>")
 

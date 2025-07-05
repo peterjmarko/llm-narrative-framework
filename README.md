@@ -309,7 +309,9 @@ The `run_experiment.ps1` PowerShell script is the main entry point for executing
     # For detailed debugging, run with the -Verbose switch
     .\run_experiment.ps1 -Verbose
     ```
-    The script manages the entire batch run, including an automatic repair phase for any failures.
+    *   The script manages the entire batch run. It automatically detects and **skips** any replications that have already been completed successfully. This allows you to safely resume an interrupted batch run without re-doing work. To force a re-analysis of existing data, you must use the `--reprocess` mode described in the maintenance section.
+    *   The script will then automatically enter a repair phase for any failed replications from the current batch.
+    *   **Crucially**, each replication's output directory will now contain a `config.ini.archived` file, making it a self-contained, reproducible artifact.
 
 3.  **Repeat for All Conditions**: Repeat steps 1-2 for each experimental condition, organizing the outputs into separate folders.
 

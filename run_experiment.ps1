@@ -43,6 +43,11 @@
 
 [CmdletBinding()]
 param(
+    # The target directory for the experiment. Can be an existing directory
+    # or one to be created. This is the first positional parameter.
+    [Parameter(Position=0, Mandatory=$false)]
+    [string]$TargetDirectory,
+
     # Optional starting replication number.
     [Parameter(Mandatory=$false)]
     [int]$StartRep,
@@ -75,6 +80,12 @@ Write-Host "--- Launching Python Batch Runner ---" -ForegroundColor Green
 
 # Build the argument list for the Python script dynamically.
 $pythonArgs = @("src/replication_manager.py")
+
+# Add the target directory if it was provided.
+if ($PSBoundParameters.ContainsKey('TargetDirectory')) {
+    $pythonArgs += $TargetDirectory
+}
+
 if ($PSBoundParameters.ContainsKey('StartRep')) {
     $pythonArgs += "--start-rep", $StartRep
 }
