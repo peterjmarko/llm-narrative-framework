@@ -4,46 +4,67 @@ We welcome contributions to this project! This document provides guidelines for 
 
 ## Getting Started: Development Environment Setup
 
-This project uses **PDM** for dependency and environment management. It simplifies setup and guarantees reproducible environments.
+This guide provides comprehensive setup instructions for developers. Following these steps ensures your environment is correctly configured with all necessary tools and hooks.
 
-### 1. Essential Tools
+### Step 1: Install Prerequisite Tools
 
-Before you begin, ensure you have the following installed on your system:
+Before cloning the project, ensure these essential tools are installed on your system.
 
-*   **Python**: Version 3.8 or higher is recommended. You can download it from [python.org](https://www.python.org/downloads/).
-*   **Git**: For version control. You can download it from [git-scm.com](https://git-scm.com/downloads).
-*   **Node.js and npm**: Required by the documentation build script to automatically render Mermaid diagrams.
-    *   Download the **LTS** version from [nodejs.org](https://nodejs.org/en/download/).
-    *   During installation, ensure the default **"Add to PATH"** option is enabled. After installing, you may need to restart your computer or terminal for the `npm` command to be recognized.
-*   **Project Dependencies**: Once Node.js is installed, navigate to the project root and install the required Node.js development tools:
+*   **Python**: Version 3.8 or higher. Download from [python.org](https://www.python.org/downloads/).
+*   **Git**: For version control. Download from [git-scm.com](https://git-scm.com/downloads).
+*   **Node.js and npm**: Required for building documentation. Download the **LTS** version from [nodejs.org](https://nodejs.org/en/download/).
+*   **Pandoc**: A universal document converter. Download from [pandoc.org](https://pandoc.org/installing.html).
+*   **PDM**: The Python dependency manager. Install it once globally with pip:
+    ```bash
+    pip install --user pdm
+    ```
+
+### Step 2: Clone and Set Up the Project
+
+1.  **Clone the Repository**:
+    ```bash
+    git clone <repository-url>
+    cd <repository-directory>
+    ```
+
+2.  **Set the Project's Python Interpreter (Crucial Step)**:
+    You must explicitly tell PDM which Python interpreter to use for this project. This prevents conflicts and ensures the local `.venv` is created correctly.
+    
+    First, try a simple alias:
+    ```bash
+    # Use the version you have installed, e.g., 3.11
+    pdm use python3.11
+    ```
+    If this fails with a `[NoPythonVersion]` error, provide the **full, absolute path** to your Python executable.
+
+    *   **To find the path on Windows:** Use the `py` launcher.
+        ```bash
+        py -0p 
+        ```
+        Copy the full path for the desired version.
+    *   **To find the path on macOS/Linux:** Use the `which` command.
+        ```bash
+        which python3.11
+        ```
+
+    Now, use the full path you found (in quotes):
+    ```bash
+    # Example for Windows. Replace with your actual path.
+    pdm use "C:\Users\YourName\AppData\Local\Programs\Python\Python311\python.exe"
+    ```
+
+3.  **Install All Dependencies and Tools**:
+    This single command installs everything needed for development: Python packages, dev tools, and pre-commit hooks. The `-d` flag includes all development dependencies.
+    ```bash
+    pdm install -G dev
+    ```
+
+4.  **Install Node.js Dependencies**:
+    Finally, install the Node.js tools required for the documentation build script.
     ```bash
     npm install
     ```
-    This reads the `package.json` file and installs dependencies locally into a `node_modules` folder.
-*   **Pandoc**: A universal document converter used to generate DOCX and other document formats. You can download it from [pandoc.org](https://pandoc.org/installing.html).
-*   **PDM**: The Python dependency manager. Install it once with pip (if you haven't already):
-    ```bash
-    # It's best to run this from a terminal *outside* of any virtual environment.
-    pip install --user pdm
-    ```
-    > **Note for Windows Users:** If you see a `pdm: The term 'pdm' is not recognized...` error in a new terminal, it means the install location is not in your system's PATH. The most reliable way to run PDM is to use `python -m pdm` instead of just `pdm`. All examples below will use this robust form.
-
-### 2. Project Installation
-
-With PDM installed, setting up the entire project environment is a single command. From the project's root directory, run:
-
-```bash
-python -m pdm install -G dev
-```
-This command will automatically:
-1.  Create a local virtual environment inside the project's `.venv` folder.
-2.  Install all required packages from the `pdm.lock` file.
-3.  Install all development packages (like `pytest` and `pre-commit`).
-4.  Install the pre-commit hooks into your Git configuration.
-
-To activate the virtual environment manually for use with your IDE, you can still use the standard command:
-*   On Windows (PowerShell): `.venv\Scripts\Activate.ps1`
-*   On macOS/Linux: `source .venv/bin/activate`
+Your development environment is now fully configured.
 
 ### 3. Adding New Dependencies
 

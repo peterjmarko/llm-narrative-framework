@@ -78,30 +78,32 @@ This logical hierarchy is reflected in the directory structure of the project an
 
 ## Setup and Installation
 
-This project uses **PDM** for dependency and environment management, which simplifies setup into a few commands.
+This project uses **PDM** for dependency and environment management.
 
 1.  **Install PDM (One-Time Setup)**:
-    If you don't have PDM, install it with pip. It's best to run this from a terminal *outside* of any virtual environment.
+    If you don't have PDM, install it once with pip. It's best to run this from a terminal *outside* of any virtual environment.
     ```bash
     pip install --user pdm
     ```
-    > **Note:** If you see a `pdm: The term 'pdm' is not recognized...` error in a new terminal, the most reliable way to run PDM is to use `python -m pdm` instead of just `pdm`.
+    > **Note:** If `pdm` is not found in a new terminal, use `python -m pdm` instead.
 
-2.  **Install Project Dependencies**:
-    From the project's root directory, run the main PDM installation command.
+2.  **Install Project Environment & Dependencies**:
+    From the project's root directory, run the main PDM installation command. The `-G dev` flag installs all packages, including the development tools needed to run the test suite.
     ```bash
-    pdm install
+    pdm install -G dev
     ```
-    This single command automatically:
-    *   Detects your Python version.
-    *   Creates a local virtual environment in the project's `.venv` folder.
-    *   Installs all required packages from the `pdm.lock` file for a reproducible setup.
+    This command creates a local `.venv` folder and installs all necessary packages into it.
 
 3.  **Configure API Key**:
     *   Create a file named `.env` in the project root.
     *   Add your API key: `OPENROUTER_API_KEY=sk-or-your-key`.
 
-To run commands within the managed environment, prefix them with `pdm run`. For example: `pdm run python src/some_script.py`.
+To run any project command, such as the test suite, prefix it with `pdm run`:
+```bash
+pdm run test
+```
+
+> **For Developers:** If you intend to contribute to the project or encounter issues with the simple setup, please see the **[Developer Setup Guide in CONTRIBUTING.md](CONTRIBUTING.md#getting-started-development-environment-setup)** for more detailed instructions and troubleshooting.
 
 ## Configuration (`config.ini`)
 
