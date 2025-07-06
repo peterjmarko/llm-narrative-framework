@@ -1,0 +1,63 @@
+
+================================================================================
+       LLM Personality Matching Study: Comprehensive Statistical Analysis
+================================================================================
+
+Introduction
+------------
+This document details the comprehensive statistical analysis for the entire study...
+...
+(Abridged methodology description)
+...
+Analysis will proceed with <N> rows from <N> models.
+...
+
+================================================================================
+ ANALYSIS FOR METRIC: '<Metric Display Name>'
+================================================================================
+Detected <n> active factor(s) with variation: <factor_1>, <factor_2>
+
+--- Descriptive Statistics by <factor_1>, <factor_2> ---
+
+                                              Replications  Total Trials (N)   Mean  Std. Dev.
+<factor_1_level_1>          <factor_2_level_1>          <n>               <N>  <val>     <val>
+...                         ...                         ...               ...    ...       ...
+
+-> Diagnostic plot saved successfully to: <path_to_qqplot.png>
+
+--- ANOVA Summary for <Metric Display Name> ---
+
+                      sum_sq         df         F   PR(>F)   eta_sq
+C(<factor_1>)         <val>      <val>     <val>    <val>    <val>
+C(<factor_2>)         <val>      <val>     <val>    <val>    <val>
+Residual              <val>      <val>       NaN      NaN    <val>
+
+Conclusion: Significant effect found for factor(s): <factor_1>, <factor_2>
+
+--- Post-Hoc Analysis ---
+
+Comparing levels for factor: '<factor_1>'
+
+Attempting Tukey HSD...
+
+                     Multiple Comparison of Means - Tukey HSD, FWER=0.05
+==============================================================================================
+           group1                      group2           meandiff p-adj   lower   upper  reject
+----------------------------------------------------------------------------------------------
+<level_A>                   <level_B>                    <val>  <val>   <val>   <val>  <bool>
+...                         ...                          ...    ...     ...     ...    ...
+
+--- Performance Groups (Models in the same group are not statistically different from each other) ---
+
+Performance Group Median Score     Models
+          Group 1       <val>      <Model A>, <Model B>
+          ...           ...        ...
+
+Factor '<factor_2>' has only two levels and is significant (ANOVA p=<val>). No pairwise table needed.
+
+--- Generating Performance Plots ---
+-> Plot saved successfully to: <path_to_boxplot.png>
+-> Plot saved successfully to: <path_to_boxplot.png>
+
+
+[... analysis for other metrics follows ...]

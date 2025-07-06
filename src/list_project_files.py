@@ -3,31 +3,39 @@
 # Filename: src/list_project_files.py
 
 """
-Project File Lister (list_project_files.py)
+Project Structure Reporter (list_project_files.py)
 
 Purpose:
-This script scans a directory structure and generates a single text file,
-`all_project_files.txt`, which contains the concatenated content of all specified
-source code files. It's designed to create a comprehensive snapshot of a
-project for analysis or archival.
+This script scans a project directory and generates a detailed text report,
+`project_structure_report_depth_[N].txt`. It provides a snapshot of the
+project's layout, including a hierarchical file tree and summaries of key files.
+This is useful for documentation, project handovers, and getting a quick
+overview of a codebase.
 
 Workflow:
-1.  Accepts a root directory to scan.
-2.  The scan depth is controlled by the --depth argument.
-3.  Finds all files with specified extensions (e.g., .py, .md, .txt).
-4.  Excludes files from specified directories (e.g., .venv, __pycache__).
-5.  Concatenates the content of all found files into one output file.
-6.  Each file's content is preceded by a header indicating its original path.
+1.  Accepts a target directory to scan (or auto-detects the project root).
+2.  Generates a hierarchical tree view of directories and files.
+3.  The overall scan depth is controlled by the `--depth` argument.
+4.  **Custom Depths:** Scan depth can be customized for specific folders
+    by editing the `CUSTOM_DEPTH_MAP` dictionary in the script's configuration.
+    This allows for more detailed views of important folders (like `src`) while
+    keeping others summarized (like `output`).
+5.  Excludes configured directories (e.g., .venv, .git) and file types.
+6.  Calculates and lists all Python (`.py`) files with their line counts.
+7.  Saves the complete report to a dedicated output directory.
 
 Command-Line Usage:
-    # Scan the current project directory '.' (depth 0)
+    # Scan the current project directory (root level only, depth 0)
     python src/list_project_files.py .
 
-    # Scan the project directory and its immediate subdirectories
+    # Scan the project directory and its immediate subdirectories (depth 1)
     python src/list_project_files.py . --depth 1
 
-    # Scan the entire project directory tree recursively
+    # Scan the entire project directory tree recursively (infinite depth)
     python src/list_project_files.py . --depth -1
+
+Note: For custom depth control (e.g., `src` at depth 2, `output` at depth 0),
+modify the `CUSTOM_DEPTH_MAP` dictionary within the script.
 """
 
 # === Start of utilities/list_project_files.py ===
@@ -40,6 +48,22 @@ import traceback # For detailed error logging if needed
 import argparse
 
 # --- Configuration ---
+# Define custom scan depths for specific directories.
+# Paths should be relative to the project root, using forward slashes.
+# The integer value represents the desired depth *from that folder*.
+#   - 0: Show the folder name, but do not list its contents.
+#   - 1: Show the folder's immediate children.
+#   - 2: Show children and grandchildren.
+#   - -1: Show all contents recursively (infinite depth).
+# Any folder NOT listed here will use the default --depth from the command line.
+CUSTOM_DEPTH_MAP = {
+    "docs": 2,          # Show contents of 'docs' down to 2 levels deep
+    "htmlcov": 0,       # Hide contents of 'htmlcov' folder
+    "output": 3,        # Show contents of 'output' down to 3 levels deep, except:
+    "output\analysis_inputs": 0,        # Hide contents of 'output\analysis_inputs'
+    "src": 1,           # Show contents of 'src' down to 1 level deep
+    "tests": 1,         # Show contents of 'tests' down to 1 level deep
+}
 # Directories to completely exclude from the scan (names, not paths)
 EXCLUDE_DIRS_SET = {
     ".venv", "venv", "__pycache__", ".git", ".vscode", ".idea",
@@ -48,7 +72,7 @@ EXCLUDE_DIRS_SET = {
     "weather", "project_code_as_txt/weather" # Specific to this project (weather scripts and data)
 }
 # Specific files to always exclude by name
-EXCLUDE_FILES_SET = {".DS_Store", "Thumbs.db", "*.pyc", "*.pyo", "*.pyd"}
+EXCLUDE_FILES_SET = {".DS_Store", "Thumbs.db", "*.pyc", "*.pyo", "*.pyd", "~$*.*"}
 # File extensions to exclude (alternative to listing full names in EXCLUDE_FILES_SET)
 EXCLUDE_EXTENSIONS_SET = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp"} # Add more as needed
 
@@ -120,16 +144,16 @@ def should_exclude_path(path_item: pathlib.Path, project_root: pathlib.Path):
 def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pathlib.Path, indent_level=0, scan_depth=0):
     """
     Recursively generates a file listing for the output file.
-    Respects scan_depth for how deep to list contents.
+    Respects a global scan_depth and a CUSTOM_DEPTH_MAP for per-folder overrides.
     """
     indent = "  " * indent_level
     prefix_dir = "📁 "
     prefix_file = "📄 "
 
     try:
+        # Sort items, directories first, then files, all alphabetically
         items_in_dir = sorted(list(current_path.iterdir()), key=lambda x: (x.is_file(), x.name.lower()))
     except (PermissionError, FileNotFoundError):
-        # This part remains the same, handles directories that can't be read.
         outfile.write(f"{indent}{prefix_dir}{current_path.name}/  (Cannot Access)\n")
         return
 
@@ -139,9 +163,30 @@ def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pat
 
         if item.is_dir():
             outfile.write(f"{indent}{prefix_dir}{item.name}/\n")
-            # CORRECTED LOGIC: Recurse only if depth is infinite (-1) or not yet reached.
-            if scan_depth == -1 or indent_level < scan_depth:
-                generate_file_listing(outfile, item, project_root, indent_level + 1, scan_depth)
+
+            # --- MODIFIED LOGIC FOR CUSTOM AND GLOBAL DEPTH ---
+            # Determine the effective scan depth for this subdirectory.
+            relative_path_str = str(item.relative_to(project_root).as_posix())
+
+            # By default, use the inherited scan_depth from the parent.
+            effective_depth = scan_depth
+
+            # Check if a custom rule applies to this specific directory.
+            if relative_path_str in CUSTOM_DEPTH_MAP:
+                # A custom rule overrides the inherited depth.
+                effective_depth = CUSTOM_DEPTH_MAP[relative_path_str]
+
+            # Recurse only if the effective depth allows.
+            # -1 means infinite depth.
+            # A positive number means we can still go deeper.
+            if effective_depth == -1:
+                # Pass -1 along for infinite recursion in this branch.
+                generate_file_listing(outfile, item, project_root, indent_level + 1, -1)
+            elif effective_depth > 0:
+                # Decrement the depth for the next level down.
+                generate_file_listing(outfile, item, project_root, indent_level + 1, effective_depth - 1)
+            # If effective_depth is 0, we do not recurse.
+
         elif item.is_file():
             outfile.write(f"{indent}{prefix_file}{item.name}\n")
 

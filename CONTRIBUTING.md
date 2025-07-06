@@ -73,9 +73,10 @@ git checkout -b fix/correct-data-parsing-error
 
 ### 2. Make Your Changes
 
-Write your code and update documentation as needed.
+Write your code, update data, or adjust documentation as needed.
 
 *   **Code**: Modify the Python files in `src/` or `tests/`. The pre-commit hooks will automatically handle formatting (Black) and linting (Flake8).
+*   **Data**: The project's ground truth is stored in the `data/` directory, particularly the file containing the 5,000 historical individuals and their verified birth data. If you are adding or correcting entries, edit this source file directly. Changes here are significant, so please justify them clearly in your pull request.
 *   **Documentation**: To edit the main README, modify `README.template.md` and its diagram files. To edit this contribution guide, modify `CONTRIBUTING.md`. The `build-docs` hook will automatically generate the final `README.md`, `README.docx`, and `CONTRIBUTING.docx`. **Do not edit generated files directly.**
 
 ### 3. Run the Test Suite
@@ -116,7 +117,7 @@ Because our pre-commit hooks can modify files (like formatting code or rebuildin
     *   `docs(readme): Update contribution workflow`
     *   `test(orchestrator): Add test for reprocess mode`
 
-### 6. Submit a Pull Request
+### 5. Submit a Pull Request
 
 1.  Push your branch to your fork on GitHub.
 2.  Open a pull request against the `main` branch of the original repository.

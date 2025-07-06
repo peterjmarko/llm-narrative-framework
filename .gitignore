@@ -19,6 +19,8 @@ __pycache__/
 /src/temp/
 /qgen_standalone_output/
 /project_code_as_txt/
+~$README.*
+~$CONTRIBUTING.*
 
 # --- Secrets ---
 # Ignore the .env file, which should contain sensitive API keys.

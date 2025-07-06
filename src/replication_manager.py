@@ -111,14 +111,18 @@ def main():
     if args.target_dir:
         final_output_dir = os.path.abspath(args.target_dir)
     else:
+        # Create a default directory by reading the structure from config.ini
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        model_name = get_config_value(APP_CONFIG, 'LLM', 'model_identifier', value_type=str, fallback='llm')
-        safe_model_name = re.sub(r'[<>:"/\\|?*]', '-', model_name)
-        project_root = os.path.dirname(current_dir)
-        base_output_path = os.path.join(project_root, 'output')
-        study_dir_name = f"study_{timestamp}_{safe_model_name}"
-        final_output_dir = os.path.join(base_output_path, study_dir_name)
-        print(f"{C_CYAN}No target directory specified. Using default: {final_output_dir}{C_RESET}")
+        project_root = os.path.abspath(os.path.join(current_dir, '..'))
+        
+        base_output = get_config_value(APP_CONFIG, 'General', 'base_output_dir', str, 'output')
+        new_exp_subdir = get_config_value(APP_CONFIG, 'General', 'new_experiments_subdir', str, 'new_experiments')
+        exp_prefix = get_config_value(APP_CONFIG, 'General', 'experiment_dir_prefix', str, 'experiment_')
+
+        base_path = os.path.join(project_root, base_output, new_exp_subdir)
+        final_output_dir = os.path.join(base_path, f"{exp_prefix}{timestamp}")
+        
+        print(f"{C_CYAN}No target directory specified. Using default from config: {final_output_dir}{C_RESET}")
 
     failed_reps = [] # Initialize for all modes
 

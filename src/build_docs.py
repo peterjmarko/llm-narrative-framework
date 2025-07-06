@@ -95,9 +95,12 @@ def main():
                 all_diagrams_ok = False
         elif diagram_source_rel_path.endswith('.txt'):
             # Differentiate font size based on the filename
-            font_size_to_use = 36  # Default for project structure
             if 'replication_report_format' in diagram_source_rel_path:
-                font_size_to_use = 22 # Smaller font for the report format
+                font_size_to_use = 22
+            elif 'analysis_log_format' in diagram_source_rel_path:
+                font_size_to_use = 20 # Even smaller for this dense format
+            else:
+                font_size_to_use = 36 # Default for project structure
             
             if not render_text_diagram(os.path.join(project_root, diagram_source_rel_path), os.path.join(project_root, image_rel_path), project_root, font_size=font_size_to_use):
                 all_diagrams_ok = False
