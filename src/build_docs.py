@@ -46,7 +46,7 @@ def render_text_diagram(source_path, output_path, project_root):
 
     padding, line_spacing = 20, 4
     # Render at a large size for high quality
-    font_size = 28  # Increase font size for better clarity
+    font_size = 32
     font_paths = ["Consolas", "cour.ttf", "Courier New", "Menlo", "DejaVu Sans Mono"]
     for font_path in font_paths:
         try:
