@@ -103,8 +103,8 @@ def main():
                 all_diagrams_ok = False
         # --- End Smart Dispatcher ---
 
-        # Add a Pandoc attribute to scale the image width. DOCX handles this correctly. The `fig:` prefix tells Pandoc to treat this as a centered figure.
-        image_tag = f"![fig: ]({image_rel_path}){{width=100%}}"
+        # Add a Pandoc attribute to scale the image width. DOCX handles this correctly.
+        image_tag = f"![ ]({image_rel_path}){{width=100%}}"
         final_md_content = final_md_content.replace(placeholder.group(0), image_tag, 1)
 
     if not all_diagrams_ok:

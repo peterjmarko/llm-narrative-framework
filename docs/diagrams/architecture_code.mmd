@@ -1,15 +1,5 @@
 graph TD;
 
-    %%{
-      init: {
-        'theme': 'base',
-        'themeVariables': {
-          'fontSize': '12px',
-          'nodePadding': '5px'
-        }
-      }
-    }%%
-
     %% --- Style Definitions ---
     classDef ExperimentRunner fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;
     classDef ReplicationManager fill:#ff7f0e,stroke:#fff,stroke-width:2px,color:#fff;
@@ -19,43 +9,46 @@ graph TD;
     classDef Legacy fill:#8c564b,stroke:#333,stroke-width:1px,color:#fff;
 
     %% --- Node Definitions ---
-    subgraph "Tier 1: Experiment Execution"
+    subgraph "Experiment Execution"
         run_exp["run_experiment.ps1<br/><i>(Main Entry Point)</i>"]:::ExperimentRunner;
         rep_man["replication_manager.py<br/><i>(Manages Batch of Replications)</i>"]:::ReplicationManager;
     end
-
-    subgraph "Tier 2: Single Replication Pipeline"
+    
+    subgraph "Main Pipeline Stages"
         direction TB
-        orch["orchestrate_replication.py<br/><i>(Single Replication Orchestrator)</i>"]:::Stage;
-        subgraph "Stage 1: Query Generation"
-            build["build_queries.py"]:::Stage;
-            qgen["query_generator.py"]:::Worker;
+        subgraph "Single Replication Pipeline"
+            orch["orchestrate_replication.py<br/><i>(Single Replication Orchestrator)</i>"]:::Stage;
+            subgraph "Stage 1: Query Generation"
+                build["build_queries.py"]:::Stage;
+                qgen["query_generator.py"]:::Worker;
+            end
+            subgraph "Stage 2: LLM Interaction"
+                sessions["run_llm_sessions.py"]:::Stage;
+                prompter["llm_prompter.py"]:::Worker;
+            end
+            subgraph "Stage 3 & 4: Analysis"
+                process["process_llm_responses.py"]:::Stage;
+                analyze["analyze_performance.py"]:::Stage;
+            end
         end
-        subgraph "Stage 2: LLM Interaction"
-            sessions["run_llm_sessions.py"]:::Stage;
-            prompter["llm_prompter.py"]:::Worker;
-        end
-        subgraph "Stage 3 & 4: Analysis"
-            process["process_llm_responses.py"]:::Stage;
-            analyze["analyze_performance.py"]:::Stage;
+
+        subgraph "Utilities & Final Analysis"
+            direction TB
+            subgraph "Standard Utilities"
+                retry["retry_failed_sessions.py"]:::Utility;
+                compile["compile_results.py"]:::Utility;
+                anova["run_anova.py"]:::Utility;
+                verify["verify_pipeline_completeness.py"]:::Utility;
+                log_man["log_manager.py"]:::Utility;
+            end
+            subgraph "Historical Data Patching"
+                patcher["patch_old_runs.py"]:::Utility;
+                restorer["restore_config.py"]:::Worker;
+            end
+            inject["inject_metadata.py<br/><i>(Legacy)</i>"]:::Legacy;
         end
     end
 
-    subgraph "Tier 3: Utilities & Final Analysis"
-        direction LR
-        subgraph "Standard Utilities"
-            retry["retry_failed_sessions.py"]:::Utility;
-            compile["compile_results.py"]:::Utility;
-            anova["run_anova.py"]:::Utility;
-            verify["verify_pipeline_completeness.py"]:::Utility;
-            log_man["log_manager.py"]:::Utility;
-        end
-        subgraph "Historical Data Patching"
-            patcher["patch_old_runs.py"]:::Utility;
-            restorer["restore_config.py"]:::Worker;
-        end
-        inject["inject_metadata.py<br/><i>(Legacy)</i>"]:::Legacy;
-    end
 
     %% --- Connection Definitions ---
     run_exp --> rep_man;
