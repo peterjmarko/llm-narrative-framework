@@ -35,9 +35,9 @@ def render_mermaid_diagram(source_path, output_path, project_root):
         if e.stderr: print(f"      STDERR from mmdc:\n---\n{e.stderr.strip()}\n---")
         return False
 
-def render_text_diagram(source_path, output_path, project_root):
-    """Renders a .txt file to a .png using Pillow."""
-    print(f"    - Rendering Text diagram: {os.path.basename(source_path)}...")
+def render_text_diagram(source_path, output_path, project_root, font_size=36):
+    """Renders a .txt file to a .png using Pillow with a specified font size."""
+    print(f"    - Rendering Text diagram: {os.path.basename(source_path)} with font size {font_size}...")
     try:
         from PIL import Image, ImageDraw, ImageFont
     except ImportError:
@@ -45,8 +45,8 @@ def render_text_diagram(source_path, output_path, project_root):
         return False
 
     padding, line_spacing = 20, 4
-    # Render at a large size for high quality
-    font_size = 32
+    # The font_size is now passed in as an argument.
+
     font_paths = ["Consolas", "cour.ttf", "Courier New", "Menlo", "DejaVu Sans Mono"]
     for font_path in font_paths:
         try:
@@ -89,14 +89,22 @@ def main():
         base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
         image_rel_path = os.path.join('docs', 'images', f"{base_name}.png").replace("\\", "/")
         
-        renderer = render_mermaid_diagram if diagram_source_rel_path.endswith('.mmd') else render_text_diagram
-        
-        if not renderer(os.path.join(project_root, diagram_source_rel_path), os.path.join(project_root, image_rel_path), project_root):
-            all_diagrams_ok = False # Mark failure but continue processing others
+        # --- Smart Dispatcher Logic ---
+        if diagram_source_rel_path.endswith('.mmd'):
+            if not render_mermaid_diagram(os.path.join(project_root, diagram_source_rel_path), os.path.join(project_root, image_rel_path), project_root):
+                all_diagrams_ok = False
+        elif diagram_source_rel_path.endswith('.txt'):
+            # Differentiate font size based on the filename
+            font_size_to_use = 36  # Default for project structure
+            if 'replication_report_format' in diagram_source_rel_path:
+                font_size_to_use = 22 # Smaller font for the report format
             
-        alt_text = base_name.replace('_', ' ').title()
-        # Add a Pandoc attribute to scale the image width. DOCX handles this correctly.
-        image_tag = f"![ ]({image_rel_path}){{width=100%}}"
+            if not render_text_diagram(os.path.join(project_root, diagram_source_rel_path), os.path.join(project_root, image_rel_path), project_root, font_size=font_size_to_use):
+                all_diagrams_ok = False
+        # --- End Smart Dispatcher ---
+
+        # Add a Pandoc attribute to scale the image width. DOCX handles this correctly. The `fig:` prefix tells Pandoc to treat this as a centered figure.
+        image_tag = f"![fig: ]({image_rel_path}){{width=100%}}"
         final_md_content = final_md_content.replace(placeholder.group(0), image_tag, 1)
 
     if not all_diagrams_ok:
