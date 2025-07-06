@@ -141,7 +141,7 @@ def main():
             current_readme_content = ""
 
         if current_readme_content != expected_readme_content:
-            print("ERROR: README.md is out of date. Please run 'pdm run build-docs' and commit the changes.")
+            print("ERROR: README.md is out of date. Please run 'python -m pdm run build-docs' and commit the changes.")
             sys.exit(1)
         else:
             print("SUCCESS: README.md is up-to-date.")
