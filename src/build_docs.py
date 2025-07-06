@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import argparse
 
 def render_mermaid_diagram(source_path, output_path, project_root):
     """Renders a .md file to a .png using the local mmdc CLI."""
@@ -74,48 +75,85 @@ def render_text_diagram(source_path, output_path, project_root, font_size=36):
     image.save(output_path, "PNG")
     return True
 
-def main():
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def build_readme_content(project_root):
+    """Generates the final README.md content as a string without writing to disk."""
     template_path = os.path.join(project_root, 'README.template.md')
-    with open(template_path, 'r', encoding='utf-8') as f: final_md_content = f.read()
+    with open(template_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # This loop just replaces placeholders, it doesn't render diagrams yet.
+    for placeholder in re.finditer(r'\{\{diagram:(.*?)\}\}', content):
+        diagram_source_rel_path = placeholder.group(1)
+        base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
+        image_rel_path = os.path.join('docs', 'images', f"{base_name}.png").replace("\\", "/")
+        image_tag = f"![ ]({image_rel_path}){{width=100%}}"
+        content = content.replace(placeholder.group(0), image_tag, 1)
+    
+    return content
+
+def render_all_diagrams(project_root):
+    """Renders all diagrams found in the template, returning True on success."""
+    template_path = os.path.join(project_root, 'README.template.md')
+    with open(template_path, 'r', encoding='utf-8') as f:
+        content = f.read()
 
     print("\n--- Processing Diagrams ---")
     images_dir = os.path.join(project_root, 'docs', 'images')
     os.makedirs(images_dir, exist_ok=True)
     
     all_diagrams_ok = True
-    for placeholder in re.finditer(r'\{\{diagram:(.*?)\}\}', final_md_content):
+    for placeholder in re.finditer(r'\{\{diagram:(.*?)\}\}', content):
         diagram_source_rel_path = placeholder.group(1)
         base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
-        image_rel_path = os.path.join('docs', 'images', f"{base_name}.png").replace("\\", "/")
+        image_rel_path = os.path.join('docs', 'images', f"{base_name}.png")
         
-        # --- Smart Dispatcher Logic ---
+        # Smart Dispatcher Logic
         if diagram_source_rel_path.endswith('.mmd'):
             if not render_mermaid_diagram(os.path.join(project_root, diagram_source_rel_path), os.path.join(project_root, image_rel_path), project_root):
                 all_diagrams_ok = False
         elif diagram_source_rel_path.endswith('.txt'):
-            # Differentiate font size based on the filename
-            if 'replication_report_format' in diagram_source_rel_path:
-                font_size_to_use = 22
-            elif 'analysis_log_format' in diagram_source_rel_path:
-                font_size_to_use = 20 # Even smaller for this dense format
-            else:
-                font_size_to_use = 36 # Default for project structure
-            
-            if not render_text_diagram(os.path.join(project_root, diagram_source_rel_path), os.path.join(project_root, image_rel_path), project_root, font_size=font_size_to_use):
+            font_size = 22 if 'replication_report_format' in diagram_source_rel_path else 20 if 'analysis_log_format' in diagram_source_rel_path else 36
+            if not render_text_diagram(os.path.join(project_root, diagram_source_rel_path), os.path.join(project_root, image_rel_path), project_root, font_size=font_size):
                 all_diagrams_ok = False
-        # --- End Smart Dispatcher ---
-
-        # Add a Pandoc attribute to scale the image width. DOCX handles this correctly.
-        image_tag = f"![ ]({image_rel_path}){{width=100%}}"
-        final_md_content = final_md_content.replace(placeholder.group(0), image_tag, 1)
-
+    
     if not all_diagrams_ok:
         print("\n--- BUILD FAILED: One or more diagrams could not be rendered. ---")
-        sys.exit(1) # This forces the pre-commit hook to fail correctly
+    
+    return all_diagrams_ok
+
+def main():
+    parser = argparse.ArgumentParser(description="Builds project documentation from templates.")
+    parser.add_argument('--check', action='store_true', help="Check if docs are up-to-date without modifying files.")
+    args = parser.parse_args()
+    
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    readme_path = os.path.join(project_root, 'README.md')
+
+    # Generate the expected content in memory
+    expected_readme_content = build_readme_content(project_root)
+
+    if args.check:
+        print("--- Checking if README.md is up-to-date... ---")
+        try:
+            with open(readme_path, 'r', encoding='utf-8') as f:
+                current_readme_content = f.read()
+        except FileNotFoundError:
+            current_readme_content = ""
+
+        if current_readme_content != expected_readme_content:
+            print("ERROR: README.md is out of date. Please run 'pdm run build-docs' and commit the changes.")
+            sys.exit(1)
+        else:
+            print("SUCCESS: README.md is up-to-date.")
+            sys.exit(0)
+
+    # --- Full Build Mode (if --check is not specified) ---
+    if not render_all_diagrams(project_root):
+        sys.exit(1)
 
     print("\n--- Building Final Markdown ---")
-    with open(os.path.join(project_root, 'README.md'), 'w', encoding='utf-8') as f: f.write(final_md_content)
+    with open(readme_path, 'w', encoding='utf-8') as f:
+        f.write(expected_readme_content)
     print("Successfully built README.md!")
 
     print("\n--- Starting DOCX Conversion ---")

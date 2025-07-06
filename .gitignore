@@ -15,6 +15,9 @@ __pycache__/
 /output/
 /archives/
 
+# Ignore generated document files
+*.docx
+
 # Intermediate and temporary files used by the pipeline
 /src/temp/
 /qgen_standalone_output/

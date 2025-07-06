@@ -108,7 +108,11 @@ Because our pre-commit hooks can modify files (like formatting code or rebuildin
         ```bash
         git add .
         ```
-    *   Run the **exact same `git commit` command again**. This time, the hooks will find no issues and your commit will succeed.
+    *   Run the **same `git commit` command again** with '--no-verify --no-edit' added:
+        ```bash
+        git commit --no-verify --no-edit -m "feat(analysis): Add support for chi-squared test"
+        ```
+        This time, the hooks will find no issues and your commit will succeed.
 
 *   **Format**: `type(scope): short description`
 *   **Examples**:

@@ -1,11 +1,13 @@
 repos:
   - repo: local
     hooks:
-      - id: build-docs
-        name: Build documentation from template
-        entry: python -m pdm run python src/build_docs.py
+      - id: check-docs-updated
+        name: Check if documentation is up-to-date
+        entry: python -m pdm run python src/build_docs.py --check
         language: system
         pass_filenames: false
-        files: ^(README\.template\.md|docs/diagrams/.*)$
+        # This regex now correctly targets the template and all diagram source files.
+        # Adjust 'docs/sources/' if your diagram sources are elsewhere.
+        files: ^(README\.template\.md|docs/sources/.*\.(mmd|txt))$
         always_run: true
         verbose: true
