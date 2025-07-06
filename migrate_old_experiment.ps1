@@ -72,7 +72,7 @@ try {
     
     Write-Host "`n######################################################" -ForegroundColor Green
     Write-Host "### Starting Data Migration for: '$($ResolvedPath)'" -ForegroundColor Green
-    Write-Host "######################################################`n"
+    Write-Host "######################################################`n" -ForegroundColor Green
 
     # --- Step 1: Run patch_old_runs.py ---
     Invoke-PythonScript -StepName "1/4: Patch Configs" -ScriptName "src/patch_old_runs.py" -Arguments $ResolvedPath
@@ -112,13 +112,13 @@ try {
     Invoke-PythonScript -StepName "4/4: Final Reprocess" -ScriptName "src/replication_manager.py" -Arguments "--reprocess", $ResolvedPath
     
     Write-Host "######################################################" -ForegroundColor Green
-    Write-Host "### Migration Finished Successfully!" -ForegroundColor Green
-    Write-Host "######################################################`n"
+    Write-Host "### Migration Finished Successfully! ###" -ForegroundColor Green
+    Write-Host "######################################################`n" -ForegroundColor Green
 
 }
 catch {
     Write-Host "`n######################################################" -ForegroundColor Red
-    Write-Host "### MIGRATION FAILED" -ForegroundColor Red
+    Write-Host "### MIGRATION FAILED ###" -ForegroundColor Red
     Write-Host "######################################################" -ForegroundColor Red
     Write-Error $_.Exception.Message
     # Exit with a non-zero status code to indicate failure to other automation tools
