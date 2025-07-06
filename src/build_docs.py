@@ -24,8 +24,9 @@ def render_mermaid_diagram(source_path, output_path, project_root):
         puppeteer_config_path = os.path.join(project_root, 'docs', 'puppeteer-config.json')
 
         # Use the platform-specific executable path
+        # Use the --scale flag for more reliable scaling. 0.8 = 80% of original size.
         result = subprocess.run(
-            [mmdc_executable, '-i', source_path, '-o', output_path, '-c', config_path, '-p', puppeteer_config_path, '-w', '800'],
+                            [mmdc_executable, '-i', source_path, '-o', output_path, '-c', config_path, '-p', puppeteer_config_path, '--scale', '2'],
             check=True, capture_output=True, text=True, encoding='utf-8'
         )
         return True
@@ -44,9 +45,8 @@ def render_text_diagram(source_path, output_path, project_root):
         return False
 
     padding, line_spacing = 20, 4
-    base_font_size = 14
-    scale_factor = 0.7  # Scale down to 70% of original size
-    font_size = int(base_font_size * scale_factor)
+    # Render at a large size for high quality
+    font_size = 28  # Increase font size for better clarity
     font_paths = ["Consolas", "cour.ttf", "Courier New", "Menlo", "DejaVu Sans Mono"]
     for font_path in font_paths:
         try:
@@ -95,8 +95,8 @@ def main():
             all_diagrams_ok = False # Mark failure but continue processing others
             
         alt_text = base_name.replace('_', ' ').title()
-        # Add a Pandoc attribute to scale the image width to 90% of the page.
-        image_tag = f"![ ]({image_rel_path})"
+        # Add a Pandoc attribute to scale the image width. DOCX handles this correctly.
+        image_tag = f"![ ]({image_rel_path}){{width=100%}}"
         final_md_content = final_md_content.replace(placeholder.group(0), image_tag, 1)
 
     if not all_diagrams_ok:
@@ -107,23 +107,21 @@ def main():
     with open(os.path.join(project_root, 'README.md'), 'w', encoding='utf-8') as f: f.write(final_md_content)
     print("Successfully built README.md!")
 
-    print("\n--- Starting RTF Conversion ---")
+    print("\n--- Starting DOCX Conversion ---")
     try:
         import pypandoc
         for md_filename in ['README.md', 'CONTRIBUTING.md']:
             source_md_path = os.path.join(project_root, md_filename)
             if os.path.exists(source_md_path):
-                output_rtf_path = os.path.join(project_root, md_filename.replace('.md', '.rtf'))
+                output_docx_path = os.path.join(project_root, md_filename.replace('.md', '.docx'))
                 pypandoc.convert_file(
-                    source_md_path, 'rtf',
-                    # Explicitly enable the link_attributes extension
-                    format='markdown+link_attributes',
-                    outputfile=output_rtf_path,
+                    source_md_path, 'docx',
+                    outputfile=output_docx_path,
                     extra_args=['--standalone', '--resource-path', project_root]
                 )
-                print(f"Successfully built '{os.path.basename(output_rtf_path)}'!")
+                print(f"Successfully built '{os.path.basename(output_docx_path)}'!")
     except ImportError:
-        print("--- DEPENDENCY ERROR: 'pypandoc' not found. Skipping RTF generation.")
+        print("--- DEPENDENCY ERROR: 'pypandoc' not found. Skipping DOCX generation.")
 
 if __name__ == "__main__":
     main()

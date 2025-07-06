@@ -32,19 +32,19 @@ The project's architecture can be understood through three different views: the 
 
 This diagram shows how the scripts in the pipeline call one another, illustrating the hierarchy of control.
 
-![ ](docs/images/architecture_code.png)
+![ ](docs/images/architecture_code.png){width=100%}
 
 ### 2. Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
-![ ](docs/images/architecture_data_flow.png)
+![ ](docs/images/architecture_data_flow.png){width=100%}
 
 ### 3. Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-![ ](docs/images/architecture_experimental_logic.png)
+![ ](docs/images/architecture_experimental_logic.png){width=100%}
 
 ## Project Structure
 
@@ -57,7 +57,7 @@ The project's experiments are organized in a logical hierarchy:
 
 This logical hierarchy is reflected in the directory structure of the project and its outputs:
 
-![ ](docs/images/project_structure.png)
+![ ](docs/images/project_structure.png){width=100%}
 
 ## Setup and Installation
 
