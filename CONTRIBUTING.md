@@ -90,36 +90,42 @@ python -m pdm run test
 
 ### 4. Commit Your Changes
 
-Use clear and descriptive commit messages. We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
+Use clear and descriptive commit messages. We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. The general format is `type(scope): short description`.
 
-**Important: The Two-Stage Commit Process**
-
-Because our pre-commit hooks can modify files (like formatting code or rebuilding the README), you may sometimes need to commit twice. This is the expected and correct behavior.
-
-1.  **First Attempt**: Run `git commit` as you normally would.
-    ```bash
-    git commit -m "feat(analysis): Add support for chi-squared test"
-    ```
-    If a hook modifies a file, the commit will be aborted with a message like "`files were modified by this hook`". This is a safety feature that gives you a chance to review the automatic changes.
-
-2.  **Review and Re-commit**:
-    *   Review the changes made by the hook (e.g., `git diff`).
-    *   If the changes are correct, add them to the staging area:
-        ```bash
-        git add .
-        ```
-    *   Run the **same `git commit` command again** with '--no-verify --no-edit' added:
-        ```bash
-        git commit --no-verify --no-edit -m "feat(analysis): Add support for chi-squared test"
-        ```
-        This time, the hooks will find no issues and your commit will succeed.
-
-*   **Format**: `type(scope): short description`
 *   **Examples**:
     *   `feat(analysis): Add support for chi-squared test`
     *   `fix(parser): Handle empty response files gracefully`
     *   `docs(readme): Update contribution workflow`
     *   `test(orchestrator): Add test for reprocess mode`
+
+**Important: The Documentation Commit Workflow**
+
+This project uses a `pre-commit` hook to ensure that the main `README.md` and all its diagrams are always up-to-date with their source files (e.g., `README.template.md`, diagram sources).
+
+This hook **does not** automatically modify files during a commit. Instead, it **checks** if the documentation is current. If it's outdated, the commit will be aborted, and you must manually regenerate the documentation before you can successfully commit. Other hooks (like code formatters) may still modify files automatically.
+
+Follow this workflow when your changes affect the documentation:
+
+1.  **First Commit Attempt (Fails as Expected)**
+    *   Make your changes to `README.template.md` or a diagram source file.
+    *   Stage your changes: `git add .`
+    *   Attempt to commit: `git commit -m "docs: Update architecture diagram"`
+    *   The commit will be aborted with a message like:
+        `ERROR: README.md is out of date. Please run 'pdm run build-docs' and commit the changes.`
+
+2.  **Rebuild and Second Commit Attempt (Succeeds)**
+    *   **Manually build the docs** by running the command from the error message:
+        ```bash
+        python -m pdm run build-docs
+        ```
+    *   **Stage the newly generated files** (`README.md`, diagrams in `docs/images/`, `*.docx`, etc.):
+        ```bash
+        git add .
+        ```
+    *   **Commit again** using the exact same message. This time, the hook will pass, and your commit will succeed.
+        ```bash
+        git commit -m "docs: Update architecture diagram"
+        ```
 
 ### 5. Submit a Pull Request
 
