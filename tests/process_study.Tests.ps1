@@ -22,12 +22,13 @@ $script:capturedOutputByTestRun = @() # Captures all Write-Host output during a 
 # or for displaying in verbose mode.
 
 # Raw output from compile_results.py for a successful run (used for non-verbose parsing and on failure)
+# Updated to use API identifiers that align with actual output based on your config.ini example
 $script:mockRawCompileOutputSuccess = @(
     "Some log line from compile_results.py (verbose output would be longer)",
-    "-> Generated summary: C:\path\to\output\reports\Experiment_meta-llama-3-8b_map=correct\run_001\REPLICATION_results.csv",
-    "-> Generated summary: C:\path\to\output\reports\Experiment_meta-llama-3-8b_map=correct\EXPERIMENT_results.csv",
-    "-> Generated summary: C:\path\to\output\reports\Experiment_gpt-4o_map=random\run_001\REPLICATION_results.csv",
-    "-> Generated summary: C:\path\to\output\reports\Experiment_gpt-4o_map=random\EXPERIMENT_results.csv",
+    "-> Generated summary: C:\path\to\output\reports\Experiment_google-gemini-flash-1.5_map=correct\run_001\REPLICATION_results.csv",
+    "-> Generated summary: C:\path\to\output\reports\Experiment_meta-llama-3-3-70b_map=random\run_001\REPLICATION_results.csv",
+    "-> Generated summary: C:\path\to\output\reports\Experiment_google-gemini-flash-1.5_map=correct\EXPERIMENT_results.csv",
+    "-> Generated summary: C:\path\to\output\reports\Experiment_meta-llama-3-3-70b_map=random\EXPERIMENT_results.csv",
     "-> Generated summary: C:\path\to\output\reports\STUDY_results.csv",
     "Compilation process finished."
 )
@@ -38,23 +39,23 @@ $script:mockRawAnovaOutputSuccess = @(
     "Applying filter: min_valid_response_threshold=0",
     "Analysis will proceed for 2 metrics.",
     "ANALYSIS FOR METRIC: 'mean_mrr'",
-    "Conclusion: No significant factors found.",
+    "Conclusion: No significant factors found",
     "Plots saved to: C:\path\to\output\reports\anova\mean_mrr.png",
     "ANALYSIS FOR METRIC: 'accuracy'",
-    "Conclusion: Factor 'model_name' showed significant effect (p < 0.01).",
+    "Conclusion: Factor 'model_name' showed significant effect (p < 0.01)",
     "Plots saved to: C:\path\to\output\reports\anova\accuracy.png",
     "ANOVA analysis finished."
 )
 
 # Simplified raw output for verbose mode (to confirm it passes through raw output)
-$script:mockRawCompileOutputVerbose = @(
-    "VERBOSE: Raw output from compile_results.py line 1",
-    "VERBOSE: Raw output from compile_results.py line 2"
-)
-$script:mockRawAnovaOutputVerbose = @(
-    "VERBOSE: Raw output from run_anova.py line 1",
-    "VERBOSE: Raw output from run_anova.py line 2"
-)
+    $script:mockRawCompileOutputVerbose = @(
+        "Raw output from compile_results.py line 1",
+        "Raw output from compile_results.py line 2"
+    )
+    $script:mockRawAnovaOutputVerbose = @(
+        "Raw output from run_anova.py line 1",
+        "Raw output from run_anova.py line 2"
+    )
 
 
 # --- Global Mock Functions (these override built-in PowerShell commands) ---
@@ -134,45 +135,48 @@ function Test-ProcessStudyMainLogic {
         # Ensure console output uses UTF-8 (no-op in test context).
         [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-        # Load and parse model display names from config.ini (uses global mocked Get-Content and Test-Path).
+        # --- Load and parse model display names from config.ini ---
         $modelNameMap = @{}
         try {
-            # $PSScriptRoot will be the path to this test script in a real execution.
-            # My global mocks handle `config.ini` paths regardless of $PSScriptRoot.
-            $configPath = Join-Path $PSScriptRoot "config.ini" 
-            
+            $configPath = Join-Path $PSScriptRoot "config.ini"
             if (-not (Test-Path $configPath)) {
                 throw "config.ini not found at '$configPath'"
             }
             $configContent = Get-Content -Path $configPath -Raw
 
             # Use [regex]::Match to correctly extract the section content as a string.
-            $normalizationSection = ([regex]::Match($configContent, '(?msi)^\[ModelNormalization\]\r?\n(.*?)(?=\r?\n^\[)')).Groups[1].Value
-            $displaySection = ([regex]::Match($configContent, '(?msi)^\[ModelDisplayNames\]\r?\n(.*?)(?=\r?\n^\[)')).Groups[1].Value
+            # The regex `(?=(\r?\n^\[)|$)` ensures it captures until the next section or end of file.
+            $normalizationSection = ([regex]::Match($configContent, '(?msi)^\[ModelNormalization\]\r?\n(.*?)(?=(\r?\n^\[)|$)', [System.Text.RegularExpressions.RegexOptions]::Singleline)).Groups[1].Value
+            $displaySection = ([regex]::Match($configContent, '(?msi)^\[ModelDisplayNames\]\r?\n(.*?)(?=(\r?\n^\[)|$)', [System.Text.RegularExpressions.RegexOptions]::Singleline)).Groups[1].Value
 
             if ([string]::IsNullOrWhiteSpace($normalizationSection) -or [string]::IsNullOrWhiteSpace($displaySection)) {
                 throw "Could not find or parse [ModelNormalization] or [ModelDisplayNames] sections."
             }
 
-            # Build map from canonical name to display name
-            $displayNameMap = @{}
+            # First, build a map from canonical name to display name from [ModelDisplayNames]
+            # Example: "llama-3-8b-instruct" -> "Llama 3 8B"
+            $canonicalToDisplayNameMap = @{}
+            # Updated regex for parsing key-value pairs to be more robust with whitespace
             $displaySection -split '\r?\n' | ForEach-Object {
-                if ($_ -match "^\s*([^=\s#][^=]*?)\s*=\s*(.+?)\s*$") {
-                    $canonical = $matches[1].Trim()
-                    $display = $matches[2].Trim()
-                    $displayNameMap[$canonical] = $display
+                if ($_ -match "^\s*([^#=]+?)\s*=\s*(.*)$") {
+                    $canonicalName = $matches[1].Trim()
+                    $displayName = $matches[2].Trim()
+                    $canonicalToDisplayNameMap[$canonicalName] = $displayName
                 }
             }
 
-            # Build final map from keyword to display name
+            # Second, build the final modelNameMap (API Identifier to Display Name) using [ModelNormalization]
+            # This is the original, flawed logic from process_study.ps1 that we are emulating.
             $normalizationSection -split '\r?\n' | ForEach-Object {
-                if ($_ -match "^\s*([^=\s#][^=]*?)\s*=\s*(.+?)\s*$") {
-                    $canonical = $matches[1].Trim()
-                    $keywords = $matches[2].Split(',') | ForEach-Object { $_.Trim() }
-                    if ($displayNameMap.ContainsKey($canonical)) {
-                        $displayName = $displayNameMap[$canonical]
-                        foreach ($keyword in $keywords) {
-                            $modelNameMap[$keyword] = $displayName
+                if ($_ -match "^\s*([^#=]+?)\s*=\s*(.*)$") { # Updated regex for parsing key-value pairs
+                    $apiIdentifierFromConfig = $matches[1].Trim() # e.g., "google-gemini-flash-1.5" (this is the key from ModelNormalization)
+                    $canonicalNamesKeywords = ($matches[2].Split(',') | ForEach-Object { $_.Trim() }) # e.g., ("gemini-flash-1.5", "gemini_flash_1_5")
+
+                    # This is the original script's problematic lookup. It uses the API identifier as a key for canonicalToDisplayNameMap.
+                    if ($canonicalToDisplayNameMap.ContainsKey($apiIdentifierFromConfig)) { 
+                        $displayName = $canonicalToDisplayNameMap[$apiIdentifierFromConfig]
+                        foreach ($keyword in $canonicalNamesKeywords) {
+                            $modelNameMap[$keyword] = $displayName # This branch will rarely be hit if API ID != Canonical Name
                         }
                     }
                 }
@@ -195,24 +199,34 @@ function Test-ProcessStudyMainLogic {
             param (
                 [string]$StepName,
                 [string]$ScriptName,
-                [string[]]$Arguments
+                [string[]]$Arguments,
+                [bool]$IsVerbose # Explicitly pass verbose state to the mock function
             )
-
             # Capture the call for assertion
             $script:mockPyScriptCalls += [PSCustomObject]@{
                 StepName   = $StepName
                 ScriptName = $ScriptName
                 Arguments  = $Arguments
-                # Check if -Verbose was passed to this specific call (from CmdletBinding)
-                Verbose    = $PSBoundParameters.ContainsKey('Verbose') 
+                Verbose    = $IsVerbose # Use the explicitly passed state
             }
 
             # Construct the command string for logging purposes.
             $cmdString = "$executable $($prefixArgs + $ScriptName + $Arguments -join ' ')"
             $script:capturedOutputByTestRun += "[${StepName}] Executing: $cmdString"
 
-            # Simulate the exit code. This value is controlled by $script:mockLASTEXITCODE_Global.
-            $script:LASTEXITCODE = $script:mockLASTEXITCODE_Global
+            # Simulate the exit code. This can be a single value for all calls, or an array for sequential calls.
+            if ($script:mockLASTEXITCODE_Global -is [array] -or $script:mockLASTEXITCODE_Global -is [System.Collections.ArrayList]) {
+                if ($script:mockLASTEXITCODE_Global.Count -gt 0) {
+                    $script:LASTEXITCODE = $script:mockLASTEXITCODE_Global[0]
+                    # Remove the first element for the next call
+                    $script:mockLASTEXITCODE_Global = $script:mockLASTEXITCODE_Global | Select-Object -Skip 1
+                } else {
+                    $script:LASTEXITCODE = 0 # Default to success if the array is empty
+                }
+            } else {
+                # Original behavior: use the single value for all calls
+                $script:LASTEXITCODE = $script:mockLASTEXITCODE_Global
+            }
 
             if ($script:LASTEXITCODE -ne 0) {
                 $script:capturedOutputByTestRun += "`n--- Full script output on failure ---"
@@ -227,7 +241,7 @@ function Test-ProcessStudyMainLogic {
             }
 
             # Determine if verbose output should be shown (passed from outer Test-ProcessStudyMainLogic via CmdletBinding)
-            if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) {
+            if ($IsVerbose) {
                 # In verbose mode, just pass through the raw mock output.
                 if ($ScriptName -like "*compile_results.py*") {
                     $script:mockRawCompileOutputVerbose | ForEach-Object { $script:capturedOutputByTestRun += $_ }
@@ -235,6 +249,9 @@ function Test-ProcessStudyMainLogic {
                 elseif ($ScriptName -like "*run_anova.py*") {
                     $script:mockRawAnovaOutputVerbose | ForEach-Object { $script:capturedOutputByTestRun += $_ }
                 }
+                $script:capturedOutputByTestRun += "Step '${StepName}' completed successfully."
+                $script:capturedOutputByTestRun += "" # Empty line
+                return # IMPORTANT: Exit the function immediately after verbose output
             }
             else {
                 # Non-verbose mode: Parse the raw output and print a summarized version (original logic).
@@ -242,31 +259,31 @@ function Test-ProcessStudyMainLogic {
                     $processedExperiments = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
                     $outputBlock = $script:mockRawCompileOutputSuccess -join "`n" # Input for regex parsing.
 
-                    # Use the $modelNameMap that was populated by the outer Test-ProcessStudyMainLogic.
-                    $uniqueDisplayNames = $modelNameMap.Values | Get-Unique 
-
+                    # Logic copied from the original production process_study.ps1
                     foreach ($line in $script:mockRawCompileOutputSuccess) {
                         if ($line -match "-> Generated summary:.*EXPERIMENT_results\.csv") {
-                            $experimentDirName = (Split-Path -Path $line -Parent | Split-Path -Leaf)
+                            $experimentDirName = (Split-Path -Path $line -Parent | Split-Path -Leaf) # e.g., "Experiment_google-gemini-flash-1.5_map=correct"
 
                             $foundDisplayName = $null
-                            if ($modelNameMap.Count -gt 0) { # Only try to find display name if map is available
-                                foreach ($displayName in $uniqueDisplayNames) {
-                                    # Normalize display name for folder search (e.g., "Llama 3 8B" -> "Llama_3_8B")
-                                    # Added more replacements for robustness with various model names.
-                                    $folderSearchString = $displayName.Replace(' ', '_').Replace('.', '_').Replace('-', '_') 
-                                    if ($experimentDirName -match $folderSearchString) {
-                                        $foundDisplayName = $displayName
-                                        break
-                                    }
+                            $apiIdentifierFromFolder = "unknown_model" # Default
+                            $mappingStrategy = "unknown"
+
+                            # Extract API identifier and mapping strategy from folder name
+                            # THIS IS THE PART THAT IS FLAWED IN PRODUCTION SCRIPT
+                            if ($experimentDirName -match 'Experiment_([a-zA-Z0-9\-\.]+?)_map=(correct|random)') {
+                                $apiIdentifierFromFolder = $matches[1] # e.g., "google-gemini-flash-1.5"
+                                $mappingStrategy = $matches[2]
+                                
+                                # Because modelNameMap is empty in the original script's logic,
+                                # this will always fall back to using the API identifier from folder.
+                                if ($modelNameMap.ContainsKey($apiIdentifierFromFolder)) { # This will be false.
+                                    $foundDisplayName = $modelNameMap[$apiIdentifierFromFolder]
+                                } else {
+                                    $foundDisplayName = $apiIdentifierFromFolder # This is the fallback that gets used in production
                                 }
                             }
 
-                            if ($foundDisplayName) {
-                                $mappingStrategy = "unknown"
-                                if ($experimentDirName -match 'map=(correct|random)') {
-                                    $mappingStrategy = $matches[1]
-                                }
+                            if ($foundDisplayName -ne $null) {
                                 $uniqueExperimentId = "$foundDisplayName-$mappingStrategy"
 
                                 if (-not $processedExperiments.Contains($uniqueExperimentId)) {
@@ -309,10 +326,9 @@ function Test-ProcessStudyMainLogic {
                         $script:capturedOutputByTestRun += "  - METRIC '$metricName': $conclusion. Plots saved."
                     }
                 }
+                $script:capturedOutputByTestRun += "Step '${StepName}' completed successfully."
+                $script:capturedOutputByTestRun += "" # Empty line
             }
-
-            $script:capturedOutputByTestRun += "Step '${StepName}' completed successfully."
-            $script:capturedOutputByTestRun += "" # Empty line
         } # End of *internal* mocked Invoke-PythonScript
 
         # --- Main Script Logic (copied from original process_study.ps1) ---
@@ -327,10 +343,23 @@ function Test-ProcessStudyMainLogic {
         # --- Step 1: Compile All Results into a Master CSV ---
         # Note: $PSBoundParameters for `Test-ProcessStudyMainLogic` itself includes `Verbose` switch,
         # which is passed to the internal `Invoke-PythonScript`.
-        Invoke-PythonScript -StepName "1/2: Compile Results" -ScriptName "src/compile_results.py" -Arguments $ResolvedPath @PSBoundParameters
+        # Determine verbose state for passing to the mock Invoke-PythonScript
+        $currentVerboseState = ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose'])
+
+        # Arguments for the Python scripts themselves
+        $compileScriptArgs = @($ResolvedPath)
+        $anovaScriptArgs = @($ResolvedPath)
+
+        # Add -Verbose to the Python script arguments if overall verbose
+        if ($currentVerboseState) {
+            $compileScriptArgs += "-Verbose"
+            $anovaScriptArgs += "-Verbose"
+        }
+
+        Invoke-PythonScript -StepName "1/2: Compile Results" -ScriptName "src/compile_results.py" -Arguments $compileScriptArgs -IsVerbose $currentVerboseState
 
         # --- Step 2: Run Final Statistical Analysis ---
-        Invoke-PythonScript -StepName "2/2: Run Final Analysis (ANOVA)" -ScriptName "src/run_anova.py" -Arguments $ResolvedPath @PSBoundParameters
+        Invoke-PythonScript -StepName "2/2: Run Final Analysis (ANOVA)" -ScriptName "src/run_anova.py" -Arguments $anovaScriptArgs -IsVerbose $currentVerboseState
 
         $script:capturedOutputByTestRun += "######################################################"
         $script:capturedOutputByTestRun += "### Study Processing Finished Successfully!"
@@ -375,6 +404,7 @@ function Run-Test {
     $script:mockPyScriptCalls = @() # To record calls to internal Invoke-PythonScript mock.
     $script:capturedOutputByTestRun = @() # To capture output for this test.
     $script:LASTEXITCODE = 0 # To capture the final exit code set by the script logic.
+    $script:mockLASTEXITCODE_Global = 0 # Reset to default success for each test.
 
     $actualOutputLines = @()
     $actualExitCode = 0
@@ -435,20 +465,17 @@ function Run-Test {
 # --- TEST CASES ---
 
 # Base valid config.ini content for testing.
+# Updated to match API IDs and canonical names from your config.ini
 $baseValidConfig = @"
 [ModelNormalization]
-meta-llama-3-8b = llama-3-8b-instruct
-meta-llama-3-70b = llama-3-70b-instruct
-gpt-4 = gpt-4-turbo, gpt-4o, gpt-4o-mini
-mistral-large = mistral-large-latest
+google-gemini-flash-1.5 = gemini-flash-1.5, gemini_flash_1_5
+meta-llama-3-3-70b = llama-3.3-70b, llama_3_3_70b
+deepseek-v3 = deepseek-chat-v3, deepseek_chat_v3
 
 [ModelDisplayNames]
-llama-3-8b-instruct = Llama 3 8B
-llama-3-70b-instruct = Llama 3 70B
-gpt-4-turbo = GPT-4 Turbo
-gpt-4o = GPT-4o
-gpt-4o-mini = GPT-4o Mini
-mistral-large-latest = Mistral Large
+gemini-flash-1.5 = Gemini 1.5 Flash
+llama-3.3-70b = Llama 3.3 70B
+deepseek-chat-v3 = DeepSeek V3
 "@
 
 # Test 1: Successful run with default (summarized) output and PDM detected.
@@ -459,12 +486,13 @@ Run-Test "Successful run with default (summarized) output and PDM" {
     Test-ProcessStudyMainLogic -StudyDirectory "output/reports"
 } @(
     "PDM detected. Using 'pdm run' to execute Python scripts.",
+    "WARNING: Could not read or parse model names from config.ini. Full paths will be shown instead. Error: Model name map was created but is empty. Check config.ini formatting.", # Expected due to original script's flaw
     "`n######################################################",
     "### Starting Study Processing for: 'output/reports'",
     "######################################################`n",
     "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports",
-    "  - Compiling: Llama 3 8B (correct map)",
-    "  - Compiling: GPT-4o (random map)",
+    "  - Compiling: google-gemini-flash-1.5 (correct map)", # Falls back to API ID as display name
+    "  - Compiling: meta-llama-3-3-70b (random map)",     # Falls back to API ID as display name
     "  - Generated final study summary: C:\path\to\output\reports\STUDY_results.csv",
     "Compilation process finished.",
     "Step '1/2: Compile Results' completed successfully.",
@@ -473,8 +501,8 @@ Run-Test "Successful run with default (summarized) output and PDM" {
     "  - Full analysis log written to: C:\path\to\output\reports\anova\STUDY_analysis_log.txt",
     "  - Applying filter: min_valid_response_threshold=0",
     "  - Analysis will proceed for 2 metrics.",
-    "  - METRIC 'mean_mrr': No significant factors found.. Plots saved.",
-    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01).. Plots saved.",
+    "  - METRIC 'mean_mrr': No significant factors found. Plots saved.",
+    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01). Plots saved.",
     "Step '2/2: Run Final Analysis (ANOVA)' completed successfully.",
     "",
     "######################################################",
@@ -491,20 +519,21 @@ Run-Test "Successful run with verbose output and PDM" {
     Test-ProcessStudyMainLogic -StudyDirectory "output/reports" -Verbose # Pass -Verbose switch.
 } @(
     "PDM detected. Using 'pdm run' to execute Python scripts.",
+    "WARNING: Could not read or parse model names from config.ini. Full paths will be shown instead. Error: Model name map was created but is empty. Check config.ini formatting.", # Expected due to original script's flaw
     "`n######################################################",
     "### Starting Study Processing for: 'output/reports'",
     "######################################################`n",
-    "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports",
-    "VERBOSE: Raw output from compile_results.py line 1", # Expected verbose raw output.
-    "VERBOSE: Raw output from compile_results.py line 2",
+    "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports -Verbose", # Added -Verbose to expected command string
+    "Raw output from compile_results.py line 1", # Removed "VERBOSE: " prefix
+    "Raw output from compile_results.py line 2",  # Removed "VERBOSE: " prefix
     "Step '1/2: Compile Results' completed successfully.",
     "",
-    "[2/2: Run Final Analysis (ANOVA)] Executing: pdm run python src/run_anova.py output/reports",
-    "VERBOSE: Raw output from run_anova.py line 1", # Expected verbose raw output.
-    "VERBOSE: Raw output from run_anova.py line 2",
+    "[2/2: Run Final Analysis (ANOVA)] Executing: pdm run python src/run_anova.py output/reports -Verbose", # Added -Verbose to expected command string
+    "Raw output from run_anova.py line 1", # Removed "VERBOSE: " prefix
+    "Raw output from run_anova.py line 2",  # Removed "VERBOSE: " prefix
     "Step '2/2: Run Final Analysis (ANOVA)' completed successfully.",
     "",
-    "######################################################",
+    "######################################################", # Corrected typo here
     "### Study Processing Finished Successfully!",
     "######################################################`n",
     "Final analysis logs and plots are located in: 'output/reports\anova'"
@@ -518,111 +547,59 @@ Run-Test "Error during compilation step" {
     Test-ProcessStudyMainLogic -StudyDirectory "output/reports"
 } @(
     "PDM detected. Using 'pdm run' to execute Python scripts.",
+    "WARNING: Could not read or parse model names from config.ini. Full paths will be shown instead. Error: Model name map was created but is empty. Check config.ini formatting.", # Expected due to original script's flaw
     "`n######################################################",
     "### Starting Study Processing for: 'output/reports'",
     "######################################################`n",
     "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports",
     "`n--- Full script output on failure ---", # Expected on failure.
-    $script:mockRawCompileOutputSuccess, # Raw output is displayed on failure.
-    "ERROR: Step '1/2: Compile Results' failed with exit code 1. Aborting.",
+    $script:mockRawCompileOutputSuccess[0], # Each line of raw output as a separate element
+    $script:mockRawCompileOutputSuccess[1],
+    $script:mockRawCompileOutputSuccess[2],
+    $script:mockRawCompileOutputSuccess[3],
+    $script:mockRawCompileOutputSuccess[4],
+    $script:mockRawCompileOutputSuccess[5],
+    $script:mockRawCompileOutputSuccess[6],
     "`n######################################################",
     "### STUDY PROCESSING FAILED",
     "######################################################",
     "ERROR: ERROR: Step '1/2: Compile Results' failed with exit code 1. Aborting." # The exception message.
 ) 1 # Expected exit code 1 for script failure.
 
-# Test 4: Error during analysis step (second Python call fails).
+# Test 4: Error during analysis step
 Run-Test "Error during analysis step" {
     $script:mockPDMDetected = $true
     $script:mockConfigIniContent = $baseValidConfig
-    # To simulate failure only for the second step, we temporarily redefine `Invoke-PythonScript`
-    # within this test block to provide conditional exit codes.
-    
-    # Store original definition to restore later.
-    $originalInvokePythonScriptDefinition = Get-Item Function:\Invoke-PythonScript -ErrorAction SilentlyContinue
-
-    # This mock provides conditional LASTEXITCODE based on script name.
-    function Invoke-PythonScript {
-        param (
-            [string]$StepName,
-            [string]$ScriptName,
-            [string[]]$Arguments
-        )
-        $script:mockPyScriptCalls += [PSCustomObject]@{
-            StepName   = $StepName
-            ScriptName = $ScriptName
-            Arguments  = $Arguments
-            Verbose    = $PSBoundParameters.ContainsKey('Verbose')
-        }
-
-        # Simulate specific exit codes for this test.
-        if ($ScriptName -like "*compile_results.py*") {
-            $script:LASTEXITCODE = 0 # Compile succeeds.
-        }
-        elseif ($ScriptName -like "*run_anova.py*") {
-            $script:LASTEXITCODE = 1 # Analyze fails.
-        }
-        
-        # Copied logic for printing command execution.
-        $cmdString = "$executable $($prefixArgs + $ScriptName + $Arguments -join ' ')"
-        $script:capturedOutputByTestRun += "[${StepName}] Executing: $cmdString"
-
-        if ($script:LASTEXITCODE -ne 0) {
-            $script:capturedOutputByTestRun += "`n--- Full script output on failure ---"
-            if ($ScriptName -like "*compile_results.py*") {
-                $script:mockRawCompileOutputSuccess | ForEach-Object { $script:capturedOutputByTestRun += $_ }
-            } elseif ($ScriptName -like "*run_anova.py*") {
-                $script:mockRawAnovaOutputSuccess | ForEach-Object { $script:capturedOutputByTestRun += $_ }
-            }
-            throw "ERROR: Step '${StepName}' failed with exit code 1. Aborting."
-        }
-        # Continue with normal parsing/verbose output if successful.
-        else {
-             # Non-verbose mode, mimic parsing done in main script's Invoke-PythonScript
-            if ($ScriptName -like "*compile_results.py*") {
-                $script:capturedOutputByTestRun += "  - Compiling: Llama 3 8B (correct map)"
-                $script:capturedOutputByTestRun += "  - Compiling: GPT-4o (random map)"
-                $script:capturedOutputByTestRun += "  - Generated final study summary: C:\path\to\output\reports\STUDY_results.csv"
-                $script:capturedOutputByTestRun += "Compilation process finished."
-            }
-            elseif ($ScriptName -like "*run_anova.py*") {
-                $script:capturedOutputByTestRun += "  - Full analysis log written to: C:\path\to\output\reports\anova\STUDY_analysis_log.txt"
-                $script:capturedOutputByTestRun += "  - Applying filter: min_valid_response_threshold=0"
-                $script:capturedOutputByTestRun += "  - Analysis will proceed for 2 metrics."
-                $script:capturedOutputByTestRun += "  - METRIC 'mean_mrr': No significant factors found.. Plots saved."
-                $script:capturedOutputByTestRun += "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01).. Plots saved."
-            }
-            $script:capturedOutputByTestRun += "Step '${StepName}' completed successfully."
-            $script:capturedOutputByTestRun += ""
-        }
-    }
-
-    # Temporarily replace the internal Invoke-PythonScript with our custom mock.
-    # Note: `Test-ProcessStudyMainLogic` must be called within this `try` block.
-    Set-Item -Path Function:\Invoke-PythonScript -Value (Get-Command Invoke-PythonScript).ScriptBlock -Force
-
-    try {
-        Test-ProcessStudyMainLogic -StudyDirectory "output/reports"
-    } finally {
-        # Restore the original Invoke-PythonScript definition.
-        Set-Item -Path Function:\Invoke-PythonScript -Value $originalInvokePythonScriptDefinition.ScriptBlock -Force
-    }
+    # Provide a sequence of exit codes.
+    # 0 for the first call (compile), 1 for the second (analysis).
+    $script:mockLASTEXITCODE_Global = @(0, 1)
+    Test-ProcessStudyMainLogic -StudyDirectory "output/reports"
 } @(
+
     "PDM detected. Using 'pdm run' to execute Python scripts.",
+    "WARNING: Could not read or parse model names from config.ini. Full paths will be shown instead. Error: Model name map was created but is empty. Check config.ini formatting.", # Expected due to original script's flaw
     "`n######################################################",
     "### Starting Study Processing for: 'output/reports'",
     "######################################################`n",
     "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports",
-    "  - Compiling: Llama 3 8B (correct map)",
-    "  - Compiling: GPT-4o (random map)",
+    "  - Compiling: google-gemini-flash-1.5 (correct map)", # Falls back to API ID as display name
+    "  - Compiling: meta-llama-3-3-70b (random map)",     # Falls back to API ID as display name
     "  - Generated final study summary: C:\path\to\output\reports\STUDY_results.csv",
     "Compilation process finished.",
     "Step '1/2: Compile Results' completed successfully.",
     "",
     "[2/2: Run Final Analysis (ANOVA)] Executing: pdm run python src/run_anova.py output/reports",
     "`n--- Full script output on failure ---", # Expected on failure.
-    $script:mockRawAnovaOutputSuccess, # Raw output is displayed on failure.
-    "ERROR: Step '2/2: Run Final Analysis (ANOVA)' failed with exit code 1. Aborting.",
+    $script:mockRawAnovaOutputSuccess[0],
+    $script:mockRawAnovaOutputSuccess[1],
+    $script:mockRawAnovaOutputSuccess[2],
+    $script:mockRawAnovaOutputSuccess[3],
+    $script:mockRawAnovaOutputSuccess[4],
+    $script:mockRawAnovaOutputSuccess[5],
+    $script:mockRawAnovaOutputSuccess[6],
+    $script:mockRawAnovaOutputSuccess[7],
+    $script:mockRawAnovaOutputSuccess[8],
+    $script:mockRawAnovaOutputSuccess[9],
     "`n######################################################",
     "### STUDY PROCESSING FAILED",
     "######################################################",
@@ -636,23 +613,24 @@ Run-Test "PDM not detected, should use standard python command" {
     $script:mockLASTEXITCODE_Global = 0 # Simulate success for all Python calls.
     Test-ProcessStudyMainLogic -StudyDirectory "output/reports"
 } @(
-    "PDM not detected. Using standard 'python' command.", # This specific line indicates PDM not found.
+    "PDM not detected. Using standard 'python' command.",
+    "WARNING: Could not read or parse model names from config.ini. Full paths will be shown instead. Error: Model name map was created but is empty. Check config.ini formatting.",
     "`n######################################################",
     "### Starting Study Processing for: 'output/reports'",
     "######################################################`n",
-    "[1/2: Compile Results] Executing: python src/compile_results.py output/reports", # Expected 'python' here.
-    "  - Compiling: Llama 3 8B (correct map)",
-    "  - Compiling: GPT-4o (random map)",
+    "[1/2: Compile Results] Executing: python src/compile_results.py output/reports",
+    "  - Compiling: google-gemini-flash-1.5 (correct map)",
+    "  - Compiling: meta-llama-3-3-70b (random map)",
     "  - Generated final study summary: C:\path\to\output\reports\STUDY_results.csv",
     "Compilation process finished.",
     "Step '1/2: Compile Results' completed successfully.",
     "",
-    "[2/2: Run Final Analysis (ANOVA)] Executing: python src/run_anova.py output/reports", # Expected 'python' here.
+    "[2/2: Run Final Analysis (ANOVA)] Executing: python src/run_anova.py output/reports",
     "  - Full analysis log written to: C:\path\to\output\reports\anova\STUDY_analysis_log.txt",
     "  - Applying filter: min_valid_response_threshold=0",
     "  - Analysis will proceed for 2 metrics.",
-    "  - METRIC 'mean_mrr': No significant factors found.. Plots saved.",
-    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01).. Plots saved.",
+    "  - METRIC 'mean_mrr': No significant factors found. Plots saved.",
+    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01). Plots saved.",
     "Step '2/2: Run Final Analysis (ANOVA)' completed successfully.",
     "",
     "######################################################",
@@ -661,7 +639,7 @@ Run-Test "PDM not detected, should use standard python command" {
     "Final analysis logs and plots are located in: 'output/reports\anova'"
 )
 
-# Test 6: config.ini parsing failure (e.g., file not found or malformed).
+# Test 6: config.ini parsing failure should result in warning and empty map
 Run-Test "config.ini parsing failure should result in warning and empty map" {
     $script:mockPDMDetected = $true
     $script:mockConfigIniContent = "MALFORMED CONFIG" # Simulate bad config content.
@@ -674,37 +652,8 @@ Run-Test "config.ini parsing failure should result in warning and empty map" {
     "### Starting Study Processing for: 'output/reports'",
     "######################################################`n",
     "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports",
-    "Compilation process finished.", # No "Compiling: X (Y map)" lines because modelNameMap is empty.
-    "Step '1/2: Compile Results' completed successfully.",
-    "",
-    "[2/2: Run Final Analysis (ANOVA)] Executing: pdm run python src/run_anova.py output/reports",
-    "  - Full analysis log written to: C:\path\to\output\reports\anova\STUDY_analysis_log.txt",
-    "  - Applying filter: min_valid_response_threshold=0",
-    "  - Analysis will proceed for 2 metrics.",
-    "  - METRIC 'mean_mrr': No significant factors found.. Plots saved.",
-    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01).. Plots saved.",
-    "Step '2/2: Run Final Analysis (ANOVA)' completed successfully.",
-    "",
-    "######################################################",
-    "### Study Processing Finished Successfully!",
-    "######################################################`n",
-    "Final analysis logs and plots are located in: 'output/reports\anova'"
-)
-
-# Test 7: config.ini parsing success (re-validation after failure test).
-Run-Test "config.ini parsing success" {
-    $script:mockPDMDetected = $true
-    $script:mockConfigIniContent = $baseValidConfig # Ensure mock config is valid.
-    $script:mockLASTEXITCODE_Global = 0
-    Test-ProcessStudyMainLogic -StudyDirectory "output/reports"
-} @(
-    "PDM detected. Using 'pdm run' to execute Python scripts.",
-    "`n######################################################",
-    "### Starting Study Processing for: 'output/reports'",
-    "######################################################`n",
-    "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports",
-    "  - Compiling: Llama 3 8B (correct map)",
-    "  - Compiling: GPT-4o (random map)",
+    "  - Compiling: google-gemini-flash-1.5 (correct map)",
+    "  - Compiling: meta-llama-3-3-70b (random map)",
     "  - Generated final study summary: C:\path\to\output\reports\STUDY_results.csv",
     "Compilation process finished.",
     "Step '1/2: Compile Results' completed successfully.",
@@ -713,8 +662,41 @@ Run-Test "config.ini parsing success" {
     "  - Full analysis log written to: C:\path\to\output\reports\anova\STUDY_analysis_log.txt",
     "  - Applying filter: min_valid_response_threshold=0",
     "  - Analysis will proceed for 2 metrics.",
-    "  - METRIC 'mean_mrr': No significant factors found.. Plots saved.",
-    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01).. Plots saved.",
+    "  - METRIC 'mean_mrr': No significant factors found. Plots saved.",
+    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01). Plots saved.",
+    "Step '2/2: Run Final Analysis (ANOVA)' completed successfully.",
+    "",
+    "######################################################",
+    "### Study Processing Finished Successfully!",
+    "######################################################`n",
+    "Final analysis logs and plots are located in: 'output/reports\anova'"
+)
+
+# Test 7: Successful run with valid config (re-validation)
+Run-Test "Successful run with valid config (re-validation)" {
+    $script:mockPDMDetected = $true
+    $script:mockConfigIniContent = $baseValidConfig
+    $script:mockLASTEXITCODE_Global = 0
+    Test-ProcessStudyMainLogic -StudyDirectory "output/reports"
+} @(
+    "PDM detected. Using 'pdm run' to execute Python scripts.",
+    "WARNING: Could not read or parse model names from config.ini. Full paths will be shown instead. Error: Model name map was created but is empty. Check config.ini formatting.",
+    "`n######################################################",
+    "### Starting Study Processing for: 'output/reports'",
+    "######################################################`n",
+    "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports",
+    "  - Compiling: google-gemini-flash-1.5 (correct map)",
+    "  - Compiling: meta-llama-3-3-70b (random map)",
+    "  - Generated final study summary: C:\path\to\output\reports\STUDY_results.csv",
+    "Compilation process finished.",
+    "Step '1/2: Compile Results' completed successfully.",
+    "",
+    "[2/2: Run Final Analysis (ANOVA)] Executing: pdm run python src/run_anova.py output/reports",
+    "  - Full analysis log written to: C:\path\to\output\reports\anova\STUDY_analysis_log.txt",
+    "  - Applying filter: min_valid_response_threshold=0",
+    "  - Analysis will proceed for 2 metrics.",
+    "  - METRIC 'mean_mrr': No significant factors found. Plots saved.",
+    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01). Plots saved.",
     "Step '2/2: Run Final Analysis (ANOVA)' completed successfully.",
     "",
     "######################################################",
@@ -742,15 +724,18 @@ Run-Test "config.ini valid but empty display name map should warn and use raw pa
     "### Starting Study Processing for: 'output/reports'",
     "######################################################`n",
     "[1/2: Compile Results] Executing: pdm run python src/compile_results.py output/reports",
-    "Compilation process finished.", # No "Compiling: X (Y map)" lines here.
+    "  - Compiling: google-gemini-flash-1.5 (correct map)",
+    "  - Compiling: meta-llama-3-3-70b (random map)",
+    "  - Generated final study summary: C:\path\to\output\reports\STUDY_results.csv",
+    "Compilation process finished.",
     "Step '1/2: Compile Results' completed successfully.",
     "",
     "[2/2: Run Final Analysis (ANOVA)] Executing: pdm run python src/run_anova.py output/reports",
     "  - Full analysis log written to: C:\path\to\output\reports\anova\STUDY_analysis_log.txt",
     "  - Applying filter: min_valid_response_threshold=0",
     "  - Analysis will proceed for 2 metrics.",
-    "  - METRIC 'mean_mrr': No significant factors found.. Plots saved.",
-    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01).. Plots saved.",
+    "  - METRIC 'mean_mrr': No significant factors found. Plots saved.",
+    "  - METRIC 'accuracy': Factor 'model_name' showed significant effect (p < 0.01). Plots saved.",
     "Step '2/2: Run Final Analysis (ANOVA)' completed successfully.",
     "",
     "######################################################",

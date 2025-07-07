@@ -42,7 +42,9 @@ venv.in-project = true
 test = "pytest -v"
 lint = "pre-commit run --all-files"
 build-docs = "python src/build_docs.py"
-test-ps = "pwsh ./tests/run_experiment.Tests.ps1"
+test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
+test-ps-stu = "pwsh ./tests/process_study.Tests.ps1"
+test-ps-all = "pdm run test-ps-exp && pdm run test-ps-stu"
 
 # Main workflow shortcuts
 run-exp = "powershell -ExecutionPolicy Bypass -File .\\run_experiment.ps1"
