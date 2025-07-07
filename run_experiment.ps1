@@ -120,23 +120,8 @@ function _Run-ScriptMain {
 }
 
 # This invocation guard ensures the main execution logic is only triggered
-# when the script is run directly (not dot-sourced) AND it is not running within a Pester context.
-# A Pester context is detected by checking for $PesterContext variable or by checking the call stack.
-$isPesterContext = $false
-try {
-    # Check for $PesterContext variable (standard Pester v5+ method)
-    if (Get-Variable -Name 'PesterContext' -ErrorAction SilentlyContinue) {
-        $isPesterContext = $true
-    }
-    # Fallback: Check the call stack for Pester modules, if $PesterContext isn't reliable
-    elseif ($MyInvocation.ScriptStackTrace -match "Pester.psm1") {
-        $isPesterContext = $true
-    }
-}
-catch {} # Suppress errors if variables/stacks are not available in strange contexts
-
-# The primary invocation guard for the script's main execution.
-if (($MyInvocation.InvocationName -ne '.') -and (-not $isPesterContext)) {
+# when the script is run directly (not dot-sourced).
+if ($MyInvocation.InvocationName -ne '.') {
     # Call the helper function to run the main logic, passing all original script parameters
     _Run-ScriptMain @PSBoundParameters
 }
