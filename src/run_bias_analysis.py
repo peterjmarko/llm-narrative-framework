@@ -48,12 +48,27 @@ def build_long_format_df(replication_dir, k_value):
         return None
 
     all_points = []
+    detected_k = 0  # Initialize to 0
+
+    if not score_matrices:
+        logging.warning(f"No score matrices found in {scores_file}.")
+        return None, detected_k
+
+    # Detect the actual 'k' from the first matrix's dimension.
+    # This is safer than relying on the command-line argument.
+    detected_k = score_matrices[0].shape[1]
+
     for i, matrix in enumerate(score_matrices):
+        # Ensure matrix dimensions match the detected k
+        if matrix.shape[1] != detected_k:
+            logging.warning(f"Matrix {i} in {scores_file} has an inconsistent shape. Skipping.")
+            continue
+            
         true_map = mappings_list[i]
-        for row_idx in range(k_value):
+        for row_idx in range(matrix.shape[0]):
             true_col_for_row = true_map[row_idx]
             max_score = np.max(matrix[row_idx, :])
-            for col_idx in range(k_value):
+            for col_idx in range(matrix.shape[1]):
                 all_points.append({
                     'person_row': row_idx + 1,
                     'desc_col': col_idx + 1,
@@ -61,7 +76,7 @@ def build_long_format_df(replication_dir, k_value):
                     'is_true_match': (col_idx + 1 == true_col_for_row),
                     'is_top_1': (matrix[row_idx, col_idx] == max_score)
                 })
-    return pd.DataFrame(all_points)
+    return pd.DataFrame(all_points), detected_k
 
 def calculate_bias_metrics(df, k_value):
     """Calculates numerical summary metrics for bias."""
@@ -104,12 +119,12 @@ def main():
     logging.debug(f"Found report file to update: {report_filepath}")
     # --- End of file finding logic ---
 
-    df_long = build_long_format_df(args.replication_dir, args.k_value)
-    if df_long is None:
+    df_long, detected_k = build_long_format_df(args.replication_dir, args.k_value)
+    if df_long is None or df_long.empty:
         # A more specific error is logged inside the function, so we can just exit.
         return
 
-    bias_metrics = calculate_bias_metrics(df_long, args.k_value)
+    bias_metrics = calculate_bias_metrics(df_long, detected_k)
 
     try:
         with open(report_filepath, 'r', encoding='utf-8') as f:

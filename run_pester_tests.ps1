@@ -28,19 +28,24 @@ Write-Host "Pester test file found: $TestFilePath" -ForegroundColor Green
 # --- Invoke Pester Tests ---
 Write-Host "Invoking Pester tests..." -ForegroundColor Cyan
 try {
-    # Invoke Pester with only the most essential parameter: the path to the test file.
-    # This minimizes the chance of triggering the "Legacy parameter set" warning.
-    Invoke-Pester -Path $TestFilePath -ErrorAction Stop
-
-    # Pester sets $LASTEXITCODE based on test failures. We propagate it.
-    # Note: When -OutputFormat is not specified, Pester defaults to Console output.
-    # NUnitXml output will not be generated with this minimal invocation.
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Pester tests completed with failures or errors. Exit code: $LASTEXITCODE" -ForegroundColor Red
-    } else {
-        Write-Host "Pester tests completed successfully." -ForegroundColor Green
+    # Using a PesterConfiguration object is the most robust way to invoke tests,
+    # ensuring that only the specified file is run. This prevents Pester from
+    # auto-discovering and running other tests in the directory.
+    $pesterConfig = [PesterConfiguration]@{
+        Run = @{
+            Path = $TestFilePath
+            Exit = $true # Ensures Pester exits with a status code for CI/CD
+        }
+        Output = @{
+            Verbosity = 'Detailed'
+        }
     }
-    exit $LASTEXITCODE # Propagate Pester's exit code
+
+    # Invoke Pester with the explicit configuration.
+    Invoke-Pester -Configuration $pesterConfig
+
+    # The 'Exit = $true' setting handles propagating the exit code,
+    # so we don't need to manually check $LASTEXITCODE here.
 }
 catch {
     Write-Error "FATAL: Pester test run encountered an unhandled error: $($_.Exception.Message)"

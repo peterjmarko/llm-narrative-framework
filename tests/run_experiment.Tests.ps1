@@ -18,14 +18,13 @@ Describe 'run_experiment.ps1 Argument Handling' {
         # This variable will store the arguments passed to our mock.
         $mockArgs = $null
 
-        # Mock the 'pdm' command. When it's called, it will just store
-        # its arguments in $mockArgs instead of running the Python script.
-        Mock pdm {
-            param($arguments)
-            $script:mockArgs = $arguments
-        } -ParameterFilter {
-            # This makes sure we only mock 'pdm run python ...' calls.
-            $arguments[0] -eq 'run' -and $arguments[1] -eq 'python'
+        # To robustly mock an external command like 'pdm.exe', we override it
+        # with a temporary function. This function intercepts any call to 'pdm',
+        # stores the arguments passed to it in our test variable, and prevents
+        # the real command from running. Pester automatically cleans up this
+        # function after each test.
+        function pdm {
+            $script:mockArgs = $args
         }
     }
 
