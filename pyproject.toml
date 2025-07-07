@@ -30,6 +30,7 @@ dev = [
     "pypandoc>=1.15",
     "pillow>=10.4.0",
     "pytest-cov>=5.0.0",
+    "pdm>=2.20.1",
 ]
 
 [tool.pdm]
