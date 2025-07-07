@@ -16,15 +16,29 @@ Describe 'run_experiment.ps1 Argument Handling' {
     # The mock captures the arguments passed to it into a variable.
     BeforeEach {
         # This variable will store the arguments passed to our mock.
-        $mockArgs = $null
+        $script:mockArgs = $null
 
-        # To robustly mock an external command like 'pdm.exe', we override it
-        # with a temporary function. This function intercepts any call to 'pdm',
-        # stores the arguments passed to it in our test variable, and prevents
-        # the real command from running. Pester automatically cleans up this
-        # function after each test.
-        function pdm {
-            $script:mockArgs = $args
+        # This is the function our mock will point to.
+        # It must be defined outside the Mock-Command scriptblock.
+        function Invoke-MockPdm {
+            param($arguments)
+            $script:mockArgs = $arguments
+        }
+
+        # We must mock Get-Command because the script uses it to find the executable.
+        # This allows us to intercept the discovery process itself.
+        Mock Get-Command -MockWith {
+            param($Name)
+
+            # If the script is asking for 'pdm', we return a reference
+            # to our own mock function instead of the real pdm.exe.
+            if ($Name -eq 'pdm') {
+                return Get-Command Invoke-MockPdm
+            }
+
+            # For any other command, let the real Get-Command handle it.
+            # We must use -TestCases to call the original command to avoid recursion.
+            [PesterConfiguration]::Default.Mocking.InvokeOriginalCommand = $true
         }
     }
 

@@ -116,9 +116,12 @@ function Invoke-Experiment {
     }
 }
 
-# This invocation guard ensures the script's main logic only runs when executed directly.
-# When dot-sourced by Pester for testing, this block is skipped.
-if ($MyInvocation.MyCommand.CommandType -eq 'ExternalScript') {
+# This is the PowerShell equivalent of Python's 'if __name__ == "__main__"'.
+# It checks if the script is being run directly (call stack size is 1) or
+# being imported/dot-sourced by another script (call stack size > 1).
+# This method is more robust than checking $MyInvocation.
+$isRunDirectly = (Get-PSCallStack).Count -eq 1
+if ($isRunDirectly) {
     # Call the main function, passing along any command-line parameters.
     Invoke-Experiment @PSBoundParameters
 }

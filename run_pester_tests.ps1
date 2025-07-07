@@ -28,24 +28,21 @@ Write-Host "Pester test file found: $TestFilePath" -ForegroundColor Green
 # --- Invoke Pester Tests ---
 Write-Host "Invoking Pester tests..." -ForegroundColor Cyan
 try {
-    # Using a PesterConfiguration object is the most robust way to invoke tests,
-    # ensuring that only the specified file is run. This prevents Pester from
-    # auto-discovering and running other tests in the directory.
+    # Using a PesterConfiguration object is the most robust way to invoke tests.
+    # It explicitly disables discovery and forces Pester to run only the specified file.
     $pesterConfig = [PesterConfiguration]@{
         Run = @{
-            Path = $TestFilePath
-            Exit = $true # Ensures Pester exits with a status code for CI/CD
+            Path = $TestFilePath # Tell Pester exactly which file to run
+            Exit = $true         # Make Pester exit with a status code for automation
         }
-        Output = @{
-            Verbosity = 'Detailed'
+        Discovery = @{
+            # Explicitly disable automatic discovery of any other test files
+            ExcludePath = '*'
         }
     }
 
-    # Invoke Pester with the explicit configuration.
+    # Invoke Pester with the explicit and unambiguous configuration.
     Invoke-Pester -Configuration $pesterConfig
-
-    # The 'Exit = $true' setting handles propagating the exit code,
-    # so we don't need to manually check $LASTEXITCODE here.
 }
 catch {
     Write-Error "FATAL: Pester test run encountered an unhandled error: $($_.Exception.Message)"
