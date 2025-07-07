@@ -35,6 +35,7 @@ import time
 import datetime
 import argparse
 import re
+import configparser
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
@@ -151,10 +152,25 @@ def main():
             try:
                 subprocess.run(cmd, check=True)
 
-                # --- ADDED: Run the new per-replication bias analysis stage ---
-                cmd_bias = [sys.executable, bias_analysis_script, run_dir]
-                subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
-                # --- END OF ADDED BLOCK ---
+                # --- FIX: Load the run-specific archived config to get the correct k value ---
+                config_path = os.path.join(run_dir, 'config.ini.archived')
+                k_value = None
+                if os.path.exists(config_path):
+                    config = configparser.ConfigParser()
+                    config.read(config_path)
+                    # Use robust key lookup to find the group size (k)
+                    if config.has_option('Study', 'group_size'):
+                        k_value = config.getint('Study', 'group_size')
+                    elif config.has_option('Study', 'k_per_query'): # Fallback for older key names
+                        k_value = config.getint('Study', 'k_per_query')
+
+                if k_value:
+                    # Run the bias analysis stage with the correct k_value
+                    cmd_bias = [sys.executable, bias_analysis_script, run_dir, "--k_value", str(k_value)]
+                    subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
+                else:
+                    logging.warning(f"Could not find k_value in {config_path}. Skipping bias analysis for {os.path.basename(run_dir)}.")
+                # --- END OF FIX ---
 
             except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
                 logging.error(f"!!! Reprocessing failed or was interrupted for {os.path.basename(run_dir)}. Continuing... !!!")
@@ -217,7 +233,12 @@ def main():
                     
                     if len(found_dirs) == 1:
                         run_dir = found_dirs[0]
-                        cmd_bias = [sys.executable, bias_analysis_script, run_dir]
+                        # Get k from the live config for the new run
+                        k_value = get_config_value(APP_CONFIG, 'Study', 'group_size', 
+                                                   value_type=int, 
+                                                   fallback_key='k_per_query', 
+                                                   fallback=10)
+                        cmd_bias = [sys.executable, bias_analysis_script, run_dir, "--k_value", str(k_value)]
                         subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
                     else:
                         logging.warning(f"Could not find unique run directory for rep {rep_num} to run bias analysis. Found: {len(found_dirs)}")
