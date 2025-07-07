@@ -124,6 +124,54 @@ The test suite is divided into two parts, one for the Python source code and one
         pdm run test-ps-mig
         ````
 
+#### How to Write a New Test (Best Practices)
+
+Most modules in `src/` are designed as executable scripts. The standard testing pattern for these modules is to **import them directly and call their `main()` function**, rather than running them as a subprocess. This ensures that code coverage is collected reliably.
+
+**All new tests for scripts must follow this pattern:**
+
+1.  **Structure the Script:** Ensure the target script (e.g., `src/my_script.py`) has its core logic inside a `main()` function that returns an exit code (`0` for success, non-zero for failure). The call to `main()` must be protected by an `if __name__ == "__main__":` block.
+
+    ````python
+    # src/my_script.py
+    import sys
+
+    def main():
+        # ... logic for parsing args and running the script ...
+        print("Script finished successfully.")
+        return 0 # Return 0 for success
+
+    if __name__ == "__main__":
+        # This code only runs when the script is executed directly
+        # It does NOT run when the script is imported by a test
+        sys.exit(main())
+    ````
+
+2.  **Structure the Test:** In your test file, import the script module and use `unittest.mock.patch` to simulate command-line arguments (`sys.argv`).
+
+    ````python
+    # tests/test_my_script.py
+    import unittest
+    from unittest.mock import patch
+    import sys
+    import my_script # Import the module we are testing
+
+    class TestMyScript(unittest.TestCase):
+        def test_some_functionality(self):
+            # 1. Define the fake command-line arguments the script expects
+            test_args = ['my_script.py', 'path/to/data', '--option', 'value']
+
+            # 2. Patch sys.argv and call the script's main() function directly
+            with patch.object(sys, 'argv', test_args):
+                return_code = my_script.main()
+                self.assertEqual(return_code, 0) # Check for success exit code
+            
+            # 3. Assert that the script created the expected files or side effects
+            # ... your file-based assertions here ...
+    ````
+
+This approach, demonstrated in `tests/test_compile_results.py`, is the required standard for maintaining test quality and coverage across the project.
+
 ### 4. Commit Your Changes
 
 Use clear and descriptive commit messages. We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. The general format is `type(scope): short description`.
