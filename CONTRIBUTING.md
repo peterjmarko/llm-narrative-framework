@@ -104,6 +104,8 @@ Write your code, update data, or adjust documentation as needed.
 
 This project includes tests that must pass before a pull request will be merged. The pre-commit hooks do not run these tests automatically, so you must run them manually.
 
+The test suite covers both Python and PowerShell components. For PowerShell scripts, due to specific environmental challenges with traditional PowerShell testing frameworks (like Pester's advanced features), a custom, bare-bones testing approach is employed. This ensures maximum compatibility and reliability by directly executing test logic without relying on complex framework structures.
+
 Use the PDM script shortcut:
 ```bash
 python -m pdm run test
