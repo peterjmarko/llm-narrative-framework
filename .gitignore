@@ -14,6 +14,8 @@ __pycache__/
 # All generated data, reports, and archives
 /output/
 /archives/
+/src/archive/
+/tests/archive/
 
 # Ignore generated document files
 *.docx

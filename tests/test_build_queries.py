@@ -193,9 +193,8 @@ class TestBuildQueries(unittest.TestCase):
         return subprocess.CompletedProcess(args=cmd_list_args, returncode=0, stdout="Mock QGEN success", stderr="")
 
 
-    @patch('builtins.input', return_value='new')
     @patch('subprocess.run') # Patch subprocess.run globally for this test method
-    def test_new_run_creates_files_and_logs(self, mock_subprocess_run, mock_input):
+    def test_new_run_creates_files_and_logs(self, mock_subprocess_run):
         mock_subprocess_run.side_effect = self.mock_query_generator_subprocess
         num_iterations = 2
         k_per_query = self.mock_config_parser_obj.getint('General', 'default_k')
@@ -230,9 +229,8 @@ class TestBuildQueries(unittest.TestCase):
         self.assertEqual(len(used_indices_lines), num_iterations * k_per_query)
         self.assertEqual(len(set(used_indices_lines)), num_iterations * k_per_query)
 
-    @patch('builtins.input', return_value='new')
     @patch('subprocess.run')
-    def test_seeding_is_deterministic(self, mock_subprocess_run, mock_input):
+    def test_seeding_is_deterministic(self, mock_subprocess_run):
         """
         Tests that providing the same seeds results in identical output files across two separate runs.
         """
@@ -241,14 +239,13 @@ class TestBuildQueries(unittest.TestCase):
         # --- Define Test Parameters ---
         num_iterations = 2
         k_per_query = 3
-        # The base run directory is defined in setUp, we just use it here.
         test_run_dir = self.test_run_dir
         run_queries_dir = os.path.join(test_run_dir, self.cfg_queries_subdir_name)
         
         # Command-line arguments with fixed seeds
         cli_args = [
             'build_queries.py', '-m', str(num_iterations), '-k', str(k_per_query),
-            '--mode', 'new', '--base_seed', '777', '--qgen_base_seed', '888',
+            '--base_seed', '777', '--qgen_base_seed', '888',
             '--run_output_dir', test_run_dir
         ]
 
@@ -270,9 +267,13 @@ class TestBuildQueries(unittest.TestCase):
             content_query_run1 = f.read()
 
         # --- Second Run ---
-        # The key is that build_queries with --mode new will clear the directory,
-        # so we are testing a full regeneration.
-        print("\n--- Seeding Test: Second Run (with same seed) ---")
+        # Explicitly clear the output directory to simulate a 'new' run behavior
+        # (as build_queries.py no longer takes a --mode argument and auto-detects)
+        # Import the helper function from the module under test
+        from build_queries import clear_output_files_for_fresh_run
+        clear_output_files_for_fresh_run(run_queries_dir, mappings_path_run1, os.path.join(run_queries_dir, self.mock_config_parser_obj['Filenames']['used_indices_log']))
+
+        print("\n--- Seeding Test: Second Run (with same seed, fresh start) ---")
         with patch.object(sys, 'argv', cli_args):
             # Reload the module to reset any internal state if necessary, although a well-written
             # script shouldn't need this, it's safer for testing.
@@ -299,9 +300,8 @@ class TestBuildQueries(unittest.TestCase):
         self.assertEqual(content_mappings_run1, content_mappings_run2, "Mappings file content differs between seeded runs.")
         self.assertEqual(content_query_run1, content_query_run2, "Query file content differs between seeded runs.")
 
-    @patch('builtins.input')
     @patch('subprocess.run')
-    def test_continue_run_appends_and_respects_used(self, mock_subprocess_run, mock_input):
+    def test_continue_run_appends_and_respects_used(self, mock_subprocess_run):
         mock_subprocess_run.side_effect = self.mock_query_generator_subprocess
         num_iterations_initial = 1
         num_iterations_continue = 1
@@ -309,7 +309,6 @@ class TestBuildQueries(unittest.TestCase):
         total_personalities_needed = (num_iterations_initial + num_iterations_continue) * k_per_query
         self._create_dummy_master_personalities_file(self.master_personalities_path, num_personalities=total_personalities_needed + 5)
 
-        mock_input.return_value = 'new'
         cli_args_run1 = ['build_queries.py', '-m', str(num_iterations_initial), '-k', str(k_per_query), '--base_seed', '10', '--qgen_base_seed', '110', '--run_output_dir', self.test_run_dir]
         with patch.object(sys, 'argv', cli_args_run1):
             build_queries_main_under_test()
@@ -320,7 +319,6 @@ class TestBuildQueries(unittest.TestCase):
         else:
             current_main_to_call = build_queries_main_under_test
 
-        mock_input.return_value = 'continue'
         cli_args_run2 = ['build_queries.py', '-m', str(num_iterations_continue), '-k', str(k_per_query), '--base_seed', '20', '--qgen_base_seed', '120', '--run_output_dir', self.test_run_dir]
         with patch.object(sys, 'argv', cli_args_run2):
             current_main_to_call()
@@ -348,10 +346,9 @@ class TestBuildQueries(unittest.TestCase):
 
 
     @patch('subprocess.run') # Not actually called if exit happens early
-    @patch('builtins.input', return_value='new')
     @patch('sys.exit') 
     @patch('logging.error') 
-    def test_insufficient_personalities(self, mock_log_error, mock_sys_exit, mock_input, mock_subprocess_run_placeholder):
+    def test_insufficient_personalities(self, mock_log_error, mock_sys_exit, mock_subprocess_run_placeholder):
         num_iterations = 3
         k_per_query = self.mock_config_parser_obj.getint('General', 'default_k')
         needed = num_iterations * k_per_query
@@ -369,9 +366,8 @@ class TestBuildQueries(unittest.TestCase):
         error_found = any("Not enough unique *available* personalities" in str(call_arg) for call_arg in mock_log_error.call_args_list)
         self.assertTrue(error_found, "Expected 'Not enough personalities' error message not logged.")
 
-    @patch('builtins.input', return_value='new')
     @patch('subprocess.run')
-    def test_manifest_creation_and_consistency(self, mock_subprocess_run, mock_input):
+    def test_manifest_creation_and_consistency(self, mock_subprocess_run):
         """
         Tests that build_queries orchestrates the creation of manifest files
         and that their content is consistent with the final aggregated mappings.txt.

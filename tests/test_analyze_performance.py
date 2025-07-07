@@ -22,6 +22,7 @@ from analyze_performance import (
     calculate_top_k_accuracy_chance,
     read_mappings_and_deduce_k,
     read_score_matrices,
+    read_successful_indices,
     main as analyze_main 
 )
 
@@ -259,22 +260,39 @@ class TestAnalyzePerformance(unittest.TestCase):
         # So, top3_hits_test3 should be 3. Top-3 Accuracy = 3/6 = 0.5.
 
         scores_content_varied = f"{scores_matrix1_str}\n\n{scores_matrix2_str}\n\n{scores_matrix3_str}"
-        mappings_header = "\t".join([f"Map{i+1}" for i in range(k)])
-        mappings_content = f"{mappings_header}\n" + \
-                           "\t".join(map(str, map1)) + "\n" + \
-                           "\t".join(map(str, map2)) + "\n" + \
-                           "\t".join(map(str, map3))
+        all_mappings = [map1, map2, map3]
+
+        # ---- New Setup for main() function to match new arg requirements ----
+        analysis_inputs_dir = os.path.join(self.test_dir, "analysis_inputs")
+        session_queries_dir = os.path.join(self.test_dir, "session_queries")
+        os.makedirs(analysis_inputs_dir, exist_ok=True)
+        os.makedirs(session_queries_dir, exist_ok=True)
         
-        scores_filepath = os.path.join(self.test_dir, f"all_scores_k{k}_m{m}.txt")
-        mappings_filepath = os.path.join(self.test_dir, f"all_mappings_k{k}_m{m}.txt")
+        scores_filepath = os.path.join(analysis_inputs_dir, "all_scores.txt")
+        mappings_filepath = os.path.join(analysis_inputs_dir, "all_mappings.txt")
 
         with open(scores_filepath, "w") as f: f.write(scores_content_varied)
+
+        mappings_header = "\t".join([f"Map{i+1}" for i in range(k)])
+        mappings_content = f"{mappings_header}\n" + "\n".join(["\t".join(map(str, m)) for m in all_mappings])
         with open(mappings_filepath, "w") as f: f.write(mappings_content)
+        
+        # Create dummy validation files that the script now requires
+        indices_filepath = os.path.join(analysis_inputs_dir, "successful_query_indices.txt")
+        with open(indices_filepath, "w") as f:
+            for i in range(1, m + 1): f.write(f"{i}\n")
+
+        for i, mapping in enumerate(all_mappings):
+            manifest_idx = i + 1
+            manifest_path = os.path.join(session_queries_dir, f"llm_query_{manifest_idx:03d}_manifest.txt")
+            manifest_content = "Col1\tCol2\tTrue_Map_ID\n"
+            manifest_lines = [f"P_{j+1}\tD_{j+1}\t{mapping[j]}" for j in range(k)]
+            manifest_content += "\n".join(manifest_lines)
+            with open(manifest_path, "w") as f: f.write(manifest_content)
 
         test_args = [
             'analyze_performance.py', 
-            scores_filepath,
-            mappings_filepath,
+            '--run_output_dir', self.test_dir,
             '--k_value', str(k),
             '--delimiter', 'tab',
             '--top_k_acc', '3' 
@@ -284,11 +302,11 @@ class TestAnalyzePerformance(unittest.TestCase):
             except SystemExit as e: self.assertTrue(e.code is None or e.code == 0, f"analyze_main exited: {e.code}")
         
         printed_output = "".join([call_args[0][0] for call_args in mock_print.call_args_list if call_args[0]])
-        # Check for the tag and a key part of the summary content
-        self.assertIn("<<<ANALYSIS_SUMMARY_START>>>", printed_output)
-        self.assertIn("Combined Significance of Score Differentiation", printed_output)
-        self.assertIn("Analysis complete.", printed_output) # Check if the script ran to completion
-        self.assertIn(f"Top-{3} Accuracy)", printed_output)
+        # Check for the machine-readable summary tags and content
+        self.assertIn("<<<METRICS_JSON_START>>>", printed_output)
+        self.assertIn("<<<METRICS_JSON_END>>>", printed_output)
+        self.assertIn(f'"mean_top_{3}_acc"', printed_output) # Check for Top-K metric in JSON
+        self.assertNotIn("Halting due to issues", printed_output)
 
 
     @patch('builtins.print')
@@ -341,21 +359,38 @@ class TestAnalyzePerformance(unittest.TestCase):
         scores_m3_comma = "\n".join(s3_list_comma)
 
         scores_content_varied_comma = f"{scores_m1_comma}\n\n{scores_m2_comma}\n\n{scores_m3_comma}"
-        mappings_header_comma = ",".join([f"H{i+1}" for i in range(k)])
-        mappings_content_comma = f"{mappings_header_comma}\n" + \
-                                 ",".join(map(str,map1)) + "\n" + \
-                                 ",".join(map(str,map2)) + "\n" + \
-                                 ",".join(map(str,map3))
+        all_mappings_comma = [map1, map2, map3]
 
-        scores_filepath = os.path.join(self.test_dir, f"s_comma_k{k}_m{m}.txt")
-        mappings_filepath = os.path.join(self.test_dir, f"m_comma_k{k}_m{m}.txt")
+        # ---- New Setup for main() function ----
+        analysis_inputs_dir = os.path.join(self.test_dir, "analysis_inputs")
+        session_queries_dir = os.path.join(self.test_dir, "session_queries")
+        os.makedirs(analysis_inputs_dir, exist_ok=True)
+        os.makedirs(session_queries_dir, exist_ok=True)
+
+        scores_filepath = os.path.join(analysis_inputs_dir, "all_scores.txt")
+        mappings_filepath = os.path.join(analysis_inputs_dir, "all_mappings.txt")
         with open(scores_filepath, "w") as f: f.write(scores_content_varied_comma)
+
+        mappings_header_comma = ",".join([f"H{i+1}" for i in range(k)])
+        mappings_content_comma = f"{mappings_header_comma}\n" + "\n".join([",".join(map(str, m)) for m in all_mappings_comma])
         with open(mappings_filepath, "w") as f: f.write(mappings_content_comma)
+
+        # Create dummy validation files that the script now requires
+        indices_filepath = os.path.join(analysis_inputs_dir, "successful_query_indices.txt")
+        with open(indices_filepath, "w") as f:
+            for i in range(1, m + 1): f.write(f"{i}\n")
+
+        for i, mapping in enumerate(all_mappings_comma):
+            manifest_idx = i + 1
+            manifest_path = os.path.join(session_queries_dir, f"llm_query_{manifest_idx:03d}_manifest.txt")
+            manifest_content = "Col1\tCol2\tTrue_Map_ID\n"
+            manifest_lines = [f"P_{j+1}\tD_{j+1}\t{mapping[j]}" for j in range(k)]
+            manifest_content += "\n".join(manifest_lines)
+            with open(manifest_path, "w") as f: f.write(manifest_content)
 
         test_args = [
             'analyze_performance.py',
-            scores_filepath,
-            mappings_filepath,
+            '--run_output_dir', self.test_dir,
             # No -k, should deduce k=6
             # No -d, should deduce comma
             '--top_k_acc', '2' # Test with Top-2 for this auto-detect case
@@ -367,13 +402,12 @@ class TestAnalyzePerformance(unittest.TestCase):
         
         printed_output = "".join([call_args[0][0] for call_args in mock_print_auto.call_args_list if call_args[0]])
         self.assertIn(f"Deduced k as {k}", printed_output)
-        self.assertIn(f"Deduced delimiter '{repr(',')}' from first line structure", printed_output)
+        self.assertIn(f"Deduced delimiter '{repr(',')}'", printed_output)
         self.assertNotIn("Halting due to issues", printed_output)
-        # Check for the tag and a key part of the summary content
-        self.assertIn("<<<ANALYSIS_SUMMARY_START>>>", printed_output)
-        self.assertIn("Combined Significance of Score Differentiation", printed_output)
-        self.assertIn("Analysis complete.", printed_output)
-        self.assertIn(f"Top-{2} Accuracy)", printed_output) # Check for the specified Top-K
+        # Check for the machine-readable summary tags and content
+        self.assertIn("<<<METRICS_JSON_START>>>", printed_output)
+        self.assertIn("<<<METRICS_JSON_END>>>", printed_output)
+        self.assertIn(f'"mean_top_{2}_acc"', printed_output) # Check for the specified Top-K
 
 
     def test_read_score_matrices_markdown_table(self):
@@ -416,6 +450,226 @@ class TestAnalyzePerformance(unittest.TestCase):
         self.assertAlmostEqual(matrices[0][0, 0], 0.1)
         self.assertAlmostEqual(matrices[0][2, 2], 0.9)
 
+    def test_evaluate_single_test_error_conditions(self):
+        k = 5
+        matrix_ok = np.eye(k)
+        mapping_ok = list(range(1, k + 1))
+
+        with patch('builtins.print') as mock_print:
+            # Test with matrix of wrong shape
+            matrix_bad_shape = np.eye(k, k + 1)
+            self.assertIsNone(evaluate_single_test(matrix_bad_shape, mapping_ok, k))
+            mock_print.assert_called_with(f"Warning: evaluate_single_test received matrix with incorrect shape {(k, k+1)}, expected ({k},{k}). Skipping this test.")
+
+            # Test with mapping of wrong length
+            mapping_bad_len = list(range(1, k))
+            self.assertIsNone(evaluate_single_test(matrix_ok, mapping_bad_len, k))
+            mock_print.assert_called_with(f"Warning: correct_mapping_indices_1_based has {len(mapping_bad_len)} elements, expected {k}. Skipping this test.")
+
+            # Test with invalid values in mapping (e.g., > k)
+            mapping_bad_val = list(range(1, k)) + [k + 1]
+            self.assertIsNone(evaluate_single_test(matrix_ok, mapping_bad_val, k))
+            mock_print.assert_called_with(f"Warning: Invalid value in correct_mapping_indices_1_based (not between 1 and {k}). Skipping this test.")
+
+    def test_read_files_error_conditions(self):
+        # Test read_mappings with non-existent file
+        mappings, k, delim = read_mappings_and_deduce_k("non_existent_file.txt")
+        self.assertIsNone(mappings)
+
+        # Test read_mappings with empty file
+        empty_filepath = os.path.join(self.test_dir, "empty.txt")
+        open(empty_filepath, 'a').close()
+        mappings, k, delim = read_mappings_and_deduce_k(empty_filepath)
+        self.assertIsNone(mappings)
+        
+        # Test read_score_matrices with invalid k
+        self.assertIsNone(read_score_matrices("any_file.txt", expected_k=0))
+        
+        # Test read_successful_indices with non-existent file
+        self.assertIsNone(read_successful_indices("non_existent_file.txt"))
+
+        # Test read_successful_indices with bad data
+        bad_indices_path = os.path.join(self.test_dir, "bad_indices.txt")
+        with open(bad_indices_path, 'w') as f: f.write("1\ntwo\n3")
+        self.assertIsNone(read_successful_indices(bad_indices_path))
+
+    def test_main_validation_failure(self):
+        k = 3
+        # Setup the necessary file structure for main()
+        analysis_inputs_dir = os.path.join(self.test_dir, "analysis_inputs")
+        session_queries_dir = os.path.join(self.test_dir, "session_queries")
+        os.makedirs(analysis_inputs_dir, exist_ok=True)
+        os.makedirs(session_queries_dir, exist_ok=True)
+
+        # Create scores file
+        scores_content = "1,0,0\n0,1,0\n0,0,1"
+        scores_filepath = os.path.join(analysis_inputs_dir, "all_scores.txt")
+        with open(scores_filepath, 'w') as f: f.write(scores_content)
+        
+        # Create mappings file
+        mappings_content = "1,2,3" # This is what we will test against
+        mappings_filepath = os.path.join(analysis_inputs_dir, "all_mappings.txt")
+        with open(mappings_filepath, 'w') as f: f.write(mappings_content)
+
+        # Create successful indices file
+        indices_filepath = os.path.join(analysis_inputs_dir, "successful_query_indices.txt")
+        with open(indices_filepath, 'w') as f: f.write("1\n")
+
+        # Create a MISMATCHED manifest file
+        manifest_path = os.path.join(session_queries_dir, f"llm_query_001_manifest.txt")
+        manifest_content = "Col1\tCol2\tTrue_Map_ID\n"
+        manifest_content += "P1\tD1\t3\n" # Mismatch here
+        manifest_content += "P2\tD2\t2\n"
+        manifest_content += "P3\tD3\t1\n"
+        with open(manifest_path, 'w') as f: f.write(manifest_content)
+
+        test_args = ['analyze_performance.py', '--run_output_dir', self.test_dir, '--k_value', str(k), '--delimiter', ',']
+        
+        with patch.object(sys, 'argv', test_args), \
+             patch('builtins.print') as mock_print:
+            with self.assertRaises(SystemExit) as cm:
+                analyze_main()
+            self.assertEqual(cm.exception.code, 1) # Should exit with error code
+            printed_output = "".join([call.args[0] for call in mock_print.call_args_list if call.args])
+            # The detailed "Mismatch" message goes to the logger, not stdout.
+            # We only need to check for the final critical message that is printed to stdout.
+            self.assertIn("CRITICAL: ANALYZER VALIDATION FAILED", printed_output)
+
+    def test_main_verbose_and_quiet_flags(self):
+        # Create a minimal valid run setup
+        k = 3
+        analysis_inputs_dir = os.path.join(self.test_dir, "analysis_inputs")
+        session_queries_dir = os.path.join(self.test_dir, "session_queries")
+        os.makedirs(analysis_inputs_dir, exist_ok=True)
+        os.makedirs(session_queries_dir, exist_ok=True)
+        
+        scores_filepath = os.path.join(analysis_inputs_dir, "all_scores.txt")
+        with open(scores_filepath, 'w') as f: f.write("1,0,0\n0,1,0\n0,0,1")
+        mappings_filepath = os.path.join(analysis_inputs_dir, "all_mappings.txt")
+        with open(mappings_filepath, 'w') as f: f.write("1,2,3")
+        indices_filepath = os.path.join(analysis_inputs_dir, "successful_query_indices.txt")
+        with open(indices_filepath, 'w') as f: f.write("1\n")
+        manifest_path = os.path.join(session_queries_dir, f"llm_query_001_manifest.txt")
+        with open(manifest_path, 'w') as f: f.write("Col1\tCol2\tTrue_Map_ID\nP1\tD1\t1\nP2\tD2\t2\nP3\tD3\t3")
+
+        # Test with --verbose_per_test
+        args_verbose = ['prog', '--run_output_dir', self.test_dir, '-k', str(k), '--delimiter', ',', '--verbose_per_test']
+        with patch.object(sys, 'argv', args_verbose), patch('builtins.print') as mock_print:
+            try: analyze_main()
+            except SystemExit: pass
+            printed_output = "".join([call.args[0] for call in mock_print.call_args_list if call.args])
+            self.assertIn("Test 1 MWU p-value:", printed_output)
+
+        # Test with --quiet
+        args_quiet = ['prog', '--run_output_dir', self.test_dir, '-k', str(k), '--delimiter', ',', '--quiet']
+        with patch.object(sys, 'argv', args_quiet), patch('builtins.print') as mock_print:
+            try: analyze_main()
+            except SystemExit: pass
+            printed_output = "".join([call.args[0] for call in mock_print.call_args_list if call.args])
+            self.assertNotIn("Successfully loaded", printed_output) # Suppressed info message
+            self.assertIn("ANALYZER_VALIDATION_SUCCESS", printed_output) # Critical messages still print
+            self.assertIn("<<<METRICS_JSON_START>>>", printed_output)
+
+    def test_print_metric_analysis_edge_cases(self):
+        from analyze_performance import print_metric_analysis
+        with patch('builtins.print') as mock_print:
+            # Test with None input
+            print_metric_analysis(None, "Test Metric", "%.4f")
+            mock_print.assert_called_with("\nTest Metric: Analysis result is None or empty.")
+            
+            # Test with zero count
+            result_zero_count = {'name': 'Empty Metric', 'count': 0}
+            print_metric_analysis(result_zero_count, "Test Metric", "%.4f")
+            mock_print.assert_called_with("\nTest Metric (Empty Metric): No valid values to analyze.")
+            
+            # Test with invalid chance level formatting
+            result_bad_chance = {'count': 1, 'chance_level': 'not-a-number'}
+            print_metric_analysis(result_bad_chance, "Test Metric", "%.2f")
+            printed_output = "".join(call.args[0] for call in mock_print.call_args_list)
+            self.assertIn("Warning: Could not format chance_level", printed_output)
+
+    def test_evaluate_single_test_k1(self):
+        """Test the edge case where k=1, so there are no incorrect scores."""
+        k = 1
+        score_matrix = np.array([[10]])
+        correct_mapping = [1]
+        results = evaluate_single_test(score_matrix, correct_mapping, k, 1)
+
+        self.assertIsNotNone(results)
+        self.assertIsNone(results['p_value_mwu']) # No incorrect scores, so MWU can't run
+        self.assertEqual(results['mrr'], 1.0)
+        self.assertEqual(results['top_1_accuracy'], 1.0)
+
+    def test_calculate_positional_bias(self):
+        """Tests the linear regression for positional bias."""
+        from analyze_performance import calculate_positional_bias
+
+        # Test with a clear downward trend
+        performance_scores = [0.9, 0.8, 0.8, 0.7, 0.6]
+        bias_metrics = calculate_positional_bias(performance_scores)
+        self.assertIsNotNone(bias_metrics)
+        self.assertLess(bias_metrics['bias_slope'], 0) # Expect a negative slope
+        self.assertTrue(0 < bias_metrics['bias_p_value'] < 0.1) # Should be significant or near-significant
+
+        # Test with insufficient data
+        bias_metrics_insufficient = calculate_positional_bias([0.9])
+        self.assertTrue(np.isnan(bias_metrics_insufficient['bias_slope']))
+
+    def test_main_mismatched_file_lengths(self):
+        """Tests main() when the number of score matrices and mappings are different."""
+        k = 3
+        analysis_inputs_dir = os.path.join(self.test_dir, "analysis_inputs")
+        os.makedirs(analysis_inputs_dir, exist_ok=True)
+        os.makedirs(os.path.join(self.test_dir, "session_queries"), exist_ok=True) # For validation
+
+        # 2 score matrices
+        scores_content = "1,0,0\n0,1,0\n0,0,1\n\n1,0,0\n0,1,0\n0,0,1"
+        with open(os.path.join(analysis_inputs_dir, "all_scores.txt"), 'w') as f: f.write(scores_content)
+        
+        # 1 mapping
+        with open(os.path.join(analysis_inputs_dir, "all_mappings.txt"), 'w') as f: f.write("1,2,3")
+        with open(os.path.join(analysis_inputs_dir, "successful_query_indices.txt"), 'w') as f: f.write("1\n") # Match mapping count
+
+        test_args = ['prog', '--run_output_dir', self.test_dir, '-k', str(k), '--delimiter', ',']
+        with patch.object(sys, 'argv', test_args), patch('builtins.print') as mock_print:
+            with self.assertRaises(SystemExit):
+                analyze_main()
+            printed_output = "".join([call.args[0] for call in mock_print.call_args_list if call.args])
+            self.assertIn("Error: Number of score matrices (2) does not match mappings (1)", printed_output)
+
+    def test_read_mappings_inconsistent_lines(self):
+        """Tests that read_mappings handles files with inconsistent numbers of columns."""
+        k = 3
+        # First line is valid (k=3), second is not
+        content = "1,2,3\n4,5"
+        map_filepath = os.path.join(self.test_dir, "map_inconsistent.txt")
+        with open(map_filepath, "w") as f: f.write(content)
+
+        with patch('builtins.print') as mock_print:
+            mappings, deduced_k, delim = read_mappings_and_deduce_k(map_filepath, specified_delimiter_keyword=',')
+            self.assertEqual(deduced_k, k)
+            self.assertEqual(len(mappings), 1) # Should only parse the valid line
+            self.assertEqual(mappings[0], [1, 2, 3])
+            
+            printed_output = "".join([call.args[0] for call in mock_print.call_args_list if call.args])
+            self.assertIn(f"Parsed with 2 elements, expected k={k}", printed_output)
+
+    def test_read_score_matrices_malformed_block(self):
+        """Tests that a malformed matrix block is skipped entirely."""
+        k = 3
+        # Middle block has only 2 columns, should be skipped
+        content = "1\t2\t3\n4\t5\t6\n7\t8\t9\n\n1\t2\n3\t4\n5\t6\n\n10\t11\t12\n13\t14\t15\n16\t17\t18"
+        scores_filepath = os.path.join(self.test_dir, "scores_malformed.txt")
+        with open(scores_filepath, "w") as f: f.write(content)
+
+        with patch('builtins.print') as mock_print:
+            matrices = read_score_matrices(scores_filepath, k, delimiter_char='\t')
+            self.assertEqual(len(matrices), 2) # Should find the first and third matrices
+            self.assertAlmostEqual(matrices[0][0, 0], 1.0)
+            self.assertAlmostEqual(matrices[1][2, 2], 18.0)
+            
+            printed_output = "".join([call.args[0] for call in mock_print.call_args_list if call.args])
+            self.assertIn(f"2 cols, exp {k}", printed_output)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

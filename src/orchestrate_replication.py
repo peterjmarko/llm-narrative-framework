@@ -136,7 +136,7 @@ def generate_run_dir_name(model_name, temperature, num_iterations, k_per_query, 
     db_base = os.path.splitext(os.path.basename(personalities_db))[0]
     subjects_str = f"sbj-{k_per_query:02d}"
     trials_str = f"trl-{num_iterations:03d}"
-    replication_str = f"rep-{replication_num:02d}"
+    replication_str = f"rep-{replication_num:03d}"
     parts = ["run", timestamp_str, replication_str, model_short, temp_str, db_base, subjects_str, trials_str]
     sanitized_parts = [re.sub(r'[^a-zA-Z0-9_.-]', '_', part) for part in parts]
     return "_".join(sanitized_parts)

@@ -41,6 +41,7 @@ venv.in-project = true
 test = "pytest -v"
 lint = "pre-commit run --all-files"
 build-docs = "python src/build_docs.py"
+test-ps = "pwsh -NoProfile -File ./run_pester_tests.ps1"
 
 # Main workflow shortcuts
 run-exp = "powershell -ExecutionPolicy Bypass -File .\\run_experiment.ps1"

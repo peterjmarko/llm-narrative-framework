@@ -769,13 +769,11 @@ def main():
             all_incorrect_scores_flat.extend(results_single_test.get('raw_incorrect_scores', []))
             all_chosen_positions_flat.extend(results_single_test.get('raw_chosen_positions', []))
             if args.verbose_per_test:
-                # ... (verbose printing logic remains the same) ...
                 p_val_mwu = results_single_test.get('p_value_mwu')
                 eff_r = results_single_test.get('effect_size_r')
-                mrr_val = results_single_test.get('mrr')
-                top1_val = results_single_test.get('top_1_accuracy')
-                topk_val = results_single_test.get(f'top_{args.top_k_acc}_accuracy')
-                print(f"  Test {i+1} MWU p-value: {p_val_mwu:.4f if p_val_mwu is not None else 'N/A'}, Effect Size r: {eff_r:.4f if eff_r is not None else 'N/A'}")
+                p_val_str = f"{p_val_mwu:.4f}" if p_val_mwu is not None else 'N/A'
+                eff_r_str = f"{eff_r:.4f}" if eff_r is not None else 'N/A'
+                print(f"  Test {i+1} MWU p-value: {p_val_str}, Effect Size r: {eff_r_str}")
         else:
             print(f"  Skipped Test {i+1} due to issues in evaluate_single_test (returned None).")
     

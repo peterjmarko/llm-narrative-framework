@@ -115,9 +115,9 @@ def main():
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         project_root = os.path.abspath(os.path.join(current_dir, '..'))
         
-        base_output = get_config_value(APP_CONFIG, 'General', 'base_output_dir', str, 'output')
-        new_exp_subdir = get_config_value(APP_CONFIG, 'General', 'new_experiments_subdir', str, 'new_experiments')
-        exp_prefix = get_config_value(APP_CONFIG, 'General', 'experiment_dir_prefix', str, 'experiment_')
+        base_output = get_config_value(APP_CONFIG, 'General', 'base_output_dir', value_type=str, fallback='output')
+        new_exp_subdir = get_config_value(APP_CONFIG, 'General', 'new_experiments_subdir', value_type=str, fallback='new_experiments')
+        exp_prefix = get_config_value(APP_CONFIG, 'General', 'experiment_dir_prefix', value_type=str, fallback='experiment_')
 
         base_path = os.path.join(project_root, base_output, new_exp_subdir)
         final_output_dir = os.path.join(base_path, f"{exp_prefix}{timestamp}")

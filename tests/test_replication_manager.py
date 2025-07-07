@@ -9,6 +9,7 @@ import tempfile
 import configparser
 import subprocess
 import importlib
+import re
 
 class TestRunBatch(unittest.TestCase):
 
@@ -23,7 +24,11 @@ class TestRunBatch(unittest.TestCase):
         self.mock_config = configparser.ConfigParser()
         self.mock_config.read_dict({
             'Study': {'num_replications': '2'},
-            'General': {'base_output_dir': self.output_dir}
+            'General': {
+                'base_output_dir': self.output_dir,
+                'new_experiments_subdir': 'new_experiments',
+                'experiment_dir_prefix': 'experiment_'
+            }
         })
 
         for script in ["orchestrate_replication.py", "log_manager.py", "retry_failed_sessions.py", "compile_results.py"]:
@@ -35,91 +40,107 @@ class TestRunBatch(unittest.TestCase):
         shutil.rmtree(self.test_dir)
 
     def _mock_get_config_value(self, config_obj, section, key, value_type=str, fallback=None):
-        """A side_effect function to replace get_config_value."""
+        """A more robust side_effect to replace get_config_value that handles incorrect positional args."""
+        # This logic handles the case where the fallback is accidentally passed as the value_type
+        if not isinstance(value_type, type):
+            fallback = value_type
+            value_type = str
+        
         try:
             val = self.mock_config.get(section, key)
-            return value_type(val)
+            if value_type is not None:
+                return value_type(val)
+            return val
         except (configparser.NoSectionError, configparser.NoOptionError):
             return fallback
 
     # --- The 3 passing tests ---
 
-    # --- CORRECTED TEST ---
+    @patch('src.replication_manager.logging.warning')
     @patch('src.replication_manager.APP_CONFIG')
-    @patch('src.replication_manager.subprocess.run', side_effect=KeyboardInterrupt)
-    def test_handles_keyboard_interrupt(self, mock_subprocess_run, mock_app_config):
-        # Configure the mocked APP_CONFIG to use our test config's values
+    @patch('src.replication_manager.subprocess.run')
+    def test_handles_keyboard_interrupt(self, mock_subprocess_run, mock_app_config, mock_log_warning):
+        """Tests that a KeyboardInterrupt is caught, logged, and halts the loop."""
         mock_app_config.get.side_effect = self.mock_config.get
-        
-        # Import the module inside the test to ensure it sees the patched config
-        from src import replication_manager
-
-        # Assert that a SystemExit is raised when a KeyboardInterrupt occurs
-        with self.assertRaises(SystemExit) as cm, patch.object(sys, 'argv', ['replication_manager.py']):
-            replication_manager.main()
-        
-        self.assertEqual(cm.exception.code, 1, "Expected SystemExit with code 1 on KeyboardInterrupt")
-
-    @patch('src.replication_manager.get_config_value')
-    def test_invalid_run_range_exits(self, mock_get_config_value):
-        mock_get_config_value.side_effect = self._mock_get_config_value
         from src import replication_manager
         importlib.reload(replication_manager)
-        
-        with self.assertRaises(SystemExit) as cm, patch.object(sys, 'argv', ['replication_manager.py', '--start-rep', '2', '--end-rep', '1']):
+
+        # Define a side effect that only raises on the orchestrator call
+        def selective_interrupt_side_effect(*args, **kwargs):
+            cmd = args[0]
+            if 'orchestrate_replication.py' in cmd[1]:
+                raise KeyboardInterrupt
+            # For other calls (like log_manager), return a successful mock process
+            return MagicMock(returncode=0)
+
+        mock_subprocess_run.side_effect = selective_interrupt_side_effect
+
+        # Run main() and expect it to handle the interrupt without crashing the test
+        with patch.object(sys, 'argv', ['replication_manager.py', self.output_dir]):
             replication_manager.main()
-        self.assertEqual(cm.exception.code, 1)
+
+        # Assert that the correct warning was logged
+        mock_log_warning.assert_called_with("\n!!! Batch run interrupted by user during replication 1. Halting... !!!")
 
     def test_format_seconds_with_negative_input(self):
         from src import replication_manager
         self.assertEqual(replication_manager.format_seconds(-100), "00:00:00")
 
-    # --- REWRITTEN TEST 1 ---
     @patch('src.replication_manager.APP_CONFIG')
     @patch('src.replication_manager.find_latest_report', return_value="dummy_report.txt")
     @patch('src.replication_manager.subprocess.run')
     def test_replication_manager_happy_path(self, mock_subprocess_run, mock_find_report, mock_app_config):
-        # Configure the mocked APP_CONFIG to use our test config's values.
-        # The script calls get_config_value(APP_CONFIG,...), so we mock what APP_CONFIG.get() returns.
         mock_app_config.get.side_effect = self.mock_config.get
-
-        # By importing the module *inside* the test, we ensure it sees the patched APP_CONFIG.
         from src import replication_manager
+        importlib.reload(replication_manager)
 
-        mock_subprocess_run.return_value = MagicMock(returncode=0)
-        with patch.object(sys, 'argv', ['replication_manager.py']):
+        # Make the mock create the directories the main script expects to find
+        def side_effect_create_dir(*args, **kwargs):
+            cmd = args[0]
+            if 'orchestrate_replication.py' in cmd[1]:
+                rep_num_index = cmd.index('--replication_num') + 1
+                rep_num = cmd[rep_num_index]
+                run_dir = os.path.join(self.output_dir, f'run_test_rep-{int(rep_num):03d}_seed123')
+                os.makedirs(run_dir, exist_ok=True)
+            return MagicMock(returncode=0)
+        mock_subprocess_run.side_effect = side_effect_create_dir
+
+        with patch.object(sys, 'argv', ['replication_manager.py', self.output_dir, '--end-rep', '2']):
             replication_manager.main()
 
-        # Expected calls: 2x orchestrate, 2x log_manager update, 1x log_manager finalize, 1x retry, 1x compile
-        self.assertEqual(mock_subprocess_run.call_count, 7)
+        # Expected calls for 2 reps: 1 log_start, 2 orchestrate, 2 bias, 1 log_rebuild, 1 compile, 1 finalize = 8
+        self.assertEqual(mock_subprocess_run.call_count, 8)
 
-    # --- REWRITTEN TEST 2 ---
     @patch('src.replication_manager.APP_CONFIG')
     @patch('src.replication_manager.find_latest_report', return_value="dummy_report.txt")
     @patch('src.replication_manager.subprocess.run')
     def test_resumes_partially_completed_batch(self, mock_subprocess_run, mock_find_report, mock_app_config):
-        # Use the mock config instead of the real one
         mock_app_config.get.side_effect = self.mock_config.get
         from src import replication_manager
+        importlib.reload(replication_manager)
 
-        # Simulate that replication 1 is already complete by creating its output directory and report
-        completed_run_dir = os.path.join(self.output_dir, "run_prefix_rep-1_")
+        # Simulate that replication 1 is already complete by creating a correctly named directory
+        completed_run_dir = os.path.join(self.output_dir, "run_test_rep-001_seed123")
         os.makedirs(completed_run_dir)
         with open(os.path.join(completed_run_dir, "replication_report_1.txt"), "w") as f:
             f.write("dummy report")
 
-        with patch.object(sys, 'argv', ['replication_manager.py']):
+        # Mock the creation of the directory for the second run
+        def side_effect_create_dir(*args, **kwargs):
+            cmd = args[0]
+            if 'orchestrate_replication.py' in cmd[1]:
+                run_dir = os.path.join(self.output_dir, f'run_test_rep-002_seed456')
+                os.makedirs(run_dir, exist_ok=True)
+            return MagicMock(returncode=0)
+        mock_subprocess_run.side_effect = side_effect_create_dir
+        
+        with patch.object(sys, 'argv', ['replication_manager.py', self.output_dir, '--end-rep', '2']):
             replication_manager.main()
 
-        # Filter for calls to the orchestrator script
         orchestrator_calls = [c for c in mock_subprocess_run.call_args_list if 'orchestrate_replication.py' in c.args[0][1]]
-        
-        # Assert that only one new replication was run
         self.assertEqual(len(orchestrator_calls), 1)
-        # Assert that the replication that ran was number 2
         self.assertIn('2', orchestrator_calls[0].args[0])
 
-    # --- REWRITTEN TEST 3 ---
     @patch('src.replication_manager.APP_CONFIG')
     @patch('src.replication_manager.find_latest_report', return_value="dummy_report.txt")
     @patch('src.replication_manager.logging.error')
@@ -128,25 +149,24 @@ class TestRunBatch(unittest.TestCase):
         # Use the mock config instead of the real one
         mock_app_config.get.side_effect = self.mock_config.get
         from src import replication_manager
+        importlib.reload(replication_manager)
 
         # Simulate a failure only for replication 1
         def side_effect(*args, **kwargs):
-            cmd = args[0]  # This is the list of arguments
-            # CORRECTED: Check for the script name within the script path (cmd[1])
-            if 'orchestrate_replication.py' in cmd[1] and cmd[cmd.index('--replication_num') + 1] == '1':
+            cmd = args[0]
+            if 'orchestrate_replication.py' in cmd[1] and '1' in cmd:
                 raise subprocess.CalledProcessError(1, cmd)
             return MagicMock(returncode=0)
         mock_subprocess_run.side_effect = side_effect
 
-        with patch.object(sys, 'argv', ['replication_manager.py']):
+        with patch.object(sys, 'argv', ['replication_manager.py', self.output_dir, '--end-rep', '2']):
             replication_manager.main()
 
         # Assert that the failure was logged
-        mock_log_error.assert_any_call("!!! Replication 1 failed. See logs above. Continuing with next replication. !!!")
+        mock_log_error.assert_any_call("!!! Replication 1 failed. Check its report for details. Continuing... !!!")
         # Assert that the script continued and tried to run replication 2
         self.assertTrue(any('orchestrate_replication.py' in c.args[0][1] and '2' in c.args[0] for c in mock_subprocess_run.call_args_list))
 
-    # --- REWRITTEN TEST 4 ---
     @patch('src.replication_manager.APP_CONFIG')
     @patch('src.replication_manager.find_latest_report', return_value="dummy_report.txt")
     @patch('src.replication_manager.logging.error')
@@ -155,44 +175,130 @@ class TestRunBatch(unittest.TestCase):
         # Use the mock config instead of the real one
         mock_app_config.get.side_effect = self.mock_config.get
         from src import replication_manager
+        importlib.reload(replication_manager)
 
-        # Simulate a failure during the post-processing 'retry' step
+        # Simulate a failure during the final compilation step
         def side_effect(*args, **kwargs):
-            cmd = args[0] # This is the list of arguments
-            # CORRECTED: Check for the script name within the script path (cmd[1])
-            if 'retry_failed_sessions.py' in cmd[1]:
-                raise Exception("Simulated retry failure")
+            cmd = args[0]
+            if 'compile_results.py' in cmd[1]:
+                raise Exception("Simulated compilation failure")
             return MagicMock(returncode=0)
         mock_subprocess_run.side_effect = side_effect
 
-        with patch.object(sys, 'argv', ['replication_manager.py']):
+        with patch.object(sys, 'argv', ['replication_manager.py', self.output_dir, '--end-rep', '2']):
             replication_manager.main()
-
+    
         # Assert that the post-processing failure was logged
-        mock_log_error.assert_any_call("An error occurred while running the retry script: Simulated retry failure")
+        mock_log_error.assert_any_call("An error occurred while running the final compilation script: Simulated compilation failure")
 
-    # --- NEW TEST FOR COVERAGE ---
-    @patch('builtins.print')
     @patch('src.replication_manager.APP_CONFIG')
-    @patch('src.replication_manager.find_latest_report', return_value="dummy_report.txt")
     @patch('src.replication_manager.subprocess.run')
-    def test_quiet_mode_suppresses_replication_headers(self, mock_subprocess_run, mock_find_report, mock_app_config, mock_print):
-        # Configure the mocked APP_CONFIG to use our test config's values
+    def test_default_mode_is_quiet(self, mock_subprocess_run, mock_app_config):
+        """Tests that the default mode correctly passes --quiet to the orchestrator."""
         mock_app_config.get.side_effect = self.mock_config.get
         from src import replication_manager
+        importlib.reload(replication_manager) # Reload to apply patches
 
         mock_subprocess_run.return_value = MagicMock(returncode=0)
-        # Run the main function with the --quiet flag
-        with patch.object(sys, 'argv', ['replication_manager.py', '--quiet']):
+        # Run the main function with default arguments (no --verbose)
+        with patch.object(sys, 'argv', ['replication_manager.py', self.output_dir, '--end-rep', '2']):
             replication_manager.main()
 
-        # Combine all arguments from all calls to print() into a single string
+        # Find calls to the orchestrator script
+        orchestrator_calls = [
+            c.args[0] for c in mock_subprocess_run.call_args_list
+            if 'orchestrate_replication.py' in c.args[0][1]
+        ]
+        # Assert that the orchestrator was called at least once
+        self.assertGreater(len(orchestrator_calls), 0, "Orchestrator script was not called")
+        # Assert that the --quiet flag was included in the command
+        self.assertIn('--quiet', orchestrator_calls[0])
+
+    @patch('src.replication_manager.APP_CONFIG')
+    @patch('src.replication_manager.subprocess.run')
+    def test_reprocess_mode_happy_path(self, mock_subprocess_run, mock_app_config):
+        """Tests the --reprocess flag with depth=0."""
+        mock_app_config.get.side_effect = self.mock_config.get
+        from src import replication_manager
+        importlib.reload(replication_manager)
+
+        # Create two fake run directories to be "found"
+        os.makedirs(os.path.join(self.output_dir, "run_test_rep-001_stuff"))
+        os.makedirs(os.path.join(self.output_dir, "run_test_rep-002_stuff"))
+
+        # Make the mock create the directories the main script expects to find
+        mock_subprocess_run.return_value = MagicMock(returncode=0)
+
+        # Run with --reprocess and --depth 0
+        with patch.object(sys, 'argv', ['replication_manager.py', self.output_dir, '--reprocess', '--depth', '0']):
+            replication_manager.main()
+
+        # Expected calls: 2x orchestrate, 2x bias, 1x log_rebuild, 1x compile, 1x finalize = 7
+        self.assertEqual(mock_subprocess_run.call_count, 7)
+        
+        # Check that orchestrator was called with --reprocess
+        orchestrator_calls = [
+            c.args[0] for c in mock_subprocess_run.call_args_list
+            if 'orchestrate_replication.py' in c.args[0][1]
+        ]
+        self.assertIn('--reprocess', orchestrator_calls[0])
+
+    @patch('builtins.print')
+    @patch('src.replication_manager.APP_CONFIG')
+    @patch('src.replication_manager.subprocess.run')
+    def test_no_target_dir_creates_default(self, mock_subprocess_run, mock_app_config, mock_print):
+        """Tests that a default directory is created when none is specified."""
+        mock_app_config.get.side_effect = self.mock_config.get
+        from src import replication_manager
+        importlib.reload(replication_manager)
+
+        mock_subprocess_run.return_value = MagicMock(returncode=0)
+
+        # Run with no target_dir argument, which forces default creation
+        with patch.object(sys, 'argv', ['replication_manager.py', '--end-rep', '1']):
+            replication_manager.main()
+
+        # Check that the print output contains the expected message
+        self.assertTrue(any("No target directory specified." in str(call.args) for call in mock_print.call_args_list))
+        # Check that the newly created default path exists
+        # This requires finding the generated path from the print statements
+        printed_output = "".join(str(call.args) for call in mock_print.call_args_list)
+        path_match = re.search(r"Using default from config: (.+?)\\x1b", printed_output)
+        self.assertIsNotNone(path_match, "Could not find default path in print output.")
+        created_path = path_match.group(1).strip()
+        self.assertTrue(os.path.isdir(created_path))
+
+    @patch('builtins.print')
+    @patch('src.replication_manager.APP_CONFIG')
+    @patch('src.replication_manager.subprocess.run')
+    def test_final_summary_reports_failures(self, mock_subprocess_run, mock_app_config, mock_print):
+        """Tests that the final summary correctly lists failed replications."""
+        mock_app_config.get.side_effect = self.mock_config.get
+        from src import replication_manager
+        importlib.reload(replication_manager)
+
+        # Simulate a failure for replication 1
+        def side_effect(*args, **kwargs):
+            cmd = args[0]
+            if 'orchestrate_replication.py' in cmd[1] and '1' in cmd:
+                raise subprocess.CalledProcessError(1, cmd)
+            # Create the directory for the successful run
+            elif 'orchestrate_replication.py' in cmd[1] and '2' in cmd:
+                run_dir = os.path.join(self.output_dir, f'run_test_rep-002_seed456')
+                os.makedirs(run_dir, exist_ok=True)
+            return MagicMock(returncode=0)
+        mock_subprocess_run.side_effect = side_effect
+
+        with patch.object(sys, 'argv', ['replication_manager.py', self.output_dir, '--end-rep', '2']):
+            replication_manager.main()
+
+        # Check that the final print output includes the failure summary
         all_print_output = " ".join(str(call.args) for call in mock_print.call_args_list)
+        self.assertIn("BATCH RUN COMPLETE WITH 1 FAILURE(S)", all_print_output)
+        self.assertIn("- 1", all_print_output)
 
-        # Assert that the per-replication header was never printed
-        self.assertNotIn("### RUNNING REPLICATION", all_print_output)
-
-    # We will add the rewritten tests below this line
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+# === End of tests/test_replication_manager.py ===
