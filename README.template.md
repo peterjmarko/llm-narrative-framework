@@ -281,8 +281,14 @@ Scripts are provided to automate all four steps for Windows environments (`migra
 
 ## Testing
 
-The project includes a suite of unit and integration tests managed by PDM. To run the complete test suite, use the PDM script command:
+The project includes a comprehensive test suite managed by PDM, covering both the Python source code and the PowerShell orchestration scripts.
 
-```bash
-pdm run test
-```
+-   **To run the Python unit tests:**
+    ````bash
+    pdm run test
+    ````
+
+-   **To run the PowerShell script tests:**
+    ````bash
+    pdm run test-ps-stu
+    ````
