@@ -41,9 +41,6 @@
     .\run_experiment.ps1 -StartRep 5 -EndRep 10
 #>
 
-# Load the testable argument-building logic from a separate file.
-. "$PSScriptRoot/src/ArgBuilder.ps1"
-
 # This is the main execution function. It uses [CmdletBinding()] to be a robust
 # "advanced function" for command-line use.
 function Invoke-Experiment {
@@ -64,7 +61,7 @@ function Invoke-Experiment {
 
         # Optional notes for the run.
         [Parameter(Mandatory=$false)]
-        [string]$Notes # Removed explicit [switch]$Verbose here, as [CmdletBinding()] provides it
+        [string]$Notes
     )
 
     # --- Auto-detect execution environment ---
@@ -84,21 +81,18 @@ function Invoke-Experiment {
 
     Write-Host "--- Launching Python Batch Runner ---" -ForegroundColor Green
 
-    # Build the argument list by calling the simple, testable helper function.
-    # We must manually copy the special $PSBoundParameters dictionary to a regular
-    # hashtable that we can modify.
-    $helperParams = @{}
-    foreach ($key in $PSBoundParameters.Keys) {
-        $helperParams[$key] = $PSBoundParameters[$key]
+    # Construct the Python arguments directly here (logic formerly in ArgBuilder.ps1).
+    $pythonArgs = @("src/replication_manager.py")
+    if (-not [string]::IsNullOrEmpty($TargetDirectory)) { $pythonArgs += $TargetDirectory }
+    if ($StartRep) { $pythonArgs += "--start-rep", $StartRep }
+    if ($EndRep) { $pythonArgs += "--end-rep", $EndRep }
+    if (-not [string]::IsNullOrEmpty($Notes)) { $pythonArgs += "--notes", $Notes }
+    
+    # Translate the common -Verbose parameter to the internal --verbose for the Python script.
+    # $PSBoundParameters contains common parameters when CmdletBinding is used.
+    if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) {
+        $pythonArgs += "--verbose"
     }
-
-    # Now, safely translate the user-facing -Verbose parameter to the internal -ShowDetails parameter.
-    # This logic correctly handles the implicit -Verbose common parameter.
-    if ($helperParams.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) { # Added -and $PSBoundParameters['Verbose']
-        $helperParams.Remove('Verbose')
-        $helperParams['ShowDetails'] = $true
-    }
-    $pythonArgs = Build-ExperimentArgs @helperParams
 
     # Combine prefix arguments with the script and its arguments
     $finalArgs = $prefixArgs + $pythonArgs

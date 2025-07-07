@@ -26,7 +26,7 @@ function Build-ExperimentArgs {
     return $pythonArgs
 }
 
-# Test-specific Invoke-Experiment function (mirrors run_experiment.ps1's function content)
+# Test-specific Invoke-Experiment function (mirrors the updated run_experiment.ps1's function content)
 # This function will RETURN the final arguments it constructs, allowing direct assertion.
 function Invoke-Experiment {
     [CmdletBinding()] # Keep CmdletBinding for common parameters like -Verbose
@@ -51,20 +51,18 @@ function Invoke-Experiment {
     $executable = "pdm"
     $prefixArgs = "run", "python"
 
-    # Capture actual parameters passed to Invoke-Experiment.
-    $helperParams = @{}
-    foreach ($key in $PSBoundParameters.Keys) {
-        $helperParams[$key] = $PSBoundParameters[$key]
-    }
-
-    # Translate -Verbose to -ShowDetails for Build-ExperimentArgs.
+    # Construct the Python arguments directly here (mirroring the updated production Invoke-Experiment).
+    $pythonArgs = @("src/replication_manager.py")
+    if (-not [string]::IsNullOrEmpty($TargetDirectory)) { $pythonArgs += $TargetDirectory }
+    if ($StartRep) { $pythonArgs += "--start-rep", $StartRep }
+    if ($EndRep) { $pythonArgs += "--end-rep", $EndRep }
+    if (-not [string]::IsNullOrEmpty($Notes)) { $pythonArgs += "--notes", $Notes }
+    
+    # Translate the common -Verbose parameter to the internal --verbose for the Python script.
+    # $PSBoundParameters reliably contains common parameters when CmdletBinding is used.
     if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) {
-        $helperParams['ShowDetails'] = $PSBoundParameters['Verbose']
+        $pythonArgs += "--verbose"
     }
-
-    # Call the test-defined Build-ExperimentArgs function directly.
-    # This call now correctly handles empty hashtable splatting.
-    $pythonArgs = Build-ExperimentArgs @helperParams
 
     # Construct the final arguments that would be passed to the external command.
     $finalCommandArgs = $prefixArgs + $pythonArgs
