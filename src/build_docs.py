@@ -8,6 +8,13 @@ import subprocess
 import sys
 import argparse
 
+# ANSI color codes for better terminal output
+class Colors:
+    RED = '\033[91m'      # Bright Red
+    YELLOW = '\033[93m'   # Yellow
+    RESET = '\033[0m'     # Resets the color to default
+
+
 def render_mermaid_diagram(source_path, output_path, project_root):
     """Renders a .md file to a .png using the local mmdc CLI."""
     # Construct the correct path to the executable based on the OS
@@ -121,6 +128,39 @@ def render_all_diagrams(project_root):
     
     return all_diagrams_ok
 
+def convert_to_docx(pypandoc, source_md_path, output_docx_path, project_root):
+    """
+    Converts a single markdown file to DOCX, with specific error handling
+    for file-in-use permission errors and missing pandoc installations.
+    """
+    print(f"    - Converting '{os.path.basename(source_md_path)}' to DOCX...")
+    try:
+        pypandoc.convert_file(
+            source_md_path, 'docx',
+            outputfile=output_docx_path,
+            extra_args=['--standalone', '--resource-path', project_root]
+        )
+        print(f"    - Successfully built '{os.path.basename(output_docx_path)}'!")
+        return True
+    except RuntimeError as e:
+        # Check for the specific "permission denied" error from pandoc
+        if "permission denied" in str(e).lower():
+            print(f"{Colors.RED}\n[ERROR] Could not write to '{os.path.basename(output_docx_path)}'.")
+            print("The file is likely open in another program (e.g., Microsoft Word).")
+            print(f"Please close the file and run the script again.{Colors.RESET}")
+            return False
+        else:
+            # For any other pandoc error, raise it so we see the full details
+            print(f"\n{Colors.RED}[ERROR] An unexpected error occurred with Pandoc.{Colors.RESET}")
+            raise e
+    except FileNotFoundError:
+        print(f"{Colors.RED}\n[ERROR] `pandoc` command not found.")
+        print("Please ensure Pandoc is installed and accessible in your system's PATH.")
+        print(f"See: https://pandoc.org/installing.html{Colors.RESET}")
+        return False
+
+
+
 def main():
     parser = argparse.ArgumentParser(description="Builds project documentation from templates.")
     parser.add_argument('--check', action='store_true', help="Check if docs are up-to-date without modifying files.")
@@ -159,18 +199,24 @@ def main():
     print("\n--- Starting DOCX Conversion ---")
     try:
         import pypandoc
-        for md_filename in ['README.md', 'CONTRIBUTING.md']:
-            source_md_path = os.path.join(project_root, md_filename)
-            if os.path.exists(source_md_path):
-                output_docx_path = os.path.join(project_root, md_filename.replace('.md', '.docx'))
-                pypandoc.convert_file(
-                    source_md_path, 'docx',
-                    outputfile=output_docx_path,
-                    extra_args=['--standalone', '--resource-path', project_root]
-                )
-                print(f"Successfully built '{os.path.basename(output_docx_path)}'!")
+        
+        # Convert README.md
+        readme_md = os.path.join(project_root, 'README.md')
+        readme_docx = os.path.join(project_root, 'README.docx')
+        if not convert_to_docx(pypandoc, readme_md, readme_docx, project_root):
+            sys.exit(1) # Exit if conversion fails
+        
+        # Convert CONTRIBUTING.md if it exists
+        contrib_md = os.path.join(project_root, 'CONTRIBUTING.md')
+        if os.path.exists(contrib_md):
+            contrib_docx = os.path.join(project_root, 'CONTRIBUTING.docx')
+            if not convert_to_docx(pypandoc, contrib_md, contrib_docx, project_root):
+                sys.exit(1) # Exit if conversion fails
+        
+        print("\nAll documents built successfully.")
+
     except ImportError:
-        print("--- DEPENDENCY ERROR: 'pypandoc' not found. Skipping DOCX generation.")
+        print(f"--- {Colors.YELLOW}DEPENDENCY WARNING:{Colors.RESET} 'pypandoc' not found. Skipping DOCX generation.")
 
 if __name__ == "__main__":
     main()
