@@ -40,8 +40,14 @@
     # Run only replications 5 through 10
     .\run_experiment.ps1 -StartRep 5 -EndRep 10
 #>
+
+# Load the testable argument-building logic from a separate file.
+. "$PSScriptRoot/src/ArgBuilder.ps1"
+
+# This is the main execution function. It uses [CmdletBinding()] to be a robust
+# "advanced function" for command-line use.
 function Invoke-Experiment {
-    [CmdletBinding()]
+    [CmdletBinding()] # Keep this, it adds common parameters like -Verbose
     param(
         # The target directory for the experiment. Can be an existing directory
         # or one to be created. This is the first positional parameter.
@@ -58,7 +64,7 @@ function Invoke-Experiment {
 
         # Optional notes for the run.
         [Parameter(Mandatory=$false)]
-        [string]$Notes
+        [string]$Notes # Removed explicit [switch]$Verbose here, as [CmdletBinding()] provides it
     )
 
     # --- Auto-detect execution environment ---
@@ -78,29 +84,21 @@ function Invoke-Experiment {
 
     Write-Host "--- Launching Python Batch Runner ---" -ForegroundColor Green
 
-    # Build the argument list for the Python script dynamically.
-    $pythonArgs = @("src/replication_manager.py")
-
-    # Add the target directory if it was provided.
-    if ($PSBoundParameters.ContainsKey('TargetDirectory')) {
-        $pythonArgs += $TargetDirectory
+    # Build the argument list by calling the simple, testable helper function.
+    # We must manually copy the special $PSBoundParameters dictionary to a regular
+    # hashtable that we can modify.
+    $helperParams = @{}
+    foreach ($key in $PSBoundParameters.Keys) {
+        $helperParams[$key] = $PSBoundParameters[$key]
     }
 
-    if ($PSBoundParameters.ContainsKey('StartRep')) {
-        $pythonArgs += "--start-rep", $StartRep
+    # Now, safely translate the user-facing -Verbose parameter to the internal -ShowDetails parameter.
+    # This logic correctly handles the implicit -Verbose common parameter.
+    if ($helperParams.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) { # Added -and $PSBoundParameters['Verbose']
+        $helperParams.Remove('Verbose')
+        $helperParams['ShowDetails'] = $true
     }
-    if ($PSBoundParameters.ContainsKey('EndRep')) {
-        $pythonArgs += "--end-rep", $EndRep
-    }
-    if ($PSBoundParameters.ContainsKey('Notes')) {
-        $pythonArgs += "--notes", $Notes
-    }
-
-    # Pass the --verbose flag to the Python script only if the PowerShell -Verbose switch is used.
-    # This aligns with replication_manager.py, which is quiet by default.
-    if ($PSBoundParameters.ContainsKey('Verbose')) {
-        $pythonArgs += "--verbose"
-    }
+    $pythonArgs = Build-ExperimentArgs @helperParams
 
     # Combine prefix arguments with the script and its arguments
     $finalArgs = $prefixArgs + $pythonArgs
@@ -116,13 +114,36 @@ function Invoke-Experiment {
     }
 }
 
-# This is the PowerShell equivalent of Python's 'if __name__ == "__main__"'.
-# It checks if the script is being run directly (call stack size is 1) or
-# being imported/dot-sourced by another script (call stack size > 1).
-# This method is more robust than checking $MyInvocation.
-$isRunDirectly = (Get-PSCallStack).Count -eq 1
-if ($isRunDirectly) {
-    # Call the main function, passing along any command-line parameters.
-    Invoke-Experiment @PSBoundParameters
+# Define a private helper function to encapsulate the actual script execution logic
+# that should ONLY run when the script is invoked directly, not when dot-sourced.
+function _Run-ScriptMain {
+    param(
+        [Parameter(ValueFromRemainingArguments=$true)]
+        $ScriptArgs
+    )
+    # The actual call to Invoke-Experiment. We pass along the parameters the script received.
+    Invoke-Experiment @ScriptArgs
+}
+
+# This invocation guard ensures the main execution logic is only triggered
+# when the script is run directly (not dot-sourced) AND it is not running within a Pester context.
+# A Pester context is detected by checking for $PesterContext variable or by checking the call stack.
+$isPesterContext = $false
+try {
+    # Check for $PesterContext variable (standard Pester v5+ method)
+    if (Get-Variable -Name 'PesterContext' -ErrorAction SilentlyContinue) {
+        $isPesterContext = $true
+    }
+    # Fallback: Check the call stack for Pester modules, if $PesterContext isn't reliable
+    elseif ($MyInvocation.ScriptStackTrace -match "Pester.psm1") {
+        $isPesterContext = $true
+    }
+}
+catch {} # Suppress errors if variables/stacks are not available in strange contexts
+
+# The primary invocation guard for the script's main execution.
+if (($MyInvocation.InvocationName -ne '.') -and (-not $isPesterContext)) {
+    # Call the helper function to run the main logic, passing all original script parameters
+    _Run-ScriptMain @PSBoundParameters
 }
 # === End of run_experiment.ps1 ===
