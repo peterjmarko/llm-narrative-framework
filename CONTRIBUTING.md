@@ -25,7 +25,7 @@ Before cloning the project, ensure these essential tools are installed on your s
     ```bash
     git clone <repository-url>
     cd <repository-directory>
-    ```
+    ````
 
 2.  **Set the Project's Python Interpreter (Crucial Step)**:
     You must explicitly tell PDM which Python interpreter to use for this project. This prevents conflicts and ensures the local `.venv` is created correctly.
@@ -113,12 +113,16 @@ The test suite is divided into two parts, one for the Python source code and one
     pdm run test
     ````
 
-*   **PowerShell Tests**: Due to specific environmental challenges with traditional PowerShell testing frameworks (like Pester's advanced features), a custom, bare-bones testing harness is used for the `process_study.ps1` script. This ensures maximum compatibility and reliability by directly executing test logic without relying on complex framework structures.
+*   **PowerShell Tests**: Due to specific environmental challenges with traditional PowerShell testing frameworks (like Pester's advanced features), a custom, bare-bones testing harness is used for the orchestration scripts. This ensures maximum compatibility and reliability.
 
-    Run the PowerShell test suite with:
-    ````bash
-    pdm run test-ps-stu
-    ````
+    -   To test the study processing script (`process_study.ps1`):
+        ````bash
+        pdm run test-ps-stu
+        ````
+    -   To test the data migration script (`migrate_old_experiment.ps1`):
+        ````bash
+        pdm run test-ps-mig
+        ````
 
 ### 4. Commit Your Changes
 

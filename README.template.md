@@ -283,12 +283,17 @@ Scripts are provided to automate all four steps for Windows environments (`migra
 
 The project includes a comprehensive test suite managed by PDM, covering both the Python source code and the PowerShell orchestration scripts.
 
--   **To run the Python unit tests:**
+-   **To run the Python unit tests (Pytest):**
     ````bash
     pdm run test
     ````
 
 -   **To run the PowerShell script tests:**
-    ````bash
-    pdm run test-ps-stu
-    ````
+    -   For the study processor (`process_study.ps1`):
+        ````bash
+        pdm run test-ps-stu
+        ````
+    -   For the data migration script (`migrate_old_experiment.ps1`):
+        ````bash
+        pdm run test-ps-mig
+        ````
