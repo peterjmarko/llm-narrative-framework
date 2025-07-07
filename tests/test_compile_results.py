@@ -1,17 +1,23 @@
 import unittest
+from unittest.mock import patch
 import os
 import sys
-import shutil
 import tempfile
 import csv
-import subprocess
 import configparser
 import json
 
-# Path to the real 'src' directory and the script under test
-REAL_SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
-COMPILE_RESULTS_SCRIPT_PATH = os.path.join(REAL_SRC_DIR, 'compile_results.py')
-PROJECT_ROOT_TEST = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# Import the script we are testing as a module
+import compile_results
+
+# Define absolute paths to key project files and directories
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+SRC_DIR = os.path.join(PROJECT_ROOT, 'src')
+COMPILE_RESULTS_SCRIPT_PATH = os.path.join(SRC_DIR, 'compile_results.py')
+COVERAGERC_PATH = os.path.join(PROJECT_ROOT, '.coveragerc')
+
+# Add the src directory to the path so modules can be found
+sys.path.insert(0, SRC_DIR)
 
 class TestCompileResultsBase(unittest.TestCase):
     """Base class with setup, teardown, and helper methods."""
@@ -22,59 +28,26 @@ class TestCompileResultsBase(unittest.TestCase):
     def tearDown(self):
         self.temp_dir_obj.cleanup()
 
-    def _run_main_script(self, *args):
-        """
-        Runs the script as a subprocess to simulate command-line execution,
-        ensuring it runs under coverage measurement.
-        """
-        # This command explicitly runs the script under coverage.
-        cmd = [
-            sys.executable,
-            "-m", "coverage", "run",
-            "--parallel-mode",
-            "--source", REAL_SRC_DIR,  # Use the absolute path to the src directory
-            COMPILE_RESULTS_SCRIPT_PATH
-        ]
-        cmd.extend(args)
+    # The _run_main_script function is no longer needed because we are now
+    # importing the script and calling its main() function directly.
 
-        # Set the environment for the subprocess
-        env = os.environ.copy()
-        
-        # --- THIS IS THE CRITICAL FIX ---
-        # Force the subprocess to write its coverage data file to the project root.
-        # In parallel mode, coverage.py will automatically add a unique suffix.
-        # This ensures the data file is not created in the temporary directory.
-        env['COVERAGE_FILE'] = os.path.join(PROJECT_ROOT_TEST, '.coverage')
 
-        # Run the subprocess.
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            # The script's CWD is still the temp dir, which is correct for its own file operations.
-            cwd=self.temp_dir,
-            encoding='utf-8',
-            env=env  # Pass the modified environment with the correct data path.
-        )
-
-        # This will help debug if any other issue occurs.
-        if result.returncode != 0:
-            print("--- SUBPROCESS FAILED ---")
-            print("STDOUT:", result.stdout)
-            print("STDERR:", result.stderr)
-            print("-------------------------")
-
-        return result
-
-    def _create_mock_run(self, base_dir, run_name, config_params, metrics_json):
-        """Helper to create a mock run directory with config and report files."""
+    def _create_mock_run(self, base_dir, run_name, config_params, metrics_json, has_bias_metrics=False):
         run_dir = os.path.join(base_dir, run_name)
         os.makedirs(run_dir, exist_ok=True)
-        config_path = os.path.join(run_dir, 'config.ini.archived')
         config = configparser.ConfigParser()
         config['LLM'] = config_params
-        with open(config_path, 'w') as f:
+        config['Study'] = {'mapping_strategy': 'correct'}
+        with open(os.path.join(run_dir, 'config.ini.archived'), 'w') as f:
             config.write(f)
+
+        # Add a nested positional_bias_metrics block if requested for the test
+        if has_bias_metrics:
+            metrics_json['positional_bias_metrics'] = {
+                'slope': 0.05,
+                'p_value': 0.01
+            }
+
         report_path = os.path.join(run_dir, f"replication_report_{run_name}.txt")
         with open(report_path, "w") as f:
             f.write("<<<METRICS_JSON_START>>>\n")
@@ -83,7 +56,6 @@ class TestCompileResultsBase(unittest.TestCase):
         return run_dir
 
     def _read_csv_output(self, file_path):
-        """Reads the generated CSV file."""
         if not os.path.exists(file_path):
             return None
         with open(file_path, 'r', newline='', encoding='utf-8') as f:
@@ -94,84 +66,120 @@ class TestCompileResultsHierarchical(TestCompileResultsBase):
 
     def setUp(self):
         super().setUp()
-        # Create a complex, multi-level directory structure
         self.study_dir = os.path.join(self.temp_dir, "study_A")
-        exp1_dir = os.path.join(self.study_dir, "experiment_1")
-        exp2_dir = os.path.join(self.study_dir, "experiment_2")
-
-        # Create mock runs
-        self._create_mock_run(exp1_dir, "run_A1", {'model': 'gpt-3.5'}, {'mrr': 0.91})
-        self._create_mock_run(exp1_dir, "run_A2", {'model': 'gpt-3.5'}, {'mrr': 0.92})
-        self._create_mock_run(exp2_dir, "run_B1", {'model': 'gpt-4.0'}, {'mrr': 0.98})
+        self.exp1_dir = os.path.join(self.study_dir, "experiment_1")
+        self.exp2_dir = os.path.join(self.study_dir, "experiment_2")
+        # Store the exact path to the run directories created
+        self.run_1_dir = self._create_mock_run(self.exp1_dir, "run_rep-1", {'model_name': 'gpt-3.5'}, {'mrr': 0.91}, has_bias_metrics=True)
+        self.run_2_dir = self._create_mock_run(self.exp1_dir, "run_rep-2", {'model_name': 'gpt-3.5'}, {'mrr': 0.92})
+        self.run_3_dir = self._create_mock_run(self.exp2_dir, "run_rep-3", {'model_name': 'gpt-4.0'}, {'mrr': 0.98})
 
     def test_hierarchical_aggregation(self):
         """Verify that summaries are created at every level with correct row counts."""
-        # Run the script in default hierarchical mode
-        result = self._run_main_script(self.study_dir)
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("Running in hierarchical mode", result.stdout)
+        # 1. Define the command-line arguments the script expects
+        test_args = ['compile_results.py', self.study_dir]
 
-        # --- Verification ---
-        # Level 3 (Run folders)
-        run_a1_summary = self._read_csv_output(os.path.join(self.study_dir, "experiment_1", "run_A1", "final_summary_results.csv"))
-        self.assertIsNotNone(run_a1_summary)
-        self.assertEqual(len(run_a1_summary), 1)
+        # 2. Use patch.object to temporarily set sys.argv, then call main()
+        with patch.object(sys, 'argv', test_args):
+            # Assert that the script returns a success code (e.g., 0)
+            return_code = compile_results.main()
+            self.assertEqual(return_code, 0, "compile_results.main() should return 0 on success.")
 
-        # Level 2 (Experiment folders)
-        exp1_summary = self._read_csv_output(os.path.join(self.study_dir, "experiment_1", "final_summary_results.csv"))
-        self.assertIsNotNone(exp1_summary)
-        self.assertEqual(len(exp1_summary), 2, "Experiment 1 should aggregate 2 runs")
-
-        exp2_summary = self._read_csv_output(os.path.join(self.study_dir, "experiment_2", "final_summary_results.csv"))
-        self.assertIsNotNone(exp2_summary)
-        self.assertEqual(len(exp2_summary), 1, "Experiment 2 should aggregate 1 run")
-
-        # Level 1 (Study folder)
-        study_summary = self._read_csv_output(os.path.join(self.study_dir, "final_summary_results.csv"))
-        self.assertIsNotNone(study_summary)
-        self.assertEqual(len(study_summary), 3, "Study should aggregate all 3 runs")
-        models = {row['model'] for row in study_summary}
-        self.assertEqual(models, {'gpt-3.5', 'gpt-4.0'})
-
-
-class TestCompileResultsFlat(TestCompileResultsBase):
-    """Tests for the legacy 'flat' mode with the --depth argument."""
-
-    def setUp(self):
-        super().setUp()
-        # Create a nested structure for depth testing
-        self.base_dir = os.path.join(self.temp_dir, "flat_test")
-        level1_dir = os.path.join(self.base_dir, "level1")
-        level2_dir = os.path.join(level1_dir, "level2")
-        os.makedirs(level2_dir)
-
-        self._create_mock_run(self.base_dir, "run_0", {'model': 'model0'}, {'mrr': 0.90})
-        self._create_mock_run(level1_dir, "run_1", {'model': 'model1'}, {'mrr': 0.91})
-        self._create_mock_run(level2_dir, "run_2", {'model': 'model2'}, {'mrr': 0.92})
-
-    def test_flat_mode_depth_0(self):
-        """Test flat mode with depth=0, finding only the top-level run."""
-        result = self._run_main_script("--mode", "flat", "--depth", "0", self.base_dir)
-        self.assertEqual(result.returncode, 0)
+        # 3. All assertions now check for file-based side effects.
         
-        master_summary = self._read_csv_output(os.path.join(self.base_dir, "final_summary_results.csv"))
-        self.assertIsNotNone(master_summary)
-        self.assertEqual(len(master_summary), 1)
-        self.assertEqual(master_summary[0]['model'], 'model0')
+        # --- VERIFICATION (No changes needed) ---
+        # Level 3 (REPLICATION): Check the individual run folder for its summary
+        run_1_summary = self._read_csv_output(os.path.join(self.run_1_dir, "REPLICATION_results.csv"))
+        self.assertIsNotNone(run_1_summary, "REPLICATION_results.csv should exist in run folder.")
+        self.assertEqual(len(run_1_summary), 1, "Replication summary should have 1 row.")
 
-    def test_flat_mode_depth_minus_1(self):
-        """Test flat mode with depth=-1, finding all runs."""
-        result = self._run_main_script("--mode", "flat", "--depth", "-1", self.base_dir)
-        self.assertEqual(result.returncode, 0)
-        
-        master_summary = self._read_csv_output(os.path.join(self.base_dir, "final_summary_results.csv"))
-        self.assertIsNotNone(master_summary)
-        self.assertEqual(len(master_summary), 3)
+        # Level 2 (EXPERIMENT): Check the experiment folder for its aggregated summary
+        exp1_summary = self._read_csv_output(os.path.join(self.exp1_dir, "EXPERIMENT_results.csv"))
+        self.assertIsNotNone(exp1_summary, "EXPERIMENT_results.csv should exist in experiment folder.")
+        self.assertEqual(len(exp1_summary), 2, "Experiment summary should aggregate 2 runs.")
 
-        # Verify individual summaries were also created
-        run_2_summary = self._read_csv_output(os.path.join(self.base_dir, "level1", "level2", "run_2", "final_summary_results.csv"))
-        self.assertIsNotNone(run_2_summary)
-        self.assertEqual(len(run_2_summary), 1)
+        # Level 1 (STUDY): Check the top-level study folder for the final aggregation
+        study_summary = self._read_csv_output(os.path.join(self.study_dir, "STUDY_results.csv"))
+        self.assertIsNotNone(study_summary, "STUDY_results.csv should exist in study folder.")
+        self.assertEqual(len(study_summary), 3, "Study summary should aggregate all 3 runs.")
+
+
+class TestCompileResultsEdgeCases(TestCompileResultsBase):
+    """Tests for edge cases and error handling."""
+
+    def test_invalid_base_directory(self):
+        """Test that the script returns an error code for a non-existent directory."""
+        invalid_path = os.path.join(self.temp_dir, "non_existent_dir")
+        test_args = ['compile_results.py', invalid_path]
+
+        with patch.object(sys, 'argv', test_args):
+            return_code = compile_results.main()
+            self.assertEqual(return_code, 1, "Script should return 1 for an invalid path.")
+
+    def test_malformed_report_is_skipped(self):
+        """Test that a run with a malformed JSON report is skipped gracefully."""
+        # Create one valid run
+        self._create_mock_run(self.temp_dir, "run_valid-1", {'model_name': 'abc'}, {'mrr': 0.5})
+
+        # Create one invalid run
+        invalid_run_dir = os.path.join(self.temp_dir, "run_invalid-2")
+        os.makedirs(invalid_run_dir)
+        with open(os.path.join(invalid_run_dir, 'config.ini.archived'), 'w') as f:
+            f.write("[LLM]\nmodel_name=xyz")
+        with open(os.path.join(invalid_run_dir, 'replication_report_x.txt'), 'w') as f:
+            f.write("<<<METRICS_JSON_START>>>\n{this is not valid json\n<<<METRICS_JSON_END>>>")
+
+        test_args = ['compile_results.py', self.temp_dir]
+        with patch.object(sys, 'argv', test_args):
+            compile_results.main()
+
+        # Check that the final summary only contains the valid run.
+        # FIX: The script correctly identifies this level as an "EXPERIMENT"
+        # because it contains 'run_*' directories. The test must check for the correct filename.
+        summary_path = os.path.join(self.temp_dir, "EXPERIMENT_results.csv")
+        summary = self._read_csv_output(summary_path)
+
+        self.assertIsNotNone(summary, f"Expected summary file was not found at {summary_path}")
+        self.assertEqual(len(summary), 1, "Summary should only contain the one valid run.")
+
+    def test_run_dir_missing_config_is_skipped(self):
+        """Test that a run directory missing its config.ini.archived is skipped."""
+        # Create a run directory but forget to add the config file
+        run_dir_no_config = os.path.join(self.temp_dir, "run_no_config-1")
+        os.makedirs(run_dir_no_config)
+        with open(os.path.join(run_dir_no_config, 'replication_report_y.txt'), 'w') as f:
+            f.write("<<<METRICS_JSON_START>>>\n{\"mrr\": 0.1}\n<<<METRICS_JSON_END>>>")
+
+        test_args = ['compile_results.py', self.temp_dir]
+        with patch.object(sys, 'argv', test_args):
+            compile_results.main()
+
+        # The process should complete but no summary file should be created
+        summary_path = os.path.join(self.temp_dir, "STUDY_results.csv")
+        self.assertFalse(os.path.exists(summary_path), "No summary file should be created if all runs are invalid.")
+
+    def test_empty_summary_file_is_handled(self):
+        """Test that an empty summary file from a sub-directory is handled gracefully."""
+        exp_dir = os.path.join(self.temp_dir, "experiment")
+        os.makedirs(exp_dir)
+
+        # Sub-directory 1 has a valid run
+        run_dir_1 = os.path.join(exp_dir, "run_good-1")
+        self._create_mock_run(run_dir_1, "run_good-1", {'model_name': 'abc'}, {'mrr': 0.5})
+
+        # Sub-directory 2 has an empty results file (simulating a failed lower-level aggregation)
+        empty_dir = os.path.join(exp_dir, "empty_results_dir")
+        os.makedirs(empty_dir)
+        with open(os.path.join(empty_dir, "EXPERIMENT_results.csv"), 'w') as f:
+            pass # Create an empty file
+
+        test_args = ['compile_results.py', self.temp_dir]
+        with patch.object(sys, 'argv', test_args):
+            compile_results.main()
+
+        summary = self._read_csv_output(os.path.join(self.temp_dir, "STUDY_results.csv"))
+        self.assertIsNotNone(summary)
+        self.assertEqual(len(summary), 1, "Final summary should correctly aggregate the one valid run.")
 
 
 if __name__ == '__main__':

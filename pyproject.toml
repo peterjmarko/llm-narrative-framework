@@ -38,15 +38,27 @@ dev = [
 venv.in-project = true
 
 [tool.pdm.scripts]
-# Development and testing shortcuts
-test = "pytest -v"
+# Development and testing shortcuts. {args} allows passing specific files.
+test = "pytest -v {args}"
+
+# --- DEFINITIVE COVERAGE SCRIPTS ---
+# By explicitly setting --cov=src, we tell pytest-cov what to measure
+# without interfering with pytest's test discovery, which will now
+# correctly use the path provided in {args}. This resolves the conflict.
+coverage = {cmd = "pytest -v --cov=src", help = "Run all tests verbosely with coverage"}
+coverage-html = {cmd = "pytest -v --cov=src --cov-report=html", help = "Generate a verbose HTML coverage report"}
+coverage-file = {cmd = "pytest -v {args} --cov=src", help = "Run coverage for a specific file. Usage: pdm run coverage-file tests/your_test.py"}
+coverage-erase = {cmd = "coverage erase", help = "Clean up coverage data files"}
+# --------------------------------
+
 lint = "pre-commit run --all-files"
 build-docs = "python src/build_docs.py"
+
 test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
 test-ps-stu = "pwsh ./tests/process_study.Tests.ps1"
 test-ps-mig = "pwsh tests/migrate_old_experiment.Tests.ps1"
-test-ps-all = "pdm run test-ps-exp && pdm run test-ps-stu && pwsh tests/migrate_old_experiment.Tests.ps1"
+test-ps-all = "pdm run test-ps-exp && pdm run test-ps-stu && pdm run test-ps-mig"
 
 # Main workflow shortcuts
 run-exp = "powershell -ExecutionPolicy Bypass -File .\\run_experiment.ps1"
-process-study = "powershell -ExecutionPolicy Bypass -File .\\process_study.ps1"
+process-study = "powershell -ExecutionPolicy Bypass -File .\\process_study.py"

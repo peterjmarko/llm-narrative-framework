@@ -134,7 +134,7 @@ def write_summary_csv(output_path, results_list):
 def run_hierarchical_mode(base_dir):
     logging.info(f"Running in hierarchical mode on: {base_dir}")
     for current_dir, subdirs, files in os.walk(base_dir, topdown=False):
-        print(f"\nProcessing directory: {current_dir}")
+        logging.info(f"\nProcessing directory: {current_dir}")
         level_results = []
         
         report_files = glob.glob(os.path.join(current_dir, 'replication_report_*.txt'))
@@ -207,10 +207,11 @@ def main():
 
     if not os.path.isdir(args.base_dir):
         logging.error(f"Error: The specified directory does not exist: {args.base_dir}")
-        return
+        return 1  # Return 1 for error
 
     run_hierarchical_mode(args.base_dir)
     print("\nCompilation process finished.")
+    return 0  # Return 0 for success
 
 if __name__ == "__main__":
     main()

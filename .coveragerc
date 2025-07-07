@@ -1,9 +1,13 @@
 [run]
-data_file = .coverage
+# This is the critical setting that enables subprocess coverage.
+parallel = true
+
+# Keep your existing beneficial settings.
 source = src/
 branch = True
 
 [report]
+# These settings are all great. No changes needed here.
 show_missing = True
 fail_under = 80
 omit =
