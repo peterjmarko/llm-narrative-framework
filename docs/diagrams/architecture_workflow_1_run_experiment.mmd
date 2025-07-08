@@ -1,37 +1,46 @@
-graph TD;
-
-    %% --- Style Definitions (Based on Original Palette) ---
-    classDef WorkflowEntry fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef ReplicationManager fill:#ff7f0e,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef Orchestrator fill:#2ca02c,stroke:#333,stroke-width:1px,color:#fff;
-    classDef StageScript fill:#9467bd,stroke:#333,stroke-width:1px,color:#fff;
-    classDef Utility fill:#d62728,stroke:#333,stroke-width:1px,color:#fff;
-    classDef DataArtifact fill:#f0f0f0,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#333;
-
-    %% === Nodes & Connections for the Normal Run Workflow ===
-    run_exp["run_experiment.ps1<br/><i>(User Entry Point)</i>"]:::WorkflowEntry;
-
-    subgraph "Batch Management Layer"
-        rep_man["replication_manager.py<br/><i>(Manages Batch)</i>"]:::ReplicationManager;
-        log_man["log_manager.py<br/><i>(Tracks Batch Progress)</i>"]:::Utility;
-        batch_log[("batch_log.txt")]:::DataArtifact;
-    end
+graph TD
+    %% 1. Define all nodes first
+    EntryPoint["run_experiment.ps1<br/>(User Entry Point)"]:::entry
+    BatchManager["replication_manager.py<br/>(Manages Batch)"]:::layer_orange
+    LogManager["log_manager.py"]:::danger
+    BatchLog[("batch_log.txt")]:::artifact
     
-    subgraph "Single Replication Layer"
-        orch["orchestrate_replication.py<br/><i>(Runs One Replication)</i>"]:::Orchestrator;
-        stage1["1. build_queries.py"]:::StageScript;
-        stage2["2. run_llm_sessions.py"]:::StageScript;
-        stage3["3. process_llm_responses.py"]:::StageScript;
-        stage4["4. analyze_performance.py"]:::StageScript;
-        replication_report[("replication_report.txt")]:::DataArtifact;
+    ReplicationOrchestrator["orchestrate_replication.py"]:::layer_green
+    BuildQueries["1. build_queries.py"]:::script
+    RunSessions["2. run_llm_sessions.py"]:::script
+    ProcessResponses["3. process_llm_responses.py"]:::script
+    AnalyzePerformance["4. analyze_performance.py"]:::script
+    ReplicationReport[("replication_report.txt")]:::artifact
+
+    %% 2. Define connections
+    EntryPoint --> BatchManager
+    BatchManager -- "Calls" --> ReplicationOrchestrator
+    BatchManager --> LogManager --> BatchLog
+    ReplicationOrchestrator --> BuildQueries --> RunSessions --> ProcessResponses --> AnalyzePerformance --> ReplicationReport
+
+    %% 3. Group nodes into subgraphs using their IDs
+    subgraph "Overall Process"
+        direction LR
+        subgraph "Batch Management Layer"
+            BatchManager
+            LogManager
+            BatchLog
+        end
+        
+        subgraph "Single Replication Layer (Called in a loop)"
+            ReplicationOrchestrator
+            BuildQueries
+            RunSessions
+            ProcessResponses
+            AnalyzePerformance
+            ReplicationReport
+        end
     end
 
-    %% --- Top Level Connections ---
-    run_exp --> rep_man;
-    rep_man -->|"Calls (in loop)"| orch;
-    rep_man --> log_man;
-    log_man -->|Produces| batch_log;
-
-    %% --- Single Replication Connections ---
-    orch --> stage1 --> stage2 --> stage3 --> stage4;
-    stage4 -->|Generates| replication_report;
+    %% 4. Styling
+    classDef entry fill:#337ab7,stroke:#2e6da4,color:#fff;
+    classDef layer_orange fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef layer_green fill:#5cb85c,stroke:#4cae4c,color:#fff;
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;
+    classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;

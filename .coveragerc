@@ -1,16 +1,22 @@
+# .coveragerc (Manual Subprocess Method)
+
 [run]
-# This is the critical setting that enables subprocess coverage.
+# This is the only setting needed for the manual method.
+# It tells coverage to create a unique data file for each run.
 parallel = true
 
-# Keep your existing beneficial settings.
-source = src/
-branch = True
+# All other settings remain the same.
+source = src
+branch = true
 
 [report]
-# These settings are all great. No changes needed here.
-show_missing = True
+show_missing = true
 fail_under = 80
 omit =
     .venv/*
     tests/*
     src/__init__.py
+exclude_lines =
+    if __name__ == .__main__.:
+    pragma: no cover
+    raise NotImplementedError

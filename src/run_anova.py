@@ -177,7 +177,7 @@ def create_and_save_plot(df, metric_key, display_metric_name, factor, p_value, o
     plot_factor = 'model_display' if factor == 'model' else factor
     
     order = df.groupby(plot_factor)[metric_key].median().sort_values(ascending=False).index
-    sns.boxplot(ax=ax, y=plot_factor, x=metric_key, data=df, order=order, orient='h', palette="coolwarm")
+    sns.boxplot(ax=ax, y=plot_factor, x=metric_key, data=df, order=order, orient='h', palette="coolwarm", hue=plot_factor, legend=False)
 
     p_value_str = format_p_value(p_value)
     display_factor_name = factor_display_map.get(factor, factor.capitalize())

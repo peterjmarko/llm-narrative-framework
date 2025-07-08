@@ -1,47 +1,32 @@
 graph TD
     subgraph "Input Data"
-        direction TB
-        A1(personalities_db_1-5000.txt)
-        A2(base_query.txt)
-        A3(config.ini)
+        direction LR
+        Input_PDB["personalities_db<br/>1-5000.txt"]:::input
+        Input_Query["base_query.txt"]:::input
+        Input_Config["config.ini"]:::input
     end
 
-    subgraph "Stage 1: Query Generation"
-        direction TB
-        B(build_queries.py)
-        B --> C[llm_query_XXX.txt]
+    subgraph "Data Pipeline Stages"
+        direction LR
+        subgraph "1: Generation"
+             Script1["build_queries.py"]:::script --> Art1["llm_query_XXX.txt"]:::artifact
+             Script1 --> Art1_archive[("config.ini.archived")]:::artifact
+        end
+        subgraph "2-3: Execution & Processing"
+            Script2["run_llm<br/>_sessions.py"]:::script --> Art2["llm_response<br/>_XXX.txt"]:::artifact
+            Art2 --> Script3["process_llm<br/>_responses.py"]:::script --> Art3["all_scores.txt"]:::artifact
+        end
+        subgraph "4: Analysis"
+             Script4a["compile_results.py"]:::script --> Art4["final_summary<br/>_results.csv"]:::artifact
+             Art4 --> Script4b["run_anova.py"]:::script --> Art_Final(("Final Report<br/>Plots & Stats")):::final
+        end
     end
+
+    Input_PDB & Input_Query & Input_Config --> Script1
+    Art1 --> Script2
+    Art3 & Art1_archive --> Script4a
     
-    subgraph "Stage 2: LLM Interaction"
-        direction TB
-        D(run_llm_sessions.py)
-        D --> E[llm_response_XXX.txt]
-    end
-    
-    subgraph "Stage 3: Response Processing"
-        direction TB
-        F(process_llm_responses.py)
-        F --> G[all_scores.txt]
-        F --> H[all_mappings.txt]
-    end
-
-    subgraph "Stage 4: Hierarchical Analysis"
-        direction TB
-        I(compile_results.py)
-        J(run_anova.py)
-        K_final[final_summary_results.csv] --> J
-        J --> L[MASTER_ANOVA_DATASET.csv]
-        J --> N((Plots & Log))
-    end
-
-    %% Data Flow Connections
-    A1 & A2 & A3 --> B
-    C --> D
-    E --> F
-    A3 --> O(config.ini.archived):::Data
-    O & G & H --> I
-
-    classDef Data fill:#e6f3ff,stroke:#007bff
-    classDef Script fill:#fff0e6,stroke:#ff7f0e
-    class A1,A2,A3,C,E,G,H,K_final,L,N,O Data
-    class B,D,F,I,J Script
+    classDef input fill:#cde4ff,stroke:#6c93be,color:#333
+    classDef script fill:#ffe8d6,stroke:#e59866,color:#333
+    classDef artifact fill:#e9ecef,stroke:#adb5bd,color:#333
+    classDef final fill:#d4edda,stroke:#155724,color:#333 font-weight:bold

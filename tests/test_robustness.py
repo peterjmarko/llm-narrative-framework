@@ -61,9 +61,10 @@ class TestPipelineRobustness(unittest.TestCase):
         fake_mod.PROJECT_ROOT = self.test_project_root
         fake_mod.APP_CONFIG = self.mock_config
         
-        def dummy_get_config_value(config, section, key, fallback=None, value_type=str):
-            # This is a simplified version for testing.
-            if not config.has_option(section, key): return fallback
+        def dummy_get_config_value(config, section, key, fallback=None, value_type=str, **kwargs):
+            # A simplified get_config_value that works with a ConfigParser object.
+            # It doesn't handle the fallback_key logic for this test's purpose.
+            if config.has_option(section, key): return fallback
             try:
                 if value_type is int: return config.getint(section, key)
                 if value_type is float: return config.getfloat(section, key)

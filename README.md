@@ -48,37 +48,43 @@ The project's architecture can be understood through three different views: the 
 ### 1. Code Architecture Diagrams
 The project's functionality is divided into three main workflows, each initiated by a PowerShell script.
 
-#### Workflow 1: Run an Experiment
-This is the primary workflow for generating new experimental data. It executes a full batch of replications.
-![ ](docs/images/architecture_workflow_1_run_experiment.png){width=100%}
+### Workflow 1: Run an Experiment
 
-#### Workflow 2: Process a Study
+This is the primary workflow for generating new experimental data. It executes a full batch of replications.
+
+![](docs/images/architecture_workflow_1_run_experiment.png){width=105%}
+
+### Workflow 2: Process a Study
+
 This workflow is used after an experiment is complete to aggregate results from all replications and perform statistical analysis.
-![ ](docs/images/architecture_workflow_2_process_study.png){width=100%}
+
+![](docs/images/architecture_workflow_2_process_study.png){width=105%}
 
 ### Workflow 3: Reprocess a Failed Run
 
 This workflow is used to recover from a failed run or to re-analyze existing data with updated processing logic without re-running the expensive LLM calls.
-![ ](docs/images/architecture_workflow_3_reprocess.png){width=100%}
+
+![](docs/images/architecture_workflow_3_reprocess.png){width=75%}
 
 ### Workflow 4: Migrate Old Experiment Data
 
 This utility workflow helps bring older experimental data (generated before `config.ini.archived` was standard) into compliance with modern analysis scripts.
-![ ](docs/images/architecture_workflow_4_migrate_data.png){width=100%}
 
-### 2. Data Flow Diagram
+![](docs/images/architecture_workflow_4_migrate_data.png){width=50%}
+
+### Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
-![ ](docs/images/architecture_data_flow.png){width=100%}
+![](docs/images/architecture_data_flow.png){width=55%}
 
-### 3. Experimental Logic Flowchart
+### Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-![ ](docs/images/architecture_experimental_logic.png){width=100%}
+![](docs/images/architecture_experimental_logic.png){width=50%}
 
-## Project Structure
+## Experimental Hierarchy
 
 The project's experiments are organized in a logical hierarchy:
 
@@ -87,9 +93,11 @@ The project's experiments are organized in a logical hierarchy:
 -   **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
 -   **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
 
-This logical hierarchy is reflected in the directory structure of the project and its outputs:
+## Directory Structure
 
-![ ](docs/images/project_structure.png){width=100%}
+This logical hierarchy is reflected in the physical layout of the repository:
+
+![](docs/images/directory_structure.png){width=110%}
 
 ## Setup and Installation
 
@@ -212,7 +220,7 @@ The pipeline now generates a consistent, standardized `replication_report.txt` f
 
 Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
 
-![ ](docs/images/replication_report_format.png){width=100%}
+![](docs/images/replication_report_format.png)
 
 **Date Handling by Mode:**
 -   **Normal Mode**: The report title is `REPLICATION RUN REPORT` and the `Date` field shows the time of the original run.
@@ -222,7 +230,7 @@ Each report contains a clear header, the base query used, a human-readable analy
 
 The final analysis script (`run_anova.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
-![ ](docs/images/analysis_log_format.png){width=100%}
+![](docs/images/analysis_log_format.png)
 
 ## Migrating Old Experiment Data (`migrate_old_experiment.ps1`)
 

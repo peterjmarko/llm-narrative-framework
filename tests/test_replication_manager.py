@@ -39,7 +39,7 @@ class TestRunBatch(unittest.TestCase):
         """Clean up the temporary directory."""
         shutil.rmtree(self.test_dir)
 
-    def _mock_get_config_value(self, config_obj, section, key, value_type=str, fallback=None):
+    def _mock_get_config_value(self, config_obj, section, key, value_type=str, fallback=None, **kwargs):
         """A more robust side_effect to replace get_config_value that handles incorrect positional args."""
         # This logic handles the case where the fallback is accidentally passed as the value_type
         if not isinstance(value_type, type):
@@ -223,8 +223,13 @@ class TestRunBatch(unittest.TestCase):
         importlib.reload(replication_manager)
 
         # Create two fake run directories to be "found"
-        os.makedirs(os.path.join(self.output_dir, "run_test_rep-001_stuff"))
-        os.makedirs(os.path.join(self.output_dir, "run_test_rep-002_stuff"))
+        # and create the necessary archived config file inside each.
+        for i in [1, 2]:
+            run_dir = os.path.join(self.output_dir, f"run_test_rep-00{i}_stuff")
+            os.makedirs(run_dir)
+            archived_config_path = os.path.join(run_dir, 'config.ini.archived')
+            with open(archived_config_path, 'w') as f:
+                f.write('[Study]\ngroup_size = 10\n')
 
         # Make the mock create the directories the main script expects to find
         mock_subprocess_run.return_value = MagicMock(returncode=0)

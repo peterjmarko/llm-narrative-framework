@@ -1,27 +1,41 @@
-graph LR
-    A[Start: Pool of 5000 Personalities] --> B{Sample 100 sets of k=10};
+graph TD
+    %% 1. Define All Nodes
+    A["Start: Pool of 5000 Personalities"]
+    B{"Sample 100 sets"}
+    C{"Sample k=10"}
+    D["Shuffle Names<br/>& Descriptions"]
+    Input[config.ini]:::input
+    M{"Define Ground Truth"}
+    F(("LLM Task:<br/>Score Similarity"))
+    G["Receive 10x10<br/>Score Matrix"]
+    H{"Calculate<br/>Trial Metrics"}
+    I{"Collect & Aggregate<br/>100 Trial Metrics"}
+    K(["Final Replication<br/>Data Point"]):::final
+
+    %% 2. Define All Connections
+    A --> B --> C
+    C --> D
     
-    B --> C{For each of the 100 sets...};
+    %% This is the corrected detail, as per your instruction
+    Input -- "Provides Mapping Strategy<br/>(Correct vs. Random)" --> M
     
+    D & M --> F
+    F --> G --> H
+    H --> I --> K
+    
+    %% 3. Group Nodes into Subgraphs using their IDs
     subgraph "Single Trial (Repeated 100 times)"
-        direction LR
-        D["Shuffle 10 Names<br/>(List A)"];
-        E["Shuffle 10 Descriptions<br/>(List B)"];
-        F((LLM Task: Score Similarity));
-        G[Receive 10x10 Score Matrix];
-        H{"Calculate Trial Metrics<br/>(MRR, Top-1 Acc, etc.)"};
-        D & E --> F;
-        F --> G;
-        G --> H;
+        C
+        F
+        G
+        H
+        subgraph "Task Setup"
+            direction LR
+            D
+            M
+        end
     end
 
-    C --> D;
-    C --> E;
-    H --> I[Collect 100 sets of trial metrics];
-    I --> J{"Aggregate Metrics<br/>(e.g., Mean of 100 MRRs)"};
-    J --> K(["Final Data Point<br/>for one Replication"]);
-
-    classDef step fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    %% 4. Styling
     classDef final fill:#d4edda,stroke:#155724;
-    class A,B,C,D,E,F,G,H,I,J step;
-    class K final;
+    classDef input fill:#e9d8fd,stroke:#9467bd;

@@ -1,0 +1,38 @@
+personality_matching/
+├── README.md                   # You are here!
+├── CONTRIBUTING.md             # Guidelines for contributors
+├── pyproject.toml              # Project dependencies and metadata (for PDM)
+|
+├── .env                        # Stores private API keys (not committed)
+├── config.ini                  # Main configuration for running experiments
+|
+├── run_experiment.ps1          # ENTRY POINT: Run a new experiment batch
+└── process_study.ps1           # ENTRY POINT: Analyze a completed study's results
+|
+├── src/                        # All Python source code for the project
+│   ├── replication_manager.py  # Manages execution of experiment batches
+│   ├── orchestrate_replication.py # Runs a single replication
+│   ├── analyze_performance.py  # Calculates final metrics from raw scores
+│   └── ...                     # (utilities for prompting, processing, etc.)
+|
+├── data/                       # Source personality databases & prompt templates
+│   ├── personalities_db_all.txt# Example: a database of personalities
+│   └── base_query.txt          # Example: a template for LLM prompts
+|
+├── output/                     # All generated artifacts from experiments
+│   └── reports/
+│       └── <Study_Name>/         # e.g., "6_Study_4"
+│           ├── <Experiment_Name>/  # e.g., "Grok_3_Mini_map=random"
+│           │   └── <Replication_Name>/ # e.g., "run_..._rep-01_..."
+│           │       ├── replication_report.txt  # Detailed report for this run
+│           │       ├── config.ini.archived     # Config snapshot for the run
+│           │       └── analysis_inputs/        # Intermediate data (scores)
+│           │
+│           └── STUDY_results.csv     # AGGREGATE: Summary of all experiments
+|
+├── docs/                       # Project documentation and diagram sources
+│   ├── diagrams/               # Source files for diagrams (.mmd, .txt)
+│   └── images/                 # Rendered images (.png) for the README
+|
+└── tests/                      # Unit and integration tests for src/ code
+    └── ...

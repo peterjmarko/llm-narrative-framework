@@ -48,37 +48,43 @@ The project's architecture can be understood through three different views: the 
 ### 1. Code Architecture Diagrams
 The project's functionality is divided into three main workflows, each initiated by a PowerShell script.
 
-#### Workflow 1: Run an Experiment
-This is the primary workflow for generating new experimental data. It executes a full batch of replications.
-{{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd}}
+### Workflow 1: Run an Experiment
 
-#### Workflow 2: Process a Study
+This is the primary workflow for generating new experimental data. It executes a full batch of replications.
+
+{{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=105%}}
+
+### Workflow 2: Process a Study
+
 This workflow is used after an experiment is complete to aggregate results from all replications and perform statistical analysis.
-{{diagram:docs/diagrams/architecture_workflow_2_process_study.mmd}}
+
+{{diagram:docs/diagrams/architecture_workflow_2_process_study.mmd | scale=2.5 | width=105%}}
 
 ### Workflow 3: Reprocess a Failed Run
 
 This workflow is used to recover from a failed run or to re-analyze existing data with updated processing logic without re-running the expensive LLM calls.
-{{diagram:docs/diagrams/architecture_workflow_3_reprocess.mmd}}
+
+{{diagram:docs/diagrams/architecture_workflow_3_reprocess.mmd | scale=2.5 | width=75%}}
 
 ### Workflow 4: Migrate Old Experiment Data
 
 This utility workflow helps bring older experimental data (generated before `config.ini.archived` was standard) into compliance with modern analysis scripts.
-{{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd}}
 
-### 2. Data Flow Diagram
+{{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=50%}}
+
+### Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
-{{diagram:docs/diagrams/architecture_data_flow.mmd}}
+{{diagram:docs/diagrams/architecture_data_flow.mmd | scale=2.5 | width=55%}}
 
-### 3. Experimental Logic Flowchart
+### Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-{{diagram:docs/diagrams/architecture_experimental_logic.mmd}}
+{{diagram:docs/diagrams/architecture_experimental_logic.mmd | scale=2.5 | width=50%}}
 
-## Project Structure
+## Experimental Hierarchy
 
 The project's experiments are organized in a logical hierarchy:
 
@@ -87,9 +93,11 @@ The project's experiments are organized in a logical hierarchy:
 -   **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
 -   **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
 
-This logical hierarchy is reflected in the directory structure of the project and its outputs:
+## Directory Structure
 
-{{diagram:docs/diagrams/project_structure.txt}}
+This logical hierarchy is reflected in the physical layout of the repository:
+
+{{diagram:docs/diagrams/directory_structure.txt | scale=2.5 | width=110%}}
 
 ## Setup and Installation
 

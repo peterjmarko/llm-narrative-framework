@@ -1,34 +1,32 @@
-graph TD;
+graph TD
+    %% Define Nodes
+    EntryPoint["replication_manager.py --reprocess<br/>(Entry Point & Batch Controller)"]:::entry
+    
+    Orchestrate["1. orchestrate_replication.py --reprocess<br/>(Runs Stages 3 & 4)"]:::layer_green
+    BiasAnalysis["2. run_bias_analysis.py"]:::script
+    
+    LogManager["3. log_manager.py (rebuild)"]:::danger
+    CompileResults["4. compile_results.py"]:::script
 
-    %% --- Style Definitions (Based on Original Palette) ---
-    classDef ReplicationManager fill:#ff7f0e,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef Orchestrator fill:#2ca02c,stroke:#333,stroke-width:1px,color:#fff;
-    classDef Utility fill:#d62728,stroke:#333,stroke-width:1px,color:#fff;
-    classDef Analysis fill:#17becf,stroke:#333,stroke-width:1px,color:#fff;
+    %% Define Connections
+    EntryPoint --> Orchestrate
+    Orchestrate --> BiasAnalysis
+    BiasAnalysis --> LogManager
+    LogManager --> CompileResults
 
-    %% === Top Level Entry Point ===
-    rep_man["replication_manager.py --reprocess<br/><i>(Entry Point & Batch Controller)</i>"]:::ReplicationManager;
-
-    %% === Looping Actions ===
+    %% Group Nodes into Subgraphs
     subgraph "Reprocessing Loop (for each run)"
-        style Loop fill:transparent,stroke:#ccc,stroke-dasharray: 5 5
-        orch["1. orchestrate_replication.py --reprocess<br/><i>(Runs Stages 3 & 4)</i>"]:::Orchestrator;
-        bias_an["2. run_bias_analysis.py"]:::Analysis;
-    end
-    
-    %% === Finalization Actions ===
-    subgraph "Finalization (after loop)"
-        style Finalization fill:transparent,stroke:#ccc,stroke-dasharray: 5 5
-        log_man["3. log_manager.py (rebuild)"]:::Utility;
-        compile_res["4. compile_results.py"]:::Analysis;
+        Orchestrate
+        BiasAnalysis
     end
 
-    %% === Connections ===
-    rep_man --> orch;
-    orch --> bias_an;
-    
-    %% Explicitly connect the last step of the loop to the first step of finalization
-    %% This correctly shows sequence and is compatible with all parsers.
-    bias_an --> log_man;
-    
-    log_man --> compile_res;
+    subgraph "Finalization (after loop)"
+        LogManager
+        CompileResults
+    end
+
+    %% Styling
+    classDef entry fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef layer_green fill:#5cb85c,stroke:#4cae4c,color:#fff;
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;

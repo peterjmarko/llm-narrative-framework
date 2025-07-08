@@ -115,7 +115,6 @@ def animate_spinner(stop_event, query_identifier: str):
     sys.stderr.flush()
 
 # --- Helper: LLM API Call ---
-# --- Helper: LLM API Call ---
 def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endpoint: str,
                         referer: str, timeout_seconds: int, query_identifier: str,
                         max_tokens: Optional[int] = None, temperature: Optional[float] = None,
@@ -177,6 +176,7 @@ def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endp
     if result_container["exception"]:
         exc = result_container["exception"]
         duration = result_container['duration']
+        # Log the specific error for detailed debugging in the console/log file
         if isinstance(exc, requests.exceptions.Timeout):
             logging.error(f"  Query {query_identifier}: API request timed out after {duration:.2f}s (timeout_setting={timeout_seconds}s).")
         elif isinstance(exc, requests.exceptions.HTTPError):
@@ -184,7 +184,10 @@ def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endp
             if exc.response is not None: logging.error(f"  Response content: {exc.response.text}")
         else:
             logging.exception(f"  Query {query_identifier}: An unexpected error occurred in the API worker thread: {exc}")
-        return None, duration
+        
+        # Re-raise the original exception so the caller (main) can handle it specifically
+        # (e.g., by writing the correct error file content)
+        raise exc
 
     # Return successful data
     return result_container["data"], result_container["duration"]
@@ -207,7 +210,7 @@ def main():
                         help="Force use of default filenames and create sample query for interactive testing.")
     # Test hook arguments
     parser.add_argument("--test_mock_api_outcome", type=str, default=None,
-                        choices=['success', 'api_returns_none', 'api_timeout', 'api_http_401', 'api_http_500'],
+                        choices=['success', 'api_returns_none', 'api_timeout', 'api_http_401', 'api_http_500', 'keyboard_interrupt', 'generic_exception_in_api'],
                         help="FOR TESTING ONLY: Simulate API outcome instead of making a real call.")
     parser.add_argument("--test_mock_api_content", type=str, default="Default mock content from prompter.",
                         help="FOR TESTING ONLY: String content for a 'success' mock API response.")
@@ -321,12 +324,29 @@ def main():
             sys.exit(1)
 
         raw_llm_response_json = None
+        # ---- MOCKING BLOCK FOR TESTING: Simulates `call_openrouter_api` outcomes ----
         if args.test_mock_api_outcome:
             logging.warning(f"!!! RUNNING IN API MOCK MODE: {args.test_mock_api_outcome} FOR QUERY {args.query_identifier} !!!")
+            logging.info(f"  MOCK API: Outcome for query {args.query_identifier} set to '{args.test_mock_api_outcome}'.")
+            
             if args.test_mock_api_outcome == 'success':
                 raw_llm_response_json = {"choices": [{"message": {"content": args.test_mock_api_content}}]}
-            logging.info(f"  MOCK API: Outcome for query {args.query_identifier} set to '{args.test_mock_api_outcome}'.")
+            elif args.test_mock_api_outcome == 'api_returns_none':
+                raw_llm_response_json = None # This will trigger the generic "None" failure path below
+            # For simulating exceptions, we raise them here so the main `except` blocks can catch them
+            elif args.test_mock_api_outcome == 'api_timeout':
+                raise requests.exceptions.Timeout("Simulated timeout via --test_mock_api_outcome")
+            elif args.test_mock_api_outcome == 'api_http_401':
+                raise requests.exceptions.HTTPError("Simulated 401 Unauthorized via --test_mock_api_outcome")
+            elif args.test_mock_api_outcome == 'api_http_500':
+                 raise requests.exceptions.HTTPError("Simulated 500 Server Error via --test_mock_api_outcome")
+            elif args.test_mock_api_outcome == 'keyboard_interrupt':
+                raise KeyboardInterrupt("Simulated KeyboardInterrupt via --test_mock_api_outcome")
+            elif args.test_mock_api_outcome == 'generic_exception_in_api':
+                raise ValueError("Simulated generic error in API worker via --test_mock_api_outcome") # Or any other generic Exception
+            # All other mock outcomes result in `raw_llm_response_json` being None, leading to a generic failure.
         else:
+            # ---- REAL API CALL ----
             raw_llm_response_json, _ = call_openrouter_api(
                 query_text=query_text_content, model_name=model_name_cfg,
                 api_key=api_key, api_endpoint=api_endpoint_cfg,
@@ -336,6 +356,7 @@ def main():
                 quiet=args.quiet
             )
 
+        # ---- Process the result (real or mocked) ----
         if raw_llm_response_json:
             sys.stdout.write("---LLM_RESPONSE_JSON_START---\n")
             json.dump(raw_llm_response_json, sys.stdout, ensure_ascii=False)
@@ -348,10 +369,8 @@ def main():
                     message = raw_llm_response_json['choices'][0].get('message', {})
                     response_content_to_save = message.get('content', '')
                 if not response_content_to_save.strip():
-                     # Downgraded from WARNING to INFO, so it will be hidden in quiet mode.
                      logging.info("  LLM Prompter: Response content is empty or whitespace.")
             except Exception as e_parse:
-                # This is a more serious parsing error, so it remains a WARNING.
                 logging.warning(f"  LLM Prompter: Error extracting message content from LLM JSON: {e_parse}. Saving empty response.")
 
             with open(output_response_file_abs, 'w', encoding='utf-8') as f_response:
@@ -360,29 +379,40 @@ def main():
             logging.info(f"  LLM Prompter: Success. Wrote response to '{os.path.basename(output_response_file_abs)}'.")
             sys.exit(0)
         else:
+            # This block now correctly handles the `api_returns_none` mock and other non-exception failures.
             logging.error(f"  LLM Prompter: LLM call failed for '{os.path.basename(input_query_file_abs)}'. No response data.")
             with open(output_error_file_abs, 'w', encoding='utf-8') as f_err:
                 f_err.write("LLM API call returned None or failed (see worker log).")
             sys.exit(1)
 
+    # ---- CENTRALIZED EXCEPTION HANDLING ----
+    except requests.exceptions.Timeout as e_timeout:
+        # THIS BLOCK WILL NOW CATCH THE TIMEOUT
+        logging.error(f"  LLM Prompter: API Timeout Error: {e_timeout}")
+        err_message = f"API call timed out for query {args.query_identifier}."
+        with open(output_error_file_abs, 'w', encoding='utf-8') as f_err:
+            f_err.write(err_message)
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e_http:
+        # THIS BLOCK WILL CATCH 4xx/5xx ERRORS
+        logging.error(f"  LLM Prompter: HTTP Error: {e_http}")
+        err_message = f"API call failed with HTTP error for query {args.query_identifier}. Details: {e_http}"
+        with open(output_error_file_abs, 'w', encoding='utf-8') as f_err:
+            f_err.write(err_message)
+        sys.exit(1)
     except FileNotFoundError as e_fnf:
         logging.error(f"  LLM Prompter: File error: {e_fnf}")
-        err_file_path = args.output_error_file if args.output_error_file else os.path.join(script_dir_worker, INTERACTIVE_TEST_ERROR_FILE)
-        with open(os.path.abspath(err_file_path), 'w', encoding='utf-8') as f_err: f_err.write(str(e_fnf))
+        with open(output_error_file_abs, 'w', encoding='utf-8') as f_err: f_err.write(str(e_fnf))
         sys.exit(1)
     except KeyboardInterrupt:
         logging.info("\nLLM Prompter: Interrupted by user (Ctrl+C).")
-        err_file_path = args.output_error_file if args.output_error_file else os.path.join(script_dir_worker, INTERACTIVE_TEST_ERROR_FILE)
-        with open(os.path.abspath(err_file_path), 'w', encoding='utf-8') as f_err: f_err.write("Processing interrupted by user (Ctrl+C).")
+        with open(output_error_file_abs, 'w', encoding='utf-8') as f_err: f_err.write("Processing interrupted by user (Ctrl+C).")
         sys.exit(1)
     except Exception as e:
-        # Immediately write the specific error to the error file for the orchestrator to find.
-        err_file_path = args.output_error_file if args.output_error_file else os.path.join(script_dir_worker, INTERACTIVE_TEST_ERROR_FILE)
-        full_err_path = os.path.abspath(err_file_path)
+        # Generic catch-all for truly unexpected errors
         err_message = f"Unhandled error in llm_prompter.py for query {args.query_identifier}: {type(e).__name__}: {e}"
-        with open(full_err_path, 'w', encoding='utf-8') as f_err:
+        with open(output_error_file_abs, 'w', encoding='utf-8') as f_err:
             f_err.write(err_message)
-        # Also log it for console visibility.
         logging.exception(f"  LLM Prompter: {err_message}")
         sys.exit(1)
 

@@ -31,6 +31,7 @@ dev = [
     "pillow>=10.4.0",
     "pytest-cov>=5.0.0",
     "pdm>=2.20.1",
+    "pytest-mock>=3.14.1",
 ]
 
 [tool.pdm]
@@ -41,15 +42,24 @@ venv.in-project = true
 # Development and testing shortcuts. {args} allows passing specific files.
 test = "pytest -v {args}"
 
-# --- DEFINITIVE COVERAGE SCRIPTS ---
-# By explicitly setting --cov=src, we tell pytest-cov what to measure
-# without interfering with pytest's test discovery, which will now
-# correctly use the path provided in {args}. This resolves the conflict.
-coverage = {cmd = "pytest -v --cov=src", help = "Run all tests verbosely with coverage"}
-coverage-html = {cmd = "pytest -v --cov=src --cov-report=html", help = "Generate a verbose HTML coverage report"}
-coverage-file = {cmd = "pytest -v {args} --cov=src", help = "Run coverage for a specific file. Usage: pdm run coverage-file tests/your_test.py"}
-coverage-erase = {cmd = "coverage erase", help = "Clean up coverage data files"}
-# --------------------------------
+# --- Definitive Coverage Workflow ---
+# This is the robust, explicit workflow for subprocess testing. It has 5 steps:
+# 1. Erase old data.
+# 2. Use `coverage run` as the main entry point to start the test session.
+# 3. Your test helper also calls `coverage run` for the subprocess.
+#    (This creates parallel data files thanks to your .coveragerc)
+# 4. `coverage combine` merges all parallel data into one file.
+# 5. `coverage report` or `coverage html` shows the final, correct results.
+
+# --- THE DEFINITIVE COVERAGE SCRIPTS ---
+# We disable the pytest-cov plugin with `-p no:cov` because we are manually
+# invoking 'coverage run' within our test's subprocesses.
+# This prevents the plugin from interfering with our manual setup.
+cov = {cmd = "coverage erase && pytest -p no:cov && coverage combine && coverage report -m", help="Run all tests with coverage analysis."}
+cov-file = {cmd = "coverage erase && pytest -p no:cov {args} && coverage combine && coverage report -m", help="Run a specific test file with coverage."}
+cov-html = {cmd = "coverage erase && pytest -p no:cov && coverage combine && coverage html", help="Run all tests and generate an HTML coverage report."}
+cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
+# ------------------------------------
 
 lint = "pre-commit run --all-files"
 build-docs = "python src/build_docs.py"
