@@ -17,6 +17,15 @@
     Use the -Verbose switch to see detailed, real-time logs from all underlying
     Python scripts, which is useful for debugging.
 
+.PARAMETER TargetDirectory
+    Optional. The target directory for the experiment. Can be an existing directory
+    or one to be created. If not provided, a new timestamped directory is created
+    in the `output/` folder. This is the first positional parameter.
+
+.PARAMETER Notes
+    Optional. A string of notes to be included in the experiment's final report
+    and logs for documentation purposes.
+
 .PARAMETER StartRep
     Optional. The starting replication number (inclusive). Defaults to 1.
 
@@ -29,16 +38,17 @@
     from all child scripts.
 
 .EXAMPLE
-    # Run the full batch with standard (quiet) output
+    # Run the full batch with standard (quiet) output.
+    # Results will be in a new timestamped folder.
     .\run_experiment.ps1
 
 .EXAMPLE
-    # Run the full batch with detailed logging for debugging
-    .\run_experiment.ps1 -Verbose
+    # Run a full batch into a specific directory with descriptive notes.
+    .\run_experiment.ps1 -TargetDirectory "output/reports/My_Llama3_Study" -Notes "First run with Llama 3"
 
 .EXAMPLE
-    # Run only replications 5 through 10
-    .\run_experiment.ps1 -StartRep 5 -EndRep 10
+    # Run only replications 5 through 10 with detailed logging for debugging.
+    .\run_experiment.ps1 -StartRep 5 -EndRep 10 -Verbose
 #>
 
 # This is the main execution function. It uses [CmdletBinding()] to be a robust

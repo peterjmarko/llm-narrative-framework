@@ -6,7 +6,7 @@ Any changes made here will be overwritten.
 
 # LLM Personality Matching Experiment Framework
 
-This project provides a fully automated and reproducible pipeline for testing a Large Language Model's (LLM) ability to solve a "who's who" personality matching task. It handles everything from data preparation and query generation to LLM interaction, response parsing, and final statistical analysis.
+This project provides a fully automated and reproducible pipeline for testing a Large Language Model's (LLM) ability to solve a "who's who" personality matching task. It handles everything from data preparation and query generation to LLM interaction, response parsing, and final statistical analysis. The framework is ideal for researchers investigating LLM capabilities and developers who need a robust system for automated, large-scale experimentation.
 
 ## Research Question
 At its core, this project investigates whether a Large Language Model (LLM) can solve a complex matching task: given a set of sanitized, narrative personality descriptions (derived from birth data) and a corresponding set of general biographical profiles, can the LLM correctly pair them at a rate significantly greater than chance?
@@ -45,11 +45,26 @@ The result is a clean dataset of personality profiles where the connection to th
 
 The project's architecture can be understood through three different views: the code architecture, the data flow, and the experimental logic.
 
-### 1. Code Architecture Diagram
+### 1. Code Architecture Diagrams
+The project's functionality is divided into three main workflows, each initiated by a PowerShell script.
 
-This diagram shows how the scripts in the pipeline call one another, illustrating the hierarchy of control.
+#### Workflow 1: Run an Experiment
+This is the primary workflow for generating new experimental data. It executes a full batch of replications.
+{{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd}}
 
-{{diagram:docs/diagrams/architecture_code.mmd}}
+#### Workflow 2: Process a Study
+This workflow is used after an experiment is complete to aggregate results from all replications and perform statistical analysis.
+{{diagram:docs/diagrams/architecture_workflow_2_process_study.mmd}}
+
+### Workflow 3: Reprocess a Failed Run
+
+This workflow is used to recover from a failed run or to re-analyze existing data with updated processing logic without re-running the expensive LLM calls.
+{{diagram:docs/diagrams/architecture_workflow_3_reprocess.mmd}}
+
+### Workflow 4: Migrate Old Experiment Data
+
+This utility workflow helps bring older experimental data (generated before `config.ini.archived` was standard) into compliance with modern analysis scripts.
+{{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd}}
 
 ### 2. Data Flow Diagram
 
@@ -111,7 +126,7 @@ The `config.ini` file is the central hub for defining all parameters for your ex
 
 ### Display Name Settings
 
--   **`[ModelDisplayNames]`**: Maps sanitized model names to friendly names (e.g., `meta-llama-4-maverick = Llama 4 Maverick`).
+-   **`[ModelDisplayNames]`**: Maps a model's API identifier to a friendly, human-readable name for plots and reports (e.g., `meta-llama/llama-3-70b-instruct = Llama 3 70B Instruct`).
 -   **`[FactorDisplayNames]`**: Maps factor names to plot labels (e.g., `mapping_strategy = Mapping Strategy`).
 -   **`[MetricDisplayNames]`**: Maps metric names to plot titles (e.g., `mean_mrr = Mean Reciprocal Rank (MRR)`).
 
@@ -122,7 +137,7 @@ The `config.ini` file is the central hub for defining all parameters for your ex
 
 ### LLM Settings (`[LLM]`)
 
--   **`model_name`**: The API identifier for the LLM to be tested (e.g., `mistralai/mistral-small-3.1-24b-instruct`).
+-   **`model_name`**: The API identifier for the LLM to be tested (e.g., from a provider like OpenRouter: `mistralai/mistral-7b-instruct`).
 
 #### Model Selection Philosophy and Future Work
 The selection of models for this study was guided by a balance of performance, cost, speed, and technical compatibility with the automated framework. Several top-tier models were not included for one of the following reasons:
@@ -136,46 +151,58 @@ A follow-up study is planned to evaluate other powerful, medium-cost models as A
 
 -   **`min_valid_response_threshold`**: Minimum average number of valid responses (`n_valid_responses`) for an experiment to be included in the final analysis. Set to `0` to disable.
 
-## Standard Workflow
+## Standard Workflow: The 2-Phase Process
 
-The workflow is designed to be fully automated.
+The project is orchestrated by PowerShell wrapper scripts that provide a clear, two-phase workflow. First, you generate data by running experiments. Second, you process the data from one or more experiments to produce a final analysis.
 
-### Phase 1: Running Experiments
+### Phase 1: Running an Experiment (`run_experiment.ps1`)
 
-The `run_experiment.ps1` PowerShell script is the main entry point for executing a complete experiment.
+This script executes a full batch of replications for a **single experimental configuration** based on the central `config.ini` file.
 
-1.  **Configure**: Adjust experimental parameters in `config.ini`.
+**Primary Usage:**
+Simply execute the script to run the experiment as defined in `config.ini`. The script creates a new, timestamped directory for the results.
 
-2.  **Execute**: Open a PowerShell terminal (with the virtual environment activated) and run the main script.
+```powershell
+# Run the experiment with standard output
+.\run_experiment.ps1
+```
+
+**Common Options:**
+
+*   **Target a Specific Directory:** Use `-TargetDirectory` to organize runs, for example, by study.
     ```powershell
-    # Run with standard output
-    .\run_experiment.ps1
-
-    # Add descriptive notes to the report
+    .\run_experiment.ps1 -TargetDirectory "output/reports/My_Llama3_Study"
+    ```
+*   **Add Notes:** Embed descriptive notes directly into the run's logs and reports.
+    ```powershell
     .\run_experiment.ps1 -Notes "First run with random mapping strategy"
-
-    # For detailed debugging, run with the -Verbose switch
+    ```
+*   **Partial Runs:** Run a specific range of replications, ideal for resuming an interrupted batch.
+    ```powershell
+    # Run only replications 5 through 10
+    .\run_experiment.ps1 -StartRep 5 -EndRep 10
+    ```
+*   **Detailed Debugging:** Use the `-Verbose` switch to see real-time output from all underlying Python scripts.
+    ```powershell
     .\run_experiment.ps1 -Verbose
     ```
-    *   The script manages the entire batch run. It automatically detects and **skips** any replications that have already been completed successfully. This allows you to safely resume an interrupted batch run without re-doing work. To force a re-analysis of existing data, you must use the `--reprocess` mode described in the maintenance section.
-    *   The script will then automatically enter a repair phase for any failed replications from the current batch.
-    *   **Crucially**, each replication's output directory will now contain a `config.ini.archived` file, making it a self-contained, reproducible artifact.
+> **Note:** The main wrapper scripts use PowerShell. While PowerShell is pre-installed on Windows and available for macOS and Linux, the core scientific logic is contained in cross-platform Python scripts.
 
-3.  **Repeat for All Conditions**: Repeat steps 1-2 for each experimental condition, organizing the outputs into separate folders.
+### Phase 2: Processing a Study (`process_study.ps1`)
 
-### Phase 2: Processing the Study
+After you have one or more experiment directories, this script aggregates all their results and performs the final statistical analysis across the entire study.
 
-After running all experiments, this phase aggregates all data and performs the final statistical analysis.
-
-1.  **Run Study Processor**: Execute `process_study.ps1`, pointing it at the top-level directory containing all experiment folders.
+1.  **Execute Study Processor:** Point the script at the top-level directory containing all relevant experiment folders (e.g., `output/reports`).
     ```powershell
+    # Analyze all experiment folders found inside 'output/reports'
     .\process_study.ps1 -StudyDirectory "output/reports"
     ```
-    This automates two stages:
-    *   **Compilation**: Runs `compile_results.py` to scan the directory tree and create level-specific summaries, aggregating them into a master `STUDY_results.csv`.
-    *   **Analysis**: Runs `run_anova.py` on the master dataset to perform a full statistical analysis.
+    The script provides a clean summary of the compilation and analysis steps. For detailed logs, add the `-Verbose` switch.
 
-2.  **Review Final Artifacts**: In the top-level analysis directory (`output/reports/anova/`), you will find publication-quality plots (`*.png`), a complete analysis log (`STUDY_analysis_log.txt`), and an `archive/` of previous results.
+2.  **Review Final Artifacts**: The script creates a new `anova` subdirectory within your study directory (e.g., `output/reports/anova/`). This folder contains:
+    *   A master `STUDY_results.csv` file aggregating all data.
+    *   Publication-quality plots (`*.png`).
+    *   A comprehensive analysis log (`STUDY_analysis_log.txt`).
 
 ## Standardized Output
 
@@ -197,40 +224,25 @@ The final analysis script (`run_anova.py`) produces a comprehensive log file det
 
 {{diagram:docs/diagrams/analysis_log_format.txt}}
 
-## Migrating Old Experiment Data
+## Migrating Old Experiment Data (`migrate_old_experiment.ps1`)
 
-A one-time migration process is required to upgrade older, incompatible data directories.
+To upgrade older experiment directories to be compatible with the current analysis pipeline, a dedicated PowerShell script automates the entire migration process.
 
-#### Migration Steps
+**What it does:**
+The `migrate_old_experiment.ps1` script orchestrates a four-step data migration:
+1.  **Patches Configs**: Runs `patch_old_runs.py` to create and archive a `config.ini` file for each run.
+2.  **Rebuilds Reports**: Executes `rebuild_reports.py` to regenerate all replication reports into the modern, standardized format.
+3.  **Cleans Artifacts**: Programmatically deletes legacy files like old summary CSVs, `.corrupted` report backups, and obsolete `analysis_inputs` directories.
+4.  **Final Reprocess**: Triggers `replication_manager.py` in reprocess mode to generate clean, modern summary files based on the newly rebuilt reports.
 
-Ensure your Python environment is activated before running these commands from the project root directory.
+**How to use it:**
+Execute the script and point it at the top-level directory of the old experiment you want to migrate using the `-TargetDirectory` parameter.
 
-**A. Manual Steps**
-
-1.  **Patch Configs:** This archives the `config.ini` file in each `run_*` subdirectory.
-    ```bash
-    python src/patch_old_runs.py "<path_to_old_experiment_dir>"
-    ```
-
-2.  **Rebuild Reports:** This uses the archived configs to regenerate each `replication_report.txt` with a modern structure and a valid `METRICS_JSON` block.
-    ```bash
-    python src/rebuild_reports.py "<path_to_old_experiment_dir>"
-    ```
-
-3.  **Clean Artifacts:** Manually delete the following old files and directories from within the `<path_to_old_experiment_dir>`:
-    - The top-level `final_summary_results.csv` or `STUDY_results.csv`.
-    - The top-level `batch_run_log.csv`
-    - The `analysis_inputs` directory inside *each* `run_*` subdirectory.
-    - All `*.txt.corrupted` files inside *each* `run_*` subdirectory.
-
-4.  **Final Reprocess:** This will regenerate the summary CSV files, logs, and all analysis artifacts using the modern, rebuilt reports. You can also add notes during this step.
-    ```bash
-    python src/replication_manager.py --reprocess "<path_to_old_experiment_dir>" --notes "Migrated to new format"
-    ```
-
-**B. Automated Scripts**
-
-Scripts are provided to automate all four steps for Windows environments (`migrate_old_experiment.ps1` and `.bat`).
+```powershell
+# Migrate the experiment data located in the "6_Study_4" directory
+.\migrate_old_experiment.ps1 -TargetDirectory "output/reports/6_Study_4"
+```
+The script will run all four steps in sequence, providing clear progress updates for each stage.
 
 ---
 
@@ -259,9 +271,6 @@ Scripts are provided to automate all four steps for Windows environments (`migra
 
 *   **`verify_pipeline_completeness.py`**:
     *   A diagnostic tool to check for missing files or incomplete stages in a run directory.
-
-*   **`inject_metadata.py`**:
-    *   **LEGACY UTILITY:** No longer part of the standard workflow.
 
 *   **`compile_results.py`**:
     *   The core script for hierarchical data aggregation. Recursively scans a directory structure, performing a bottom-up summary.

@@ -174,7 +174,11 @@ This approach, demonstrated in `tests/test_compile_results.py`, is the required 
 
 ### 4. Commit Your Changes
 
-Use clear and descriptive commit messages. We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. The general format is `type(scope): short description`.
+Use the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification for clear and automated versioning.
+
+*   **Format**: `type(scope): subject` (e.g., `feat(parser): ...`)
+*   **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`.
+*   **Scope**: The part of the codebase affected (e.g., `analysis`, `readme`, `github`).
 
 *   **Examples**:
     *   `feat(analysis): Add support for chi-squared test`
@@ -184,32 +188,35 @@ Use clear and descriptive commit messages. We follow the [Conventional Commits](
 
 **Important: The Documentation Commit Workflow**
 
-This project uses a `pre-commit` hook to ensure that the main `README.md` and all its diagrams are always up-to-date with their source files (e.g., `README.template.md`, diagram sources).
+To ensure generated documentation (`README.md`, diagrams) stays synchronized with its sources (`README.template.md`), a **two-commit process** is required.
 
-This hook **does not** automatically modify files during a commit. Instead, it **checks** if the documentation is current. If it's outdated, the commit will be aborted, and you must manually regenerate the documentation before you can successfully commit. Other hooks (like code formatters) may still modify files automatically.
+1.  **Commit #1: Update the Source File(s)**
+    *   Modify the source file (e.g., `README.template.md`).
+    *   Stage and commit *only* the source file change with a descriptive `docs` message.
+    ```bash
+    # Stage only the template
+    git add README.template.md
+    
+    # Commit the logical change
+    git commit -m "docs(readme): Clarify installation instructions"
+    ```
 
-Follow this workflow when your changes affect the documentation:
+2.  **Commit #2: Build and Commit the Generated File(s)**
+    *   After the first commit, manually run the documentation builder script:
+    ```bash
+    pdm run build-docs
+    ```
+    *   The script will generate or update `README.md` and other assets.
+    *   Stage all the newly generated files.
+    ```bash
+    git add README.md docs/images/
+    ```
+    *   Commit these generated files with a standardized `build` message.
+    ```bash
+        git commit -m "build(docs): Regenerate documentation from source"
+    ```
 
-1.  **First Commit Attempt (Fails as Expected)**
-    *   Make your changes to `README.template.md` or a diagram source file.
-    *   Stage your changes: `git add .`
-    *   Attempt to commit: `git commit -m "docs: Update architecture diagram"`
-    *   The commit will be aborted with a message like:
-        `ERROR: README.md is out of date. Please run 'pdm run build-docs' and commit the changes.`
-
-2.  **Rebuild and Second Commit Attempt (Succeeds)**
-    *   **Manually build the docs** by running the command from the error message:
-        ```bash
-        python -m pdm run build-docs
-        ```
-    *   **Stage the newly generated files** (`README.md`, diagrams in `docs/images/`, `*.docx`, etc.):
-        ```bash
-        git add .
-        ```
-    *   **Commit again** using the exact same message. This time, the hook will pass, and your commit will succeed.
-        ```bash
-        git commit -m "docs: Update architecture diagram"
-        ```
+This process cleanly separates logical documentation changes from the automated build output in the project's history.
 
 ### 5. Submit a Pull Request
 

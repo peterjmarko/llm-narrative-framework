@@ -1,0 +1,47 @@
+graph TD;
+
+    %% --- Style Definitions (Based on Original Palette) ---
+    classDef WorkflowEntry fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef Utility fill:#d62728,stroke:#333,stroke-width:1px,color:#fff;
+    classDef Worker fill:#9467bd,stroke:#333,stroke-width:1px,color:#fff;
+    classDef DataArtifact fill:#f0f0f0,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#333;
+
+    %% === Top Level Entry Point ===
+    migrate_ps1["migrate_old_experiment.ps1<br/><i>(Entry Point)</i>"]:::WorkflowEntry;
+
+    %% === Stage Definitions ===
+    subgraph "Stage 1: Standardize Configs"
+        patcher["1. patch_old_runs.py"]:::Utility;
+        restore["restore_config.py"]:::Utility;
+        config_archived[("config.ini.archived")]:::DataArtifact;
+    end
+
+    subgraph "Stage 2: Rebuild Reports"
+        rebuilder["2. rebuild_reports.py"]:::Utility;
+        stage3["process_llm_responses.py"]:::Worker;
+        stage4["analyze_performance.py"]:::Worker;
+        replication_report[("replication_report.txt")]:::DataArtifact;
+    end
+    
+    %% === Define Connections ===
+    
+    %% Entry point connects to the start of the first stage
+    migrate_ps1 --> patcher;
+
+    %% Stage 1 internal flow
+    patcher -->|"Calls (in loop)"| restore;
+    restore -->|"Creates"| config_archived;
+
+    %% Stage 2 internal flow
+    rebuilder -->|"Calls (in loop)"| stage3;
+    stage3 --> stage4;    
+    stage4 -->|"Generates"| replication_report;
+
+    %% Data flow connects the two stages
+    config_archived -->|"Read by"| rebuilder;
+
+    %% --- Layout Hint using an Invisible Link ---
+    %% This link encourages the renderer to place the two top nodes
+    %% of the stages on the same horizontal level.
+    patcher -.-> rebuilder;
+    linkStyle 7 stroke-width:0px;

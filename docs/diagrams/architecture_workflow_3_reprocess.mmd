@@ -1,0 +1,34 @@
+graph TD;
+
+    %% --- Style Definitions (Based on Original Palette) ---
+    classDef ReplicationManager fill:#ff7f0e,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef Orchestrator fill:#2ca02c,stroke:#333,stroke-width:1px,color:#fff;
+    classDef Utility fill:#d62728,stroke:#333,stroke-width:1px,color:#fff;
+    classDef Analysis fill:#17becf,stroke:#333,stroke-width:1px,color:#fff;
+
+    %% === Top Level Entry Point ===
+    rep_man["replication_manager.py --reprocess<br/><i>(Entry Point & Batch Controller)</i>"]:::ReplicationManager;
+
+    %% === Looping Actions ===
+    subgraph "Reprocessing Loop (for each run)"
+        style Loop fill:transparent,stroke:#ccc,stroke-dasharray: 5 5
+        orch["1. orchestrate_replication.py --reprocess<br/><i>(Runs Stages 3 & 4)</i>"]:::Orchestrator;
+        bias_an["2. run_bias_analysis.py"]:::Analysis;
+    end
+    
+    %% === Finalization Actions ===
+    subgraph "Finalization (after loop)"
+        style Finalization fill:transparent,stroke:#ccc,stroke-dasharray: 5 5
+        log_man["3. log_manager.py (rebuild)"]:::Utility;
+        compile_res["4. compile_results.py"]:::Analysis;
+    end
+
+    %% === Connections ===
+    rep_man --> orch;
+    orch --> bias_an;
+    
+    %% Explicitly connect the last step of the loop to the first step of finalization
+    %% This correctly shows sequence and is compatible with all parsers.
+    bias_an --> log_man;
+    
+    log_man --> compile_res;

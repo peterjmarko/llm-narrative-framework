@@ -17,8 +17,10 @@ __pycache__/
 /src/archive/
 /tests/archive/
 
-# Ignore generated document files
+# Ignore generated document and image files
 *.docx
+docs/images/*.png
+
 
 # Intermediate and temporary files used by the pipeline
 /src/temp/
