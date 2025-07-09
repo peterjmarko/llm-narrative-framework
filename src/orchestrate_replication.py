@@ -132,7 +132,10 @@ def generate_run_dir_name(model_name, temperature, num_iterations, k_per_query, 
     """Generates a descriptive, sanitized directory name."""
     timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     model_short = model_name.split('/')[-1] if model_name else "unknown_model"
-    temp_str = f"tmp-{float(temperature):.2f}"
+    try:
+        temp_str = f"tmp-{float(temperature):.2f}"
+    except (ValueError, TypeError):
+        temp_str = "tmp-NA"
     db_base = os.path.splitext(os.path.basename(personalities_db))[0]
     subjects_str = f"sbj-{k_per_query:02d}"
     trials_str = f"trl-{num_iterations:03d}"

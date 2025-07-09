@@ -7,6 +7,7 @@ import subprocess
 import sys
 import pathlib
 from unittest.mock import patch, MagicMock
+import configparser
 
 # Ensure the src directory is in the Python path for direct imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -44,7 +45,16 @@ class TestListProjectFiles(unittest.TestCase):
         (self.project_root / ".venv").mkdir()
         (self.project_root / "test.log").touch()
         
-        self.report_path = self.output_dir / "project_reports" / "project_structure_report.txt"
+        self.report_path = self.output_dir / "project_reports" / "project_structure_report_depth_-1.txt"
+
+        # FIX: Create a mock config.ini in the temp project root so the script can find it
+        # and know where to write the output report.
+        mock_config = configparser.ConfigParser()
+        mock_config['General'] = {'base_output_dir': 'output'}
+        mock_config['Filenames'] = {'project_structure_report': 'project_structure_report.txt'}
+        
+        with open(self.project_root / "config.ini", "w") as f:
+            mock_config.write(f)
 
     def tearDown(self):
         """Clean up the temporary directory."""
@@ -62,10 +72,11 @@ class TestListProjectFiles(unittest.TestCase):
         """High-level test to ensure the script runs and produces expected output."""
         result = self._run_script_as_subprocess("--depth", "-1")
         self.assertEqual(result.returncode, 0, f"Script failed: {result.stderr}")
-        self.assertTrue(self.report_path.exists())
+        report_path = self.output_dir / "project_reports" / "project_structure_report_depth_all.txt"
+        self.assertTrue(report_path.exists(), "The report file was not created at the expected path.")
         
-        # FIX: Explicitly specify UTF-8 encoding to prevent UnicodeDecodeError on Windows.
-        report_content = self.report_path.read_text(encoding='utf-8')
+        # Corrected to use the local 'report_path' variable
+        report_content = report_path.read_text(encoding='utf-8')
         self.assertIn("Report generation complete", report_content)
         self.assertIn(os.path.join("src", "module1.py"), report_content)
         self.assertNotIn("test.log", report_content)
@@ -77,7 +88,8 @@ class TestListProjectFiles(unittest.TestCase):
         
         result = self._run_script_as_subprocess("--depth", "-1")
         self.assertEqual(result.returncode, 0, f"Script failed: {result.stderr}")
-        report_content = self.report_path.read_text(encoding='utf-8')
+        report_path = self.output_dir / "project_reports" / "project_structure_report_depth_all.txt"
+        report_content = report_path.read_text(encoding='utf-8')
         self.assertIn("(No .py files found meeting criteria)", report_content)
 
     def test_no_key_files_found(self):
@@ -86,7 +98,8 @@ class TestListProjectFiles(unittest.TestCase):
         
         result = self._run_script_as_subprocess("--depth", "0")
         self.assertEqual(result.returncode, 0, f"Script failed: {result.stderr}")
-        report_content = self.report_path.read_text(encoding='utf-8')
+        report_path = self.output_dir / "project_reports" / "project_structure_report_depth_0.txt"
+        report_content = report_path.read_text(encoding='utf-8')
         self.assertIn("(No predefined key files found at project root)", report_content)
 
     # --- Unit Tests for Coverage ---

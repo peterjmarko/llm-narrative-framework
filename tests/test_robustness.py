@@ -56,66 +56,59 @@ class TestPipelineRobustness(unittest.TestCase):
             del sys.modules['config_loader']
         
         fake_mod = types.ModuleType("config_loader")
-        # Point the PROJECT_ROOT to our temporary directory. The script will use
-        # this to find config.ini and create the output directory.
         fake_mod.PROJECT_ROOT = self.test_project_root
         fake_mod.APP_CONFIG = self.mock_config
         
         def dummy_get_config_value(config, section, key, fallback=None, value_type=str, **kwargs):
-            # A simplified get_config_value that works with a ConfigParser object.
-            # It doesn't handle the fallback_key logic for this test's purpose.
-            if config.has_option(section, key): return fallback
-            try:
-                if value_type is int: return config.getint(section, key)
-                if value_type is float: return config.getfloat(section, key)
-                return config.get(section, key)
-            except (ValueError, configparser.NoOptionError):
-                return fallback
+            # CORRECTED LOGIC: This now correctly returns the found value.
+            if config.has_option(section, key):
+                try:
+                    if value_type is int: return config.getint(section, key)
+                    if value_type is float: return config.getfloat(section, key)
+                    return config.get(section, key)
+                except (ValueError, configparser.NoOptionError):
+                    return fallback
+            return fallback
             
         fake_mod.get_config_value = dummy_get_config_value
         sys.modules['config_loader'] = fake_mod
 
-    # CORRECTED PATCH PATH: The target is now the real module path.
-    @patch('src.orchestrate_replication.run_script')
-    def test_orchestrator_handles_missing_temperature_key(self, mock_run_script):
+    def test_orchestrator_handles_missing_temperature_key(self):
         """Test that generate_run_dir_name uses fallback for a missing config key."""
-        self.mock_config['General'] = {'base_output_dir': 'output'}
-        self.mock_config['LLM'] = {'model_name': 'test-model'}
-        self.mock_config['Filenames'] = {'personalities_src': 'db.txt'}
-        self.mock_config['Study'] = {'num_trials': '1', 'group_size': '1'}
-        
-        mock_run_script.return_value = "Mocked success"
-        
-        # Create the physical config file that the script needs to archive.
-        with open(os.path.join(self.test_project_root, 'config.ini'), 'w') as f:
-            self.mock_config.write(f)
+        with patch('src.orchestrate_replication.run_script') as mock_run_script:
+            self.mock_config['General'] = {'base_output_dir': 'output'}
+            self.mock_config['LLM'] = {'model_name': 'test-model'} # No temperature key
+            self.mock_config['Filenames'] = {'personalities_src': 'db.txt'}
+            self.mock_config['Study'] = {'num_trials': '1', 'group_size': '1'}
+            mock_run_script.return_value = ("Mocked success", 0, None)
 
-        orchestrator_args = ['orchestrate_replication.py', '--replication_num', '1', '--base_seed', '1000', '--qgen_base_seed', '1500']
-        with patch.object(sys, 'argv', orchestrator_args):
-            self.orchestrator_main()
+            with open(os.path.join(self.test_project_root, 'config.ini'), 'w') as f:
+                self.mock_config.write(f)
 
-        run_dirs = [d for d in os.listdir(self.output_dir) if d.startswith('run_')]
-        self.assertEqual(len(run_dirs), 1, "Expected exactly one run directory.")
-        self.assertIn("tmp-0.00", run_dirs[0], "Directory name should contain the fallback temperature 'tmp-0.00'.")
+            orchestrator_args = ['orchestrate_replication.py', '--replication_num', '1']
+            with patch.object(sys, 'argv', orchestrator_args):
+                self.orchestrator_main()
 
-    # CORRECTED PATCH PATH: The target is now the real module path.
-    @patch('src.orchestrate_replication.run_script')
-    def test_orchestrator_handles_invalid_temperature_value(self, mock_run_script):
+            run_dirs = [d for d in os.listdir(self.output_dir) if d.startswith('run_')]
+            self.assertEqual(len(run_dirs), 1, "Expected exactly one run directory.")
+            self.assertIn("tmp-NA", run_dirs[0], "Directory name should contain the fallback 'tmp-NA'.")
+
+    def test_orchestrator_handles_invalid_temperature_value(self):
         """Test that generate_run_dir_name handles non-numeric temperature value."""
-        self.mock_config['General'] = {'base_output_dir': 'output'}
-        self.mock_config['LLM'] = {'model_name': 'test-model', 'temperature': 'not-a-float'}
-        self.mock_config['Filenames'] = {'personalities_src': 'db.txt'}
-        self.mock_config['Study'] = {'num_trials': '1', 'group_size': '1'}
-        
-        mock_run_script.return_value = "Mocked success"
-        
-        with open(os.path.join(self.test_project_root, 'config.ini'), 'w') as f:
-            self.mock_config.write(f)
+        with patch('src.orchestrate_replication.run_script') as mock_run_script:
+            self.mock_config['General'] = {'base_output_dir': 'output'}
+            self.mock_config['LLM'] = {'model_name': 'test-model', 'temperature': 'not-a-float'}
+            self.mock_config['Filenames'] = {'personalities_src': 'db.txt'}
+            self.mock_config['Study'] = {'num_trials': '1', 'group_size': '1'}
+            mock_run_script.return_value = ("Mocked success", 0, None)
 
-        orchestrator_args = ['orchestrate_replication.py', '--replication_num', '1', '--base_seed', '1000', '--qgen_base_seed', '1500']
-        with patch.object(sys, 'argv', orchestrator_args):
-            self.orchestrator_main()
+            with open(os.path.join(self.test_project_root, 'config.ini'), 'w') as f:
+                self.mock_config.write(f)
 
-        run_dirs = [d for d in os.listdir(self.output_dir) if d.startswith('run_')]
-        self.assertEqual(len(run_dirs), 1)
-        self.assertIn("tmp-0.00", run_dirs[0], "Directory name should contain the fallback 'tmp-0.00' for invalid temperature.")
+            orchestrator_args = ['orchestrate_replication.py', '--replication_num', '1']
+            with patch.object(sys, 'argv', orchestrator_args):
+                self.orchestrator_main()
+
+            run_dirs = [d for d in os.listdir(self.output_dir) if d.startswith('run_')]
+            self.assertEqual(len(run_dirs), 1)
+            self.assertIn("tmp-NA", run_dirs[0], "Directory name should contain 'tmp-NA' for invalid temperature.")
