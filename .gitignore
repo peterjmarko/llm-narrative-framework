@@ -24,6 +24,7 @@ docs/images/*.png
 
 # Intermediate and temporary files used by the pipeline
 /src/temp/
+/src/temp_qgen_outputs_iter_001/
 /qgen_standalone_output/
 /project_code_as_txt/
 ~$README.*
