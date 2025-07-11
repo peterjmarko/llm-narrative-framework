@@ -119,7 +119,8 @@ def load_env_vars():
             logger.debug(f"Successfully loaded .env file from: {dotenv_path}")
             return True
         else:
-            logger.warning(f"Found .env file at {dotenv_path}, but python-dotenv reported an issue loading it.")
+            # This branch is for when .env exists but load_dotenv returns False (e.g., it's empty).
+            logger.warning(f"Found .env file at {dotenv_path}, but it may be empty or failed to load.")
             return False
     else:
         logger.info(f".env file not found at {dotenv_path}. API keys/secrets must be set as environment variables.")
@@ -187,9 +188,11 @@ def get_config_value(config: configparser.ConfigParser, section: str, key: str,
         keys_to_try.append(fallback_key)
 
     raw_value = None
+    found_key = None
     for k in keys_to_try:
         if config.has_option(section, k):
             raw_value = config.get(section, k)
+            found_key = k # Store the key that was actually found
             break # Found a valid key, exit the loop
     
     if raw_value is None:
@@ -218,25 +221,23 @@ def get_config_value(config: configparser.ConfigParser, section: str, key: str,
             try:
                 return int(cleaned_value)
             except ValueError:
-                logger.warning(f"Config: Error converting [{section}]/{key} value '{raw_value}' "
+                logger.warning(f"Config: Error converting [{section}]/{found_key} value '{raw_value}' "
                                f"(cleaned: '{cleaned_value}') to int. Using fallback: {fallback}")
                 return fallback
         elif value_type == float:
             try:
                 return float(cleaned_value)
             except ValueError:
-                logger.warning(f"Config: Error converting [{section}]/{key} value '{raw_value}' "
+                logger.warning(f"Config: Error converting [{section}]/{found_key} value '{raw_value}' "
                                f"(cleaned: '{cleaned_value}') to float. Using fallback: {fallback}")
                 return fallback
         elif value_type == bool:
             # configparser's getboolean is quite flexible (True/False, yes/no, 1/0, on/off)
-            # We can rely on it if we pass the original raw_value,
-            # or implement similar logic for cleaned_value.
-            # For simplicity using config.getboolean directly if type is bool:
             try:
-                return config.getboolean(section, key) # Let configparser handle bool conversion
+                # Use the key that was actually found (`found_key`) for getboolean.
+                return config.getboolean(section, found_key)
             except ValueError: # getboolean raises ValueError if not a valid boolean string
-                logger.warning(f"Config: Error converting [{section}]/{key} value '{raw_value}' "
+                logger.warning(f"Config: Error converting [{section}]/{found_key} value '{raw_value}' "
                                f"to bool. Using fallback: {fallback}")
                 return fallback
         else: # Should not happen if value_type is one of the above
@@ -253,8 +254,10 @@ def get_config_list(config, section, key, fallback=None):
     of cleaned strings.
     """
     value_str = get_config_value(config, section, key, fallback=None)
-    if value_str:
+    if value_str is not None and value_str != '':
         return [item.strip() for item in value_str.split(',')]
+    elif value_str == '':
+        return []
     return fallback if fallback is not None else []
 
 def get_config_section_as_dict(config, section):
@@ -270,10 +273,3 @@ APP_CONFIG = load_app_config()
 ENV_LOADED = load_env_vars() # Load .env once globally as well
 
 # === End of src/config_loader.py ===
-
-# Example of how scripts might use this:
-# from config_loader import APP_CONFIG, ENV_LOADED, get_config_value, PROJECT_ROOT
-# DEFAULT_K = get_config_value(APP_CONFIG, 'General', 'default_k', fallback=6, value_type=int)
-# api_key = os.getenv("OPENROUTER_API_KEY")
-# if ENV_LOADED and api_key:
-#    logging.info("API key ready.")

@@ -48,6 +48,11 @@ The project's architecture can be understood through three different views: the 
 ### 1. Code Architecture Diagrams
 The project's functionality is divided into three main workflows, each initiated by a PowerShell script.
 
+#### Codebase Architecture
+This diagram provides a comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.
+
+{{diagram:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=110%}}
+
 ### Workflow 1: Run an Experiment
 
 This is the primary workflow for generating new experimental data. It executes a full batch of replications.

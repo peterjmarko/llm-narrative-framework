@@ -48,33 +48,40 @@ from dotenv import load_dotenv
 from typing import Optional, Dict, List, Tuple, Any
 
 # --- Import from config_loader ---
+# Define a fallback class and function in case the real config_loader is not found.
+class DummyConfig:
+    def has_section(self, section): return False
+    def has_option(self, section, key): return False
+    def get(self, section, key, fallback=None): return fallback
+    def getint(self, section, key, fallback=None): return fallback
+    def getfloat(self, section, key, fallback=None): return fallback
+    def getboolean(self, section, key, fallback=None): return fallback
+
+def get_config_value_fallback(cfg, section, key, fallback=None, value_type=str):
+    return fallback
+
 try:
+    # First attempt to import from the standard path
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 except ImportError:
+    # If the first attempt fails, try to fix sys.path and re-import.
     current_script_dir_lprompter = os.path.dirname(os.path.abspath(__file__))
+    project_root_for_loader_lprompter = os.path.dirname(current_script_dir_lprompter)
     if current_script_dir_lprompter not in sys.path:
         sys.path.insert(0, current_script_dir_lprompter)
+    if project_root_for_loader_lprompter not in sys.path:
+        sys.path.insert(0, project_root_for_loader_lprompter)
+
     try:
+        # Second attempt after path correction.
         from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
-    except ImportError:
-        project_root_for_loader_lprompter = os.path.dirname(current_script_dir_lprompter)
-        if project_root_for_loader_lprompter not in sys.path:
-            sys.path.insert(0, project_root_for_loader_lprompter)
-        try:
-            from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
-        except ImportError as e_lprompter:
-            class DummyConfig: # Fallback for tests if config_loader is truly missing
-                def has_section(self, section): return False
-                def has_option(self, section, key): return False
-                def get(self, section, key, fallback=None): return fallback
-                def getint(self, section, key, fallback=None): return fallback
-                def getfloat(self, section, key, fallback=None): return fallback
-                def getboolean(self, section, key, fallback=None): return fallback
-            APP_CONFIG = DummyConfig()
-            def get_config_value(cfg, section, key, fallback=None, value_type=str): return fallback
-            PROJECT_ROOT = os.getcwd() # Best guess
-            print(f"WARNING: llm_prompter.py - Could not fully import from config_loader.py. Error: {e_lprompter}. "
-                  "Using minimal fallbacks. This might affect functionality if config is essential.")
+    except ImportError as e_lprompter:
+        # If it still fails, use the fallback configuration.
+        APP_CONFIG = DummyConfig()
+        get_config_value = get_config_value_fallback
+        PROJECT_ROOT = os.getcwd() # Best guess
+        print(f"WARNING: llm_prompter.py - Could not import from config_loader.py. Error: {e_lprompter}. "
+              "Using minimal fallbacks. This might affect functionality if config is essential.")
 
 
 # --- Default filenames for standalone interactive test mode ---
@@ -243,31 +250,25 @@ def main():
     run_as_interactive_test = args.interactive_test_mode or not is_worker_provided_paths
 
     if run_as_interactive_test:
+        logging.info("Running in standalone interactive test mode with default file names.")
         if is_worker_provided_paths and args.interactive_test_mode:
-            logging.warning("--interactive_test_mode flag is set, but specific file paths were also provided. File path arguments will take precedence.")
-            input_query_file_abs = os.path.abspath(args.input_query_file)
-            output_response_file_abs = os.path.abspath(args.output_response_file)
-            output_error_file_abs = os.path.abspath(args.output_error_file)
-        else:
-            logging.info("Running in standalone interactive test mode with default file names.")
-            input_query_file_abs = os.path.join(script_dir_worker, INTERACTIVE_TEST_QUERY_FILE)
-            output_response_file_abs = os.path.join(script_dir_worker, INTERACTIVE_TEST_RESPONSE_FILE)
-            output_error_file_abs = os.path.join(script_dir_worker, INTERACTIVE_TEST_ERROR_FILE)
+            logging.warning("--interactive_test_mode flag is set, but specific file paths were also provided. Default interactive filenames will be used.")
 
-            debug_json_filename_default = os.path.splitext(output_response_file_abs)[0] + "_full.json"
-            files_to_clear_interactive = [output_response_file_abs, output_error_file_abs, debug_json_filename_default]
-            for f_path in files_to_clear_interactive:
-                if os.path.exists(f_path):
-                    try: os.remove(f_path); logging.info(f"  Interactive mode: Cleared old file: {os.path.basename(f_path)}")
-                    except OSError as e: logging.warning(f"  Interactive mode: Could not clear old file {os.path.basename(f_path)}: {e}")
+        input_query_file_abs = os.path.join(script_dir_worker, INTERACTIVE_TEST_QUERY_FILE)
+        output_response_file_abs = os.path.join(script_dir_worker, INTERACTIVE_TEST_RESPONSE_FILE)
+        output_error_file_abs = os.path.join(script_dir_worker, INTERACTIVE_TEST_ERROR_FILE)
 
-            if not os.path.exists(input_query_file_abs):
+        debug_json_filename_default = os.path.splitext(output_response_file_abs)[0] + "_full.json"
+        files_to_clear_interactive = [output_response_file_abs, output_error_file_abs, debug_json_filename_default]
+        for f_path in files_to_clear_interactive:
+            if os.path.exists(f_path):
                 try:
-                    with open(input_query_file_abs, 'w', encoding='utf-8') as f_iq:
-                        f_iq.write("This is an interactive test query.\nWhat is the capital of the Moon?")
-                    logging.info(f"Created sample query file: {input_query_file_abs}")
-                except IOError as e: logging.error(f"Error creating sample query file {input_query_file_abs}: {e}"); sys.exit(1)
-    else:
+                    os.remove(f_path)
+                    logging.info(f"  Interactive mode: Cleared old file: {os.path.basename(f_path)}")
+                except OSError as e:
+                    logging.warning(f"  Interactive mode: Could not clear old file {os.path.basename(f_path)}: {e}")
+
+    else: # Worker mode (paths provided)
         logging.info("Running in worker mode (paths provided by orchestrator or user).")
         input_query_file_abs = os.path.abspath(args.input_query_file)
         output_response_file_abs = os.path.abspath(args.output_response_file)
@@ -291,6 +292,15 @@ def main():
         if os.path.exists(d_path) and load_dotenv(d_path):
             env_loaded_path = d_path
             break
+            
+    # In interactive mode, create the sample query *before* checking for the API key.
+    if run_as_interactive_test and not os.path.exists(input_query_file_abs):
+        try:
+            with open(input_query_file_abs, 'w', encoding='utf-8') as f_iq:
+                f_iq.write("This is an interactive test query.\nWhat is the capital of the Moon?")
+            logging.info(f"Created sample query file: {input_query_file_abs}")
+        except IOError as e: logging.error(f"Error creating sample query file {input_query_file_abs}: {e}"); sys.exit(1)
+
     if env_loaded_path:
         logging.info(f"LLM Prompter: Loaded .env from: {env_loaded_path}")
     else:

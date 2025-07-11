@@ -60,10 +60,11 @@ CUSTOM_DEPTH_MAP = {
     "docs": 2,          # Show contents of 'docs' down to 2 levels deep
     "htmlcov": 0,       # Hide contents of 'htmlcov' folder
     "output": 3,        # Show contents of 'output' down to 3 levels deep, except:
-    "output\analysis_inputs": 0,        # Hide contents of 'output\analysis_inputs'
+    "output/analysis_inputs": 0,        # Hide contents of 'output\analysis_inputs'
     "src": 1,           # Show contents of 'src' down to 1 level deep
     "tests": 1,         # Show contents of 'tests' down to 1 level deep
 }
+
 # Directories to completely exclude from the scan (names, not paths)
 EXCLUDE_DIRS_SET = {
     ".venv", "venv", "__pycache__", ".git", ".vscode", ".idea",
@@ -101,6 +102,9 @@ def get_project_root():
         else: # Default to CWD if unsure, user might be running it from project root
             project_root = current_working_dir
             print(f"  Using current working directory as project root: {project_root}")
+    except Exception as e:
+        print(f"Warning: Error resolving script path: {e}. Falling back to CWD.")
+        project_root = pathlib.Path.cwd()
     return project_root
 
 def should_exclude_path(path_item: pathlib.Path, project_root: pathlib.Path):
@@ -127,9 +131,9 @@ def should_exclude_path(path_item: pathlib.Path, project_root: pathlib.Path):
             if current_path_iter.name in EXCLUDE_DIRS_SET:
                 return True
             # Special check for top-level hidden dirs not explicitly in EXCLUDE_DIRS_SET
-            if current_path_iter.parent == project_root and current_path_iter.name.startswith(".") and current_path_iter.name not in {".git", ".vscode", ".idea"}: # Allow common dev hidden dirs
+            if current_path_iter.is_dir() and current_path_iter.parent == project_root and current_path_iter.name.startswith(".") and current_path_iter.name not in {".git", ".vscode", ".idea"}: # Allow common dev hidden dirs
                 if current_path_iter.name not in EXCLUDE_DIRS_SET: # If it's like ".pytest_cache" and already excluded, fine.
-                    pass
+                    return True
             current_path_iter = current_path_iter.parent
     except ValueError:
         if path_item.name in EXCLUDE_DIRS_SET or path_item.name in EXCLUDE_FILES_SET:
@@ -224,6 +228,10 @@ def main():
         project_root = pathlib.Path(args.target_directory).resolve()
     else:
         project_root = get_project_root()
+
+    if not project_root.exists() or not project_root.is_dir():
+        print(f"Error: Determined project directory not found or invalid: {project_root}")
+        sys.exit(1)
     
     # --- MODIFICATION START ---
     # Create a dynamic filename based on the scan depth to avoid overwriting reports.
@@ -239,6 +247,8 @@ def main():
     dynamic_filename = f"{base_name}_depth_{depth_suffix}{extension}"
     # --- MODIFICATION END ---
 
+    print(f"Determined project root: {project_root}")
+
     # Define the dedicated output directory for reports
     report_output_dir = project_root / "output" / REPORT_SUBDIR
     
@@ -252,11 +262,6 @@ def main():
     # MODIFIED: Use the new dynamic filename instead of the static constant
     output_file_path = report_output_dir / dynamic_filename
 
-    if not project_root.exists() or not project_root.is_dir():
-        print(f"Error: Determined project directory not found or invalid: {project_root}")
-        sys.exit(1)
-
-    print(f"Determined project root: {project_root}")
     print(f"Output will be saved to: {output_file_path}")
 
     # Store tuples of (relative_path_str, line_count) for .py files

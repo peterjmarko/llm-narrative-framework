@@ -100,12 +100,14 @@ def parse_report_file(report_path):
 
 def write_log_row(log_file_path, log_entry, fieldnames):
     """Appends a single row to the CSV, writing a header if needed."""
-    write_header = not os.path.exists(log_file_path)
+    file_exists = os.path.exists(log_file_path)
     with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
-        if write_header:
+        if not file_exists:
             writer.writeheader()
-        writer.writerow(log_entry)
+        # Only write the row if the entry is not empty
+        if log_entry:
+            writer.writerow(log_entry)
 
 def finalize_log(log_file_path):
     """Reads the log, cleans any old summary, and appends a new, correct summary."""
@@ -250,19 +252,6 @@ def main():
     elif args.mode == 'finalize':
         log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
         finalize_log(log_file_path)
-
-# You will also need to slightly modify write_log_row to handle the empty dict case for 'start'
-# Find the 'write_log_row' function and replace it with this:
-def write_log_row(log_file_path, log_entry, fieldnames):
-    """Appends a single row to the CSV, writing a header if needed."""
-    file_exists = os.path.exists(log_file_path)
-    with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        if not file_exists:
-            writer.writeheader()
-        # Only write the row if the entry is not empty
-        if log_entry:
-            writer.writerow(log_entry)
 
 if __name__ == "__main__":
     main()

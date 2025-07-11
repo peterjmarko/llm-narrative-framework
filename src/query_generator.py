@@ -79,22 +79,7 @@ import sys
 import logging
 import unicodedata
 
-# --- Import from config_loader ---
-try:
-    from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
-except ImportError:
-    current_script_dir = os.path.dirname(os.path.abspath(__file__))
-    if current_script_dir not in sys.path: sys.path.insert(0, current_script_dir)
-    try:
-        from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
-    except ImportError:
-        project_root_for_loader = os.path.dirname(current_script_dir)
-        if project_root_for_loader not in sys.path: sys.path.insert(0, project_root_for_loader)
-        try:
-            from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
-        except ImportError as e:
-            print(f"FATAL: query_generator.py - Could not import config_loader.py. Error: {e}")
-            sys.exit(1)
+from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 
 # --- Configuration: Default Filenames from config.ini (via config_loader) ---
 DEFAULT_PERSONALITIES_SRC_FN = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="personalities.txt")
@@ -559,4 +544,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of personality_matching_test/query_generator.py ===
+# === End of src/query_generator.py ===

@@ -117,8 +117,13 @@ def rebuild_report_for_run(run_dir, compat_map):
     cmd3 = [sys.executable, process_script, "--run_output_dir", run_dir]
     output3 = run_script(cmd3, "Process LLM Responses")
 
-    cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_dir, "--quiet"]
-    output4 = run_script(cmd4, "Analyze Performance")
+    # --- FAIL-FAST IMPROVEMENT ---
+    # If Stage 3 failed, don't run Stage 4. Use Stage 3's error output for the report.
+    if "STAGE FAILED" in output3:
+        output4 = output3
+    else:
+        cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_dir, "--quiet"]
+        output4 = run_script(cmd4, "Analyze Performance")
 
     # --- 3. Extract status information from the fresh script outputs ---
     parsing_status = "N/A"

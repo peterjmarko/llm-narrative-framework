@@ -167,6 +167,7 @@ def main():
                 if k_value:
                     # Run the bias analysis stage with the correct k_value
                     cmd_bias = [sys.executable, bias_analysis_script, run_dir, "--k_value", str(k_value)]
+                    if args.verbose: cmd_bias.append("--verbose")
                     subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
                 else:
                     logging.warning(f"Could not find k_value in {config_path}. Skipping bias analysis for {os.path.basename(run_dir)}.")
@@ -239,6 +240,7 @@ def main():
                                                    fallback_key='k_per_query', 
                                                    fallback=10)
                         cmd_bias = [sys.executable, bias_analysis_script, run_dir, "--k_value", str(k_value)]
+                        if args.verbose: cmd_bias.append("--verbose")
                         subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
                     else:
                         logging.warning(f"Could not find unique run directory for rep {rep_num} to run bias analysis. Found: {len(found_dirs)}")

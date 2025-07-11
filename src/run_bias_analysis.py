@@ -18,9 +18,8 @@ from io import StringIO
 logging.basicConfig(level=logging.INFO, format='%(levelname)s (run_bias_analysis): %(message)s')
 
 def build_long_format_df(replication_dir, k_value):
-    """Builds the detailed DataFrame for a single replication."""
+    """Builds the detailed DataFrame for a single replication, validating against k."""
     analysis_dir = os.path.join(replication_dir, "analysis_inputs")
-    
     scores_file = os.path.join(analysis_dir, "all_scores.txt")
     mappings_file = os.path.join(analysis_dir, "all_mappings.txt")
 
@@ -29,42 +28,39 @@ def build_long_format_df(replication_dir, k_value):
         return None
 
     try:
-        score_matrices = [np.loadtxt(StringIO(block)) for block in open(scores_file, 'r').read().strip().split('\n\n')]
-        mappings_list = []
+        # Use a context manager for reading the file
+        with open(scores_file, 'r') as f:
+            content = f.read().strip()
+        # Handle empty file case
+        if not content:
+            score_matrices = []
+        else:
+            # Manually split by the double newline, then process each block.
+            # This is more robust than relying on loadtxt's newline handling.
+            blocks = content.strip().split('\n\n')
+            score_matrices = [np.loadtxt(StringIO(block)) for block in blocks if block.strip()]
+        
         with open(mappings_file, 'r') as f:
-            for line in f:
-                stripped_line = line.strip()
-                if not stripped_line:
-                    continue
-                try:
-                    parsed_line = list(map(int, stripped_line.split()))
-                    mappings_list.append(parsed_line)
-                except ValueError:
-                    # This is expected for the header row, so we log at DEBUG level.
-                    logging.debug(f"Skipping non-integer row (likely header) in {mappings_file}: '{stripped_line}'")
-                    continue
+            mappings_list = [list(map(int, line.strip().split())) for line in f if line.strip() and line.strip()[0].isdigit()]
     except Exception as e:
         logging.error(f"Could not read score/mapping files in {analysis_dir}: {e}")
         return None
 
     all_points = []
-    detected_k = 0  # Initialize to 0
+    
+    # Ensure we don't process more matrices than we have mappings for
+    num_trials = min(len(score_matrices), len(mappings_list))
+    if len(score_matrices) != len(mappings_list):
+        logging.warning(f"Mismatch between number of score matrices ({len(score_matrices)}) and mappings ({len(mappings_list)}). Processing the minimum ({num_trials}).")
 
-    if not score_matrices:
-        logging.warning(f"No score matrices found in {scores_file}.")
-        return None, detected_k
-
-    # Detect the actual 'k' from the first matrix's dimension.
-    # This is safer than relying on the command-line argument.
-    detected_k = score_matrices[0].shape[1]
-
-    for i, matrix in enumerate(score_matrices):
-        # Ensure matrix dimensions match the detected k
-        if matrix.shape[1] != detected_k:
-            logging.warning(f"Matrix {i} in {scores_file} has an inconsistent shape. Skipping.")
-            continue
-            
+    for i in range(num_trials):
+        matrix = score_matrices[i]
         true_map = mappings_list[i]
+
+        # Validate that the matrix is 2D and has the expected shape
+        if matrix.ndim != 2 or matrix.shape != (k_value, k_value):
+            logging.warning(f"Matrix {i} in {scores_file} has shape {matrix.shape}, expected ({k_value}, {k_value}). Skipping.")
+            continue
         for row_idx in range(matrix.shape[0]):
             true_col_for_row = true_map[row_idx]
             max_score = np.max(matrix[row_idx, :])
@@ -76,14 +72,17 @@ def build_long_format_df(replication_dir, k_value):
                     'is_true_match': (col_idx + 1 == true_col_for_row),
                     'is_top_1': (matrix[row_idx, col_idx] == max_score)
                 })
-    return pd.DataFrame(all_points), detected_k
+    return pd.DataFrame(all_points)
 
 def calculate_bias_metrics(df, k_value):
     """Calculates numerical summary metrics for bias."""
     if df is None or df.empty: return {}
+    
+    num_trials = len(df) / (k_value * k_value)
+    if num_trials == 0: return {}
 
     # Metric 1: Std Dev of top-1 prediction proportions across columns
-    top1_props = df[df['is_top_1']].groupby('desc_col').size() / df['person_row'].nunique()
+    top1_props = df[df['is_top_1']].groupby('desc_col').size() / num_trials
     top1_props = top1_props.reindex(range(1, k_value + 1), fill_value=0)
     top1_pred_bias_std = top1_props.std()
 
@@ -100,31 +99,27 @@ def calculate_bias_metrics(df, k_value):
 def main():
     parser = argparse.ArgumentParser(description="Calculate bias metrics and update a replication report.")
     parser.add_argument("replication_dir", help="Path to the replication run directory.")
-    parser.add_argument("--k_value", type=int, default=10, help="The 'k' dimension.")
+    parser.add_argument("--k_value", type=int, required=True, help="The 'k' dimension (num_subjects).")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose (INFO level) logging.")
     args = parser.parse_args()
 
-    # --- Dynamically find the timestamped report file ---
+    # If --verbose is NOT specified, suppress INFO logs.
+    if not args.verbose:
+        logging.getLogger().setLevel(logging.WARNING)
+
     report_files = [f for f in os.listdir(args.replication_dir) if f.startswith("replication_report_") and f.endswith(".txt")]
-
     if not report_files:
-        logging.error(f"No replication_report_*.txt file found in {args.replication_dir}. Aborting bias analysis.")
+        logging.error(f"No replication_report_*.txt file found in {args.replication_dir}. Aborting.")
         return
 
-    if len(report_files) > 1:
-        # Sort to ensure we get the latest file if multiple exist
-        report_files.sort()
-        logging.warning(f"Multiple report files found. Using the most recent: {report_files[-1]}")
+    report_filepath = os.path.join(args.replication_dir, sorted(report_files)[-1])
 
-    report_filepath = os.path.join(args.replication_dir, report_files[-1])
-    logging.debug(f"Found report file to update: {report_filepath}")
-    # --- End of file finding logic ---
-
-    df_long, detected_k = build_long_format_df(args.replication_dir, args.k_value)
+    df_long = build_long_format_df(args.replication_dir, args.k_value)
     if df_long is None or df_long.empty:
-        # A more specific error is logged inside the function, so we can just exit.
+        logging.warning("DataFrame is empty or could not be built. No bias metrics will be calculated.")
         return
 
-    bias_metrics = calculate_bias_metrics(df_long, detected_k)
+    bias_metrics = calculate_bias_metrics(df_long, args.k_value)
 
     try:
         with open(report_filepath, 'r', encoding='utf-8') as f:
@@ -141,28 +136,18 @@ def main():
 
         json_string = report_content[start_idx + len(json_start_tag):end_idx].strip()
         report_data = json.loads(json_string)
-
         report_data["positional_bias_metrics"] = bias_metrics
-
         new_json_string = json.dumps(report_data, indent=4)
         new_report_content = (
-            report_content[:start_idx + len(json_start_tag)] +
-            "\n" + new_json_string + "\n" +
-            report_content[end_idx:]
+            report_content[:start_idx + len(json_start_tag)] + "\n" + new_json_string + "\n" + report_content[end_idx:]
         )
 
         with open(report_filepath, 'w', encoding='utf-8') as f:
             f.write(new_report_content)
+        logging.info(f"Successfully updated bias metrics in {report_filepath}")
 
-        logging.debug(f"Successfully updated bias metrics in {report_filepath}")
-
-    except FileNotFoundError:
-        # This case should not be hit due to the check at the start, but is good practice.
-        logging.error(f"Report file disappeared before update: {report_filepath}")
-    except json.JSONDecodeError:
-        logging.error(f"Failed to parse JSON from report file: {report_filepath}")
     except Exception as e:
-        logging.error(f"Failed to update report file {report_filepath}: {e}")
+        logging.error(f"Failed to update report file {report_filepath}: {e}", exc_info=True)
 
 if __name__ == "__main__":
     main()

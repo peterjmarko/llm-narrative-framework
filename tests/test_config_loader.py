@@ -4,72 +4,38 @@
 
 """
 Unit Tests for the Configuration Loader (config_loader.py)
-
-Purpose:
-This script tests the core functionality of the `config_loader.py` module, which is
-responsible for finding the project's root directory, loading the `config.ini` file,
-and providing a typed-access interface to its values.
-
-Given that `config_loader` is a foundational module imported by nearly every other
-script in the pipeline, ensuring its reliability is critical. These tests validate
-its logic in an isolated environment.
-
-Key Test Areas:
--   **`get_config_value` Function**:
-    -   **Happy Path**: Verifies that the function correctly retrieves and casts
-      configuration values to their expected types (string, integer, float, boolean).
-      It also tests the handling of inline comments.
-    -   **Fallback Logic**: Ensures the function returns the specified `fallback`
-      value gracefully under various failure conditions:
-        - When the requested section is missing from the config.
-        - When the requested key is missing from a section.
-        - When a value cannot be cast to the requested type (e.g., parsing "abc"
-          as an integer).
-
--   **`load_app_config` Function**:
-    -   Tests the file discovery mechanism. It uses mocks to simulate the presence
-      of `config.ini` and asserts that the loader correctly attempts to read it from
-      the expected location (e.g., the current working directory).
-
--   **`PROJECT_ROOT` Constant**:
-    -   Performs a basic sanity check to confirm that the auto-detected `PROJECT_ROOT`
-      is a valid, existing directory and appears to be the correct project folder by
-      checking for the presence of a key file (`src/config_loader.py`).
-
-Test Strategy & Mocks:
--   **Direct Import**: Unlike other tests that mock `config_loader`, this script
-    imports the module directly to test its actual functions.
--   **Temporary Directory**: Each test runs in a temporary working directory created
-    by `tempfile.TemporaryDirectory` to isolate file system operations.
--   **In-Memory Config**: The tests for `get_config_value` use an in-memory
-    `configparser.ConfigParser` object, allowing for precise control over the test
-    data without needing to write physical `.ini` files.
--   **File System Mocking**: The test for `load_app_config` uses `unittest.mock.patch`
-    to mock `os.path.exists` and `configparser.ConfigParser.read`, isolating the
-    test from the actual file system and focusing purely on the path-finding logic.
 """
 
 # === Start of tests/test_config_loader.py ===
 
 import unittest
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 import os
 import tempfile
 import configparser
 
-# Since we are testing config_loader itself, we import it directly.
-# This requires the test runner (e.g., pytest) to handle the path.
-from config_loader import get_config_value, load_app_config, PROJECT_ROOT
+# Import all necessary components from the module under test
+from config_loader import (
+    get_config_value, load_app_config, PROJECT_ROOT, get_project_root,
+    load_env_vars, get_config_compatibility_map, get_config_list,
+    get_config_section_as_dict
+)
 
 class TestConfigLoader(unittest.TestCase):
+    """
+    A single, unified test class for all config_loader functionality.
+    Each test method is self-contained to prevent test pollution.
+    """
 
     def setUp(self):
+        """Set up a temporary directory for file system isolation."""
         self.test_dir_obj = tempfile.TemporaryDirectory(prefix="test_config_loader_")
         self.test_dir = self.test_dir_obj.name
         self.original_cwd = os.getcwd()
         os.chdir(self.test_dir)
 
     def tearDown(self):
+        """Clean up the temporary directory."""
         os.chdir(self.original_cwd)
         self.test_dir_obj.cleanup()
 
@@ -97,30 +63,140 @@ class TestConfigLoader(unittest.TestCase):
         config = configparser.ConfigParser()
         config['TestSection'] = {'int_key': 'not-an-int'}
 
-        # Missing section
         self.assertEqual(get_config_value(config, 'MissingSection', 'key', fallback='default'), 'default')
-        # Missing key
         self.assertEqual(get_config_value(config, 'TestSection', 'missing_key', fallback=99), 99)
-        # Type conversion error
         self.assertEqual(get_config_value(config, 'TestSection', 'int_key', fallback=-1, value_type=int), -1)
+
+    def test_get_config_value_edge_cases(self):
+        """Test edge cases for get_config_value like fallback keys and special strings."""
+        config = configparser.ConfigParser()
+        config['TestSection'] = {
+            'fallback_key': 'fallback_value',
+            'true_key_fallback': 'true',
+            'tab_key': r'\t',
+            'none_key': 'None',
+            'bad_float': 'not-a-float',
+            'bad_bool': 'not-a-bool'
+        }
+
+        self.assertEqual(get_config_value(config, 'TestSection', 'missing_primary', fallback_key='fallback_key'), 'fallback_value')
+        self.assertTrue(get_config_value(config, 'TestSection', 'missing_bool', value_type=bool, fallback_key='true_key_fallback'), 'Should use fallback key')
+        self.assertEqual(get_config_value(config, 'TestSection', 'tab_key'), '\t')
+        self.assertIsNone(get_config_value(config, 'TestSection', 'none_key'))
+
+        with self.assertLogs('config_loader', level='WARNING') as cm:
+            self.assertEqual(get_config_value(config, 'TestSection', 'bad_float', value_type=float, fallback=0.0), 0.0)
+            self.assertIn("Error converting [TestSection]/bad_float", cm.output[0])
+
+        with self.assertLogs('config_loader', level='WARNING') as cm:
+            self.assertEqual(get_config_value(config, 'TestSection', 'bad_bool', value_type=bool, fallback=True), True)
+            self.assertIn("Error converting [TestSection]/bad_bool", cm.output[0])
+
+        with self.assertLogs('config_loader', level='ERROR') as cm:
+            self.assertEqual(get_config_value(config, 'TestSection', 'fallback_key', value_type=list, fallback=[]), [])
+            self.assertIn("Unsupported value_type 'list'", cm.output[0])
 
     @patch('os.path.exists')
     @patch('configparser.ConfigParser.read')
     def test_load_app_config_finds_config_in_cwd(self, mock_read, mock_exists):
         """Test that config is loaded from CWD if present."""
-        # Simulate that config.ini exists only in the current working directory
         def exists_side_effect(path):
             return os.path.basename(path) == 'config.ini' and self.test_dir in path
         mock_exists.side_effect = exists_side_effect
         
         load_app_config()
         
-        mock_read.assert_called_once_with(os.path.join(self.test_dir, 'config.ini'))
+        mock_read.assert_called_once_with(os.path.abspath(os.path.join(self.test_dir, 'config.ini')))
+
+    @patch('os.path.exists')
+    @patch('configparser.ConfigParser.read')
+    def test_load_app_config_finds_config_in_project_root(self, mock_read, mock_exists):
+        """Test that config is loaded from project root if not in CWD."""
+        def exists_side_effect(path):
+            if self.test_dir in path: return False
+            return os.path.basename(path) == 'config.ini'
+        mock_exists.side_effect = exists_side_effect
+        
+        load_app_config()
+        expected_path = os.path.abspath(os.path.join(get_project_root(), 'config.ini'))
+        mock_read.assert_called_once_with(expected_path)
+
+    @patch('os.path.exists', return_value=False)
+    def test_load_app_config_not_found(self, mock_exists):
+        """Test that a warning is logged if config.ini is not found."""
+        with self.assertLogs('config_loader', level='WARNING') as cm:
+            load_app_config()
+            self.assertIn("config.ini not found", cm.output[0])
+
+    @patch('os.path.exists', return_value=True)
+    @patch('configparser.ConfigParser.read', side_effect=configparser.Error("Mock parsing error"))
+    def test_load_app_config_parsing_error(self, mock_read, mock_exists):
+        """Test that an error is logged if config.ini is malformed."""
+        with self.assertLogs('config_loader', level='ERROR') as cm:
+            load_app_config()
+            self.assertIn("Error parsing configuration file", cm.output[0])
+
+    @patch('config_loader.os.path.exists')
+    @patch('config_loader.load_dotenv')
+    def test_load_env_vars(self, mock_load_dotenv, mock_exists):
+        """Test the three main branches of .env loading logic."""
+        mock_exists.return_value = True
+        mock_load_dotenv.return_value = True
+        self.assertTrue(load_env_vars())
+
+        mock_load_dotenv.return_value = False
+        with self.assertLogs('config_loader', level='WARNING'):
+            self.assertFalse(load_env_vars())
+
+        mock_exists.return_value = False
+        with self.assertLogs('config_loader', level='INFO'):
+            self.assertFalse(load_env_vars())
 
     def test_project_root_detection(self):
         """Test if PROJECT_ROOT is a valid, existing directory."""
-        # This is a simple sanity check
         self.assertTrue(os.path.isdir(PROJECT_ROOT))
         self.assertTrue(os.path.exists(os.path.join(PROJECT_ROOT, 'src', 'config_loader.py')))
+
+    def test_get_config_list(self):
+        """Test retrieving a comma-separated list."""
+        config = configparser.ConfigParser()
+        config.add_section('TestSection')
+        config.set('TestSection', 'list_key', 'item1, item2, item3')
+        config.set('TestSection', 'list_key_empty', '')
+
+        expected = ['item1', 'item2', 'item3']
+        self.assertEqual(get_config_list(config, 'TestSection', 'list_key'), expected)
+        self.assertEqual(get_config_list(config, 'TestSection', 'missing_key', fallback=['default']), ['default'])
+        self.assertEqual(get_config_list(config, 'TestSection', 'missing_key'), [])
+        self.assertEqual(get_config_list(config, 'TestSection', 'list_key_empty'), [])
+
+    def test_get_config_section_as_dict(self):
+        """Test retrieving a section as a dictionary."""
+        config = configparser.ConfigParser()
+        config.add_section('TestSection')
+        config.set('TestSection', 'key1', 'val1')
+        config.set('TestSection', 'key2', 'val2')
+
+        expected = {'key1': 'val1', 'key2': 'val2'}
+        self.assertEqual(get_config_section_as_dict(config, 'TestSection'), expected)
+        self.assertEqual(get_config_section_as_dict(config, 'MissingSection'), {})
+
+    def test_get_config_compatibility_map(self):
+        """Test parsing the compatibility map."""
+        config = configparser.ConfigParser()
+        config.add_section('ConfigCompatibility')
+        config.set('ConfigCompatibility', 'canonical_name', 'GoodSection:good_key, BadSection:bad_key')
+        config.set('ConfigCompatibility', 'bad_entry', 'this-is-malformed')
+
+        expected_map = {
+            'canonical_name': [('GoodSection', 'good_key'), ('BadSection', 'bad_key')]
+        }
+        with patch('builtins.print'):
+            compat_map = get_config_compatibility_map(config)
+        self.assertEqual(compat_map['canonical_name'], expected_map['canonical_name'])
+        self.assertNotIn('bad_entry', compat_map)
+        
+        empty_config = configparser.ConfigParser()
+        self.assertEqual(get_config_compatibility_map(empty_config), {})
 
 # === End of tests/test_config_loader.py ===

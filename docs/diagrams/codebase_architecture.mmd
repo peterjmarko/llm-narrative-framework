@@ -1,0 +1,83 @@
+graph TD
+    %% Main Entry Points
+    direction LR
+    ps_run_exp("run_experiment.ps1")
+    ps_process("process_study.ps1")
+    ps_migrate("migrate_old_experiment.ps1")
+
+    %% Workflows
+    subgraph "Workflow 1: Run Experiment"
+        direction TB
+        repl_manager("replication_manager.py")
+        run_bias_analysis("run_bias_analysis.py")
+        
+        %% Core Pipeline Stages (Sequentially Orchestrated)
+        orchestrate("orchestrate_replication.py")
+        build_queries("build_queries.py")
+        run_sessions("run_llm_sessions.py")
+        process_responses("process_llm_responses.py")
+        analyze_perf("analyze_performance.py")
+
+        %% Internal Workers/Helpers for Workflow 1
+        llm_prompter("llm_prompter.py")
+        query_gen_util("query_generator.py")
+        log_manager("log_manager.py")
+    end
+
+    subgraph "Workflow 2: Process Study"
+        direction TB
+        compile_results("compile_results.py")
+        run_anova("run_anova.py")
+    end
+    
+    subgraph "Workflow 3: Data Migration"
+        direction TB
+        patch_old("patch_old_runs.py")
+        restore_config("restore_config.py")
+        rebuild_reports("rebuild_reports.py")
+    end
+
+    subgraph "Shared Utilities"
+        direction TB
+        config_loader("config_loader.py")
+        %% retry_failed_sessions.py is now completely removed as requested
+    end
+
+    %% --- Define Relationships ---
+    %% Use --> for Execution and -.-> for Import
+
+    %% PowerShell to Python Entry Points
+    ps_run_exp --> repl_manager
+    ps_process --> compile_results
+    ps_process --> run_anova
+    ps_migrate --> patch_old
+    ps_migrate --> rebuild_reports
+
+    %% Workflow 1: Run Experiment Connections
+    repl_manager --> orchestrate
+    repl_manager --> run_bias_analysis
+    repl_manager --> log_manager
+    repl_manager --> compile_results
+    repl_manager -.-> config_loader
+    
+    orchestrate --> build_queries
+    orchestrate --> run_sessions
+    orchestrate --> process_responses
+    orchestrate --> analyze_perf
+    orchestrate -.-> config_loader
+
+    build_queries --> query_gen_util
+    query_gen_util -.-> config_loader
+
+    run_sessions --> llm_prompter
+    llm_prompter -.-> config_loader
+
+    %% Workflow 2: Process Study Connections
+    compile_results -.-> config_loader
+    run_anova -.-> config_loader
+
+    %% Workflow 3: Data Migration Connections
+    patch_old --> restore_config
+    rebuild_reports --> process_responses
+    rebuild_reports --> analyze_perf
+    rebuild_reports -.-> config_loader
