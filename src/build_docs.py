@@ -269,7 +269,7 @@ def main():
         import pypandoc
         
         readme_md = os.path.join(project_root, 'docs/DOCUMENTATION.md')
-        readme_docx = os.path.join(project_root, 'docs/README.docx')
+        readme_docx = os.path.join(project_root, 'docs/DOCUMENTATION.docx')
         if not convert_to_docx(pypandoc, readme_md, readme_docx, project_root):
             sys.exit(1)
         
