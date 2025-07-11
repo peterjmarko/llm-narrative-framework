@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: src/restore_config.py
 
 """
 Restores a config.ini.archived file for a single, previously completed
 experiment run by reverse-engineering its replication_report.txt file.
 
-This utility is intended to be called by a batch script (like patch_old_runs.py)
+This utility is intended to be called by a batch script (like patch_old_experiment.py)
 to bring older experiment data into compliance with the new standard of
 having an archived config file in every run directory.
 """
@@ -24,7 +41,7 @@ def parse_report_header(report_content):
         match = re.search(pattern, text, re.IGNORECASE)
         return match.group(1).strip() if match else 'unknown'
 
-    # Use the same logic as the old compile_results.py
+    # Use the same logic as the old compile_study_results.py
     params['model_name'] = extract(r"LLM Model:\s*(.*)", report_content)
     params['mapping_strategy'] = extract(r"Mapping Strategy:\s*(.*)", report_content)
     params['group_size'] = extract(r"Items per Query \(k\):\s*(\d+)", report_content)
@@ -104,3 +121,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# === End of src/restore_config.py ===

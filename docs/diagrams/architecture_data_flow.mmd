@@ -9,7 +9,7 @@ graph TD
     subgraph "Data Pipeline Stages"
         direction LR
         subgraph "1: Generation"
-             Script1["build_queries.py"]:::script --> Art1["llm_query_XXX.txt"]:::artifact
+             Script1["build_llm_queries.py"]:::script --> Art1["llm_query_XXX.txt"]:::artifact
              Script1 --> Art1_archive[("config.ini.archived")]:::artifact
         end
         subgraph "2-3: Execution & Processing"
@@ -17,8 +17,8 @@ graph TD
             Art2 --> Script3["process_llm<br/>_responses.py"]:::script --> Art3["all_scores.txt"]:::artifact
         end
         subgraph "4: Analysis"
-             Script4a["compile_results.py"]:::script --> Art4["final_summary<br/>_results.csv"]:::artifact
-             Art4 --> Script4b["run_anova.py"]:::script --> Art_Final(("Final Report<br/>Plots & Stats")):::final
+             Script4a["compile_study_results.py"]:::script --> Art4["final_summary<br/>_results.csv"]:::artifact
+             Art4 --> Script4b["analyze_study_results.py"]:::script --> Art_Final(("Final Report<br/>Plots & Stats")):::final
         end
     end
 
@@ -30,3 +30,4 @@ graph TD
     classDef script fill:#ffe8d6,stroke:#e59866,color:#333
     classDef artifact fill:#e9ecef,stroke:#adb5bd,color:#333
     classDef final fill:#d4edda,stroke:#155724,color:#333 font-weight:bold
+

@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: src/orchestrate_replication.py
 
 """
@@ -14,10 +31,10 @@ It operates in two modes:
     -   Creates a new, unique run directory.
     -   Archives the `config.ini` for reproducibility.
     -   Executes the full pipeline:
-        -   Stage 1: `build_queries.py`
+        -   Stage 1: `build_llm_queries.py`
         -   Stage 2: `run_llm_sessions.py`
         -   Stage 3: `process_llm_responses.py`
-        -   Stage 4: `analyze_performance.py`
+        -   Stage 4: `analyze_llm_performance.py`
 2.  **Reprocess Mode (`--reprocess`):**
     -   Operates on an existing `run_output_dir`.
     -   Skips Stages 1 and 2 (query building and LLM interaction).
@@ -28,7 +45,7 @@ It operates in two modes:
 Finally, it compiles all captured output from the subprocesses into a single,
 comprehensive `replication_report.txt` within the run directory.
 
-Usage (for a new run, typically called by replication_manager.py):
+Usage (for a new run, typically called by experiment_manager.py):
     python src/orchestrate_replication.py --replication_num 1
 
 Usage (for reprocessing an existing run):
@@ -199,10 +216,10 @@ def main():
         shutil.copy2(os.path.join(PROJECT_ROOT, 'config.ini'), os.path.join(run_specific_dir_path, 'config.ini.archived'))
 
     src_dir = os.path.join(PROJECT_ROOT, 'src')
-    build_script = os.path.join(src_dir, 'build_queries.py')
+    build_script = os.path.join(src_dir, 'build_llm_queries.py')
     run_sessions_script = os.path.join(src_dir, 'run_llm_sessions.py')
     process_script = os.path.join(src_dir, 'process_llm_responses.py')
-    analyze_script = os.path.join(src_dir, 'analyze_performance.py')
+    analyze_script = os.path.join(src_dir, 'analyze_llm_performance.py')
 
     try:
         if not args.reprocess:
@@ -461,4 +478,4 @@ Run Notes:       {args.notes}
 if __name__ == "__main__":
     main()
 
-# === End of src/orchestrate_experiment.py ===
+# === End of src/orchestrate_replication.py ===

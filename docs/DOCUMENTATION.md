@@ -37,8 +37,8 @@ The result is a clean dataset of personality profiles where the connection to th
 -   **Advanced Artifact Management**:
     -   **Reprocessing Engine**: The main runner has a `--reprocess` mode to re-run the analysis stages on existing experimental data, with a `--depth` parameter for recursive scanning. You can even add or override run notes during reprocessing.
     -   **Configuration Restoration**: Includes utilities to reverse-engineer and archive `config.ini` files for historical data that was generated before the auto-archiving feature was implemented.
--   **Hierarchical Analysis**: The `compile_results.py` script performs a bottom-up aggregation of all data. It now generates **level-aware summary files**: `REPLICATION_results.csv` in each replication folder, `EXPERIMENT_results.csv` at the experiment level, and a final master `STUDY_results.csv` at the top study level. This creates a fully auditable and easily navigable research archive.
--   **Streamlined ANOVA Workflow**: The final statistical analysis is now a simple two-step process. `compile_results.py` first prepares a master dataset, which `run_anova.py` then automatically finds and analyzes, generating tables and publication-quality plots using user-friendly display names for factors and metrics.
+-   **Hierarchical Analysis**: The `compile_study_results.py` script performs a bottom-up aggregation of all data. It now generates **level-aware summary files**: `REPLICATION_results.csv` in each replication folder, `EXPERIMENT_results.csv` at the experiment level, and a final master `STUDY_results.csv` at the top study level. This creates a fully auditable and easily navigable research archive.
+-   **Streamlined ANOVA Workflow**: The final statistical analysis is now a simple two-step process. `compile_study_results.py` first prepares a master dataset, which `analyze_study_results.py` then automatically finds and analyzes, generating tables and publication-quality plots using user-friendly display names for factors and metrics.
 -   **Smart Console Output**: The main `process_study.ps1` wrapper provides a clean, high-level summary of compilation and analysis steps, showing progress without overwhelming detail. A `-Verbose` flag is available to switch to real-time raw output for debugging.
 
 ## Visual Architecture
@@ -51,43 +51,43 @@ The project's functionality is divided into three main workflows, each initiated
 #### Codebase Architecture
 This diagram provides a comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.
 
-{{diagram:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=110%}}
+![](docs/images/codebase_architecture.png){width=110%}
 
 ### Workflow 1: Run an Experiment
 
 This is the primary workflow for generating new experimental data. It executes a full batch of replications.
 
-{{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=105%}}
+![](docs/images/architecture_workflow_1_run_experiment.png){width=105%}
 
 ### Workflow 2: Process a Study
 
 This workflow is used after an experiment is complete to aggregate results from all replications and perform statistical analysis.
 
-{{diagram:docs/diagrams/architecture_workflow_2_process_study.mmd | scale=2.5 | width=105%}}
+![](docs/images/architecture_workflow_2_process_study.png){width=105%}
 
 ### Workflow 3: Reprocess a Failed Run
 
 This workflow is used to recover from a failed run or to re-analyze existing data with updated processing logic without re-running the expensive LLM calls.
 
-{{diagram:docs/diagrams/architecture_workflow_3_reprocess.mmd | scale=2.5 | width=75%}}
+![](docs/images/architecture_workflow_3_reprocess.png){width=75%}
 
 ### Workflow 4: Migrate Old Experiment Data
 
 This utility workflow helps bring older experimental data (generated before `config.ini.archived` was standard) into compliance with modern analysis scripts.
 
-{{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=50%}}
+![](docs/images/architecture_workflow_4_migrate_data.png){width=50%}
 
 ### Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
-{{diagram:docs/diagrams/architecture_data_flow.mmd | scale=2.5 | width=55%}}
+![](docs/images/architecture_data_flow.png){width=55%}
 
 ### Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-{{diagram:docs/diagrams/architecture_experimental_logic.mmd | scale=2.5 | width=50%}}
+![](docs/images/architecture_experimental_logic.png){width=50%}
 
 ## Experimental Hierarchy
 
@@ -102,7 +102,7 @@ The project's experiments are organized in a logical hierarchy:
 
 This logical hierarchy is reflected in the physical layout of the repository:
 
-{{diagram:docs/diagrams/directory_structure.txt | scale=2.5 | width=110%}}
+![](docs/images/directory_structure.png){width=110%}
 
 ## Setup and Installation
 
@@ -225,7 +225,7 @@ The pipeline now generates a consistent, standardized `replication_report.txt` f
 
 Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
 
-{{diagram:docs/diagrams/replication_report_format.txt}}
+![](docs/images/replication_report_format.png)
 
 **Date Handling by Mode:**
 -   **Normal Mode**: The report title is `REPLICATION RUN REPORT` and the `Date` field shows the time of the original run.
@@ -233,9 +233,9 @@ Each report contains a clear header, the base query used, a human-readable analy
 
 ### Study Analysis Log Format
 
-The final analysis script (`run_anova.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
+The final analysis script (`analyze_study_results.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
-{{diagram:docs/diagrams/analysis_log_format.txt}}
+![](docs/images/analysis_log_format.png)
 
 ## Migrating Old Experiment Data (`migrate_old_experiment.ps1`)
 
@@ -243,10 +243,10 @@ To upgrade older experiment directories to be compatible with the current analys
 
 **What it does:**
 The `migrate_old_experiment.ps1` script orchestrates a four-step data migration:
-1.  **Patches Configs**: Runs `patch_old_runs.py` to create and archive a `config.ini` file for each run.
+1.  **Patches Configs**: Runs `patch_old_experiment.py` to create and archive a `config.ini` file for each run.
 2.  **Rebuilds Reports**: Executes `rebuild_reports.py` to regenerate all replication reports into the modern, standardized format.
 3.  **Cleans Artifacts**: Programmatically deletes legacy files like old summary CSVs, `.corrupted` report backups, and obsolete `analysis_inputs` directories.
-4.  **Final Reprocess**: Triggers `replication_manager.py` in reprocess mode to generate clean, modern summary files based on the newly rebuilt reports.
+4.  **Final Reprocess**: Triggers `experiment_manager.py` in reprocess mode to generate clean, modern summary files based on the newly rebuilt reports.
 
 **How to use it:**
 Execute the script and point it at the top-level directory of the old experiment you want to migrate using the `-TargetDirectory` parameter.
@@ -261,39 +261,39 @@ The script will run all four steps in sequence, providing clear progress updates
 
 ## Maintenance and Utility Scripts
 
-*   **`replication_manager.py`**:
+*   **`experiment_manager.py`**:
     *   The main batch runner for managing multiple replications. Can be invoked in a reprocessing mode (`--reprocess`) to fix or update the analysis for existing runs without re-running expensive LLM sessions. Can also add/override run notes (`--notes`).
-    *   Usage: `python src/replication_manager.py path/to/experiment --reprocess --depth 1`
+    *   Usage: `python src/experiment_manager.py path/to/experiment --reprocess --depth 1`
 
 *   **`rebuild_reports.py`**:
     *   A powerful utility to regenerate complete `replication_report.txt` files from the ground-truth archived config. Useful for applying fixes to the processing or analysis stages across an entire study.
     *   Usage: `python src/rebuild_reports.py path/to/study`
 
-*   **`patch_old_runs.py`**:
+*   **`patch_old_experiment.py`**:
     *   **Utility for historical data.** Scans a directory for old experiment runs that are missing a `config.ini.archived` file and generates one for each by reverse-engineering the `replication_report.txt`. Supports recursive scanning with `--depth`.
-    *   Usage: `python src/patch_old_runs.py "path/to/old/experiments" --depth -1`
+    *   Usage: `python src/patch_old_experiment.py "path/to/old/experiments" --depth -1`
 
-*   **`log_manager.py`**:
+*   **`replication_log_manager.py`**:
     *   The core utility for automated log management. Called by the main runner but can also be used manually.
     *   `start`: Archives any old log and creates a new, empty one with a header.
     *   `rebuild`: Recreates the log from scratch by parsing all existing replication reports in a directory.
     *   `finalize`: Cleans any existing summary from the log, recalculates a correct summary, and appends it.
 
-*   **`retry_failed_sessions.py`**:
+*   **`retry_llm_sessions.py`**:
     *   Used automatically by the main runner for the repair cycle. Can be run manually to fix failed API calls in a specific run.
 
-*   **`verify_pipeline_completeness.py`**:
+*   **`verify_experiment_completeness.py`**:
     *   A diagnostic tool to check for missing files or incomplete stages in a run directory.
 
-*   **`compile_results.py`**:
+*   **`compile_study_results.py`**:
     *   The core script for hierarchical data aggregation. Recursively scans a directory structure, performing a bottom-up summary.
     *   **Generates level-aware filenames**: `REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`.
-    *   Usage: `python src/compile_results.py path/to/study`
+    *   Usage: `python src/compile_study_results.py path/to/study`
 
-*   **`run_anova.py`**:
+*   **`analyze_study_results.py`**:
     *   Performs a comprehensive statistical analysis on a study's master CSV.
     *   Uses display names from `config.ini` to produce clean, human-readable plots and logs.
-    *   Usage: `python src/run_anova.py path/to/study`
+    *   Usage: `python src/analyze_study_results.py path/to/study`
 
 *   **`list_project_files.py`**:
     *   A diagnostic tool for creating a snapshot of the project's structure.
@@ -319,3 +319,4 @@ The project includes a comprehensive test suite managed by PDM, covering both th
         ````bash
         pdm run test-ps-mig
         ````
+

@@ -1,4 +1,23 @@
-# Filename: tests/test_compile_results.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_compile_study_results.py
 
 import unittest
 from unittest.mock import patch, MagicMock
@@ -11,7 +30,7 @@ import configparser
 import json
 
 # Import the functions from the module we are testing
-from src.compile_results import main as compile_main, parse_config_params
+from src.compile_study_results import main as compile_main, parse_config_params
 
 class TestCompileResultsScript(unittest.TestCase):
 
@@ -60,7 +79,7 @@ class TestCompileResultsScript(unittest.TestCase):
             metrics_data={'mwu_stouffer_p': 0.88} # No bias metrics
         )
         
-        with patch.object(sys, 'argv', ['compile_results.py', study_dir]):
+        with patch.object(sys, 'argv', ['compile_study_results.py', study_dir]):
             compile_main()
 
         study_output_path = os.path.join(study_dir, "STUDY_results.csv")
@@ -80,7 +99,7 @@ class TestCompileResultsScript(unittest.TestCase):
         """Test script handles a non-existent directory correctly."""
         invalid_path = os.path.join(self.test_dir, "non_existent")
         
-        with patch.object(sys, 'argv', ['compile_results.py', invalid_path]):
+        with patch.object(sys, 'argv', ['compile_study_results.py', invalid_path]):
             compile_main()
             
         mock_log_error.assert_called_with(f"Error: The specified directory does not exist: {invalid_path}")
@@ -105,3 +124,5 @@ class TestCompileResultsScript(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+# === End of tests/test_compile_study_results.py ===

@@ -8,31 +8,31 @@ graph TD
     %% Workflows
     subgraph "Workflow 1: Run Experiment"
         direction TB
-        repl_manager("replication_manager.py")
+        repl_manager("experiment_manager.py")
         run_bias_analysis("run_bias_analysis.py")
         
         %% Core Pipeline Stages (Sequentially Orchestrated)
         orchestrate("orchestrate_replication.py")
-        build_queries("build_queries.py")
+        build_queries("build_llm_queries.py")
         run_sessions("run_llm_sessions.py")
         process_responses("process_llm_responses.py")
-        analyze_perf("analyze_performance.py")
+        analyze_perf("analyze_llm_performance.py")
 
         %% Internal Workers/Helpers for Workflow 1
         llm_prompter("llm_prompter.py")
         query_gen_util("query_generator.py")
-        log_manager("log_manager.py")
+        log_manager("replication_log_manager.py")
     end
 
     subgraph "Workflow 2: Process Study"
         direction TB
-        compile_results("compile_results.py")
-        run_anova("run_anova.py")
+        compile_results("compile_study_results.py")
+        run_anova("analyze_study_results.py")
     end
     
     subgraph "Workflow 3: Data Migration"
         direction TB
-        patch_old("patch_old_runs.py")
+        patch_old("patch_old_experiment.py")
         restore_config("restore_config.py")
         rebuild_reports("rebuild_reports.py")
     end
@@ -40,7 +40,7 @@ graph TD
     subgraph "Shared Utilities"
         direction TB
         config_loader("config_loader.py")
-        %% retry_failed_sessions.py is now completely removed as requested
+        %% retry_llm_sessions.py is now completely removed as requested
     end
 
     %% --- Define Relationships ---

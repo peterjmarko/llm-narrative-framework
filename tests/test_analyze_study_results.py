@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: tests/test_run_anova.py
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_analyze_study_results.py
 
 import unittest
 from unittest.mock import patch, MagicMock
@@ -14,10 +31,10 @@ import configparser
 import io
 import numpy as np
 
-import src.run_anova as run_anova_module
+import src.analyze_study_results as run_anova_module
 
 class TestAnovaScript(unittest.TestCase):
-    """Tests for the main orchestration and helper functions of run_anova.py."""
+    """Tests for the main orchestration and helper functions of analyze_study_results.py."""
 
     def setUp(self):
         """Set up a temporary directory for each test."""
@@ -46,15 +63,15 @@ class TestAnovaScript(unittest.TestCase):
         })
         
         # This setup will patch the functions for ALL tests in the class.
-        self.patch_get_config_list = patch('src.run_anova.get_config_list')
+        self.patch_get_config_list = patch('src.analyze_study_results.get_config_list')
         self.mock_get_config_list = self.patch_get_config_list.start()
         self.mock_get_config_list.side_effect = lambda _, section, option: self.mock_config.get(section, option).split(',')
 
-        self.patch_get_config_section_as_dict = patch('src.run_anova.get_config_section_as_dict')
+        self.patch_get_config_section_as_dict = patch('src.analyze_study_results.get_config_section_as_dict')
         self.mock_get_config_section_as_dict = self.patch_get_config_section_as_dict.start()
         self.mock_get_config_section_as_dict.side_effect = lambda _, section: dict(self.mock_config.items(section))
 
-        self.patch_app_config = patch('src.run_anova.APP_CONFIG', new=MagicMock())
+        self.patch_app_config = patch('src.analyze_study_results.APP_CONFIG', new=MagicMock())
         self.mock_app_config = self.patch_app_config.start()
         self.mock_app_config.getint.side_effect = self.mock_config.getint
         self.mock_app_config.get.side_effect = self.mock_config.get
@@ -79,10 +96,10 @@ class TestAnovaScript(unittest.TestCase):
 
         with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout, \
              patch('sys.stderr', new_callable=io.StringIO) as mock_stderr, \
-             patch('src.run_anova.plt'), \
-             patch('src.run_anova.sns'), \
-             patch('src.run_anova.nx'), \
-             patch('src.run_anova.sm'): # Patching sm here for consistency in main() tests
+             patch('src.analyze_study_results.plt'), \
+             patch('src.analyze_study_results.sns'), \
+             patch('src.analyze_study_results.nx'), \
+             patch('src.analyze_study_results.sm'): # Patching sm here for consistency in main() tests
 
             # Intercept StreamHandler initialization to redirect output to our mocks
             def mock_stream_handler_init(self_obj, stream=None, *args, **kwargs):
@@ -114,7 +131,7 @@ class TestAnovaScript(unittest.TestCase):
             self.assertIsNone(run_anova_module.find_master_csv(self.test_dir))
 
     def test_main_happy_path(self):
-        with patch('src.run_anova.perform_analysis') as mock_perform_analysis:
+        with patch('src.analyze_study_results.perform_analysis') as mock_perform_analysis:
             stdout, stderr, exit_code = self._run_main_and_capture_output([self.test_dir])
             self.assertEqual(exit_code, 0)
             self.assertIn("Successfully loaded", stdout)
@@ -155,7 +172,7 @@ class TestAnovaScript(unittest.TestCase):
     def test_create_diagnostic_plot_no_residuals(self):
         mock_model = MagicMock()
         mock_model.resid = pd.Series([], dtype=float)
-        with patch('src.run_anova.plt') as mock_plt, \
+        with patch('src.analyze_study_results.plt') as mock_plt, \
              self.assertLogs('root', level='WARNING') as cm:
             run_anova_module.create_diagnostic_plot(mock_model, 'Test', self.test_dir, 'key')
             self.assertIn("Could not generate Q-Q plot for 'Test': No residuals found.", cm.output[0])
@@ -163,7 +180,7 @@ class TestAnovaScript(unittest.TestCase):
 
     def test_perform_analysis_single_factor_no_variation(self):
         df = pd.DataFrame({'model': ['a']*4, 'metric':[1,2,3,4]})
-        with patch('src.run_anova.create_and_save_plot') as mock_plot, \
+        with patch('src.analyze_study_results.create_and_save_plot') as mock_plot, \
              self.assertLogs('root', level='INFO') as cm:
             run_anova_module.perform_analysis(df, 'metric', ['model'], self.test_dir, {}, {}, {})
             self.assertTrue(any("Only one experimental group found. No analysis possible." in log for log in cm.output))
@@ -177,14 +194,14 @@ class TestAnovaScript(unittest.TestCase):
             'mapping_strategy': ['const_strat']*9 # Ensure mapping_strategy is present but constant
         })
         
-        with patch('src.run_anova.sm') as mock_sm, \
-             patch('src.run_anova.pg') as mock_pg, \
+        with patch('src.analyze_study_results.sm') as mock_sm, \
+             patch('src.analyze_study_results.pg') as mock_pg, \
              patch('statsmodels.stats.multicomp.pairwise_tukeyhsd', side_effect=ValueError("Tukey failed intentionally")), \
-             patch('src.run_anova.generate_performance_tiers') as mock_generate_tiers, \
+             patch('src.analyze_study_results.generate_performance_tiers') as mock_generate_tiers, \
              patch('logging.warning') as mock_log_warning, \
              patch('logging.info') as mock_log_info, \
-             patch('src.run_anova.create_diagnostic_plot'), \
-             patch('src.run_anova.create_and_save_plot'): # Patch plotting functions to prevent FileNotFoundError
+             patch('src.analyze_study_results.create_diagnostic_plot'), \
+             patch('src.analyze_study_results.create_and_save_plot'): # Patch plotting functions to prevent FileNotFoundError
 
             mock_model = MagicMock()
             mock_model.resid = pd.Series(range(9), dtype=float)  # Match DataFrame size
@@ -199,7 +216,7 @@ class TestAnovaScript(unittest.TestCase):
                                               self.test_dir, {'a':'A', 'b':'B', 'c':'C'}, {'mean_top_1_acc':'Top-1 Acc'}, {'model':'Model', 'mapping_strategy': 'Mapping Strategy'})
 
     def test_perform_analysis_exception_handling(self):
-        with patch('src.run_anova.ols', side_effect=Exception("OLS error")), \
+        with patch('src.analyze_study_results.ols', side_effect=Exception("OLS error")), \
              self.assertLogs('root', level='ERROR') as cm:
             run_anova_module.perform_analysis(self.base_df, 'mean_top_1_acc', ['model'], self.test_dir, {}, {}, {})
             self.assertIn("ERROR: Could not perform analysis for metric 'mean_top_1_acc'. Reason: OLS error", cm.output[0])
@@ -230,11 +247,11 @@ class TestAnovaScript(unittest.TestCase):
 
     def test_perform_analysis_tukey_success_and_tiers(self):
         df = pd.DataFrame({'model': ['a']*3 + ['b']*3 + ['c']*3, 'mean_top_1_acc': range(9)})
-        with patch('src.run_anova.sm') as mock_sm, \
+        with patch('src.analyze_study_results.sm') as mock_sm, \
              patch('statsmodels.stats.multicomp.pairwise_tukeyhsd') as mock_tukey, \
-             patch('src.run_anova.generate_performance_tiers') as mock_tiers, \
-             patch('src.run_anova.create_diagnostic_plot'), \
-             patch('src.run_anova.create_and_save_plot'), \
+             patch('src.analyze_study_results.generate_performance_tiers') as mock_tiers, \
+             patch('src.analyze_study_results.create_diagnostic_plot'), \
+             patch('src.analyze_study_results.create_and_save_plot'), \
              self.assertLogs('root', level='INFO') as cm:
             mock_sm.ols().fit().resid = pd.Series(range(9))
             mock_sm.stats.anova_lm.return_value = pd.DataFrame({
@@ -256,11 +273,11 @@ class TestAnovaScript(unittest.TestCase):
         os.makedirs(os.path.join(self.test_dir, 'diagnostics'), exist_ok=True)
         os.makedirs(os.path.join(self.test_dir, 'boxplots', 'model'), exist_ok=True)
 
-        with patch('src.run_anova.sm') as mock_sm, \
-             patch('src.run_anova.generate_performance_tiers') as mock_tiers, \
-             patch('src.run_anova.logging.info') as mock_log_info, \
-             patch('src.run_anova.create_diagnostic_plot'), \
-             patch('src.run_anova.create_and_save_plot'): # Patch plotting functions
+        with patch('src.analyze_study_results.sm') as mock_sm, \
+             patch('src.analyze_study_results.generate_performance_tiers') as mock_tiers, \
+             patch('src.analyze_study_results.logging.info') as mock_log_info, \
+             patch('src.analyze_study_results.create_diagnostic_plot'), \
+             patch('src.analyze_study_results.create_and_save_plot'): # Patch plotting functions
 
             mock_model = MagicMock()
             mock_model.resid = pd.Series(np.random.rand(len(df)) - 0.5, dtype=float)
@@ -276,10 +293,10 @@ class TestAnovaScript(unittest.TestCase):
             mock_tiers.assert_not_called()
 
     def test_perform_analysis_two_level_significant_factor(self):
-        with patch('src.run_anova.sm') as mock_sm, \
+        with patch('src.analyze_study_results.sm') as mock_sm, \
              patch('statsmodels.stats.multicomp.pairwise_tukeyhsd') as mock_tukey, \
-             patch('src.run_anova.create_diagnostic_plot'), \
-             patch('src.run_anova.create_and_save_plot'), \
+             patch('src.analyze_study_results.create_diagnostic_plot'), \
+             patch('src.analyze_study_results.create_and_save_plot'), \
              self.assertLogs('root', level='INFO') as cm:
             mock_sm.ols().fit().resid = self.base_df['mean_top_1_acc']
             mock_sm.stats.anova_lm.return_value = pd.DataFrame({
@@ -291,13 +308,13 @@ class TestAnovaScript(unittest.TestCase):
             mock_tukey.assert_not_called()
 
     def test_generate_performance_tiers_no_cliques(self):
-        with patch('src.run_anova.nx') as mock_nx, self.assertLogs('root', level='INFO') as cm:
+        with patch('src.analyze_study_results.nx') as mock_nx, self.assertLogs('root', level='INFO') as cm:
             mock_nx.find_cliques.return_value = []
             run_anova_module.generate_performance_tiers(pd.DataFrame(), '', pd.DataFrame(), {})
             self.assertTrue(any("No distinct performance groups found" in log for log in cm.output))
 
     def test_generate_performance_tiers_empty_cliques(self):
-        with patch('src.run_anova.nx') as mock_nx, self.assertLogs('root', level='INFO') as cm:
+        with patch('src.analyze_study_results.nx') as mock_nx, self.assertLogs('root', level='INFO') as cm:
             mock_nx.find_cliques.return_value = [[]]
             run_anova_module.generate_performance_tiers(pd.DataFrame(), '', pd.DataFrame({'group1':[],'group2':[],'reject':[]}), {})
             self.assertTrue(any("No distinct performance groups found" in log for log in cm.output))
@@ -308,6 +325,6 @@ class TestAnovaScript(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         help_output = stdout + stderr
         self.assertIn("Example Usage:", help_output)
-        self.assertIn("python src/run_anova.py path/to/your/study_folder/", help_output)
+        self.assertIn("python src/analyze_study_results.py path/to/your/study_folder/", help_output)
 
-# === End of tests/test_run_anova.py ===
+# === End of tests/test_analyze_study_results.py ===

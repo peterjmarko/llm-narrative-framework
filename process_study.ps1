@@ -11,8 +11,8 @@
     By default, it intelligently parses the output of the underlying Python scripts
     to provide a clean, high-level summary of the process.
 
-    1.  It calls `compile_results.py` to aggregate all results into a master 'STUDY_results.csv'.
-    2.  It then calls `run_anova.py` to perform a full statistical analysis on that
+    1.  It calls `compile_study_results.py` to aggregate all results into a master 'STUDY_results.csv'.
+    2.  It then calls `analyze_study_results.py` to perform a full statistical analysis on that
         master CSV, generating final plots and logs.
 
     For detailed, real-time output from the Python scripts, use the -Verbose switch.
@@ -128,7 +128,7 @@ function Invoke-PythonScript {
     }
     else {
                 # By default, parse the output and show a clean, high-level summary.
-        if ($ScriptName -like "*compile_results.py*") {
+        if ($ScriptName -like "*compile_study_results.py*") {
             $processedExperiments = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
             $outputBlock = $output -join "`n"
             $uniqueDisplayNames = $script:modelNameMap.Values | Get-Unique
@@ -173,7 +173,7 @@ function Invoke-PythonScript {
             $output | Select-String -Pattern "Compilation process finished" | ForEach-Object { $_.Line }
 
         }
-        elseif ($ScriptName -like "*run_anova.py*") {
+        elseif ($ScriptName -like "*analyze_study_results.py*") {
             $metricName = $null
             $conclusion = $null
 
@@ -214,10 +214,10 @@ try {
     Write-Host "######################################################`n"
 
     # --- Step 1: Compile All Results into a Master CSV ---
-    Invoke-PythonScript -StepName "1/2: Compile Results" -ScriptName "src/compile_results.py" -Arguments $ResolvedPath
+    Invoke-PythonScript -StepName "1/2: Compile Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
 
     # --- Step 2: Run Final Statistical Analysis ---
-    Invoke-PythonScript -StepName "2/2: Run Final Analysis (ANOVA)" -ScriptName "src/run_anova.py" -Arguments $ResolvedPath
+    Invoke-PythonScript -StepName "2/2: Run Final Analysis (ANOVA)" -ScriptName "src/analyze_study_results.py" -Arguments $ResolvedPath
 
     Write-Host "######################################################" -ForegroundColor Green
     Write-Host "### Study Processing Finished Successfully!" -ForegroundColor Green

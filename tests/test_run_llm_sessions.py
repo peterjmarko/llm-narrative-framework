@@ -1,3 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_run_llm_sessions.py
+
 import unittest
 from unittest.mock import patch, MagicMock, call
 import os
@@ -737,3 +758,5 @@ class TestRunLLMSessions(unittest.TestCase):
         # The summary print should indicate 0 successful sessions.
         captured_output_summary = "".join([call.args[0] for call in mock_stdout.write.call_args_list])
         self.assertIn("Summary for this run: 0 sessions got responses, 2 resulted in errors. 0 were skipped (pre-existing).", captured_output_summary)
+
+# === End of tests/test_run_llm_sessions.py ===

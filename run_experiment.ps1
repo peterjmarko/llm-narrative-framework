@@ -9,7 +9,7 @@
 
 .DESCRIPTION
     This script is the main entry point for running a full experimental batch. It calls
-    the `replication_manager.py` script, which contains the core logic for the run.
+    the `experiment_manager.py` script, which contains the core logic for the run.
 
     By default, this launcher runs in a "quiet" mode, showing only major progress
     headers and a final summary for each replication. This is ideal for standard runs.
@@ -92,7 +92,7 @@ function Invoke-Experiment {
     Write-Host "--- Launching Python Batch Runner ---" -ForegroundColor Green
 
     # Construct the Python arguments directly here (logic formerly in ArgBuilder.ps1).
-    $pythonArgs = @("src/replication_manager.py")
+    $pythonArgs = @("src/experiment_manager.py")
     if (-not [string]::IsNullOrEmpty($TargetDirectory)) { $pythonArgs += $TargetDirectory }
     if ($StartRep) { $pythonArgs += "--start-rep", $StartRep }
     if ($EndRep) { $pythonArgs += "--end-rep", $EndRep }

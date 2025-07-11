@@ -1,9 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: src/retry_failed_sessions.py
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: src/retry_llm_sessions.py
 
 """
-Retry Failed Sessions Utility (retry_failed_sessions.py)
+Retry Failed Sessions Utility (retry_llm_sessions.py)
 
 Purpose:
 This script automates the process of identifying and retrying failed trials
@@ -24,13 +41,13 @@ Workflow:
 
 Command-Line Usage:
     # Scan the './output' directory for failures (depth 0)
-    python src/retry_failed_sessions.py ./output
+    python src/retry_llm_sessions.py ./output
 
     # Scan a specific directory and its immediate subdirectories
-    python src/retry_failed_sessions.py /path/to/batch --depth 1
+    python src/retry_llm_sessions.py /path/to/batch --depth 1
 
     # Scan an entire directory tree recursively
-    python src/retry_failed_sessions.py /path/to/batch --depth -1
+    python src/retry_llm_sessions.py /path/to/batch --depth -1
 """
 
 import argparse
@@ -151,8 +168,8 @@ def _retry_worker(run_dir: str, sessions_script_path: str, index: int) -> tuple[
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SESSIONS_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "run_llm_sessions.py")
 PROCESSOR_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "process_llm_responses.py")
-ANALYZER_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "analyze_performance.py")
-COMPILER_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "compile_results.py")
+ANALYZER_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "analyze_llm_performance.py")
+COMPILER_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "compile_study_results.py")
 
 
 def main():
@@ -307,3 +324,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# === End of src/retry_llm_sessions.py ===

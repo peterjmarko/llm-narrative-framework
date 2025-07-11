@@ -1,3 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_patch_old_experiment.py
+
 # tests/test_patch_old_runs.py
 import subprocess
 from pathlib import Path
@@ -5,7 +26,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.patch_old_runs import main
+from src.patch_old_experiment import main
 
 
 @pytest.fixture
@@ -20,8 +41,8 @@ def temp_study_dir(tmp_path: Path) -> Path:
 
 
 @patch("builtins.print")
-@patch("src.patch_old_runs.subprocess.run")
-@patch("src.patch_old_runs.os.path.exists", return_value=True)
+@patch("src.patch_old_experiment.subprocess.run")
+@patch("src.patch_old_experiment.os.path.exists", return_value=True)
 def test_main_success(
     mock_exists, mock_subprocess_run, mock_print, temp_study_dir
 ):
@@ -47,8 +68,8 @@ def test_main_success(
 
 
 @patch("builtins.print")
-@patch("src.patch_old_runs.subprocess.run")
-@patch("src.patch_old_runs.os.path.exists", return_value=True)
+@patch("src.patch_old_experiment.subprocess.run")
+@patch("src.patch_old_experiment.os.path.exists", return_value=True)
 def test_main_subprocess_fails(
     mock_exists, mock_subprocess_run, mock_print, temp_study_dir
 ):
@@ -90,7 +111,7 @@ def test_main_root_dir_not_found(mock_print, tmp_path):
 
 
 @patch("builtins.print")
-@patch("src.patch_old_runs.os.path.exists", return_value=False)
+@patch("src.patch_old_experiment.os.path.exists", return_value=False)
 def test_main_restore_script_not_found(
     mock_exists, mock_print, temp_study_dir
 ):
@@ -126,3 +147,5 @@ def test_main_no_args(mock_print):
     mock_print.assert_called_with(
         "Usage: python patch_old_runs.py <path_to_root_output_directory>"
     )
+
+# === End of tests/test_patch_old_experiment.py ===

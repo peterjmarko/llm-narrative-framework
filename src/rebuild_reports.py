@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: src/rebuild_reports.py
 
 """
@@ -13,7 +30,7 @@ Workflow:
 1.  Scans a base directory for all individual `run_*` folders.
 2.  For each run, it reads the ground-truth parameters from the
     `config.ini.archived` file.
-3.  It re-runs `process_llm_responses.py` (Stage 3) and `analyze_performance.py`
+3.  It re-runs `process_llm_responses.py` (Stage 3) and `analyze_llm_performance.py`
     (Stage 4) to generate fresh, validated outputs.
 4.  It archives any existing, potentially corrupted reports by renaming them
     with a `.corrupted` extension.
@@ -111,7 +128,7 @@ def rebuild_report_for_run(run_dir, compat_map):
 
     # --- 2. Re-run Stage 3 (Process) and Stage 4 (Analyze) ---
     process_script = os.path.join(PROJECT_ROOT, 'src', 'process_llm_responses.py')
-    analyze_script = os.path.join(PROJECT_ROOT, 'src', 'analyze_performance.py')
+    analyze_script = os.path.join(PROJECT_ROOT, 'src', 'analyze_llm_performance.py')
     
     # NOTE: Removed --quiet from Stage 3 to ensure its summary line is captured.
     cmd3 = [sys.executable, process_script, "--run_output_dir", run_dir]

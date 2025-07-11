@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: src/replication_manager.py
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: src/experiment_manager.py
 
 """
 Main Batch Runner for Managing Multiple Replications.
@@ -16,14 +33,14 @@ Key Features:
 -   **Batch Reprocessing:** Scans a directory for existing run folders and
     re-runs the analysis stages (3 and 4) on all of them.
 -   **Post-Processing:** After all tasks are complete, it automatically calls the
-    `compile_results.py` script to generate the final statistical summary for
+    `compile_study_results.py` script to generate the final statistical summary for
     the entire study.
 
 Usage (to run replications 1 through 30):
-    python src/replication_manager.py /path/to/study_output_dir --end-rep 30
+    python src/experiment_manager.py /path/to/study_output_dir --end-rep 30
 
 Usage (to reprocess all runs in a directory):
-    python src/replication_manager.py /path/to/study_output_dir --reprocess
+    python src/experiment_manager.py /path/to/study_output_dir --reprocess
 """
 
 import sys
@@ -104,8 +121,8 @@ def main():
     args = parser.parse_args()
 
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
-    log_manager_script = os.path.join(current_dir, "log_manager.py")
-    compile_script = os.path.join(current_dir, "compile_results.py")
+    log_manager_script = os.path.join(current_dir, "replication_log_manager.py")
+    compile_script = os.path.join(current_dir, "compile_study_results.py")
     # Correctly point to the new per-replication bias analysis script
     bias_analysis_script = os.path.join(current_dir, "run_bias_analysis.py")
     
@@ -281,14 +298,14 @@ def main():
     print("### ALL TASKS COMPLETE. BEGINNING POST-PROCESSING. ###")
     print("="*80)
     
-    # Call compile_results.py
+    # Call compile_study_results.py
     print("\n--- Compiling final statistical summary... ---")
     try:
         subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True, capture_output=True, text=True)
     except Exception as e:
         logging.error(f"An error occurred while running the final compilation script: {e}")
     
-    # Call the existing 'finalize' command in log_manager.py to append the summary.
+    # Call the existing 'finalize' command in replication_log_manager.py to append the summary.
     print("\n--- Finalizing batch log with summary... ---")
     try:
         subprocess.run([sys.executable, log_manager_script, "finalize", final_output_dir], check=True, capture_output=True, text=True)
@@ -310,4 +327,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/replication_manager.py ===
+# === End of src/experiment_manager.py ===

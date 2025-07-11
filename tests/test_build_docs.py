@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: tests/test_build_docs.py
 
 import pytest
@@ -17,6 +34,21 @@ class TestBuildDocs:
     def setup_method(self):
         """Set up test fixtures."""
         self.test_dir = tempfile.mkdtemp()
+        # Create docs directory structure in temp
+        self.docs_dir = os.path.join(self.test_dir, "docs")
+        os.makedirs(self.docs_dir, exist_ok=True)
+        
+        # Copy the real DOCUMENTATION.template.md to temp docs directory
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        real_template = os.path.join(project_root, "docs", "DOCUMENTATION.template.md")
+        temp_template = os.path.join(self.docs_dir, "DOCUMENTATION.template.md")
+        
+        if os.path.exists(real_template):
+            shutil.copy2(real_template, temp_template)
+        else:
+            # Fallback: create a basic template if real one doesn't exist
+            with open(temp_template, 'w') as f:
+                f.write("# Test Documentation\n{{diagram:test.mmd}}\n{{include:test.txt}}\n")
         
     def teardown_method(self):
         """Clean up test fixtures."""
@@ -119,7 +151,7 @@ class TestBuildDocs:
     def test_build_readme_content_diagram_placeholder(self):
         """Test README content building with diagram placeholders."""
         template_content = "# Test\n{{diagram:test.mmd}}\nEnd"
-        template_path = os.path.join(self.test_dir, "README.template.md")
+        template_path = os.path.join(self.docs_dir, "DOCUMENTATION.template.md")
         
         with open(template_path, 'w') as f:
             f.write(template_content)
@@ -132,7 +164,7 @@ class TestBuildDocs:
     def test_build_readme_content_diagram_with_attributes(self):
         """Test README content building with diagram attributes."""
         template_content = "{{diagram:test.mmd|scale=2.0|width=500}}"
-        template_path = os.path.join(self.test_dir, "README.template.md")
+        template_path = os.path.join(self.docs_dir, "DOCUMENTATION.template.md")
         
         with open(template_path, 'w') as f:
             f.write(template_content)
@@ -152,7 +184,7 @@ class TestBuildDocs:
         
         # Create template
         template_content = "# Test\n{{include:include.txt}}\nEnd"
-        template_path = os.path.join(self.test_dir, "README.template.md")
+        template_path = os.path.join(self.docs_dir, "DOCUMENTATION.template.md")
         with open(template_path, 'w') as f:
             f.write(template_content)
         
@@ -164,7 +196,7 @@ class TestBuildDocs:
     def test_build_readme_content_missing_include(self):
         """Test README content building with missing include file."""
         template_content = "{{include:missing.txt}}"
-        template_path = os.path.join(self.test_dir, "README.template.md")
+        template_path = os.path.join(self.docs_dir, "DOCUMENTATION.template.md")
         
         with open(template_path, 'w') as f:
             f.write(template_content)
@@ -180,7 +212,7 @@ class TestBuildDocs:
         """Test successful rendering of all diagrams."""
         # Setup template with diagrams
         template_content = "{{diagram:test.mmd}}\n{{diagram:text.txt}}"
-        template_path = os.path.join(self.test_dir, "README.template.md")
+        template_path = os.path.join(self.docs_dir, "DOCUMENTATION.template.md")
         with open(template_path, 'w') as f:
             f.write(template_content)
         
@@ -197,7 +229,7 @@ class TestBuildDocs:
     def test_render_all_diagrams_failure(self, mock_render_mermaid):
         """Test diagram rendering with failures."""
         template_content = "{{diagram:test.mmd}}"
-        template_path = os.path.join(self.test_dir, "README.template.md")
+        template_path = os.path.join(self.docs_dir, "DOCUMENTATION.template.md")
         with open(template_path, 'w') as f:
             f.write(template_content)
         

@@ -1,15 +1,15 @@
 graph TD
     %% 1. Define all nodes first
     EntryPoint["run_experiment.ps1<br/>(User Entry Point)"]:::entry
-    BatchManager["replication_manager.py<br/>(Manages Batch)"]:::layer_orange
-    LogManager["log_manager.py"]:::danger
+    BatchManager["experiment_manager.py<br/>(Manages Batch)"]:::layer_orange
+    LogManager["replication_log_manager.py"]:::danger
     BatchLog[("batch_log.txt")]:::artifact
     
     ReplicationOrchestrator["orchestrate_replication.py"]:::layer_green
-    BuildQueries["1. build_queries.py"]:::script
+    BuildQueries["1. build_llm_queries.py"]:::script
     RunSessions["2. run_llm_sessions.py"]:::script
     ProcessResponses["3. process_llm_responses.py"]:::script
-    AnalyzePerformance["4. analyze_performance.py"]:::script
+    AnalyzePerformance["4. analyze_llm_performance.py"]:::script
     ReplicationReport[("replication_report.txt")]:::artifact
 
     %% 2. Define connections
@@ -44,3 +44,4 @@ graph TD
     classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
     classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;
     classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;
+

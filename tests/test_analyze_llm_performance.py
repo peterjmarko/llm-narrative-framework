@@ -1,3 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_analyze_llm_performance.py
+
 import unittest
 from unittest.mock import patch, MagicMock, mock_open
 import os
@@ -13,7 +34,7 @@ SRC_DIR_REAL_PROJECT = os.path.abspath(os.path.join(SCRIPT_DIR_TEST, '..', 'src'
 if SRC_DIR_REAL_PROJECT not in sys.path:
     sys.path.insert(0, SRC_DIR_REAL_PROJECT)
 
-from analyze_performance import (
+from analyze_llm_performance import (
     evaluate_single_test,
     combine_p_values_stouffer,
     combine_p_values_fisher,
@@ -291,7 +312,7 @@ class TestAnalyzePerformance(unittest.TestCase):
             with open(manifest_path, "w") as f: f.write(manifest_content)
 
         test_args = [
-            'analyze_performance.py', 
+            'analyze_llm_performance.py', 
             '--run_output_dir', self.test_dir,
             '--k_value', str(k),
             '--delimiter', 'tab',
@@ -389,7 +410,7 @@ class TestAnalyzePerformance(unittest.TestCase):
             with open(manifest_path, "w") as f: f.write(manifest_content)
 
         test_args = [
-            'analyze_performance.py',
+            'analyze_llm_performance.py',
             '--run_output_dir', self.test_dir,
             # No -k, should deduce k=6
             # No -d, should deduce comma
@@ -523,7 +544,7 @@ class TestAnalyzePerformance(unittest.TestCase):
         manifest_content += "P3\tD3\t1\n"
         with open(manifest_path, 'w') as f: f.write(manifest_content)
 
-        test_args = ['analyze_performance.py', '--run_output_dir', self.test_dir, '--k_value', str(k), '--delimiter', ',']
+        test_args = ['analyze_llm_performance.py', '--run_output_dir', self.test_dir, '--k_value', str(k), '--delimiter', ',']
         
         with patch.object(sys, 'argv', test_args), \
              patch('builtins.print') as mock_print:
@@ -571,7 +592,7 @@ class TestAnalyzePerformance(unittest.TestCase):
             self.assertIn("<<<METRICS_JSON_START>>>", printed_output)
 
     def test_print_metric_analysis_edge_cases(self):
-        from analyze_performance import print_metric_analysis
+        from analyze_llm_performance import print_metric_analysis
         with patch('builtins.print') as mock_print:
             # Test with None input
             print_metric_analysis(None, "Test Metric", "%.4f")
@@ -602,7 +623,7 @@ class TestAnalyzePerformance(unittest.TestCase):
 
     def test_calculate_positional_bias(self):
         """Tests the linear regression for positional bias."""
-        from analyze_performance import calculate_positional_bias
+        from analyze_llm_performance import calculate_positional_bias
 
         # Test with a clear downward trend
         performance_scores = [0.9, 0.8, 0.8, 0.7, 0.6]
@@ -673,3 +694,5 @@ class TestAnalyzePerformance(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+# === End of tests/test_analyze_llm_performance.py ===

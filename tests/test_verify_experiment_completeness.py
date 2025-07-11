@@ -1,3 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_verify_experiment_completeness.py
+
 import unittest
 from unittest.mock import patch
 import os
@@ -8,7 +29,7 @@ import re
 
 # Add src directory to path to allow importing the script under test
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-from verify_pipeline_completeness import main as verify_main, count_matrices_in_file, count_lines_in_file
+from verify_experiment_completeness import main as verify_main, count_matrices_in_file, count_lines_in_file
 
 class TestVerifyPipelineCompleteness(unittest.TestCase):
 
@@ -86,7 +107,7 @@ class TestVerifyPipelineCompleteness(unittest.TestCase):
 
     def test_depth_0_finds_only_top_level(self):
         """Tests that --depth 0 (default) finds the run in the target directory only."""
-        cli_args = ['verify_pipeline_completeness.py', self.test_dir, '--depth', '0']
+        cli_args = ['verify_experiment_completeness.py', self.test_dir, '--depth', '0']
         
         with patch('logging.info') as mock_log_info, patch.object(sys, 'argv', cli_args):
             verify_main()
@@ -101,7 +122,7 @@ class TestVerifyPipelineCompleteness(unittest.TestCase):
 
     def test_depth_1_finds_nested_runs(self):
         """Tests that --depth 1 finds runs at the top level and one level down."""
-        cli_args = ['verify_pipeline_completeness.py', self.test_dir, '--depth', '1']
+        cli_args = ['verify_experiment_completeness.py', self.test_dir, '--depth', '1']
         
         with patch('logging.info') as mock_log_info, patch.object(sys, 'argv', cli_args):
             verify_main()
@@ -116,7 +137,7 @@ class TestVerifyPipelineCompleteness(unittest.TestCase):
 
     def test_depth_minus_1_finds_all_recursively(self):
         """Tests that --depth -1 finds all runs recursively."""
-        cli_args = ['verify_pipeline_completeness.py', self.test_dir, '--depth', '-1']
+        cli_args = ['verify_experiment_completeness.py', self.test_dir, '--depth', '-1']
         
         with patch('logging.info') as mock_log_info, patch.object(sys, 'argv', cli_args):
             verify_main()
@@ -131,3 +152,5 @@ class TestVerifyPipelineCompleteness(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+# === End of tests/test_verify_experiment_completeness.py ===

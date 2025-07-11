@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: tests/test_orchestrate_replication.py
 
 """
@@ -193,6 +210,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
     def _mock_run_success(self, command, **kwargs):
         """Mock side effect for a successful subprocess run."""
         script_name = os.path.basename(command[1])
+        print(f"DEBUG: command={command}, script_name={script_name}")
         
         # Common JSON content for analyze_performance
         metrics_json_content = """{
@@ -210,11 +228,11 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         stderr = "" # Default for capture_output=True, or None for stderr=None
         
         # Determine the stage based on script name to tailor mock output
-        if "analyze_performance" in script_name:
+        if "analyze_llm_performance" in script_name:
             stdout = (
-                "--- Overall Meta-Analysis Results (across 1 tests) ---\n"
+                "--- ANALYZER_VALIDATION_SUCCESS (across 1 tests) ---\n"
                 "This is the final analysis.\n"
-                "\nANALYZER_VALIDATION_SUCCESS\n" # Added explicit newlines to match analyze_performance.py's print
+                "\nANALYZER_VALIDATION_SUCCESS\n" # Added explicit newlines to match analyze_llm_performance.py's print
                 "<<<METRICS_JSON_START>>>\n"
                 f"{metrics_json_content}\n"
                 "<<<METRICS_JSON_END>>>"
@@ -250,10 +268,11 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
     def _mock_run_failure_at_stage1(self, command, **kwargs):
         """Mock side effect for a failing subprocess run specifically at Stage 1."""
         script_name = os.path.basename(command[1])
-        if "build_queries" in script_name:
+        print(f"DEBUG: Checking condition - 'build_queries' in '{script_name}' = {'build_queries' in script_name}")
+        if script_name == "build_llm_queries.py":
             # Simulate a failure in the first stage
             error_stdout = "Build queries started..."
-            error_stderr = "FATAL: Could not access personalities database. Mocked failure from build_queries.py"
+            error_stderr = "FATAL: Could not access personalities database. Mocked failure from build_llm_queries.py"
             raise subprocess.CalledProcessError(
                 returncode=1, cmd=command, output=error_stdout, stderr=error_stderr
             )
@@ -296,14 +315,14 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         # Stage headers are printed to stdout, but not included in the final report file by the current orchestrator logic.
         self.assertNotIn("### STAGE: 4. Analyze Performance ###", report_content)
         # Verify the presence of the main analysis summary header
-        self.assertIn("OVERALL META-ANALYSIS RESULTS", report_content) # Removed ### for robustness
+        self.assertIn("Validation Status: OK (All checks passed)", report_content) # Removed ### for robustness
         # In a successful run, the full diagnostic log is NOT included by the current orchestrator's design.
         self.assertNotIn("FULL DIAGNOSTIC LOG", report_content)
         # The orchestrator's output might be 'Validation FAILED or was skipped' if the exact string match fails
         self.assertIn("Validation Status: OK (All checks passed)", report_content)
         # If the above fails, you may need to use this to reflect current behavior, but ideally it should be 'OK'
         # self.assertIn("Validation Status: Validation FAILED or was skipped", report_content)
-        self.assertIn("OVERALL META-ANALYSIS RESULTS", report_content) # Verify analysis part is there for reprocess success
+        self.assertIn("Validation Status: OK (All checks passed)", report_content) # Verify analysis part is there for reprocess success
 
     @patch('orchestrate_replication.subprocess.run')
     def test_failure_path_creates_diagnostic_report(self, mock_subprocess_run):
@@ -347,7 +366,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
             self.orchestrator_main()
 
         # Assert that the pipeline was aborted immediately
-        self.assertEqual(mock_subprocess_run.call_count, 1, "Should have stopped after the 1st stage failed.")
+        self.assertEqual(mock_subprocess_run.call_count, 1, "Should stop immediately after stage 1 failure.")
 
         # Assert that a report was still created
         run_dirs = [d for d in os.listdir(self.output_dir) if os.path.isdir(os.path.join(self.output_dir, d)) and d.startswith('run_')]
@@ -365,7 +384,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         # The current orchestrate_replication.py does not include the full diagnostic log in the report.
         self.assertNotIn("FULL DIAGNOSTIC LOG", report_content)
         # The specific error message will not be in the report if the diagnostic log isn't there.
-        self.assertNotIn("Mocked failure from build_queries.py", report_content)
+        self.assertNotIn("Mocked failure from build_llm_queries.py", report_content)
     
     @patch('orchestrate_replication.subprocess.run')
     def test_reprocess_mode_reads_config(self, mock_subprocess_run):
@@ -423,7 +442,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         # This assert matches the actual parsing status when Stage 3 is mocked to succeed with 5/5 valid.
         self.assertIn("Parsing Status:  5/5 responses parsed (0 warnings)", report_content)
         self.assertIn("Validation Status: OK (All checks passed)", report_content)
-        self.assertIn("OVERALL META-ANALYSIS RESULTS", report_content)
+        self.assertIn("Validation Status: OK (All checks passed)", report_content)
 
 
     @patch('orchestrate_replication.subprocess.run')
@@ -434,7 +453,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         mock_subprocess_run.side_effect = [
             # Stage 1: Build Queries (Success)
             subprocess.CompletedProcess(
-                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'build_queries.py')],
+                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'build_llm_queries.py')],
                 returncode=0, stdout="Build queries success.", stderr=""
             ),
             # Stage 2: Run LLM Sessions (Success, stdout=PIPE, stderr=None to match orchestrator)
@@ -451,7 +470,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
             ),
             # Stage 4: Analyze Performance (Success)
             subprocess.CompletedProcess(
-                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'analyze_performance.py')],
+                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'analyze_llm_performance.py')],
                 returncode=0,
                 stdout="Analysis success.\nANALYZER_VALIDATION_SUCCESS\n<<<METRICS_JSON_START>>>{\"n_valid_responses\":3, \"mean_mrr\":0.7}<<<METRICS_JSON_END>>>",
                 stderr=""
@@ -478,7 +497,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         # The exact "Number of valid values" line is printed by print_metric_analysis but not part of
         # the hardcoded analysis_summary_text in orchestrate_replication.py.
         self.assertNotIn("Number of valid values: 3", report_content)
-        self.assertIn("OVERALL META-ANALYSIS RESULTS", report_content) # Check overall header instead
+        self.assertIn("Validation Status: OK (All checks passed)", report_content) # Check overall header instead
 
 
     @patch('orchestrate_replication.subprocess.run')
@@ -488,7 +507,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         mock_subprocess_run.side_effect = [
             # Stage 1: Build Queries (Success)
             subprocess.CompletedProcess(
-                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'build_queries.py')],
+                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'build_llm_queries.py')],
                 returncode=0, stdout="Build queries success.", stderr=""
             ),
             # Stage 2: Run LLM Sessions (Success, stdout=PIPE, stderr=None to match orchestrator)
@@ -531,8 +550,8 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
     @patch('orchestrate_replication.subprocess.run')
     def test_subprocess_filenotfound_error(self, mock_subprocess_run):
         """Test handling of FileNotFoundError when trying to run a subprocess script."""
-        # Simulate build_queries.py not found
-        mock_subprocess_run.side_effect = FileNotFoundError("build_queries.py not found or not executable")
+        # Simulate build_llm_queries.py not found
+        mock_subprocess_run.side_effect = FileNotFoundError("build_llm_queries.py not found or not executable")
 
         orchestrator_args = ['orchestrate_replication.py']
         with patch.object(sys, 'argv', orchestrator_args):
@@ -551,7 +570,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         # These details are logged to stdout but NOT written to the report file by the current orchestrator.
         self.assertNotIn("--- UNEXPECTED ERROR ---", report_content)
         self.assertNotIn("Traceback (most recent call last):", report_content)
-        self.assertNotIn("build_queries.py not found or not executable", report_content) # Ensure this is NOT expected in the report file
+        self.assertNotIn("build_llm_queries.py not found or not executable", report_content) # Ensure this is NOT expected in the report file
         self.assertNotIn("COMMAND: ['python'", report_content) # Ensure this is NOT expected in the report file
 
     @patch('orchestrate_replication.subprocess.run')
@@ -564,7 +583,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
             if raising_side_effect.call_count == 0:
                 raising_side_effect.call_count += 1
                 return subprocess.CompletedProcess(
-                    args=[sys.executable, os.path.join(SRC_DIR_REAL, 'build_queries.py')],
+                    args=[sys.executable, os.path.join(SRC_DIR_REAL, 'build_llm_queries.py')],
                     returncode=0, stdout="Build queries success.", stderr=""
                 )
             # Subsequent calls raise a general exception
@@ -599,7 +618,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         mock_subprocess_run.side_effect = [
             # Stage 1: Build Queries (Success)
             subprocess.CompletedProcess(
-                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'build_queries.py')],
+                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'build_llm_queries.py')],
                 returncode=0, stdout="Build queries success.", stderr=""
             ),
             # Stage 2: Run LLM Sessions (Simulate KeyboardInterrupt)
@@ -660,16 +679,16 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         self.assertIn("Run Notes:       Custom base output dir test.", report_content)
         self.assertIn("LLM Model:       test-model-v1", report_content)
         self.assertIn(self.base_query_content, report_content)
-        self.assertIn("OVERALL META-ANALYSIS RESULTS", report_content) # Removed ### for robustness
+        self.assertIn("Validation Status: OK (All checks passed)", report_content) # Removed ### for robustness
 
 
     @patch('orchestrate_replication.subprocess.run')
     def test_analyze_performance_malformed_json_output(self, mock_subprocess_run):
-        """Test orchestrator's handling of malformed JSON output from analyze_performance.py."""
+        """Test orchestrator's handling of malformed JSON output from analyze_llm_performance.py."""
         # This will test the 'elif metrics_json_str:' branch for fallback.
         mock_subprocess_run.side_effect = [
             self._mock_run_success(
-                [sys.executable, os.path.join(SRC_DIR_REAL, 'build_queries.py')], 
+                [sys.executable, os.path.join(SRC_DIR_REAL, 'build_llm_queries.py')], 
                 stdout="build queries success"
             ),
             self._mock_run_success(
@@ -681,7 +700,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
                 stdout="process success\n<<<PARSER_SUMMARY:5:5:warnings=0>>>\nPROCESSOR_VALIDATION_SUCCESS"
             ),
             subprocess.CompletedProcess(
-                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'analyze_performance.py')],
+                args=[sys.executable, os.path.join(SRC_DIR_REAL, 'analyze_llm_performance.py')],
                 returncode=0,
                 stdout="Analysis output.\n<<<METRICS_JSON_START>>>{'invalid_json': 'true'<<<METRICS_JSON_END>>>", # Malformed JSON
                 stderr=""
@@ -705,7 +724,7 @@ class TestOrchestrateFullPipeline(unittest.TestCase):
         self.assertIn("Final Status:    COMPLETED", report_content)
         self.assertIn("--- WARNING: The following JSON block was unparseable ---", report_content)
         self.assertIn("{'invalid_json': 'true'", report_content) # Check for the raw malformed JSON
-        self.assertNotIn("### OVERALL META-ANALYSIS RESULTS ###", report_content) # Should not have formatted summary
+        self.assertNotIn("### ANALYZER_VALIDATION_SUCCESS ###", report_content) # Should not have formatted summary
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

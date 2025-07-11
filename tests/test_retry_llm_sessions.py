@@ -1,3 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_retry_llm_sessions.py
+
 import unittest
 import os
 import sys
@@ -24,8 +45,8 @@ class TestRetryFailedSessions(unittest.TestCase):
         # --- In-Place Mocking Strategy ---
         self.scripts_to_restore = []
         scripts_to_mock = [
-            "run_llm_sessions.py", "compile_results.py",
-            "process_llm_responses.py", "analyze_performance.py"
+            "run_llm_sessions.py", "compile_study_results.py",
+            "process_llm_responses.py", "analyze_llm_performance.py"
         ]
         
         for script_name in scripts_to_mock:
@@ -86,7 +107,7 @@ class TestRetryFailedSessions(unittest.TestCase):
         Helper to run the REAL script under coverage in a subprocess, ensuring
         the coverage data file is written to the project root.
         """
-        real_script_path = os.path.join(REAL_SRC_DIR, 'retry_failed_sessions.py')
+        real_script_path = os.path.join(REAL_SRC_DIR, 'retry_llm_sessions.py')
 
         command = [
             sys.executable, "-m", "coverage", "run",
@@ -182,7 +203,7 @@ class TestRetryFailedSessions(unittest.TestCase):
     def test_exits_if_required_script_is_missing(self):
         """Tests that the script fails gracefully if a dependency is missing."""
         # Hide one of the required scripts.
-        os.remove(os.path.join(REAL_SRC_DIR, "analyze_performance.py"))
+        os.remove(os.path.join(REAL_SRC_DIR, "analyze_llm_performance.py"))
 
         result = self._run_script(self.output_dir)
         self.assertNotEqual(result.returncode, 0)
@@ -210,3 +231,5 @@ class TestRetryFailedSessions(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+# === End of tests/test_retry_llm_sessions.py ===

@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: tests/test_smoke.py
 
 """
@@ -18,7 +35,7 @@ Workflow Simulated:
     -   `config.ini` & `.env`: Mocked configuration files pointing to the temporary directories.
     -   The `config_loader` module is patched to use this temporary environment.
 
-2.  **build_queries.py**: Run with small parameters (m=1, k=3). This step calls the *real*
+2.  **build_llm_queries.py**: Run with small parameters (m=1, k=3). This step calls the *real*
     `query_generator.py` as a subprocess. The test asserts that the expected query and mapping
     files are created in the temporary `output/run_smoke_test/session_queries/` directory.
 
@@ -31,7 +48,7 @@ Workflow Simulated:
     asserts that the resulting `all_scores.txt`, `all_mappings.txt`, and `successful_query_indices.txt`
     files are created in `output/run_smoke_test/analysis_inputs/` and contain the expected data.
 
-5.  **analyze_performance.py**: Run using the predictable scores and mappings from step 4. The test
+5.  **analyze_llm_performance.py**: Run using the predictable scores and mappings from step 4. The test
     asserts that the analysis script runs to completion without errors and prints its summary output.
 
 This test validates the primary "happy path" of the entire pipeline, confirming that file
@@ -57,9 +74,9 @@ PROJECT_ROOT_FOR_TEST = os.path.abspath(os.path.join(SCRIPT_DIR_TEST, '..'))
 SRC_DIR_REAL = os.path.join(PROJECT_ROOT_FOR_TEST, 'src')
 
 PIPELINE_SCRIPTS = [
-    "config_loader.py", "query_generator.py", "build_queries.py",
+    "config_loader.py", "query_generator.py", "build_llm_queries.py",
     "llm_prompter.py", "run_llm_sessions.py", "process_llm_responses.py",
-    "analyze_performance.py", "orchestrate_replication.py"
+    "analyze_llm_performance.py", "orchestrate_replication.py"
 ]
 
 class TestEndToEndSmoke(unittest.TestCase):
@@ -98,7 +115,7 @@ class TestEndToEndSmoke(unittest.TestCase):
         self._setup_fake_config_loader_in_sys_modules()
         
         self.imported_mains = {}
-        for script in ["build_queries", "run_llm_sessions", "process_llm_responses", "analyze_performance"]:
+        for script in ["build_llm_queries", "run_llm_sessions", "process_llm_responses", "analyze_llm_performance"]:
             module_name = script
             try:
                 if module_name in sys.modules:
@@ -159,10 +176,10 @@ class TestEndToEndSmoke(unittest.TestCase):
         run_responses_dir = os.path.join(self.test_run_dir, 'session_responses')
         run_analysis_dir = os.path.join(self.test_run_dir, 'analysis_inputs')
 
-        # === Step 1: Run build_queries.py ===
-        build_queries_args = ['build_queries.py', '-m', '1', '-k', '3', '--base_seed', '123', '--qgen_base_seed', '456', '--run_output_dir', self.test_run_dir]
-        with patch.object(sys, 'argv', build_queries_args), patch('builtins.input', return_value='new'):
-            self.imported_mains['build_queries']()
+        # === Step 1: Run build_llm_queries.py ===
+        build_llm_queries_args = ['build_llm_queries.py', '-m', '1', '-k', '3', '--base_seed', '123', '--qgen_base_seed', '456', '--run_output_dir', self.test_run_dir]
+        with patch.object(sys, 'argv', build_llm_queries_args), patch('builtins.input', return_value='new'):
+            self.imported_mains['build_llm_queries']()
 
         query_file_path = os.path.join(run_queries_dir, 'llm_query_001.txt')
         self.assertTrue(os.path.exists(query_file_path), "llm_query_001.txt was not created.")
@@ -206,13 +223,13 @@ class TestEndToEndSmoke(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(run_analysis_dir, 'all_mappings.txt')))
         self.assertTrue(os.path.exists(os.path.join(run_analysis_dir, 'successful_query_indices.txt')))
 
-        # === Step 4: Run analyze_performance.py ===
-        analyze_args = ['analyze_performance.py', '--quiet', '--run_output_dir', self.test_run_dir]
+        # === Step 4: Run analyze_llm_performance.py ===
+        analyze_args = ['analyze_llm_performance.py', '--quiet', '--run_output_dir', self.test_run_dir]
         with patch.object(sys, 'argv', analyze_args), patch('builtins.print') as mock_print:
             try:
-                self.imported_mains['analyze_performance']()
+                self.imported_mains['analyze_llm_performance']()
             except SystemExit as e:
-                self.fail(f"analyze_performance.py exited unexpectedly with code: {e.code}")
+                self.fail(f"analyze_llm_performance.py exited unexpectedly with code: {e.code}")
         
         printed_output = "".join(str(call.args[0]) for call in mock_print.call_args_list)
         # Check for the machine-readable JSON block, which is a reliable success indicator.
@@ -221,3 +238,5 @@ class TestEndToEndSmoke(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+# === End of tests/test_smoke.py ===

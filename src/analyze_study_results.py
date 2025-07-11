@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: src/run_anova.py
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: src/analyze_study_results.py
 
 """
 Performs a comprehensive statistical analysis on compiled experimental results.
@@ -33,7 +50,7 @@ All output, including a detailed `STUDY_analysis_log.txt` and all generated
 plots, is saved to the `anova/` directory within the specified study path.
 
 Usage:
-    python src/run_anova.py /path/to/top_level_results_dir/
+    python src/analyze_study_results.py /path/to/top_level_results_dir/
 """
 
 import argparse
@@ -307,10 +324,10 @@ def main():
         Example Usage:
         --------------
         # To analyze a full study
-        python src/run_anova.py path/to/your/study_folder/
+        python src/analyze_study_results.py path/to/your/study_folder/
         
         # To analyze a single experiment
-        python src/run_anova.py path/to/your/experiment_folder/
+        python src/analyze_study_results.py path/to/your/experiment_folder/
         
         The script automatically finds the most relevant summary file 
         ('final_summary_results.csv' or 'EXPERIMENT_results.csv') in the
@@ -489,5 +506,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-# === End of src/run_anova.py ===
+# === End of src/analyze_study_results.py ===

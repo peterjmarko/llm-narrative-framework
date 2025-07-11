@@ -9,10 +9,10 @@
 
 .DESCRIPTION
     This script orchestrates a four-step data migration:
-    1. Patches old config.ini files using 'patch_old_runs.py'.
+    1. Patches old config.ini files using 'patch_old_experiment.py'.
     2. Rebuilds reports into the modern format using 'rebuild_reports.py'.
     3. Cleans up old artifacts like summary files, corrupted reports, and legacy analysis inputs.
-    4. Performs a final reprocessing step using 'replication_manager.py' to generate clean, modern outputs.
+    4. Performs a final reprocessing step using 'experiment_manager.py' to generate clean, modern outputs.
 
 .PARAMETER TargetDirectory
     The path to the old experiment directory that needs to be migrated.
@@ -74,8 +74,8 @@ try {
     Write-Host "### Starting Data Migration for: '$($ResolvedPath)'" -ForegroundColor Green
     Write-Host "######################################################`n" -ForegroundColor Green
 
-    # --- Step 1: Run patch_old_runs.py ---
-    Invoke-PythonScript -StepName "1/4: Patch Configs" -ScriptName "src/patch_old_runs.py" -Arguments $ResolvedPath
+    # --- Step 1: Run patch_old_experiment.py ---
+    Invoke-PythonScript -StepName "1/4: Patch Configs" -ScriptName "src/patch_old_experiment.py" -Arguments $ResolvedPath
 
     # --- Step 2: Run rebuild_reports.py ---
     Invoke-PythonScript -StepName "2/4: Rebuild Reports" -ScriptName "src/rebuild_reports.py" -Arguments $ResolvedPath
@@ -108,8 +108,8 @@ try {
     Write-Host "Step '3/4: Clean Artifacts' completed successfully."
     Write-Host ""
 
-    # --- Step 4: Run replication_manager.py --reprocess ---
-    Invoke-PythonScript -StepName "4/4: Final Reprocess" -ScriptName "src/replication_manager.py" -Arguments "--reprocess", $ResolvedPath
+    # --- Step 4: Run experiment_manager.py --reprocess ---
+    Invoke-PythonScript -StepName "4/4: Final Reprocess" -ScriptName "src/experiment_manager.py" -Arguments "--reprocess", $ResolvedPath
     
     Write-Host "######################################################" -ForegroundColor Green
     Write-Host "### Migration Finished Successfully! ###" -ForegroundColor Green

@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: src/query_generator.py
 
 """
 LLM Query and Mapping File Generator (query_generator.py)
 
 Purpose:
-This script acts as a worker for `build_queries.py`. It takes a small subset
+This script acts as a worker for `build_llm_queries.py`. It takes a small subset
 of 'k' personalities, shuffles their names and descriptions independently, and
 generates a complete, self-contained query set. Its most crucial outputs are
 the LLM query itself, the ground-truth mapping, and a manifest file for auditing.
@@ -29,7 +46,7 @@ Key Operations:
        created for reference and debugging.
 
 This script is not intended to be run directly by the user but is called as a
-subprocess by `build_queries.py`.
+subprocess by `build_llm_queries.py`.
 
 Configuration:
 - Default values for 'k', source filenames, output prefix, and logging levels
@@ -412,7 +429,7 @@ def main():
 
     if user_provided_prefix and (os.path.sep in user_provided_prefix or (os.altsep and os.altsep in user_provided_prefix)):
         dir_part_of_prefix = os.path.dirname(user_provided_prefix)
-        # Specific check for build_queries.py's temporary output pattern
+        # Specific check for build_llm_queries.py's temporary output pattern
         if dir_part_of_prefix.startswith("temp_qgen_outputs_iter_"):
             is_orchestrator_temp_output = True
         

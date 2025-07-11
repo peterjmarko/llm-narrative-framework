@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: src/analyze_performance.py
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# Filename: src/analyze_llm_performance.py
 
 """
-Performance Analysis Script for LLM Matching Task (analyze_performance.py)
+Performance Analysis Script for LLM Matching Task (analyze_llm_performance.py)
 
 Purpose:
 This script takes aggregated score matrices and their corresponding true mappings
@@ -35,7 +49,7 @@ Output Files (within the provided `<run_output_dir>`):
 - ... (and other metric distribution files)
 
 Command-Line Usage (for orchestrated runs):
-    python src/analyze_performance.py --run_output_dir <path_to_run_dir> --quiet
+    python src/analyze_llm_performance.py --run_output_dir <path_to_run_dir> --quiet
 
 Required Argument for Orchestrated Runs:
     --run_output_dir      The absolute path to the self-contained output
@@ -45,7 +59,7 @@ Optional Arguments:
                           only the final summary statistics. Used by the orchestrator.
 """
 
-# === Start of src/analyze_performance.py ===
+# === Start of src/analyze_llm_performance.py ===
 
 import numpy as np
 from scipy.stats import mannwhitneyu, norm, chi2, ttest_1samp, wilcoxon, rankdata, linregress
@@ -621,7 +635,7 @@ def save_metric_distribution(metric_values, output_dir, filename, quiet=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Performs statistical analysis on LLM matching scores.")
-    # Make run_output_dir a required argument for analyze_performance.py
+    # Make run_output_dir a required argument for analyze_llm_performance.py
     parser.add_argument("--run_output_dir", required=True,
                         help="The absolute path to the self-contained output directory for this specific run.")
     
@@ -878,4 +892,5 @@ def main():
 if __name__ == "__main__":
     main()
     
-# === End of src/analyze_performance.py ===
+# === End of src/analyze_llm_performance.py ===
+

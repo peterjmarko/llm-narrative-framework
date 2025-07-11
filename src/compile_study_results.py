@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: src/compile_results.py
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# Filename: src/compile_study_results.py
 
 """
 Compiles All Experiment Results into Level-Aware Summary CSVs.
@@ -23,7 +37,7 @@ The final result is a master `STUDY_results.csv` at the top level of the
 specified directory, ready for statistical analysis.
 
 Usage:
-    python src/compile_results.py /path/to/study_output_dir
+    python src/compile_study_results.py /path/to/study_output_dir
 """
 
 import os
@@ -215,4 +229,5 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/compile_results.py ===
+# === End of src/compile_study_results.py ===
+

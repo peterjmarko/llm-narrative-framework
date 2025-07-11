@@ -170,7 +170,7 @@ Most modules in `src/` are designed as executable scripts. The standard testing 
             # ... your file-based assertions here ...
     ````
 
-This approach, demonstrated in `tests/test_compile_results.py`, is the required standard for maintaining test quality and coverage across the project.
+This approach, demonstrated in `tests/test_compile_study_results.py`, is the required standard for maintaining test quality and coverage across the project.
 
 ### 4. Commit Your Changes
 
@@ -229,3 +229,4 @@ This process cleanly separates logical documentation changes from the automated 
 If you find a bug or have an idea for an improvement, please **open an issue** on GitHub.
 *   For bugs, include a clear title, steps to reproduce, expected behavior, and any relevant logs.
 *   For enhancements, describe the feature and why it would be valuable.
+

@@ -3,14 +3,14 @@ graph TD
     EntryPoint["migrate_old_experiment.ps1<br/>(Entry Point)"]:::entry
     
     subgraph "Stage 1: Standardize Configs"
-        S1_Patch["1. patch_old_runs.py"]:::danger
+        S1_Patch["1. patch_old_experiment.py"]:::danger
         S1_Restore["restore_config.py"]:::danger
         S1_Art[("config.ini.archived")]:::artifact
     end
 
     subgraph "Stage 2: Rebuild Reports"
         S2_Rebuild["2. rebuild_reports.py"]:::danger
-        S2_Log["3. log_manager.py<br/>(rebuilds)"]:::danger
+        S2_Log["3. replication_log_manager.py<br/>(rebuilds)"]:::danger
     end
 
     Final[("Final Rebuilt<br/>Reports")]:::final
@@ -25,3 +25,4 @@ graph TD
     classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;
     classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;
     classDef final fill:#5cb85c,stroke:#4cae4c,color:#fff;
+

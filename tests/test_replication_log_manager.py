@@ -1,11 +1,32 @@
-# tests/test_log_manager.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_replication_replication_log_manager.py
+
+# tests/test_replication_log_manager.py
 
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from src import log_manager
+import src.replication_log_manager as replication_log_manager
 
 # Sample data for tests
 GOOD_REPORT_CONTENT = """
@@ -71,7 +92,7 @@ class TestLogManagerHelpers:
     def test_parse_report_file_success(self, tmp_path):
         report_path = tmp_path / "report.txt"
         report_path.write_text(GOOD_REPORT_CONTENT)
-        log_entry = log_manager.parse_report_file(str(report_path))
+        log_entry = replication_log_manager.parse_report_file(str(report_path))
         assert log_entry["ReplicationNum"] == "5"
         assert log_entry["Status"] == "COMPLETED"
         assert log_entry["MeanMRR"] == "0.8500"
@@ -81,14 +102,14 @@ class TestLogManagerHelpers:
     def test_parse_report_file_failure(self, tmp_path):
         report_path = tmp_path / "report_failed.txt"
         report_path.write_text(FAILED_REPORT_CONTENT)
-        log_entry = log_manager.parse_report_file(str(report_path))
+        log_entry = replication_log_manager.parse_report_file(str(report_path))
         assert log_entry["Status"] == "FAILED"
         assert log_entry["ErrorMessage"] == "See report"
 
     def test_parse_report_file_malformed_json(self, tmp_path):
         report_path = tmp_path / "report_malformed.txt"
         report_path.write_text(MALFORMED_JSON_REPORT_CONTENT)
-        log_entry = log_manager.parse_report_file(str(report_path))
+        log_entry = replication_log_manager.parse_report_file(str(report_path))
         assert log_entry["Status"] == "COMPLETED"
         assert log_entry["MeanMRR"] == "N/A"
 
@@ -102,7 +123,7 @@ class TestLogManagerHelpers:
             "Totals,old_data\n"
         )
         log_path.write_text(log_content)
-        log_manager.finalize_log(str(log_path))
+        replication_log_manager.finalize_log(str(log_path))
         content = log_path.read_text()
         assert content.count("BatchSummary") == 1
         assert "Totals,2023-01-01 10:00:00,2023-01-01 10:05:00,00:05:00,1,0" in content
@@ -112,13 +133,13 @@ class TestLogManagerMain:
     """Tests for the main function and its command-line modes."""
 
     @patch("builtins.print")
-    @patch("src.log_manager.os.rename")
-    @patch("src.log_manager.os.path.exists", return_value=True)
+    @patch("src.replication_log_manager.os.rename")
+    @patch("src.replication_log_manager.os.path.exists", return_value=True)
     def test_main_start_archives_old_log(
         self, mock_exists, mock_rename, mock_print, temp_output_dir
     ):
         with patch("sys.argv", ["script", "start", str(temp_output_dir)]):
-            log_manager.main()
+            replication_log_manager.main()
         mock_rename.assert_called_once()
         mock_print.assert_any_call("Initialized new batch run log with header.")
 
@@ -128,7 +149,7 @@ class TestLogManagerMain:
         )
         log_file = temp_output_dir / "batch_run_log.csv"
         with patch("sys.argv", ["script", "update", str(report_file)]):
-            log_manager.main()
+            replication_log_manager.main()
         assert log_file.exists()
         assert "1,COMPLETED" in log_file.read_text()
 
@@ -142,7 +163,7 @@ class TestLogManagerMain:
             GOOD_REPORT_CONTENT.replace("-5", "-0")
         )
         with patch("sys.argv", ["script", "rebuild", str(temp_output_dir)]):
-            log_manager.main()
+            replication_log_manager.main()
         log_file = temp_output_dir / "batch_run_log.csv"
         lines = log_file.read_text().replace("\r", "").strip().split("\n")
         assert len(lines) == 4  # Header + 3 reports
@@ -156,7 +177,7 @@ class TestLogManagerMain:
             "1,COMPLETED,2023-01-01 10:00:00,2023-01-01 10:05:00,...\n"
         )
         with patch("sys.argv", ["script", "finalize", str(temp_output_dir)]):
-            log_manager.main()
+            replication_log_manager.main()
         assert "BatchSummary" in log_file.read_text()
 
     def test_main_rebuild_no_reports(self, tmp_path):
@@ -164,8 +185,10 @@ class TestLogManagerMain:
         empty_dir.mkdir()
         with patch("sys.argv", ["script", "rebuild", str(empty_dir)]):
             with pytest.raises(SystemExit) as e:
-                log_manager.main()
+                replication_log_manager.main()
         assert e.value.code == 0
         log_file = empty_dir / "batch_run_log.csv"
         assert log_file.exists()
         assert len(log_file.read_text().strip().splitlines()) == 1  # Header only
+
+# === End of tests/test_replication_replication_log_manager.py ===

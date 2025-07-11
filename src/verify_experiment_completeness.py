@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: src/verify_pipeline_completeness.py
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: src/verify_experiment_completeness.py
 
 """
 Verify Pipeline Completeness Utility (verify_pipeline_completeness.py)
@@ -24,13 +41,13 @@ Workflow:
 
 Command-Line Usage:
     # Audit the default 'output' directory (depth 0)
-    python src/verify_pipeline_completeness.py
+    python src/verify_experiment_completeness.py
 
     # Audit a specific directory and its immediate subdirectories
-    python src/verify_pipeline_completeness.py /path/to/my/experiments --depth 1
+    python src/verify_experiment_completeness.py /path/to/my/experiments --depth 1
 
     # Audit an entire directory tree recursively
-    python src/verify_pipeline_completeness.py /path/to/my/experiments --depth -1
+    python src/verify_experiment_completeness.py /path/to/my/experiments --depth -1
 """
 
 import os
@@ -194,4 +211,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/verify_pipeline_completeness.py ===
+# === End of src/verify_experiment_completeness.py ===

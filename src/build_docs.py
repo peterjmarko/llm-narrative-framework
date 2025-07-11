@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: src/build_docs.py
 
 import os
@@ -86,10 +103,10 @@ def render_text_diagram(source_path, output_path, project_root, font_size=36):
 
 def build_readme_content(project_root):
     """
-    Builds the full README.md content by processing the template,
+    Builds the full DOCUMENTATION.md content by processing the template,
     injecting diagram placeholders and including other files.
     """
-    template_path = os.path.join(project_root, 'README.template.md')
+    template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
     with open(template_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
@@ -138,7 +155,7 @@ def build_readme_content(project_root):
 
 def render_all_diagrams(project_root):
     """Renders all diagrams found in the template, returning True on success."""
-    template_path = os.path.join(project_root, 'README.template.md')
+    template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
     with open(template_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
@@ -219,12 +236,12 @@ def main():
     args = parser.parse_args()
     
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    readme_path = os.path.join(project_root, 'README.md')
+    readme_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
 
     expected_readme_content = build_readme_content(project_root)
 
     if args.check:
-        print(f"{Colors.BOLD}{Colors.CYAN}--- Checking if README.md is up-to-date... ---{Colors.RESET}")
+        print(f"{Colors.BOLD}{Colors.CYAN}--- Checking if DOCUMENTATION.md is up-to-date... ---{Colors.RESET}")
         try:
             with open(readme_path, 'r', encoding='utf-8') as f:
                 current_readme_content = f.read()
@@ -232,10 +249,10 @@ def main():
             current_readme_content = ""
 
         if current_readme_content != expected_readme_content:
-            print(f"{Colors.RED}ERROR: README.md is out of date. Please run 'pdm run build-docs' and commit the changes.{Colors.RESET}")
+            print(f"{Colors.RED}ERROR: DOCUMENTATION.md is out of date. Please run 'pdm run build-docs' and commit the changes.{Colors.RESET}")
             sys.exit(1)
         else:
-            print(f"{Colors.GREEN}SUCCESS: README.md is up-to-date.{Colors.RESET}")
+            print(f"{Colors.GREEN}SUCCESS: DOCUMENTATION.md is up-to-date.{Colors.RESET}")
             sys.exit(0)
 
     # --- Full Build Mode ---
@@ -245,20 +262,20 @@ def main():
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Final Markdown ---{Colors.RESET}")
     with open(readme_path, 'w', encoding='utf-8') as f:
         f.write(expected_readme_content)
-    print(f"{Colors.GREEN}Successfully built README.md!{Colors.RESET}")
+    print(f"{Colors.GREEN}Successfully built DOCUMENTATION.md!{Colors.RESET}")
 
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Starting DOCX Conversion ---{Colors.RESET}")
     try:
         import pypandoc
         
-        readme_md = os.path.join(project_root, 'README.md')
-        readme_docx = os.path.join(project_root, 'README.docx')
+        readme_md = os.path.join(project_root, 'docs/DOCUMENTATION.md')
+        readme_docx = os.path.join(project_root, 'docs/README.docx')
         if not convert_to_docx(pypandoc, readme_md, readme_docx, project_root):
             sys.exit(1)
         
-        contrib_md = os.path.join(project_root, 'CONTRIBUTING.md')
+        contrib_md = os.path.join(project_root, 'docs/CONTRIBUTING.md')
         if os.path.exists(contrib_md):
-            contrib_docx = os.path.join(project_root, 'CONTRIBUTING.docx')
+            contrib_docx = os.path.join(project_root, 'docs/CONTRIBUTING.docx')
             if not convert_to_docx(pypandoc, contrib_md, contrib_docx, project_root):
                 sys.exit(1)
         

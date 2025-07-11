@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Filename: tests/test_build_queries.py
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/test_build_llm_queries.py
 
 import unittest
 from unittest.mock import patch, MagicMock, mock_open, call
@@ -15,11 +32,11 @@ import importlib
 import subprocess # For CompletedProcess
 
 # This will be set inside setUp for each test run
-build_queries_main_under_test = None
+build_llm_queries_main_under_test = None
 
 class TestBuildQueries(unittest.TestCase):
 
-    DUMMY_QGEN_FILENAME = "query_generator.py" # This is what build_queries.py uses
+    DUMMY_QGEN_FILENAME = "query_generator.py" # This is what build_llm_queries.py uses
 
     def setUp(self):
         self.test_project_root_obj = tempfile.TemporaryDirectory(prefix="test_build_queries_proj_")
@@ -74,15 +91,15 @@ class TestBuildQueries(unittest.TestCase):
         self.sys_modules_patcher.start()
         
         # Now that the mock is in place, we can safely import/reload the module under test
-        module_name_to_test = 'build_queries'
-        global build_queries_main_under_test
+        module_name_to_test = 'build_llm_queries'
+        global build_llm_queries_main_under_test
         if module_name_to_test in sys.modules:
             # Reload to make sure it uses our mocked config_loader
             reloaded_module = importlib.reload(sys.modules[module_name_to_test])
-            build_queries_main_under_test = reloaded_module.main
+            build_llm_queries_main_under_test = reloaded_module.main
         else:
             imported_module = importlib.import_module(module_name_to_test)
-            build_queries_main_under_test = imported_module.main
+            build_llm_queries_main_under_test = imported_module.main
 
         # Create dummy files needed by the test logic
         self.dummy_base_query_path = os.path.join(self.test_data_dir, 
@@ -170,12 +187,12 @@ class TestBuildQueries(unittest.TestCase):
         k_per_query = self.mock_config_parser_obj.getint('General', 'default_k')
 
         cli_args = [
-            'build_queries.py', '-m', str(num_iterations), '-k', str(k_per_query),
+            'build_llm_queries.py', '-m', str(num_iterations), '-k', str(k_per_query),
             '--base_seed', '42', '--qgen_base_seed', '100',
             '--run_output_dir', self.test_run_dir
         ]
         with patch.object(sys, 'argv', cli_args):
-            build_queries_main_under_test()
+            build_llm_queries_main_under_test()
 
         run_queries_dir = os.path.join(self.test_run_dir, self.cfg_queries_subdir_name)
         self.assertTrue(os.path.exists(run_queries_dir))
@@ -207,13 +224,13 @@ class TestBuildQueries(unittest.TestCase):
         run_queries_dir = os.path.join(test_run_dir, self.cfg_queries_subdir_name)
         
         cli_args = [
-            'build_queries.py', '-m', str(num_iterations), '-k', str(k_per_query),
+            'build_llm_queries.py', '-m', str(num_iterations), '-k', str(k_per_query),
             '--base_seed', '777', '--qgen_base_seed', '888',
             '--run_output_dir', test_run_dir
         ]
 
         with patch.object(sys, 'argv', cli_args):
-            build_queries_main_under_test()
+            build_llm_queries_main_under_test()
             
         mappings_path_run1 = os.path.join(run_queries_dir, self.mock_config_parser_obj['Filenames']['aggregated_mappings_in_queries_dir'])
         query_path_run1 = os.path.join(run_queries_dir, "llm_query_001.txt")
@@ -223,11 +240,11 @@ class TestBuildQueries(unittest.TestCase):
         with open(mappings_path_run1, 'r') as f: content_mappings_run1 = f.read()
         with open(query_path_run1, 'r') as f: content_query_run1 = f.read()
 
-        from build_queries import clear_output_files_for_fresh_run
+        from src.build_llm_queries import clear_output_files_for_fresh_run
         clear_output_files_for_fresh_run(run_queries_dir, mappings_path_run1, os.path.join(run_queries_dir, self.mock_config_parser_obj['Filenames']['used_indices_log']))
 
         with patch.object(sys, 'argv', cli_args):
-            importlib.reload(sys.modules['build_queries']).main()
+            importlib.reload(sys.modules['build_llm_queries']).main()
 
         mappings_path_run2 = os.path.join(run_queries_dir, self.mock_config_parser_obj['Filenames']['aggregated_mappings_in_queries_dir'])
         query_path_run2 = os.path.join(run_queries_dir, "llm_query_001.txt")
@@ -249,14 +266,14 @@ class TestBuildQueries(unittest.TestCase):
         total_personalities_needed = (num_iterations_initial + num_iterations_continue) * k_per_query
         self._create_dummy_master_personalities_file(self.master_personalities_path, num_personalities=total_personalities_needed + 5)
 
-        cli_args_run1 = ['build_queries.py', '-m', str(num_iterations_initial), '-k', str(k_per_query), '--base_seed', '10', '--qgen_base_seed', '110', '--run_output_dir', self.test_run_dir]
+        cli_args_run1 = ['build_llm_queries.py', '-m', str(num_iterations_initial), '-k', str(k_per_query), '--base_seed', '10', '--qgen_base_seed', '110', '--run_output_dir', self.test_run_dir]
         with patch.object(sys, 'argv', cli_args_run1):
-            build_queries_main_under_test()
+            build_llm_queries_main_under_test()
         
         # Reload the module to ensure it picks up the changed file system state
-        current_main_to_call = importlib.reload(sys.modules['build_queries']).main
+        current_main_to_call = importlib.reload(sys.modules['build_llm_queries']).main
 
-        cli_args_run2 = ['build_queries.py', '-m', str(num_iterations_continue), '-k', str(k_per_query), '--base_seed', '20', '--qgen_base_seed', '120', '--run_output_dir', self.test_run_dir]
+        cli_args_run2 = ['build_llm_queries.py', '-m', str(num_iterations_continue), '-k', str(k_per_query), '--base_seed', '20', '--qgen_base_seed', '120', '--run_output_dir', self.test_run_dir]
         with patch.object(sys, 'argv', cli_args_run2):
             current_main_to_call()
 
@@ -281,9 +298,9 @@ class TestBuildQueries(unittest.TestCase):
         needed = num_iterations * k_per_query
         self._create_dummy_master_personalities_file(self.master_personalities_path, num_personalities=needed - 1)
 
-        cli_args = ['build_queries.py', '-m', str(num_iterations), '-k', str(k_per_query), '--run_output_dir', self.test_run_dir]
+        cli_args = ['build_llm_queries.py', '-m', str(num_iterations), '-k', str(k_per_query), '--run_output_dir', self.test_run_dir]
         with patch.object(sys, 'argv', cli_args):
-            importlib.reload(sys.modules['build_queries']).main()
+            importlib.reload(sys.modules['build_llm_queries']).main()
         
         mock_sys_exit.assert_called_once_with(1)
         error_found = any("Not enough unique *available* personalities" in str(call_arg) for call_arg in mock_log_error.call_args_list)
@@ -296,12 +313,12 @@ class TestBuildQueries(unittest.TestCase):
         k_per_query = 3
 
         cli_args = [
-            'build_queries.py', '-m', str(num_iterations), '-k', str(k_per_query),
+            'build_llm_queries.py', '-m', str(num_iterations), '-k', str(k_per_query),
             '--base_seed', '999', '--qgen_base_seed', '888',
             '--run_output_dir', self.test_run_dir
         ]
         with patch.object(sys, 'argv', cli_args):
-            build_queries_main_under_test()
+            build_llm_queries_main_under_test()
 
         run_queries_dir = os.path.join(self.test_run_dir, self.cfg_queries_subdir_name)
         for i in range(1, num_iterations + 1):
@@ -335,4 +352,4 @@ class TestBuildQueries(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main(verbosity=2)
 
-# === End of tests/test_build_queries.py ===
+# === End of tests/test_build_llm_queries.py ===
