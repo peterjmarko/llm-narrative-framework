@@ -102,7 +102,7 @@ def render_text_diagram(source_path, output_path, project_root, font_size=36):
     image.save(output_path, "PNG")
     return True
 
-def build_readme_content(project_root):
+def build_readme_content(project_root, flavor='viewer'):
     """
     Builds the full DOCUMENTATION.md content by processing the template,
     injecting diagram placeholders and including other files.
@@ -113,30 +113,42 @@ def build_readme_content(project_root):
 
     # --- Process diagram placeholders ---
     # {{diagram:path/to/diagram.mmd}}
-    # Locate this function inside the build_readme_content function
-    def replace_diagram_placeholder(match):
+    def replace_diagram_placeholder(match, flavor='viewer'):
         diagram_source_rel_path = match.group(1).strip()
-        attributes_str = match.group(2)
+        attributes_str = match.group(2) or ""
 
-        pandoc_attributes = ""
-        if attributes_str:
-            # Pass through width/etc but remove our custom scale attribute
-            cleaned_attrs = re.sub(r'scale=([\d\.]+)', '', attributes_str)
-            cleaned_attrs = re.sub(r'\|\s*\|', '|', cleaned_attrs).strip(' |')
-            if cleaned_attrs:
-                pandoc_attributes = f"{{{cleaned_attrs}}}"
-        
+        # Path must be relative to DOCUMENTATION.md, which is in the docs/ dir
         base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
-        # Use a forward-slash path, which markdown prefers
-        image_rel_path = f"docs/images/{base_name}.png"
+        image_rel_path = f"images/{base_name}.png"
         
-        # This is the key: a simple, captionless Markdown image.
-        # Our Lua filter will find and center this.
-        return f"![]({image_rel_path}){pandoc_attributes}"
+        # Parse attributes like 'width=110%' into a dictionary
+        attr_dict = {}
+        if attributes_str:
+            pairs = [p.strip() for p in attributes_str.split('|')]
+            for pair in pairs:
+                if '=' in pair:
+                    key, value = pair.split('=', 1)
+                    attr_dict[key.strip().lower()] = value.strip()
+
+        if flavor == 'pandoc':
+            # For DOCX: Generate Pandoc-style attributes string, e.g., {width="110%"}
+            pandoc_attr_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
+            pandoc_attributes = "{" + " ".join(pandoc_attr_parts) + "}" if pandoc_attr_parts else ""
+            # Pandoc syntax does not use a space before the attributes
+            return f"![]({image_rel_path}){pandoc_attributes}"
+        else: # 'viewer' flavor
+            # For MD viewers: Generate a standard HTML <img> tag, which works everywhere.
+            html_attrs_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
+            html_attrs = " ".join(html_attrs_parts)
+            # Center the image using a div container
+            return f'<div align="center">\n  <img src="{image_rel_path}" {html_attrs.strip()}>\n</div>'
 
     
     # Updated regex to capture the optional attribute part after a pipe |
-    content = re.sub(r'\{\{diagram:(.*?)(?:\|(.*?))?\}\}', replace_diagram_placeholder, content)
+    # Use a lambda to pass the 'flavor' parameter to the placeholder function
+    content = re.sub(r'\{\{diagram:(.*?)(?:\|(.*?))?\}\}', 
+                     lambda m: replace_diagram_placeholder(m, flavor=flavor), 
+                     content)
 
     # --- Process include placeholders ---
     # {{include:path/to/file.txt}}
@@ -154,7 +166,7 @@ def build_readme_content(project_root):
     return content
 
 
-def render_all_diagrams(project_root):
+def render_all_diagrams(project_root, force_render=False):
     """Renders all diagrams found in the template, returning True on success."""
     template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
     with open(template_path, 'r', encoding='utf-8') as f:
@@ -170,51 +182,83 @@ def render_all_diagrams(project_root):
         base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
         image_rel_path = os.path.join('docs', 'images', f"{base_name}.png")
         
-        attributes_str = placeholder.group(2) or ""
+        source_abs_path = os.path.join(project_root, diagram_source_rel_path)
+        image_abs_path = os.path.join(project_root, image_rel_path)
         
-        if diagram_source_rel_path.endswith('.mmd'):
-            scale_match = re.search(r'scale=([\d\.]+)', attributes_str)
-            scale = scale_match.group(1) if scale_match else '1.8' # default in function
-            
-            if not render_mermaid_diagram(
-                os.path.join(project_root, diagram_source_rel_path), 
-                os.path.join(project_root, image_rel_path), 
-                project_root, 
-                scale=scale
-            ):
-                all_diagrams_ok = False
-        elif diagram_source_rel_path.endswith('.txt'):
-            font_size = 22 if 'replication_report_format' in diagram_source_rel_path else 20 if 'analysis_log_format' in diagram_source_rel_path else 36
-            if not render_text_diagram(os.path.join(project_root, diagram_source_rel_path), os.path.join(project_root, image_rel_path), project_root, font_size=font_size):
-                all_diagrams_ok = False
-    
+        should_render = False
+        if force_render:
+            should_render = True
+        elif not os.path.exists(image_abs_path):
+            should_render = True
+        else:
+            try:
+                source_mtime = os.path.getmtime(source_abs_path)
+                image_mtime = os.path.getmtime(image_abs_path)
+                if source_mtime > image_mtime:
+                    should_render = True
+                else:
+                    print(f"    - Skipping {Colors.CYAN}{os.path.basename(diagram_source_rel_path)}{Colors.RESET} (up-to-date)")
+            except FileNotFoundError:
+                print(f"    - {Colors.YELLOW}WARNING: Source file not found for comparison: {diagram_source_rel_path}. Will attempt to render.{Colors.RESET}")
+                should_render = True
+
+        if should_render:
+            attributes_str = placeholder.group(2) or ""
+            if diagram_source_rel_path.endswith('.mmd'):
+                scale_match = re.search(r'scale=([\d\.]+)', attributes_str)
+                scale = scale_match.group(1) if scale_match else '1.8'
+                if not render_mermaid_diagram(source_abs_path, image_abs_path, project_root, scale=scale):
+                    all_diagrams_ok = False
+            elif diagram_source_rel_path.endswith('.txt'):
+                font_size = 22 if 'replication_report_format' in diagram_source_rel_path else 20 if 'analysis_log_format' in diagram_source_rel_path else 36
+                if not render_text_diagram(source_abs_path, image_abs_path, project_root, font_size=font_size):
+                    all_diagrams_ok = False
+
     if not all_diagrams_ok:
         print(f"\n{Colors.RED}{Colors.BOLD}--- BUILD FAILED: One or more diagrams could not be rendered. ---{Colors.RESET}")
     
     return all_diagrams_ok
 
-def convert_to_docx(pypandoc, source_md_path, output_docx_path, project_root):
+def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path=None, source_md_content=None):
     """
-    Converts a single markdown file to DOCX, with specific error handling
-    for file-in-use permission errors and missing pandoc installations.
+    Converts a markdown source (from file OR string) to DOCX, with robust error handling.
     """
-    source_filename = os.path.basename(source_md_path)
-    output_filename = os.path.basename(output_docx_path)
+    if not source_md_path and not source_md_content:
+        print(f"{Colors.RED}ERROR: convert_to_docx requires either a source_md_path or source_md_content.{Colors.RESET}")
+        return False
 
-    print(f"    - Converting '{Colors.CYAN}{source_filename}{Colors.RESET}' to DOCX...")
+    # Determine a logical filename for logging messages
+    logical_source_name = os.path.basename(source_md_path) if source_md_path else os.path.basename(output_docx_path).replace('.docx', '.md')
+    output_filename = os.path.basename(output_docx_path)
+    
+    # Base the resource path on the *output* file's location. This is more reliable.
+    if 'docs' in os.path.normpath(output_docx_path):
+        resource_path = os.path.join(project_root, 'docs')
+    else:
+        resource_path = project_root
+
+    print(f"    - Converting '{Colors.CYAN}{logical_source_name}{Colors.RESET}' to DOCX...")
     
     permission_error_printed = False
     while True:
         try:
-            extra_args = ['--standalone', '--resource-path', project_root]
-            pypandoc.convert_file(
-                source_md_path, 'docx',
-                outputfile=output_docx_path,
-                extra_args=extra_args
-            )
+            extra_args = ['--standalone', '--resource-path', resource_path]
+            
+            # Use the correct pypandoc function based on the provided source
+            if source_md_content:
+                pypandoc.convert_text(
+                    source_md_content, 'docx', format='md',
+                    outputfile=output_docx_path,
+                    extra_args=extra_args
+                )
+            else: # source_md_path must exist
+                pypandoc.convert_file(
+                    source_md_path, 'docx',
+                    outputfile=output_docx_path,
+                    extra_args=extra_args
+                )
             
             if permission_error_printed:
-                # Add a newline for cleaner output after the waiting message
                 print(f"      {Colors.GREEN}File unlocked. Resuming...{Colors.RESET}")
             
             print(f"      {Colors.GREEN}Successfully built '{Colors.CYAN}{output_filename}{Colors.GREEN}'!{Colors.RESET}")
@@ -227,16 +271,14 @@ def convert_to_docx(pypandoc, source_md_path, output_docx_path, project_root):
                     print(f"      The file is likely open in another program (e.g., Microsoft Word).")
                     print(f"      Please close the file. The script will retry automatically... (Ctrl+C to cancel){Colors.RESET}")
                     permission_error_printed = True
-                time.sleep(2)  # Wait for 2 seconds before retrying
+                time.sleep(2)
                 continue
             else:
                 print(f"\n{Colors.RED}[ERROR] An unexpected error occurred with Pandoc.{Colors.RESET}")
                 raise e
         
         except FileNotFoundError:
-            print(f"{Colors.RED}\n[ERROR] `pandoc` command not found.")
-            print("Please ensure Pandoc is installed and accessible in your system's PATH.")
-            print(f"See: https://pandoc.org/installing.html{Colors.RESET}")
+            print(f"{Colors.RED}\n[ERROR] `pandoc` command not found. See: https://pandoc.org/installing.html{Colors.RESET}")
             return False
             
         except KeyboardInterrupt:
@@ -247,50 +289,41 @@ def convert_to_docx(pypandoc, source_md_path, output_docx_path, project_root):
 def main():
     parser = argparse.ArgumentParser(description="Builds project documentation from templates.")
     parser.add_argument('--check', action='store_true', help="Check if docs are up-to-date without modifying files.")
+    parser.add_argument('--force-render', action='store_true', help="Force re-rendering of all diagrams, ignoring timestamps.")
     args = parser.parse_args()
     
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    readme_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
-
-    expected_readme_content = build_readme_content(project_root)
-
-    if args.check:
-        print(f"{Colors.BOLD}{Colors.CYAN}--- Checking if DOCUMENTATION.md is up-to-date... ---{Colors.RESET}")
-        try:
-            with open(readme_path, 'r', encoding='utf-8') as f:
-                current_readme_content = f.read()
-        except FileNotFoundError:
-            current_readme_content = ""
-
-        if current_readme_content != expected_readme_content:
-            print(f"{Colors.RED}ERROR: DOCUMENTATION.md is out of date. Please run 'pdm run build-docs' and commit the changes.{Colors.RESET}")
-            sys.exit(1)
-        else:
-            print(f"{Colors.GREEN}SUCCESS: DOCUMENTATION.md is up-to-date.{Colors.RESET}")
-            sys.exit(0)
-
-    # --- Full Build Mode ---
-    if not render_all_diagrams(project_root):
+    
+    # Render all diagram images first, passing the force_render flag
+    if not render_all_diagrams(project_root, force_render=args.force_render):
         sys.exit(1)
 
-    print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Final Markdown ---{Colors.RESET}")
+    # --- Build for MD Viewers (GitHub, VS Code) ---
+    print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Markdown for Viewers ---{Colors.RESET}")
+    # The 'viewer' flavor generates HTML <img> tags for maximum compatibility
+    viewer_content = build_readme_content(project_root, flavor='viewer')
+    readme_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
     with open(readme_path, 'w', encoding='utf-8') as f:
-        f.write(expected_readme_content)
+        f.write(viewer_content)
     print(f"{Colors.GREEN}Successfully built DOCUMENTATION.md!{Colors.RESET}")
 
-    print(f"\n{Colors.BOLD}{Colors.CYAN}--- Starting DOCX Conversion ---{Colors.RESET}")
+    # --- Build for DOCX Conversion ---
+    print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Content for DOCX Conversion ---{Colors.RESET}")
     try:
         import pypandoc
+        # The 'pandoc' flavor generates Pandoc-native syntax for attributes
+        pandoc_content = build_readme_content(project_root, flavor='pandoc')
         
-        readme_md = os.path.join(project_root, 'docs/DOCUMENTATION.md')
+        # Convert the main documentation
         readme_docx = os.path.join(project_root, 'docs/DOCUMENTATION.docx')
-        if not convert_to_docx(pypandoc, readme_md, readme_docx, project_root):
+        if not convert_to_docx(pypandoc, readme_docx, project_root, source_md_content=pandoc_content):
             sys.exit(1)
         
-        contrib_md = os.path.join(project_root, 'docs/CONTRIBUTING.md')
-        if os.path.exists(contrib_md):
-            contrib_docx = os.path.join(project_root, 'docs/CONTRIBUTING.docx')
-            if not convert_to_docx(pypandoc, contrib_md, contrib_docx, project_root):
+        # Convert the contributing guide (which has no special placeholders)
+        contrib_md_path = os.path.join(project_root, 'docs/CONTRIBUTING.md')
+        if os.path.exists(contrib_md_path):
+            contrib_docx_path = os.path.join(project_root, 'docs/CONTRIBUTING.docx')
+            if not convert_to_docx(pypandoc, contrib_docx_path, project_root, source_md_path=contrib_md_path):
                 sys.exit(1)
         
         print(f"\n{Colors.GREEN}{Colors.BOLD}All documents built successfully.{Colors.RESET}")

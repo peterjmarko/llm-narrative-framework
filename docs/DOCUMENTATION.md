@@ -48,7 +48,9 @@ The project's functionality is divided into three main workflows, each initiated
 #### Codebase Architecture
 This diagram provides a comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.
 
-![](docs/images/codebase_architecture.png){width=110%}
+<div align="center">
+  <img src="images/codebase_architecture.png" width="110%">
+</div>
 
 ### Workflow 1: Run an Experiment
 
@@ -60,37 +62,49 @@ Each replication executes the four core pipeline stages in sequence:
 3.  **Response Processing**: `process_llm_responses.py` parses the raw text responses from the LLM into a structured table of similarity scores.
 4.  **Performance Analysis**: Finally, `analyze_llm_performance.py` performs the final statistical analysis for the replication. It calculates key metrics (MRR, Top-1 Accuracy, effect size), uses non-parametric tests to assess significance against chance, and embeds a comprehensive JSON summary of the results into the final report.
 
-![](docs/images/architecture_workflow_1_run_experiment.png){width=105%}
+<div align="center">
+  <img src="images/architecture_workflow_1_run_experiment.png" width="105%">
+</div>
 
 ### Workflow 2: Process a Study
 
 This workflow is used after an experiment is complete to aggregate results from all replications and perform statistical analysis.
 
-![](docs/images/architecture_workflow_2_process_study.png){width=105%}
+<div align="center">
+  <img src="images/architecture_workflow_2_process_study.png" width="105%">
+</div>
 
 ### Workflow 3: Reprocess a Failed Run
 
 This workflow is used to recover from a failed run or to re-analyze existing data with updated processing logic without re-running the expensive LLM calls.
 
-![](docs/images/architecture_workflow_3_reprocess.png){width=75%}
+<div align="center">
+  <img src="images/architecture_workflow_3_reprocess.png" width="75%">
+</div>
 
 ### Workflow 4: Migrate Old Experiment Data
 
 This utility workflow helps bring older experimental data (generated before `config.ini.archived` was standard) into compliance with modern analysis scripts.
 
-![](docs/images/architecture_workflow_4_migrate_data.png){width=50%}
+<div align="center">
+  <img src="images/architecture_workflow_4_migrate_data.png" width="50%">
+</div>
 
 ### Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
-![](docs/images/architecture_data_flow.png){width=55%}
+<div align="center">
+  <img src="images/architecture_data_flow.png" width="55%">
+</div>
 
 ### Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-![](docs/images/architecture_experimental_logic.png){width=50%}
+<div align="center">
+  <img src="images/architecture_experimental_logic.png" width="50%">
+</div>
 
 ## Experimental Hierarchy
 
@@ -105,7 +119,9 @@ The project's experiments are organized in a logical hierarchy:
 
 This logical hierarchy is reflected in the physical layout of the repository:
 
-![](docs/images/directory_structure.png){width=110%}
+<div align="center">
+  <img src="images/directory_structure.png" width="110%">
+</div>
 
 ## Setup and Installation
 
@@ -223,7 +239,9 @@ The pipeline now generates a consistent, standardized `replication_report.txt` f
 
 Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
 
-![](docs/images/replication_report_format.png)
+<div align="center">
+  <img src="images/replication_report_format.png" >
+</div>
 
 **Date Handling by Mode:**
 -   **Normal Mode**: The report title is `REPLICATION RUN REPORT` and the `Date` field shows the time of the original run.
@@ -233,7 +251,9 @@ Each report contains a clear header, the base query used, a human-readable analy
 
 The final analysis script (`analyze_study_results.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
-![](docs/images/analysis_log_format.png)
+<div align="center">
+  <img src="images/analysis_log_format.png" >
+</div>
 
 ## Migrating Old Experiment Data (`migrate_old_experiment.ps1`)
 
