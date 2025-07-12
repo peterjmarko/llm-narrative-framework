@@ -17,27 +17,33 @@
 # Filename: src/compile_study_results.py
 
 """
-Compiles All Experiment Results into Level-Aware Summary CSVs.
+Hierarchical Results Compiler for Study-Wide Analysis.
 
-This script recursively scans a directory structure to find all individual
-replication reports and aggregates their data into a master CSV file.
+This script is the primary data aggregation tool in the analysis workflow.
+It systematically transforms the raw output from numerous individual replication
+reports into a clean, unified, and analysis-ready dataset.
 
-It operates in a hierarchical, bottom-up fashion:
-1.  It starts from the deepest directories in the specified path.
-2.  It parses metrics and parameters from `replication_report.txt` and the
-    archived `config.ini.archived` files.
-3.  It generates level-aware summary files:
-    - `REPLICATION_results.csv`: For a single replication run.
-    - `EXPERIMENT_results.csv`: Aggregates all replications in an experiment.
-    - `STUDY_results.csv`: Aggregates all experiments in a study.
-4.  This process repeats up the directory tree, with each parent directory
-    aggregating the summaries from its children.
+Its core mechanism is a **bottom-up hierarchical compilation**:
+1.  It performs a post-order traversal (`os.walk(..., topdown=False)`) of a
+    given study directory.
+2.  At the "leaf" level (individual `run_*` directories), it parses metrics
+    from `replication_report.txt` and experimental parameters from the
+    `config.ini.archived` file. It saves this as a single-row
+    `REPLICATION_results.csv`.
+3.  As it moves up the directory tree, it aggregates the summary CSVs from all
+    its child directories. For example, an "experiment" directory will
+    combine all the `REPLICATION_results.csv` files from its children into a
+    single, comprehensive `EXPERIMENT_results.csv`.
+4.  This process continues until it reaches the top-level directory, where it
+    creates a master `STUDY_results.csv` containing the data from every
+    valid replication in the entire study.
 
-The final result is a master `STUDY_results.csv` at the top level of the
-specified directory, ready for statistical analysis.
+The final output is a set of perfectly structured, level-aware CSV files that
+create a fully auditable data archive, ready for the final statistical
+analysis phase (`analyze_study_results.py`).
 
-Usage:
-    python src/compile_study_results.py /path/to/study_output_dir
+Usage (typically called by process_study.ps1):
+    python src/compile_study_results.py /path/to/study_directory
 """
 
 import os

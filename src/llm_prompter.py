@@ -20,34 +20,24 @@
 # Filename: src/llm_prompter.py
 
 """
-LLM Prompter Worker Script (llm_prompter.py)
+LLM Prompter Worker for a Single API Call.
 
-Purpose:
-This script is the worker responsible for sending a single query to the configured
-Large Language Model (LLM) and logging the API call duration. It is called as a
-subprocess by `run_llm_sessions.py`.
+This script is the dedicated worker responsible for sending a single query to the
+configured LLM provider. It is designed to be called as a subprocess by the
+`run_llm_sessions.py` orchestrator.
 
-Workflow (Worker Mode):
-1.  Receives a query identifier and paths for I/O, including the absolute path
-    for the API timing log file (`--api_log_file`).
-2.  Loads API key and LLM parameters.
-3.  Reads the query text from the specified input file.
-4.  Makes an API call to the LLM provider.
-5.  Appends the API call duration to the specified log file.
-6.  **On success**:
-    a. Writes the full, raw JSON response to `stdout`, wrapped in delimiters.
-    b. Extracts the primary text content and writes it to the output response file.
-    c. Exits with code 0.
-7.  **On failure**:
-    a. Writes an error message to the output error file.
-    b. Exits with a non-zero code.
-
-Required Arguments for Orchestrated Runs:
-    query_identifier        Identifier for this query (e.g., '001').
-    --input_query_file      Path to the input query file.
-    --output_response_file  Path for the output response file.
-    --output_error_file     Path for the output error file.
-    --api_log_file          Absolute path to the API timing log file to append to.
+Key Features:
+-   **Threaded API Call**: Makes the blocking network request in a separate
+    thread, allowing the main thread to display a status spinner on `stderr`.
+-   **Robust Output Contract**: Communicates results back to the orchestrator via
+    a clear contract:
+    - On Success: The full, raw JSON response is written to `stdout` between
+      delimiters, while the extracted text content is saved to a file.
+    - On Failure: A descriptive error message is saved to a file.
+-   **Comprehensive Error Handling**: Catches and logs specific network errors
+    (timeouts, HTTP errors) and user interruptions.
+-   **Designed for Testability**: Includes `--test_mock_api_outcome` hooks to
+    allow for simulating various API responses without making live network calls.
 """
 
 # === Start of src/llm_prompter.py ===

@@ -20,38 +20,22 @@
 # Filename: src/run_llm_sessions.py
 
 """
-LLM Session Runner (run_llm_sessions.py)
+Orchestrator for Running Multiple LLM Sessions.
 
-Purpose:
-This script orchestrates sending multiple pre-generated queries to an LLM by
-invoking the `llm_prompter.py` worker script for each query.
+This script manages the process of sending a batch of pre-generated queries to
+the LLM by invoking the `llm_prompter.py` worker script in a loop.
 
-Console Output Modes:
--   **Default (Verbose) Mode**: When run directly, the script provides detailed,
-    real-time logging of each query being orchestrated, including worker output.
-    This is useful for debugging a specific run.
-
--   **Quiet Mode (`--quiet`)**: When the `--quiet` flag is used (typically by an
-    orchestrator like `orchestrate_replication.py`), the script suppresses all
-    detailed logs. Instead, it displays a single, updating status line on the
-    console showing the overall progress, duration of the last trial, total
-    elapsed time, and the estimated time remaining (ETR).
-
-Workflow (when called by an orchestrator):
-1.  Receives the path to a unique run directory via `--run_output_dir`.
-2.  Locates the `session_queries` and creates `session_responses` subdirectories.
-3.  For each targeted query file, it invokes `llm_prompter.py`.
-4.  Saves the LLM's text response to `llm_response_XXX.txt` and the full raw
-    JSON response to `llm_response_XXX_full.json`.
-5.  Logs detailed progress to a file (`llm_sessions.log`) inside the run
-    directory, regardless of whether quiet mode is active.
-
-Command-Line Usage:
-    # Run all queries in a directory with full verbose output
-    python src/run_llm_sessions.py --run_output_dir <path_to_run_dir> -v
-
-    # Manually retry specific failed queries (e.g., 12 and 37)
-    python src/run_llm_sessions.py --run_output_dir <path_to_run_dir> --indices 12 37 --force-rerun
+Key Features:
+-   **Batch Processing**: Iterates through all `llm_query_XXX.txt` files in a
+    directory and orchestrates a worker for each one.
+-   **Smart Console Output**: In default mode, it provides verbose logging. In
+    `--quiet` mode (used by the main pipeline), it displays a clean, single-line
+    progress bar with completion stats and an Estimated Time Remaining (ETR).
+-   **Resilient Operation**: Supports resuming interrupted runs (`--continue-run`)
+    and re-running specific failed queries (`--force-rerun --indices ...`).
+-   **Artifact Management**: Manages the I/O, passing queries to the worker and
+    saving the final text response and full JSON response to correctly named
+    files in the `session_responses` directory.
 """
 
 import argparse

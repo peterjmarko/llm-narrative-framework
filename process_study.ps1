@@ -4,29 +4,29 @@
 
 <#
 .SYNOPSIS
-    Automates the final compilation and statistical analysis of a full study.
+    Compiles and analyzes a full study, providing a clean, high-level summary.
 
 .DESCRIPTION
-    This script provides a user-friendly wrapper for the two main post-processing stages.
-    By default, it intelligently parses the output of the underlying Python scripts
-    to provide a clean, high-level summary of the process.
+    This script is the main entry point for the entire post-processing workflow. It
+    orchestrates the two key analysis scripts in sequence:
+    1.  `compile_study_results.py`: To aggregate all individual run data into a master CSV.
+    2.  `analyze_study_results.py`: To perform statistical analysis on the master CSV.
 
-    1.  It calls `compile_study_results.py` to aggregate all results into a master 'STUDY_results.csv'.
-    2.  It then calls `analyze_study_results.py` to perform a full statistical analysis on that
-        master CSV, generating final plots and logs.
-
-    For detailed, real-time output from the Python scripts, use the -Verbose switch.
+    By default, it intelligently parses the output from these scripts to provide a
+    clean, high-level summary of the compilation and analysis steps. For detailed,
+    real-time output, use the -Verbose switch.
 
 .PARAMETER StudyDirectory
-    The path to the top-level study directory containing one or more experiment
-    directories to be compiled and analyzed (e.g., 'output/reports').
+    The path to the top-level study directory containing experiment folders that need
+    to be analyzed (e.g., 'output/reports'). This is a mandatory parameter.
 
 .EXAMPLE
-    # Run with standard (summarized) output:
-    .\process_study.ps1 "output/reports"
+    # Run analysis with the default high-level summary.
+    .\process_study.ps1 "output/reports/My_Full_Study"
 
-    # Run with full, detailed output for debugging:
-    .\process_study.ps1 -StudyDirectory "output/reports" -Verbose
+.EXAMPLE
+    # Run analysis with detailed, real-time output for debugging.
+    .\process_study.ps1 "output/reports/My_Full_Study" -Verbose
 #>
 [CmdletBinding()]
 param (

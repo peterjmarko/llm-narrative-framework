@@ -23,33 +23,37 @@
 Orchestrator for a Single Experimental Replication.
 
 This script is the engine for executing or reprocessing a single, self-contained
-experimental run. It calls the various pipeline stages (build queries, run LLM,
-process, analyze) in sequence as subprocesses.
+experimental replication. It is typically called in a loop by the main batch
+runner, `experiment_manager.py`.
 
-It operates in two modes:
+It operates in two primary modes:
+
 1.  **New Run Mode (default):**
-    -   Creates a new, unique run directory.
-    -   Archives the `config.ini` for reproducibility.
-    -   Executes the full pipeline:
-        -   Stage 1: `build_llm_queries.py`
-        -   Stage 2: `run_llm_sessions.py`
-        -   Stage 3: `process_llm_responses.py`
-        -   Stage 4: `analyze_llm_performance.py`
+    -   Creates a new, timestamped directory for the replication's artifacts.
+    -   Archives the root `config.ini` file to the new directory for perfect
+        reproducibility.
+    -   Executes the complete four-stage pipeline by calling each script:
+        1. `build_llm_queries.py`: Generates queries and trial data.
+        2. `run_llm_sessions.py`: Interacts with the LLM API.
+        3. `process_llm_responses.py`: Parses LLM responses into scores.
+        4. `analyze_llm_performance.py`: Calculates final replication metrics.
+
 2.  **Reprocess Mode (`--reprocess`):**
-    -   Operates on an existing `run_output_dir`.
-    -   Skips Stages 1 and 2 (query building and LLM interaction).
-    -   Re-runs only Stage 3 (processing) and Stage 4 (analysis). This is
-        useful for fixing bugs in the analysis code without re-running the
-        expensive LLM calls.
+    -   Operates on a specified, existing replication directory.
+    -   Skips the expensive query generation and LLM interaction stages (1 & 2).
+    -   Re-runs only the data processing and analysis stages (3 & 4), making it
+        ideal for applying fixes or updates to the analysis logic.
 
-Finally, it compiles all captured output from the subprocesses into a single,
-comprehensive `replication_report.txt` within the run directory.
+In both modes, the script's final action is to generate a comprehensive
+`replication_report.txt` file. This report contains all run parameters, the
+final status, a human-readable summary, a machine-parsable JSON block of all
+metrics, and the full logs from all pipeline stages.
 
-Usage (for a new run, typically called by experiment_manager.py):
-    python src/orchestrate_replication.py --replication_num 1
+Usage (as called by experiment_manager.py):
+    python src/orchestrate_replication.py --replication_num 1 --base_output_dir path/to/exp
 
-Usage (for reprocessing an existing run):
-    python src/orchestrate_replication.py --reprocess --run_output_dir /path/to/run_dir
+Usage (for manual reprocessing):
+    python src/orchestrate_replication.py --reprocess --run_output_dir path/to/run_dir
 """
 
 import argparse

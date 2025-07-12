@@ -20,50 +20,46 @@
 # Filename: src/config_loader.py
 
 """
-Configuration Loader (config_loader.py)
+Universal Configuration Loader (config_loader.py)
 
-Purpose:
-This module is responsible for loading project-wide configurations. It defines:
-1.  The project's root directory (`PROJECT_ROOT`).
-2.  An application configuration object (`APP_CONFIG`) by parsing 'config.ini'.
-3.  A helper function (`get_config_value`) to safely retrieve typed values from `APP_CONFIG`.
-4.  Logic to load environment variables from a '.env' file (`ENV_LOADED`).
+This module provides a robust, centralized system for loading configurations
+for the entire project. It is designed to be imported by any script that needs
+access to project-wide settings.
 
-Configuration File ('config.ini'):
-- Expected to be at the `PROJECT_ROOT`.
-- Uses INI format with sections and key-value pairs.
-- Supports inline comments starting with '#' or ';'.
+Key Features:
+-   **Loads `config.ini`**: Parses the main configuration file into a global
+    `APP_CONFIG` object, automatically finding it relative to the project root.
+-   **Loads `.env`**: Securely loads environment variables (like API keys) from
+    a `.env` file at the project root.
+-   **Safe Value Retrieval**: The `get_config_value()` helper function provides
+    type-safe access to config values, with support for fallbacks, type
+    conversion (str, int, float, bool), and stripping of inline comments.
+-   **Advanced Parsing**: Includes helpers for parsing comma-separated lists
+    (`get_config_list`) and entire sections as dictionaries
+    (`get_config_section_as_dict`).
+-   **Backward Compatibility**: The `get_config_compatibility_map()` function
+    can parse a `[ConfigCompatibility]` section in the config, allowing
+    scripts to read legacy parameter names from older configuration files.
 
-Environment Variables File ('.env'):
-- Expected to be at the `PROJECT_ROOT`.
-- Used for sensitive information like API keys (e.g., OPENROUTER_API_KEY).
-- Loaded using python-dotenv.
+Global Objects Provided:
+-   `PROJECT_ROOT`: An absolute path to the project's root directory.
+-   `APP_CONFIG`: A `configparser.ConfigParser` instance holding all data from
+    `config.ini`.
+-   `ENV_LOADED`: A boolean indicating if a `.env` file was successfully loaded.
 
 Usage by other scripts:
-    from config_loader import APP_CONFIG, ENV_LOADED, get_config_value, PROJECT_ROOT
+    from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 
-    # Example:
-    # api_key = os.getenv("OPENROUTER_API_KEY")
-    # default_k = get_config_value(APP_CONFIG, 'General', 'default_k', fallback=6, value_type=int)
-    # data_file_path = os.path.join(PROJECT_ROOT, "data", "my_data.csv")
+    # Get a typed value with a fallback
+    num_trials = get_config_value(APP_CONFIG, 'Study', 'num_trials',
+                                  value_type=int, fallback=100)
 
-Key Components:
-- `PROJECT_ROOT`: Dynamically determined absolute path to the project's root directory.
-  Assumes `config_loader.py` is in a subdirectory (e.g., 'src/') of `PROJECT_ROOT`.
-- `APP_CONFIG`: A `configparser.ConfigParser` instance holding data from 'config.ini'.
-- `ENV_LOADED`: Boolean indicating if a '.env' file was successfully found and loaded.
-- `get_config_value()`: Safely retrieves values, handles missing sections/keys,
-  type conversion (str, int, float, bool), and inline comment stripping.
-  Recognizes '\t' string in config as a tab character.
-  Recognizes 'None' string in config as Python None for string types.
+    # Get a list
+    model_list = get_config_list(APP_CONFIG, 'Analysis', 'models_to_plot')
 
-Error Handling:
-- Logs warnings if 'config.ini' or '.env' are not found or if parsing errors occur,
-  allowing scripts to proceed with fallbacks or default behaviors.
-- `get_config_value` logs warnings for type conversion errors and uses fallbacks.
+    # Build a path relative to the project root
+    db_path = os.path.join(PROJECT_ROOT, 'data', 'personalities.db')
 """
-
-# === Start of src/config_loader.py ===
 
 import configparser
 import os

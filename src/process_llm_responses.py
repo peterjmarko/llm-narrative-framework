@@ -20,36 +20,27 @@
 # Filename: src/process_llm_responses.py
 
 """
-Stage 3: Process and Validate LLM Responses.
+Stage 3: LLM Response Parser and Validator.
 
-This script transforms raw LLM text outputs into structured data suitable for
-statistical analysis. It acts as a bridge between the raw data generation
-(Stage 2) and the final performance analysis (Stage 4).
+This script is the critical data-cleaning stage of the pipeline. It takes the
+raw, potentially inconsistent text responses from the LLM and transforms them
+into clean, validated, and structured numerical data ready for analysis.
 
-Core Workflow:
-1.  Receives a specific `run_output_dir` as input.
-2.  Reads raw text responses from the `session_responses` subdirectory.
-3.  Parses each response to extract a score matrix using a robust method that
-    handles common formatting inconsistencies.
-4.  Performs a critical validation step: for each successfully parsed response, it
-    cross-references the ground-truth mapping from `mappings.txt` against the
-    individual query's manifest file to ensure data integrity.
-5.  Aggregates all successfully parsed score matrices and their corresponding
-    *validated* mappings into clean output files.
+Key Features:
+-   **Robust Parsing**: Employs a flexible parser to extract score matrices from
+    LLM text, correctly handling markdown fences, variable spacing, and
+    unexpected column order.
+-   **Ground-Truth Validation**: Before accepting a trial's data, it performs a
+    critical validation by cross-referencing the master `mappings.txt` against
+    the individual trial's `manifest.txt`, ensuring data integrity.
+-   **Output Self-Validation**: After writing the final `all_scores.txt`, it
+    performs a "read-after-write" check to validate the file's content against
+    the in-memory data, preventing data corruption.
+-   **Clear Orchestration Signals**: Prints machine-readable tags upon success
+    (e.g., `PROCESSOR_VALIDATION_SUCCESS`) for the calling script to interpret.
 
-Inputs (read from `<run_output_dir>`):
--   `session_responses/llm_response_XXX.txt`: Raw text from the LLM.
--   `session_queries/llm_query_XXX.txt`: The original query sent to the LLM.
--   `session_queries/mappings.txt`: The master list of ground-truth mappings.
--   `session_queries/llm_query_XXX_manifest.txt`: Ground truth for a single query.
-
-Outputs (written to `<run_output_dir>/analysis_inputs/`):
--   `all_scores.txt`: A file containing all parsed score matrices.
--   `all_mappings.txt`: A file containing only the validated ground-truth mappings.
--   `successful_query_indices.txt`: A log of which queries were successfully processed.
-
-Usage (typically called by an orchestrator):
-    python src/process_llm_responses.py --run_output_dir /path/to/run_dir
+This script's rigorous validation ensures that the final performance analysis
+is built upon a foundation of verifiably correct data.
 """
 
 # === Start of src/process_llm_responses.py ===

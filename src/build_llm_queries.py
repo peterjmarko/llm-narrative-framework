@@ -20,40 +20,26 @@
 # Filename: src/build_llm_queries.py
 
 """
-Batch LLM Query and Mapping Generator (build_queries.py)
+Orchestrates the generation of all query sets for a single replication.
 
-Purpose:
-This script orchestrates the generation of multiple unique sets of queries for
-a single experimental run. It is designed to be called by `orchestrate_experiment.py`
-and operates within a unique run-specific directory provided to it.
+This script is the first stage of the experimental pipeline, responsible for
+creating all the trials for one replication. It orchestrates `query_generator.py`
+in a loop to produce a batch of unique queries.
 
-Key Features:
--   Generates a specified number of query sets for the experiment.
--   Accepts seeds from the caller to ensure deterministic, reproducible selection
-    and shuffling of personalities.
--   Ensures personalities are selected "without replacement" from a master list.
--   Creates all its output within the designated run-specific directory.
-
-Workflow:
-1.  Receives the path to a unique run directory via the `--run_output_dir` argument.
-2.  Receives seeds for selection (`--base_seed`) and shuffling (`--qgen_base_seed`).
-3.  Creates a `session_queries` subdirectory inside the run directory.
-4.  For the specified number of iterations:
-    a.  Selects 'k' unique, available personalities deterministically using the seed.
-    b.  Invokes `query_generator.py` as a worker with a derived seed.
-    c.  Copies the generated query, manifest, and mapping files from the worker
-        into the run-specific `session_queries` directory.
-5.  Updates the `used_personality_indices.txt` log for the current run.
-
-Input Files:
-    - Master Personalities File (e.g., 'data/personalities.txt')
-
-Output Files/Directories (within the provided `<run_output_dir>`):
-    - `<run_output_dir>/session_queries/`:
-        - `llm_query_XXX.txt`: Numbered query files for the LLM.
-        - `llm_query_XXX_manifest.txt`: Audit file for each query.
-        - `mappings.txt`: Consolidated file of all true mappings for the run.
-        - `used_personality_indices.txt`: Log of used personalities for the run.
+Key Workflow:
+1.  Loads the master list of all personalities.
+2.  Loads the list of personalities already used in the experiment to ensure
+    sampling is done without replacement.
+3.  For the specified number of iterations (`m`):
+    a. Samples `k` unique, available personalities from the master list.
+    b. Writes this subset to a temporary file.
+    c. Invokes `query_generator.py` as a subprocess, passing it the temporary
+       file and a derived seed for deterministic shuffling.
+    d. Collects the output files from the worker (query, mapping, manifest)
+       and places them in the final `session_queries` directory with the
+       correct numbering.
+4.  After the loop, it updates the `used_personality_indices.txt` log with all
+    personalities selected during this run.
 """
 
 # === Start of src/build_queries.py ===

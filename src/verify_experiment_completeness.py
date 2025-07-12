@@ -20,34 +20,21 @@
 # Filename: src/verify_experiment_completeness.py
 
 """
-Verify Pipeline Completeness Utility (verify_pipeline_completeness.py)
+Audits experiment directories to verify data completeness.
 
-Purpose:
-This script audits an entire output directory structure to verify that every
-query in every replication run was successfully processed and included in the
-final analysis data. It provides a definitive, high-level summary of data
-integrity across multiple experimental batches.
+This diagnostic tool scans a directory for all `run_*` folders and verifies
+the integrity of each one by comparing file counts at each stage of the pipeline.
 
-Workflow:
-1.  Scans a parent directory for all `run_*` subdirectories.
-2.  The scan depth is controlled by the --depth argument.
-3.  For each run found, it compares three key counts:
-    a. The number of query files (`llm_query_*.txt`) generated.
-    b. The number of score matrices parsed into `all_scores.txt`.
-    c. The number of ground-truth mappings in `all_mappings.txt`.
-4.  A run is marked "COMPLETE" only if all three counts are equal.
-5.  It prints a summary table with the status of each run and a final
-    overall completeness percentage.
+For each run, it checks that the number of:
+- Expected trials (from the directory name)
+- Generated query files
+- Successful response files
+- Parsed score matrices
+- Final ground-truth mappings
+...are all equal.
 
-Command-Line Usage:
-    # Audit the default 'output' directory (depth 0)
-    python src/verify_experiment_completeness.py
-
-    # Audit a specific directory and its immediate subdirectories
-    python src/verify_experiment_completeness.py /path/to/my/experiments --depth 1
-
-    # Audit an entire directory tree recursively
-    python src/verify_experiment_completeness.py /path/to/my/experiments --depth -1
+It prints a clear summary table indicating the status of each run, which is
+invaluable for quickly identifying incomplete or corrupted data.
 """
 
 import os

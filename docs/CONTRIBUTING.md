@@ -98,7 +98,10 @@ Write your code, update data, or adjust documentation as needed.
 
 *   **Code**: Modify the Python files in `src/` or `tests/`. The pre-commit hooks will automatically handle formatting (Black) and linting (Flake8).
 *   **Data**: The project's ground truth is stored in the `data/` directory, particularly the file containing the 5,000 historical individuals and their verified birth data. If you are adding or correcting entries, edit this source file directly. Changes here are significant, so please justify them clearly in your pull request.
-*   **Documentation**: To edit the main README, modify `README.template.md` and its diagram files. To edit this contribution guide, modify `CONTRIBUTING.md`. The `build-docs` hook will automatically generate the final `README.md`, `README.docx`, and `CONTRIBUTING.docx`. **Do not edit generated files directly.**
+*   **Documentation**: The project's main documentation is generated from source files in the `docs/` directory.
+    -   To edit the main documentation, modify `docs/DOCUMENTATION.template.md` and its diagram files.
+    -   To edit this contribution guide, modify the `CONTRIBUTING.md` file at the project root.
+    -   The `pdm run build-docs` command (run by the pre-commit hook) will automatically generate the final `docs/DOCUMENTATION.md`, `docs/DOCUMENTATION.docx`, and `docs/CONTRIBUTING.docx`. **Do not edit generated files directly.**
 
 ### 3. Run the Test Suite
 
@@ -122,6 +125,10 @@ The test suite is divided into two parts, one for the Python source code and one
     -   To test the data migration script (`migrate_old_experiment.ps1`):
         ````bash
         pdm run test-ps-mig
+        ````
+    -   To test the main experiment runner (`run_experiment.ps1`):
+        ````bash
+        pdm run test-ps-exp
         ````
 
 #### How to Write a New Test (Best Practices)

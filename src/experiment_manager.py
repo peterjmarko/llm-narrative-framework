@@ -20,27 +20,37 @@
 # Filename: src/experiment_manager.py
 
 """
-Main Batch Runner for Managing Multiple Replications.
+Main Batch Controller for Experiments.
 
-This script is the primary user-facing tool for managing large-scale experiments.
-It automates the process of running many replications or reprocessing entire
-studies by calling the single-run orchestrator (`orchestrate_replication.py`)
-in a loop.
+This script is the high-level controller for running or reprocessing an entire
+experimental batch (e.g., all 30 replications). It serves as the primary engine
+called by the user-facing PowerShell wrappers. Its main job is to call the
+single-run orchestrator (`orchestrate_replication.py`) in a loop.
 
 Key Features:
--   **Batch Execution:** Runs a specified range of new replications, automatically
-    skipping any that are already complete. Provides progress and ETA.
--   **Batch Reprocessing:** Scans a directory for existing run folders and
-    re-runs the analysis stages (3 and 4) on all of them.
--   **Post-Processing:** After all tasks are complete, it automatically calls the
-    `compile_study_results.py` script to generate the final statistical summary for
-    the entire study.
+-   **Batch Execution**: For new experiments, it runs a specified range of
+    replications, intelligently skipping any that are already complete to allow
+    for easy resumption of interrupted batches.
+-   **Batch Reprocessing**: In `--reprocess` mode, it recursively scans a
+    target directory for all existing replication folders and re-runs the
+    analysis stages on each one.
+-   **Integrated Bias Analysis**: After each successful replication (new or
+    reprocessed), it automatically calls `run_bias_analysis.py` to ensure
+    consistent analysis across the experiment.
+-   **Robust Log Management**: At the end of the batch run, it calls
+    `replication_log_manager.py rebuild` to create a clean, comprehensive
+    `batch_run_log.csv` that accurately reflects the state of all completed runs.
+-   **Automated Finalization**: After all replications are complete, it
+    triggers the final post-processing steps:
+    1.  `compile_study_results.py`: To aggregate all data into a master CSV.
+    2.  `replication_log_manager.py finalize`: To append a final summary to the
+        batch log.
 
-Usage (to run replications 1 through 30):
-    python src/experiment_manager.py /path/to/study_output_dir --end-rep 30
+Usage (to run replications 1-30 in a new experiment directory):
+    python src/experiment_manager.py --end-rep 30
 
-Usage (to reprocess all runs in a directory):
-    python src/experiment_manager.py /path/to/study_output_dir --reprocess
+Usage (to reprocess all runs in an existing experiment directory):
+    python src/experiment_manager.py /path/to/experiment_dir --reprocess
 """
 
 import sys

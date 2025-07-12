@@ -20,28 +20,17 @@
 # Filename: src/rebuild_reports.py
 
 """
-Utility to Rebuild High-Fidelity Replication Reports.
+Rebuilds all replication reports from ground-truth data.
 
-This script is a data recovery and reprocessing tool. It is designed to fix
-corrupted or incomplete reports by re-running the final stages of the analysis
-pipeline using the original, ground-truth parameters.
+This script is a powerful reprocessing tool that allows for applying fixes to the
+data processing or analysis logic without re-running expensive LLM calls.
 
-Workflow:
-1.  Scans a base directory for all individual `run_*` folders.
-2.  For each run, it reads the ground-truth parameters from the
-    `config.ini.archived` file.
-3.  It re-runs `process_llm_responses.py` (Stage 3) and `analyze_llm_performance.py`
-    (Stage 4) to generate fresh, validated outputs.
-4.  It archives any existing, potentially corrupted reports by renaming them
-    with a `.corrupted` extension.
-5.  It assembles a new, complete `replication_report_*.txt` file containing the
-    original parameters and the fresh analysis output.
-
-This is useful for applying fixes in the analysis or processing scripts to all
-runs in a study without re-running the expensive LLM calls.
-
-Usage:
-    python src/rebuild_reports.py /path/to/study_output_dir
+For each run directory found, it:
+1.  Reads the ground-truth parameters from `config.ini.archived`.
+2.  Re-runs `process_llm_responses.py` (Stage 3) and `analyze_llm_performance.py`
+    (Stage 4) to generate fresh results.
+3.  Safely archives any old report as `.corrupted`.
+4.  Assembles a new, complete `replication_report.txt` with the updated analysis.
 """
 
 import argparse

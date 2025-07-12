@@ -20,34 +20,18 @@
 # Filename: src/retry_llm_sessions.py
 
 """
-Retry Failed Sessions Utility (retry_llm_sessions.py)
+Finds and retries failed LLM API calls in parallel, then updates all analysis.
 
-Purpose:
-This script automates the process of identifying and retrying failed trials
-from a batch of experimental runs. A trial is considered "failed" if a query
-was generated but a corresponding response was not successfully saved.
+This is a powerful repair utility that automates the full cycle of finding,
+retrying, and re-analyzing failed trials.
 
 Workflow:
-1.  Scans a parent directory for 'run_*' subdirectories.
-2.  The scan depth is controlled by the --depth argument.
-3.  For each run, it compares the list of generated query files against the
-    list of saved response files.
-4.  If a query file exists without a matching response file, it is marked as a
-    failed trial.
-5.  The script reads the content of the failed query file.
-6.  It re-submits the query to the specified language model API.
-7.  The new response is saved to the correct location, completing the trial.
-8.  Provides a summary of how many failures were found and retried for each run.
-
-Command-Line Usage:
-    # Scan the './output' directory for failures (depth 0)
-    python src/retry_llm_sessions.py ./output
-
-    # Scan a specific directory and its immediate subdirectories
-    python src/retry_llm_sessions.py /path/to/batch --depth 1
-
-    # Scan an entire directory tree recursively
-    python src/retry_llm_sessions.py /path/to/batch --depth -1
+1.  Scans a directory structure for runs with missing `llm_response_XXX.txt` files.
+2.  Uses a parallel thread pool to re-run only the failed trials by calling
+    `run_llm_sessions.py` with specific indices.
+3.  After retries are complete, it automatically re-runs the entire downstream
+    analysis pipeline (`process_llm_responses`, `analyze_llm_performance`, and
+    `compile_study_results`) to ensure all reports and summaries are up-to-date.
 """
 
 import argparse

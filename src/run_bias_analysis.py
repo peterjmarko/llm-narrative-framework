@@ -20,8 +20,23 @@
 # Filename: src/run_bias_analysis.py
 
 """
-Calculates key numerical metrics for positional bias on a per-replication basis
-and appends them to the replication_report.txt for study-wide analysis.
+Calculates positional bias metrics and updates the replication report.
+
+This script is a post-processor that runs after a replication is complete.
+It reads the raw `all_scores.txt` and `all_mappings.txt` files, transforms
+them into a long-format DataFrame, and calculates metrics related to
+positional bias.
+
+It then parses the `replication_report.txt` file, finds the main JSON block,
+and injects the following bias metrics into a nested dictionary called
+'positional_bias_metrics':
+- top1_pred_bias_std: The standard deviation of top-1 predictions across all
+  possible positions, indicating choice concentration.
+- true_false_score_diff: The mean difference between scores for true matches
+  and scores for false matches.
+
+This augmented report is then used by `compile_study_results.py` for the final
+study-wide analysis.
 """
 
 import argparse

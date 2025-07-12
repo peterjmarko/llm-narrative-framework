@@ -4,22 +4,22 @@
 
 <#
 .SYNOPSIS
-    Automates the 4-step process to upgrade an old experiment directory to be
-    compatible with the latest analysis and reporting scripts.
+    Upgrades a legacy experiment directory to be compatible with the current analysis pipeline.
 
 .DESCRIPTION
-    This script orchestrates a four-step data migration:
-    1. Patches old config.ini files using 'patch_old_experiment.py'.
-    2. Rebuilds reports into the modern format using 'rebuild_reports.py'.
-    3. Cleans up old artifacts like summary files, corrupted reports, and legacy analysis inputs.
-    4. Performs a final reprocessing step using 'experiment_manager.py' to generate clean, modern outputs.
+    This script orchestrates a full, four-step data migration process. It ensures
+    that old experimental data can be analyzed using the latest tools. The steps are:
+    1.  Patch Configs: Runs 'patch_old_experiment.py' to create missing config archives.
+    2.  Rebuild Reports: Runs 'rebuild_reports.py' to update all reports to the modern format.
+    3.  Clean Artifacts: Deletes obsolete summary files and temporary data.
+    4.  Final Reprocess: Runs 'experiment_manager.py --reprocess' to generate new, clean summary files.
 
 .PARAMETER TargetDirectory
-    The path to the old experiment directory that needs to be migrated.
-    This path should contain the 'run_*' subdirectories.
+    The path to the root of the old experiment directory that needs to be migrated.
 
 .EXAMPLE
-    .\migrate_old_data.ps1 -TargetDirectory "output/reports/6_Study_4"
+    # To migrate the experiment data in the "6_Study_4" directory:
+    .\migrate_old_experiment.ps1 -TargetDirectory "output/reports/6_Study_4"
 #>
 [CmdletBinding()]
 param (

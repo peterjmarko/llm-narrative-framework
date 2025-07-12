@@ -4,47 +4,40 @@
 
 <#
 .SYNOPSIS
-    Main entry point for the experiment pipeline. Runs a full batch of replications
-    with clean, high-level output by default.
+    Runs a complete experimental batch by orchestrating the Python backend.
 
 .DESCRIPTION
-    This script is the main entry point for running a full experimental batch. It calls
-    the `experiment_manager.py` script, which contains the core logic for the run.
+    This script is the main user entry point for running a full experimental batch.
+    It serves as a user-friendly wrapper for `experiment_manager.py`.
 
-    By default, this launcher runs in a "quiet" mode, showing only major progress
-    headers and a final summary for each replication. This is ideal for standard runs.
-
-    Use the -Verbose switch to see detailed, real-time logs from all underlying
-    Python scripts, which is useful for debugging.
+    It automatically detects the environment (PDM or standard Python) and translates
+    standard PowerShell parameters (like -Verbose) into the appropriate arguments
+    for the Python backend.
 
 .PARAMETER TargetDirectory
-    Optional. The target directory for the experiment. Can be an existing directory
-    or one to be created. If not provided, a new timestamped directory is created
-    in the `output/` folder. This is the first positional parameter.
+    The target directory for the experiment. Can be an existing directory or one to
+    be created. If not provided, a unique directory is created based on config.ini settings.
 
 .PARAMETER Notes
-    Optional. A string of notes to be included in the experiment's final report
-    and logs for documentation purposes.
+    A string of notes to embed in the experiment's reports and logs.
 
 .PARAMETER StartRep
-    Optional. The starting replication number (inclusive). Defaults to 1.
+    The replication number to start from (e.g., 1).
 
 .PARAMETER EndRep
-    Optional. The ending replication number (inclusive). Defaults to the value
-    in config.ini.
+    The replication number to end at (e.g., 30).
 
 .PARAMETER Verbose
-    Optional. Use this switch to enable verbose output, showing detailed logs
-    from all child scripts.
+    A switch to enable detailed, real-time output from all underlying Python scripts.
+    By default, output is a high-level summary.
 
 .EXAMPLE
-    # Run the full batch with standard (quiet) output.
-    # Results will be in a new timestamped folder.
+    # Run a full batch defined in config.ini.
     .\run_experiment.ps1
 
 .EXAMPLE
-    # Run a full batch into a specific directory with descriptive notes.
-    .\run_experiment.ps1 -TargetDirectory "output/reports/My_Llama3_Study" -Notes "First run with Llama 3"
+    # Run a batch, organizing results into a specific directory with notes.
+    .\run_experiment.ps1 -TargetDirectory "output/reports/My_Llama3_Study" -Notes "First run with random mapping"
 
 .EXAMPLE
     # Run only replications 5 through 10 with detailed logging for debugging.

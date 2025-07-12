@@ -20,12 +20,16 @@
 # Filename: src/restore_config.py
 
 """
-Restores a config.ini.archived file for a single, previously completed
-experiment run by reverse-engineering its replication_report.txt file.
+Reverse-engineers a config.ini.archived file from a legacy report.
 
-This utility is intended to be called by a batch script (like patch_old_experiment.py)
-to bring older experiment data into compliance with the new standard of
-having an archived config file in every run directory.
+This single-purpose utility operates on a single run directory. It reads the
+human-readable 'replication_report.txt' file, parses key experimental
+parameters using regular expressions, and writes them into a new,
+structured 'config.ini.archived' file.
+
+It is designed to be called in a loop by the `patch_old_experiment.py` batch
+script to upgrade an entire legacy experiment dataset, ensuring compatibility
+with modern analysis and reprocessing tools.
 """
 
 import os

@@ -17,46 +17,24 @@
 # Filename: src/analyze_llm_performance.py
 
 """
-Performance Analysis Script for LLM Matching Task (analyze_llm_performance.py)
+Stage 4: Final Statistical Analyzer for a Single Replication.
 
-Purpose:
-This script takes aggregated score matrices and their corresponding true mappings
-from a specific experimental run to perform a final statistical analysis of the
-LLM's performance.
+This script is the final, quantitative engine of the single-replication pipeline.
+It takes the clean, structured data from Stage 3 and computes a comprehensive
+suite of performance metrics.
 
-Workflow (when called by orchestrator):
-1.  Receives the path to a unique run directory via the `--run_output_dir` argument.
-2.  Reads `all_scores.txt`, `all_mappings.txt`, and `successful_query_indices.txt`
-    from the `<run_output_dir>/analysis_inputs/` directory.
-3.  Performs a **final validation step**: uses the successful indices list to ensure
-    the mappings in `all_mappings.txt` align with their original `manifest.txt`
-    files located in `<run_output_dir>/session_queries/`.
-4.  If validation passes, it calculates and prints a full statistical summary,
-    including Mann-Whitney U tests, effect sizes, MRR, and Top-K Accuracy.
-5.  Saves the raw data distributions for each key metric (e.g., MRR values for
-    each trial) to text files within the `analysis_inputs` directory for further
-    analysis or visualization.
-
-Input Files (within the provided `<run_output_dir>`):
-- `<run_output_dir>/analysis_inputs/all_scores.txt`
-- `<run_output_dir>/analysis_inputs/all_mappings.txt`
-- `<run_output_dir>/analysis_inputs/successful_query_indices.txt`
-- `<run_output_dir>/session_queries/llm_query_XXX_manifest.txt` (for validation)
-
-Output Files (within the provided `<run_output_dir>`):
-- `<run_output_dir>/analysis_inputs/mrr_distribution_kX.txt`
-- `<run_output_dir>/analysis_inputs/top_1_accuracy_distribution_kX.txt`
-- ... (and other metric distribution files)
-
-Command-Line Usage (for orchestrated runs):
-    python src/analyze_llm_performance.py --run_output_dir <path_to_run_dir> --quiet
-
-Required Argument for Orchestrated Runs:
-    --run_output_dir      The absolute path to the self-contained output
-                          directory for this specific run.
-Optional Arguments:
-    --quiet               Suppress verbose progress and info messages, showing
-                          only the final summary statistics. Used by the orchestrator.
+Key Features:
+-   **Final Validation**: Before analysis, it performs a final data integrity
+    check, cross-validating the mappings against their original manifests.
+-   **Statistical Rigor**: It uses appropriate non-parametric tests (Mann-Whitney U,
+    Wilcoxon) to assess performance against chance and combines p-values using
+    meta-analysis techniques (Stouffer's, Fisher's methods).
+-   **Comprehensive Metrics**: Calculates key performance indicators including
+    Mean Reciprocal Rank (MRR), Top-K accuracy, effect sizes, and performs a
+    linear regression to detect performance trends over the trials.
+-   **Structured JSON Output**: Its primary output is a machine-readable JSON
+    block containing all calculated metrics, which is embedded in the final
+    replication report for later aggregation.
 """
 
 # === Start of src/analyze_llm_performance.py ===

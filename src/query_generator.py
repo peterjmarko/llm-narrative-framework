@@ -20,71 +20,22 @@
 # Filename: src/query_generator.py
 
 """
-LLM Query and Mapping File Generator (query_generator.py)
+Worker script to generate a single, complete LLM query set.
 
-Purpose:
-This script acts as a worker for `build_llm_queries.py`. It takes a small subset
-of 'k' personalities, shuffles their names and descriptions independently, and
-generates a complete, self-contained query set. Its most crucial outputs are
-the LLM query itself, the ground-truth mapping, and a manifest file for auditing.
+This script is the "worker" in the query generation stage. It is called by
+`build_llm_queries.py` and is responsible for taking a pre-selected subset of
+`k` personalities and generating one self-contained set of query artifacts.
 
 Key Operations:
-1.  Loads 'k' personalities from a temporary input file created by its caller.
-2.  Loads a base query template to use for the LLM instructions.
-3.  Assigns a temporary `internal_ref_id` to each person/description pair to
-    maintain their true connection.
-4.  Shuffles the list of names and the list of descriptions independently.
-5.  Generates the following primary output files:
-    a. `llm_query.txt`: The final, formatted prompt for the LLM, containing
-       the shuffled "List A" (names) and "List B" (descriptions).
-    b. `mapping.txt`: The ground truth, containing a single line of tab-separated
-       indices that defines the correct name-to-description mapping.
-    c. `manifest.txt`: The **auditable ground truth**, a detailed table showing
-       exactly how each name was mapped to each description's shuffled index,
-       linked by the `internal_ref_id`. This is used for validation.
-    d. Intermediate files (`names.txt`, `shuffled_names.txt`, etc.) are also
-       created for reference and debugging.
-
-This script is not intended to be run directly by the user but is called as a
-subprocess by `build_llm_queries.py`.
-
-Configuration:
-- Default values for 'k', source filenames, output prefix, and logging levels
-  are loaded from 'config.ini' (via 'config_loader.py').
-- Command-line arguments override these defaults.
-
-Input File Locations:
-    - Source Personalities File:
-        - Path provided via `--personalities_file`.
-        - If filename is 'temp_subset_personalities.txt' (default from config, used by orchestrator),
-          it's expected in the script's directory ('src/').
-        - Otherwise, it's expected in 'PROJECT_ROOT/data/'.
-        - Format: Tab-delimited. Header: Index\tName\tBirthYear\tDescriptionText.
-          'BirthYear' should be integer-convertible.
-    - Base Query File:
-        - Path provided via `--base_query_file`. Expected in 'PROJECT_ROOT/data/'.
-        - Format: Text prompt. Header: BaseQueryText (content starts on line 2).
-
-Command-Line Usage:
-    python src/query_generator.py [options]
-
-Optional Arguments:
-    -h, --help            Show this help message and exit.
-    -k K_VALUE            Number of people/descriptions for the query.
-    --seed SEED           Optional random seed (integer) for reproducibility of shuffles.
-    --personalities_file PERSONALITIES_FILE
-                          Filename of the source personalities. See "Input File Locations".
-    --base_query_file BASE_QUERY_FILE
-                          Filename of the base query template. See "Input File Locations".
-    --output_basename_prefix OUTPUT_BASENAME_PREFIX
-                          Prefix for all output filenames. Can include relative path
-                          components from script's location. Default from config or empty.
-                          If empty and not path-like, outputs go to 'src/qgen_standalone_output/'.
-    -v, --verbose         Increase verbosity (-v INFO, -vv DEBUG).
-
-Dependencies:
-    - Python 3.x (os, sys, random, argparse, logging modules)
-    - src/config_loader.py
+1.  Assigns a temporary `internal_ref_id` to each person to maintain the true
+    link between their name and description.
+2.  Handles the `mapping_strategy` ('correct' or 'random') to define the ground
+    truth for the trial.
+3.  Shuffles the list of names and the list of descriptions independently.
+4.  Generates the three critical output files for a single trial:
+    - `llm_query.txt`: The final prompt for the LLM.
+    - `mapping.txt`: The ground truth mapping for scoring.
+    - `manifest.txt`: A detailed audit file to validate the shuffling and mapping.
 """
 
 # === Start of personality_matching_project/src/query_generator.py ===
