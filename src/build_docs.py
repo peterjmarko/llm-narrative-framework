@@ -143,6 +143,45 @@ def render_text_diagram(source_path, output_path, project_root, font_size=36):
     image.save(output_path, "PNG")
     return True
 
+def check_diagrams_are_up_to_date(project_root):
+    """
+    Performs a read-only check to see if diagram images are up-to-date.
+    Returns True if all diagrams are current, False otherwise.
+    """
+    template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except FileNotFoundError:
+        print(f"{Colors.RED}ERROR: Template file not found at {template_path}{Colors.RESET}")
+        return False
+
+    all_up_to_date = True
+    for placeholder in re.finditer(r'\{\{diagram:(.*?)(?:\|(.*?))?\}\}', content):
+        diagram_source_rel_path = placeholder.group(1).strip()
+        base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
+        image_rel_path = os.path.join('docs', 'images', f"{base_name}.png")
+        
+        source_abs_path = os.path.join(project_root, diagram_source_rel_path)
+        image_abs_path = os.path.join(project_root, image_rel_path)
+
+        if not os.path.exists(image_abs_path):
+            print(f"    - {Colors.RED}MISSING:{Colors.RESET} {image_rel_path} (source: {diagram_source_rel_path})")
+            all_up_to_date = False
+            continue
+
+        try:
+            source_mtime = os.path.getmtime(source_abs_path)
+            image_mtime = os.path.getmtime(image_abs_path)
+            if source_mtime > image_mtime:
+                print(f"    - {Colors.RED}OUTDATED:{Colors.RESET} {image_rel_path} (source: {diagram_source_rel_path})")
+                all_up_to_date = False
+        except FileNotFoundError:
+             print(f"    - {Colors.YELLOW}WARNING: Source file not found for check: {diagram_source_rel_path}.{Colors.RESET}")
+             all_up_to_date = False
+    
+    return all_up_to_date
+
 def build_readme_content(project_root, flavor='viewer'):
     """
     Builds the full DOCUMENTATION.md content by processing the template,
@@ -335,32 +374,52 @@ def main():
     
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    # Render all diagram images first, passing the force_render flag
+    if args.check:
+        print(f"{Colors.BOLD}{Colors.CYAN}--- Checking if documentation is up-to-date... ---{Colors.RESET}")
+        
+        diagrams_ok = check_diagrams_are_up_to_date(project_root)
+        
+        readme_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
+        expected_viewer_content = build_readme_content(project_root, flavor='viewer')
+        try:
+            with open(readme_path, 'r', encoding='utf-8') as f:
+                current_content = f.read()
+        except FileNotFoundError:
+            print(f"    - {Colors.RED}MISSING:{Colors.RESET} docs/DOCUMENTATION.md")
+            diagrams_ok = False # Missing doc file is a failure state
+            current_content = ""
+
+        content_ok = (current_content == expected_viewer_content)
+        if not content_ok and os.path.exists(readme_path):
+            print(f"    - {Colors.RED}OUTDATED:{Colors.RESET} docs/DOCUMENTATION.md content does not match template.")
+
+        if diagrams_ok and content_ok:
+            print(f"{Colors.GREEN}Documentation is up-to-date.{Colors.RESET}")
+            sys.exit(0)
+        else:
+            print(f"\n{Colors.RED}Documentation is out of date. Please run 'pdm run build-docs' and commit the changes.{Colors.RESET}")
+            sys.exit(1)
+
+    # --- Build Mode (if not --check) ---
     if not render_all_diagrams(project_root, force_render=args.force_render):
         sys.exit(1)
 
-    # --- Build for MD Viewers (GitHub, VS Code) ---
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Markdown for Viewers ---{Colors.RESET}")
-    # The 'viewer' flavor generates HTML <img> tags for maximum compatibility
     viewer_content = build_readme_content(project_root, flavor='viewer')
     readme_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
     with open(readme_path, 'w', encoding='utf-8') as f:
         f.write(viewer_content)
     print(f"{Colors.GREEN}Successfully built DOCUMENTATION.md!{Colors.RESET}")
 
-    # --- Build for DOCX Conversion ---
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Content for DOCX Conversion ---{Colors.RESET}")
     try:
         import pypandoc
-        # The 'pandoc' flavor generates Pandoc-native syntax for attributes
         pandoc_content = build_readme_content(project_root, flavor='pandoc')
         
-        # Convert the main documentation
         readme_docx = os.path.join(project_root, 'docs/DOCUMENTATION.docx')
         if not convert_to_docx(pypandoc, readme_docx, project_root, source_md_content=pandoc_content):
             sys.exit(1)
         
-        # Convert the contributing guide (which has no special placeholders)
         contrib_md_path = os.path.join(project_root, 'docs/CONTRIBUTING.md')
         if os.path.exists(contrib_md_path):
             contrib_docx_path = os.path.join(project_root, 'docs/CONTRIBUTING.docx')
