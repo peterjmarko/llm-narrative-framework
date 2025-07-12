@@ -20,28 +20,24 @@
 # Filename: src/replication_log_manager.py
 
 """
-Provides a command-line interface to manage the experiment's batch run log.
+Manages the lifecycle of the human-readable `batch_run_log.csv`.
 
-This script centralizes all interactions with `batch_run_log.csv`, ensuring that
-logging is robust and maintainable. It is called by the main replication manager
-to handle the state of the log file at different stages of the experiment.
+This script provides a robust, command-based interface for creating and
+maintaining the experiment's batch log. It is called by `experiment_manager.py`
+at key stages of a run to ensure the log is always accurate and complete.
 
-Modes of Operation:
--   'start': Prepares for a new experiment. It safely archives any existing log
-    file and creates a new, empty `batch_run_log.csv` with only a header.
+Core Commands:
+-   `start`: Initializes a new experiment. It archives any existing log file
+    and creates a fresh `batch_run_log.csv` with only a header.
 
--   'update': Appends a single entry to the log from a completed replication's
-    report file. This provides a real-time record of progress.
+-   `rebuild`: The primary method for ensuring log integrity. It scans the
+    experiment directory, parses every `replication_report.txt`, and builds a
+    new, clean log from scratch, ensuring it perfectly reflects the state of
+    all completed replications.
 
--   'rebuild': Safely rebuilds the log to ensure integrity when resuming a run.
-    It backs up the original log, then creates a new, clean version by parsing all
-    existing replication reports. This ensures the log is in a clean, appendable
-    state.
-
--   'finalize': Ccleans and finalizes the log. It first removes any existing summary
-    blocks from the end of the file, then recalculates a fresh summary from the
-    remaining clean data rows and appends it. This ensures the log always has a
-    single, correct summary footer, making the command safe to re-run.
+-   `finalize`: A safe, idempotent command to complete the log. It strips any
+    pre-existing summary from the file, then recalculates and appends a fresh
+    summary footer. This can be run multiple times without causing duplication.
 """
 
 import os
@@ -194,9 +190,8 @@ def main():
     parser_start = subparsers.add_parser('start', help="Start a new batch, backing up any old log and creating a fresh one.")
     parser_start.add_argument('output_dir', type=str, help="Path to the base output directory.")
 
-    # --- 'update' command ---
-    parser_update = subparsers.add_parser('update', help="Append a single replication's data to the log.")
-    parser_update.add_argument('report_file', type=str, help="Path to the single replication_report.txt file.")
+    # The 'update' command has been removed as it is legacy.
+    # The 'rebuild' command is the primary method for populating the log.
 
     # --- 'rebuild' command ---
     parser_rebuild = subparsers.add_parser('rebuild', help="Recreate the entire log from all existing reports, backing up the original.")
@@ -228,14 +223,7 @@ def main():
         # The write_log_row needs a slight modification to handle this
         print("Initialized new batch run log with header.")
 
-    elif args.mode == 'update':
-        if not os.path.exists(args.report_file):
-            print(f"Error: Report file not found at '{args.report_file}'", file=sys.stderr)
-            sys.exit(1)
-        log_entry = parse_report_file(args.report_file)
-        log_file_path = os.path.join(os.path.dirname(os.path.dirname(args.report_file)), "batch_run_log.csv")
-        write_log_row(log_file_path, log_entry, fieldnames)
-        print(f"Updated {os.path.basename(log_file_path)} for replication {log_entry['ReplicationNum']}")
+    # The 'update' command has been removed.
 
     elif args.mode == 'rebuild':
         log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")

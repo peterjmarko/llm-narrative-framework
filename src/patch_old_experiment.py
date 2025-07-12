@@ -20,15 +20,15 @@
 # Filename: src/patch_old_experiment.py
 
 """
-Batch-processes historical experiment run directories to create an archived
-config.ini file in each one.
+Batch-patches historical experiments by creating missing config archives.
 
-This script scans a root directory for all subfolders matching the 'run_*'
-pattern. For each folder that does not already contain a 'config.ini.archived',
-it calls the `restore_config.py` utility to generate one.
+This script serves as a batch controller that recursively scans a target
+directory for all subfolders matching the 'run_*' pattern. For each `run_*`
+directory found, it calls the `restore_config.py` utility.
 
-This allows older data to be used with newer analysis scripts that rely on
-the archived config for parameter information.
+`restore_config.py` then reverse-engineers the `replication_report.txt` to
+generate and save a `config.ini.archived` file, making legacy data compatible
+with modern reprocessing and analysis scripts.
 """
 
 import os
@@ -38,7 +38,7 @@ import subprocess
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python patch_old_runs.py <path_to_root_output_directory>")
+        print("Usage: python patch_old_experiment.py <path_to_root_output_directory>")
         sys.exit(1)
     
     root_dir = sys.argv[1]

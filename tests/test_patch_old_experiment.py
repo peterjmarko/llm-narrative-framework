@@ -19,7 +19,6 @@
 #
 # Filename: tests/test_patch_old_experiment.py
 
-# tests/test_patch_old_runs.py
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -145,7 +144,7 @@ def test_main_no_args(mock_print):
             main()
     assert e.value.code == 1
     mock_print.assert_called_with(
-        "Usage: python patch_old_runs.py <path_to_root_output_directory>"
+        "Usage: python patch_old_experiment.py <path_to_root_output_directory>"
     )
 
 # === End of tests/test_patch_old_experiment.py ===

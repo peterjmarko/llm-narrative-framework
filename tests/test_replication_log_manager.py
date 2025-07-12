@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_replication_replication_log_manager.py
+# Filename: tests/test_replication_log_manager.py
 
 # tests/test_replication_log_manager.py
 
@@ -143,15 +143,7 @@ class TestLogManagerMain:
         mock_rename.assert_called_once()
         mock_print.assert_any_call("Initialized new batch run log with header.")
 
-    def test_main_update(self, temp_output_dir):
-        report_file = (
-            temp_output_dir / "run_20230101_120000_rep-1" / "replication_report_20230101-120500.txt"
-        )
-        log_file = temp_output_dir / "batch_run_log.csv"
-        with patch("sys.argv", ["script", "update", str(report_file)]):
-            replication_log_manager.main()
-        assert log_file.exists()
-        assert "1,COMPLETED" in log_file.read_text()
+    # The 'update' mode has been removed, so its test is also removed.
 
     @patch("builtins.print")
     def test_main_rebuild(self, mock_print, temp_output_dir):

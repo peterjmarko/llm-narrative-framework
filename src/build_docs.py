@@ -24,6 +24,7 @@ import re
 import subprocess
 import sys
 import argparse
+import time
 
 # ANSI color codes for better terminal output
 class Colors:
@@ -201,33 +202,46 @@ def convert_to_docx(pypandoc, source_md_path, output_docx_path, project_root):
     output_filename = os.path.basename(output_docx_path)
 
     print(f"    - Converting '{Colors.CYAN}{source_filename}{Colors.RESET}' to DOCX...")
-    try:
-        # Reverted to a minimal set of arguments for basic conversion.
-        extra_args = [
-            '--standalone',
-            '--resource-path', project_root,
-        ]
-        pypandoc.convert_file(
-            source_md_path, 'docx',
-            outputfile=output_docx_path,
-            extra_args=extra_args
-        )
-        print(f"      {Colors.GREEN}Successfully built '{Colors.CYAN}{output_filename}{Colors.GREEN}'!{Colors.RESET}")
-        return True
-    except RuntimeError as e:
-        if "permission denied" in str(e).lower():
-            print(f"{Colors.RED}\n[ERROR] Could not write to '{Colors.CYAN}{output_filename}{Colors.RED}'.")
-            print("The file is likely open in another program (e.g., Microsoft Word).")
-            print(f"Please close the file and run the script again.{Colors.RESET}")
+    
+    permission_error_printed = False
+    while True:
+        try:
+            extra_args = ['--standalone', '--resource-path', project_root]
+            pypandoc.convert_file(
+                source_md_path, 'docx',
+                outputfile=output_docx_path,
+                extra_args=extra_args
+            )
+            
+            if permission_error_printed:
+                # Add a newline for cleaner output after the waiting message
+                print(f"      {Colors.GREEN}File unlocked. Resuming...{Colors.RESET}")
+            
+            print(f"      {Colors.GREEN}Successfully built '{Colors.CYAN}{output_filename}{Colors.GREEN}'!{Colors.RESET}")
+            return True
+
+        except RuntimeError as e:
+            if "permission denied" in str(e).lower():
+                if not permission_error_printed:
+                    print(f"      {Colors.YELLOW}[WAITING] Could not write to '{output_filename}'.")
+                    print(f"      The file is likely open in another program (e.g., Microsoft Word).")
+                    print(f"      Please close the file. The script will retry automatically... (Ctrl+C to cancel){Colors.RESET}")
+                    permission_error_printed = True
+                time.sleep(2)  # Wait for 2 seconds before retrying
+                continue
+            else:
+                print(f"\n{Colors.RED}[ERROR] An unexpected error occurred with Pandoc.{Colors.RESET}")
+                raise e
+        
+        except FileNotFoundError:
+            print(f"{Colors.RED}\n[ERROR] `pandoc` command not found.")
+            print("Please ensure Pandoc is installed and accessible in your system's PATH.")
+            print(f"See: https://pandoc.org/installing.html{Colors.RESET}")
             return False
-        else:
-            print(f"\n{Colors.RED}[ERROR] An unexpected error occurred with Pandoc.{Colors.RESET}")
-            raise e
-    except FileNotFoundError:
-        print(f"{Colors.RED}\n[ERROR] `pandoc` command not found.")
-        print("Please ensure Pandoc is installed and accessible in your system's PATH.")
-        print(f"See: https://pandoc.org/installing.html{Colors.RESET}")
-        return False
+            
+        except KeyboardInterrupt:
+            print(f"\n{Colors.YELLOW}Build cancelled by user.{Colors.RESET}")
+            return False
 
 
 def main():
