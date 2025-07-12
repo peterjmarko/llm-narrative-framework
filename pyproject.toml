@@ -67,8 +67,8 @@ build-docs = "python src/build_docs.py"
 test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
 test-ps-stu = "pwsh ./tests/process_study.Tests.ps1"
 test-ps-mig = "pwsh tests/migrate_old_experiment.Tests.ps1"
-test-ps-all = "pdm run test-ps-exp && pdm run test-ps-stu && pdm run test-ps-mig"
+test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
 
 # Main workflow shortcuts
 run-exp = "powershell -ExecutionPolicy Bypass -File .\\run_experiment.ps1"
-process-study = "powershell -ExecutionPolicy Bypass -File .\\process_study.py"
+pro-stu = "powershell -ExecutionPolicy Bypass -File .\\process_study.ps1"
