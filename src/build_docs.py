@@ -41,6 +41,10 @@ Key Features:
 -   **Force Re-render**: Accepts a `--force-render` flag to override the cache
     and regenerate all diagrams.
 
+-   **Pre-commit Hook Integration**: Includes a `--check` mode that performs a
+    read-only verification to ensure documentation is up-to-date without
+    modifying files, ideal for CI/CD pipelines.
+
 -   **Dual-Syntax Generation**: To ensure compatibility with different renderers,
     it generates two versions of the documentation content in memory:
     1.  For `.md` viewers (GitHub, VS Code): Uses HTML `<img>` tags for
@@ -116,6 +120,7 @@ def render_text_diagram(source_path, output_path, project_root, font_size=36):
     padding, line_spacing = 20, 4
     # The font_size is now passed in as an argument.
 
+    font = None
     font_paths = ["Consolas", "cour.ttf", "Courier New", "Menlo", "DejaVu Sans Mono"]
     for font_path in font_paths:
         try:

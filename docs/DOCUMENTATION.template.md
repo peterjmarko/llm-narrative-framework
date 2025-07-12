@@ -68,13 +68,7 @@ This workflow is used after an experiment is complete to aggregate results from 
 
 {{diagram:docs/diagrams/architecture_workflow_2_process_study.mmd | scale=2.5 | width=105%}}
 
-### Workflow 3: Reprocess a Failed Run
-
-This workflow is used to recover from a failed run or to re-analyze existing data with updated processing logic without re-running the expensive LLM calls.
-
-{{diagram:docs/diagrams/architecture_workflow_3_reprocess.mmd | scale=2.5 | width=75%}}
-
-### Workflow 4: Migrate Old Experiment Data
+### Workflow 3: Migrate Old Experiment Data
 
 This utility workflow helps bring older experimental data (generated before `config.ini.archived` was standard) into compliance with modern analysis scripts.
 
@@ -260,11 +254,10 @@ The script will run all four steps in sequence, providing clear progress updates
 ## Maintenance and Utility Scripts
 
 *   **`experiment_manager.py`**:
-    *   The main batch controller for managing multiple replications. This is the core engine called by `run_experiment.ps1`.
-    *   **Normal Mode**: Runs a batch of new replications, with intelligent resumption of interrupted batches.
-    *   **Reprocess Mode (`--reprocess`)**: Scans a directory for existing runs and re-applies the processing and analysis stages (Stages 3 & 4). Can be combined with `--depth` for recursive reprocessing and `--notes` to add/override notes.
-    *   Usage: `python src/experiment_manager.py path/to/experiment --end-rep 30`
-    *   Usage (Reprocess): `python src/experiment_manager.py path/to/study --reprocess --depth 1`
+    *   The primary controller for an entire experiment, functioning as a state machine.
+    *   It continuously verifies the experiment's state and automatically takes the correct action (`NEW`, `REPAIR`, or `REPROCESS`) until the experiment is `COMPLETE`.
+    *   This self-healing design makes the pipeline resilient to interruptions.
+    *   Usage: `python src/experiment_manager.py path/to/experiment`
 
 *   **`orchestrate_replication.py`**:
     *   The engine for a **single** experimental run. Called in a loop by `experiment_manager.py`.
@@ -274,7 +267,7 @@ The script will run all four steps in sequence, providing clear progress updates
 *   **`run_bias_analysis.py`**:
     *   Calculates specific metrics for positional bias (e.g., standard deviation of top-1 choice counts) from a run's raw scores.
     *   It injects these metrics into the `replication_report.txt`'s JSON block for later aggregation and analysis.
-    *   This is called automatically by `experiment_manager.py` after each successful replication.
+    *   This is called automatically by `experiment_manager.py` during the `NEW` and `REPROCESS` modes.
 
 *   **`compile_study_results.py`**:
     *   The core script for hierarchical data aggregation. Recursively scans a study directory, performing a bottom-up summary.
@@ -301,6 +294,9 @@ The script will run all four steps in sequence, providing clear progress updates
 *   **`patch_old_experiment.py`**:
     *   **Utility for historical data.** A batch controller that recursively scans an experiment directory and calls `restore_config.py` on every `run_*` subfolder. This ensures all legacy runs have a proper `config.ini.archived` file for modern reprocessing.
     *   Usage: `python src/patch_old_experiment.py "path/to/old/experiments"`
+
+*   **`verify_experiment_completeness.py`**:
+    *   A standalone diagnostic tool for manually auditing an experiment directory. It compares file counts at each stage to verify data integrity. Its core logic is also used internally by `experiment_manager.py` for its automated state verification.
 
 *   **`rebuild_reports.py`**:
     *   A powerful utility to regenerate all `replication_report.txt` files from the ground-truth `analysis_inputs` data. Useful for applying fixes to the processing or analysis stages across an entire study.

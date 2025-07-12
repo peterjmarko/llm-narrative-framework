@@ -20,34 +20,27 @@
 # Filename: src/experiment_manager.py
 
 """
-State-Machine Controller for a Single Experiment.
+State-Machine Controller for Experiments.
 
 This script is the high-level, intelligent controller for managing an entire
 experiment. It operates as a state machine, continuously verifying the
 experiment's status and automatically taking the correct action until the
 experiment is fully complete and all data is consistent.
 
-It internalizes the logic that was previously split across multiple scripts,
-creating a single, robust entry point for running, repairing, and reprocessing
-an experiment.
+This self-healing design makes the experiment pipeline resilient to
+interruptions. The script's core is a `Verify -> Act` loop that decides
+which mode to enter based on the state of the experiment directory:
 
-The core logic is a loop that performs:
-1.  **Verification**: Audits all `run_*` subdirectories to determine the
-    experiment's current state.
-2.  **Decision**: Based on the audit, it decides which mode to enter:
-    a) **New Mode**: If replications are missing, it calls
-       `orchestrate_replication.py` to generate the data from scratch.
-    b) **Repair Mode**: If API responses are missing (query file exists but
-       response does not), it uses a parallel worker pool to call
-       `run_llm_sessions.py` to efficiently fetch only the missing data.
-    c) **Reprocess Mode**: If API responses are present but downstream analysis
-       artifacts are corrupt or missing, it calls `orchestrate_replication.py`
-       in reprocess mode to rebuild the analysis files.
-    d) **Complete**: If all data is consistent, it performs final aggregation
-       and exits the loop.
-
-This design makes the experiment pipeline self-healing and resilient to
-interruptions.
+1.  **NEW Mode**: If replications are missing, it calls
+    `orchestrate_replication.py` to generate the data from scratch.
+2.  **REPAIR Mode**: If API responses are missing (query file exists but
+    response does not), it uses a parallel worker pool to call
+    `run_llm_sessions.py` to efficiently fetch only the missing data.
+3.  **REPROCESS Mode**: If API responses are present but downstream analysis
+    artifacts are corrupt or missing, it calls `orchestrate_replication.py`
+    in reprocess mode to rebuild the analysis files.
+4.  **COMPLETE**: Once all data is consistent, it performs a final data
+    aggregation and exits the loop.
 
 Usage:
 # To manage an existing experiment (run, repair, reprocess to completion):

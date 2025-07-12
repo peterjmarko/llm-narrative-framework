@@ -25,11 +25,13 @@
 
 .DESCRIPTION
     This script is the main user entry point for running a full experimental batch.
-    It serves as a user-friendly wrapper for `experiment_manager.py`.
+    It serves as a user-friendly wrapper for the state-machine controller,
+    `experiment_manager.py`.
 
-    It automatically detects the environment (PDM or standard Python) and translates
-    standard PowerShell parameters (like -Verbose) into the appropriate arguments
-    for the Python backend.
+    The controller will automatically run, repair, or reprocess an experiment
+    until it is complete. This script provides a simple interface for starting
+    that process, translating PowerShell parameters (like -Verbose) into the
+    appropriate arguments for the Python backend.
 
 .PARAMETER TargetDirectory
     The target directory for the experiment. Can be an existing directory or one to
