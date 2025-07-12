@@ -1,5 +1,22 @@
-#!/usr/bin/env pwsh
-# -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 [Your Name/Institution]
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 # Filename: run_experiment.ps1
 
 <#
@@ -44,29 +61,29 @@
     .\run_experiment.ps1 -StartRep 5 -EndRep 10 -Verbose
 #>
 
-# This is the main execution function. It uses [CmdletBinding()] to be a robust
-# "advanced function" for command-line use.
+[CmdletBinding()]
+param(
+    # The target directory for the experiment. Can be an existing directory
+    # or one to be created. This is the first positional parameter.
+    [Parameter(Position=0, Mandatory=$false)]
+    [string]$TargetDirectory,
+
+    # Optional starting replication number.
+    [Parameter(Mandatory=$false)]
+    [int]$StartRep,
+
+    # Optional ending replication number.
+    [Parameter(Mandatory=$false)]
+    [int]$EndRep,
+
+    # Optional notes for the run.
+    [Parameter(Mandatory=$false)]
+    [string]$Notes
+)
+
+# This is the main execution function. It uses the script-level parameters defined above.
 function Invoke-Experiment {
-    [CmdletBinding()] # Keep this, it adds common parameters like -Verbose
-    param(
-        # The target directory for the experiment. Can be an existing directory
-        # or one to be created. This is the first positional parameter.
-        [Parameter(Position=0, Mandatory=$false)]
-        [string]$TargetDirectory,
-
-        # Optional starting replication number.
-        [Parameter(Mandatory=$false)]
-        [int]$StartRep,
-
-        # Optional ending replication number.
-        [Parameter(Mandatory=$false)]
-        [int]$EndRep,
-
-        # Optional notes for the run.
-        [Parameter(Mandatory=$false)]
-        [string]$Notes
-    )
-
+    
     # --- Auto-detect execution environment ---
     $executable = "python"
     $prefixArgs = @()
@@ -111,21 +128,10 @@ function Invoke-Experiment {
     }
 }
 
-# Define a private helper function to encapsulate the actual script execution logic
-# that should ONLY run when the script is invoked directly, not when dot-sourced.
-function _Run-ScriptMain {
-    param(
-        [Parameter(ValueFromRemainingArguments=$true)]
-        $ScriptArgs
-    )
-    # The actual call to Invoke-Experiment. We pass along the parameters the script received.
-    Invoke-Experiment @ScriptArgs
-}
-
 # This invocation guard ensures the main execution logic is only triggered
 # when the script is run directly (not dot-sourced).
 if ($MyInvocation.InvocationName -ne '.') {
-    # Call the helper function to run the main logic, passing all original script parameters
-    _Run-ScriptMain @PSBoundParameters
+    # Call the main function. It will have access to the script-level parameters.
+    Invoke-Experiment
 }
 # === End of run_experiment.ps1 ===

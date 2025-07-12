@@ -20,32 +20,46 @@
 # Filename: tests/test_experiment_manager.py
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 import os
 import sys
 import shutil
 import tempfile
 import configparser
 import subprocess
-import time
+
+# Ensure src is in path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.abspath(os.path.join(current_dir, '..', 'src'))
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 from src import experiment_manager
 
-class TestReplicationManager(unittest.TestCase):
-    """Unified test class for experiment_manager.py."""
+class TestExperimentManagerState(unittest.TestCase):
+    """
+    Tests the state-machine logic of experiment_manager.py by mocking
+    the state-determination and mode-execution helper functions.
+    """
 
     def setUp(self):
-        """Set up a temporary directory and a controlled, in-memory config."""
-        self.test_dir = tempfile.mkdtemp(prefix="rep_manager_")
-        self.output_dir = os.path.join(self.test_dir, "output")
-        os.makedirs(self.output_dir, exist_ok=True)
-
+        """Set up a temporary directory and mock configuration."""
+        self.test_dir = tempfile.mkdtemp(prefix="exp_manager_state_")
+        
         self.mock_config = configparser.ConfigParser()
+        self.output_dir = os.path.join(self.test_dir, "output")
+        os.makedirs(self.output_dir)
+
         self.mock_config.read_dict({
-            'Study': {'num_replications': '2', 'group_size': '10'},
-            'General': {'base_output_dir': self.output_dir, 'new_experiments_subdir': 'new'}
+            'Study': {'num_replications': '1'},
+            'General': {
+                'base_output_dir': 'output', # Relative path
+                'new_experiments_subdir': 'new_exps',
+                'experiment_dir_prefix': 'exp_'
+            },
+            'Filenames': {'batch_run_log': 'batch_run_log.csv'}
         })
-    
+
     def tearDown(self):
         """Clean up the temporary directory."""
         shutil.rmtree(self.test_dir)
@@ -56,273 +70,323 @@ class TestReplicationManager(unittest.TestCase):
             val = self.mock_config.get(section, key)
             value_type = kwargs.get('value_type', str)
             return value_type(val)
-        return kwargs.get('fallback')
+        return kwargs.get('fallback', None)
 
+    @patch('src.experiment_manager._run_reprocess_mode', return_value=True)
+    @patch('src.experiment_manager._run_repair_mode', return_value=True)
+    @patch('src.experiment_manager._run_new_mode', return_value=True)
+    @patch('src.experiment_manager._get_experiment_state')
     @patch('src.experiment_manager.get_config_value')
     @patch('src.experiment_manager.subprocess.run')
-    def test_handles_replication_failure(self, mock_subprocess_run, mock_get_config_value):
-        """Test that a failure in the orchestrator script is handled gracefully."""
-        mock_get_config_value.side_effect = self._get_config_side_effect
+    def test_new_to_complete_flow(self, mock_subprocess, mock_get_config, mock_get_state, mock_new, mock_repair, mock_reprocess):
+        """Tests that state NEW_NEEDED correctly calls the new_mode function."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_get_state.side_effect = [
+            ("NEW_NEEDED", {"missing_reps": 1}),
+            ("COMPLETE", None)
+        ]
         
-        def selective_fail_effect(cmd_list, **kwargs):
-            if any("orchestrate_replication.py" in s for s in cmd_list):
-                raise subprocess.CalledProcessError(1, cmd_list)
-            return MagicMock(returncode=0)
-        
-        mock_subprocess_run.side_effect = selective_fail_effect
-
-        with patch('src.experiment_manager.logging.error') as mock_log_error, \
-             patch.object(sys, 'argv', ['script.py', self.output_dir]):
-            
-            experiment_manager.main()
-
-        mock_log_error.assert_any_call("!!! Replication 1 failed. Check its report for details. Continuing... !!!")
-
-    @patch('src.experiment_manager.get_config_value')
-    @patch('src.experiment_manager.subprocess.run')
-    def test_reprocess_happy_path(self, mock_subprocess_run, mock_get_config_value):
-        """Test that reprocess mode calls the orchestrator with the --reprocess flag."""
-        mock_get_config_value.side_effect = self._get_config_side_effect
-        
-        run_dir = os.path.join(self.output_dir, "run_1")
-        os.makedirs(run_dir)
-        with open(os.path.join(run_dir, 'config.ini.archived'), 'w') as f:
-            f.write('[Study]\ngroup_size=10\n')
-
-        # The key is to patch find_run_dirs_by_depth to return our controlled directory
-        with patch('src.experiment_manager.find_run_dirs_by_depth', return_value=[run_dir]):
-            cli_args = ['script.py', self.output_dir, '--reprocess']
-            with patch.object(sys, 'argv', cli_args):
-                experiment_manager.main()
-
-        # Verify orchestrate_replication was called with the correct flags
-        orchestrator_calls = [c for c in mock_subprocess_run.call_args_list if any("orchestrate_replication.py" in s for s in c.args[0])]
-        self.assertEqual(len(orchestrator_calls), 1)
-        self.assertIn('--reprocess', orchestrator_calls[0].args[0])
-        self.assertIn(run_dir, orchestrator_calls[0].args[0])
-
-    @patch('builtins.print')
-    def test_reprocess_mode_no_run_dirs_found(self, mock_print):
-        """Test behavior when no 'run_*' directories are found for reprocessing."""
-        empty_dir = os.path.join(self.test_dir, "empty")
-        os.makedirs(empty_dir)
-        with patch.object(sys, 'argv', ['script.py', empty_dir, '--reprocess']):
-            experiment_manager.main()
-        mock_print.assert_any_call("No 'run_*' directories found. Exiting.")
-
-    def test_utility_functions(self):
-        """Test utility functions for basic functionality."""
-        # Test format_seconds
-        self.assertEqual(experiment_manager.format_seconds(3661), "1:01:01")
-        self.assertEqual(experiment_manager.format_seconds(-5), "00:00:00")
-        self.assertEqual(experiment_manager.format_seconds(0), "0:00:00")
-        
-        # Test find_latest_report with no reports
-        self.assertIsNone(experiment_manager.find_latest_report(self.test_dir))
-        
-        # Test find_latest_report with reports
-        report1 = os.path.join(self.test_dir, "replication_report_1.txt")
-        report2 = os.path.join(self.test_dir, "replication_report_2.txt")
-        with open(report1, 'w') as f:
-            f.write("old report")
-        time.sleep(0.01)  # Ensure different timestamps
-        with open(report2, 'w') as f:
-            f.write("new report")
-        
-        latest = experiment_manager.find_latest_report(self.test_dir)
-        self.assertEqual(latest, report2)
-
-    def test_get_completed_replications(self):
-        """Test identification of completed replications."""
-        # Create some run directories with reports
-        run1_dir = os.path.join(self.output_dir, "run_rep-001_test")
-        run2_dir = os.path.join(self.output_dir, "run_rep-003_test") 
-        run3_dir = os.path.join(self.output_dir, "run_rep-005_test")
-        
-        os.makedirs(run1_dir)
-        os.makedirs(run2_dir) 
-        os.makedirs(run3_dir)
-        
-        # Add reports to run1 and run3 only
-        with open(os.path.join(run1_dir, "replication_report_001.txt"), 'w') as f:
-            f.write("completed")
-        with open(os.path.join(run3_dir, "replication_report_005.txt"), 'w') as f:
-            f.write("completed")
-        
-        completed = experiment_manager.get_completed_replications(self.output_dir)
-        self.assertEqual(completed, {1, 5})
-
-    @patch('src.experiment_manager.get_config_value')
-    @patch('src.experiment_manager.subprocess.run')
-    @patch('src.experiment_manager.glob.glob')
-    def test_normal_replication_mode(self, mock_glob, mock_subprocess_run, mock_get_config_value):
-        """Test normal replication execution mode."""
-        mock_get_config_value.side_effect = self._get_config_side_effect
-        
-        # Mock no existing runs (so all replications need to run)
-        mock_glob.return_value = []
-        
-        # Mock successful subprocess calls
-        mock_subprocess_run.return_value = MagicMock(returncode=0)
-        
-        with patch('src.experiment_manager.get_completed_replications', return_value=set()), \
-            patch('builtins.print') as mock_print:
-            
-            cli_args = ['script.py', self.output_dir, '--end-rep', '2']
-            with patch.object(sys, 'argv', cli_args):
-                experiment_manager.main()
-        
-        # Should have called orchestrate_replication twice (for rep 1 and 2)
-        orchestrator_calls = [c for c in mock_subprocess_run.call_args_list 
-                            if any("orchestrate_replication.py" in str(c) for c in c.args[0])]
-        self.assertEqual(len(orchestrator_calls), 2)
-        
-        # Should have called post-processing scripts
-        compile_calls = [c for c in mock_subprocess_run.call_args_list 
-                        if any("compile_study_results.py" in str(c) for c in c.args[0])]
-        self.assertTrue(len(compile_calls) >= 1)
-
-    @patch('src.experiment_manager.get_config_value')
-    @patch('src.experiment_manager.subprocess.run')
-    @patch('src.experiment_manager.datetime')
-    def test_default_directory_creation(self, mock_datetime, mock_subprocess_run, mock_get_config_value):
-        """Test that default directory is created when none specified."""
-        mock_get_config_value.side_effect = self._get_config_side_effect
-        mock_datetime.datetime.now.return_value.strftime.return_value = "20240101_120000"
-        mock_subprocess_run.return_value = MagicMock(returncode=0)
-        
-        with patch('src.experiment_manager.get_completed_replications', return_value={1, 2}), \
-            patch('builtins.print') as mock_print:
-            
-            # No target_dir specified
-            cli_args = ['script.py', '--end-rep', '2']
-            with patch.object(sys, 'argv', cli_args):
-                experiment_manager.main()
-        
-        # Should print message about using default directory
-        default_dir_msgs = [str(call) for call in mock_print.call_args_list 
-                        if "No target directory specified" in str(call)]
-        self.assertTrue(len(default_dir_msgs) > 0)
-
-    def test_find_run_dirs_by_depth(self):
-        """Test finding run directories at different depths."""
-        # Create nested structure
-        level1_dir = os.path.join(self.test_dir, "run_test1")
-        level2_dir = os.path.join(self.test_dir, "subdir", "run_test2") 
-        os.makedirs(level1_dir)
-        os.makedirs(level2_dir)
-        
-        # Test depth 0 (only immediate children)
-        dirs_depth0 = experiment_manager.find_run_dirs_by_depth(self.test_dir, 0)
-        self.assertIn(level1_dir, dirs_depth0)
-        self.assertNotIn(level2_dir, dirs_depth0)
-        
-        # Test depth 1 (includes subdirectories)
-        dirs_depth1 = experiment_manager.find_run_dirs_by_depth(self.test_dir, 1)
-        self.assertIn(level1_dir, dirs_depth1)
-        self.assertIn(level2_dir, dirs_depth1)
-        
-        # Test depth -1 (recursive)
-        dirs_recursive = experiment_manager.find_run_dirs_by_depth(self.test_dir, -1)
-        self.assertIn(level1_dir, dirs_recursive)
-        self.assertIn(level2_dir, dirs_recursive)
-
-    @patch('src.experiment_manager.get_config_value')
-    @patch('src.experiment_manager.subprocess.run')
-    def test_keyboard_interrupt_handling(self, mock_subprocess_run, mock_get_config_value):
-        """Test keyboard interrupt during replication execution."""
-        mock_get_config_value.side_effect = self._get_config_side_effect
-        
-        def interrupt_on_orchestrator(cmd_list, **kwargs):
-            if any("orchestrate_replication.py" in s for s in cmd_list):
-                raise KeyboardInterrupt()
-            return MagicMock(returncode=0)
-        
-        mock_subprocess_run.side_effect = interrupt_on_orchestrator
-        
-        with patch('src.experiment_manager.get_completed_replications', return_value=set()), \
-            patch('src.experiment_manager.logging.warning') as mock_log_warning:
-            
-            cli_args = ['script.py', self.output_dir, '--end-rep', '2']
-            with patch.object(sys, 'argv', cli_args):
-                experiment_manager.main()  # Should complete normally, not exit
-        
-        # Should log the interruption
-        interrupt_calls = [call for call in mock_log_warning.call_args_list 
-                        if "interrupted by user" in str(call)]
-        self.assertTrue(len(interrupt_calls) > 0)
-        
-        # Should only call orchestrator once (for rep 1), not twice (rep 2 skipped due to interrupt)
-        orchestrator_calls = [c for c in mock_subprocess_run.call_args_list 
-                            if any("orchestrate_replication.py" in str(c) for c in c.args[0])]
-        self.assertEqual(len(orchestrator_calls), 1)
-
-    @patch('src.experiment_manager.get_config_value')
-    @patch('src.experiment_manager.subprocess.run')
-    def test_post_processing_failures(self, mock_subprocess_run, mock_get_config_value):
-        """Test handling of post-processing script failures."""
-        mock_get_config_value.side_effect = self._get_config_side_effect
-        
-        def fail_on_compile(cmd_list, **kwargs):
-            if any("compile_study_results.py" in s for s in cmd_list):
-                raise subprocess.CalledProcessError(1, cmd_list)
-            return MagicMock(returncode=0)
-        
-        mock_subprocess_run.side_effect = fail_on_compile
-        
-        with patch('src.experiment_manager.get_completed_replications', return_value={1, 2}), \
-            patch('src.experiment_manager.logging.error') as mock_log_error:
-            
-            cli_args = ['script.py', self.output_dir, '--end-rep', '2']
-            with patch.object(sys, 'argv', cli_args):
-                experiment_manager.main()
-        
-        # Should log compilation error
-        compile_errors = [call for call in mock_log_error.call_args_list 
-                        if "compilation script" in str(call)]
-        self.assertTrue(len(compile_errors) > 0)
-
-    @patch('src.experiment_manager.get_config_value')
-    def test_reprocess_mode_error_target_dir_required(self, mock_get_config_value):
-        """Test reprocess mode without target directory fails."""
-        mock_get_config_value.side_effect = self._get_config_side_effect
-        
-        cli_args = ['script.py', '--reprocess']
+        cli_args = ['script.py', self.test_dir]
         with patch.object(sys, 'argv', cli_args):
-            with self.assertRaises(SystemExit):
-                experiment_manager.main()
+            experiment_manager.main()
 
+        mock_new.assert_called_once()
+        mock_repair.assert_not_called()
+        mock_reprocess.assert_not_called()
+        # Check that finalization runs
+        self.assertTrue(any("compile_study_results.py" in str(c) for c in mock_subprocess.call_args_list))
+
+    @patch('src.experiment_manager._run_reprocess_mode', return_value=True)
+    @patch('src.experiment_manager._run_repair_mode', return_value=True)
+    @patch('src.experiment_manager._run_new_mode', return_value=True)
+    @patch('src.experiment_manager._get_experiment_state')
     @patch('src.experiment_manager.get_config_value')
-    @patch('src.experiment_manager.subprocess.run') 
-    def test_verbose_mode(self, mock_subprocess_run, mock_get_config_value):
-        """Test verbose mode passes correct flags."""
-        mock_get_config_value.side_effect = self._get_config_side_effect
-        mock_subprocess_run.return_value = MagicMock(returncode=0)
+    @patch('src.experiment_manager.subprocess.run')
+    def test_repair_to_complete_flow(self, mock_subprocess, mock_get_config, mock_get_state, mock_new, mock_repair, mock_reprocess):
+        """Tests that state REPAIR_NEEDED correctly calls the repair_mode function."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_get_state.side_effect = [
+            ("REPAIR_NEEDED", [{"dir": "run_1", "failed_indices": [1]}]),
+            ("COMPLETE", None)
+        ]
         
-        with patch('src.experiment_manager.get_completed_replications', return_value=set()):
-            cli_args = ['script.py', self.output_dir, '--end-rep', '1', '--verbose']
+        cli_args = ['script.py', self.test_dir]
+        with patch.object(sys, 'argv', cli_args):
+            experiment_manager.main()
+
+        mock_repair.assert_called_once()
+        mock_new.assert_not_called()
+        mock_reprocess.assert_not_called()
+        self.assertTrue(any("compile_study_results.py" in str(c) for c in mock_subprocess.call_args_list))
+    
+    @patch('src.experiment_manager._run_reprocess_mode', return_value=True)
+    @patch('src.experiment_manager._run_repair_mode', return_value=True)
+    @patch('src.experiment_manager._run_new_mode', return_value=True)
+    @patch('src.experiment_manager._get_experiment_state')
+    @patch('src.experiment_manager.get_config_value')
+    @patch('src.experiment_manager.subprocess.run')
+    def test_reprocess_to_complete_flow(self, mock_subprocess, mock_get_config, mock_get_state, mock_new, mock_repair, mock_reprocess):
+        """Tests that state REPROCESS_NEEDED correctly calls the reprocess_mode function."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_get_state.side_effect = [
+            ("REPROCESS_NEEDED", [{"dir": "run_1"}]),
+            ("COMPLETE", None)
+        ]
+
+        cli_args = ['script.py', self.test_dir]
+        with patch.object(sys, 'argv', cli_args):
+            experiment_manager.main()
+        
+        mock_reprocess.assert_called_once()
+        mock_new.assert_not_called()
+        mock_repair.assert_not_called()
+        self.assertTrue(any("compile_study_results.py" in str(c) for c in mock_subprocess.call_args_list))
+
+    @patch('src.experiment_manager._run_repair_mode', return_value=True)
+    @patch('src.experiment_manager._get_experiment_state')
+    @patch('src.experiment_manager.get_config_value')
+    def test_max_loops_exceeded(self, mock_get_config, mock_get_state, mock_run_repair):
+        """Test that the manager halts if it gets stuck in a loop."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_get_state.return_value = ("REPAIR_NEEDED", [{"dir": "run_1", "failed_indices": [1]}])
+        
+        cli_args = ['script.py', self.test_dir, '--max-loops', '3']
+        with patch('sys.exit') as mock_exit, \
+             patch('builtins.print') as mock_print:
             with patch.object(sys, 'argv', cli_args):
                 experiment_manager.main()
         
-        # Check that --quiet is NOT passed when --verbose is used
-        orchestrator_calls = [c for c in mock_subprocess_run.call_args_list 
-                            if any("orchestrate_replication.py" in str(c) for c in c.args[0])]
-        if orchestrator_calls:
-            # Verify --quiet is not in the command
-            cmd_args = orchestrator_calls[0].args[0]
-            self.assertNotIn('--quiet', cmd_args)
+        self.assertEqual(mock_run_repair.call_count, 3)
+        mock_print.assert_any_call("\033[91m--- Max loop count reached. Halting to prevent infinite loop. ---\033[0m")
+        mock_exit.assert_called_with(1)
 
-    def test_find_run_dirs_edge_cases(self):
-        """Test edge cases in find_run_dirs_by_depth."""
-        # Test with depth < -1 (should be normalized to -1)
-        result = experiment_manager.find_run_dirs_by_depth(self.test_dir, -5)
-        self.assertIsInstance(result, list)
+    @patch('src.experiment_manager._get_experiment_state')
+    @patch('src.experiment_manager.get_config_value')
+    def test_unhandled_state_halts(self, mock_get_config, mock_get_state):
+        """
+        Test that an INCONSISTENT or UNKNOWN state causes a halt.
+        """
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_get_state.return_value = ("INCONSISTENT", {"details": "something is wrong"})
         
-        # Test empty directory
-        empty_dir = os.path.join(self.test_dir, "empty")
-        os.makedirs(empty_dir)
-        result = experiment_manager.find_run_dirs_by_depth(empty_dir, 0)
-        self.assertEqual(result, [])
+        cli_args = ['script.py', self.test_dir]
+        with patch('sys.exit') as mock_exit, \
+             patch('builtins.print') as mock_print:
+            with patch.object(sys, 'argv', cli_args):
+                experiment_manager.main()
+                
+        mock_print.assert_any_call("\033[91m--- Unhandled or inconsistent state detected: INCONSISTENT. Halting. ---\033[0m")
+        mock_exit.assert_called_with(1)
+
+    @patch('src.experiment_manager._run_new_mode', return_value=False)
+    @patch('src.experiment_manager._get_experiment_state')
+    @patch('src.experiment_manager.get_config_value')
+    def test_mode_failure_halts_execution(self, mock_get_config, mock_get_state, mock_new):
+        """Tests that if a mode function returns False, the manager halts."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        # After the first attempt, the state doesn't change, but the loop should exit.
+        mock_get_state.side_effect = [
+            ("NEW_NEEDED", {}), 
+            ("COMPLETE", None) # Lets the loop terminate after failure.
+        ]
+
+        cli_args = ['script.py', self.test_dir]
+        with patch('sys.exit') as mock_exit, \
+             patch('builtins.print') as mock_print:
+            with patch.object(sys, 'argv', cli_args):
+                experiment_manager.main()
+
+        mock_new.assert_called_once()
+        mock_print.assert_any_call("\033[91m--- A step failed. Halting experiment manager. Please review logs. ---\033[0m")
+        mock_exit.assert_called_with(1)
+
+    @patch('src.experiment_manager._get_experiment_state', return_value=("COMPLETE", None))
+    @patch('src.experiment_manager.get_config_value')
+    @patch('src.experiment_manager.datetime')
+    @patch('src.experiment_manager.subprocess.run')
+    def test_default_directory_creation(self, mock_subprocess, mock_datetime, mock_get_config, mock_get_state):
+        """Tests that a default directory is created when none is specified."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_datetime.datetime.now.return_value.strftime.return_value = "20240101_120000"
+
+        # Note: No target_dir in cli_args
+        cli_args = ['script.py']
+        with patch('sys.exit'), patch('builtins.print') as mock_print, \
+             patch.object(sys, 'argv', cli_args):
+            # We now mock PROJECT_ROOT to point to our temp dir for this test
+            with patch('src.experiment_manager.PROJECT_ROOT', self.test_dir):
+                experiment_manager.main()
+
+        # Check if the print call for creating the directory contains the expected path
+        found_message = False
+        expected_path_fragment = os.path.join(self.test_dir, 'output', 'new_exps', 'exp_20240101_120000')
+        for call_args in mock_print.call_args_list:
+            if "No target directory specified" in call_args[0][0] and expected_path_fragment in call_args[0][0]:
+                found_message = True
+                break
+        self.assertTrue(found_message, "Default directory creation message not found or incorrect.")
+
+class TestExperimentManagerVerification(unittest.TestCase):
+    """
+    Tests the verification logic of experiment_manager.py against
+    a simulated filesystem to validate edge case handling.
+    """
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp(prefix="exp_manager_verify_")
+        # Example run dir with m=3 trials and k=4 subjects per trial
+        self.run_dir = os.path.join(self.test_dir, "run_20240101_120000_rep-001_model-x_sbj-04_trl-003")
+        os.makedirs(os.path.join(self.run_dir, "session_queries"))
+        os.makedirs(os.path.join(self.run_dir, "session_responses"))
+        os.makedirs(os.path.join(self.run_dir, "analysis_inputs"))
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def _create_files(self, path, prefix, count):
+        """Helper to create a number of mock trial files."""
+        for i in range(1, count + 1):
+            with open(os.path.join(path, f"{prefix}_{i:03d}.txt"), 'w') as f:
+                f.write(f"content {i}")
+    
+    def _create_matrix_file(self, path, num_matrices, k):
+        """Helper to create a mock scores file."""
+        with open(path, 'w') as f:
+            for _ in range(num_matrices):
+                for _ in range(k):
+                    f.write("\t".join([str(x/10) for x in range(k)]) + "\n")
+
+    def test_verify_state_complete(self):
+        """Test verification correctly identifies a complete run."""
+        self._create_files(os.path.join(self.run_dir, "session_queries"), "llm_query", 3)
+        self._create_files(os.path.join(self.run_dir, "session_responses"), "llm_response", 3)
+        self._create_matrix_file(os.path.join(self.run_dir, "analysis_inputs", "all_scores.txt"), 3, 4)
+        with open(os.path.join(self.run_dir, "analysis_inputs", "all_mappings.txt"), 'w') as f:
+            f.write("header\n" * 4) # 1 header + 3 data lines
+        
+        result = experiment_manager._verify_single_run_completeness(self.run_dir)
+        self.assertEqual(result['status'], 'COMPLETE')
+
+    def test_verify_state_repair_needed(self):
+        """Test verification correctly identifies a run needing API call repair."""
+        self._create_files(os.path.join(self.run_dir, "session_queries"), "llm_query", 3)
+        self._create_files(os.path.join(self.run_dir, "session_responses"), "llm_response", 2) # Missing one response
+
+        result = experiment_manager._verify_single_run_completeness(self.run_dir)
+        self.assertEqual(result['status'], 'REPAIR_NEEDED')
+        self.assertEqual(result['failed_indices'], [3])
+
+    def test_verify_state_reprocess_needed(self):
+        """Test verification correctly identifies a run needing analysis reprocessing."""
+        self._create_files(os.path.join(self.run_dir, "session_queries"), "llm_query", 3)
+        self._create_files(os.path.join(self.run_dir, "session_responses"), "llm_response", 3)
+        self._create_matrix_file(os.path.join(self.run_dir, "analysis_inputs", "all_scores.txt"), 2, 4) # Missing one matrix
+        
+        result = experiment_manager._verify_single_run_completeness(self.run_dir)
+        self.assertEqual(result['status'], 'REPROCESS_NEEDED')
+
+    def test_verify_state_new(self):
+        """Test verification correctly identifies a new (empty) run directory."""
+        result = experiment_manager._verify_single_run_completeness(self.run_dir)
+        self.assertEqual(result['status'], 'NEW')
+
+    def test_verify_state_invalid_name(self):
+        """Test verification handles directories with invalid names."""
+        invalid_dir = os.path.join(self.test_dir, "not_a_valid_run_dir")
+        os.makedirs(invalid_dir)
+        result = experiment_manager._verify_single_run_completeness(invalid_dir)
+        self.assertEqual(result['status'], 'INVALID_NAME')
+
+    def test_verify_state_inconsistent(self):
+        """Test verification correctly identifies an inconsistent run (e.g., more matrices than expected)."""
+        # To reach the INCONSISTENT state, all prior checks must pass.
+        self._create_files(os.path.join(self.run_dir, "session_queries"), "llm_query", 3)
+        self._create_files(os.path.join(self.run_dir, "session_responses"), "llm_response", 3)
+        self._create_matrix_file(os.path.join(self.run_dir, "analysis_inputs", "all_scores.txt"), 4, 4) # More matrices
+        with open(os.path.join(self.run_dir, "analysis_inputs", "all_mappings.txt"), 'w') as f:
+            f.write("header\n" * 5) # More mappings
+        
+        result = experiment_manager._verify_single_run_completeness(self.run_dir)
+        self.assertEqual(result['status'], 'INCONSISTENT')
+
+class TestExperimentManagerModeExecution(unittest.TestCase):
+    """
+    Tests the mode-execution helper functions (_run_new_mode, etc.)
+    to ensure they call subprocesses with the correct arguments.
+    """
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp(prefix="exp_manager_modes_")
+        self.mock_config = configparser.ConfigParser()
+        self.mock_config.read_dict({
+            'Study': {'num_replications': '1', 'group_size': '4'},
+            'General': {'base_output_dir': self.test_dir}
+        })
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def _get_config_side_effect(self, config_obj, section, key, **kwargs):
+        """Helper to safely get values from the mock_config."""
+        if self.mock_config.has_option(section, key):
+            val = self.mock_config.get(section, key)
+            value_type = kwargs.get('value_type', str)
+            return value_type(val)
+        return kwargs.get('fallback', None)
+
+    @patch('src.experiment_manager.subprocess.run', return_value=MagicMock(returncode=0))
+    def test_run_new_mode_calls_scripts_correctly(self, mock_subprocess):
+        """Ensure _run_new_mode calls orchestrator and bias analysis."""
+
+        def glob_side_effect(pattern):
+            # This pattern is ONLY used when searching for the run dir for bias analysis
+            if 'run_*_rep-001_*' in pattern and 'isdir' not in str(pattern):
+                return [os.path.join(self.test_dir, "run_..._rep-001_...")]
+            # This is the general pattern for finding completed reps
+            elif 'run_*_rep-*' in pattern:
+                return []
+            return []
+
+        with patch('src.experiment_manager.glob.glob', side_effect=glob_side_effect), \
+             patch('src.experiment_manager.get_config_value', side_effect=self._get_config_side_effect), \
+             patch('os.path.isdir', return_value=True):
+            result = experiment_manager._run_new_mode(self.test_dir, 1, 1, "test_notes", False, "orch.py", "bias.py")
+
+        self.assertTrue(result)
+        # Check that orchestrator was called
+        orch_call = next((c for c in mock_subprocess.call_args_list if "orch.py" in c.args[0]), None)
+        self.assertIsNotNone(orch_call)
+        self.assertIn("--replication_num", orch_call.args[0])
+        self.assertIn("test_notes", orch_call.args[0])
+        # Check that bias analysis was called
+        bias_call = next((c for c in mock_subprocess.call_args_list if "bias.py" in c.args[0]), None)
+        self.assertIsNotNone(bias_call)
+
+    @patch('src.experiment_manager.subprocess.run', return_value=MagicMock(returncode=0))
+    def test_run_reprocess_mode_calls_scripts_correctly(self, mock_subprocess):
+        """Ensure _run_reprocess_mode calls orchestrator with --reprocess."""
+        run_info = {"dir": self.test_dir}
+        # Create a mock archived config for bias analysis to read
+        with open(os.path.join(self.test_dir, 'config.ini.archived'), 'w') as f:
+            f.write('[Study]\ngroup_size=4\n')
+
+        with patch('src.experiment_manager.get_config_value', side_effect=self._get_config_side_effect):
+             result = experiment_manager._run_reprocess_mode([run_info], "test_notes", False, "orch.py", "bias.py")
+
+        self.assertTrue(result)
+        # Check that orchestrator was called with reprocess flag
+        orch_call = next((c for c in mock_subprocess.call_args_list if "orch.py" in c.args[0]), None)
+        self.assertIsNotNone(orch_call)
+        self.assertIn("--reprocess", orch_call.args[0])
+
+    @patch('src.experiment_manager.subprocess.run')
+    def test_repair_worker_handles_failure(self, mock_subprocess):
+        """Ensure the _repair_worker function correctly reports failures."""
+        mock_subprocess.side_effect = subprocess.CalledProcessError(1, "cmd", "output", "stderr")
+        
+        index, success, error_log = experiment_manager._repair_worker("run_dir", "script.py", 1, True)
+        
+        self.assertEqual(index, 1)
+        self.assertFalse(success)
+        self.assertIn("REPAIR FAILED", error_log)
 
 
 if __name__ == '__main__':

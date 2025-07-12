@@ -20,37 +20,41 @@
 # Filename: src/experiment_manager.py
 
 """
-Main Batch Controller for Experiments.
+State-Machine Controller for a Single Experiment.
 
-This script is the high-level controller for running or reprocessing an entire
-experimental batch (e.g., all 30 replications). It serves as the primary engine
-called by the user-facing PowerShell wrappers. Its main job is to call the
-single-run orchestrator (`orchestrate_replication.py`) in a loop.
+This script is the high-level, intelligent controller for managing an entire
+experiment. It operates as a state machine, continuously verifying the
+experiment's status and automatically taking the correct action until the
+experiment is fully complete and all data is consistent.
 
-Key Features:
--   **Batch Execution**: For new experiments, it runs a specified range of
-    replications, intelligently skipping any that are already complete to allow
-    for easy resumption of interrupted batches.
--   **Batch Reprocessing**: In `--reprocess` mode, it recursively scans a
-    target directory for all existing replication folders and re-runs the
-    analysis stages on each one.
--   **Integrated Bias Analysis**: After each successful replication (new or
-    reprocessed), it automatically calls `run_bias_analysis.py` to ensure
-    consistent analysis across the experiment.
--   **Robust Log Management**: At the end of the batch run, it calls
-    `replication_log_manager.py rebuild` to create a clean, comprehensive
-    `batch_run_log.csv` that accurately reflects the state of all completed runs.
--   **Automated Finalization**: After all replications are complete, it
-    triggers the final post-processing steps:
-    1.  `compile_study_results.py`: To aggregate all data into a master CSV.
-    2.  `replication_log_manager.py finalize`: To append a final summary to the
-        batch log.
+It internalizes the logic that was previously split across multiple scripts,
+creating a single, robust entry point for running, repairing, and reprocessing
+an experiment.
 
-Usage (to run replications 1-30 in a new experiment directory):
-    python src/experiment_manager.py --end-rep 30
+The core logic is a loop that performs:
+1.  **Verification**: Audits all `run_*` subdirectories to determine the
+    experiment's current state.
+2.  **Decision**: Based on the audit, it decides which mode to enter:
+    a) **New Mode**: If replications are missing, it calls
+       `orchestrate_replication.py` to generate the data from scratch.
+    b) **Repair Mode**: If API responses are missing (query file exists but
+       response does not), it uses a parallel worker pool to call
+       `run_llm_sessions.py` to efficiently fetch only the missing data.
+    c) **Reprocess Mode**: If API responses are present but downstream analysis
+       artifacts are corrupt or missing, it calls `orchestrate_replication.py`
+       in reprocess mode to rebuild the analysis files.
+    d) **Complete**: If all data is consistent, it performs final aggregation
+       and exits the loop.
 
-Usage (to reprocess all runs in an existing experiment directory):
-    python src/experiment_manager.py /path/to/experiment_dir --reprocess
+This design makes the experiment pipeline self-healing and resilient to
+interruptions.
+
+Usage:
+# To manage an existing experiment (run, repair, reprocess to completion):
+python src/experiment_manager.py path/to/experiment_dir
+
+# To start a brand new experiment in a default, timestamped directory:
+python src/experiment_manager.py
 """
 
 import sys
@@ -63,278 +67,396 @@ import datetime
 import argparse
 import re
 import configparser
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
+
+# tqdm is a library that provides a clean progress bar.
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, *args, **kwargs): return iterable
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 try:
-    from config_loader import APP_CONFIG, get_config_value
+    from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 except ImportError as e:
     print(f"FATAL: Could not import config_loader.py. Error: {e}", file=sys.stderr)
     sys.exit(1)
 
 C_CYAN = '\033[96m'
 C_GREEN = '\033[92m'
+C_YELLOW = '\033[93m'
+C_RED = '\033[91m'
 C_RESET = '\033[0m'
 
-def get_completed_replications(output_dir):
-    completed = set()
-    search_pattern = os.path.join(output_dir, '**', 'run_*')
-    run_dirs = glob.glob(search_pattern, recursive=True)
+# --- Verification Helper Functions ---
 
-    for dir_path in run_dirs:
-        if not os.path.isdir(dir_path): continue
-        dir_name = os.path.basename(dir_path)
-        match = re.search(r'_rep-(\d+)_', dir_name)
-        if match:
-            if glob.glob(os.path.join(dir_path, 'replication_report_*.txt')):
-                completed.add(int(match.group(1)))
-    return completed
+def _count_lines_in_file(filepath: str, skip_header: bool = True) -> int:
+    """Counts data lines in a file, optionally skipping a header."""
+    if not os.path.exists(filepath):
+        return 0
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        start_index = 1 if skip_header and lines else 0
+        return len([line for line in lines[start_index:] if line.strip()])
+    except Exception:
+        return 0
 
-def format_seconds(seconds):
-    if seconds < 0: return "00:00:00"
-    return str(datetime.timedelta(seconds=int(seconds)))
+def _count_matrices_in_file(filepath: str, k: int) -> int:
+    """Counts how many k x k matrices are in a file."""
+    if not os.path.exists(filepath) or k <= 0:
+        return 0
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = [line for line in f.read().splitlines() if line.strip()]
+        return len(lines) // k
+    except Exception:
+        return 0
 
-def find_latest_report(run_dir):
-    report_files = glob.glob(os.path.join(run_dir, "replication_report_*.txt"))
-    return max(report_files, key=os.path.getmtime) if report_files else None
+def _verify_single_run_completeness(run_dir, verbose=False):
+    """Audits a single run_* directory and returns its state."""
+    run_name = os.path.basename(run_dir)
+    if verbose:
+        print(f"[MANAGER_DEBUG] Verifying: {run_name}")
 
-def find_run_dirs_by_depth(base_dir, depth):
-    if depth < -1: depth = -1
-    pattern = 'run_*'
-    if depth == -1:
-        search_pattern = os.path.join(base_dir, '**', pattern)
-        return sorted([p for p in glob.glob(search_pattern, recursive=True) if os.path.isdir(p)])
+    m_match = re.search(r"trl-(\d+)", run_name)
+    k_match = re.search(r"sbj-(\d+)", run_name)
+
+    if not m_match or not k_match:
+        if verbose:
+            print(f"[MANAGER_DEBUG]   - Determined Status: {C_RED}INVALID_NAME{C_RESET}")
+        return {"status": "INVALID_NAME", "details": "Name must contain trl-NNN and sbj-NN."}
+
+    expected_trials = int(m_match.group(1))
+    k = int(k_match.group(1))
+
+    # File counts
+    # Use a robust method for counting to ensure only valid trial queries are included.
+    query_files = glob.glob(os.path.join(run_dir, "session_queries", "llm_query_*.txt"))
+    num_queries = len([f for f in query_files if re.search(r'_(\d{3})\.txt', f)])
     
-    all_paths = set()
-    for d in range(depth + 1):
-        wildcards = ['*'] * d
-        path_parts = [base_dir] + wildcards
-        current_pattern = os.path.join(*path_parts)
-        run_dirs_at_level = glob.glob(os.path.join(current_pattern, pattern))
-        all_paths.update(run_dirs_at_level)
+    # Also make the response count more specific to avoid counting .error files etc.
+    response_files = glob.glob(os.path.join(run_dir, "session_responses", "llm_response_*.txt"))
+    num_responses = len([f for f in response_files if re.fullmatch(r'llm_response_\d{3}\.txt', os.path.basename(f))])
+
+    analysis_path = os.path.join(run_dir, "analysis_inputs")
+    num_matrices = _count_matrices_in_file(os.path.join(analysis_path, "all_scores.txt"), k)
+    num_mappings = _count_lines_in_file(os.path.join(analysis_path, "all_mappings.txt"), skip_header=True)
+
+    if verbose:
+        print(f"[MANAGER_DEBUG]   - Expected Trials: {expected_trials}")
+        print(f"[MANAGER_DEBUG]   - Queries Found:   {num_queries}")
+        print(f"[MANAGER_DEBUG]   - Responses Found: {num_responses}")
+        print(f"[MANAGER_DEBUG]   - Matrices Found:  {num_matrices}")
+        print(f"[MANAGER_DEBUG]   - Mappings Found:  {num_mappings}")
+
+    # Determine state
+    state = {
+        "dir": run_dir,
+        "expected": expected_trials,
+        "queries": num_queries,
+        "responses": num_responses,
+        "matrices": num_matrices,
+        "mappings": num_mappings,
+        "status": "UNKNOWN"
+    }
+
+    if num_queries == 0:
+        state["status"] = "NEW"
+    elif num_queries < expected_trials:
+        state["status"] = "INCOMPLETE_QUERIES" # Should be treated as NEW
+    elif num_responses < num_queries:
+        state["status"] = "REPAIR_NEEDED"
+        failed_indices = []
         
-    return sorted([p for p in all_paths if os.path.isdir(p)])
+        # Robustly find all valid query indices from filenames
+        query_indices = set()
+        for f in glob.glob(os.path.join(run_dir, "session_queries", "llm_query_*.txt")):
+            match = re.search(r'_(\d{3})\.txt', f)
+            if match:
+                query_indices.add(int(match.group(1)))
+
+        for index in query_indices:
+            if not os.path.exists(os.path.join(run_dir, "session_responses", f"llm_response_{index:03d}.txt")):
+                failed_indices.append(index)
+        state["failed_indices"] = failed_indices
+    elif num_matrices < expected_trials or num_mappings < expected_trials:
+        state["status"] = "REPROCESS_NEEDED"
+    elif num_responses == expected_trials and num_matrices == expected_trials and num_mappings == expected_trials:
+        state["status"] = "COMPLETE"
+    else:
+        state["status"] = "INCONSISTENT" # e.g. more responses than queries
+    
+    if verbose:
+        status_color = C_GREEN if state['status'] == 'COMPLETE' else C_YELLOW
+        print(f"[MANAGER_DEBUG]   - Determined Status: {status_color}{state['status']}{C_RESET}")
+
+    return state
+
+def _get_experiment_state(target_dir, expected_reps, verbose=False):
+    """Aggregates verification of all runs to determine overall experiment state."""
+    if verbose:
+        print(f"{C_YELLOW}[MANAGER_DEBUG] Running verification...{C_RESET}")
+        
+    run_dirs = sorted([p for p in glob.glob(os.path.join(target_dir, 'run_*')) if os.path.isdir(p)])
+    
+    if not run_dirs or len(run_dirs) < expected_reps:
+        return "NEW_NEEDED", {"missing_reps": expected_reps - len(run_dirs)}
+
+    states = {"REPAIR_NEEDED": [], "REPROCESS_NEEDED": [], "COMPLETE": [], "INCONSISTENT": []}
+    for run_dir in run_dirs:
+        verification = _verify_single_run_completeness(run_dir, verbose)
+        status = verification["status"]
+        if status in states:
+            states[status].append(verification)
+    
+    if states["INCONSISTENT"]:
+        return "INCONSISTENT", states["INCONSISTENT"]
+    if states["REPAIR_NEEDED"]:
+        return "REPAIR_NEEDED", states["REPAIR_NEEDED"]
+    if states["REPROCESS_NEEDED"]:
+        return "REPROCESS_NEEDED", states["REPROCESS_NEEDED"]
+    if len(states["COMPLETE"]) == expected_reps:
+        return "COMPLETE", None
+    
+    return "UNKNOWN", states # Fallback
+
+# --- Mode Execution Functions ---
+
+def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, bias_script):
+    """Executes the 'NEW' mode to create missing replications."""
+    print(f"{C_CYAN}--- Entering NEW Mode: Creating missing replications ---{C_RESET}")
+    
+    completed_reps = {int(re.search(r'_rep-(\d+)_', os.path.basename(d)).group(1))
+                      for d in glob.glob(os.path.join(target_dir, 'run_*_rep-*'))
+                      if re.search(r'_rep-(\d+)_', os.path.basename(d))}
+                      
+    reps_to_run = [r for r in range(start_rep, end_rep + 1) if r not in completed_reps]
+    if not reps_to_run:
+        print("All replications exist. Nothing to do in NEW mode.")
+        return True
+
+    print(f"Will create {len(reps_to_run)} new replication(s).")
+    batch_start_time = time.time()
+    
+    for i, rep_num in enumerate(reps_to_run):
+        header_text = f" RUNNING REPLICATION {rep_num} of {end_rep} "
+        print("\n" + "="*80)
+        print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
+        print("="*80)
+        
+        cmd_orch = [sys.executable, orchestrator_script, "--replication_num", str(rep_num), "--base_output_dir", target_dir]
+        if notes: cmd_orch.extend(["--notes", notes])
+        if quiet: cmd_orch.append("--quiet")
+        
+        try:
+            subprocess.run(cmd_orch, check=True)
+            
+            # Run bias analysis
+            search_pattern = os.path.join(target_dir, f'run_*_rep-{rep_num:03d}_*')
+            found_dirs = [d for d in glob.glob(search_pattern) if os.path.isdir(d)]
+            if len(found_dirs) == 1:
+                run_dir = found_dirs[0]
+                k_val = get_config_value(APP_CONFIG, 'Study', 'group_size', value_type=int, fallback_key='k_per_query', fallback=10)
+                cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_val)]
+                if not quiet: cmd_bias.append("--verbose")
+                subprocess.run(cmd_bias, check=True)
+            else:
+                logging.warning(f"Could not find unique run directory for rep {rep_num} to run bias analysis.")
+
+        except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
+            logging.error(f"Replication {rep_num} failed or was interrupted.")
+            if isinstance(e, KeyboardInterrupt): sys.exit(1)
+            return False # Indicate failure
+
+        elapsed = time.time() - batch_start_time
+        avg_time = elapsed / (i + 1)
+        remaining_reps = len(reps_to_run) - (i + 1)
+        eta = datetime.datetime.now() + datetime.timedelta(seconds=remaining_reps * avg_time)
+        print(f"{C_GREEN}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
+
+    return True
+
+def _repair_worker(run_dir, sessions_script_path, index, quiet):
+    """Worker function to retry a single failed session."""
+    cmd = [sys.executable, sessions_script_path, "--run_output_dir", run_dir, "--indices", str(index), "--force-rerun"]
+    if quiet: cmd.append("--quiet")
+    
+    try:
+        # Run quietly, capture output to prevent jumbled logs
+        result = subprocess.run(cmd, check=True, text=True, capture_output=True)
+        return index, True, None
+    except subprocess.CalledProcessError as e:
+        error_log = f"REPAIR FAILED for index {index} in {os.path.basename(run_dir)}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
+        return index, False, error_log
+
+def _run_repair_mode(runs_to_repair, sessions_script_path, quiet, max_workers):
+    """Executes the 'REPAIR' mode to fix missing API responses."""
+    print(f"{C_YELLOW}--- Entering REPAIR Mode: Fixing {len(runs_to_repair)} run(s) with missing responses ---{C_RESET}")
+    
+    all_tasks = []
+    for run_info in runs_to_repair:
+        for index in run_info.get("failed_indices", []):
+            all_tasks.append((run_info["dir"], index))
+            
+    if not all_tasks:
+        print("No specific failed indices found to repair.")
+        return True
+
+    print(f"Attempting to repair {len(all_tasks)} failed API calls across all runs.")
+    successful_repairs = 0
+    failed_repairs = 0
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        task_func = partial(_repair_worker, sessions_script_path=sessions_script_path, quiet=quiet)
+        future_to_task = {executor.submit(task_func, run_dir=task[0], index=task[1]): task for task in all_tasks}
+
+        for future in tqdm(as_completed(future_to_task), total=len(all_tasks), desc="Repairing Sessions"):
+            index, success, error_log = future.result()
+            if success:
+                successful_repairs += 1
+            else:
+                failed_repairs += 1
+                logging.error(error_log)
+    
+    print(f"Repair complete: {successful_repairs} successful, {failed_repairs} failed.")
+    return failed_repairs == 0
+
+def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, bias_script):
+    """Executes 'REPROCESS' mode to fix corrupted analysis files."""
+    print(f"{C_YELLOW}--- Entering REPROCESS Mode: Fixing {len(runs_to_reprocess)} run(s) with corrupt analysis ---{C_RESET}")
+
+    for i, run_info in enumerate(runs_to_reprocess):
+        run_dir = run_info["dir"]
+        header_text = f" RE-PROCESSING {os.path.basename(run_dir)} ({i+1}/{len(runs_to_reprocess)}) "
+        print("\n" + "="*80)
+        print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
+        print("="*80)
+        
+        cmd_orch = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", run_dir]
+        if quiet: cmd_orch.append("--quiet")
+        if notes: cmd_orch.extend(["--notes", notes])
+
+        try:
+            subprocess.run(cmd_orch, check=True)
+            
+            # Run bias analysis
+            config_path = os.path.join(run_dir, 'config.ini.archived')
+            if os.path.exists(config_path):
+                config = configparser.ConfigParser()
+                config.read(config_path)
+                k_value = config.getint('Study', 'group_size', fallback=config.getint('Study', 'k_per_query', fallback=0))
+                if k_value > 0:
+                    cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_value)]
+                    if not quiet: cmd_bias.append("--verbose")
+                    subprocess.run(cmd_bias, check=True)
+            else:
+                logging.warning(f"No archived config in {os.path.basename(run_dir)}, cannot run bias analysis.")
+
+        except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
+            logging.error(f"Reprocessing failed for {os.path.basename(run_dir)}.")
+            if isinstance(e, KeyboardInterrupt): sys.exit(1)
+            return False
+            
+    return True
 
 def main():
-    parser = argparse.ArgumentParser(description="Main batch runner for experiments.")
-    parser.add_argument('target_dir', nargs='?', default=None, 
-                    help="Optional. The target directory for the operation. If not provided, a unique directory will be created.")
-    parser.add_argument('--start-rep', type=int, default=1)
-    parser.add_argument('--end-rep', type=int, default=None)
-    parser.add_argument('--reprocess', action='store_true', help='Run in reprocessing mode.')
-    parser.add_argument('--depth', type=int, default=0, help="Recursion depth for finding run folders.")
-    # MODIFIED: Changed --quiet to --verbose and inverted the logic. Default is now quiet.
+    parser = argparse.ArgumentParser(description="State-machine controller for running experiments.")
+    parser.add_argument('target_dir', nargs='?', default=None,
+                        help="Optional. The target directory for the experiment. If not provided, a unique directory will be created.")
+    parser.add_argument('--start-rep', type=int, default=1, help="First replication number for new runs.")
+    parser.add_argument('--end-rep', type=int, default=None, help="Last replication number for new runs.")
+    parser.add_argument('--max-workers', type=int, default=10, help="Max parallel workers for repair mode.")
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose per-replication status updates.')
-    parser.add_argument('--notes', type=str, help='Optional notes for the report.')
+    parser.add_argument('--notes', type=str, help='Optional notes for the reports.')
+    parser.add_argument('--max-loops', type=int, default=10, help="Safety limit for state-machine loops.")
     args = parser.parse_args()
 
+    # --- Script Paths ---
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
+    sessions_script = os.path.join(current_dir, "run_llm_sessions.py")
     log_manager_script = os.path.join(current_dir, "replication_log_manager.py")
     compile_script = os.path.join(current_dir, "compile_study_results.py")
-    # Correctly point to the new per-replication bias analysis script
     bias_analysis_script = os.path.join(current_dir, "run_bias_analysis.py")
-    
+
     if args.target_dir:
         final_output_dir = os.path.abspath(args.target_dir)
     else:
-        # Create a default directory by reading the structure from config.ini
+        # Create a default directory based on config.ini
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        project_root = os.path.abspath(os.path.join(current_dir, '..'))
-        
-        base_output = get_config_value(APP_CONFIG, 'General', 'base_output_dir', value_type=str, fallback='output')
-        new_exp_subdir = get_config_value(APP_CONFIG, 'General', 'new_experiments_subdir', value_type=str, fallback='new_experiments')
-        exp_prefix = get_config_value(APP_CONFIG, 'General', 'experiment_dir_prefix', value_type=str, fallback='experiment_')
-
-        base_path = os.path.join(project_root, base_output, new_exp_subdir)
+        base_output = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback='output')
+        new_exp_subdir = get_config_value(APP_CONFIG, 'General', 'new_experiments_subdir', fallback='new_experiments')
+        exp_prefix = get_config_value(APP_CONFIG, 'General', 'experiment_dir_prefix', fallback='experiment_')
+        base_path = os.path.join(PROJECT_ROOT, base_output, new_exp_subdir)
         final_output_dir = os.path.join(base_path, f"{exp_prefix}{timestamp}")
-        
-        print(f"{C_CYAN}No target directory specified. Using default from config: {final_output_dir}{C_RESET}")
+        print(f"{C_CYAN}No target directory specified. Creating default: {final_output_dir}{C_RESET}")
 
-    failed_reps = [] # Initialize for all modes
+    if not os.path.exists(final_output_dir):
+        os.makedirs(final_output_dir)
+        print(f"Created target directory: {final_output_dir}")
 
-    if args.reprocess:
-        if not args.target_dir:
-            print("ERROR: Reprocessing mode requires a target directory to be specified.", file=sys.stderr)
-            sys.exit(1)
-        print(f"--- Starting Batch Reprocess on: {final_output_dir} (Depth: {args.depth}) ---")
-        dirs_to_reprocess = find_run_dirs_by_depth(final_output_dir, args.depth)
-        if not dirs_to_reprocess:
-            print("No 'run_*' directories found. Exiting.")
-            return
-        print(f"Found {len(dirs_to_reprocess)} replication directories to reprocess.")
-        os.system('')
-        # failed_reps = [] # <-- This line is now removed from here
+    config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+    end_rep = args.end_rep if args.end_rep is not None else config_num_reps
 
-        for i, run_dir in enumerate(dirs_to_reprocess):
-            header_text = f" RE-PROCESSING {os.path.basename(run_dir)} ({i+1}/{len(dirs_to_reprocess)}) "
-            print("\n" + "="*80)
-            print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
-            print("="*80)
-            cmd = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", run_dir]
-            if not args.verbose: cmd.append("--quiet")
-            if args.notes:
-                cmd.extend(["--notes", args.notes])
-            try:
-                subprocess.run(cmd, check=True)
-
-                # --- FIX: Load the run-specific archived config to get the correct k value ---
-                config_path = os.path.join(run_dir, 'config.ini.archived')
-                k_value = None
-                if os.path.exists(config_path):
-                    config = configparser.ConfigParser()
-                    config.read(config_path)
-                    # Use robust key lookup to find the group size (k)
-                    if config.has_option('Study', 'group_size'):
-                        k_value = config.getint('Study', 'group_size')
-                    elif config.has_option('Study', 'k_per_query'): # Fallback for older key names
-                        k_value = config.getint('Study', 'k_per_query')
-
-                if k_value:
-                    # Run the bias analysis stage with the correct k_value
-                    cmd_bias = [sys.executable, bias_analysis_script, run_dir, "--k_value", str(k_value)]
-                    if args.verbose: cmd_bias.append("--verbose")
-                    subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
-                else:
-                    logging.warning(f"Could not find k_value in {config_path}. Skipping bias analysis for {os.path.basename(run_dir)}.")
-                # --- END OF FIX ---
-
-            except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
-                logging.error(f"!!! Reprocessing failed or was interrupted for {os.path.basename(run_dir)}. Continuing... !!!")
-                failed_reps.append(os.path.basename(run_dir)) # Add failed run to the list
-                if isinstance(e, KeyboardInterrupt): sys.exit(1)
-        
-        # --- ADDED: Log rebuilding for reprocess mode ---
+    # --- Main State-Machine Loop ---
+    loop_count = 0
+    while loop_count < args.max_loops:
+        loop_count += 1
         print("\n" + "="*80)
-        print("### REPROCESSING PHASE COMPLETE. REBUILDING BATCH LOG. ###")
-        print("="*80)
-        try:
-            subprocess.run([sys.executable, log_manager_script, "rebuild", final_output_dir], check=True)
-            print("Batch run log successfully rebuilt.")
-        except Exception as e:
-            logging.error(f"An error occurred while rebuilding the batch log after reprocessing: {e}")
+        print(f"{C_CYAN}### VERIFICATION CYCLE {loop_count}/{args.max_loops} ###{C_RESET}")
 
-    else:
-        if not os.path.exists(final_output_dir):
-            os.makedirs(final_output_dir)
-            print(f"Created target directory: {final_output_dir}")
+        state, details = _get_experiment_state(final_output_dir, end_rep, args.verbose)
+        print(f"Current Experiment State: {C_GREEN}{state}{C_RESET}")
 
-        config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int)
-        end_rep = args.end_rep if args.end_rep is not None else config_num_reps
-        completed_reps = get_completed_replications(final_output_dir)
-        
-        log_command = 'rebuild' if completed_reps else 'start'
-        print(f"\n--- Preparing log file with command: '{log_command}' ---")
-        subprocess.run([sys.executable, log_manager_script, log_command, final_output_dir], check=True)
-
-        reps_to_run = [r for r in range(args.start_rep, end_rep + 1) if r not in completed_reps]
-        if not reps_to_run:
-            print("All replications in the specified range are already complete.")
+        success = False
+        if state == "NEW_NEEDED":
+            success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script, bias_analysis_script)
+        elif state == "REPAIR_NEEDED":
+            success = _run_repair_mode(details, sessions_script, not args.verbose, args.max_workers)
+        elif state == "REPROCESS_NEEDED":
+            success = _run_reprocess_mode(details, args.notes, not args.verbose, orchestrator_script, bias_analysis_script)
+        elif state == "COMPLETE":
+            print(f"{C_GREEN}--- Experiment is COMPLETE. Proceeding to finalization. ---{C_RESET}")
+            break
         else:
-            print(f"Will execute {len(reps_to_run)} new replication(s).")
-            batch_start_time = time.time()
-            newly_completed_count = 0
-            os.system('')
-            interrupted = False
+            print(f"{C_RED}--- Unhandled or inconsistent state detected: {state}. Halting. ---{C_RESET}")
+            print(f"Details: {details}")
+            sys.exit(1)
 
-            for i, rep_num in enumerate(reps_to_run):
-                header_text = f" RUNNING REPLICATION {rep_num} of {end_rep} "
-                print("\n" + "="*80)
-                print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
-                print("="*80)
-                
-                cmd = [sys.executable, orchestrator_script, 
-                    "--replication_num", str(rep_num),
-                    "--base_output_dir", final_output_dir]
-                if args.notes:
-                    cmd.extend(["--notes", args.notes])
-                # MODIFIED: Pass --quiet to the orchestrator unless --verbose is specified.
-                if not args.verbose: cmd.append("--quiet")
-                
-                try:
-                    subprocess.run(cmd, check=True)
+        if not success:
+            print(f"{C_RED}--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
+            sys.exit(1)
 
-                    # --- ADDED: Find the run directory and run bias analysis for consistency ---
-                    search_pattern = os.path.join(final_output_dir, f'run_*_rep-{rep_num:03d}_*')
-                    found_dirs = [d for d in glob.glob(search_pattern) if os.path.isdir(d)]
-                    
-                    if len(found_dirs) == 1:
-                        run_dir = found_dirs[0]
-                        # Get k from the live config for the new run
-                        k_value = get_config_value(APP_CONFIG, 'Study', 'group_size', 
-                                                   value_type=int, 
-                                                   fallback_key='k_per_query', 
-                                                   fallback=10)
-                        cmd_bias = [sys.executable, bias_analysis_script, run_dir, "--k_value", str(k_value)]
-                        if args.verbose: cmd_bias.append("--verbose")
-                        subprocess.run(cmd_bias, check=True, text=True, capture_output=False)
-                    else:
-                        logging.warning(f"Could not find unique run directory for rep {rep_num} to run bias analysis. Found: {len(found_dirs)}")
-                    # --- END OF ADDED BLOCK ---
+    if loop_count >= args.max_loops:
+        print(f"{C_RED}--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
+        sys.exit(1)
 
-                    newly_completed_count += 1
-                    elapsed = time.time() - batch_start_time
-                    avg_time = elapsed / newly_completed_count
-                    remaining_reps = len(reps_to_run) - (i + 1)
-                    eta = datetime.datetime.now() + datetime.timedelta(seconds=remaining_reps * avg_time)
-                    print(f"\n--- Replication {rep_num} Finished ({newly_completed_count}/{len(reps_to_run)}) ---")
-                    print(f"{C_GREEN}Time Elapsed: {format_seconds(elapsed)} | Remaining: {format_seconds(remaining_reps * avg_time)} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
-
-                except subprocess.CalledProcessError:
-                    logging.error(f"!!! Replication {rep_num} failed. Check its report for details. Continuing... !!!")
-                    failed_reps.append(rep_num) # Add the failed replication number to our list
-                except KeyboardInterrupt:
-                    logging.warning(f"\n!!! Batch run interrupted by user during replication {rep_num}. Halting... !!!")
-                    interrupted = True
-                
-                if interrupted:
-                    break
-            
-            # --- THIS IS THE NEW LOGIC BLOCK ---
-            # It runs once after the entire replication loop is finished or interrupted.
-            print("\n" + "="*80)
-            print("### REPLICATION PHASE COMPLETE. REBUILDING BATCH LOG. ###")
-            print("="*80)
-            try:
-                # Rebuild the entire log from the completed reports in one go.
-                subprocess.run([sys.executable, log_manager_script, "rebuild", final_output_dir], check=True)
-                print("Batch run log successfully rebuilt.")
-            except Exception as e:
-                logging.error(f"An error occurred while rebuilding the batch run log: {e}")
-
-    # --- Post-Processing Stage ---
+    # --- Finalization Stage ---
     print("\n" + "="*80)
-    print("### ALL TASKS COMPLETE. BEGINNING POST-PROCESSING. ###")
+    print("### ALL TASKS COMPLETE. BEGINNING FINALIZATION. ###")
     print("="*80)
     
-    # Call compile_study_results.py
-    print("\n--- Compiling final statistical summary... ---")
+    # Rebuild log, compile results, finalize log
     try:
-        subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True, capture_output=True, text=True)
+        log_file_path = os.path.join(final_output_dir, get_config_value(APP_CONFIG, 'Filenames', 'batch_run_log', fallback='batch_run_log.csv'))
+        log_message = "Rebuilding batch log..." if os.path.exists(log_file_path) else "Building batch log..."
+        
+        print(f"\n--- {log_message} ---")
+        subprocess.run([sys.executable, log_manager_script, "rebuild", final_output_dir], check=True, capture_output=True)
+        
+        print("\n--- Compiling final statistical summary... ---")
+        subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True, capture_output=True)
+        print("\n--- Finalizing batch log with summary... ---")
+        subprocess.run([sys.executable, log_manager_script, "finalize", final_output_dir], check=True, capture_output=True)
     except Exception as e:
-        logging.error(f"An error occurred while running the final compilation script: {e}")
-    
-    # Call the existing 'finalize' command in replication_log_manager.py to append the summary.
-    print("\n--- Finalizing batch log with summary... ---")
-    try:
-        subprocess.run([sys.executable, log_manager_script, "finalize", final_output_dir], check=True, capture_output=True, text=True)
-    except Exception as e:
-        logging.error(f"An error occurred while finalizing the batch log: {e}")
+        logging.error(f"An error occurred during finalization: {e}")
+        sys.exit(1)
 
-    # NEW: Add a summary of any failures at the very end.
-    if failed_reps:
-        print("\n" + "="*80)
-        print(f"### BATCH RUN COMPLETE WITH {len(failed_reps)} FAILURE(S) ###")
-        print("The following replications failed and should be investigated:")
-        for rep in failed_reps:
-            print(f"  - {rep}")
-        print("Check the 'replication_report.txt' inside each failed directory for details.")
-        print("="*80)
-    else:
-        print("\n--- Batch Run Finished Successfully ---")
+    print(f"\n{C_GREEN}--- Experiment Run Finished Successfully ---{C_RESET}")
 
 if __name__ == "__main__":
     main()
-
-# === End of src/experiment_manager.py ===

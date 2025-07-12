@@ -193,37 +193,21 @@ Use the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) s
     *   `docs(readme): Update contribution workflow`
     *   `test(orchestrator): Add test for reprocess mode`
 
-**Important: The Documentation Commit Workflow**
+**Important: The Automated Documentation Workflow**
 
-To ensure generated documentation (`README.md`, diagrams) stays synchronized with its sources (`README.template.md`), a **two-commit process** is required.
+This project uses a `pre-commit` hook to keep the documentation synchronized. When you make changes to documentation source files (like `docs/DOCUMENTATION.template.md` or diagram sources), you only need to commit the source file.
 
-1.  **Commit #1: Update the Source File(s)**
-    *   Modify the source file (e.g., `README.template.md`).
-    *   Stage and commit *only* the source file change with a descriptive `docs` message.
-    ```bash
-    # Stage only the template
-    git add README.template.md
-    
-    # Commit the logical change
-    git commit -m "docs(readme): Clarify installation instructions"
-    ```
+1.  **Modify the source file(s)** (e.g., edit text in `DOCUMENTATION.template.md` or update a diagram's `.mmd` file).
+2.  **Stage your changes** (`git add docs/DOCUMENTATION.template.md`).
+3.  **Commit with a standard `docs` message**.
 
-2.  **Commit #2: Build and Commit the Generated File(s)**
-    *   After the first commit, manually run the documentation builder script:
-    ```bash
-    pdm run build-docs
-    ```
-    *   The script will generate or update `README.md` and other assets.
-    *   Stage all the newly generated files.
-    ```bash
-    git add README.md docs/images/
-    ```
-    *   Commit these generated files with a standardized `build` message.
-    ```bash
-        git commit -m "build(docs): Regenerate documentation from source"
-    ```
+When you run `git commit`, the hook will automatically:
+1.  Run the `build_docs.py` script.
+2.  Re-render any outdated diagrams.
+3.  Re-generate `DOCUMENTATION.md` and the `.docx` files.
+4.  **Add these generated files to your commit for you.**
 
-This process cleanly separates logical documentation changes from the automated build output in the project's history.
+This ensures that every commit containing documentation source changes also includes the corresponding built artifacts, keeping the repository perfectly in sync.
 
 ### 5. Submit a Pull Request
 
