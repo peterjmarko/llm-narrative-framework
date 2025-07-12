@@ -19,6 +19,47 @@
 #
 # Filename: src/build_docs.py
 
+"""
+Builds all project documentation from source templates and diagrams.
+
+This script is the central engine for generating the project's documentation.
+It takes `docs/DOCUMENTATION.template.md` as its primary input, processes
+custom placeholders, renders diagrams, and outputs the final `DOCUMENTATION.md`
+and `.docx` files.
+
+Key Features:
+-   **Template Processing**: Parses `{{diagram:...}}` and `{{include:...}}`
+    placeholders within the template file.
+
+-   **Diagram Rendering**:
+    -   Renders Mermaid (`.mmd`) diagrams to PNG using the local `mmdc` CLI.
+    -   Renders text-based (`.txt`) diagrams to PNG using the Pillow library.
+
+-   **Intelligent Caching**: Skips rendering diagrams if the output image file
+    is newer than the source diagram file, speeding up subsequent builds.
+
+-   **Force Re-render**: Accepts a `--force-render` flag to override the cache
+    and regenerate all diagrams.
+
+-   **Dual-Syntax Generation**: To ensure compatibility with different renderers,
+    it generates two versions of the documentation content in memory:
+    1.  For `.md` viewers (GitHub, VS Code): Uses HTML `<img>` tags for
+        universal compatibility with attributes like `width`.
+    2.  For `.docx` conversion: Uses Pandoc-native `![](){...}` attribute
+        syntax for correct image sizing in the final document.
+
+-   **Resilient DOCX Conversion**: When converting to `.docx` via Pandoc, it
+    includes a retry loop that waits for locked files (e.g., open in Word)
+    to be closed instead of failing immediately.
+
+Usage:
+    # Standard build (uses cache)
+    pdm run build-docs
+
+    # Force a full rebuild of all diagrams
+    pdm run build-docs --force-render
+"""
+
 import os
 import re
 import subprocess
