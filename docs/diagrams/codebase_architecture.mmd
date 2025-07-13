@@ -1,83 +1,86 @@
-graph TD
-    %% Main Entry Points
-    direction LR
-    ps_run_exp("run_experiment.ps1")
-    ps_process("process_study.ps1")
-    ps_migrate("migrate_old_experiment.ps1")
+graph LR
+    %% Main User Entry Points (Leftmost column)
+    subgraph "1. Main User Entry Points"
+        ps_run_exp("run_experiment.ps1")
+        ps_update_exp("update_experiment.ps1")
+        ps_audit_exp("audit_experiment.ps1")
+        ps_migrate("migrate_experiment.ps1")
+        ps_analyze_study("analyze_study.ps1")
+    end
 
-    %% Workflows
-    subgraph "Workflow 1: Run Experiment"
+    %% Experiment Lifecycle (Central, main activities)
+    subgraph "2. Experiment Lifecycle"
         direction TB
-        repl_manager("experiment_manager.py")
-        run_bias_analysis("run_bias_analysis.py")
-        
-        %% Core Pipeline Stages (Sequentially Orchestrated)
+        exp_manager("experiment_manager.py")
         orchestrate("orchestrate_replication.py")
         build_queries("build_llm_queries.py")
         run_sessions("run_llm_sessions.py")
         process_responses("process_llm_responses.py")
         analyze_perf("analyze_llm_performance.py")
-
-        %% Internal Workers/Helpers for Workflow 1
+        log_manager("replication_log_manager.py")
+        run_bias_analysis("run_bias_analysis.py")
         llm_prompter("llm_prompter.py")
         query_gen_util("query_generator.py")
-        log_manager("replication_log_manager.py")
     end
 
-    subgraph "Workflow 2: Process Study"
-        direction TB
-        compile_results("compile_study_results.py")
-        run_anova("analyze_study_results.py")
-    end
-    
-    subgraph "Workflow 3: Data Migration"
+    %% Data Migration Processes (Above Experiment Lifecycle, called by exp_manager)
+    subgraph "3. Data Migration Processes"
         direction TB
         patch_old("patch_old_experiment.py")
         restore_config("restore_config.py")
         rebuild_reports("rebuild_reports.py")
+        patch_old --> restore_config
+    end
+    
+    %% Study-Level Analysis (Below Experiment Lifecycle, final aggregation)
+    subgraph "4. Study-Level Analysis"
+        direction TB
+        aggregator("experiment_aggregator.py")
+        study_analyzer("study_analysis.py")
+        aggregator --> study_analyzer
     end
 
-    subgraph "Shared Utilities"
+    %% Shared Utilities (Positioned to reduce clutter, often below or to the right)
+    subgraph "5. Shared Utilities"
         direction TB
         config_loader("config_loader.py")
-        %% retry_llm_sessions.py is now completely removed as requested
     end
 
     %% --- Define Relationships ---
-    %% Use --> for Execution and -.-> for Import
-
-    %% PowerShell to Python Entry Points
-    ps_run_exp --> repl_manager
-    ps_process --> compile_results
-    ps_process --> run_anova
-    ps_migrate --> patch_old
-    ps_migrate --> rebuild_reports
-
-    %% Workflow 1: Run Experiment Connections
-    repl_manager --> orchestrate
-    repl_manager --> run_bias_analysis
-    repl_manager --> log_manager
-    repl_manager --> compile_results
-    repl_manager -.-> config_loader
+    %% PowerShell to Python Entry Points (Solid: Execution)
+    ps_run_exp --> exp_manager
+    ps_update_exp --> exp_manager
+    ps_audit_exp --> exp_manager
+    ps_migrate --> exp_manager
+    ps_analyze_study --> aggregator
     
+    %% Experiment Manager's calls (Solid: Execution)
+    exp_manager --> orchestrate
+    exp_manager --> log_manager
+    exp_manager --> run_bias_analysis
+    exp_manager --> aggregator        
+    exp_manager --> patch_old         
+    exp_manager --> rebuild_reports   
+
+    %% Core Replication Pipeline flow (Solid: Execution)
     orchestrate --> build_queries
     orchestrate --> run_sessions
     orchestrate --> process_responses
     orchestrate --> analyze_perf
-    orchestrate -.-> config_loader
 
+    %% Utility dependencies (Solid: Execution)
     build_queries --> query_gen_util
-    query_gen_util -.-> config_loader
-
     run_sessions --> llm_prompter
-    llm_prompter -.-> config_loader
-
-    %% Workflow 2: Process Study Connections
-    compile_results -.-> config_loader
-    run_anova -.-> config_loader
-
-    %% Workflow 3: Data Migration Connections
-    patch_old --> restore_config
     rebuild_reports --> process_responses
     rebuild_reports --> analyze_perf
+
+    %% Shared Utility Imports (Dotted: Import/Dependency)
+    exp_manager -.-> config_loader
+    orchestrate -.-> config_loader
+    aggregator -.-> config_loader
+    study_analyzer -.-> config_loader
     rebuild_reports -.-> config_loader
+    query_gen_util -.-> config_loader
+    llm_prompter -.-> config_loader
+    analyze_perf -.-> config_loader
+    process_responses -.-> config_loader

@@ -3,11 +3,17 @@ graph TD
     EntryPoint["run_experiment.ps1<br/>(User Entry Point)"]:::entry
     BatchManager["experiment_manager.py<br/>(Manages Batch)"]:::layer_orange
     LogManager["replication_log_manager.py"]:::danger
-    BatchLog[("batch_log.txt")]:::artifact
+    BatchLog[("batch_run_log.csv")]:::artifact
+    BiasAnalysis["run_bias_analysis.py"]:::script
+    Aggregator["experiment_aggregator.py"]:::script
+    ReplResults[("REPLICATION_results.csv")]:::artifact
+    ExpResults[("EXPERIMENT_results.csv")]:::artifact
     
     ReplicationOrchestrator["orchestrate_replication.py"]:::layer_green
     BuildQueries["1. build_llm_queries.py"]:::script
+    QueryGenerator["query_generator.py"]:::script
     RunSessions["2. run_llm_sessions.py"]:::script
+    LLMPrompter["llm_prompter.py"]:::script
     ProcessResponses["3. process_llm_responses.py"]:::script
     AnalyzePerformance["4. analyze_llm_performance.py"]:::script
     ReplicationReport[("replication_report.txt")]:::artifact
@@ -15,22 +21,43 @@ graph TD
     %% 2. Define connections
     EntryPoint --> BatchManager
     BatchManager -- "Calls" --> ReplicationOrchestrator
-    BatchManager --> LogManager --> BatchLog
-    ReplicationOrchestrator --> BuildQueries --> RunSessions --> ProcessResponses --> AnalyzePerformance --> ReplicationReport
+    BatchManager --> LogManager
+    LogManager --> BatchLog
+    BatchManager --> BiasAnalysis
+    BatchManager -- "Finalizes" --> Aggregator
+    Aggregator --> ReplResults
+    Aggregator --> ExpResults
+
+    ReplicationOrchestrator --> BuildQueries
+    ReplicationOrchestrator --> RunSessions
+    ReplicationOrchestrator --> ProcessResponses
+    ReplicationOrchestrator --> AnalyzePerformance
+
+    BuildQueries --> QueryGenerator
+    RunSessions --> LLMPrompter
+    AnalyzePerformance --> ReplicationReport
+    BiasAnalysis -- "Modifies" --> ReplicationReport
 
     %% 3. Group nodes into subgraphs using their IDs
-    subgraph "Overall Process"
-        direction LR
+    subgraph "Workflow 1: Run an Experiment"
+        direction TB
+        EntryPoint
         subgraph "Batch Management Layer"
             BatchManager
             LogManager
             BatchLog
+            BiasAnalysis
+            Aggregator
+            ReplResults
+            ExpResults
         end
         
         subgraph "Single Replication Layer (Called in a loop)"
             ReplicationOrchestrator
             BuildQueries
+            QueryGenerator
             RunSessions
+            LLMPrompter
             ProcessResponses
             AnalyzePerformance
             ReplicationReport
@@ -44,4 +71,3 @@ graph TD
     classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
     classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;
     classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;
-

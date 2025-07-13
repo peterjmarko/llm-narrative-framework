@@ -1,0 +1,39 @@
+graph TD;
+
+    %% --- Style Definitions (Based on Original Palette) ---
+    classDef WorkflowEntry fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef Analysis fill:#17becf,stroke:#333,stroke-width:1px,color:#fff;
+    classDef DataArtifact fill:#f0f0f0,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#333;
+
+    %% === Nodes for Workflow 5: Analyze a Study ===
+    analyze_study_ps["analyze_study.ps1<br/>(User Entry Point)"]:::WorkflowEntry;
+    
+    subgraph "Workflow 5: Analyze a Study"
+        direction TB
+        analyze_study_ps
+        subgraph "Stage 1: Data Aggregation"
+            aggregator["experiment_aggregator.py"]:::Analysis;
+            data_repl_csv[("REPLICATION_results.csv")]:::DataArtifact;
+            data_exp_csv[("EXPERIMENT_results.csv")]:::DataArtifact;
+            data_study_csv[("STUDY_results.csv<br/>(Master Data File)")]:::DataArtifact;
+        end
+        
+        subgraph "Stage 2: Statistical Analysis"
+            direction LR
+            study_analyzer["study_analysis.py"]:::Analysis;
+            subgraph "Generated Artifacts"
+                log_file[("STUDY_analysis_log.txt")]:::DataArtifact;
+                boxplots_dir[("Boxplots/")]:::DataArtifact;
+                diag_plots_dir[("Diagnostics/")]:::DataArtifact;
+            end
+        end
+
+        %% === Connections ===
+        analyze_study_ps --> aggregator;
+        aggregator -->|Generates| data_repl_csv;
+        aggregator -->|Generates| data_exp_csv;
+        aggregator -->|Generates| data_study_csv;
+        data_study_csv -->|Analyzed by| study_analyzer;
+        aggregator -->|Calls for Analysis| study_analyzer;
+        study_analyzer -->|Generates| log_file & boxplots_dir & diag_plots_dir;
+    end

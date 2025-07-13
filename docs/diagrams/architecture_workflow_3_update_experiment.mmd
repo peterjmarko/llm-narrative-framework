@@ -1,0 +1,63 @@
+graph TD
+    %% 1. Define all nodes first
+    EntryPointPS["update_experiment.ps1<br/>(User Entry Point)"]:::entry_ps
+    EntryPointPy["experiment_manager.py<br/>(--reprocess Mode)"]:::entry_py
+    
+    Orchestrate["orchestrate_replication.py<br/>(--reprocess Mode)"]:::layer_green
+    ReplicationReport[("replication_report.txt")]:::artifact
+    BiasAnalysis["run_bias_analysis.py"]:::script
+    
+    LogManagerRebuild["replication_log_manager.py<br/>(rebuild command)"]:::danger
+    BatchRunLog[("batch_run_log.csv")]:::artifact
+    Aggregator["experiment_aggregator.py<br/>(hierarchical mode)"]:::script
+    ReplResults[("REPLICATION_results.csv")]:::artifact
+    ExpResults[("EXPERIMENT_results.csv")]:::artifact
+    StudyResults[("STUDY_results.csv")]:::artifact
+    LogManagerFinalize["replication_log_manager.py<br/>(finalize command)"]:::danger
+
+    %% 2. Define connections
+    EntryPointPS --> EntryPointPy
+    EntryPointPy -- "Calls in loop" --> Orchestrate
+    Orchestrate --> ReplicationReport
+    EntryPointPy -- "Calls in loop" --> BiasAnalysis
+    BiasAnalysis -- "Modifies" --> ReplicationReport
+
+    EntryPointPy -- "Finalizes" --> LogManagerRebuild
+    LogManagerRebuild --> BatchRunLog
+    EntryPointPy -- "Finalizes" --> Aggregator
+    Aggregator --> ReplResults
+    Aggregator --> ExpResults
+    Aggregator --> StudyResults
+    EntryPointPy -- "Finalizes" --> LogManagerFinalize
+    LogManagerFinalize --> BatchRunLog
+
+    %% 3. Group nodes into subgraphs
+    subgraph "Workflow 3: Update an Experiment"
+        direction TB
+        EntryPointPS
+        EntryPointPy
+        subgraph "Reprocessing Actions (Orchestrated by experiment_manager.py)"
+            direction TB
+            Orchestrate
+            ReplicationReport
+            BiasAnalysis
+        end
+        subgraph "Finalization Steps (After reprocessing loop)"
+            direction TB
+            LogManagerRebuild
+            BatchRunLog
+            Aggregator
+            ReplResults
+            ExpResults
+            StudyResults
+            LogManagerFinalize
+        end
+    end
+
+    %% 4. Styling
+    classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
+    classDef entry_py fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef layer_green fill:#5cb85c,stroke:#4cae4c,color:#fff;
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;
+    classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;

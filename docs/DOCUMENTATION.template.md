@@ -40,45 +40,80 @@ The result is a clean dataset of personality profiles where the connection to th
 
 ## Visual Architecture
 
-The project's architecture can be understood through three different views: the code architecture, the data flow, and the experimental logic.
+The project's architecture can be understood through four different views: the code architecture, the workflows, the data flow, and the experimental logic.
 
-### 1. Code Architecture Diagrams
-The project's functionality is divided into three main workflows, each initiated by a PowerShell script.
+### Code Architecture Diagrams
+The codebase can be divided into the following components:
+
+1.  **Main User Entry Points**: The PowerShell scripts that users directly execute to initiate various workflows (e.g., `run_experiment.ps1`, `analyze_study.ps1`).
+
+2.  **Experiment Lifecycle**: Python scripts primarily responsible for conducting a single experiment, including query generation, LLM interaction, response processing, and performance analysis.
+
+3.  **Data Migration Processes**: Utility scripts used specifically for updating and cleaning older experiment data to ensure compatibility with the current analysis pipeline.
+
+4.  **Study-Level Analysis**: Python scripts that aggregate results from multiple experiments and perform comprehensive statistical analysis for an entire study.
+
+5.  **Shared Utilities**: Helper scripts and modules, like `config_loader.py`, that provide common functionality and are imported by multiple other scripts across different workflows.
 
 #### Codebase Architecture
 This diagram provides a comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.
 
-> **Note:** This diagram reflects a previous version of the architecture. It will be updated to show the renamed `experiment_aggregator.py` and `study_analysis.py` scripts and the new centralized migration flow.
+{{diagram:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=111%}}
 
-{{diagram:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=110%}}
+### Workflow Diagrams
+The project's functionality is organized into five primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
 
-### Workflow 1: Run an Experiment
+1.  **Run an Experiment**: The most common action; used for starting a new experiment or resuming/healing an interrupted one.
+
+2.  **Audit an Experiment**: Provides a read-only, detailed completeness report for an experiment, acting as the primary diagnostic tool.
+
+3.  **Update an Experiment**: A specific action for existing experiments, used to reapply analysis or bug fixes without re-running expensive LLM calls.
+
+4.  **Migrate Old Experiment Data**: A utility workflow designed to bring older, legacy experimental data into compliance with the modern pipeline.
+
+5.  **Analyze a Study**: The highest-level analytical tool, used after one or more experiments are complete to aggregate results across multiple experiments and perform comprehensive statistical analysis.
+
+#### Workflow 1: Run an Experiment
 
 This is the primary workflow for generating new experimental data. The PowerShell entry point (`run_experiment.ps1`) calls the Python batch controller (`experiment_manager.py`), which in turn executes a loop of single replications using `orchestrate_replication.py`.
 
 Each replication executes the four core pipeline stages in sequence:
+
 1.  **Query Generation**: `orchestrate_replication.py` first calls `build_llm_queries.py`. This script samples personalities from the master database (without replacement) and orchestrates the `query_generator.py` worker to create the prompt, a ground-truth mapping, and an audit manifest for each trial.
+
 2.  **LLM Interaction**: Next, `run_llm_sessions.py` is called. It manages sending each generated query to the LLM via the `llm_prompter.py` worker and saves the responses.
+
 3.  **Response Processing**: `process_llm_responses.py` parses the raw text responses from the LLM into a structured table of similarity scores.
+
 4.  **Performance Analysis**: Finally, `analyze_llm_performance.py` performs the final statistical analysis for the replication. It calculates key metrics (MRR, Top-1 Accuracy, effect size), uses non-parametric tests to assess significance against chance, and embeds a comprehensive JSON summary of the results into the final report.
 
-{{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=105%}}
+{{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=111%}}
 
-### Workflow 2: Analyze a Study
+#### Workflow 2: Audit an Experiment
+
+This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag.
+
+{{diagram:docs/diagrams/architecture_workflow_2_audit_experiment.mmd | scale=2.5 | width=100%}}
+
+#### Workflow 3: Update an Experiment
+
+This workflow allows you to re-run the data processing and analysis stages on an existing, complete experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag, which intelligently regenerates only the necessary analysis artifacts and reports.
+
+{{diagram:docs/diagrams/architecture_workflow_3_update_experiment.mmd | scale=2.5 | width=111%}}
+
+#### Workflow 4: Migrate Old Experiment Data
+
+This utility workflow helps bring older experimental data into compliance with the modern pipeline. The `migrate_experiment.ps1` wrapper now calls `experiment_manager.py` with a `--migrate` flag, which orchestrates the entire process internally.
+
+{{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=111%}}
+
+#### Workflow 5: Analyze a Study
 
 This workflow is used after an experiment is complete to aggregate results from all replications and perform statistical analysis. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
 
 > **Note:** The diagram below reflects a previous version of the architecture, which used `process_study.ps1`, `compile_study_results.py`, and `analyze_study_results.py`. The core logic remains the same.
 
-{{diagram:docs/diagrams/architecture_workflow_2_process_study.mmd | scale=2.5 | width=105%}}
-
-### Workflow 3: Migrate Old Experiment Data
-
-This utility workflow helps bring older experimental data into compliance with the modern pipeline. The `migrate_experiment.ps1` wrapper now calls `experiment_manager.py` with a `--migrate` flag, which orchestrates the entire process internally.
-
-> **Note:** The diagram below reflects the previous, multi-script migration process. This has been centralized into `experiment_manager.py` for better consistency and control.
-
-{{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=50%}}
+{{diagram:docs/diagrams/architecture_workflow_5_analyze_study.mmd | scale=2.5 | width=111%}}
 
 ### Data Flow Diagram
 

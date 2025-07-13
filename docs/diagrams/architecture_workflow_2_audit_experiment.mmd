@@ -1,0 +1,22 @@
+graph TD
+    %% 1. Define all nodes first
+    EntryPointAudit["audit_experiment.ps1<br/>(User Entry Point)"]:::entry
+    AuditManager["experiment_manager.py<br/>(Audit Mode)"]:::layer_orange
+    AuditOutput[("Completeness Report<br/>(Console/Log)")]:::artifact
+
+    %% 2. Define connections
+    EntryPointAudit --> AuditManager
+    AuditManager --> AuditOutput
+
+    %% 3. Group nodes into subgraphs
+    subgraph "Workflow 2: Audit an Experiment"
+        direction LR
+        EntryPointAudit
+        AuditManager
+        AuditOutput
+    end
+
+    %% 4. Styling (re-using existing styles)
+    classDef entry fill:#337ab7,stroke:#2e6da4,color:#fff;
+    classDef layer_orange fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;
