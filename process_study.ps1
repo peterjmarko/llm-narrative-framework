@@ -26,8 +26,8 @@
 .DESCRIPTION
     This script is the main entry point for the entire post-processing workflow. It
     orchestrates the two key analysis scripts in sequence:
-    1.  `compile_study_results.py`: To aggregate all individual run data into a master CSV.
-    2.  `analyze_study_results.py`: To perform statistical analysis on the master CSV.
+    1.  `experiment_aggregator.py`: To aggregate all individual run data into a master CSV.
+    2.  `study_analysis.py`: To perform statistical analysis on the master CSV.
 
     By default, it intelligently parses the output from these scripts to provide a
     clean, high-level summary of the compilation and analysis steps. For detailed,
@@ -145,7 +145,7 @@ function Invoke-PythonScript {
     }
     else {
                 # By default, parse the output and show a clean, high-level summary.
-        if ($ScriptName -like "*compile_study_results.py*") {
+        if ($ScriptName -like "*experiment_aggregator.py*") {
             $processedExperiments = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
             $outputBlock = $output -join "`n"
             $uniqueDisplayNames = $script:modelNameMap.Values | Get-Unique
@@ -173,7 +173,7 @@ function Invoke-PythonScript {
                         $uniqueExperimentId = "$foundDisplayName-$mappingStrategy"
 
                         if (-not $processedExperiments.Contains($uniqueExperimentId)) {
-                            Write-Host "  - Compiling: $foundDisplayName ($($mappingStrategy) map)"
+                            Write-Host "  - Aggregating: $foundDisplayName ($($mappingStrategy) map)"
                             [void]$processedExperiments.Add($uniqueExperimentId)
                         }
                     }
@@ -187,10 +187,10 @@ function Invoke-PythonScript {
                 Write-Host "  - Generated final study summary: $finalSummaryLine"
             }
 
-            $output | Select-String -Pattern "Compilation process finished" | ForEach-Object { $_.Line }
+            $output | Select-String -Pattern "Aggregation process finished" | ForEach-Object { $_.Line }
 
         }
-        elseif ($ScriptName -like "*analyze_study_results.py*") {
+        elseif ($ScriptName -like "*study_analysis.py*") {
             $metricName = $null
             $conclusion = $null
 
@@ -230,11 +230,11 @@ try {
     Write-Host "### Starting Study Processing for: '$($ResolvedPath)'" -ForegroundColor Green
     Write-Host "######################################################`n"
 
-    # --- Step 1: Compile All Results into a Master CSV ---
-    Invoke-PythonScript -StepName "1/2: Compile Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
+    # --- Step 1: Aggregate All Results into a Master CSV ---
+    Invoke-PythonScript -StepName "1/2: Aggregate Results" -ScriptName "src/experiment_aggregator.py" -Arguments $ResolvedPath
 
     # --- Step 2: Run Final Statistical Analysis ---
-    Invoke-PythonScript -StepName "2/2: Run Final Analysis (ANOVA)" -ScriptName "src/analyze_study_results.py" -Arguments $ResolvedPath
+    Invoke-PythonScript -StepName "2/2: Run Final Analysis (ANOVA)" -ScriptName "src/study_analysis.py" -Arguments $ResolvedPath
 
     Write-Host "######################################################" -ForegroundColor Green
     Write-Host "### Study Processing Finished Successfully!" -ForegroundColor Green

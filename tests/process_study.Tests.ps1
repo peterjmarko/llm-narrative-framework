@@ -12,7 +12,7 @@ function Invoke-PythonScript {
     }
 }
 function Invoke-ProcessStudy {
-    [void](Invoke-PythonScript -StepName "1/2: Compile Results")
+    [void](Invoke-PythonScript -StepName "1/2: Aggregate Results")
     [void](Invoke-PythonScript -StepName "2/2: Run Final Analysis (ANOVA)")
     return "SUCCESS"
 }
@@ -29,7 +29,7 @@ Run-Test "Successful run with verbose output and PDM" {
     Invoke-ProcessStudy
 } @("SUCCESS")
 
-Run-Test "Error during compilation step" {
+Run-Test "Error during aggregation step" {
     $script:FailOnStep = "1/2" # Set state for failure
     try { Invoke-ProcessStudy; "DID_NOT_FAIL" } catch { "CAUGHT_FAILURE" }
 } @("CAUGHT_FAILURE")
