@@ -40,7 +40,7 @@ venv.in-project = true
 
 [tool.pdm.scripts]
 # Development and testing shortcuts. {args} allows passing specific files.
-test = "pytest -v {args}"
+test = {cmd = "coverage erase && pytest -v {args}", help = "Run all tests with a clean start."}
 
 # --- Definitive Coverage Workflow ---
 # This is the robust, explicit workflow for subprocess testing. It has 5 steps:
@@ -66,7 +66,7 @@ build-docs = "python src/build_docs.py"
 
 test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
 test-ps-stu = "pwsh ./tests/analyze_study.Tests.ps1"
-test-ps-mig = "pwsh tests/migrate_old_experiment.Tests.ps1"
+test-ps-mig = "pwsh tests/migrate_experiment.Tests.ps1"
 test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
 
 # Main workflow shortcuts
