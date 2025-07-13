@@ -177,10 +177,12 @@ def _verify_single_run_completeness(run_dir, verbose=False):
             if not os.path.exists(os.path.join(run_dir, "session_responses", f"llm_response_{index:03d}.txt")):
                 failed_indices.append(index)
         state["failed_indices"] = failed_indices
-    elif num_matrices < expected_trials or num_mappings < expected_trials:
-        state["status"] = "REPROCESS_NEEDED"
-    elif num_responses == expected_trials and num_matrices == expected_trials and num_mappings == expected_trials:
+    # New definition of "complete": all API calls have a response file, AND the analysis has been run.
+    # The number of valid responses is a performance metric, not a pipeline state.
+    elif num_responses == num_queries and os.path.exists(os.path.join(analysis_path, "all_scores.txt")):
         state["status"] = "COMPLETE"
+    elif num_responses == num_queries and not os.path.exists(os.path.join(analysis_path, "all_scores.txt")):
+        state["status"] = "REPROCESS_NEEDED"
     else:
         state["status"] = "INCONSISTENT" # e.g. more responses than queries
     
@@ -219,6 +221,67 @@ def _get_experiment_state(target_dir, expected_reps, verbose=False):
     return "UNKNOWN", states # Fallback
 
 # --- Mode Execution Functions ---
+
+def _run_verify_only_mode(target_dir, expected_reps):
+    """
+    Runs a read-only verification and prints a detailed summary table.
+    This function contains the logic from the old verify_experiment_completeness.py.
+    """
+    print(f"\n--- Verifying Data Completeness in: {target_dir} ---")
+    run_dirs = sorted([p for p in glob.glob(os.path.join(target_dir, 'run_*')) if os.path.isdir(p)])
+    
+    if not run_dirs:
+        print("No 'run_*' directories found. Nothing to verify.")
+        return
+
+    all_runs_data = []
+    total_expected_trials = 0
+    total_valid_responses = 0
+    total_complete_runs = 0
+
+    for run_dir in run_dirs:
+        verification = _verify_single_run_completeness(run_dir)
+        status = verification.get("status", "ERROR")
+        details = ""
+        is_complete = (status == "COMPLETE")
+        
+        valid_responses = verification.get('matrices', 0)
+        expected_trials = verification.get('expected', 0)
+
+        if is_complete:
+            details = f"Parsed {valid_responses}/{expected_trials} trials"
+            total_complete_runs += 1
+        elif status == "INVALID_NAME":
+            details = "Invalid directory name"
+        else:
+            q = verification.get('queries', 0)
+            r = verification.get('responses', 0)
+            parts = []
+            if q < expected_trials: parts.append(f"Queries:{q}/{expected_trials}")
+            if r < q: parts.append(f"Responses:{r}/{q}")
+            if not os.path.exists(os.path.join(run_dir, "analysis_inputs", "all_scores.txt")):
+                parts.append("Analysis not run")
+            details = ", ".join(parts)
+        
+        total_expected_trials += expected_trials
+        total_valid_responses += valid_responses
+        all_runs_data.append({"name": os.path.basename(run_dir), "status": status, "details": details})
+
+    max_name_len = max(len(run['name']) for run in all_runs_data) if all_runs_data else 20
+    print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
+    print(f"{'-'*max_name_len} {'-'*20} {'-'*30}")
+    for run in all_runs_data:
+        status_color = C_GREEN if run['status'] == "COMPLETE" else C_RED
+        print(f"{run['name']:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
+
+    if total_expected_trials > 0:
+        completeness = (total_valid_responses / total_expected_trials) * 100
+        print("\n--- Overall Summary ---")
+        print(f"Total Runs Verified: {len(run_dirs)}")
+        print(f"Total Runs Complete (Pipeline): {total_complete_runs}/{len(run_dirs)}")
+        print(f"Total Valid LLM Responses:      {total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
+    
+    return True # Indicates the mode ran successfully
 
 def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, bias_script):
     """Executes the 'NEW' mode to create missing replications."""
@@ -367,6 +430,7 @@ def main():
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose per-replication status updates.')
     parser.add_argument('--notes', type=str, help='Optional notes for the reports.')
     parser.add_argument('--max-loops', type=int, default=10, help="Safety limit for state-machine loops.")
+    parser.add_argument('--verify-only', action='store_true', help="Run in read-only diagnostic mode and print a detailed completeness report.")
     args = parser.parse_args()
 
     # --- Script Paths ---
@@ -389,11 +453,20 @@ def main():
         print(f"{C_CYAN}No target directory specified. Creating default: {final_output_dir}{C_RESET}")
 
     if not os.path.exists(final_output_dir):
+        # If in verify-only mode and the dir doesn't exist, just say so and exit.
+        if args.verify_only:
+            print(f"Directory not found: {final_output_dir}")
+            sys.exit(1)
         os.makedirs(final_output_dir)
         print(f"Created target directory: {final_output_dir}")
 
     config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
     end_rep = args.end_rep if args.end_rep is not None else config_num_reps
+
+    # --- Run verify-only mode and exit if specified ---
+    if args.verify_only:
+        _run_verify_only_mode(final_output_dir, end_rep)
+        sys.exit(0)
 
     # --- Main State-Machine Loop ---
     loop_count = 0
