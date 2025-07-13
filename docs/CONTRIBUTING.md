@@ -118,11 +118,11 @@ The test suite is divided into two parts, one for the Python source code and one
 
 *   **PowerShell Tests**: Due to specific environmental challenges with traditional PowerShell testing frameworks (like Pester's advanced features), a custom, bare-bones testing harness is used for the orchestration scripts. This ensures maximum compatibility and reliability.
 
-    -   To test the study processing script (`process_study.ps1`):
+    -   To test the study analysis script (`analyze_study.ps1`):
         ````bash
         pdm run test-ps-stu
         ````
-    -   To test the data migration script (`migrate_old_experiment.ps1`):
+    -   To test the data migration script (`migrate_experiment.ps1`):
         ````bash
         pdm run test-ps-mig
         ````
@@ -177,7 +177,7 @@ Most modules in `src/` are designed as executable scripts. The standard testing 
             # ... your file-based assertions here ...
     ````
 
-This approach, demonstrated in `tests/test_compile_study_results.py`, is the required standard for maintaining test quality and coverage across the project.
+This approach, demonstrated in `tests/test_experiment_aggregator.py`, is the required standard for maintaining test quality and coverage across the project.
 
 ### 4. Commit Your Changes
 

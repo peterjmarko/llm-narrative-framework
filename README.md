@@ -9,7 +9,7 @@ A comprehensive research framework for conducting Large Language Model (LLM) per
 .\run_experiment.ps1
 
 # Process study results  
-.\process_study.ps1
+.\analyze_study.ps1
 
 # View results
 Get-ChildItem "data/study_results/*.csv"
