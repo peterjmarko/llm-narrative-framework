@@ -4,6 +4,7 @@
 # --- Configuration ---
 $TestSuites = @(
     "run_experiment.Tests.ps1",
+    "audit_experiment.Tests.ps1",
     "analyze_study.Tests.ps1",
     "migrate_experiment.Tests.ps1"
 )
@@ -45,9 +46,11 @@ foreach ($suite in $TestSuites) {
 Write-Host "`n--- PowerShell Test Suite Summary ---" -ForegroundColor Cyan
 
 $maxNameLen = ($allResults.TestSuite | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
-$header = "{0,-$maxNameLen} {1,-8} {2,-8} {3,-8} {4,-8}" -f "Test Suite", "Status", "Passed", "Failed", "Total"
-Write-Host $header
-Write-Host ("-" * $maxNameLen + " " + "-" * 8 + " " + "-" * 8 + " " + "-" * 8 + " " + "-" * 8)
+# Use right-alignment for numeric columns to match Python output
+$header = "{0,-$maxNameLen} {1,8} {2,8} {3,8} {4,8}" -f "Test Suite", "Status", "Passed", "Failed", "Total"
+Write-Host $header -ForegroundColor Cyan
+$divider = "-" * $maxNameLen + " " + "-" * 8 + " " + "-" * 8 + " " + "-" * 8 + " " + "-" * 8
+Write-Host $divider -ForegroundColor Cyan
 
 $overallTotalFailures = 0
 $overallTotalTests = 0
@@ -56,15 +59,17 @@ foreach ($result in $allResults) {
     $statusColor = if ($result.Status -eq "PASS") { "`e[92m" } else { "`e[91m" }
     $resetColor = "`e[0m"
     $statusStr = "$($statusColor)$($result.Status)$($resetColor)"
-    Write-Host ("{0,-$maxNameLen} {1,-18} {2,-8} {3,-8} {4,-8}" -f $result.TestSuite, $statusStr, $result.Passed, $result.Failed, $result.Total)
+    # Right-align numeric columns, adjust spacing for colored status
+    Write-Host ("{0,-$maxNameLen} {1,-15} {2,8} {3,8} {4,8}" -f $result.TestSuite, $statusStr, $result.Passed, $result.Failed, $result.Total)
     $overallTotalFailures += $result.Failed
     $overallTotalTests += $result.Total
 }
 
 # --- Overall Totals ---
-Write-Host ("-" * $maxNameLen + " " + "-" * 8 + " " + "-" * 8 + " " + "-" * 8 + " " + "-" * 8)
+Write-Host $divider -ForegroundColor Cyan
 $overallPassed = $overallTotalTests - $overallTotalFailures
-$summaryStr = "{0,-$maxNameLen} {1,-18} {2,-8} {3,-8} {4,-8}" -f "OVERALL TOTALS", "", $overallPassed, $overallTotalFailures, $overallTotalTests
+# Right-align the totals, skip the status column
+$summaryStr = "{0,-$maxNameLen} {1,8} {2,8} {3,8} {4,8}" -f "OVERALL TOTALS", "", $overallPassed, $overallTotalFailures, $overallTotalTests
 Write-Host $summaryStr -ForegroundColor Cyan
 Write-Host ""
 
