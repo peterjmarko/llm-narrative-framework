@@ -5,8 +5,9 @@
 $TestSuites = @(
     "run_experiment.Tests.ps1",
     "audit_experiment.Tests.ps1",
-    "analyze_study.Tests.ps1",
-    "migrate_experiment.Tests.ps1"
+    "update_experiment.Tests.ps1",
+    "migrate_experiment.Tests.ps1",
+    "analyze_study.Tests.ps1"
 )
 
 $allResults = @()
