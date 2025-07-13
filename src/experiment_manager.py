@@ -59,6 +59,7 @@ import time
 import datetime
 import argparse
 import re
+import shutil
 import configparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
@@ -387,6 +388,64 @@ def _run_repair_mode(runs_to_repair, sessions_script_path, quiet, max_workers):
     print(f"Repair complete: {successful_repairs} successful, {failed_repairs} failed.")
     return failed_repairs == 0
 
+def _run_migrate_mode(target_dir, patch_script, rebuild_script):
+    """
+    Executes a one-time migration process for a legacy experiment directory.
+    This mode is destructive and will delete old artifacts.
+    """
+    print(f"{C_YELLOW}--- Entering MIGRATE Mode: Upgrading experiment at: {target_dir} ---{C_RESET}")
+
+    # Step 1: Patch Configs
+    print("\n[1/3: Patch Configs] Running patch_old_experiment.py...")
+    try:
+        subprocess.run([sys.executable, patch_script, target_dir], check=True, capture_output=True, text=True)
+        print("Step 1 completed successfully.")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to patch configs. Stderr:\n{e.stderr}")
+        return False
+
+    # Step 2: Rebuild Reports
+    print("\n[2/3: Rebuild Reports] Running rebuild_reports.py...")
+    try:
+        subprocess.run([sys.executable, rebuild_script, target_dir], check=True, capture_output=True, text=True)
+        print("Step 2 completed successfully.")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to rebuild reports. Stderr:\n{e.stderr}")
+        return False
+
+    # Step 3: Clean Artifacts
+    print("\n[3/3: Clean Artifacts] Deleting old and temporary files...")
+    try:
+        # Delete top-level summary files that will be regenerated
+        files_to_delete = ["final_summary_results.csv", "batch_run_log.csv", "EXPERIMENT_results.csv"]
+        for file in files_to_delete:
+            file_path = os.path.join(target_dir, file)
+            if os.path.exists(file_path):
+                print(f" - Deleting old '{file}'")
+                os.remove(file_path)
+
+        # Delete artifacts from all run_* subdirectories
+        run_dirs = glob.glob(os.path.join(target_dir, "run_*"))
+        for run_dir in run_dirs:
+            if not os.path.isdir(run_dir): continue
+            
+            # Delete corrupted report backups
+            for corrupted_file in glob.glob(os.path.join(run_dir, "*.txt.corrupted")):
+                os.remove(corrupted_file)
+            
+            # Delete old analysis_inputs directory
+            analysis_inputs_path = os.path.join(run_dir, "analysis_inputs")
+            if os.path.isdir(analysis_inputs_path):
+                shutil.rmtree(analysis_inputs_path)
+        print("Step 3 completed successfully.")
+    except Exception as e:
+        logging.error(f"Failed to clean artifacts: {e}")
+        return False
+    
+    print(f"\n{C_GREEN}--- Migration pre-processing complete. ---{C_RESET}")
+    print("The manager will now proceed with reprocessing to finalize the migration.")
+    return True
+
 def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, bias_script):
     """Executes 'REPROCESS' mode to fix corrupted analysis files."""
     print(f"{C_YELLOW}--- Entering REPROCESS Mode: Fixing {len(runs_to_reprocess)} run(s) with corrupt analysis ---{C_RESET}")
@@ -436,14 +495,17 @@ def main():
     parser.add_argument('--notes', type=str, help='Optional notes for the reports.')
     parser.add_argument('--max-loops', type=int, default=10, help="Safety limit for state-machine loops.")
     parser.add_argument('--verify-only', action='store_true', help="Run in read-only diagnostic mode and print a detailed completeness report.")
+    parser.add_argument('--migrate', action='store_true', help="Run a one-time migration workflow for a legacy experiment directory.")
     args = parser.parse_args()
 
     # --- Script Paths ---
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
     sessions_script = os.path.join(current_dir, "run_llm_sessions.py")
     log_manager_script = os.path.join(current_dir, "replication_log_manager.py")
-    compile_script = os.path.join(current_dir, "compile_study_results.py")
+    compile_script = os.path.join(current_dir, "experiment_aggregator.py")
     bias_analysis_script = os.path.join(current_dir, "run_bias_analysis.py")
+    patch_script = os.path.join(current_dir, "patch_old_experiment.py")
+    rebuild_script = os.path.join(current_dir, "rebuild_reports.py")
 
     if args.target_dir:
         final_output_dir = os.path.abspath(args.target_dir)
@@ -472,6 +534,12 @@ def main():
     if args.verify_only:
         _run_verify_only_mode(final_output_dir, end_rep)
         sys.exit(0)
+
+    # --- Run migrate mode if specified. This is a pre-step to the main loop. ---
+    if args.migrate:
+        if not _run_migrate_mode(final_output_dir, patch_script, rebuild_script):
+            print(f"{C_RED}--- Migration failed. Please review logs. ---{C_RESET}")
+            sys.exit(1)
 
     # --- Main State-Machine Loop ---
     loop_count = 0

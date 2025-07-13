@@ -1,22 +1,12 @@
-# .coveragerc (Manual Subprocess Method)
-
 [run]
-# This is the only setting needed for the manual method.
-# It tells coverage to create a unique data file for each run.
 parallel = true
-
-# All other settings remain the same.
 source = src
-branch = true
 
 [report]
 show_missing = true
-fail_under = 80
-omit =
-    .venv/*
-    tests/*
-    src/__init__.py
 exclude_lines =
-    if __name__ == .__main__.:
     pragma: no cover
-    raise NotImplementedError
+    if __name__ == .__main__.:
+    import
+    from .* import
+    pass

@@ -61,3 +61,4 @@ Thumbs.db
 
 # Ignore 'npm install' artifacts
 /node_modules.coverage.*
+node_modules/

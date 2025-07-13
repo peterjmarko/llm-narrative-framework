@@ -42,9 +42,7 @@ foreach ($suite in $TestSuites) {
 }
 
 # --- Final Consolidated Summary ---
-Write-Host "`n######################################################" -ForegroundColor Cyan
-Write-Host "###      OVERALL POWERSHELL TEST SUMMARY       ###" -ForegroundColor Cyan
-Write-Host "######################################################`n" -ForegroundColor Cyan
+Write-Host "`n--- PowerShell Test Suite Summary ---" -ForegroundColor Cyan
 
 $maxNameLen = ($allResults.TestSuite | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
 $header = "{0,-$maxNameLen} {1,-8} {2,-8} {3,-8} {4,-8}" -f "Test Suite", "Status", "Passed", "Failed", "Total"

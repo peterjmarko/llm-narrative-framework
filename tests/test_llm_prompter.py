@@ -64,18 +64,75 @@ class TestLLMPrompterEndToEnd(unittest.TestCase):
 
     def run_llm_prompter_subprocess(self, query_id, cli_extra_args=None, custom_env=None, cwd_override=None):
         coveragerc_path = PROJECT_ROOT_TEST / ".coveragerc"
-        script_to_run_path = LLM_PROMPTER_SCRIPT_PATH
         base_cmd = [
             sys.executable, "-m", "coverage", "run",
             "--rcfile", str(coveragerc_path), "--parallel-mode",
-            str(script_to_run_path), query_id,
+            str(LLM_PROMPTER_SCRIPT_PATH),  # Run script directly instead of as module
+            query_id,
             "--input_query_file", self.input_query_file,
             "--output_response_file", self.output_response_file,
             "--output_error_file", self.output_error_file,
         ]
         if cli_extra_args:
             base_cmd.extend(cli_extra_args)
+        
+        # Create a clean environment that includes the project's 'src' directory in the PYTHONPATH.
         env_for_subprocess = custom_env if custom_env is not None else os.environ.copy()
+        src_path_str = str(SRC_DIR_TEST)
+        project_root_str = str(PROJECT_ROOT_TEST)
+        existing_python_path = env_for_subprocess.get('PYTHONPATH', '')
+        
+        # Add both src and project root to PYTHONPATH
+        if existing_python_path:
+            env_for_subprocess['PYTHONPATH'] = f"{src_path_str}{os.pathsep}{project_root_str}{os.pathsep}{existing_python_path}"
+        else:
+            env_for_subprocess['PYTHONPATH'] = f"{src_path_str}{os.pathsep}{project_root_str}"
+
+        # Ensure API key is available for tests
+        if 'OPENROUTER_API_KEY' not in env_for_subprocess:
+            env_for_subprocess['OPENROUTER_API_KEY'] = 'test-api-key'
+
+        cwd_for_subprocess = cwd_override if cwd_override is not None else str(PROJECT_ROOT_TEST)
+        result = subprocess.run(
+            base_cmd, capture_output=True, text=True,
+            cwd=cwd_for_subprocess, encoding='utf-8', env=env_for_subprocess,
+        )
+        
+        # Debug output for failing tests
+        if result.returncode != 0:
+            print(f"\nDEBUG - Command failed: {' '.join(base_cmd)}")
+            print(f"Return code: {result.returncode}")
+            print(f"STDOUT: {result.stdout}")
+            print(f"STDERR: {result.stderr}")
+            print(f"CWD: {cwd_for_subprocess}")
+            print(f"PYTHONPATH: {env_for_subprocess.get('PYTHONPATH', 'Not set')}")
+        
+        return result
+        coveragerc_path = PROJECT_ROOT_TEST / ".coveragerc"
+        base_cmd = [
+            sys.executable, "-m", "coverage", "run",
+            "--rcfile", str(coveragerc_path), "--parallel-mode",
+            str(LLM_PROMPTER_SCRIPT_PATH),  # Run script directly instead of as module
+            query_id,
+            "--input_query_file", self.input_query_file,
+            "--output_response_file", self.output_response_file,
+            "--output_error_file", self.output_error_file,
+        ]
+        if cli_extra_args:
+            base_cmd.extend(cli_extra_args)
+        
+        # Create a clean environment that includes the project's 'src' directory in the PYTHONPATH.
+        env_for_subprocess = custom_env if custom_env is not None else os.environ.copy()
+        src_path_str = str(SRC_DIR_TEST)
+        project_root_str = str(PROJECT_ROOT_TEST)
+        existing_python_path = env_for_subprocess.get('PYTHONPATH', '')
+        
+        # Add both src and project root to PYTHONPATH
+        if existing_python_path:
+            env_for_subprocess['PYTHONPATH'] = f"{src_path_str}{os.pathsep}{project_root_str}{os.pathsep}{existing_python_path}"
+        else:
+            env_for_subprocess['PYTHONPATH'] = f"{src_path_str}{os.pathsep}{project_root_str}"
+
         cwd_for_subprocess = cwd_override if cwd_override is not None else str(PROJECT_ROOT_TEST)
         return subprocess.run(
             base_cmd, capture_output=True, text=True,
@@ -86,6 +143,9 @@ class TestLLMPrompterEndToEnd(unittest.TestCase):
         self.create_test_input_query_file(content="Success query.")
         extra_args = ["--test_mock_api_outcome", "success", "--test_mock_api_content", "Mocked success."]
         result = self.run_llm_prompter_subprocess("test_success_001", extra_args)
+        if result.returncode != 0:
+            print(f"STDOUT: {result.stdout}")
+            print(f"STDERR: {result.stderr}")
         self.assertEqual(result.returncode, 0)
 
     def test_llm_prompter_api_failure_scenario(self):

@@ -40,7 +40,8 @@ venv.in-project = true
 
 [tool.pdm.scripts]
 # Development and testing shortcuts. {args} allows passing specific files.
-test = {cmd = "coverage erase && pytest -v {args}", help = "Run all tests with a clean start."}
+# This is the main entry point for all tests (Python and PowerShell).
+test = {cmd = "python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
 
 # --- Definitive Coverage Workflow ---
 # This is the robust, explicit workflow for subprocess testing. It has 5 steps:

@@ -94,7 +94,7 @@ class TestExperimentManagerState(unittest.TestCase):
         mock_repair.assert_not_called()
         mock_reprocess.assert_not_called()
         # Check that finalization runs
-        self.assertTrue(any("compile_study_results.py" in str(c) for c in mock_subprocess.call_args_list))
+        self.assertTrue(any("experiment_aggregator.py" in str(c) for c in mock_subprocess.call_args_list))
 
     @patch('src.experiment_manager._run_reprocess_mode', return_value=True)
     @patch('src.experiment_manager._run_repair_mode', return_value=True)
@@ -117,7 +117,7 @@ class TestExperimentManagerState(unittest.TestCase):
         mock_repair.assert_called_once()
         mock_new.assert_not_called()
         mock_reprocess.assert_not_called()
-        self.assertTrue(any("compile_study_results.py" in str(c) for c in mock_subprocess.call_args_list))
+        self.assertTrue(any("experiment_aggregator.py" in str(c) for c in mock_subprocess.call_args_list))
     
     @patch('src.experiment_manager._run_reprocess_mode', return_value=True)
     @patch('src.experiment_manager._run_repair_mode', return_value=True)
@@ -140,7 +140,7 @@ class TestExperimentManagerState(unittest.TestCase):
         mock_reprocess.assert_called_once()
         mock_new.assert_not_called()
         mock_repair.assert_not_called()
-        self.assertTrue(any("compile_study_results.py" in str(c) for c in mock_subprocess.call_args_list))
+        self.assertTrue(any("experiment_aggregator.py" in str(c) for c in mock_subprocess.call_args_list))
 
     @patch('src.experiment_manager._run_repair_mode', return_value=True)
     @patch('src.experiment_manager._get_experiment_state')
