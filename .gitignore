@@ -60,4 +60,4 @@ Thumbs.db
 .python-version
 
 # Ignore 'npm install' artifacts
-/node_modules
+/node_modules.coverage.*

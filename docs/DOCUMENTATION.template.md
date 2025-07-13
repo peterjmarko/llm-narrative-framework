@@ -64,9 +64,9 @@ Each replication executes the four core pipeline stages in sequence:
 
 {{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=105%}}
 
-### Workflow 2: Process a Study
+### Workflow 2: Analyze a Study
 
-This workflow is used after an experiment is complete to aggregate results from all replications and perform statistical analysis. The `process_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
+This workflow is used after an experiment is complete to aggregate results from all replications and perform statistical analysis. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
 
 {{diagram:docs/diagrams/architecture_workflow_2_process_study.mmd | scale=2.5 | width=105%}}
 
@@ -191,7 +191,7 @@ This will execute the full batch of replications defined in `config.ini` and pla
 ```
 > **Note:** The main wrapper scripts use PowerShell. While PowerShell is pre-installed on Windows and available for macOS and Linux, the core scientific logic is contained in cross-platform Python scripts.
 
-### Phase 2: Processing a Study (`process_study.ps1`)
+### Phase 2: Analyzing a Study (`analyze_study.ps1`)
 
 After running one or more experiments, this script aggregates all their results and performs the final statistical analysis for the entire study.
 
@@ -199,7 +199,7 @@ After running one or more experiments, this script aggregates all their results 
 Point the script at the top-level directory containing all relevant experiment folders. It will provide a clean, high-level summary of its progress.
 
 ```powershell
-.\process_study.ps1 -StudyDirectory "output/reports"
+.\analyze_study.ps1 -StudyDirectory "output/reports"
 ```
 For detailed, real-time logs, add the `-Verbose` switch.
 
@@ -231,12 +231,12 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 {{diagram:docs/diagrams/analysis_log_format.txt}}
 
-## Migrating Old Experiment Data (`migrate_old_experiment.ps1`)
+## Migrating Old Experiment Data (`migrate_experiment.ps1`)
 
 To upgrade older experiment directories to be compatible with the current analysis pipeline, a dedicated PowerShell script automates the entire migration process.
 
 **What it does:**
-The `migrate_old_experiment.ps1` script will be updated to be a simple wrapper that calls `experiment_manager.py` with a new `--migrate` flag. This will centralize the entire migration process within the manager, which will orchestrate:
+The `migrate_experiment.ps1` script is a simple wrapper that calls `experiment_manager.py` with a new `--migrate` flag. This centralizes the entire migration process within the manager, which orchestrates:
 1.  **Patching Configs**: Running `patch_old_experiment.py` to add archived `config.ini` files.
 2.  **Rebuilding Reports**: Executing `rebuild_reports.py` to regenerate all reports into the modern, standardized format.
 3.  **Finalizing**: Reprocessing the newly-migrated experiment to generate clean, modern summary files.
@@ -246,7 +246,7 @@ Execute the script and point it at the top-level directory of the old experiment
 
 ```powershell
 # Migrate the experiment data located in the "6_Study_4" directory
-.\migrate_old_experiment.ps1 -TargetDirectory "output/reports/6_Study_4"
+.\migrate_experiment.ps1 -TargetDirectory "output/reports/6_Study_4"
 ```
 
 ---
@@ -312,11 +312,11 @@ The project includes a comprehensive test suite managed by PDM, covering both th
     ````
 
 -   **To run the PowerShell script tests:**
-    -   For the study processor (`process_study.ps1`):
+    -   For the study analysis script (`analyze_study.ps1`):
         ````bash
         pdm run test-ps-stu
         ````
-    -   For the data migration script (`migrate_old_experiment.ps1`):
+    -   For the data migration script (`migrate_experiment.ps1`):
         ````bash
         pdm run test-ps-mig
         ````

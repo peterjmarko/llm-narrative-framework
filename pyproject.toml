@@ -65,10 +65,10 @@ lint = "pre-commit run --all-files"
 build-docs = "python src/build_docs.py"
 
 test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
-test-ps-stu = "pwsh ./tests/process_study.Tests.ps1"
+test-ps-stu = "pwsh ./tests/analyze_study.Tests.ps1"
 test-ps-mig = "pwsh tests/migrate_old_experiment.Tests.ps1"
 test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
 
 # Main workflow shortcuts
 run-exp = "powershell -ExecutionPolicy Bypass -File .\\run_experiment.ps1"
-pro-stu = "powershell -ExecutionPolicy Bypass -File .\\process_study.ps1"
+analyze-stu = "powershell -ExecutionPolicy Bypass -File .\\analyze_study.ps1"

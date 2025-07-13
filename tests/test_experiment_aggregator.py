@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_compile_study_results.py
+# Filename: tests/test_experiment_aggregator.py
 
 import unittest
 from unittest.mock import patch, MagicMock
@@ -30,9 +30,9 @@ import configparser
 import json
 
 # Import the functions from the module we are testing
-from src.compile_study_results import main as compile_main, parse_config_params
+from src.experiment_aggregator import main as compile_main, parse_config_params
 
-class TestCompileResultsScript(unittest.TestCase):
+class TestExperimentAggregatorScript(unittest.TestCase):
 
     def setUp(self):
         """Set up a temporary directory for each test."""
@@ -79,7 +79,7 @@ class TestCompileResultsScript(unittest.TestCase):
             metrics_data={'mwu_stouffer_p': 0.88} # No bias metrics
         )
         
-        with patch.object(sys, 'argv', ['compile_study_results.py', study_dir]):
+        with patch.object(sys, 'argv', ['experiment_aggregator.py', study_dir]):
             compile_main()
 
         study_output_path = os.path.join(study_dir, "STUDY_results.csv")
@@ -99,7 +99,7 @@ class TestCompileResultsScript(unittest.TestCase):
         """Test script handles a non-existent directory correctly."""
         invalid_path = os.path.join(self.test_dir, "non_existent")
         
-        with patch.object(sys, 'argv', ['compile_study_results.py', invalid_path]):
+        with patch.object(sys, 'argv', ['experiment_aggregator.py', invalid_path]):
             compile_main()
             
         mock_log_error.assert_called_with(f"Error: The specified directory does not exist: {invalid_path}")
@@ -125,4 +125,4 @@ class TestCompileResultsScript(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_compile_study_results.py ===
+# === End of tests/test_experiment_aggregator.py ===

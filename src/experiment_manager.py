@@ -177,12 +177,17 @@ def _verify_single_run_completeness(run_dir, verbose=False):
             if not os.path.exists(os.path.join(run_dir, "session_responses", f"llm_response_{index:03d}.txt")):
                 failed_indices.append(index)
         state["failed_indices"] = failed_indices
-    # New definition of "complete": all API calls have a response file, AND the analysis has been run.
-    # The number of valid responses is a performance metric, not a pipeline state.
-    elif num_responses == num_queries and os.path.exists(os.path.join(analysis_path, "all_scores.txt")):
-        state["status"] = "COMPLETE"
-    elif num_responses == num_queries and not os.path.exists(os.path.join(analysis_path, "all_scores.txt")):
-        state["status"] = "REPROCESS_NEEDED"
+    elif num_responses == num_queries:
+        analysis_file_exists = os.path.exists(os.path.join(analysis_path, "all_scores.txt"))
+        # A run is COMPLETE only if the analysis file exists AND the counts inside are correct.
+        if analysis_file_exists and num_matrices == num_queries and num_mappings == num_queries:
+            state["status"] = "COMPLETE"
+        # A run needs REPROCESSING if responses are all there, but analysis is missing or incomplete.
+        elif not analysis_file_exists or num_matrices < num_queries or num_mappings < num_queries:
+            state["status"] = "REPROCESS_NEEDED"
+        # Any other case (e.g., more matrices than queries) is an INCONSISTENT state.
+        else:
+            state["status"] = "INCONSISTENT"
     else:
         state["status"] = "INCONSISTENT" # e.g. more responses than queries
     

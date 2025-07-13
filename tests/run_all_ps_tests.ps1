@@ -4,8 +4,8 @@
 # --- Configuration ---
 $TestSuites = @(
     "run_experiment.Tests.ps1",
-    "process_study.Tests.ps1",
-    "migrate_old_experiment.Tests.ps1"
+    "analyze_study.Tests.ps1",
+    "migrate_experiment.Tests.ps1"
 )
 
 $allResults = @()

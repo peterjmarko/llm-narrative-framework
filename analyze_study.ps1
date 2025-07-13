@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: process_study.ps1
+# Filename: analyze_study.ps1
 
 <#
 .SYNOPSIS
@@ -251,4 +251,4 @@ catch {
     exit 1
 }
 
-# === End of process_study.ps1 ===
+# === End of analyze_study.ps1 ===

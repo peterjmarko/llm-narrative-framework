@@ -323,10 +323,10 @@ def main():
         Example Usage:
         --------------
         # To analyze the results of a full study
-        python src/analyze_study_results.py path/to/your/study_folder/
+        python src/study_analysis.py path/to/your/study_folder/
         
         # To analyze the results of a single experiment
-        python src/analyze_study_results.py path/to/your/experiment_folder/
+        python src/study_analysis.py path/to/your/experiment_folder/
         
         The script automatically finds the most relevant summary file in the
         specified directory and saves all output to an 'anova/' subfolder.
