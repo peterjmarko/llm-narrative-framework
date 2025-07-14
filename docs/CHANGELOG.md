@@ -5,31 +5,6 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
-### Added
-- Initial personality matching experiment framework
-- LLM query generation and processing pipeline
-- Statistical analysis with ANOVA and bias detection
-- Experiment replication management system
-- Data migration tools for legacy experiments
-- Comprehensive logging and error handling
-- Study-level result compilation and analysis
-
-### Framework Components
-- **Entry Points:** PowerShell scripts for user-friendly execution
-- **Core Pipeline:** Python scripts for LLM interaction and analysis
-- **Data Management:** Automated organization and validation
-- **Analysis Tools:** Statistical testing and bias detection
-- **Documentation:** Auto-generated reports and visualizations
-
-### Supported Features
-- Multiple LLM model integration
-- Batch experiment processing
-- Automatic retry mechanisms
-- Result compilation across experiments
-- Statistical significance testing
-- Bias analysis and reporting
-- Legacy data migration
 ## v2.0.0 (2025-07-14)
 
 ### BREAKING CHANGE
@@ -48,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **testing**: Add audit script and finalize test runner
 - **tests**: Introduce shared harness for PowerShell tests
 - **build**: Make docx conversion resilient to locked files
-- **testing**: Overhaul coverage and refactor compile_results test
 - **testing**: Overhaul coverage and refactor compile_results test
 - **testing**: Implement test suite for migrate_old_experiment.ps1
 - **testing**: Implement full test suite for process_study.ps1
@@ -76,4 +50,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhance test suite and update documentation
 - Centralize batch logic in Python and update config
 
-## v1.0.0 (2025-07-14)
+## [1.0.0] - 2025-07-11
+
+### Added
+- Initial personality matching experiment framework
+- LLM query generation and processing pipeline
+- Statistical analysis with ANOVA and bias detection
+- Experiment replication management system
+- Data migration tools for legacy experiments
+- Comprehensive logging and error handling
+- Study-level result compilation and analysis
+
+### Framework Components
+- **Entry Points:** PowerShell scripts for user-friendly execution
+- **Core Pipeline:** Python scripts for LLM interaction and analysis
+- **Data Management:** Automated organization and validation
+- **Analysis Tools:** Statistical testing and bias detection
+- **Documentation:** Auto-generated reports and visualizations
+
+### Supported Features
+- Multiple LLM model integration
+- Batch experiment processing
+- Automatic retry mechanisms
+- Result compilation across experiments
+- Statistical significance testing
+- Bias analysis and reporting
+- Legacy data migration
