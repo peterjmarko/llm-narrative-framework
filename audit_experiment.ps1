@@ -45,10 +45,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to audit.")]
-    [string]$TargetDirectory,
-
-    [Parameter(Mandatory = $false)]
-    [switch]$Verbose
+    [string]$TargetDirectory
 )
 
 # --- Auto-detect execution environment ---

@@ -105,7 +105,9 @@ This workflow allows you to re-run the data processing and analysis stages on an
 
 #### Workflow 4: Migrate Old Experiment Data
 
-This utility workflow helps bring older experimental data into compliance with the modern pipeline. The `migrate_experiment.ps1` wrapper now calls `experiment_manager.py` with a `--migrate` flag, which orchestrates the entire process internally.
+This utility workflow provides a safe, non-destructive process to upgrade older experimental data. It copies the legacy data to a new location before running the migration, leaving the original data untouched.
+
+The PowerShell entry point (`migrate_experiment.ps1`) first copies the source experiment to a new timestamped directory, then calls `experiment_manager.py --migrate` on the new copy to perform the upgrade.
 
 {{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=111%}}
 
@@ -250,23 +252,25 @@ This calls `experiment_manager.py` with the `--reprocess` flag, which intelligen
 
 ### Migrating Old Experiment Data (`migrate_experiment.ps1`)
 
-To upgrade older experiment directories to be compatible with the current analysis pipeline, a dedicated PowerShell script automates the entire migration process.
+This script provides a safe, non-destructive workflow to upgrade older, legacy experiment directories to be compatible with the current analysis pipeline. The original data is always preserved.
 
 **What it does:**
-The `migrate_experiment.ps1` script is a simple wrapper that calls `experiment_manager.py` with a `--migrate` flag. This centralizes the entire migration process within the manager, which orchestrates:
+The `migrate_experiment.ps1` script automates a copy-then-migrate process:
 
-1.  **Patching Configs**: Running `patch_old_experiment.py` to add archived `config.ini` files.
+1.  **Copy**: It takes a source directory and copies it to a new, timestamped folder inside `output/migrated_experiments/`.
+2.  **Migrate**: It then calls `experiment_manager.py --migrate` on this new directory. The manager orchestrates the internal upgrade steps:
+    *   **Patching Configs**: Creating `config.ini.archived` files from old reports.
+    *   **Rebuilding Reports**: Regenerating all reports into the modern format.
+    *   **Finalizing**: Generating clean, modern summary files for the migrated experiment.
 
-2.  **Rebuilding Reports**: Executing `rebuild_reports.py` to regenerate all reports into the modern, standardized format.
-
-3.  **Finalizing**: Reprocessing the newly-migrated experiment to generate clean, modern summary files.
+This approach leaves the original data completely untouched.
 
 **How to use it:**
-Execute the script and point it at the top-level directory of the old experiment you want to migrate.
+Point the script at the source directory of the legacy experiment. The script will automatically create a timestamped destination folder.
 
 ```powershell
-# Migrate the experiment data located in the Study_1/Experiment_1/ directory
-.\migrate_experiment.ps1 -TargetDirectory "output/reports/Study_1/Experiment_1"
+# Migrate data from "Legacy_Experiment_1", saving the result to a new timestamped folder.
+.\migrate_experiment.ps1 -SourceDirectory "output/legacy/Legacy_Experiment_1"
 ```
 
 ### Analyzing a Study (`analyze_study.ps1`)
@@ -320,13 +324,13 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 *   **`update_experiment.ps1`**: Re-runs the data processing and analysis stages on existing results, ideal for applying analysis updates or bug fixes.
 
-*   **`migrate_experiment.ps1`**: Upgrades older, legacy experiment directories to be compatible with the current analysis pipeline.
+*   **`migrate_experiment.ps1`**: Safely migrates a legacy experiment by first copying it to a new timestamped directory and then upgrading the copy to be compatible with the current pipeline.
 
 *   **`analyze_study.ps1`**: Aggregates all results within a study and performs the final statistical analysis (e.g., ANOVA).
 
 ## Main Orchestrator
 
-*   **`experiment_manager.py`**: The top-level controller for an entire experiment, functioning as a state machine. It verifies the experiment's state and automatically takes the correct action (`NEW`, `REPAIR`, `REPROCESS`, or `MIGRATE`) until the experiment is complete.
+*   **`experiment_manager.py`**: The top-level controller for an entire experiment, functioning as a state machine. It verifies the experiment's state and automatically takes the correct action (`NEW`, `REPAIR`, `REPROCESS`, or `MIGRATE`) until the experiment is complete. It can also be forced to reprocess an entire experiment via the `--reprocess` command-line flag.
 
 ## Replication Pipeline Scripts
 

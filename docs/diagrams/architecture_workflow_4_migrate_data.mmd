@@ -1,6 +1,7 @@
 graph TD
     %% 1. Define all nodes first
     EntryPointPS["migrate_experiment.ps1<br/>(User Entry Point)"]:::entry_ps
+    CopyStep("Copies Legacy Directory<br/>to New Timestamped Folder"):::action
     EntryPointPy["experiment_manager.py<br/>(--migrate Mode)"]:::entry_py
     
     PatchOld["patch_old_experiment.py"]:::script
@@ -18,12 +19,15 @@ graph TD
     FinalArtifacts[("STUDY_results.csv")]:::artifact
 
     %% 2. Define connections
-    EntryPointPS --> EntryPointPy
+    EntryPointPS --> CopyStep
+    CopyStep -- "Calls manager on new copy" --> EntryPointPy
+    
     EntryPointPy -- "Orchestrates Step 1" --> PatchOld
     PatchOld --> RestoreConfig
     RestoreConfig --> ArchivedConfig
     ArchivedConfig -- "Read By" --> RebuildReports
     EntryPointPy -- "Orchestrates Step 2" --> RebuildReports
+    
     EntryPointPy -- "Finalizes (Step 3)" --> LogManagerRebuild
     LogManagerRebuild --> BatchRunLog
     EntryPointPy -- "Finalizes (Step 3)" --> Aggregator
@@ -32,15 +36,14 @@ graph TD
     Aggregator --> FinalArtifacts
     EntryPointPy -- "Finalizes (Step 3)" --> LogManagerFinalize
     LogManagerFinalize --> BatchRunLog
-    
-    %% No direct connection from LogManagerFinalize to FinalArtifacts anymore
 
     %% 3. Group nodes into subgraphs
     subgraph "Workflow 4: Migrate Old Experiment Data"
         direction TB
         EntryPointPS
+        CopyStep
         EntryPointPy
-        subgraph "Migration Steps (Orchestrated by experiment_manager.py)"
+        subgraph "Migration Steps (Run on new copy)"
             direction TB
             PatchOld
             RestoreConfig
@@ -59,8 +62,9 @@ graph TD
         end
     end
 
-    %% 4. Styling (re-using existing styles, adding new ones if needed)
+    %% 4. Styling
     classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
+    classDef action fill:#5cb85c,stroke:#4cae4c,color:#fff;
     classDef entry_py fill:#f0ad4e,stroke:#eea236,color:#333;
     classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
     classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;

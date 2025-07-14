@@ -28,6 +28,7 @@
     # Reprocess the same experiment with verbose output and notes
     .\update_experiment.ps1 "output/reports/MyStudy/Experiment_1" -Notes "Applied fix to MRR calculation" -Verbose
 #>
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to update.")]
     [ValidateScript({
@@ -39,36 +40,43 @@ param(
     [string]$TargetDirectory,
 
     [Parameter(Mandatory = $false)]
-    [string]$Notes,
-
-    [Parameter(Mandatory = $false)]
-    [switch]$Verbose
+    [string]$Notes
 )
 
+# --- Auto-detect execution environment ---
+$executable = "python"
+$prefixArgs = @()
+if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    $executable = "pdm"
+    $prefixArgs = "run", "python"
+}
+
 try {
-    # Get the directory of the current script to reliably locate the Python script
-    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $PythonScriptPath = Join-Path -Path $ScriptDir -ChildPath "..\src\experiment_manager.py"
+    # The Python script path is relative to the project root where this is run.
+    $PythonScriptPath = "src/experiment_manager.py"
 
     # Assemble the arguments for the Python script
-    $pythonArgs = @(
-        $PythonScriptPath,
+    $arguments = @(
         '--reprocess',
         $TargetDirectory
     )
 
     if ($PSBoundParameters.ContainsKey('Notes')) {
-        $pythonArgs += '--notes', $Notes
+        $arguments += '--notes', $Notes
     }
 
+    # The -Verbose switch is automatically passed by PowerShell
+    # when [CmdletBinding()] is used, but we check it to pass to python.
     if ($Verbose.IsPresent) {
-        $pythonArgs += '--verbose'
+        $arguments += '--verbose'
     }
+
+    $finalArgs = $prefixArgs + $PythonScriptPath + $arguments
 
     Write-Host "Starting experiment update for: $TargetDirectory" -ForegroundColor Green
     
     # Execute the Python script with the assembled arguments
-    & python @pythonArgs
+    & $executable $finalArgs
 
     if ($LASTEXITCODE -ne 0) {
         throw "The Python script exited with an error (Exit Code: $LASTEXITCODE)."

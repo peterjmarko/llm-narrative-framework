@@ -21,24 +21,26 @@
 
 <#
 .SYNOPSIS
-    Upgrades a legacy experiment directory by calling the central experiment manager in migrate mode.
+    Copies a legacy experiment to a new, timestamped directory and upgrades it.
 
 .DESCRIPTION
-    This script is a simple wrapper for the main 'experiment_manager.py' script.
-    It passes the --migrate flag to the manager, which then orchestrates the entire
-    data migration process to make old data compatible with the current pipeline.
+    This script performs a safe, non-destructive migration. It takes a source
+    legacy experiment directory, copies it to a new timestamped folder within
+    'output/migrated_experiments/', and then runs the migration process on the
+    new copy. The original data is left untouched.
 
-.PARAMETER TargetDirectory
+.PARAMETER SourceDirectory
     The path to the root of the old experiment directory that needs to be migrated.
 
 .EXAMPLE
-    # To migrate the experiment data in the "6_Study_4" directory:
-    .\migrate_experiment.ps1 -TargetDirectory "output/reports/6_Study_4"
+    # Copy and migrate "Legacy_Experiment_1"
+    # This creates a folder like "output/migrated_experiments/Legacy_Experiment_1_migrated_20250712_103000"
+    .\migrate_experiment.ps1 -SourceDirectory "output/legacy/Legacy_Experiment_1"
 #>
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the old experiment directory.")]
-    [string]$TargetDirectory
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the source legacy experiment directory to migrate.")]
+    [string]$SourceDirectory
 )
 
 # --- Auto-detect execution environment ---
@@ -55,16 +57,35 @@ else {
 
 # --- Main Script Logic ---
 try {
-    # Resolve the path to ensure it's absolute and check for existence
-    $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
+    # 1. Resolve source and automatically determine destination
+    $SourcePath = Resolve-Path -Path $SourceDirectory -ErrorAction Stop
+    $SourceBaseName = (Get-Item -Path $SourcePath).Name
+    $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $NewFolderName = "${SourceBaseName}_migrated_${Timestamp}"
+    $DestinationParent = "output/migrated_experiments"
+    $DestinationPath = Join-Path -Path $DestinationParent -ChildPath $NewFolderName
 
+    # Create the parent directory if it doesn't exist
+    if (-not (Test-Path -Path $DestinationParent)) {
+        New-Item -ItemType Directory -Path $DestinationParent -Force | Out-Null
+    }
+
+    # 2. Copy the experiment to the new location
     Write-Host "`n######################################################" -ForegroundColor Green
-    Write-Host "### Starting Data Migration for: '$($ResolvedPath)'" -ForegroundColor Green
-    Write-Host "######################################################`n" -ForegroundColor Green
+    Write-Host "### Step 1/2: Copying Experiment Data" -ForegroundColor Green
+    Write-Host "######################################################`n"
+    Write-Host "Source:      $SourcePath"
+    Write-Host "Destination: $DestinationPath"
+    Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
+    Write-Host "`nCopy complete."
 
-    # This script is now a simple wrapper for the experiment manager's migrate mode.
+    # 3. Run the migration process on the new copy
+    Write-Host "`n######################################################" -ForegroundColor Green
+    Write-Host "### Step 2/2: Migrating New Experiment Copy" -ForegroundColor Green
+    Write-Host "######################################################`n"
+    
     $scriptName = "src/experiment_manager.py"
-    $arguments = "--migrate", $ResolvedPath
+    $arguments = "--migrate", $DestinationPath
     $finalArgs = $prefixArgs + $scriptName + $arguments
 
     Write-Host "Executing: $executable $($finalArgs -join ' ')"
@@ -76,6 +97,7 @@ try {
 
     Write-Host "`n######################################################" -ForegroundColor Green
     Write-Host "### Migration Finished Successfully! ###" -ForegroundColor Green
+    Write-Host "### Migrated data is in: '$($DestinationPath)'" -ForegroundColor Green
     Write-Host "######################################################`n" -ForegroundColor Green
 
 }

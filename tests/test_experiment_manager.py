@@ -142,6 +142,42 @@ class TestExperimentManagerState(unittest.TestCase):
         mock_repair.assert_not_called()
         self.assertTrue(any("experiment_aggregator.py" in str(c) for c in mock_subprocess.call_args_list))
 
+    @patch('os.path.isdir', return_value=True)
+    @patch('glob.glob')
+    @patch('src.experiment_manager._run_reprocess_mode', return_value=True)
+    @patch('src.experiment_manager._run_repair_mode', return_value=True)
+    @patch('src.experiment_manager._run_new_mode', return_value=True)
+    @patch('src.experiment_manager._get_experiment_state')
+    @patch('src.experiment_manager.get_config_value')
+    @patch('src.experiment_manager.subprocess.run')
+    def test_reprocess_flag_forces_reprocessing(self, mock_subprocess, mock_get_config, mock_get_state, mock_new, mock_repair, mock_reprocess, mock_glob, mock_isdir):
+        """Tests that the --reprocess flag bypasses state detection and forces reprocessing."""
+        # Arrange
+        mock_get_config.side_effect = self._get_config_side_effect
+        # _get_experiment_state is called AFTER the forced reprocess to check for completion
+        mock_get_state.return_value = ("COMPLETE", None)
+        # Mock glob to find some run directories to reprocess
+        mock_run_dirs = [os.path.join(self.test_dir, 'run_001'), os.path.join(self.test_dir, 'run_002')]
+        mock_glob.return_value = mock_run_dirs
+
+        cli_args = ['script.py', self.test_dir, '--reprocess']
+        with patch.object(sys, 'argv', cli_args):
+            experiment_manager.main()
+
+        # Assert
+        # Check that the reprocess mode was called.
+        mock_reprocess.assert_called_once()
+        # Check that it was called with the directories found by glob.
+        reprocess_call_args = mock_reprocess.call_args[0][0]  # First positional arg
+        self.assertEqual(len(reprocess_call_args), 2)
+        self.assertEqual(reprocess_call_args[0]['dir'], mock_run_dirs[0])
+
+        # _get_experiment_state should only be called once, on the second loop, after the forced reprocess.
+        mock_get_state.assert_called_once()
+        mock_new.assert_not_called()
+        mock_repair.assert_not_called()
+        self.assertTrue(any("experiment_aggregator.py" in str(c) for c in mock_subprocess.call_args_list))
+
     @patch('src.experiment_manager._run_repair_mode', return_value=True)
     @patch('src.experiment_manager._get_experiment_state')
     @patch('src.experiment_manager.get_config_value')

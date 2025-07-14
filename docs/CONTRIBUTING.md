@@ -22,6 +22,10 @@ Before cloning the project, ensure these essential tools are installed on your s
     ```bash
     pip install --user commitizen
     ```
+*   **Commitizen**: A tool for standardized commits and automated changelogs. Install it once globally with pip:
+    ```bash
+    pip install --user commitizen
+    ```
 
 ### Step 2: Clone and Set Up the Project
 
@@ -185,35 +189,27 @@ This approach, demonstrated in `tests/test_experiment_aggregator.py`, is the req
 
 ### 4. Commit Your Changes
 
-Use the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification for clear and automated versioning.
+This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This ensures clear, automated versioning and changelog generation.
 
-*   **Format**: `type(scope): subject` (e.g., `feat(parser): ...`)
-*   **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`.
-*   **Scope**: The part of the codebase affected (e.g., `analysis`, `readme`, `github`).
+Instead of using `git commit -m "..."`, all commits should be made using the `commitizen` interactive prompt:
+```bash
+# Stage your changes first
+git add .
 
-*   **Examples**:
-    *   `feat(analysis): Add support for chi-squared test`
-    *   `fix(parser): Handle empty response files gracefully`
-    *   `docs(readme): Update contribution workflow`
-    *   `test(orchestrator): Add test for reprocess mode`
+# Then, run the commitizen command
+pdm run cz commit
+```
+The prompt will guide you through selecting the type of change (`feat`, `fix`, `docs`, etc.), defining the scope, and writing a subject line and body.
 
-**Important: The Automated Documentation Workflow**
+### 5. Releasing a New Version (Maintainers Only)
 
-This project uses a `pre-commit` hook to keep the documentation synchronized. When you make changes to documentation source files (like `docs/DOCUMENTATION.template.md` or diagram sources), you only need to commit the source file.
+Maintainers can automatically generate the changelog, bump the project version, and create a Git tag with a single command:
+```bash
+pdm run cz bump --changelog
+```
+This command reads all commits since the last tag and updates `pyproject.toml` and `docs/CHANGELOG.md` accordingly.
 
-1.  **Modify the source file(s)** (e.g., edit text in `DOCUMENTATION.template.md` or update a diagram's `.mmd` file).
-2.  **Stage your changes** (`git add docs/DOCUMENTATION.template.md`).
-3.  **Commit with a standard `docs` message**.
-
-When you run `git commit`, the hook will automatically:
-1.  Run the `build_docs.py` script.
-2.  Re-render any outdated diagrams.
-3.  Re-generate `DOCUMENTATION.md` and the `.docx` files.
-4.  **Add these generated files to your commit for you.**
-
-This ensures that every commit containing documentation source changes also includes the corresponding built artifacts, keeping the repository perfectly in sync.
-
-### 5. Submit a Pull Request
+### 6. Submit a Pull Request
 
 1.  Push your branch to your fork on GitHub.
 2.  Open a pull request against the `main` branch of the original repository.

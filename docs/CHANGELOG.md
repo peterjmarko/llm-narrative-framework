@@ -5,6 +5,35 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- (Your next feature here)
+
+## [1.1.0] - 2025-07-14
+
+### Added
+- New `update_experiment.ps1` script for reprocessing experiments.
+- New `audit_experiment.ps1` script for validating experiment completeness.
+- `commitizen` integration for standardized commits and automated changelogs.
+- Shared test harness for PowerShell scripts.
+
+### Changed
+- **BREAKING**: Refactored project architecture into five distinct, documented workflows.
+- **BREAKING**: Renamed `process_study.ps1` to `analyze_study.ps1`.
+- Updated all documentation (`README.md`, `DOCUMENTATION.md`, `CONTRIBUTING.md`) to align with the consolidated architecture.
+
+### Fixed
+- Corrected logic in the statistical analysis module.
+- Repaired diagram rendering and optimized the documentation build script.
+- Excluded archive directories from test collection.
+- Added missing `pytest-cov` development dependency.
+
+### Build
+- Automated test coverage cleanup and updated script paths.
+- Made DOCX conversion resilient to locked files.
+
+## [1.0.0] - 2025-07-11
 
 ### Added
 - Initial personality matching experiment framework
@@ -30,41 +59,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Statistical significance testing
 - Bias analysis and reporting
 - Legacy data migration
-
-## v1.1.0 (2025-07-14)
-
-### Feat
-
-- Add update_experiment script for reprocessing
-- **testing**: Add audit script and finalize test runner
-- **tests**: Introduce shared harness for PowerShell tests
-- **build**: Make docx conversion resilient to locked files
-- **testing**: Overhaul coverage and refactor compile_results test
-- **testing**: Overhaul coverage and refactor compile_results test
-- **testing**: Implement test suite for migrate_old_experiment.ps1
-- **testing**: Implement full test suite for process_study.ps1
-- Integrate ArgBuilder logic into run_experiment.ps1 and finalize bare-bones, non-Pester testing setup
-- Establish working PowerShell test suite (without Pester) and retain ArgBuilder as production dependency
-- **build**: Automate documentation and diagram generation
-- Enhance final analysis workflow and reporting
-- Enhance analysis and untrack generated code files
-- Implement docs-as-code and finalize utilities
-
-### Fix
-
-- **analysis**: Correct test logic and align scripts with docs
-- **builder**: Properly handle doc status check by build_docs.py during commit.
-- **docs**: Repair diagram rendering and optimize build script
-- **scripts**: Sync tests and improve build utility
-- **tests**: Exclude archive directories from test collection
-- **deps**: Add missing pytest-cov to dev dependencies
-
-### Refactor
-
-- **project**: Consolidate architecture and testing
-- **analysis**: Rename study processing scripts for clarity
-- All tests passing with overall 60% coverage; test suite not necessarily complete.
-- Enhance test suite and update documentation
-- Centralize batch logic in Python and update config
-
-## v1.0.0 (2025-07-14)

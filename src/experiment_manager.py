@@ -28,26 +28,34 @@ experiment's status and automatically taking the correct action until the
 experiment is fully complete and all data is consistent.
 
 This self-healing design makes the experiment pipeline resilient to
-interruptions. The script's core is a `Verify -> Act` loop that decides
-which mode to enter based on the state of the experiment directory:
+interruptions. Its core is a `Verify -> Act` loop, but it can also be
+invoked with explicit flags for specific, one-time actions.
 
-1.  **NEW Mode**: If replications are missing, it calls
-    `orchestrate_replication.py` to generate the data from scratch.
-2.  **REPAIR Mode**: If API responses are missing (query file exists but
-    response does not), it uses a parallel worker pool to call
-    `run_llm_sessions.py` to efficiently fetch only the missing data.
-3.  **REPROCESS Mode**: If API responses are present but downstream analysis
-    artifacts are corrupt or missing, it calls `orchestrate_replication.py`
-    in reprocess mode to rebuild the analysis files.
-4.  **COMPLETE**: Once all data is consistent, it performs a final data
-    aggregation and exits the loop.
+Modes of Operation:
+-   **Default (State Machine)**: Verifies the experiment's state and automatically
+    runs the appropriate action (`NEW`, `REPAIR`, `REPROCESS`) until completion.
+-   **`--reprocess`**: Forces a full reprocessing of all analysis artifacts for
+    an existing experiment.
+-   **`--migrate`**: Runs a one-time migration workflow to upgrade a legacy
+    experiment directory to the modern format.
+-   **`--verify-only`**: Performs a read-only audit and prints a detailed
+    completeness report without making changes.
 
 Usage:
-# To manage an existing experiment (run, repair, reprocess to completion):
+# Start a brand new experiment in a default, timestamped directory:
+python src/experiment_manager.py
+
+# Run, repair, or resume an existing experiment to completion:
 python src/experiment_manager.py path/to/experiment_dir
 
-# To start a brand new experiment in a default, timestamped directory:
-python src/experiment_manager.py
+# Force a full reprocessing of an existing experiment:
+python src/experiment_manager.py --reprocess path/to/experiment_dir
+
+# Migrate a legacy experiment (after it has been copied to a new location):
+python src/experiment_manager.py --migrate path/to/migrated_copy_dir
+
+# Audit an experiment without making changes:
+python src/experiment_manager.py --verify-only path/to/experiment_dir
 """
 
 import sys
@@ -496,6 +504,7 @@ def main():
     parser.add_argument('--max-loops', type=int, default=10, help="Safety limit for state-machine loops.")
     parser.add_argument('--verify-only', action='store_true', help="Run in read-only diagnostic mode and print a detailed completeness report.")
     parser.add_argument('--migrate', action='store_true', help="Run a one-time migration workflow for a legacy experiment directory.")
+    parser.add_argument('--reprocess', action='store_true', help="Force reprocessing of all runs in an experiment, then finalize.")
     args = parser.parse_args()
 
     # --- Script Paths ---
@@ -541,6 +550,9 @@ def main():
             print(f"{C_RED}--- Migration failed. Please review logs. ---{C_RESET}")
             sys.exit(1)
 
+    # The --reprocess flag acts as a one-time override for the state machine.
+    force_reprocess_once = args.reprocess
+
     # --- Main State-Machine Loop ---
     loop_count = 0
     while loop_count < args.max_loops:
@@ -548,7 +560,16 @@ def main():
         print("\n" + "="*80)
         print(f"{C_CYAN}### VERIFICATION CYCLE {loop_count}/{args.max_loops} ###{C_RESET}")
 
-        state, details = _get_experiment_state(final_output_dir, end_rep, args.verbose)
+        # If the reprocess flag is set, force the state for the first loop iteration.
+        if force_reprocess_once:
+            print(f"{C_YELLOW}Forced reprocessing flag is active. Overriding state detection.{C_RESET}")
+            all_run_dirs = sorted([p for p in glob.glob(os.path.join(final_output_dir, 'run_*')) if os.path.isdir(p)])
+            state = "REPROCESS_NEEDED"
+            details = [{"dir": d} for d in all_run_dirs]
+            force_reprocess_once = False  # Ensure it only runs once
+        else:
+            state, details = _get_experiment_state(final_output_dir, end_rep, args.verbose)
+        
         print(f"Current Experiment State: {C_GREEN}{state}{C_RESET}")
 
         success = False
