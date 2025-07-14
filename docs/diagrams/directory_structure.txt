@@ -1,3 +1,7 @@
+## Directory Structure
+
+This logical hierarchy is reflected in the physical layout of the repository:
+
 personality_matching/
 ├── README.md                   # You are here!
 ├── CONTRIBUTING.md             # Guidelines for contributors
@@ -6,33 +10,78 @@ personality_matching/
 ├── .env                        # Stores private API keys (not committed)
 ├── config.ini                  # Main configuration for running experiments
 |
-├── run_experiment.ps1          # ENTRY POINT: Run a new experiment batch
-└── process_study.ps1           # ENTRY POINT: Analyze a completed study's results
+├── analyze_study.ps1           # ENTRY POINT: Analyze a completed study's results
+├── audit_experiment.ps1        # ENTRY POINT: Audit an experiment's completeness
+├── migrate_experiment.ps1      # ENTRY POINT: Migrate old experiment data
+├── run_experiment.ps1          # ENTRY POINT: Run a new or existing experiment batch
+└── update_experiment.ps1       # ENTRY POINT: Re-run analysis for an existing experiment
 |
 ├── src/                        # All Python source code for the project
-│   ├── replication_manager.py  # Manages execution of experiment batches
-│   ├── orchestrate_replication.py # Runs a single replication
-│   ├── analyze_performance.py  # Calculates final metrics from raw scores
-│   └── ...                     # (utilities for prompting, processing, etc.)
+│   ├── analyze_llm_performance.py  # Stage 3: Calculates final metrics for a replication
+│   ├── build_llm_queries.py        # Stage 1: Generates queries and ground truth
+│   ├── config_loader.py            # Loads configuration files
+│   ├── experiment_aggregator.py    # Stage 4: Aggregates results hierarchically (produces all_results.csv)
+│   ├── experiment_manager.py       # Manages experiment lifecycle (main controller)
+│   ├── llm_prompter.py             # Worker: Interacts with LLM API
+│   ├── orchestrate_replication.py  # Orchestrates stages for a single replication
+│   ├── patch_old_experiment.py     # Utility: Adds archived configs to old runs
+│   ├── process_llm_responses.py    # Stage 2: Parses LLM responses into scores
+│   ├── query_generator.py          # Worker: Generates a single LLM query
+│   ├── rebuild_reports.py          # Utility: Regenerates replication reports
+│   ├── replication_log_manager.py  # Manages the batch_run_log.csv
+│   ├── restore_config.py           # Utility: Reverse-engineers config from old reports
+│   ├── run_bias_analysis.py        # Utility: Calculates positional bias metrics
+│   ├── run_llm_sessions.py         # Orchestrates LLM interaction sessions
+│   └── study_analysis.py           # Final: Performs statistical analysis for a study
 |
-├── data/                       # Source personality databases & prompt templates
-│   ├── personalities_db_all.txt# Example: a database of personalities
-│   └── base_query.txt          # Example: a template for LLM prompts
+├── data/                               # Source personality databases & prompt templates
+│   ├── personalities_db_1-5000.txt     # Main personalities database used in experiments
+│   └── base_query.txt                  # Template for LLM prompts
 |
-├── output/                     # All generated artifacts from experiments
-│   └── reports/
-│       └── <Study_Name>/         # e.g., "6_Study_4"
-│           ├── <Experiment_Name>/  # e.g., "Grok_3_Mini_map=random"
-│           │   └── <Replication_Name>/ # e.g., "run_..._rep-01_..."
-│           │       ├── replication_report.txt  # Detailed report for this run
-│           │       ├── config.ini.archived     # Config snapshot for the run
-│           │       └── analysis_inputs/        # Intermediate data (scores)
-│           │
-│           └── STUDY_results.csv     # AGGREGATE: Summary of all experiments
+├── output/                                     # All generated artifacts from experiments
+│   ├── new_experiments/                        # Contains all new experiments
+│       └── <Experiment_Name>/                          # e.g., "Grok_3_Mini_map=random"
+│           ├── <Replication_Name>/                     # e.g., "run_..._rep-01_..."
+│           │   ├── analysis_inputs/                    # Intermediate data for ANOVA consumption
+│           │   ├── session_queries/                    # Raw LLM queries (JSON and text)
+│           │   ├── session_responses/                  # Raw LLM responses (JSON and text)
+│           │   ├── api_times.log                       # Run times of API calls
+│           │   ├── config.ini.archived                 # Config snapshot for the run
+│           │   ├── replication_report_DATE-TIME.txt    # Detailed report for this run
+│           │   └── REPLICATION_results.csv             # AGGREGATE: Summary of all trials within a replication
+│           ├── batch_run_log.csv                       # Log of all replication runs in an experiment
+│           └── EXPERIMENT_results.csv                  # AGGREGATE: Summary of all replications within an experiment
+│   └── studies/                                    # Contains all experiment and study outputs
+│       └── <Study_Name>/                           # e.g., "Study_1"
+│           ├── anova/                                      # Statistical analysis outputs (if run at this level)
+│           │   ├── boxplots/                               # Publication-quality plots
+│           │   ├── diagnostics/                            # Q-Q plots for checking statistical assumptions
+│           │   └── STUDY_analysis_log.txt                  # Comprehensive text report of statistical findings
+│           ├── <Experiment_Name>/                          # e.g., "Grok_3_Mini_map=random"
+│           │   ├── <Replication_Name>/                     # e.g., "run_..._rep-01_..."
+│           │   │   ├── analysis_inputs/                    # Intermediate data for ANOVA consumption
+│           │   │   ├── session_queries/                    # Raw LLM queries (JSON and text)
+│           │   │   ├── session_responses/                  # Raw LLM responses (JSON and text)
+│           │   │   ├── api_times.log                       # Run times of API calls
+│           │   │   ├── config.ini.archived                 # Config snapshot for the run
+│           │   │   ├── replication_report_DATE-TIME.txt    # Detailed report for this run
+│           │   │   └── REPLICATION_results.csv             # AGGREGATE: Summary of all trials within a replication
+│           │   ├── batch_run_log.csv                       # Log of all replication runs in an experiment
+│           │   └── EXPERIMENT_results.csv                  # AGGREGATE: Summary of all replications within an experiment
+│           └── STUDY_results.csv                           # AGGREGATE: Summary of all experiments in a study
 |
 ├── docs/                       # Project documentation and diagram sources
 │   ├── diagrams/               # Source files for diagrams (.mmd, .txt)
+│   │   ├── architecture_data_flow.mmd
+│   │   ├── architecture_experimental_logic.mmd
+│   │   ├── architecture_workflow_1_run_experiment.mmd
+│   │   ├── architecture_workflow_2_audit_experiment.mmd
+│   │   ├── architecture_workflow_3_update_experiment.mmd
+│   │   ├── architecture_workflow_4_migrate_data.mmd
+│   │   ├── architecture_workflow_5_analyze_study.mmd
+│   │   └── codebase_architecture.mmd
 │   └── images/                 # Rendered images (.png) for the README
+│   └── ...                     # (other documentation files like CONTRIBUTING.md, LICENSE.md)
 |
 └── tests/                      # Unit and integration tests for src/ code
     └── ...

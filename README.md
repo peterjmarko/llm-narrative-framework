@@ -1,18 +1,18 @@
-# Personality Matching Experiment Framework
+# A Resilient Framework for Large-Scale LLM Experimentation
 
-A comprehensive research framework for conducting Large Language Model (LLM) personality matching experiments with statistical analysis and bias detection.
+A comprehensive research framework for conducting Large Language Model (LLM) experiments with statistical analysis, hierarchical data aggregation, and resilient, self-healing workflow management.
 
 ## 🚀 Quick Start
 
 \\\powershell
-# Run complete experiment
+# Run a complete experiment (outputs to a new timestamped directory)
 .\run_experiment.ps1
 
-# Process study results  
-.\analyze_study.ps1
+# Analyze the results of all experiments in the default output folder
+.\analyze_study.ps1 -StudyDirectory output/new_experiments
 
-# View results
-Get-ChildItem "data/study_results/*.csv"
+# View the final analysis log
+Get-Content output/new_experiments/anova/STUDY_analysis_log.txt
 \\\
 
 ## 📊 What This Framework Does
@@ -32,7 +32,7 @@ Get-ChildItem "data/study_results/*.csv"
 
 **[📖 Complete Documentation](docs/DOCUMENTATION.md)** - Detailed setup, usage, and architecture
 
-**[🏗️ Architecture Diagrams](docs/diagrams/)** - Visual workflow and system design
+**[🏗️ Architecture Diagrams](docs/images/)** - Visual workflow and system design
 
 **[🤝 Contributing Guide](docs/CONTRIBUTING.md)** - Development and contribution guidelines
 

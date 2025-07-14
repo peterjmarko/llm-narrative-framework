@@ -18,6 +18,10 @@ Before cloning the project, ensure these essential tools are installed on your s
     ```bash
     pip install --user pdm
     ```
+*   **Commitizen**: A tool for standardized commits and automated changelogs. Install it once globally with pip:
+    ```bash
+    pip install --user commitizen
+    ```
 
 ### Step 2: Clone and Set Up the Project
 

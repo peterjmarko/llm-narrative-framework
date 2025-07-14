@@ -1,30 +1,34 @@
 graph TD
     %% 1. Define All Nodes
-    A["Start: Pool of 5000 Personalities"]
-    B{"Sample 100 sets"}
-    C{"Sample k=10"}
-    D["Shuffle Names<br/>& Descriptions"]
+    A(["Start: Pool of 5000 Personalities"]):::start_end_node
+    C{"Sample `k` Unique Personalities<br/>(from Pool, without replacement)"}
+    DrawingSeed[Drawing Seed]:::input
+    D["Shuffle Names & Descriptions<br/>(for `k` Personalities)"]
+    ShufflingSeed[Shuffling Seed]:::input
     Input[config.ini]:::input
-    M{"Define Ground Truth"}
+    M{"Define Ground Truth Mapping"}
     F(("LLM Task:<br/>Score Similarity"))
-    G["Receive 10x10<br/>Score Matrix"]
-    H{"Calculate<br/>Trial Metrics"}
-    I{"Collect & Aggregate<br/>100 Trial Metrics"}
-    K(["Final Replication<br/>Data Point"]):::final
+    G["Receive Score Matrix"]
+    H{"Calculate Trial Metrics"}
+    I{"Aggregate Replication Metrics"}
+    K(["Final Replication<br/>Data Point"]):::start_end_node
 
     %% 2. Define All Connections
-    A --> B --> C
-    C --> D
+    A --> C
+    DrawingSeed --> C
     
-    %% This is the corrected detail, as per your instruction
+    C --> D
+    ShufflingSeed --> D
+    
     Input -- "Provides Mapping Strategy<br/>(Correct vs. Random)" --> M
     
-    D & M --> F
+    D --> F
+    M --> H
     F --> G --> H
     H --> I --> K
     
     %% 3. Group Nodes into Subgraphs using their IDs
-    subgraph "Single Trial (Repeated 100 times)"
+    subgraph "Single Trial (Repeated `m` times)"
         C
         F
         G
@@ -37,5 +41,5 @@ graph TD
     end
 
     %% 4. Styling
-    classDef final fill:#d4edda,stroke:#155724;
+    classDef start_end_node fill:#d4edda,stroke:#155724;
     classDef input fill:#e9d8fd,stroke:#9467bd;

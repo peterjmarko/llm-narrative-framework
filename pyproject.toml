@@ -32,6 +32,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "pdm>=2.20.1",
     "pytest-mock>=3.14.1",
+    "commitizen>=3.31.0",
 ]
 
 [tool.pdm]
@@ -78,3 +79,9 @@ audit-exp = "powershell -ExecutionPolicy Bypass -File .\\audit_experiment.ps1"
 update-exp = "powershell -ExecutionPolicy Bypass -File .\\update_experiment.ps1"
 migrate-exp = "powershell -ExecutionPolicy Bypass -File .\\migrate_experiment.ps1"
 analyze-stu = "powershell -ExecutionPolicy Bypass -File .\\analyze_study.ps1"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "pdm"
+changelog_file = "docs/CHANGELOG.md"
+changelog_format = "keep_a_changelog"

@@ -6,28 +6,69 @@ graph TD
         Input_Config["config.ini"]:::input
     end
 
-    subgraph "Data Pipeline Stages"
+    subgraph "Core Data Pipeline Flow"
         direction LR
         subgraph "1: Generation"
-             Script1["build_llm_queries.py"]:::script --> Art1["llm_query_XXX.txt"]:::artifact
-             Script1 --> Art1_archive[("config.ini.archived")]:::artifact
+             Script1["build_llm_queries.py"]:::script
         end
-        subgraph "2-3: Execution & Processing"
-            Script2["run_llm<br/>_sessions.py"]:::script --> Art2["llm_response<br/>_XXX.txt"]:::artifact
-            Art2 --> Script3["process_llm<br/>_responses.py"]:::script --> Art3["all_scores.txt"]:::artifact
+        subgraph "2: Execution & Processing"
+            Script2["run_llm<br/>_sessions.py"]:::script
+            Script3["process_llm<br/>_responses.py"]:::script
         end
-        subgraph "4: Analysis"
-             Script4a["compile_study_results.py"]:::script --> Art4["final_summary<br/>_results.csv"]:::artifact
-             Art4 --> Script4b["analyze_study_results.py"]:::script --> Art_Final(("Final Report<br/>Plots & Stats")):::final
+        subgraph "3: Single-Run Analysis"
+            Script4["analyze_llm<br/>_performance.py"]:::script
+        end
+        subgraph "4: Study-Level Aggregation & Analysis"
+             Aggregator["experiment_aggregator.py"]:::script
+             StudyAnalyzer["study_analysis.py"]:::script
         end
     end
 
+    subgraph "Key Data Artifacts"
+        direction LR
+        Art1_archive[("config.ini.archived")]:::artifact
+        Art1_query["llm_query_XXX.txt"]:::artifact
+        Art1_mappings[("mappings.txt")]:::artifact
+        Art1_manifest[("manifest.txt")]:::artifact
+        Art2_response["llm_response<br/>_XXX.txt"]:::artifact
+        Art3_scores["all_scores.txt"]:::artifact
+        Art4_report["replication_report.txt"]:::artifact
+        BatchRunLog[("batch_run_log.csv")]:::artifact
+        RepResultsCSV[("REPLICATION_results.csv")]:::artifact
+        ExpResultsCSV[("EXPERIMENT_results.csv")]:::artifact
+        StudyResultsCSV[("STUDY_results.csv")]:::artifact
+        FinalOutputs(("STUDY_analysis_log.txt<br/>Boxplots/<br/>Diagnostics/")):::final
+    end
+
+    %% Connections reflecting primary data flow only
     Input_PDB & Input_Query & Input_Config --> Script1
-    Art1 --> Script2
-    Art3 & Art1_archive --> Script4a
-    
+    Script1 --> Art1_query
+    Script1 --> Art1_mappings
+    Script1 --> Art1_manifest
+    Script1 --> Art1_archive
+
+    Art1_query --> Script2
+    Script2 --> Art2_response
+    Art2_response --> Script3
+    Art1_mappings --> Script3
+    Art1_manifest --> Script3
+    Script3 --> Art3_scores
+
+    Art3_scores & Art1_archive --> Script4
+    Art4_report --> Script4
+    Script4 --> Art4_report
+
+    Art4_report & Art1_archive --> Aggregator
+    Aggregator --> RepResultsCSV
+    Aggregator --> ExpResultsCSV
+    Aggregator --> StudyResultsCSV
+
+    StudyResultsCSV --> StudyAnalyzer
+    StudyAnalyzer --> FinalOutputs
+
+    Art4_report --> BatchRunLog
+
     classDef input fill:#cde4ff,stroke:#6c93be,color:#333
     classDef script fill:#ffe8d6,stroke:#e59866,color:#333
     classDef artifact fill:#e9ecef,stroke:#adb5bd,color:#333
     classDef final fill:#d4edda,stroke:#155724,color:#333 font-weight:bold
-
