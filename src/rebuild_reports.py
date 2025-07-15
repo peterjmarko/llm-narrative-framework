@@ -43,6 +43,12 @@ import re
 import glob
 import configparser
 
+# tqdm is a library that provides a clean progress bar.
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, *args, **kwargs): return iterable
+
 # --- Setup ---
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
@@ -242,9 +248,10 @@ Run Notes:       N/A (Original notes cannot be recovered)
 def main():
     parser = argparse.ArgumentParser(description="Rebuilds replication reports to their original high-fidelity format.")
     parser.add_argument('base_dir', help="The base directory to scan for experiment runs (e.g., 'output/reports/6_Study_4').")
+    parser.add_argument('--verbose', '-v', action='store_true', help="Enable detailed, per-directory logging instead of a progress bar.")
     args = parser.parse_args()
 
-        # --- Load the main config and the compatibility map ONCE ---
+    # --- Load the main config and the compatibility map ONCE ---
     try:
         # Import the globally loaded config and the map parser function
         from config_loader import APP_CONFIG, get_config_compatibility_map
@@ -267,17 +274,32 @@ def main():
         return
 
     logging.info(f"Found {len(run_dirs)} total run directories. Rebuilding reports...")
-    
+
+    iterable = run_dirs
+    if not args.verbose:
+        # Suppress INFO-level logs to keep the progress bar clean
+        logging.getLogger().setLevel(logging.WARNING)
+        iterable = tqdm(run_dirs, desc="Progress", unit="dir", ncols=80)
+
     success_count = 0
     total_count = 0
-    for run_dir in run_dirs:
-        if os.path.isdir(run_dir):
-            total_count += 1
-            # --- Pass the map to the worker function ---
-            if rebuild_report_for_run(run_dir, compat_map):
-                success_count += 1
+    try:
+        for run_dir in iterable:
+            if os.path.isdir(run_dir):
+                total_count += 1
+                # --- Pass the map to the worker function ---
+                if rebuild_report_for_run(run_dir, compat_map):
+                    success_count += 1
 
-    logging.info(f"\nReport rebuilding complete. Successfully processed {success_count}/{total_count} directories.")
+        # Reset logger to INFO to ensure final summary is always displayed
+        logging.getLogger().setLevel(logging.INFO)
+        logging.info(f"\nReport rebuilding complete. Successfully processed {success_count}/{total_count} directories.")
+
+    except KeyboardInterrupt:
+        # Ensure the cursor moves to a new line after the progress bar is interrupted
+        print("\n", file=sys.stderr)
+        logging.warning("Operation interrupted by user (Ctrl+C). Exiting gracefully.")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

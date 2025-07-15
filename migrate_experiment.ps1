@@ -71,18 +71,18 @@ try {
     }
 
     # 2. Copy the experiment to the new location
-    Write-Host "`n######################################################" -ForegroundColor Green
-    Write-Host "### Step 1/2: Copying Experiment Data" -ForegroundColor Green
-    Write-Host "######################################################`n"
+    Write-Host "`n######################################################" -ForegroundColor Cyan
+    Write-Host "### Step 1/2: Copying Experiment Data" -ForegroundColor Cyan
+    Write-Host "######################################################`n" -ForegroundColor Cyan
     Write-Host "Source:      $SourcePath"
     Write-Host "Destination: $DestinationPath"
     Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
     Write-Host "`nCopy complete."
 
     # 3. Run the migration process on the new copy
-    Write-Host "`n######################################################" -ForegroundColor Green
-    Write-Host "### Step 2/2: Migrating New Experiment Copy" -ForegroundColor Green
-    Write-Host "######################################################`n"
+    Write-Host "`n######################################################" -ForegroundColor Cyan
+    Write-Host "### Step 2/2: Migrating New Experiment Copy" -ForegroundColor Cyan
+    Write-Host "######################################################`n" -ForegroundColor Cyan
     
     $scriptName = "src/experiment_manager.py"
     $arguments = "--migrate", $DestinationPath

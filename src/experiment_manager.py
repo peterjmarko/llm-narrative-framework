@@ -516,107 +516,114 @@ def main():
     patch_script = os.path.join(current_dir, "patch_old_experiment.py")
     rebuild_script = os.path.join(current_dir, "rebuild_reports.py")
 
-    if args.target_dir:
-        final_output_dir = os.path.abspath(args.target_dir)
-    else:
-        # Create a default directory based on config.ini
-        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        base_output = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback='output')
-        new_exp_subdir = get_config_value(APP_CONFIG, 'General', 'new_experiments_subdir', fallback='new_experiments')
-        exp_prefix = get_config_value(APP_CONFIG, 'General', 'experiment_dir_prefix', fallback='experiment_')
-        base_path = os.path.join(PROJECT_ROOT, base_output, new_exp_subdir)
-        final_output_dir = os.path.join(base_path, f"{exp_prefix}{timestamp}")
-        print(f"{C_CYAN}No target directory specified. Creating default: {final_output_dir}{C_RESET}")
-
-    if not os.path.exists(final_output_dir):
-        # If in verify-only mode and the dir doesn't exist, just say so and exit.
-        if args.verify_only:
-            print(f"Directory not found: {final_output_dir}")
-            sys.exit(1)
-        os.makedirs(final_output_dir)
-        print(f"Created target directory: {final_output_dir}")
-
-    config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
-    end_rep = args.end_rep if args.end_rep is not None else config_num_reps
-
-    # --- Run verify-only mode and exit if specified ---
-    if args.verify_only:
-        _run_verify_only_mode(final_output_dir, end_rep)
-        sys.exit(0)
-
-    # --- Run migrate mode if specified. This is a pre-step to the main loop. ---
-    if args.migrate:
-        if not _run_migrate_mode(final_output_dir, patch_script, rebuild_script):
-            print(f"{C_RED}--- Migration failed. Please review logs. ---{C_RESET}")
-            sys.exit(1)
-
-    # The --reprocess flag acts as a one-time override for the state machine.
-    force_reprocess_once = args.reprocess
-
-    # --- Main State-Machine Loop ---
-    loop_count = 0
-    while loop_count < args.max_loops:
-        loop_count += 1
-        print("\n" + "="*80)
-        print(f"{C_CYAN}### VERIFICATION CYCLE {loop_count}/{args.max_loops} ###{C_RESET}")
-
-        # If the reprocess flag is set, force the state for the first loop iteration.
-        if force_reprocess_once:
-            print(f"{C_YELLOW}Forced reprocessing flag is active. Overriding state detection.{C_RESET}")
-            all_run_dirs = sorted([p for p in glob.glob(os.path.join(final_output_dir, 'run_*')) if os.path.isdir(p)])
-            state = "REPROCESS_NEEDED"
-            details = [{"dir": d} for d in all_run_dirs]
-            force_reprocess_once = False  # Ensure it only runs once
-        else:
-            state, details = _get_experiment_state(final_output_dir, end_rep, args.verbose)
-        
-        print(f"Current Experiment State: {C_GREEN}{state}{C_RESET}")
-
-        success = False
-        if state == "NEW_NEEDED":
-            success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script, bias_analysis_script)
-        elif state == "REPAIR_NEEDED":
-            success = _run_repair_mode(details, sessions_script, not args.verbose, args.max_workers)
-        elif state == "REPROCESS_NEEDED":
-            success = _run_reprocess_mode(details, args.notes, not args.verbose, orchestrator_script, bias_analysis_script)
-        elif state == "COMPLETE":
-            print(f"{C_GREEN}--- Experiment is COMPLETE. Proceeding to finalization. ---{C_RESET}")
-            break
-        else:
-            print(f"{C_RED}--- Unhandled or inconsistent state detected: {state}. Halting. ---{C_RESET}")
-            print(f"Details: {details}")
-            sys.exit(1)
-
-        if not success:
-            print(f"{C_RED}--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
-            sys.exit(1)
-
-    if loop_count >= args.max_loops:
-        print(f"{C_RED}--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
-        sys.exit(1)
-
-    # --- Finalization Stage ---
-    print("\n" + "="*80)
-    print("### ALL TASKS COMPLETE. BEGINNING FINALIZATION. ###")
-    print("="*80)
-    
-    # Rebuild log, compile results, finalize log
     try:
-        log_file_path = os.path.join(final_output_dir, get_config_value(APP_CONFIG, 'Filenames', 'batch_run_log', fallback='batch_run_log.csv'))
-        log_message = "Rebuilding batch log..." if os.path.exists(log_file_path) else "Building batch log..."
-        
-        print(f"\n--- {log_message} ---")
-        subprocess.run([sys.executable, log_manager_script, "rebuild", final_output_dir], check=True, capture_output=True)
-        
-        print("\n--- Compiling final statistical summary... ---")
-        subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True, capture_output=True)
-        print("\n--- Finalizing batch log with summary... ---")
-        subprocess.run([sys.executable, log_manager_script, "finalize", final_output_dir], check=True, capture_output=True)
-    except Exception as e:
-        logging.error(f"An error occurred during finalization: {e}")
-        sys.exit(1)
+        if args.target_dir:
+            final_output_dir = os.path.abspath(args.target_dir)
+        else:
+            # Create a default directory based on config.ini
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            base_output = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback='output')
+            new_exp_subdir = get_config_value(APP_CONFIG, 'General', 'new_experiments_subdir', fallback='new_experiments')
+            exp_prefix = get_config_value(APP_CONFIG, 'General', 'experiment_dir_prefix', fallback='experiment_')
+            base_path = os.path.join(PROJECT_ROOT, base_output, new_exp_subdir)
+            final_output_dir = os.path.join(base_path, f"{exp_prefix}{timestamp}")
+            print(f"{C_CYAN}No target directory specified. Creating default: {final_output_dir}{C_RESET}")
 
-    print(f"\n{C_GREEN}--- Experiment Run Finished Successfully ---{C_RESET}")
+        if not os.path.exists(final_output_dir):
+            # If in verify-only mode and the dir doesn't exist, just say so and exit.
+            if args.verify_only:
+                print(f"Directory not found: {final_output_dir}")
+                sys.exit(1)
+            os.makedirs(final_output_dir)
+            print(f"Created target directory: {final_output_dir}")
+
+        config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+        end_rep = args.end_rep if args.end_rep is not None else config_num_reps
+
+        # --- Run verify-only mode and exit if specified ---
+        if args.verify_only:
+            _run_verify_only_mode(final_output_dir, end_rep)
+            sys.exit(0)
+
+        # --- Run migrate mode if specified. This is a pre-step to the main loop. ---
+        if args.migrate:
+            if not _run_migrate_mode(final_output_dir, patch_script, rebuild_script, args.verbose):
+                print(f"{C_RED}--- Migration failed. Please review logs. ---{C_RESET}")
+                sys.exit(1)
+
+        # The --reprocess flag acts as a one-time override for the state machine.
+        force_reprocess_once = args.reprocess
+
+        # --- Main State-Machine Loop ---
+        loop_count = 0
+        while loop_count < args.max_loops:
+            loop_count += 1
+            print("\n" + "="*80)
+            print(f"{C_CYAN}### VERIFICATION CYCLE {loop_count}/{args.max_loops} ###{C_RESET}")
+
+            # If the reprocess flag is set, force the state for the first loop iteration.
+            if force_reprocess_once:
+                print(f"{C_YELLOW}Forced reprocessing flag is active. Overriding state detection.{C_RESET}")
+                all_run_dirs = sorted([p for p in glob.glob(os.path.join(final_output_dir, 'run_*')) if os.path.isdir(p)])
+                state = "REPROCESS_NEEDED"
+                details = [{"dir": d} for d in all_run_dirs]
+                force_reprocess_once = False  # Ensure it only runs once
+            else:
+                state, details = _get_experiment_state(final_output_dir, end_rep, args.verbose)
+            
+            print(f"Current Experiment State: {C_GREEN}{state}{C_RESET}")
+
+            success = False
+            if state == "NEW_NEEDED":
+                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script, bias_analysis_script)
+            elif state == "REPAIR_NEEDED":
+                success = _run_repair_mode(details, sessions_script, not args.verbose, args.max_workers)
+            elif state == "REPROCESS_NEEDED":
+                success = _run_reprocess_mode(details, args.notes, not args.verbose, orchestrator_script, bias_analysis_script)
+            elif state == "COMPLETE":
+                print(f"{C_GREEN}--- Experiment is COMPLETE. Proceeding to finalization. ---{C_RESET}")
+                break
+            else:
+                print(f"{C_RED}--- Unhandled or inconsistent state detected: {state}. Halting. ---{C_RESET}")
+                print(f"Details: {details}")
+                sys.exit(1)
+
+            if not success:
+                print(f"{C_RED}--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
+                sys.exit(1)
+
+        if loop_count >= args.max_loops:
+            print(f"{C_RED}--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
+            sys.exit(1)
+
+        # --- Finalization Stage ---
+        print("\n" + "="*80)
+        print("### ALL TASKS COMPLETE. BEGINNING FINALIZATION. ###")
+        print("="*80)
+        
+        # Rebuild log, compile results, finalize log
+        try:
+            log_file_path = os.path.join(final_output_dir, get_config_value(APP_CONFIG, 'Filenames', 'batch_run_log', fallback='batch_run_log.csv'))
+            log_message = "Rebuilding batch log..." if os.path.exists(log_file_path) else "Building batch log..."
+            
+            print(f"\n--- {log_message} ---")
+            subprocess.run([sys.executable, log_manager_script, "rebuild", final_output_dir], check=True, capture_output=True)
+            
+            print("\n--- Compiling final statistical summary... ---")
+            subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True, capture_output=True)
+            print("\n--- Finalizing batch log with summary... ---")
+            subprocess.run([sys.executable, log_manager_script, "finalize", final_output_dir], check=True, capture_output=True)
+        except Exception as e:
+            logging.error(f"An error occurred during finalization: {e}")
+            sys.exit(1)
+
+        print(f"\n{C_GREEN}--- Experiment Run Finished Successfully ---{C_RESET}")
+
+    except KeyboardInterrupt:
+        print(f"\n{C_YELLOW}--- Operation interrupted by user (Ctrl+C). Exiting gracefully. ---{C_RESET}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
+
+# === End of src/experiment_manager.py ===
