@@ -23,7 +23,7 @@
 import configparser
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 import pytest
 
@@ -140,33 +140,58 @@ class TestRebuildReportWorker:
             assert "STAGE FAILED: Process LLM Responses" in content
 
 
-@patch("src.rebuild_reports.logging")
-@patch("src.rebuild_reports.rebuild_report_for_run")
-@patch("src.config_loader.get_config_compatibility_map", return_value={})
 class TestRebuildReportsMain:
     """Tests the main orchestration function."""
 
-    def test_main_success(self, mock_map, mock_worker, mock_logging, temp_study_dir):
-        """Test main finds and processes directories."""
-        mock_worker.return_value = True
-        with patch("sys.argv", ["script", str(temp_study_dir)]):
-            rebuild_reports.main()
+# Fix for tests/test_rebuild_reports.py in the test_main_success method
 
-        mock_worker.assert_called_once()
+    @patch("glob.glob")
+    @patch("os.path.isdir", return_value=True)
+    @patch("src.config_loader.get_config_compatibility_map")
+    @patch("src.rebuild_reports.rebuild_report_for_run")
+    @patch("src.rebuild_reports.logging")
+    def test_main_success(self, mock_logging, mock_worker, mock_map, mock_isdir, mock_glob, temp_study_dir):
+        """Test main finds and processes directories."""
+        # Arrange: Force glob to find one mock directory.
+        mock_run_dir = str(temp_study_dir / "run_dir_1")
+        mock_glob.return_value = [mock_run_dir]
+        mock_worker.return_value = True
+        
+        # Determine the actual compatibility map that will be used
+        expected_compat_map = {
+            "model_name": [("Model", "model_name"), ("LLM", "model")],
+            "num_trials": [("Study", "num_trials"), ("Study", "num_iterations")],
+            "num_subjects": [("Study", "num_subjects"), ("Study", "k_per_query")],
+            "mapping_strategy": [("Study", "mapping_strategy")],
+            "personalities_db_path": [("General", "personalities_db_path"), ("Filenames", "personalities_src")]
+        }
+        mock_map.return_value = expected_compat_map
+
+        # Act
+        with patch("sys.argv", ["script", str(temp_study_dir)]):
+            # Let the real tqdm be replaced with a simple iterable
+            with patch("src.rebuild_reports.tqdm", lambda x, **kwargs: x):
+                rebuild_reports.main()
+
+        # Assert
+        mock_worker.assert_called_once_with(mock_run_dir, expected_compat_map)
         mock_logging.info.assert_any_call(
             "\nReport rebuilding complete. Successfully processed 1/1 directories."
         )
 
-    def test_main_dir_not_found(self, mock_map, mock_worker, mock_logging, tmp_path):
+    @patch("src.rebuild_reports.logging")
+    def test_main_dir_not_found(self, mock_logging, tmp_path):
         """Test main exits if the base directory is not found."""
         non_existent_dir = tmp_path / "non_existent"
         with patch("sys.argv", ["script", str(non_existent_dir)]):
-            rebuild_reports.main()
+            with patch("sys.exit"):  # Mock exit to prevent actual exit
+                rebuild_reports.main()
         mock_logging.error.assert_called_with(
             f"Error: Provided directory does not exist: {non_existent_dir}"
         )
 
-    def test_main_no_run_dirs_found(self, mock_map, mock_worker, mock_logging, tmp_path):
+    @patch("src.rebuild_reports.logging")
+    def test_main_no_run_dirs_found(self, mock_logging, tmp_path):
         """Test main exits gracefully if no run directories are found."""
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
@@ -175,5 +200,60 @@ class TestRebuildReportsMain:
         mock_logging.info.assert_any_call(
             f"No 'run_*' directories found in {empty_dir}."
         )
+
+    @patch("glob.glob")
+    @patch("os.path.isdir", return_value=True)
+    @patch("src.config_loader.get_config_compatibility_map", return_value={})
+    @patch("src.rebuild_reports.rebuild_report_for_run")
+    @patch("src.rebuild_reports.logging")
+    def test_main_keyboard_interrupt(self, mock_logging, mock_worker, mock_map, mock_isdir, mock_glob, temp_study_dir):
+        """Test that KeyboardInterrupt is handled gracefully."""
+        # Arrange
+        mock_run_dir = str(temp_study_dir / "run_dir_1")
+        mock_glob.return_value = [mock_run_dir]
+        mock_worker.side_effect = KeyboardInterrupt
+        
+        # Act & Assert
+        with patch("sys.argv", ["script", str(temp_study_dir)]):
+            with pytest.raises(SystemExit) as excinfo:
+                with patch("src.rebuild_reports.tqdm", lambda x, **kwargs: x):
+                    rebuild_reports.main()
+
+            assert excinfo.value.code == 1
+            mock_logging.warning.assert_called_with(
+                "Operation interrupted by user (Ctrl+C). Exiting gracefully."
+            )
+
+    @patch("src.rebuild_reports.tqdm")
+    @patch("os.path.isdir", return_value=True)
+    @patch("src.config_loader.get_config_compatibility_map", return_value={})
+    @patch("src.rebuild_reports.rebuild_report_for_run")
+    @patch("src.rebuild_reports.logging")
+    def test_main_verbose_flag(self, mock_logging, mock_worker, mock_map, mock_isdir, mock_tqdm, temp_study_dir):
+        """Test that --verbose flag disables tqdm and keeps INFO logging."""
+        mock_worker.return_value = True
+        
+        # Case 1: --verbose is used
+        with patch("sys.argv", ["script", str(temp_study_dir), "--verbose"]):
+            rebuild_reports.main()
+
+        # Assert tqdm was NOT used and logger level was NOT changed
+        mock_tqdm.assert_not_called()
+        
+        # Reset mocks for Case 2
+        mock_tqdm.reset_mock()
+        mock_logging.reset_mock()
+        mock_worker.reset_mock() # Also reset the worker
+
+        # Case 2: --verbose is NOT used
+        with patch("sys.argv", ["script", str(temp_study_dir)]):
+             rebuild_reports.main()
+        
+        # Assert tqdm was used and logger was set to WARNING
+        mock_tqdm.assert_called_once()
+        # Be specific: Check that WARNING was set, then INFO was set later.
+        log_level_calls = mock_logging.getLogger.return_value.setLevel.call_args_list
+        assert call(mock_logging.WARNING) in log_level_calls
+        assert call(mock_logging.INFO) in log_level_calls
 
 # === End of tests/test_rebuild_reports.py ===

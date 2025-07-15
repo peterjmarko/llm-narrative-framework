@@ -236,6 +236,27 @@ class TestExperimentManagerState(unittest.TestCase):
         mock_print.assert_any_call("\033[91m--- A step failed. Halting experiment manager. Please review logs. ---\033[0m")
         mock_exit.assert_called_with(1)
 
+    @patch('src.experiment_manager._run_new_mode')
+    @patch('src.experiment_manager._get_experiment_state')
+    @patch('src.experiment_manager.get_config_value')
+    def test_keyboard_interrupt_exits_gracefully(self, mock_get_config, mock_get_state, mock_new_mode):
+        """Tests that Ctrl+C (KeyboardInterrupt) exits gracefully."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_get_state.return_value = ("NEW_NEEDED", {})
+        mock_new_mode.side_effect = KeyboardInterrupt
+
+        cli_args = ['script.py', self.test_dir]
+        with patch('sys.exit') as mock_exit, \
+             patch('builtins.print') as mock_print:
+            with patch.object(sys, 'argv', cli_args):
+                experiment_manager.main()
+
+        mock_new_mode.assert_called_once()
+        
+        expected_message = "\n\033[93m--- Operation interrupted by user (Ctrl+C). Exiting gracefully. ---\033[0m"
+        mock_print.assert_any_call(expected_message, file=sys.stderr)
+        mock_exit.assert_called_with(1)
+
     @patch('src.experiment_manager._get_experiment_state', return_value=("COMPLETE", None))
     @patch('src.experiment_manager.get_config_value')
     @patch('src.experiment_manager.datetime')
@@ -423,6 +444,27 @@ class TestExperimentManagerModeExecution(unittest.TestCase):
         self.assertEqual(index, 1)
         self.assertFalse(success)
         self.assertIn("REPAIR FAILED", error_log)
+
+    @patch('src.experiment_manager.subprocess.run', return_value=MagicMock(returncode=0))
+    def test_run_migrate_mode_calls_scripts_correctly(self, mock_subprocess):
+        """Ensure _run_migrate_mode calls scripts correctly, passing verbosity and not capturing output."""
+        # Test non-verbose case
+        experiment_manager._run_migrate_mode(self.test_dir, "patch.py", "rebuild.py", verbose=False)
+        
+        rebuild_call_non_verbose = next((c for c in mock_subprocess.call_args_list if "rebuild.py" in c.args[0]), None)
+        self.assertIsNotNone(rebuild_call_non_verbose)
+        self.assertNotIn("--verbose", rebuild_call_non_verbose.args[0])
+        # Check that output is NOT captured, allowing progress bar to show
+        self.assertNotIn('capture_output', rebuild_call_non_verbose.kwargs)
+
+        # Reset mock and test verbose case
+        mock_subprocess.reset_mock()
+        experiment_manager._run_migrate_mode(self.test_dir, "patch.py", "rebuild.py", verbose=True)
+
+        rebuild_call_verbose = next((c for c in mock_subprocess.call_args_list if "rebuild.py" in c.args[0]), None)
+        self.assertIsNotNone(rebuild_call_verbose)
+        self.assertIn("--verbose", rebuild_call_verbose.args[0])
+        self.assertNotIn('capture_output', rebuild_call_verbose.kwargs)
 
 
 if __name__ == '__main__':

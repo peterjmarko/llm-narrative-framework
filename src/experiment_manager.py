@@ -396,7 +396,7 @@ def _run_repair_mode(runs_to_repair, sessions_script_path, quiet, max_workers):
     print(f"Repair complete: {successful_repairs} successful, {failed_repairs} failed.")
     return failed_repairs == 0
 
-def _run_migrate_mode(target_dir, patch_script, rebuild_script):
+def _run_migrate_mode(target_dir, patch_script, rebuild_script, verbose=False):
     """
     Executes a one-time migration process for a legacy experiment directory.
     This mode is destructive and will delete old artifacts.
@@ -415,7 +415,11 @@ def _run_migrate_mode(target_dir, patch_script, rebuild_script):
     # Step 2: Rebuild Reports
     print("\n[2/3: Rebuild Reports] Running rebuild_reports.py...")
     try:
-        subprocess.run([sys.executable, rebuild_script, target_dir], check=True, capture_output=True, text=True)
+        cmd = [sys.executable, rebuild_script, target_dir]
+        if verbose:
+            cmd.append("--verbose")
+        # Do not capture output, so the progress bar from the child script is visible.
+        subprocess.run(cmd, check=True, text=True)
         print("Step 2 completed successfully.")
     except subprocess.CalledProcessError as e:
         logging.error(f"Failed to rebuild reports. Stderr:\n{e.stderr}")

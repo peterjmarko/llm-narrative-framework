@@ -191,23 +191,50 @@ This approach, demonstrated in `tests/test_experiment_aggregator.py`, is the req
 
 This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This ensures clear, automated versioning and changelog generation.
 
-Instead of using `git commit -m "..."`, all commits should be made using the `commitizen` interactive prompt:
-```bash
-# Stage your changes first
-git add .
+To bypass potential issues with interactive prompts, all commits should be made using a file-based workflow.
 
-# Then, run the commitizen command
-pdm run cz commit
-```
-The prompt will guide you through selecting the type of change (`feat`, `fix`, `docs`, etc.), defining the scope, and writing a subject line and body.
+1.  **Stage your changes**:
+    ```bash
+    git add .
+    ```
+
+2.  **Create a `commit.txt` file**:
+    Create a file named `commit.txt` in the project root. Write your full commit message inside, following the Conventional Commits format.
+
+    **Example `commit.txt`:**
+    ```
+    feat(analysis): add new statistical metric
+
+    This commit introduces the F1 score as a new performance metric in the
+    final analysis script. It is calculated for each replication and included
+    in the final JSON report and summary CSVs.
+
+    This provides a more nuanced view of model performance beyond MRR and Top-1 accuracy, especially for imbalanced results.
+    ```
+
+3.  **Create the commit from the file**:
+    ```bash
+    git commit -F commit.txt
+    ```
+    This creates the commit with your detailed, well-formatted message. You can delete `commit.txt` afterward.
 
 ### 5. Releasing a New Version (Maintainers Only)
 
-Maintainers can automatically generate the changelog, bump the project version, and create a Git tag with a single command:
-```bash
-pdm run cz bump --changelog
-```
-This command reads all commits since the last tag and updates `pyproject.toml` and `docs/CHANGELOG.md` accordingly.
+After one or more feature (`feat`) or fix (`fix`) commits have been merged into the `main` branch, a maintainer can create a new release.
+
+This is a manual, two-step process that uses `commitizen` to automatically bump the version, generate a detailed changelog, and tag the release.
+
+1.  **Ensure you are on the `main` branch and have pulled the latest changes.**
+    ```bash
+    git checkout main
+    git pull origin main
+    ```
+
+2.  **Run the bump command.**
+    ```bash
+    pdm run cz bump --changelog
+    ```
+    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `docs/CHANGELOG.md`, and creates a new commit and tag for the release.
 
 ### 6. Submit a Pull Request
 

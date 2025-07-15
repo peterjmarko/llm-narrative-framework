@@ -6,8 +6,6 @@ repos:
         entry: python -m pdm run python src/build_docs.py --check
         language: system
         pass_filenames: false
-        # This regex now correctly targets the template and all diagram source files.
-        # Adjust 'docs/sources/' if your diagram sources are elsewhere.
         files: ^(docs/DOCUMENTATION\.template\.md|docs/diagrams/.*\.(mmd|txt))$
         always_run: true
         verbose: true

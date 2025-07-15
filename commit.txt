@@ -1,7 +1,6 @@
-fix(workflow): improve migration progress display and Ctrl-C handling
+fix(workflow): improve script usability and test reliability
 
-Adds a progress bar to `rebuild_reports.py` when run in non-verbose mode to provide high-level feedback during the migration workflow.
-
-Implements graceful `KeyboardInterrupt` (Ctrl+C) handling in `experiment_manager.py` and `rebuild_reports.py` to prevent stack traces on user cancellation.
-
-Adjusts the color of header text in `migrate_experiment.ps1` for consistency.
+- Adds graceful Ctrl+C handling to `experiment_manager.py` to prevent stack traces on user interruption.
+- Implements a progress bar in the migration workflow's report rebuilding step for better user feedback on long-running operations.
+- Corrects the mock argument order in `test_rebuild_reports.py` to fix failing tests and ensure test suite stability.
+- Updates `CONTRIBUTING.md` to document the more robust, two-step commit and release process.

@@ -82,10 +82,10 @@ ana-stu = "powershell -ExecutionPolicy Bypass -File ./analyze_study.ps1"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "2.0.0"
+version = "1.1.0"
 version_files = [
     "pyproject.toml:version"
 ]
 tag_format = "v$version"
 changelog_file = "docs/CHANGELOG.md"
-changelog_format = "keep_a_changelog"
+changelog_format = "markdown"
