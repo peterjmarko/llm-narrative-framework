@@ -15,8 +15,6 @@ graph TD
     ReplResults[("REPLICATION_results.csv")]:::artifact
     ExpResults[("EXPERIMENT_results.csv")]:::artifact
     LogManagerFinalize["replication_log_manager.py<br/>(finalize command)"]:::danger
-    
-    FinalArtifacts[("STUDY_results.csv")]:::artifact
 
     %% 2. Define connections
     EntryPointPS --> CopyStep
@@ -33,7 +31,6 @@ graph TD
     EntryPointPy -- "Finalizes (Step 3)" --> Aggregator
     Aggregator --> ReplResults
     Aggregator --> ExpResults
-    Aggregator --> FinalArtifacts
     EntryPointPy -- "Finalizes (Step 3)" --> LogManagerFinalize
     LogManagerFinalize --> BatchRunLog
 
@@ -57,7 +54,6 @@ graph TD
             Aggregator
             ReplResults
             ExpResults
-            FinalArtifacts
             LogManagerFinalize
         end
     end

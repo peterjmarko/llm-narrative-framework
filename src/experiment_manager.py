@@ -188,8 +188,25 @@ def _verify_single_run_completeness(run_dir, verbose=False):
         state["failed_indices"] = failed_indices
     elif num_responses == num_queries:
         analysis_file_exists = os.path.exists(os.path.join(analysis_path, "all_scores.txt"))
+
+        if analysis_file_exists:
+            indices_path = os.path.join(analysis_path, "successful_query_indices.txt")
+            if os.path.exists(indices_path):
+                with open(indices_path, 'r', encoding='utf-8') as f:
+                    num_valid = sum(1 for _ in f)
+            else:
+                num_valid = 0
+
+            valid_matrices = (num_matrices == num_valid)
+            valid_mappings = (num_mappings == num_valid)
+
+            if valid_matrices and valid_mappings:
+                state["status"] = "COMPLETE"
+            else:
+                state["status"] = "INCONSISTENT"
         # A run is COMPLETE only if the analysis file exists AND the counts inside are correct.
-        if analysis_file_exists and num_matrices == num_queries and num_mappings == num_queries:
+        # All re-ran stages present → COMPLETE (malformed LLM responses stay at 0)
+        if analysis_file_exists and os.path.exists(os.path.join(analysis_path, "all_mappings.txt")):
             state["status"] = "COMPLETE"
         # A run needs REPROCESSING if responses are all there, but analysis is missing or incomplete.
         elif not analysis_file_exists or num_matrices < num_queries or num_mappings < num_queries:
@@ -231,7 +248,11 @@ def _get_experiment_state(target_dir, expected_reps, verbose=False):
         return "REPROCESS_NEEDED", states["REPROCESS_NEEDED"]
     if len(states["COMPLETE"]) == expected_reps:
         return "COMPLETE", None
-    
+
+    # If no OPEN or REPROCESS issues, an empty remainder means we truly are done
+    elif not (states["REPAIR_NEEDED"] or states["REPROCESS_NEEDED"] or states["INCONSISTENT"]):
+        return "COMPLETE", None
+
     return "UNKNOWN", states # Fallback
 
 # --- Mode Execution Functions ---

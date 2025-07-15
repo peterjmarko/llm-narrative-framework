@@ -52,40 +52,30 @@ if (Get-Command pdm -ErrorAction SilentlyContinue) {
 }
 
 try {
-    # The Python script path is relative to the project root where this is run.
-    $PythonScriptPath = "src/experiment_manager.py"
+    $auditArgs = @("src/experiment_manager.py","--verify-only",$TargetDirectory)
+    if ($Verbose.IsPresent) { $auditArgs += "--verbose" }
 
-    # Assemble the arguments for the Python script
-    $arguments = @(
-        '--reprocess',
-        $TargetDirectory
-    )
-
-    if ($PSBoundParameters.ContainsKey('Notes')) {
-        $arguments += '--notes', $Notes
+    & $executable $prefixArgs $auditArgs        # ---- 1. audit only
+    switch ($LASTEXITCODE) {
+        0 {
+            Write-Host "UPDATE: experiment already COMPLETE - nothing to do." -ForegroundColor Green
+            return
+        }
+        1 { }   # state = REPROCESS_NEEDED
+        default {
+            throw "Audit failed unexpectedly - see above."
+        }
     }
 
-    # The -Verbose switch is automatically passed by PowerShell
-    # when [CmdletBinding()] is used, but we check it to pass to python.
-    if ($Verbose.IsPresent) {
-        $arguments += '--verbose'
-    }
+    $procArgs = @("src/experiment_manager.py","--reprocess",$TargetDirectory)
+    if ($Verbose.IsPresent) { $procArgs += "--verbose" }
+    if ($Notes) { $procArgs += "--notes",$Notes }
 
-    $finalArgs = $prefixArgs + $PythonScriptPath + $arguments
-
-    Write-Host "Starting experiment update for: $TargetDirectory" -ForegroundColor Green
-    
-    # Execute the Python script with the assembled arguments
-    & $executable $finalArgs
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "The Python script exited with an error (Exit Code: $LASTEXITCODE)."
-    }
+    & $executable $prefixArgs $procArgs
+    if ($LASTEXITCODE -ne 0) { throw "Re-processing failed - exit code $LASTEXITCODE" }
 
     Write-Host "Experiment update completed successfully." -ForegroundColor Green
-}
-catch {
-    Write-Error "An error occurred during the update process: $_"
-    # Exit with a non-zero status code to indicate failure to calling processes
+} catch {
+    Write-Error "An error occurred during the update process: $($_.Exception.Message)"
     exit 1
 }
