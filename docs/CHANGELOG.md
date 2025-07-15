@@ -5,6 +5,16 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.0.1 (2025-07-15)
+
+### Fix
+
+- **workflow**: improve script usability and test reliability
+    - Adds graceful Ctrl+C handling to `experiment_manager.py` to prevent stack traces on user interruption.
+    - Implements a progress bar in the migration workflow's report rebuilding step for better user feedback on long-running operations.
+    - Corrects the mock argument order in `test_rebuild_reports.py` to fix failing tests and ensure test suite stability.
+    - Updates `CONTRIBUTING.md` to document the more robust, two-step commit and release process.
+
 ## v2.0.0 (2025-07-14)
 
 ### BREAKING CHANGE
