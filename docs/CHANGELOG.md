@@ -5,6 +5,24 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.0.5 (2025-07-16)
+
+### Fix
+
+- **audit**: finalize audit logic for all file types and outputs
+
+    This commit resolves all remaining issues with the experiment audit
+    function, making it fully robust for both new and migrated data.
+
+    Key changes include:
+    - The `FILE_MANIFEST` was updated with the correct file patterns for
+      `mappings.txt` and the trial-level `llm_query_*_manifest.txt` files,
+      resolving incorrect failure reports.
+    - The audit logic for optional trial manifests is now conditional,
+      ensuring legacy runs without these files are correctly validated.
+    - The `audit_experiment.ps1` wrapper script has been enhanced to
+      simultaneously display colored output in the console while saving a
+
 ## v2.0.4 (2025-07-16)
 
 ### Fix
