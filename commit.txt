@@ -1,13 +1,22 @@
-refactor(audit): harden and isolate config validation logic
+fix(audit): resolve all verification failures for legacy and new data
 
-This commit refactors the configuration verification logic within the
-experiment_manager.py audit/verify mode.
+This commit addresses a series of cascading bugs in the experiment
+auditor (`--verify-only` mode) that caused incorrect failure reports.
 
-The validation logic now uses a self-contained, hardcoded compatibility
-map within the script's FILE_MANIFEST. This intentional design choice
-insulates the audit function from any changes to the live, project-level
-config.ini, ensuring that historical experiments can be reliably and
-reproducibly validated over time without external dependencies.
+Key fixes include:
+- Corrected the file search logic to use full sub-directory paths,
+  resolving `SESSION_QUERIES_MISSING` errors.
+- Enforced the use of precise regular expressions for counting trial
+  files, preventing `SESSION_QUERIES_TOO_MANY` errors from extra
+  non-trial files in the directory.
+- Refactored the analysis file validation to use the definitive
+  `n_valid_responses` metric from the `replication_report.txt` JSON as
+  the ground truth. This ensures the check correctly handles runs with
+  fewer than 100% valid responses, which is common in migrated
+  legacy experiments.
+- Updated CONTRIBUTING.md to clarify the commit and versioning workflow,
+  and added `commit.txt` to `.gitignore`.
 
-This change resolves issues where the audit was failing incorrectly by
-making the verifier a stable, self-contained tool.
+With these changes, the audit function now correctly validates both new
+and migrated experiments, providing a reliable and robust verification
+of data integrity.
