@@ -5,6 +5,24 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.0.4 (2025-07-16)
+
+### Fix
+
+- **audit**: resolve all verification failures for legacy and new data
+
+    This commit addresses a series of cascading bugs in the experiment
+    auditor (`--verify-only` mode) that caused incorrect failure reports.
+
+    Key fixes include:
+    - Corrected the file search logic to use full sub-directory paths,
+      resolving `SESSION_QUERIES_MISSING` errors.
+    - Enforced the use of precise regular expressions for counting trial
+      files, preventing `SESSION_QUERIES_TOO_MANY` errors from extra
+      non-trial files in the directory.
+    - Refactored the analysis file validation to use the definitive
+      `n_valid_responses` metric from the `replication_report.txt` JSON as
+
 ## v2.0.3 (2025-07-16)
 
 ### Refactor
