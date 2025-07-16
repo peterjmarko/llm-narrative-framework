@@ -7,13 +7,13 @@ graph TD
     ReplicationReport[("replication_report.txt")]:::artifact
     BiasAnalysis["run_bias_analysis.py"]:::script
     
-    LogManagerRebuild["replication_log_manager.py<br/>(rebuild command)"]:::danger
-    BatchRunLog[("batch_run_log.csv")]:::artifact
-    Aggregator["experiment_aggregator.py<br/>(hierarchical mode)"]:::script
+    AggregatorInternal["experiment_aggregator.py<br/>(hierarchical mode)"]:::script
     ReplResults[("REPLICATION_results.csv")]:::artifact
     ExpResults[("EXPERIMENT_results.csv")]:::artifact
-    StudyResults[("STUDY_results.csv")]:::artifact
+
+    LogManagerRebuild["replication_log_manager.py<br/>(rebuild command)"]:::danger
     LogManagerFinalize["replication_log_manager.py<br/>(finalize command)"]:::danger
+    BatchRunLog[("batch_run_log.csv")]:::artifact
 
     %% 2. Define connections
     EntryPointPS --> EntryPointPy
@@ -22,12 +22,14 @@ graph TD
     EntryPointPy -- "Calls in loop" --> BiasAnalysis
     BiasAnalysis -- "Modifies" --> ReplicationReport
 
+    %% New: Aggregation happens after reprocessing loop, within EM's control
+    EntryPointPy -- "Calls after loop" --> AggregatorInternal
+    AggregatorInternal --> ReplResults
+    AggregatorInternal --> ExpResults
+
+    %% Original Finalization Steps (executed once by overall experiment_manager.py)
     EntryPointPy -- "Finalizes" --> LogManagerRebuild
     LogManagerRebuild --> BatchRunLog
-    EntryPointPy -- "Finalizes" --> Aggregator
-    Aggregator --> ReplResults
-    Aggregator --> ExpResults
-    Aggregator --> StudyResults
     EntryPointPy -- "Finalizes" --> LogManagerFinalize
     LogManagerFinalize --> BatchRunLog
 
@@ -42,14 +44,16 @@ graph TD
             ReplicationReport
             BiasAnalysis
         end
-        subgraph "Finalization Steps (After reprocessing loop)"
+        subgraph "Aggregation After Reprocessing Loop"
+            direction TB
+            AggregatorInternal
+            ReplResults
+            ExpResults
+        end
+        subgraph "Overall Script Finalization"
             direction TB
             LogManagerRebuild
             BatchRunLog
-            Aggregator
-            ReplResults
-            ExpResults
-            StudyResults
             LogManagerFinalize
         end
     end

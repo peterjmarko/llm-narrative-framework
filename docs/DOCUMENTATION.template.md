@@ -107,21 +107,24 @@ The run is complete and all checks passed. No action is needed.
 The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. The folder must be renamed.
 
 **CONFIG_ISSUE**  
-The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This often requires manual inspection and repair.
+The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This requires manual inspection or migration.
+
+**QUERY_ISSUE**  
+There is a problem with the fundamental input files needed for an LLM session, such as missing query files or trial manifests. This requires repair by running `run_experiment.ps1`.
 
 **RESPONSE_ISSUE**  
-There is an issue with the LLM response files, often caused by an interrupted run. Re-running the experiment will typically fix this.
+The query files are intact, but one or more corresponding LLM response files are missing. This is typically caused by an interrupted run and is repaired by running `run_experiment.ps1`.
 
 **ANALYSIS_ISSUE**  
-A problem exists in the generated queries, analysis files, summary files (`REPLICATION_results.csv`), or the final report. This often indicates a bug and can be fixed by running `--reprocess`.
+All core data files (queries, responses) are present, but there is a problem with derivative artifacts like analysis files, summary CSVs, or the final report. This can be fixed by running `update_experiment.ps1` (`--reprocess`).
 
 The `Details` string provides specific error flags, such as `MANIFESTS_INCOMPLETE`, `QUERY_RESPONSE_INDEX_MISMATCH`, or `REPORT_INCOMPLETE_METRICS`, which help diagnose the root cause quickly.
 
-In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Finalization Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`), which confirms whether the entire experiment successfully completed its final aggregation steps.
+In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Aggregation Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`), confirming whether the last aggregation step for the experiment was successfully completed.
 
 #### Workflow 3: Update an Experiment
 
-This workflow allows you to re-run the data processing and analysis stages on an existing, complete experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag, which intelligently regenerates only the necessary analysis artifacts and reports.
+This workflow allows you to re-run the data processing and analysis stages on an existing, complete experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag. This action first regenerates the primary report (`replication_report.txt`) for each run and then performs a full re-aggregation, ensuring that all summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`) are also brought up to date.
 
 {{diagram:docs/diagrams/architecture_workflow_3_update_experiment.mmd | scale=2.5 | width=111%}}
 
@@ -270,7 +273,7 @@ Point the script at the directory of the experiment you wish to reprocess.
 # Update an experiment in the Study_2/Experiment_3/ directory
 .\update_experiment.ps1 -TargetDirectory "output/reports/Study_2/Experiment_3"
 ```
-This calls `experiment_manager.py` with the `--reprocess` flag, which intelligently regenerates only the necessary analysis artifacts and reports. For detailed, real-time logs, add the `-Verbose` switch.
+This calls `experiment_manager.py` with the `--reprocess` flag. This action first regenerates the primary report for each replication and then performs a full re-aggregation, ensuring all summary files are consistent and up-to-date. For detailed, real-time logs, add the `-Verbose` switch.
 
 ### Migrating Old Experiment Data (`migrate_experiment.ps1`)
 
