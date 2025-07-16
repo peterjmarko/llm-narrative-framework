@@ -39,7 +39,18 @@ Modes of Operation:
 -   **`--migrate`**: Runs a one-time migration workflow to upgrade a legacy
     experiment directory to the modern format.
 -   **`--verify-only`**: Performs a read-only audit and prints a detailed
-    completeness report without making changes.
+    completeness report without making changes. It checks for:
+    -   **Configuration Integrity**: Verifies that `config.ini.archived` exists,
+        is valid, and contains all required keys.
+    -   **File Set Completeness**: Ensures the correct number of query, response,
+        manifest, and mapping files exist for the run.
+    -   **Index Consistency**: Confirms a one-to-one match between query and
+        response file indices (e.g., `query_001.txt` -> `response_001.txt`).
+    -   **Analysis Data Validity**: Checks that analysis files contain the
+        correct number of entries, matching the `n_valid_responses` metric
+        from the final report.
+    -   **Report Completeness**: Validates the final report's JSON block,
+        ensuring all required top-level and nested metrics are present.
 
 Usage:
 # Start a brand new experiment in a default, timestamped directory:
@@ -91,11 +102,11 @@ except ImportError as e:
     print(f"FATAL: Could not import config_loader.py. Error: {e}", file=sys.stderr)
     sys.exit(1)
 
-C_CYAN = '\033[96m'
-C_GREEN = '\033[92m'
-C_YELLOW = '\033[93m'
-C_RED = '\033[91m'
-C_RESET = '\033[0m'
+# This will be set based on command-line args later in the script
+_FORCE_COLOR = False
+
+# ANSI color constants, will be defined in main() after arg parsing
+C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = '', '', '', '', ''
 
 #==============================================================================
 #   CENTRAL FILE MANIFEST & REPORT CRITERIA
@@ -116,6 +127,8 @@ FILE_MANIFEST = {
     },
     "queries_dir":   {"path": "session_queries"},
     "query_files":   {"path": "session_queries/llm_query_*.txt", "pattern": r"llm_query_(\d+)\.txt"},
+    "trial_manifests": {"path": "session_queries/llm_query_*_manifest.txt", "pattern": r"llm_query_(\d+)_manifest\.txt"},
+    "aggregated_mappings_file": {"path": "session_queries/mappings.txt"},
     "responses_dir": {"path": "session_responses"},
     "response_files":{"path": "session_responses/llm_response_*.txt", "pattern": r"llm_response_(\d+)\.txt"},
     "analysis_dir":  {"path": "analysis_inputs"},
@@ -124,9 +137,25 @@ FILE_MANIFEST = {
     "replication_report": {"pattern": r"replication_report_\d{4}-\d{2}-\d{2}.*\.txt"},
 }
 
-REPORT_REQUIRED_METRICS = {"mean_mrr", "top1_pred_bias_std", "n_valid_responses"}
+REPORT_REQUIRED_METRICS = {
+    "mean_mrr", "mean_top_1_acc", "mwu_stouffer_z", "mean_effect_size_r",
+    "top1_pred_bias_std", "n_valid_responses"
+}
+
+REPORT_REQUIRED_NESTED_DICTS = {"positional_bias_metrics"}
 
 # --- Verification Helper Functions ---
+
+def _get_file_indices(run_path: Path, spec: dict) -> set[int]:
+    """Extracts the numerical indices from a set of files using regex."""
+    indices = set()
+    regex = re.compile(spec["pattern"])
+    files = run_path.glob(spec["path"])
+    for f in files:
+        match = regex.match(os.path.basename(f))
+        if match:
+            indices.add(int(match.group(1)))
+    return indices
 
 def _count_lines_in_file(filepath: str, skip_header: bool = True) -> int:
     """Counts data lines in a file, optionally skipping a header."""
@@ -259,8 +288,17 @@ def _check_report(run_path: Path):
         j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
     except Exception:
         return "REPORT_MALFORMED"
-    if not REPORT_REQUIRED_METRICS <= j.keys():
-        return "REPORT_INCOMPLETE_METRICS"
+
+    # Check for required top-level metric keys
+    missing_metrics = REPORT_REQUIRED_METRICS - j.keys()
+    if missing_metrics:
+        return f"REPORT_INCOMPLETE_METRICS: {', '.join(sorted(missing_metrics))}"
+
+    # Check for required nested dictionaries (e.g., from bias analysis)
+    for key in REPORT_REQUIRED_NESTED_DICTS:
+        if not isinstance(j.get(key), dict):
+            return f"REPORT_MISSING_NESTED_DICT: {key}"
+
     return "VALID"
 
 def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
@@ -287,13 +325,33 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
     else:
         status_details.append("queries OK")
 
-    # 4. responses (1 file per query file is expected)
-    expected_responses = m_expected   # one response file per trial
+    # 4. Check for mappings file and optional trial manifests
+    aggregated_mappings_path = run_path / FILE_MANIFEST["aggregated_mappings_file"]["path"]
+    if not aggregated_mappings_path.exists():
+        status_details.append("AGGREGATED_MAPPINGS_MISSING")
+
+    # Conditionally check for trial manifests, as they may not exist in legacy runs.
+    # First, do a quick check to see if ANY manifest files are present.
+    manifest_spec = FILE_MANIFEST["trial_manifests"]
+    if list(run_path.glob(manifest_spec["path"])):
+        # If manifests are found, then perform the full, strict check for completeness.
+        stat_q_manifests = _check_file_set(run_path, manifest_spec, m_expected)
+        if stat_q_manifests != "VALID":
+            status_details.append("TRIAL_MANIFESTS_INCOMPLETE")
+
+    # 5. Check response files
+    expected_responses = m_expected
     stat_r = _check_file_set(run_path, FILE_MANIFEST["response_files"], expected_responses)
     if stat_r != "VALID":
         status_details.append(stat_r)
     else:
-        status_details.append("responses OK")
+        # If counts are OK, perform a deeper check for index consistency
+        query_indices = _get_file_indices(run_path, FILE_MANIFEST["query_files"])
+        response_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
+        if query_indices != response_indices:
+            status_details.append("QUERY_RESPONSE_INDEX_MISMATCH")
+        else:
+            status_details.append("responses OK")
 
     # 5. analysis files
     if (run_path / FILE_MANIFEST["analysis_dir"]["path"]).exists():
@@ -643,7 +701,18 @@ def main():
     parser.add_argument('--verify-only', action='store_true', help="Run in read-only diagnostic mode and print a detailed completeness report.")
     parser.add_argument('--migrate', action='store_true', help="Run a one-time migration workflow for a legacy experiment directory.")
     parser.add_argument('--reprocess', action='store_true', help="Force reprocessing of all runs in an experiment, then finalize.")
+    parser.add_argument('--force-color', action='store_true', help=argparse.SUPPRESS) # Hidden from user help
     args = parser.parse_args()
+
+    # Define color constants based on TTY status or the --force-color flag
+    use_color = sys.stdout.isatty() or args.force_color
+    if use_color:
+        global C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET
+        C_CYAN = '\033[96m'
+        C_GREEN = '\033[92m'
+        C_YELLOW = '\033[93m'
+        C_RED = '\033[91m'
+        C_RESET = '\033[0m'
 
     # --- Script Paths ---
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")

@@ -103,6 +103,19 @@ This workflow provides a read-only, detailed completeness report for an experime
   <img src="images/architecture_workflow_2_audit_experiment.png" width="100%">
 </div>
 
+##### Interpreting the Audit Report
+The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It outputs a summary table with a high-level status for each replication run. The `Details` column provides granular error codes that pinpoint the exact problem.
+
+| Summary Status     | Meaning and Common Cause                                                                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VALIDATED`        | The run is complete and all checks passed. No action is needed.                                                                                       |
+| `INVALID_NAME`     | The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. The folder must be renamed.                         |
+| `CONFIG_ISSUE`     | The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This often requires manual inspection and repair.                        |
+| `RESPONSE_ISSUE`   | There is an issue with the LLM response files, often caused by an interrupted run. Re-running the experiment will typically fix this.                   |
+| `ANALYSIS_ISSUE`   | A problem exists in the generated queries, analysis files, or the final report. This often indicates a bug and can be fixed by running `--reprocess`. |
+
+The `Details` string provides specific error flags, such as `SESSION_QUERIES_INCOMPLETE`, `QUERY_RESPONSE_INDEX_MISMATCH`, or `REPORT_INCOMPLETE_METRICS`, which help diagnose the root cause quickly.
+
 #### Workflow 3: Update an Experiment
 
 This workflow allows you to re-run the data processing and analysis stages on an existing, complete experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag, which intelligently regenerates only the necessary analysis artifacts and reports.

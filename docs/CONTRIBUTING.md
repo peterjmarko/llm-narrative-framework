@@ -239,7 +239,7 @@ This is a manual, two-step process that uses `commitizen` to automatically bump 
 3.  **(Manual Step) Update Changelog Details:**
     The `bump` command only adds the commit *header* to `CHANGELOG.md`. To include the full commit body for clarity, you must add it manually.
 
-    a. View the last few commits using `git log -n 3` (or more).
+    a. View the last few commits using `git log -n 3` (or more). **Press 'q' to exit the log view.**
     b. Find and copy the full commit message (header and body) for the relevant `feat`, `fix`, or `refactor` commit(s) you want to document.
     c. Paste the message(s) into `docs/CHANGELOG.md` under the appropriate version heading.
     d. Amend the release commit to include this documentation update:

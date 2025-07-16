@@ -66,10 +66,28 @@ try {
         $arguments += "--verbose"
     }
 
+    # Force the python script to generate color for stream processing
+    $arguments += "--force-color"
     $finalArgs = $prefixArgs + $scriptName + $arguments
 
-    # No need for a verbose summary; this script's purpose is to show the output.
-    & $executable $finalArgs
+    # Define the log file path and inform the user
+    $LogFilePath = Join-Path $ResolvedPath "audit_log.txt"
+    Write-Host "Audit report will be saved to: $LogFilePath" -ForegroundColor Cyan
+
+    # Clear any old log file
+    if (Test-Path $LogFilePath) { Remove-Item $LogFilePath }
+
+    # Execute the command and process each line of output
+    & $executable $finalArgs | ForEach-Object {
+        # 1. Write the raw line (with colors) to the console
+        Write-Host $_
+
+        # 2. Strip ANSI color codes for the log file
+        $cleanLine = $_ -replace "\x1B\[[0-9;]*m", ""
+        
+        # 3. Append the clean line to the log file
+        Add-Content -Path $LogFilePath -Value $cleanLine
+    }
 
     if ($LASTEXITCODE -ne 0) {
         throw "ERROR: Audit process failed with exit code ${LASTEXITCODE}."
