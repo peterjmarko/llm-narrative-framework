@@ -5,6 +5,24 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.0.6 (2025-07-16)
+
+### Fix
+
+- **audit**: complete audit logic and improve report readability
+
+    This commit finalizes the experiment audit functionality, making it
+    fully comprehensive and visually readable.
+
+    Key changes include:
+    - Added new checks to verify the presence and completeness of
+      experiment-level (`EXPERIMENT_results.csv`) and replication-level
+      (`REPLICATION_results.csv`) summary files.
+    - Corrected the audit summary to use the definitive `n_valid_responses`
+      from replication reports, ensuring an accurate total.
+    - Improved the visual layout of the console audit report by truncating
+      long directory names for better alignment.
+
 ## v2.0.5 (2025-07-16)
 
 ### Fix
