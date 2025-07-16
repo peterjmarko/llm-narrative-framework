@@ -234,7 +234,7 @@ This is a manual, two-step process that uses `commitizen` to automatically bump 
     ```bash
     pdm run cz bump --changelog
     ```
-    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `docs/CHANGELOG.md`, and creates a new commit and tag for the release.
+    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `docs/CHANGELOG.md`, and creates a new commit and tag for the release. If you want to see the detailed commit message in the changelog, add it manually by copying it from change.txt and pasting it right below the latest commit message.
 
 ### 6. Submit a Pull Request
 

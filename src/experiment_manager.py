@@ -66,11 +66,14 @@ import glob
 import time
 import datetime
 import argparse
+import json
 import re
 import shutil
 import configparser
+from configparser import ConfigParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
+from pathlib import Path
 
 # tqdm is a library that provides a clean progress bar.
 try:
@@ -93,6 +96,35 @@ C_GREEN = '\033[92m'
 C_YELLOW = '\033[93m'
 C_RED = '\033[91m'
 C_RESET = '\033[0m'
+
+#==============================================================================
+#   CENTRAL FILE MANIFEST & REPORT CRITERIA
+#==============================================================================
+FILE_MANIFEST = {
+    "config": {
+        "path": "config.ini.archived",
+        "type": "config_file",
+        "required_keys": {
+            # canonical_name: [(section, key), (fallback_section, fallback_key), ...]
+            "model_name": [("LLM", "model_name"), ("LLM", "model")],
+            "temperature": [("LLM", "temperature")],
+            "mapping_strategy": [("Study", "mapping_strategy")],
+            "num_subjects": [("Study", "group_size"), ("Study", "k_per_query")],
+            "num_trials": [("Study", "num_trials"), ("Study", "num_iterations")],
+            "personalities_db_path": [("Filenames", "personalities_src")],
+        },
+    },
+    "queries_dir":   {"path": "session_queries"},
+    "query_files":   {"path": "session_queries/llm_query_*.txt", "pattern": r"llm_query_(\d+)\.txt"},
+    "responses_dir": {"path": "session_responses"},
+    "response_files":{"path": "session_responses/llm_response_*.txt", "pattern": r"llm_response_(\d+)\.txt"},
+    "analysis_dir":  {"path": "analysis_inputs"},
+    "scores_file":   {"path": "analysis_inputs/all_scores.txt"},
+    "mappings_file": {"path": "analysis_inputs/all_mappings.txt"},
+    "replication_report": {"pattern": r"replication_report_\d{4}-\d{2}-\d{2}.*\.txt"},
+}
+
+REPORT_REQUIRED_METRICS = {"mean_mrr", "top1_pred_bias_std", "n_valid_responses"}
 
 # --- Verification Helper Functions ---
 
@@ -119,141 +151,195 @@ def _count_matrices_in_file(filepath: str, k: int) -> int:
     except Exception:
         return 0
 
-def _verify_single_run_completeness(run_dir, verbose=False):
-    """Audits a single run_* directory and returns its state."""
-    run_name = os.path.basename(run_dir)
-    if verbose:
-        print(f"[MANAGER_DEBUG] Verifying: {run_name}")
+# ------------------------------------------------------------------ helpers
+def _check_config_manifest(run_path: Path, k_expected: int, m_expected: int):
+    cfg_path = run_path / FILE_MANIFEST["config"]["path"]
+    required_keys_map = FILE_MANIFEST["config"]["required_keys"]
 
-    m_match = re.search(r"trl-(\d+)", run_name)
-    k_match = re.search(r"sbj-(\d+)", run_name)
+    try:
+        cfg = ConfigParser()
+        cfg.read(cfg_path, encoding="utf-8")
+        if not cfg.sections():
+            return "CONFIG_MALFORMED"
+    except Exception:
+        return "CONFIG_MALFORMED"
 
-    if not m_match or not k_match:
-        if verbose:
-            print(f"[MANAGER_DEBUG]   - Determined Status: {C_RED}INVALID_NAME{C_RESET}")
-        return {"status": "INVALID_NAME", "details": "Name must contain trl-NNN and sbj-NN."}
+    # Generic function to find a key's value using the fallback map
+    def _get_value(canonical_name, value_type=str):
+        for section, key in required_keys_map[canonical_name]:
+            if cfg.has_option(section, key):
+                try:
+                    if value_type is int:
+                        return cfg.getint(section, key)
+                    if value_type is float:
+                        return cfg.getfloat(section, key)
+                    return cfg.get(section, key)
+                except (configparser.Error, ValueError):
+                    continue  # Try next fallback
+        return None
 
-    expected_trials = int(m_match.group(1))
-    k = int(k_match.group(1))
+    # Check for presence of all required keys
+    missing_keys = [name for name in required_keys_map if _get_value(name) is None]
+    if missing_keys:
+        return f"CONFIG_MISSING_KEYS: {', '.join(missing_keys)}"
 
-    # File counts
-    # Use a robust method for counting to ensure only valid trial queries are included.
-    query_files = glob.glob(os.path.join(run_dir, "session_queries", "llm_query_*.txt"))
-    num_queries = len([f for f in query_files if re.search(r'_(\d{3})\.txt', f)])
-    
-    # Also make the response count more specific to avoid counting .error files etc.
-    response_files = glob.glob(os.path.join(run_dir, "session_responses", "llm_response_*.txt"))
-    num_responses = len([f for f in response_files if re.fullmatch(r'llm_response_\d{3}\.txt', os.path.basename(f))])
+    # Validate k and m values against directory name
+    k_cfg = _get_value("num_subjects", value_type=int)
+    m_cfg = _get_value("num_trials", value_type=int)
 
-    analysis_path = os.path.join(run_dir, "analysis_inputs")
-    num_matrices = _count_matrices_in_file(os.path.join(analysis_path, "all_scores.txt"), k)
-    num_mappings = _count_lines_in_file(os.path.join(analysis_path, "all_mappings.txt"), skip_header=True)
+    mismatched = []
+    if k_cfg != k_expected:
+        mismatched.append(f"k (expected {k_expected}, found {k_cfg})")
+    if m_cfg != m_expected:
+        mismatched.append(f"m (expected {m_expected}, found {m_cfg})")
 
-    if verbose:
-        print(f"[MANAGER_DEBUG]   - Expected Trials: {expected_trials}")
-        print(f"[MANAGER_DEBUG]   - Queries Found:   {num_queries}")
-        print(f"[MANAGER_DEBUG]   - Responses Found: {num_responses}")
-        print(f"[MANAGER_DEBUG]   - Matrices Found:  {num_matrices}")
-        print(f"[MANAGER_DEBUG]   - Mappings Found:  {num_mappings}")
+    if mismatched:
+        return f"CONFIG_MISMATCH: {', '.join(mismatched)}"
 
-    # Determine state
-    state = {
-        "dir": run_dir,
-        "expected": expected_trials,
-        "queries": num_queries,
-        "responses": num_responses,
-        "matrices": num_matrices,
-        "mappings": num_mappings,
-        "status": "UNKNOWN"
-    }
+    return "VALID"
 
-    if num_queries == 0:
-        state["status"] = "NEW"
-    elif num_queries < expected_trials:
-        state["status"] = "INCOMPLETE_QUERIES" # Should be treated as NEW
-    elif num_responses < num_queries:
-        state["status"] = "REPAIR_NEEDED"
-        failed_indices = []
-        
-        # Robustly find all valid query indices from filenames
-        query_indices = set()
-        for f in glob.glob(os.path.join(run_dir, "session_queries", "llm_query_*.txt")):
-            match = re.search(r'_(\d{3})\.txt', f)
-            if match:
-                query_indices.add(int(match.group(1)))
+def _check_file_set(run_path: Path, spec: dict, expected_count: int):
+    pattern = spec["path"]
+    actual = list(run_path.glob(os.path.basename(pattern)))
+    label = spec["path"].split("/", 1)[0]  # e.g. session_queries
+    if not actual:
+        return f"{label.upper()}_MISSING"
+    count = len(actual)
+    if count < expected_count:
+        return f"{label.upper()}_INCOMPLETE"
+    if count > expected_count:
+        return f"{label.upper()}_TOO_MANY"
+    return "VALID"
 
-        for index in query_indices:
-            if not os.path.exists(os.path.join(run_dir, "session_responses", f"llm_response_{index:03d}.txt")):
-                failed_indices.append(index)
-        state["failed_indices"] = failed_indices
-    elif num_responses == num_queries:
-        analysis_file_exists = os.path.exists(os.path.join(analysis_path, "all_scores.txt"))
 
-        if analysis_file_exists:
-            indices_path = os.path.join(analysis_path, "successful_query_indices.txt")
-            if os.path.exists(indices_path):
-                with open(indices_path, 'r', encoding='utf-8') as f:
-                    num_valid = sum(1 for _ in f)
-            else:
-                num_valid = 0
+def _check_analysis_files(run_path: Path, expected_trials: int, k_value: int):
+    scores_p = run_path / FILE_MANIFEST["scores_file"]["path"]
+    mappings_p = run_path / FILE_MANIFEST["mappings_file"]["path"]
+    for p in (scores_p, mappings_p):
+        if not p.exists():
+            return "ANALYSIS_FILES_MISSING"
+    try:
+        # Mappings files are simple line-delimited files with no header.
+        n_mappings = _count_lines_in_file(mappings_p, skip_header=False)
+        # The number of score matrices depends on 'k' (group size).
+        n_scores = _count_matrices_in_file(scores_p, k_value)
+    except Exception:
+        return "ANALYSIS_DATA_MALFORMED"
+    if n_scores != expected_trials or n_mappings != expected_trials:
+        return "ANALYSIS_DATA_INCOMPLETE"
+    return "VALID"
 
-            valid_matrices = (num_matrices == num_valid)
-            valid_mappings = (num_mappings == num_valid)
 
-            if valid_matrices and valid_mappings:
-                state["status"] = "COMPLETE"
-            else:
-                state["status"] = "INCONSISTENT"
-        # A run is COMPLETE only if the analysis file exists AND the counts inside are correct.
-        # All re-ran stages present → COMPLETE (malformed LLM responses stay at 0)
-        if analysis_file_exists and os.path.exists(os.path.join(analysis_path, "all_mappings.txt")):
-            state["status"] = "COMPLETE"
-        # A run needs REPROCESSING if responses are all there, but analysis is missing or incomplete.
-        elif not analysis_file_exists or num_matrices < num_queries or num_mappings < num_queries:
-            state["status"] = "REPROCESS_NEEDED"
-        # Any other case (e.g., more matrices than queries) is an INCONSISTENT state.
-        else:
-            state["status"] = "INCONSISTENT"
+def _check_report(run_path: Path):
+    reports = sorted(run_path.glob("replication_report_*.txt"))
+    if not reports:
+        return "REPORT_MISSING"
+    latest = reports[-1]
+    try:
+        text = latest.read_text(encoding="utf-8")
+    except Exception:
+        return "REPORT_MALFORMED"
+    if "<<<METRICS_JSON_START>>>" not in text or "<<<METRICS_JSON_END>>>" not in text:
+        return "REPORT_MALFORMED"
+    try:
+        start = text.index("<<<METRICS_JSON_START>>>")
+        end = text.index("<<<METRICS_JSON_END>>>")
+        j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
+    except Exception:
+        return "REPORT_MALFORMED"
+    if not REPORT_REQUIRED_METRICS <= j.keys():
+        return "REPORT_INCOMPLETE_METRICS"
+    return "VALID"
+
+def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
+    status_details = []
+
+    # 1. name validity
+    name_match = re.match(r"run_.*_sbj-(\d+)_trl-(\d+)$", run_path.name)
+    if not name_match:
+        status_details = [f"{run_path.name} != run_*_sbj-NN_trl-NNN"]
+        return "INVALID_NAME", status_details
+    k_expected, m_expected = int(name_match.group(1)), int(name_match.group(2))
+
+    # 2. config
+    stat_cfg = _check_config_manifest(run_path, k_expected, m_expected)
+    if stat_cfg != "VALID":
+        status_details.append(stat_cfg)
     else:
-        state["status"] = "INCONSISTENT" # e.g. more responses than queries
-    
-    if verbose:
-        status_color = C_GREEN if state['status'] == 'COMPLETE' else C_YELLOW
-        print(f"[MANAGER_DEBUG]   - Determined Status: {status_color}{state['status']}{C_RESET}")
+        status_details.append("config OK")
 
-    return state
+    # 3. queries
+    stat_q = _check_file_set(run_path, FILE_MANIFEST["query_files"], m_expected)
+    if stat_q != "VALID":
+        status_details.append(stat_q)
+    else:
+        status_details.append("queries OK")
 
-def _get_experiment_state(target_dir, expected_reps, verbose=False):
-    """Aggregates verification of all runs to determine overall experiment state."""
-    if verbose:
-        print(f"{C_YELLOW}[MANAGER_DEBUG] Running verification...{C_RESET}")
-        
-    run_dirs = sorted([p for p in glob.glob(os.path.join(target_dir, 'run_*')) if os.path.isdir(p)])
-    
-    if not run_dirs or len(run_dirs) < expected_reps:
-        return "NEW_NEEDED", {"missing_reps": expected_reps - len(run_dirs)}
+    # 4. responses (1 file per query file is expected)
+    expected_responses = m_expected   # one response file per trial
+    stat_r = _check_file_set(run_path, FILE_MANIFEST["response_files"], expected_responses)
+    if stat_r != "VALID":
+        status_details.append(stat_r)
+    else:
+        status_details.append("responses OK")
 
-    states = {"REPAIR_NEEDED": [], "REPROCESS_NEEDED": [], "COMPLETE": [], "INCONSISTENT": []}
-    for run_dir in run_dirs:
-        verification = _verify_single_run_completeness(run_dir, verbose)
-        status = verification["status"]
-        if status in states:
-            states[status].append(verification)
-    
-    if states["INCONSISTENT"]:
-        return "INCONSISTENT", states["INCONSISTENT"]
-    if states["REPAIR_NEEDED"]:
-        return "REPAIR_NEEDED", states["REPAIR_NEEDED"]
-    if states["REPROCESS_NEEDED"]:
-        return "REPROCESS_NEEDED", states["REPROCESS_NEEDED"]
-    if len(states["COMPLETE"]) == expected_reps:
-        return "COMPLETE", None
+    # 5. analysis files
+    if (run_path / FILE_MANIFEST["analysis_dir"]["path"]).exists():
+        stat_a = _check_analysis_files(run_path, m_expected, k_expected)
+        if stat_a != "VALID":
+            status_details.append(stat_a)
+        else:
+            status_details.append("analysis OK")
+    else:
+        status_details.append("ANALYSIS_FILES_MISSING")
 
-    # If no OPEN or REPROCESS issues, an empty remainder means we truly are done
-    elif not (states["REPAIR_NEEDED"] or states["REPROCESS_NEEDED"] or states["INCONSISTENT"]):
-        return "COMPLETE", None
+    # 6. report
+    stat_rep = _check_report(run_path)
+    if stat_rep != "VALID":
+        status_details.append(stat_rep)
+    else:
+        status_details.append("report OK")
 
-    return "UNKNOWN", states # Fallback
+    # roll up
+    if all(d.endswith(" OK") for d in status_details):
+        return "VALIDATED", status_details
+    if any("INVALID_NAME" in d for d in status_details):
+        return "INVALID_NAME", status_details
+    if any("CONFIG" in d for d in status_details):
+        return "CONFIG_ISSUE", status_details
+    if any("RESPONSE" in d and "INCOMPLETE" not in d for d in status_details):
+        return "RESPONSE_ISSUE", status_details  # Missing/too-many takes precedence over incomplete
+    if any("QUERY" in d or "ANALYSIS" in d or "REPORT" in d for d in status_details):
+        return "ANALYSIS_ISSUE", status_details
+    if any("INCOMPLETE" in d for d in status_details):
+        return "ANALYSIS_ISSUE", status_details
+    return "UNKNOWN", status_details
+
+def _get_experiment_state(target_dir: Path, verbose=False) -> str:
+    """High-level state machine driver."""
+    cfg = ConfigLoader(target_dir / "config.ini")
+    expected_reps = cfg.getint("Study", "num_replications")
+
+    run_dirs = [p for p in target_dir.glob("run_*") if p.is_dir()]
+    granular = {p.name: _verify_single_run_completeness(p) for p in run_dirs}
+    fails = {n: (s, d) for n, (s, d) in granular.items() if s != "VALIDATED"}
+
+    fatal = [n for n, (s, _) in fails.items() if s in {"INVALID_NAME", "CONFIG_ISSUE", "UNKNOWN"}]
+    if fatal:
+        return "FATAL_ISSUE"
+
+    if (len(run_dirs) - len(fails)) < expected_reps:
+        return "NEW_NEEDED"
+
+    response_issue = [n for n, (s, _) in fails.items() if s == "RESPONSE_ISSUE"]
+    if response_issue:
+        return "REPAIR_NEEDED"
+
+    reprocess_issues = {s for s, _ in fails.values()} - {"RESPONSE_ISSUE"}
+    if reprocess_issues:
+        return "REPROCESS_NEEDED"
+
+    return "COMPLETE"
 
 # --- Mode Execution Functions ---
 
@@ -264,59 +350,54 @@ def _run_verify_only_mode(target_dir, expected_reps):
     """
     print(f"\n--- Verifying Data Completeness in: {target_dir} ---")
     run_dirs = sorted([p for p in glob.glob(os.path.join(target_dir, 'run_*')) if os.path.isdir(p)])
-    
+
     if not run_dirs:
         print("No 'run_*' directories found. Nothing to verify.")
-        return
+        return True
 
     all_runs_data = []
     total_expected_trials = 0
     total_valid_responses = 0
     total_complete_runs = 0
 
-    for run_dir in run_dirs:
-        verification = _verify_single_run_completeness(run_dir)
-        status = verification.get("status", "ERROR")
-        details = ""
-        is_complete = (status == "COMPLETE")
-        
-        valid_responses = verification.get('matrices', 0)
-        expected_trials = verification.get('expected', 0)
+    for run_dir_path in run_dirs:
+        run_dir = Path(run_dir_path)
+        status, details = _verify_single_run_completeness(run_dir)
 
-        if is_complete:
-            details = f"Parsed {valid_responses}/{expected_trials} trials"
+        if status == "VALIDATED":
             total_complete_runs += 1
-        elif status == "INVALID_NAME":
-            details = "Invalid directory name"
-        else:
-            q = verification.get('queries', 0)
-            r = verification.get('responses', 0)
-            parts = []
-            if q < expected_trials: parts.append(f"Queries:{q}/{expected_trials}")
-            if r < q: parts.append(f"Responses:{r}/{q}")
-            if not os.path.exists(os.path.join(run_dir, "analysis_inputs", "all_scores.txt")):
-                parts.append("Analysis not run")
-            details = ", ".join(parts)
-        
-        total_expected_trials += expected_trials
-        total_valid_responses += valid_responses
-        all_runs_data.append({"name": os.path.basename(run_dir), "status": status, "details": details})
+
+        # Safely get trial/response counts, even for malformed directories
+        try:
+            expected_trials = int(re.match(r".*_trl-(\d+)$", run_dir.name).group(1))
+            valid_responses = len(list(run_dir.glob("session_responses/llm_response_*.txt")))
+            total_expected_trials += expected_trials
+            total_valid_responses += valid_responses
+        except (AttributeError, ValueError):
+            pass  # Ignore if name is invalid
+
+        all_runs_data.append({
+            "name": run_dir.name,
+            "status": status,
+            "details": "; ".join(details)
+        })
 
     max_name_len = max(len(run['name']) for run in all_runs_data) if all_runs_data else 20
     print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
-    print(f"{'-'*max_name_len} {'-'*20} {'-'*30}")
+    print(f"{'-'*max_name_len} {'-'*20} {'-'*45}")
     for run in all_runs_data:
-        status_color = C_GREEN if run['status'] == "COMPLETE" else C_RED
+        status_color = C_GREEN if run['status'] == "VALIDATED" else C_RED
         print(f"{run['name']:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
 
+    # Only show summary if there are valid runs to report on
     if total_expected_trials > 0:
         completeness = (total_valid_responses / total_expected_trials) * 100
         print("\n--- Overall Summary ---")
         print(f"Total Runs Verified: {len(run_dirs)}")
         print(f"Total Runs Complete (Pipeline): {total_complete_runs}/{len(run_dirs)}")
         print(f"Total Valid LLM Responses:      {total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
-    
-    return True # Indicates the mode ran successfully
+
+    return True  # Indicates the mode ran successfully
 
 def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, bias_script):
     """Executes the 'NEW' mode to create missing replications."""
