@@ -42,8 +42,9 @@ Modes of Operation:
     completeness report without making changes. It checks for:
     -   **Configuration Integrity**: Verifies that `config.ini.archived` exists,
         is valid, and contains all required keys.
-    -   **File Set Completeness**: Ensures the correct number of query, response,
-        manifest, and mapping files exist for the run.
+    -   **Replication File Completeness**: Ensures the correct number of core
+        replication files exist (queries, responses, manifests, mappings,
+        and the `REPLICATION_results.csv` summary).
     -   **Index Consistency**: Confirms a one-to-one match between query and
         response file indices (e.g., `query_001.txt` -> `response_001.txt`).
     -   **Analysis Data Validity**: Checks that analysis files contain the
@@ -51,6 +52,9 @@ Modes of Operation:
         from the final report.
     -   **Report Completeness**: Validates the final report's JSON block,
         ensuring all required top-level and nested metrics are present.
+    -   **Experiment Finalization**: Verifies that top-level summary files
+        (`EXPERIMENT_results.csv`, `batch_run_log.csv`) exist and that the
+        log is marked as complete.
 
 Usage:
 # Start a brand new experiment in a default, timestamped directory:
@@ -337,7 +341,7 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
         # If manifests are found, then perform the full, strict check for completeness.
         stat_q_manifests = _check_file_set(run_path, manifest_spec, m_expected)
         if stat_q_manifests != "VALID":
-            status_details.append("TRIAL_MANIFESTS_INCOMPLETE")
+            status_details.append("MANIFESTS_INCOMPLETE")
 
     # 5. Check response files
     expected_responses = m_expected
@@ -353,7 +357,7 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
         else:
             status_details.append("responses OK")
 
-    # 5. analysis files
+    # 6. analysis files
     if (run_path / FILE_MANIFEST["analysis_dir"]["path"]).exists():
         # The true number of expected entries in analysis files is not the
         # count of response files (some may be invalid), but the
@@ -383,12 +387,16 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
     else:
         status_details.append("ANALYSIS_FILES_MISSING")
 
-    # 6. report
+    # 7. report
     stat_rep = _check_report(run_path)
     if stat_rep != "VALID":
         status_details.append(stat_rep)
     else:
         status_details.append("report OK")
+
+    # 8. replication-level summary file
+    if not (run_path / "REPLICATION_results.csv").exists():
+        status_details.append("REPLICATION_RESULTS_MISSING")
 
     # roll up
     if all(d.endswith(" OK") for d in status_details):
@@ -433,6 +441,37 @@ def _get_experiment_state(target_dir: Path, verbose=False) -> str:
 
 # --- Mode Execution Functions ---
 
+def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
+    """Checks for top-level summary files for the entire experiment."""
+    is_complete = True
+    details = []
+    
+    # These consolidated summary files should exist in the experiment's root directory.
+    required_files = [
+        "batch_run_log.csv",
+        "EXPERIMENT_results.csv"
+    ]
+
+    for filename in required_files:
+        if not (target_dir / filename).exists():
+            is_complete = False
+            details.append(f"MISSING: {filename}")
+
+    # Check if the batch log is finalized (contains a summary line)
+    log_path = target_dir / "batch_run_log.csv"
+    if log_path.exists():
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            if "BatchSummary" not in content:
+                is_complete = False
+                details.append("batch_run_log.csv NOT FINALIZED")
+        except Exception:
+            is_complete = False
+            details.append("batch_run_log.csv UNREADABLE")
+
+    return is_complete, details
+
 def _run_verify_only_mode(target_dir, expected_reps):
     """
     Runs a read-only verification and prints a detailed summary table.
@@ -457,14 +496,25 @@ def _run_verify_only_mode(target_dir, expected_reps):
         if status == "VALIDATED":
             total_complete_runs += 1
 
-        # Safely get trial/response counts, even for malformed directories
+        # Get total expected trials and actual valid responses for the summary
         try:
-            expected_trials = int(re.match(r".*_trl-(\d+)$", run_dir.name).group(1))
-            valid_responses = len(list(run_dir.glob("session_responses/llm_response_*.txt")))
-            total_expected_trials += expected_trials
-            total_valid_responses += valid_responses
-        except (AttributeError, ValueError):
-            pass  # Ignore if name is invalid
+            # Total possible trials is still derived from the folder name
+            total_expected_trials += int(re.match(r".*_trl-(\d+)$", run_dir.name).group(1))
+            
+            # Actual valid responses comes from the JSON report, the single source of truth
+            n_valid_in_run = 0
+            latest_report = sorted(run_dir.glob("replication_report_*.txt"))[-1]
+            text = latest_report.read_text(encoding="utf-8")
+            start = text.index("<<<METRICS_JSON_START>>>")
+            end = text.index("<<<METRICS_JSON_END>>>")
+            j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
+            n_valid_in_run = j.get("n_valid_responses", 0)
+            total_valid_responses += n_valid_in_run
+            
+        except (AttributeError, ValueError, IndexError, json.JSONDecodeError):
+            # If anything goes wrong (bad name, no report, bad JSON),
+            # we just skip adding to the totals for this run.
+            pass
 
         all_runs_data.append({
             "name": run_dir.name,
@@ -472,20 +522,36 @@ def _run_verify_only_mode(target_dir, expected_reps):
             "details": "; ".join(details)
         })
 
-    max_name_len = max(len(run['name']) for run in all_runs_data) if all_runs_data else 20
+    # Set a max width for the directory name column to keep the table compact
+    MAX_NAME_WIDTH = 65
+    max_name_len = min(max(len(run['name']) for run in all_runs_data), MAX_NAME_WIDTH) if all_runs_data else 20
+
     print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
     print(f"{'-'*max_name_len} {'-'*20} {'-'*45}")
     for run in all_runs_data:
-        status_color = C_GREEN if run['status'] == "VALIDATED" else C_RED
-        print(f"{run['name']:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
+        display_name = run['name']
+        if len(display_name) > max_name_len:
+            display_name = display_name[:max_name_len - 3] + "..."
 
+        status_color = C_GREEN if run['status'] == "VALIDATED" else C_RED
+        print(f"{display_name:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
+
+    # Check for experiment-level summary files
+    exp_complete, exp_details = _verify_experiment_level_files(Path(target_dir))
+    exp_status_str = f"{C_GREEN}COMPLETE{C_RESET}" if exp_complete else f"{C_RED}INCOMPLETE{C_RESET}"
+    
     # Only show summary if there are valid runs to report on
     if total_expected_trials > 0:
         completeness = (total_valid_responses / total_expected_trials) * 100
         print("\n--- Overall Summary ---")
-        print(f"Total Runs Verified: {len(run_dirs)}")
-        print(f"Total Runs Complete (Pipeline): {total_complete_runs}/{len(run_dirs)}")
-        print(f"Total Valid LLM Responses:      {total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
+        print(f"Replication Status:")
+        print(f"  - Total Runs Verified:          {len(run_dirs)}")
+        print(f"  - Total Runs Complete (Pipeline): {total_complete_runs}/{len(run_dirs)}")
+        print(f"  - Total Valid LLM Responses:      {total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
+        print(f"Experiment Finalization Status: {exp_status_str}")
+        if not exp_complete:
+            for detail in exp_details:
+                print(f"  - {C_RED}{detail}{C_RESET}")
 
     return True  # Indicates the mode ran successfully
 

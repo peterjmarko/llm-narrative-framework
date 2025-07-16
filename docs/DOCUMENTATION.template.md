@@ -95,20 +95,29 @@ Each replication executes the four core pipeline stages in sequence:
 
 This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag.
 
-{{diagram:docs/diagrams/architecture_workflow_2_audit_experiment.mmd | scale=2.5 | width=100%}}
+{{diagram:docs/diagrams/architecture_workflow_2_audit_experiment.mmd | scale=2.5 | width=111%}}
 
 ##### Interpreting the Audit Report
 The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It outputs a summary table with a high-level status for each replication run. The `Details` column provides granular error codes that pinpoint the exact problem.
 
-| Summary Status     | Meaning and Common Cause                                                                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VALIDATED`        | The run is complete and all checks passed. No action is needed.                                                                                       |
-| `INVALID_NAME`     | The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. The folder must be renamed.                         |
-| `CONFIG_ISSUE`     | The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This often requires manual inspection and repair.                        |
-| `RESPONSE_ISSUE`   | There is an issue with the LLM response files, often caused by an interrupted run. Re-running the experiment will typically fix this.                   |
-| `ANALYSIS_ISSUE`   | A problem exists in the generated queries, analysis files, or the final report. This often indicates a bug and can be fixed by running `--reprocess`. |
+**VALIDATED**  
+The run is complete and all checks passed. No action is needed.
 
-The `Details` string provides specific error flags, such as `SESSION_QUERIES_INCOMPLETE`, `QUERY_RESPONSE_INDEX_MISMATCH`, or `REPORT_INCOMPLETE_METRICS`, which help diagnose the root cause quickly.
+**INVALID_NAME**  
+The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. The folder must be renamed.
+
+**CONFIG_ISSUE**  
+The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This often requires manual inspection and repair.
+
+**RESPONSE_ISSUE**  
+There is an issue with the LLM response files, often caused by an interrupted run. Re-running the experiment will typically fix this.
+
+**ANALYSIS_ISSUE**  
+A problem exists in the generated queries, analysis files, summary files (`REPLICATION_results.csv`), or the final report. This often indicates a bug and can be fixed by running `--reprocess`.
+
+The `Details` string provides specific error flags, such as `MANIFESTS_INCOMPLETE`, `QUERY_RESPONSE_INDEX_MISMATCH`, or `REPORT_INCOMPLETE_METRICS`, which help diagnose the root cause quickly.
+
+In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Finalization Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`), which confirms whether the entire experiment successfully completed its final aggregation steps.
 
 #### Workflow 3: Update an Experiment
 
