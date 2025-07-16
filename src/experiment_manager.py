@@ -199,11 +199,23 @@ def _check_config_manifest(run_path: Path, k_expected: int, m_expected: int):
     return "VALID"
 
 def _check_file_set(run_path: Path, spec: dict, expected_count: int):
-    pattern = spec["path"]
-    actual = list(run_path.glob(os.path.basename(pattern)))
-    label = spec["path"].split("/", 1)[0]  # e.g. session_queries
+    glob_pattern = spec["path"]
+    regex_pattern = spec.get("pattern")
+
+    all_files_in_dir = list(run_path.glob(glob_pattern))
+
+    # If a specific regex pattern is provided, filter the glob results for a more precise count.
+    if regex_pattern:
+        regex = re.compile(regex_pattern)
+        actual = [f for f in all_files_in_dir if regex.match(os.path.basename(f))]
+    else:
+        # If no regex is provided, use the glob results directly.
+        actual = all_files_in_dir
+
+    label = glob_pattern.split("/", 1)[0]  # e.g. session_queries
     if not actual:
         return f"{label.upper()}_MISSING"
+
     count = len(actual)
     if count < expected_count:
         return f"{label.upper()}_INCOMPLETE"
@@ -212,20 +224,20 @@ def _check_file_set(run_path: Path, spec: dict, expected_count: int):
     return "VALID"
 
 
-def _check_analysis_files(run_path: Path, expected_trials: int, k_value: int):
+def _check_analysis_files(run_path: Path, expected_entries: int, k_value: int):
     scores_p = run_path / FILE_MANIFEST["scores_file"]["path"]
     mappings_p = run_path / FILE_MANIFEST["mappings_file"]["path"]
     for p in (scores_p, mappings_p):
         if not p.exists():
             return "ANALYSIS_FILES_MISSING"
     try:
-        # Mappings files are simple line-delimited files with no header.
-        n_mappings = _count_lines_in_file(mappings_p, skip_header=False)
+        # Mappings are simple line-delimited files; we assume a potential header.
+        n_mappings = _count_lines_in_file(mappings_p, skip_header=True)
         # The number of score matrices depends on 'k' (group size).
         n_scores = _count_matrices_in_file(scores_p, k_value)
     except Exception:
         return "ANALYSIS_DATA_MALFORMED"
-    if n_scores != expected_trials or n_mappings != expected_trials:
+    if n_scores != expected_entries or n_mappings != expected_entries:
         return "ANALYSIS_DATA_INCOMPLETE"
     return "VALID"
 
@@ -285,11 +297,31 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
 
     # 5. analysis files
     if (run_path / FILE_MANIFEST["analysis_dir"]["path"]).exists():
-        stat_a = _check_analysis_files(run_path, m_expected, k_expected)
-        if stat_a != "VALID":
-            status_details.append(stat_a)
+        # The true number of expected entries in analysis files is not the
+        # count of response files (some may be invalid), but the
+        # 'n_valid_responses' metric stored in the replication report's JSON.
+        expected_entries = None
+        try:
+            latest_report = sorted(run_path.glob("replication_report_*.txt"))[-1]
+            text = latest_report.read_text(encoding="utf-8")
+            start = text.index("<<<METRICS_JSON_START>>>")
+            end = text.index("<<<METRICS_JSON_END>>>")
+            j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
+            expected_entries = j.get("n_valid_responses")
+        except (IndexError, ValueError, KeyError):
+            # This will be caught by the report check later.
+            # We set a placeholder to allow the analysis check to proceed.
+            expected_entries = -1 # An impossible value to ensure failure
+
+        if expected_entries is not None and expected_entries >= 0:
+            stat_a = _check_analysis_files(run_path, expected_entries, k_expected)
+            if stat_a != "VALID":
+                status_details.append(stat_a)
+            else:
+                status_details.append("analysis OK")
         else:
-            status_details.append("analysis OK")
+            # This branch handles cases where the report is missing or lacks the key.
+            status_details.append("ANALYSIS_SKIPPED_BAD_REPORT")
     else:
         status_details.append("ANALYSIS_FILES_MISSING")
 
