@@ -1,6 +1,13 @@
-fix(migration-and-update): resolve infinite-migration loop and drop STUDY_results.csv
+refactor(audit): harden and isolate config validation logic
 
-- Eliminate STUDY_results.csv entirely; aggregator now outputs only REPLICATION / EXPERIMENT CSVs  
-- Prevent infinite loop in legacy-migration workflow by ensuring state transitions NEW_NEEDED → COMPLETE  
-- update_experiment.ps1 enforces step-wise VERIFY → REPAIR/REPROCESS logic, never loops more than once  
-- Mermaid diagram and docstrings updated to reflect final artifact list
+This commit refactors the configuration verification logic within the
+experiment_manager.py audit/verify mode.
+
+The validation logic now uses a self-contained, hardcoded compatibility
+map within the script's FILE_MANIFEST. This intentional design choice
+insulates the audit function from any changes to the live, project-level
+config.ini, ensuring that historical experiments can be reliably and
+reproducibly validated over time without external dependencies.
+
+This change resolves issues where the audit was failing incorrectly by
+making the verifier a stable, self-contained tool.

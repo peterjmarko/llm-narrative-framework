@@ -198,8 +198,8 @@ To bypass potential issues with interactive prompts, all commits should be made 
     git add .
     ```
 
-2.  **Create a `commit.txt` file**:
-    Create a file named `commit.txt` in the project root. Write your full commit message inside, following the Conventional Commits format.
+2.  **Create the Commit Message**:
+    Create a temporary file named `commit.txt` in the project root. Write your full commit message inside, following the Conventional Commits format. This file is ignored by Git (via `.gitignore`) and can be deleted after the commit is made.
 
     **Example `commit.txt`:**
     ```
@@ -212,11 +212,11 @@ To bypass potential issues with interactive prompts, all commits should be made 
     This provides a more nuanced view of model performance beyond MRR and Top-1 accuracy, especially for imbalanced results.
     ```
 
-3.  **Create the commit from the file**:
+3.  **Create the Commit from the File**:
     ```bash
     git commit -F commit.txt
     ```
-    This creates the commit with your detailed, well-formatted message. You can delete `commit.txt` afterward.
+    This command creates the commit using your detailed, well-formatted message.
 
 ### 5. Releasing a New Version (Maintainers Only)
 
@@ -234,7 +234,22 @@ This is a manual, two-step process that uses `commitizen` to automatically bump 
     ```bash
     pdm run cz bump --changelog
     ```
-    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `docs/CHANGELOG.md`, and creates a new commit and tag for the release. If you want to see the detailed commit message in the changelog, add it manually by copying it from change.txt and pasting it right below the latest commit message.
+    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `docs/CHANGELOG.md`, and creates a new commit and tag.
+
+3.  **(Manual Step) Update Changelog Details:**
+    The `bump` command only adds the commit *header* to `CHANGELOG.md`. To include the full commit body for clarity, you must add it manually.
+
+    a. View the last few commits using `git log -n 3` (or more).
+    b. Find and copy the full commit message (header and body) for the relevant `feat`, `fix`, or `refactor` commit(s) you want to document.
+    c. Paste the message(s) into `docs/CHANGELOG.md` under the appropriate version heading.
+    d. Amend the release commit to include this documentation update:
+       ```bash
+       # Stage the changelog change
+       git add docs/CHANGELOG.md
+       
+       # Attach it to the last commit without changing the message
+       git commit --amend --no-edit
+       ```
 
 ### 6. Submit a Pull Request
 

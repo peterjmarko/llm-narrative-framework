@@ -30,6 +30,9 @@ docs/images/*.png
 ~$README.*
 ~$CONTRIBUTING.*
 
+# Temporary file for crafting conventional commit messages (see CONTRIBUTING.md)
+commit.txt
+
 # --- Secrets ---
 # Ignore the .env file, which should contain sensitive API keys.
 # A .env.example file should be created and committed instead.
