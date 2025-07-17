@@ -92,17 +92,17 @@ try {
             $shouldExitImmediately = $true
         }
         $AUDIT_NEEDS_REPROCESS {
-            $summaryMessage = "Reprocessing Recommended. This script will perform a full migration, including the necessary update (reprocessing)."
+            $summaryMessage = "Reprocessing Recommended. This script will perform a full migration, which involves first copying the data and then transforming the new copy."
             $summaryDetails = "For analysis updates *without* migration, use 'update_experiment.ps1' instead."
             $summaryColor = "Yellow"
         }
         $AUDIT_NEEDS_REPAIR {
-            $summaryMessage = "Critical Repair Recommended. This script will attempt to fix issues via a full migration process, including updates."
+            $summaryMessage = "Critical Repair Recommended. This script will attempt to fix issues via a full migration, which involves first copying the data and then transforming the new copy."
             $summaryDetails = "For automatic repair *without* migration, use 'run_experiment.ps1' instead."
             $summaryColor = "Red"
         }
         $AUDIT_NEEDS_MIGRATION {
-            $summaryMessage = "Migration Required. This script will now proceed with a full migration to transform the experiment, including any necessary updates (reprocessing)."
+            $summaryMessage = "Migration Required. This script will proceed with a full migration, which involves first copying the data and then transforming the new copy."
             $summaryColor = "Yellow"
         }
         default {

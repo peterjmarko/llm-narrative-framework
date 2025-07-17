@@ -144,11 +144,9 @@ The PowerShell entry point (`migrate_experiment.ps1`) now performs three key ste
 
 1.  **Audit Source Experiment**: It first runs a read-only audit on the specified `SourceDirectory` to determine its current state (e.g., `VALIDATED`, `REPROCESS_NEEDED`, `REPAIR_NEEDED`, or `MIGRATION_NEEDED`). Based on this audit, it provides a summary and asks for user confirmation to proceed with the full migration. If the experiment is already `VALIDATED`, it will suggest no action is needed and exit.
 2.  **Copy Experiment Data**: If confirmed, it copies the `SourceDirectory` to a new, timestamped folder within `output/migrated_experiments/`.
-3.  **Transform New Experiment Copy**: It then calls `experiment_manager.py --migrate` on this *new copy*. This initiates a robust, multi-stage process managed by `experiment_manager.py`'s state machine, which includes:
-    *   **Patching Configs**: Creating or updating `config.ini.archived` files for individual replication runs.
-    *   **Rebuilding Reports**: Regenerating `replication_report.txt` files to the modern format.
-    *   **Cleaning Artifacts**: Deleting old, consolidated summary files and temporary data.
-    *   **Self-Healing**: If issues like `REPAIR_NEEDED` (e.g., missing responses or query files for specific runs) or `REPROCESS_NEEDED` (e.g., analysis errors) are detected during transformation, `experiment_manager.py` will automatically prompt and attempt to resolve them until the experiment is fully `COMPLETED`.
+3.  **Transform New Experiment Copy**: It then calls `experiment_manager.py --migrate` on this *new copy*. This initiates a robust, multi-stage process:
+    *   **Migration Pre-processing**: The `--migrate` flag triggers a special sequence that cleans old artifacts, patches legacy configurations, and then performs a deep reprocessing of each replication by calling `orchestrate_replication.py --reprocess`. This critical step regenerates all analysis files from the raw LLM responses using the latest validation logic.
+    *   **Self-Healing Loop**: After pre-processing, the manager enters its standard `Verify -> Act` loop. If it detects remaining issues that reprocessing could not fix (e.g., missing raw response files), it will prompt the user to run the necessary repairs until the experiment is fully `VALIDATED`.
 
 <div align="center">
   <img src="images/architecture_workflow_4_migrate_data.png" width="111%">

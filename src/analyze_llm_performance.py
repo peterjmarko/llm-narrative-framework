@@ -667,8 +667,31 @@ def main():
     mappings_list, k_val_from_map_func, delimiter_determined_for_map = \
         read_mappings_and_deduce_k(mappings_filepath_abs, args.k_value, actual_delimiter_for_parsing)
 
-    if mappings_list is None or k_val_from_map_func is None:
-        print("Halting due to issues reading mappings or deducing/validating k.")
+    # Gracefully handle the case of zero valid responses
+    if not mappings_list:
+        logging.warning("No valid mappings found. This indicates zero valid LLM responses. Generating a null report.")
+        
+        summary_data = {
+            'mwu_stouffer_z': None, 'mwu_stouffer_p': None, 'mwu_fisher_chi2': None,
+            'mwu_fisher_p': None, 'mean_effect_size_r': None, 'effect_size_r_p': None,
+            'mean_mrr': None, 'mrr_p': None, 'mean_top_1_acc': None, 'top_1_acc_p': None,
+            f'mean_top_{args.top_k_acc}_acc': None, f'top_{args.top_k_acc}_acc_p': None,
+            'mean_rank_of_correct_id': None, 'rank_of_correct_id_p': None,
+            'top1_pred_bias_std': None, 'true_false_score_diff': None,
+            'bias_slope': None, 'bias_intercept': None, 'bias_r_value': None,
+            'bias_p_value': None, 'bias_std_err': None,
+            'n_valid_responses': 0
+        }
+
+        # Print success/JSON markers so the orchestrator considers this stage complete
+        print("\nANALYZER_VALIDATION_SUCCESS\n")
+        print("\n<<<METRICS_JSON_START>>>")
+        print(json.dumps(summary_data, indent=4))
+        print("<<<METRICS_JSON_END>>>")
+        sys.exit(0) # Exit successfully
+
+    if k_val_from_map_func is None:
+        print("Critical Error: Mappings list is not empty, but could not determine k. Halting.")
         sys.exit(1)
     
     k_to_use = k_val_from_map_func 

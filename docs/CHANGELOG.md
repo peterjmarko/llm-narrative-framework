@@ -11,6 +11,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **framework**: enhance experiment management and self-healing workflows
 
+    This commit introduces significant improvements to the experiment management
+    and data handling processes, enhancing robustness and user experience.
+
+    - **`src/experiment_manager.py`:**
+      - **Robust State Machine:** Refined primary loop to ensure correct
+        state re-evaluation after actions (repair, update) to break infinite loops.
+        Now uses `_get_experiment_state` to accurately determine next action.
+      - **Intelligent Repair Handling:** Distinguishes between session-level
+        (`RESPONSE_ISSUE`) and full replication (`QUERY_ISSUE`, `CONFIG_ISSUE`) repairs.
+      - **Full Replication Regeneration:** `_run_full_replication_repair` now
+        deletes severely corrupted runs and regenerates them from scratch.
+      - **Interactive Prompts:** Presents clear findings and prompts user
+        confirmation for `REPAIR` and `UPDATE` actions.
+      - **Automated Update during Migration:** Automatically proceeds with `UPDATE`
+        (reprocessing) during the `MIGRATE` workflow after initial confirmation.
+      - **Improved Logging:** Ensures subprocess output is streamed directly or captured
+        based on `quiet` mode, fixing spinner display issues and providing better logs.
+
+    - **`src/rebuild_reports.py`:**
+      - **Diagnostic Mode:** Temporarily simplified to focus on raw subprocess
+        output and basic logging, aiding in diagnosing underlying analysis failures.
+      - **Explicit `k` value passing:** Ensures analysis scripts receive the correct `k`
+        from `config.ini.archived`, addressing "Could not deduce k > 0" errors.
+
+    - **`migrate_experiment.ps1`:**
+      - **Clearer Audit Phase:** Removed misleading "Step 0/2" and provides a clean
+        summary from `experiment_manager.py`'s audit.
+      - **Consistent Terminology:** Renamed "Migrating New Experiment Copy" to
+        "Transforming New Experiment Copy" (Step 2/2) for clarity and consistency
+        with documentation.
+      - **Streamlined User Interaction:** Consolidates audit output and action prompt,
+        removing unnecessary intermediate prompts.
+
+    - **`audit_experiment.ps1`:**
+      - **Robust Exit Code Handling:** Correctly interprets `experiment_manager.py`'s
+        exit codes to provide accurate final audit summaries (VALIDATED, NEEDS UPDATE, etc.).
+      - **Standardized Banners:** Ensures consistent visual formatting.
+
+    - **General:**
+      - Standardized terminology across scripts for 'audit', 'update', and 'transform'.
+      - Enhanced error propagation to halt on specific internal subprocess failures
+        (e.g., "--- FAILED ---", "Missing scores/mappings").
+
+    This set of changes addresses previous infinite loop issues and significantly
+    improves the framework's overall resilience and user guidance.
+
 ## v2.1.0 (2025-07-16)
 
 ### Feat

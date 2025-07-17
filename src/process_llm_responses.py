@@ -674,37 +674,34 @@ def main():
             
     all_scores_output_filename = get_config_value(APP_CONFIG, 'Filenames', 'all_scores_for_analysis', fallback="all_scores.txt")
     all_scores_output_path = os.path.join(analysis_inputs_dir, all_scores_output_filename)
-    
-    if all_parsed_score_matrices:
-        try:
-            with open(all_scores_output_path, 'w', encoding='utf-8') as f_out:
+
+    try:
+        # Always create the file to ensure a consistent state for downstream scripts.
+        with open(all_scores_output_path, 'w', encoding='utf-8') as f_out:
+            if all_parsed_score_matrices:
                 for i, matrix in enumerate(all_parsed_score_matrices):
-                    if i > 0: f_out.write("\n") 
+                    if i > 0: f_out.write("\n")
                     for row in matrix: f_out.write("\t".join(map(lambda x: f"{x:{args.score_format}}", row)) + "\n")
-            logging.info(f"Successfully wrote {len(all_parsed_score_matrices)} score matrices to {all_scores_output_path}")
-            
-            # NEW: Call the validation function for all_scores.txt
+                logging.info(f"Successfully wrote {len(all_parsed_score_matrices)} score matrices to {all_scores_output_path}")
+            else:
+                # This block runs inside the 'with open...' context.
+                # The file is created but remains empty, which is the desired behavior.
+                logging.warning(f"No score matrices were successfully parsed. Creating empty file at '{all_scores_output_path}'.")
+
+        # After writing, whether empty or not, run validation only if there's data to validate.
+        if all_parsed_score_matrices:
             scores_file_validation_passed = validate_all_scores_file_content(
                 all_scores_output_path,
                 parsed_matrices_for_validation,
-                k # 'k' is the k_value determined for the current response, assuming it's consistent across all.
-                  # If k can vary per response, you might need to pass a list/dict of k_values,
-                  # but typically k is fixed per experiment run.
+                k  # 'k' is from the last successfully processed item
             )
             if not scores_file_validation_passed:
                 logging.critical("Halting due to critical all_scores.txt file validation failures.")
-                sys.exit(1) # Exit if validation fails
-            
-        except IOError as e:
-            logging.error(f"Error writing aggregated scores to {all_scores_output_path}: {e}")
-            sys.exit(1) # Exit if writing fails
-    else:
-        logging.warning(f"No score matrices were successfully parsed. '{all_scores_output_path}' will not be created or will be empty.")
-        # If no matrices were parsed, and thus no all_scores.txt was generated,
-        # the validation function would ideally be skipped or handle this case.
-        # For now, if all_parsed_score_matrices is empty, we don't call validate,
-        # which implies success for an empty output, but you might want to adjust
-        # your pipeline's expectations for this scenario.
+                sys.exit(1)
+
+    except IOError as e:
+        logging.error(f"Error writing aggregated scores to {all_scores_output_path}: {e}")
+        sys.exit(1)
 
     source_mappings_filename = get_config_value(APP_CONFIG, 'Filenames', 'aggregated_mappings_in_queries_dir', fallback="mappings.txt")
     source_mappings_path = os.path.join(queries_dir, source_mappings_filename)

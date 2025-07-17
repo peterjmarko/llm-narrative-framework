@@ -34,7 +34,14 @@ invoked with explicit flags for specific, one-time actions.
 Modes of Operation:
 -   **Default (State Machine)**: Verifies the experiment's state, presents its findings, and prompts the user to confirm the next necessary action (`NEW`, `REPAIR`, `UPDATE`). It continues this process until the experiment is complete. This interactive, self-healing design makes the pipeline resilient.
 -   **`--reprocess`**: Forces a full re-processing (update) of all analysis artifacts for an existing experiment. This includes regenerating individual replication reports and then re-running the hierarchical aggregation to update all summary CSV files.
--   **`--migrate`**: Runs a one-time migration workflow to transform a legacy experiment directory to the modern format. This mode triggers specific pre-processing steps and then enters the state machine to finalize the transformation.
+-   **`--migrate`**: Runs a one-time migration workflow on a copied legacy
+        experiment. It first executes a special pre-processing sequence:
+        1. **Clean**: Deletes old summary files and corrupted analysis artifacts.
+        2. **Patch**: Creates or updates `config.ini.archived` files.
+        3. **Reprocess**: Re-runs the full data processing pipeline for each
+           replication run to generate modern, valid reports.
+        After pre-processing, it enters the standard state-machine loop to
+        handle any remaining issues (e.g., missing raw data).
 -   **`--verify-only`**: Performs a read-only audit and prints a detailed completeness report without making changes. It checks for:
     -   **Configuration Integrity**: Verifies that `config.ini.archived` exists,
         is valid, and contains all required keys.
@@ -852,66 +859,61 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, bias_scrip
             return False # Indicate failure
     return True
 
-def _run_migrate_mode(target_dir, patch_script, rebuild_script, verbose=False):
+def _run_migrate_mode(target_dir, patch_script, orchestrator_script, verbose=False):
     """
     Executes a one-time migration process for a legacy experiment directory.
     This mode is destructive and will delete old artifacts.
     """
     print(f"{C_YELLOW}--- Entering MIGRATE Mode: Transforming experiment at: {target_dir} ---{C_RESET}")
+    run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
 
-    # Step 1: Patch Configs
-    print("\n[1/3: Patch Configs] Running patch_old_experiment.py...")
+    # Sub-step 1: Clean Artifacts (Run this first to remove corrupt files)
+    print("\n- Cleaning old summary files and corrupted analysis artifacts...")
     try:
-        subprocess.run([sys.executable, patch_script, target_dir], check=True, capture_output=True, text=True)
-        print("Step 1 completed successfully.")
+        files_to_delete = ["final_summary_results.csv", "batch_run_log.csv", "EXPERIMENT_results.csv"]
+        for file in files_to_delete:
+            file_path = target_dir / file
+            if file_path.exists():
+                print(f"  - Deleting old '{file_path.name}'")
+                file_path.unlink()
+
+        for run_dir in run_dirs:
+            for corrupted_file in run_dir.glob("*.txt.corrupted"):
+                corrupted_file.unlink()
+            analysis_inputs_path = run_dir / "analysis_inputs"
+            if analysis_inputs_path.is_dir():
+                shutil.rmtree(analysis_inputs_path)
+        print("  - Cleaning complete.")
+    except Exception as e:
+        logging.error(f"Failed to clean artifacts: {e}")
+        return False
+
+    # Sub-step 2: Patch Configs
+    print("\n- Patching legacy configuration files...")
+    try:
+        subprocess.run([sys.executable, patch_script, str(target_dir)], check=True, capture_output=True, text=True)
+        print("  - Patching complete.")
     except subprocess.CalledProcessError as e:
         logging.error(f"Failed to patch configs. Stderr:\n{e.stderr}")
         return False
 
-    # Step 2: Rebuild Reports
-    print("\n[2/3: Rebuild Reports] Running rebuild_reports.py...")
+    # Sub-step 3: Reprocess Each Replication
+    print(f"\n- Reprocessing {len(run_dirs)} individual runs to generate modern reports...")
     try:
-        cmd = [sys.executable, rebuild_script, target_dir]
-        if verbose:
-            cmd.append("--verbose")
-        # Do not capture output, so the progress bar from the child script is visible.
-        subprocess.run(cmd, check=True, text=True)
-        print("Step 2 completed successfully.")
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to rebuild reports. Stderr:\n{e.stderr}")
-        return False
-
-    # Step 3: Clean Artifacts
-    print("\n[3/3: Clean Artifacts] Deleting old and temporary files...")
-    try:
-        # Delete top-level summary files that will be regenerated
-        files_to_delete = ["final_summary_results.csv", "batch_run_log.csv", "EXPERIMENT_results.csv"]
-        for file in files_to_delete:
-            file_path = os.path.join(target_dir, file)
-            if os.path.exists(file_path):
-                print(f" - Deleting old '{file}'")
-                os.remove(file_path)
-
-        # Delete artifacts from all run_* subdirectories
-        run_dirs = glob.glob(os.path.join(target_dir, "run_*"))
-        for run_dir in run_dirs:
-            if not os.path.isdir(run_dir): continue
-            
-            # Delete corrupted report backups
-            for corrupted_file in glob.glob(os.path.join(run_dir, "*.txt.corrupted")):
-                os.remove(corrupted_file)
-            
-            # Delete old analysis_inputs directory
-            analysis_inputs_path = os.path.join(run_dir, "analysis_inputs")
-            if os.path.isdir(analysis_inputs_path):
-                shutil.rmtree(analysis_inputs_path)
-        print("Step 3 completed successfully.")
+        for run_dir in tqdm(run_dirs, desc="Reprocessing Runs"):
+            cmd = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", str(run_dir)]
+            if not verbose: cmd.append("--quiet")
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            if result.returncode != 0:
+                logging.error(f"Failed to reprocess {run_dir.name}. Stderr:\n{result.stderr}")
+                return False
+        print("  - Reprocessing complete.")
     except Exception as e:
-        logging.error(f"Failed to clean artifacts: {e}")
+        logging.error(f"An unexpected error occurred during reprocessing: {e}")
         return False
-    
+
     print(f"\n{C_GREEN}--- Migration pre-processing complete. ---{C_RESET}")
-    print("The manager will now proceed with reprocessing to finalize the migration.")
+    print("The manager will now proceed with final checks to finalize the migration.")
     return True
 
 def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, bias_script, compile_script, target_dir):

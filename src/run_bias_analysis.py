@@ -147,11 +147,15 @@ def main():
     report_filepath = os.path.join(args.replication_dir, sorted(report_files)[-1])
 
     df_long = build_long_format_df(args.replication_dir, args.k_value)
-    if df_long is None or df_long.empty:
-        logging.warning("DataFrame is empty or could not be built. No bias metrics will be calculated.")
-        return
 
-    bias_metrics = calculate_bias_metrics(df_long, args.k_value)
+    if df_long is None or df_long.empty:
+        logging.warning("DataFrame is empty or could not be built. Writing null bias metrics to report to prevent looping.")
+        bias_metrics = {
+            "top1_pred_bias_std": None,
+            "true_false_score_diff": None,
+        }
+    else:
+        bias_metrics = calculate_bias_metrics(df_long, args.k_value)
 
     try:
         with open(report_filepath, 'r', encoding='utf-8') as f:
