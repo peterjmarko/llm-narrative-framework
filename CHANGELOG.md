@@ -5,6 +5,22 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.3.0 (2025-07-17)
+
+### Feat
+
+- **parser**: Enhance response parsing for verbose LLMs
+
+    This commit introduces a more robust LLM response parser and improves the experiment update workflow.
+
+    - The response parser in `process_llm_responses.py` now includes a fallback mechanism. If a markdown code block is not found, it attempts to parse the last k+1 lines of the response. This significantly improves the valid response rate for verbose, "thinking" LLMs.
+
+    - The update workflow (`update_experiment.ps1` and `experiment_manager.py`) is now more intelligent. It prompts for confirmation before reprocessing an already `VALIDATED` experiment and automatically runs a post-update audit to verify success.
+
+    - Refactored the project structure by moving `CONTRIBUTING.md`, `CHANGELOG.md`, and `LICENSE.md` to the root directory to align with open-source conventions.
+
+    - Updated all relevant documentation, diagrams, and build scripts to reflect these enhancements.
+
 ## v2.2.1 (2025-07-17)
 
 ### Fix
