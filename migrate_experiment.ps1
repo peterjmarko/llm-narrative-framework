@@ -182,6 +182,16 @@ try {
         throw "ERROR: Migration process failed with exit code ${LASTEXITCODE}."
     }
 
+    # --- Final Validation Audit ---
+    Write-Host "`n--- Running Post-Migration Audit to Verify Changes... ---" -ForegroundColor Cyan
+    $postAuditArgs = "--verify-only", $DestinationPath, "--force-color"
+    $finalPostAuditArgs = $prefixArgs + $scriptName + $postAuditArgs
+    & $executable $finalPostAuditArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Post-migration audit failed. The experiment may still have unresolved issues."
+    }
+
     Write-Host "`n######################################################" -ForegroundColor Green
     Write-Host "### Migration Finished Successfully!             ###" -ForegroundColor Green
     Write-Host "### Migrated data is in: '$($DestinationPath)'" -ForegroundColor Green

@@ -755,7 +755,7 @@ def _run_repair_mode(runs_to_repair, sessions_script_path, quiet, max_workers):
         task_func = partial(_repair_worker, sessions_script_path=sessions_script_path, quiet=quiet)
         future_to_task = {executor.submit(task_func, run_dir=task[0], index=task[1]): task for task in all_tasks}
 
-        for future in tqdm(as_completed(future_to_task), total=len(all_tasks), desc="Repairing Sessions"):
+        for future in tqdm(as_completed(future_to_task), total=len(all_tasks), desc="Repairing Sessions", ncols=80):
             index, success, error_log = future.result()
             if success:
                 successful_repairs += 1
@@ -816,42 +816,33 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, bias_scrip
             # If not capturing, output streams directly to console (fixing spinner).
             result = subprocess.run(cmd_orch, check=True, capture_output=capture_output_flag, text=capture_output_flag)
             
-            # Log captured output only if it was captured (i.e., in quiet mode)
-            if capture_output_flag and result.stdout:
-                logging.info(f"Orchestrate Replication STDOUT for {run_basename}:\n{result.stdout}")
-            if capture_output_flag and result.stderr:
-                logging.error(f"Orchestrate Replication STDERR for {run_basename}:\n{result.stderr}")
-            
-            if capture_output_flag and result.stdout:
-                logging.info(f"Orchestrate Replication Output for {os.path.basename(run_dir)}:\n{result.stdout}")
-            if capture_output_flag and result.stderr:
-                logging.error(f"Orchestrate Replication Error for {os.path.basename(run_dir)}:\n{result.stderr}")
+            # Log captured output if in quiet mode
+            if capture_output_flag:
+                if result.stdout:
+                    logging.info(f"Orchestrate Replication STDOUT for {run_basename}:\n{result.stdout}")
+                if result.stderr:
+                    logging.error(f"Orchestrate Replication STDERR for {run_basename}:\n{result.stderr}")
 
-            # Note: The bias analysis is intentionally run AFTER orchestrate_replication.py has finished,
-            # because orchestrate_replication.py's Stage 4 is supposed to generate the data bias_analysis needs.
+            # After successful orchestration, we must find the newly created directory
+            # to run the subsequent bias analysis step, which is critical for validation.
+            search_pattern = os.path.join(base_output_dir, f'run_*_rep-{rep_num:02d}_*')
+            found_dirs = [d for d in glob.glob(search_pattern) if os.path.isdir(d)]
             
-            # Ensure bias analysis runs directly after the replication orchestration.
-            # This is critical for the replication report to be fully VALIDATED.
-            config_path = os.path.join(run_dir, 'config.ini.archived')
-            if os.path.exists(config_path):
-                config = configparser.ConfigParser()
-                config.read(config_path)
-                k_value = config.getint('Study', 'group_size', fallback=config.getint('Study', 'k_per_query', fallback=0))
-                
-                # Check for existing analysis files. If orchestrate_replication.py failed to produce them,
-                # or if run_bias_analysis also needs to create/update them, run it here.
-                # However, the most robust way is to ensure orchestrate_replication.py itself is infallible
-                # or to force analysis/bias steps here if it only does query/LLM.
-                # Given orchestrate_replication.py runs 'analyze_llm_performance.py', the issue might be specific
-                # to bias analysis not producing the expected output. Let's ensure bias analysis is called correctly.
-                
-                # Rerunning bias analysis (which also regenerates the replication_report.txt json metrics)
-                # is critical to set the run to 'VALIDATED' for the next audit cycle.
-                cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_value)]
-                if not quiet: cmd_bias.append("--verbose")
-                subprocess.run(cmd_bias, check=True) # Ensure this runs and doesn't fail silently for auditing.
+            if len(found_dirs) == 1:
+                run_dir = found_dirs[0]
+                config_path = os.path.join(run_dir, 'config.ini.archived')
+                if os.path.exists(config_path):
+                    config = configparser.ConfigParser()
+                    config.read(config_path)
+                    k_value = config.getint('Study', 'group_size', fallback=config.getint('Study', 'k_per_query', fallback=0))
+                    
+                    cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_value)]
+                    if not quiet: cmd_bias.append("--verbose")
+                    subprocess.run(cmd_bias, check=True)
+                else:
+                    logging.warning(f"No archived config in new directory '{os.path.basename(run_dir)}', cannot run bias analysis.")
             else:
-                logging.warning(f"No archived config in {os.path.basename(run_dir)}, cannot run bias analysis after full replication repair. Run might not be fully VALIDATED.")
+                logging.warning(f"Could not find unique run directory for rep {rep_num} after repair. Bias analysis skipped. Run may not be fully VALIDATED.")
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
             logging.error(f"Full replication repair failed for {os.path.basename(run_dir)}.")
@@ -900,7 +891,7 @@ def _run_migrate_mode(target_dir, patch_script, orchestrator_script, verbose=Fal
     # Sub-step 3: Reprocess Each Replication
     print(f"\n- Reprocessing {len(run_dirs)} individual runs to generate modern reports...")
     try:
-        for run_dir in tqdm(run_dirs, desc="Reprocessing Runs"):
+        for run_dir in tqdm(run_dirs, desc="Reprocessing Runs", ncols=80):
             cmd = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", str(run_dir)]
             if not verbose: cmd.append("--quiet")
             result = subprocess.run(cmd, check=False, capture_output=True, text=True)

@@ -141,13 +141,14 @@ It first performs an audit. If the experiment has analysis errors, it proceeds t
 
 This utility workflow provides a safe, non-destructive process to transform older or malformed experimental data to the current pipeline's format. The process ensures the original data is left untouched.
 
-The PowerShell entry point (`migrate_experiment.ps1`) now performs three key steps:
+The PowerShell entry point (`migrate_experiment.ps1`) now performs four key steps:
 
 1.  **Audit Source Experiment**: It first runs a read-only audit on the specified `SourceDirectory` to determine its current state (e.g., `VALIDATED`, `REPROCESS_NEEDED`, `REPAIR_NEEDED`, or `MIGRATION_NEEDED`). Based on this audit, it provides a summary and asks for user confirmation to proceed with the full migration. If the experiment is already `VALIDATED`, it will suggest no action is needed and exit.
 2.  **Copy Experiment Data**: If confirmed, it copies the `SourceDirectory` to a new, timestamped folder within `output/migrated_experiments/`.
 3.  **Transform New Experiment Copy**: It then calls `experiment_manager.py --migrate` on this *new copy*. This initiates a robust, multi-stage process:
     *   **Migration Pre-processing**: The `--migrate` flag triggers a special sequence that cleans old artifacts, patches legacy configurations, and then performs a deep reprocessing of each replication by calling `orchestrate_replication.py --reprocess`. This critical step regenerates all analysis files from the raw LLM responses using the latest validation logic.
     *   **Self-Healing Loop**: After pre-processing, the manager enters its standard `Verify -> Act` loop. If it detects remaining issues that reprocessing could not fix (e.g., missing raw response files), it will prompt the user to run the necessary repairs until the experiment is fully `VALIDATED`.
+4.  **Final Validation Audit**: After the `experiment_manager.py` completes its work and the experiment is deemed `COMPLETE`, `migrate_experiment.ps1` runs a final read-only audit on the newly migrated experiment. This provides explicit confirmation that the migration process was successful and the data is fully `VALIDATED`.
 
 <div align="center">
   <img src="images/architecture_workflow_4_migrate_data.png" width="111%">

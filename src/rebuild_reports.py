@@ -20,12 +20,13 @@
 # Filename: src/rebuild_reports.py
 
 """
-Rebuilds all replication reports from ground-truth data.
+Rebuilds a single replication report from ground-truth data.
 
-This script is a powerful reprocessing tool that allows for applying fixes to the
-data processing or analysis logic without re-running expensive LLM calls.
+This script is primarily a worker utility, typically called by `experiment_manager.py`
+during migration or full reprocessing. It allows for applying fixes to the data
+processing or analysis logic without re-running expensive LLM calls.
 
-For each run directory found, it:
+For the given run directory, it:
 1.  Reads the ground-truth parameters from `config.ini.archived`.
 2.  Re-runs `process_llm_responses.py` (Stage 3) and `analyze_llm_performance.py`
     (Stage 4) to generate fresh results.
@@ -246,60 +247,35 @@ Run Notes:       N/A (Original notes cannot be recovered)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Rebuilds replication reports to their original high-fidelity format.")
-    parser.add_argument('base_dir', help="The base directory to scan for experiment runs (e.g., 'output/reports/6_Study_4').")
-    parser.add_argument('--verbose', '-v', action='store_true', help="Enable detailed, per-directory logging instead of a progress bar.")
+    # This script is now a worker, called by a manager process like experiment_manager.py
+    parser = argparse.ArgumentParser(description="Rebuilds a single replication report from ground-truth data.")
+    parser.add_argument('--run_output_dir', required=True, help="Path to the single run_* directory to reprocess.")
+    # The following arguments are accepted for compatibility with the caller, but not used directly.
+    parser.add_argument('--reprocess', action='store_true', help="Flag to indicate reprocessing mode (for compatibility).")
+    parser.add_argument('--quiet', action='store_true', help="Flag for quiet mode (for compatibility).")
     args = parser.parse_args()
 
     # --- Load the main config and the compatibility map ONCE ---
     try:
-        # Import the globally loaded config and the map parser function
         from config_loader import APP_CONFIG, get_config_compatibility_map
-
         compat_map = get_config_compatibility_map(APP_CONFIG)
         if not compat_map:
             logging.warning("No [ConfigCompatibility] map found in config.ini. Assuming all configs are modern.")
-
     except Exception as e:
         logging.error(f"Could not load main config or compatibility map. Error: {e}")
         sys.exit(1)
 
-    if not os.path.isdir(args.base_dir):
-        logging.error(f"Error: Provided directory does not exist: {args.base_dir}")
-        return
-
-    run_dirs = glob.glob(os.path.join(args.base_dir, '**', 'run_*'), recursive=True)
-    if not run_dirs:
-        logging.info(f"No 'run_*' directories found in {args.base_dir}.")
-        return
-
-    logging.info(f"Found {len(run_dirs)} total run directories. Rebuilding reports...")
-
-    iterable = run_dirs
-    if not args.verbose:
-        # Suppress INFO-level logs to keep the progress bar clean
-        logging.getLogger().setLevel(logging.WARNING)
-        iterable = tqdm(run_dirs, desc="Progress", unit="dir", ncols=80)
-
-    success_count = 0
-    total_count = 0
-    try:
-        for run_dir in iterable:
-            if os.path.isdir(run_dir):
-                total_count += 1
-                # --- Pass the map to the worker function ---
-                if rebuild_report_for_run(run_dir, compat_map):
-                    success_count += 1
-
-        # Reset logger to INFO to ensure final summary is always displayed
-        logging.getLogger().setLevel(logging.INFO)
-        logging.info(f"\nReport rebuilding complete. Successfully processed {success_count}/{total_count} directories.")
-
-    except KeyboardInterrupt:
-        # Ensure the cursor moves to a new line after the progress bar is interrupted
-        print("\n", file=sys.stderr)
-        logging.warning("Operation interrupted by user (Ctrl+C). Exiting gracefully.")
+    run_dir = args.run_output_dir
+    if not os.path.isdir(run_dir):
+        logging.error(f"Error: Provided run directory does not exist: {run_dir}")
         sys.exit(1)
+
+    if not rebuild_report_for_run(run_dir, compat_map):
+        logging.error(f"Failed to rebuild report for {os.path.basename(run_dir)}")
+        sys.exit(1)
+
+    # Success, exit cleanly. The worker function does its own logging.
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

@@ -71,7 +71,7 @@ try {
     switch ($auditExitCode) {
         0 { # AUDIT_ALL_VALID
             # If the experiment is already valid, ask the user if they want to force a reprocess.
-            $promptMessage = "`nExperiment is already complete and valid. Do you want to force an update anyway? (y/n)"
+            $promptMessage = "`nExperiment is already complete and valid. Do you want to force an update anyway? (Y/N)"
             $choice = Read-Host -Prompt $promptMessage
             if ($choice.Trim().ToLower() -ne 'y') {
                 Write-Host "Update aborted by user." -ForegroundColor Yellow

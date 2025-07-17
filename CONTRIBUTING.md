@@ -234,22 +234,42 @@ This is a manual, two-step process that uses `commitizen` to automatically bump 
     ```bash
     pdm run cz bump --changelog
     ```
-    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `docs/CHANGELOG.md`, and creates a new commit and tag.
+    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `CHANGELOG.md`, and creates a new commit and tag.
 
 3.  **(Manual Step) Update Changelog Details:**
     The `bump` command only adds the commit *header* to `CHANGELOG.md`. To include the full commit body for clarity, you must add it manually.
 
     a. View the last few commits using `git log -n 3` (or more). **Press 'q' to exit the log view.**
     b. Find and copy the full commit message (header and body) for the relevant `feat`, `fix`, or `refactor` commit(s) you want to document.
-    c. Paste the message(s) into `docs/CHANGELOG.md` under the appropriate version heading.
+    c. Paste the message(s) into `CHANGELOG.md` under the appropriate version heading.
     d. Amend the release commit to include this documentation update:
        ```bash
        # Stage the changelog change
-       git add docs/CHANGELOG.md
+       git add CHANGELOG.md
        
        # Attach it to the last commit without changing the message
        git commit --amend --no-edit
        ```
+
+#### How to Undo a Version Bump
+If you run `cz bump` by mistake or realize a commit was missed, you must manually undo the release before trying again. Follow these steps precisely:
+
+1.  **Undo the Commit**: The `bump` command creates a commit (e.g., `chore(release): v2.3.0`). Roll it back but keep the file changes staged for editing.
+    ```bash
+    git reset --soft HEAD~1
+    ```
+
+2.  **Delete the Git Tag**: The command also creates a version tag (`vX.Y.Z`) that must be deleted locally before you can re-create it.
+    ```bash
+    # Replace v2.3.0 with the actual tag that was created
+    git tag -d v2.3.0
+    ```
+
+3.  **Revert File Changes**: The `reset` command kept the changes in your working directory. You must now manually revert them.
+    *   **`pyproject.toml`**: Open this file and revert the `version` key in **both** the `[project]` and `[tool.commitizen]` sections to its original value (e.g., from `2.3.0` back to `2.2.1`).
+    *   **`CHANGELOG.md`**: Open this file and delete the new version entry that was added at the top.
+
+After these steps, your repository is clean. You can now make any additional changes (like fixing the `changelog_file` path in `pyproject.toml`), stage them, and then run `pdm run cz bump --changelog` again.
 
 ### 6. Submit a Pull Request
 
