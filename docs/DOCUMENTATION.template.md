@@ -93,30 +93,30 @@ Each replication executes the four core pipeline stages in sequence:
 
 #### Workflow 2: Audit an Experiment
 
-This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag.
+This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag. The full audit report, including subprocess outputs, is also saved to `audit_log.txt` within the audited directory.
 
 {{diagram:docs/diagrams/architecture_workflow_2_audit_experiment.mmd | scale=2.5 | width=111%}}
 
 ##### Interpreting the Audit Report
-The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It outputs a summary table with a high-level status for each replication run. The `Details` column provides granular error codes that pinpoint the exact problem.
+The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It outputs a summary table with a high-level status for each replication run. The `Details` column provides granular error codes that pinpoint the exact problem. The final `Audit Result` and `Recommendation` suggest the next steps, if any.
 
 **VALIDATED**  
 The run is complete and all checks passed. No action is needed.
 
 **INVALID_NAME**  
-The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. The folder must be renamed.
+The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. The folder must be renamed or repaired via a `run_experiment.ps1` initiated process.
 
 **CONFIG_ISSUE**  
-The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This requires manual inspection or migration.
+The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This typically indicates a legacy experiment requiring **migration**.
 
 **QUERY_ISSUE**  
-There is a problem with the fundamental input files needed for an LLM session, such as missing query files or trial manifests. This requires repair by running `run_experiment.ps1`.
+There is a problem with the fundamental input files needed for an LLM session, such as missing query files or trial manifests. This requires **repair** by running `run_experiment.ps1` (or `migrate_experiment.ps1` if legacy).
 
 **RESPONSE_ISSUE**  
-The query files are intact, but one or more corresponding LLM response files are missing. This is typically caused by an interrupted run and is repaired by running `run_experiment.ps1`.
+The query files are intact, but one or more corresponding LLM response files are missing. This is typically caused by an interrupted run and requires **repair** by running `run_experiment.ps1` (or `migrate_experiment.ps1` if legacy).
 
 **ANALYSIS_ISSUE**  
-All core data files (queries, responses) are present, but there is a problem with derivative artifacts like analysis files, summary CSVs, or the final report. This can be fixed by running `update_experiment.ps1` (`--reprocess`).
+All core data files (queries, responses) are present, but there is a problem with derivative artifacts like analysis files, summary CSVs, or the final report. This requires an **update** (reprocessing) and can be fixed by running `update_experiment.ps1`.
 
 The `Details` string provides specific error flags, such as `MANIFESTS_INCOMPLETE`, `QUERY_RESPONSE_INDEX_MISMATCH`, or `REPORT_INCOMPLETE_METRICS`, which help diagnose the root cause quickly.
 
@@ -124,15 +124,23 @@ In addition to the per-replication table, the audit provides an `Overall Summary
 
 #### Workflow 3: Update an Experiment
 
-This workflow allows you to re-run the data processing and analysis stages on an existing, complete experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag. This action first regenerates the primary report (`replication_report.txt`) for each run and then performs a full re-aggregation, ensuring that all summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`) are also brought up to date.
+This workflow allows you to re-run the data processing and analysis stages on an existing experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag. This action first prompts for user confirmation, then regenerates the primary report (`replication_report.txt`) for each run and performs a full re-aggregation, ensuring that all summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`) are also brought up to date.
 
 {{diagram:docs/diagrams/architecture_workflow_3_update_experiment.mmd | scale=2.5 | width=111%}}
 
 #### Workflow 4: Migrate Old Experiment Data
 
-This utility workflow provides a safe, non-destructive process to upgrade older experimental data. It copies the legacy data to a new location before running the migration, leaving the original data untouched.
+This utility workflow provides a safe, non-destructive process to transform older or malformed experimental data to the current pipeline's format. The process ensures the original data is left untouched.
 
-The PowerShell entry point (`migrate_experiment.ps1`) first copies the source experiment to a new timestamped directory, then calls `experiment_manager.py --migrate` on the new copy to perform the upgrade.
+The PowerShell entry point (`migrate_experiment.ps1`) now performs three key steps:
+
+1.  **Audit Source Experiment**: It first runs a read-only audit on the specified `SourceDirectory` to determine its current state (e.g., `VALIDATED`, `REPROCESS_NEEDED`, `REPAIR_NEEDED`, or `MIGRATION_NEEDED`). Based on this audit, it provides a summary and asks for user confirmation to proceed with the full migration. If the experiment is already `VALIDATED`, it will suggest no action is needed and exit.
+2.  **Copy Experiment Data**: If confirmed, it copies the `SourceDirectory` to a new, timestamped folder within `output/migrated_experiments/`.
+3.  **Transform New Experiment Copy**: It then calls `experiment_manager.py --migrate` on this *new copy*. This initiates a robust, multi-stage process managed by `experiment_manager.py`'s state machine, which includes:
+    *   **Patching Configs**: Creating or updating `config.ini.archived` files for individual replication runs.
+    *   **Rebuilding Reports**: Regenerating `replication_report.txt` files to the modern format.
+    *   **Cleaning Artifacts**: Deleting old, consolidated summary files and temporary data.
+    *   **Self-Healing**: If issues like `REPAIR_NEEDED` (e.g., missing responses or query files for specific runs) or `REPROCESS_NEEDED` (e.g., analysis errors) are detected during transformation, `experiment_manager.py` will automatically prompt and attempt to resolve them until the experiment is fully `COMPLETED`.
 
 {{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=111%}}
 

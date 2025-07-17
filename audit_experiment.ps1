@@ -56,6 +56,14 @@ if (Get-Command pdm -ErrorAction SilentlyContinue) {
     $prefixArgs = "run", "python"
 }
 
+# --- Define Audit Exit Codes from experiment_manager.py ---
+# These are mapped from the Python script for clarity and robustness.
+$AUDIT_ALL_VALID       = 0 # Experiment is complete and valid.
+$AUDIT_NEEDS_REPROCESS = 1 # Experiment needs reprocessing (e.g., analysis issues).
+$AUDIT_NEEDS_REPAIR    = 2 # Experiment needs repair (e.g., missing responses, critical files).
+$AUDIT_NEEDS_MIGRATION = 3 # Experiment is legacy or malformed, requires full migration.
+$AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt in experiment_manager.py
+
 # --- Main Script Logic ---
 try {
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
@@ -70,31 +78,81 @@ try {
     $arguments += "--force-color"
     $finalArgs = $prefixArgs + $scriptName + $arguments
 
-    # Define the log file path and inform the user
+    # Define the log file path
     $LogFilePath = Join-Path $ResolvedPath "audit_log.txt"
-    Write-Host "Audit report will be saved to: $LogFilePath" -ForegroundColor Cyan
+    Write-Host "`nAudit report will be saved to: $LogFilePath" -ForegroundColor DarkCyan
 
     # Clear any old log file
-    if (Test-Path $LogFilePath) { Remove-Item $LogFilePath }
+    if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
 
-    # Execute the command and process each line of output
-    & $executable $finalArgs | ForEach-Object {
-        # 1. Write the raw line (with colors) to the console
-        Write-Host $_
+    Write-Host "`n######################################################" -ForegroundColor Cyan
+    Write-Host "### Running Experiment Audit                     ###" -ForegroundColor Cyan
+    Write-Host "######################################################`n" -ForegroundColor Cyan
 
-        # 2. Strip ANSI color codes for the log file
-        $cleanLine = $_ -replace "\x1B\[[0-9;]*m", ""
-        
-        # 3. Append the clean line to the log file
-        Add-Content -Path $LogFilePath -Value $cleanLine
-    }
+    Write-Host "Executing: $executable $($finalArgs -join ' ')"
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "ERROR: Audit process failed with exit code ${LASTEXITCODE}."
+    # Execute the command and redirect all output (stdout and stderr) to the log file.
+    # This ensures $LASTEXITCODE accurately reflects the Python script's exit code.
+    & $executable $finalArgs *>&1 | Out-File -FilePath $LogFilePath -Encoding UTF8
+
+    # Get the exit code from the Python script
+    $pythonExitCode = $LASTEXITCODE
+
+    # Display the captured output from the log file to the console
+    Get-Content -Path $LogFilePath | ForEach-Object { Write-Host $_ }
+
+    # Interpret the audit result and provide appropriate final messaging
+    switch ($pythonExitCode) {
+        $AUDIT_ALL_VALID {
+            Write-Host "`n######################################################" -ForegroundColor Green
+            Write-Host "### Audit Finished: Experiment is VALIDATED.     ###" -ForegroundColor Green
+            Write-Host "######################################################`n" -ForegroundColor Green
+            exit 0
+        }
+        $AUDIT_NEEDS_REPROCESS {
+            Write-Host "`n######################################################" -ForegroundColor Yellow
+            Write-Host "### Audit Finished: Experiment needs UPDATE.     ###" -ForegroundColor Yellow
+            Write-Host "### Recommendation: Run 'update_experiment.ps1' to ###" -ForegroundColor Yellow
+            Write-Host "### reprocess analysis and summaries.            ###" -ForegroundColor Yellow
+            Write-Host "######################################################`n" -ForegroundColor Yellow
+            exit 0 # It's a non-fatal audit result, so exit 0 for the audit script itself
+        }
+        $AUDIT_NEEDS_REPAIR {
+            Write-Host "`n######################################################" -ForegroundColor Red
+            Write-Host "### Audit Finished: Experiment needs REPAIR.     ###" -ForegroundColor Red
+            Write-Host "### Recommendation: Run 'run_experiment.ps1' to    ###" -ForegroundColor Red
+            Write-Host "### automatically fix critical issues.           ###" -ForegroundColor Red
+            Write-Host "######################################################`n" -ForegroundColor Red
+            exit 0 # It's a non-fatal audit result, so exit 0 for the audit script itself
+        }
+        $AUDIT_NEEDS_MIGRATION {
+            Write-Host "`n######################################################" -ForegroundColor Red
+            Write-Host "### Audit Finished: Experiment needs MIGRATION.  ###" -ForegroundColor Red
+            Write-Host "### Recommendation: Run 'migrate_experiment.ps1' to ###" -ForegroundColor Red
+            Write-Host "### convert the legacy format.                   ###" -ForegroundColor Red
+            Write-Host "######################################################`n" -ForegroundColor Red
+            exit 0 # It's a non-fatal audit result, so exit 0 for the audit script itself
+        }
+        $AUDIT_ABORTED_BY_USER {
+            Write-Host "`n######################################################" -ForegroundColor Yellow
+            Write-Host "### Audit Process Aborted by User.               ###" -ForegroundColor Yellow
+            Write-Host "######################################################`n" -ForegroundColor Yellow
+            exit 0 # User aborted Python script, which is a graceful exit for the wrapper
+        }
+        default {
+            # Any other non-zero exit code is a true error for the audit process
+            Write-Host "`n######################################################" -ForegroundColor Red
+            Write-Host "### AUDIT FAILED ###" -ForegroundColor Red
+            Write-Host "######################################################`n" -ForegroundColor Red
+            Write-Error "Unknown or unexpected exit code from experiment_manager.py: ${pythonExitCode}."
+            exit 1
+        }
     }
 }
 catch {
-    Write-Host "`nAUDIT FAILED" -ForegroundColor Red
+    Write-Host "`n######################################################" -ForegroundColor Red
+    Write-Host "### AUDIT FAILED ###" -ForegroundColor Red
+    Write-Host "######################################################`n" -ForegroundColor Red
     Write-Error $_.Exception.Message
     exit 1
 }

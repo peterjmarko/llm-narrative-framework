@@ -55,10 +55,90 @@ else {
     Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
 }
 
+# --- Define Audit Exit Codes from experiment_manager.py ---
+# These are mapped from the Python script for clarity and robustness.
+$AUDIT_ALL_VALID       = 0 # Experiment is complete and valid.
+$AUDIT_NEEDS_REPROCESS = 1 # Experiment needs reprocessing (e.g., analysis issues).
+$AUDIT_NEEDS_REPAIR    = 2 # Experiment needs repair (e.g., missing responses, critical files).
+$AUDIT_NEEDS_MIGRATION = 3 # Experiment is legacy or malformed, requires full migration.
+$AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt in experiment_manager.py
+
 # --- Main Script Logic ---
 try {
-    # 1. Resolve source and automatically determine destination
+    # 0. Audit Source Experiment
+    Write-Host "`n======================================================" -ForegroundColor Cyan
+    Write-Host "### Auditing Source Experiment                   ###" -ForegroundColor Cyan
+    Write-Host "======================================================`n" -ForegroundColor Cyan
+
     $SourcePath = Resolve-Path -Path $SourceDirectory -ErrorAction Stop
+    $scriptName = "src/experiment_manager.py"
+    $auditArgs = "--verify-only", $SourcePath
+    $finalAuditArgs = $prefixArgs + $scriptName + $auditArgs
+
+    Write-Host "Auditing: $executable $($finalAuditArgs -join ' ')"
+    & $executable $finalAuditArgs
+
+    $pythonExitCode = $LASTEXITCODE # Capture exit code from the audit command
+
+    # Determine message and color based on audit result
+    $summaryMessage = ""
+    $summaryColor = "Green"
+    $shouldExitImmediately = $false
+
+    switch ($pythonExitCode) {
+        $AUDIT_ALL_VALID {
+            $summaryMessage = "Experiment is in mint condition. No action is required by this script."
+            $summaryColor = "Green"
+            $shouldExitImmediately = $true
+        }
+        $AUDIT_NEEDS_REPROCESS {
+            $summaryMessage = "Reprocessing Recommended. This script will perform a full migration, including the necessary update (reprocessing)."
+            $summaryDetails = "For analysis updates *without* migration, use 'update_experiment.ps1' instead."
+            $summaryColor = "Yellow"
+        }
+        $AUDIT_NEEDS_REPAIR {
+            $summaryMessage = "Critical Repair Recommended. This script will attempt to fix issues via a full migration process, including updates."
+            $summaryDetails = "For automatic repair *without* migration, use 'run_experiment.ps1' instead."
+            $summaryColor = "Red"
+        }
+        $AUDIT_NEEDS_MIGRATION {
+            $summaryMessage = "Migration Required. This script will now proceed with a full migration to transform the experiment, including any necessary updates (reprocessing)."
+            $summaryColor = "Yellow"
+        }
+        default {
+            Write-Host "`n######################################################" -ForegroundColor Red
+            Write-Host "### Audit FAILED: Unknown or unexpected exit code: ${pythonExitCode}. ###" -ForegroundColor Red
+            Write-Host "######################################################`n" -ForegroundColor Red
+            Write-Error "Halting migration due to unexpected audit result."
+            exit 1
+        }
+    }
+
+    # Print the audit summary banner
+    Write-Host "`n######################################################" -ForegroundColor $summaryColor
+    Write-Host "### Audit Summary:                                 ###" -ForegroundColor $summaryColor
+    Write-Host "### (See detailed report above)                    ###" -ForegroundColor $summaryColor
+    Write-Host "######################################################`n" -ForegroundColor $summaryColor
+    
+    # Print the action message below the banner for better flow
+    Write-Host "$summaryMessage" -ForegroundColor $summaryColor
+    if ($summaryDetails) {
+        Write-Host "$summaryDetails" -ForegroundColor $summaryColor
+    }
+
+    # Prompt for user review and then confirmation if needed
+    if ($shouldExitImmediately) {
+        Write-Host "`n$(Read-Host "Press Enter to review the audit report, then continue to exit...")`n"
+        exit 0
+    } else {
+        $confirm = Read-Host "`nDo you wish to proceed with the full migration? (Y/N)"
+        if ($confirm -ne 'Y' -and $confirm -ne 'y') {
+            Write-Host "`nMigration aborted by user." -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    # 1. Resolve source and automatically determine destination
     $SourceBaseName = (Get-Item -Path $SourcePath).Name
     $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $NewFolderName = "${SourceBaseName}_migrated_${Timestamp}"
@@ -71,18 +151,18 @@ try {
     }
 
     # 2. Copy the experiment to the new location
-    Write-Host "`n######################################################" -ForegroundColor Cyan
-    Write-Host "### Step 1/2: Copying Experiment Data" -ForegroundColor Cyan
-    Write-Host "######################################################`n" -ForegroundColor Cyan
+    Write-Host "`n======================================================" -ForegroundColor Cyan
+    Write-Host "### Step 1/2: Copying Experiment Data ###" -ForegroundColor Cyan
+    Write-Host "======================================================`n" -ForegroundColor Cyan
     Write-Host "Source:      $SourcePath"
     Write-Host "Destination: $DestinationPath"
     Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
     Write-Host "`nCopy complete."
 
     # 3. Run the migration process on the new copy
-    Write-Host "`n######################################################" -ForegroundColor Cyan
-    Write-Host "### Step 2/2: Migrating New Experiment Copy" -ForegroundColor Cyan
-    Write-Host "######################################################`n" -ForegroundColor Cyan
+    Write-Host "`n======================================================" -ForegroundColor Cyan
+    Write-Host "### Step 2/2: Transforming New Experiment Copy ###" -ForegroundColor Cyan
+    Write-Host "======================================================`n" -ForegroundColor Cyan
     
     $scriptName = "src/experiment_manager.py"
     $arguments = "--migrate", $DestinationPath
@@ -91,12 +171,19 @@ try {
     Write-Host "Executing: $executable $($finalArgs -join ' ')"
     & $executable $finalArgs
 
-    if ($LASTEXITCODE -ne 0) {
+    # Check if the experiment_manager.py exited with a user-abort code.
+    if ($LASTEXITCODE -eq $AUDIT_ABORTED_BY_USER) {
+        Write-Host "`n######################################################" -ForegroundColor Yellow
+        Write-Host "### Migration Process Aborted by User! ###" -ForegroundColor Yellow
+        Write-Host "######################################################`n" -ForegroundColor Yellow
+        exit 0 # Exit successfully, as it was a user-initiated graceful abort
+    } elseif ($LASTEXITCODE -ne 0) {
+        # Any other non-zero exit code is a true error
         throw "ERROR: Migration process failed with exit code ${LASTEXITCODE}."
     }
 
     Write-Host "`n######################################################" -ForegroundColor Green
-    Write-Host "### Migration Finished Successfully! ###" -ForegroundColor Green
+    Write-Host "### Migration Finished Successfully!             ###" -ForegroundColor Green
     Write-Host "### Migrated data is in: '$($DestinationPath)'" -ForegroundColor Green
     Write-Host "######################################################`n" -ForegroundColor Green
 
