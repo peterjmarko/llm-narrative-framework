@@ -177,7 +177,7 @@ def finalize_log(log_file_path):
         f.write('\n')
         f.write('BatchSummary,StartTime,EndTime,TotalDuration,Completed,Failed\n')
         f.write(f'Totals,{summary_start_time},{summary_end_time},{total_duration_str},{completed_count},{failed_count}\n')
-    print(f"Cleaned and appended batch summary to {os.path.basename(log_file_path)}")
+    print(f"Cleaned and appended batch summary to:\n{log_file_path}")
 
 # --- Main Execution ---
 
@@ -214,7 +214,7 @@ def main():
             try:
                 # Back up the old log by moving it
                 os.rename(log_file_path, backup_path)
-                print(f"Archived existing log to: {os.path.basename(backup_path)}")
+                print(f"Archived existing log to:\n{backup_path}")
             except OSError as e:
                 print(f"Error: Could not back up existing log file: {e}", file=sys.stderr)
                 sys.exit(1)
@@ -233,7 +233,7 @@ def main():
             backup_path = f"{log_file_path}.{timestamp}.bak"
             try:
                 os.rename(log_file_path, backup_path)
-                print(f"Backed up existing log to {os.path.basename(backup_path)} before rebuild.")
+                print(f"Backed up existing log to:\n{backup_path}\nbefore rebuild.")
             except OSError as e:
                 print(f"Error: Could not back up existing log file: {e}", file=sys.stderr)
                 sys.exit(1)

@@ -128,7 +128,8 @@ function Invoke-PythonScript {
     $finalArgs = $prefixArgs + $ScriptName + $Arguments
 
     # Use -join to correctly format the command for logging
-    Write-Host "[${StepName}] Executing: $executable $($finalArgs -join ' ')"
+    Write-Host "[${StepName}] Executing:"
+    Write-Host "  $executable $($finalArgs -join ' ')" # Indent the command path
 
     # Execute the command with its final argument list, capturing output
     $output = & $executable $finalArgs 2>&1
@@ -184,7 +185,7 @@ function Invoke-PythonScript {
             $finalSummaryMatch = [regex]::Match($outputBlock, "-> Generated summary:\s*(.*final_summary_results\.csv.*)")
             if ($finalSummaryMatch.Success) {
                 $finalSummaryLine = $finalSummaryMatch.Groups[1].Value.Trim()
-                Write-Host "  - Generated final study summary: $finalSummaryLine"
+                Write-Host "  - Generated final study summary:`n    $finalSummaryLine" # Newline before path
             }
 
             $output | Select-String -Pattern "Aggregation process finished" | ForEach-Object { $_.Line }
@@ -227,7 +228,8 @@ try {
     $ResolvedPath = Resolve-Path -Path $StudyDirectory -ErrorAction Stop
     
     Write-Host "`n######################################################" -ForegroundColor Green
-    Write-Host "### Starting Study Processing for: '$($ResolvedPath)'" -ForegroundColor Green
+    Write-Host "### Starting Study Processing for:" -ForegroundColor Green
+    Write-Host "### '$($ResolvedPath)'" -ForegroundColor Green # Newline before path
     Write-Host "######################################################`n"
 
     # --- Step 1: Aggregate All Results into a Master CSV ---
@@ -239,7 +241,7 @@ try {
     Write-Host "######################################################" -ForegroundColor Green
     Write-Host "### Study Processing Finished Successfully!" -ForegroundColor Green
     Write-Host "######################################################`n"
-    Write-Host "Final analysis logs and plots are located in: '$($ResolvedPath)\anova'"
+    Write-Host "Final analysis logs and plots are located in:`n'$($ResolvedPath)\anova'" # Newline before path
 
 }
 catch {

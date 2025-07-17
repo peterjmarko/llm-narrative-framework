@@ -84,12 +84,12 @@ def main():
     # Find the report file
     report_files = glob.glob(os.path.join(run_dir, "replication_report_*.txt"))
     if not report_files:
-        print(f"Error: No 'replication_report_*.txt' file found in '{run_dir}'")
+        print(f"\nError: No 'replication_report_*.txt' file found in:\n'{run_dir}'")
         sys.exit(1)
     
     report_path = report_files[0] # Assume there's only one
 
-    print(f"Processing: '{os.path.basename(run_dir)}'")
+    print(f"\nProcessing:\n'{run_dir}'")
     with open(report_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
@@ -121,7 +121,7 @@ def main():
     with open(dest_config_path, 'w', encoding='utf-8') as config_file:
         config.write(config_file)
     
-    print(f"  -> Success: Created '{os.path.basename(dest_config_path)}'")
+    print(f"  -> Success: Created:\n     '{dest_config_path}'")
 
 if __name__ == "__main__":
     main()

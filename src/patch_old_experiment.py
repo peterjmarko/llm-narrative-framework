@@ -81,10 +81,11 @@ def main():
             if "Success" in result.stdout:
                 patched_count += 1
                 # Print the output from the worker script so the user sees the progress.
+                # This output already contains the desired newline and path format from restore_config.py
                 print(result.stdout.strip())
 
         except subprocess.CalledProcessError as e:
-            print(f"Failed to process '{os.path.basename(run_dir)}'. Error:\n{e.stderr}")
+            print(f"\nFailed to process '{os.path.basename(run_dir)}'. Error:\n{e.stderr}")
 
     print("\n--- Patching complete ---")
     print(f"Scanned {len(run_dirs)} directories.")

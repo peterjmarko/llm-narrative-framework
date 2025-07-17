@@ -154,8 +154,10 @@ try {
     Write-Host "`n======================================================" -ForegroundColor Cyan
     Write-Host "### Step 1/2: Copying Experiment Data ###" -ForegroundColor Cyan
     Write-Host "======================================================`n" -ForegroundColor Cyan
-    Write-Host "Source:      $SourcePath"
-    Write-Host "Destination: $DestinationPath"
+    Write-Host "Source:"
+    Write-Host "             $SourcePath"
+    Write-Host "Destination:"
+    Write-Host "             $DestinationPath"
     Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
     Write-Host "`nCopy complete."
 
@@ -194,7 +196,8 @@ try {
 
     Write-Host "`n######################################################" -ForegroundColor Green
     Write-Host "### Migration Finished Successfully!             ###" -ForegroundColor Green
-    Write-Host "### Migrated data is in: '$($DestinationPath)'" -ForegroundColor Green
+    Write-Host "### Migrated data is in:" -ForegroundColor Green
+    Write-Host "### '$($DestinationPath)'" -ForegroundColor Green
     Write-Host "######################################################`n" -ForegroundColor Green
 
 }

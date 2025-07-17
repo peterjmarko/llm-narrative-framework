@@ -232,7 +232,7 @@ def main():
             if args.base_seed: cmd1.extend(["--base_seed", str(args.base_seed)])
             if args.qgen_base_seed: cmd1.extend(["--qgen_base_seed", str(args.qgen_base_seed)])
             
-            output1, return_code1, error_obj1 = run_script(cmd1, "1. Build Queries", quiet=args.quiet)
+            output1, return_code1, error_obj1 = run_script(cmd1, "1. Build LLM Queries", quiet=args.quiet)
             all_stage_outputs.append(output1)
             if return_code1 != 0: raise error_obj1 # Propagate error if not clean exit
             
@@ -243,7 +243,7 @@ def main():
             if return_code2 != 0: raise error_obj2 # Propagate error if not clean exit
 
         else:
-            logging.info("Skipping Stage 1 (Build Queries) and Stage 2 (Run LLM Sessions) due to --reprocess flag.")
+            logging.info("Skipping Stage 1 (Build LLM Queries) and Stage 2 (Run LLM Sessions) due to --reprocess flag.")
 
         # Stage 3: Process LLM Responses
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path] # Changed to named argument
@@ -288,7 +288,7 @@ def main():
             if n_valid_responses != -1:
                 cmd4.extend(["--num_valid_responses", str(n_valid_responses)])
 
-            output4, return_code4, error_obj4 = run_script(cmd4, "4. Analyze Performance", quiet=args.quiet)
+            output4, return_code4, error_obj4 = run_script(cmd4, "4. Analyze LLM Performance", quiet=args.quiet)
             all_stage_outputs.append(output4)
             if return_code4 != 0: raise error_obj4 # Propagate error if not clean exit
             

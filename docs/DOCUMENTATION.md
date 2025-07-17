@@ -32,12 +32,13 @@ The result is a clean dataset of personality profiles where the connection to th
 
 ## Key Features
 
--   **Automated Batch Execution**: The `experiment_manager.py` script, driven by a simple PowerShell wrapper, manages entire experimental batches. It can run hundreds of replications, intelligently skipping completed ones to resume interrupted runs, and provides real-time ETA updates.
+-   **Automated Batch Execution**: The `experiment_manager.py` script, driven by a simple PowerShell wrapper, manages entire experimental batches. It can run hundreds of replications, intelligently skipping completed ones to resume interrupted runs, and provides real-time ETA updates including "Time Elapsed" and "Time Remaining".
 -   **Powerful Reprocessing Engine**: The manager's `--reprocess` mode allows for re-running the data processing and analysis stages on existing results without repeating expensive LLM calls. This makes it easy to apply analysis updates or bug fixes across an entire experiment.
 -   **Guaranteed Reproducibility**: On every new run, the `config.ini` file is automatically archived in the run's output directory, permanently linking the results to the exact parameters that generated them.
 -   **Standardized, Comprehensive Reporting**: Each replication produces a `replication_report.txt` file containing run parameters, status, a human-readable statistical summary, and a machine-parsable JSON block with all key metrics. This format is identical for new runs and reprocessed runs.
 -   **Hierarchical Analysis & Aggregation**: The `experiment_aggregator.py` script performs a bottom-up aggregation of all data, generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and a master `STUDY_results.csv`) for a fully auditable research archive.
 -   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `replication_log_manager.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
+-   **Enhanced Console Readability**: All console outputs for file paths, commands, and key statuses are now formatted with consistent newlines and indentation, greatly improving log clarity and user experience during long runs.
 -   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `experiment_aggregator.py` prepares a master dataset, which `study_analysis.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
 
 ## Visual Architecture
@@ -83,13 +84,13 @@ This is the primary workflow for generating new experimental data. The PowerShel
 
 Each replication executes the four core pipeline stages in sequence:
 
-1.  **Query Generation**: `orchestrate_replication.py` first calls `build_llm_queries.py`. This script samples personalities from the master database (without replacement) and orchestrates the `query_generator.py` worker to create the prompt, a ground-truth mapping, and an audit manifest for each trial.
+1.  **Build LLM Queries**: `orchestrate_replication.py` first calls `build_llm_queries.py`. This script samples personalities from the master database (without replacement) and orchestrates the `query_generator.py` worker to create the prompt, a ground-truth mapping, and an audit manifest for each trial.
 
 2.  **LLM Interaction**: Next, `run_llm_sessions.py` is called. It manages sending each generated query to the LLM via the `llm_prompter.py` worker and saves the responses.
 
 3.  **Response Processing**: `process_llm_responses.py` parses the raw text responses from the LLM into a structured table of similarity scores.
 
-4.  **Performance Analysis**: Finally, `analyze_llm_performance.py` performs the final statistical analysis for the replication. It calculates key metrics (MRR, Top-1 Accuracy, effect size), uses non-parametric tests to assess significance against chance, and embeds a comprehensive JSON summary of the results into the final report.
+4.  **Analyze LLM Performance**: Finally, `analyze_llm_performance.py` performs the final statistical analysis for the replication. It calculates key metrics (MRR, Top-1 Accuracy, effect size), uses non-parametric tests to assess significance against chance, and embeds a comprehensive JSON summary of the results into the final report.
 
 <div align="center">
   <img src="images/architecture_workflow_1_run_experiment.png" width="111%">

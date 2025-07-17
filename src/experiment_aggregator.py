@@ -149,12 +149,12 @@ def write_summary_csv(output_path, results_list):
     
     df = df[fieldnames]
     df.to_csv(output_path, index=False)
-    logging.info(f"  -> Generated summary: {output_path} ({len(df)} rows)")
+    logging.info(f"  -> Generated summary:\n    {output_path} ({len(df)} rows)")
 
 def run_hierarchical_mode(base_dir):
-    logging.info(f"Running in hierarchical mode on: {base_dir}")
+    logging.info(f"Running in hierarchical mode on:\n{base_dir}")
     for current_dir, subdirs, files in os.walk(base_dir, topdown=False):
-        print(f"\nProcessing directory: {current_dir}")
+        print(f"\nProcessing directory:\n{current_dir}")
         level_results = []
         
         report_files = glob.glob(os.path.join(current_dir, 'replication_report_*.txt'))
