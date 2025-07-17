@@ -233,6 +233,10 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
     """
     Robustly parses LLM response text into a k x k numerical score matrix using a fully manual
     line-by-line, field-by-field approach to maximize flexibility and error tolerance.
+    It uses a two-stage strategy:
+    1. Primary: Extracts text from a markdown code block (```...```).
+    2. Fallback: If no markdown is found, it attempts to parse the last k+1 non-empty lines.
+
     It specifically handles:
     - Markdown code block fences.
     - Prioritizes tab-separated parsing as per instruction, falls back to flexible space/pipe splitting.
@@ -247,11 +251,31 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
     is_rejected = False # Initialize rejection flag
 
     try:
-        # 1. Isolate the table text, removing markdown fences (```python ... ```)
-        table_text = response_text
+        # 1. Isolate the table text.
+        # Primary Strategy: Look for a markdown code block.
+        table_text = ""
         code_block_match = re.search(r"```(?:[a-zA-Z]+\n)?(.*?)```", response_text, re.DOTALL)
+        
         if code_block_match:
+            logging.debug("Found table in markdown code block.")
             table_text = code_block_match.group(1).strip()
+        else:
+            # Fallback Strategy: No markdown block. Try to get the last k+1 non-empty lines.
+            logging.warning("No markdown block found. Attempting to parse last k+1 lines as fallback.")
+            warning_count += 1
+            
+            # Get all non-empty lines from the full response
+            all_lines = [line.strip() for line in response_text.split('\n') if line.strip()]
+            
+            if len(all_lines) >= k_value + 1:
+                # Take the slice of the last k+1 lines (header + k data rows)
+                candidate_lines = all_lines[-(k_value + 1):]
+                table_text = "\n".join(candidate_lines)
+                logging.debug(f"Using last {k_value + 1} non-empty lines as table candidate.")
+            else:
+                # Last resort: not enough lines for the fallback, so parse the whole response.
+                logging.warning(f"Not enough non-empty lines ({len(all_lines)}) for fallback. Reverting to parse entire response.")
+                table_text = response_text
 
         raw_lines = table_text.split('\n')
         

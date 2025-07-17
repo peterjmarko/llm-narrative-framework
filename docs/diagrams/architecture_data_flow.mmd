@@ -28,10 +28,11 @@ graph TD
         direction LR
         Art1_archive[("config.ini.archived")]:::artifact
         Art1_query["llm_query_XXX.txt"]:::artifact
-        Art1_mappings[("mappings.txt")]:::artifact
+        Art1_mappings_src[("mappings.txt<br/>(source)")]:::artifact
         Art1_manifest[("manifest.txt")]:::artifact
-        Art2_response["llm_response<br/>_XXX.txt"]:::artifact
+        Art2_response["llm_response_XXX.txt"]:::artifact
         Art3_scores["all_scores.txt"]:::artifact
+        Art3_mappings_analysis["all_mappings.txt<br/>(for analysis)"]:::artifact
         Art4_report["replication_report.txt"]:::artifact
         BatchRunLog[("batch_run_log.csv")]:::artifact
         RepResultsCSV[("REPLICATION_results.csv")]:::artifact
@@ -40,33 +41,34 @@ graph TD
         FinalOutputs(("STUDY_analysis_log.txt<br/>Boxplots/<br/>Diagnostics/")):::final
     end
 
-    %% Connections reflecting primary data flow only
+    %% Connections reflecting data flow
     Input_PDB & Input_Query & Input_Config --> Script1
+    Input_Config --> Art1_archive
+
     Script1 --> Art1_query
-    Script1 --> Art1_mappings
+    Script1 --> Art1_mappings_src
     Script1 --> Art1_manifest
-    Script1 --> Art1_archive
 
     Art1_query --> Script2
     Script2 --> Art2_response
-    Art2_response --> Script3
-    Art1_mappings --> Script3
-    Art1_manifest --> Script3
-    Script3 --> Art3_scores
 
-    Art3_scores & Art1_archive --> Script4
-    Art4_report --> Script4
+    Art2_response & Art1_mappings_src & Art1_manifest --> Script3
+    Script3 --> Art3_scores
+    Script3 --> Art3_mappings_analysis
+
+    Art3_scores & Art3_mappings_analysis & Art1_archive --> Script4
     Script4 --> Art4_report
 
-    Art4_report & Art1_archive --> Aggregator
+    Art4_report --> BatchRunLog
+    Art4_report --> Aggregator
+    Art1_archive --> Aggregator
+
     Aggregator --> RepResultsCSV
     Aggregator --> ExpResultsCSV
     Aggregator --> StudyResultsCSV
 
     StudyResultsCSV --> StudyAnalyzer
     StudyAnalyzer --> FinalOutputs
-
-    Art4_report --> BatchRunLog
 
     classDef input fill:#cde4ff,stroke:#6c93be,color:#333
     classDef script fill:#ffe8d6,stroke:#e59866,color:#333

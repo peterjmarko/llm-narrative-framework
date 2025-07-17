@@ -4,8 +4,10 @@
 
 .DESCRIPTION
     This script serves as a user-friendly wrapper for 'src/experiment_manager.py' with the '--reprocess' flag.
-    It first runs a preliminary audit to ensure the experiment is in a valid state for reprocessing.
-    It then forces the pipeline to regenerate analysis artifacts for a specified experiment directory.
+    It first runs a preliminary audit. If the audit finds issues that can be fixed by reprocessing,
+    it proceeds automatically. If the audit finds the experiment is already complete and valid,
+    it will prompt the user for confirmation before forcing a full update.
+
     This process involves two main steps:
     1. Regenerating the primary report ('replication_report.txt') for each individual run.
     2. Re-running the hierarchical aggregation to update all summary files ('REPLICATION_results.csv', 'EXPERIMENT_results.csv').
@@ -68,11 +70,19 @@ try {
 
     switch ($auditExitCode) {
         0 { # AUDIT_ALL_VALID
-            # The Python script has already printed a "complete and valid" message. Exit successfully.
-            return
+            # If the experiment is already valid, ask the user if they want to force a reprocess.
+            $promptMessage = "`nExperiment is already complete and valid. Do you want to force an update anyway? (y/n)"
+            $choice = Read-Host -Prompt $promptMessage
+            if ($choice.Trim().ToLower() -ne 'y') {
+                Write-Host "Update aborted by user." -ForegroundColor Yellow
+                return # Exit the script successfully without doing anything.
+            }
+            # If 'y', proceed to the reprocess step.
+            Write-Host "`nProceeding with forced update as requested..." -ForegroundColor Cyan
         }
         1 { # AUDIT_NEEDS_REPROCESS
-            # The Python script has already confirmed the experiment is ready. Proceed silently.
+            # The audit confirmed an update is needed. Let the user know we're proceeding.
+            Write-Host "`nAn update is required to fix analysis files. Proceeding..." -ForegroundColor Cyan
         }
         2 { # AUDIT_NEEDS_REPAIR
             # The audit script already printed the reason and recommendation. Exit with a failure code.
@@ -100,6 +110,13 @@ try {
 
     & $executable $prefixArgs $procArgs
     if ($LASTEXITCODE -ne 0) { throw "Re-processing failed with exit code $LASTEXITCODE" }
+
+    Write-Host "`n--- Running post-update audit to verify changes... ---" -ForegroundColor Cyan
+    & $executable $prefixArgs $auditArgs
+    if ($LASTEXITCODE -ne 0) {
+        # The update should result in a valid state (exit code 0). If not, something is wrong.
+        Write-Warning "Post-update audit failed. The experiment may still have unresolved issues."
+    }
 
     Write-Host "`nExperiment update completed successfully." -ForegroundColor Green
 } catch {

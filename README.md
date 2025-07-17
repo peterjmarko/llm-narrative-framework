@@ -28,18 +28,15 @@ Get-Content output/new_experiments/anova/STUDY_analysis_log.txt
 - PDM package manager
 - PowerShell (Windows/Linux/macOS)
 
-## 📚 Documentation
+## 📚 Documentation & Resources
 
-**[📖 Complete Documentation](docs/DOCUMENTATION.md)** - Detailed setup, usage, and architecture
+**[📖 Complete Documentation](docs/DOCUMENTATION.md)** - Detailed setup, usage, and architecture.
 
-**[🏗️ Architecture Diagrams](docs/images/)** - Visual workflow and system design
+**[🤝 Contributing Guide](CONTRIBUTING.md)** - How to set up a development environment and contribute.
 
-**[🤝 Contributing Guide](docs/CONTRIBUTING.md)** - Development and contribution guidelines
+**[📋 Changelog](CHANGELOG.md)** - Version history and updates.
 
-## 📄 Additional Resources
-
-- **[📋 Changelog](docs/CHANGELOG.md)** - Version history and updates
-- **[⚖️ License](docs/LICENSE.md)** - GPL v3.0 license terms
+**[⚖️ License](LICENSE.md)** - GPL v3.0 license terms.
 
 ## 🎯 Core Workflow
 

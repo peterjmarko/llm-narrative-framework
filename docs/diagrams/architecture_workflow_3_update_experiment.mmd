@@ -1,67 +1,45 @@
 graph TD
-    %% 1. Define all nodes first
+    %% 1. Nodes
     EntryPointPS["update_experiment.ps1<br/>(User Entry Point)"]:::entry_ps
-    EntryPointPy["experiment_manager.py<br/>(--reprocess Mode)"]:::entry_py
+    PreAudit["1. Audit Experiment<br/>(calls experiment_manager.py --verify-only)"]:::script
+    Decision{Audit Result?}:::decision
+    Prompt["Prompt User<br/>'Force Update?'"]:::user_interaction
+    Stop((Exit)):::stop_node
     
-    Orchestrate["orchestrate_replication.py<br/>(--reprocess Mode)"]:::layer_green
-    ReplicationReport[("replication_report.txt")]:::artifact
-    BiasAnalysis["run_bias_analysis.py"]:::script
+    Reprocess["2. Reprocess Experiment<br/>(calls experiment_manager.py --reprocess)"]:::entry_py
     
-    AggregatorInternal["experiment_aggregator.py<br/>(hierarchical mode)"]:::script
-    ReplResults[("REPLICATION_results.csv")]:::artifact
-    ExpResults[("EXPERIMENT_results.csv")]:::artifact
+    PostAudit["3. Verify Update<br/>(calls experiment_manager.py --verify-only)"]:::script
 
-    LogManagerRebuild["replication_log_manager.py<br/>(rebuild command)"]:::danger
-    LogManagerFinalize["replication_log_manager.py<br/>(finalize command)"]:::danger
-    BatchRunLog[("batch_run_log.csv")]:::artifact
-
-    %% 2. Define connections
-    EntryPointPS --> EntryPointPy
-    EntryPointPy -- "Calls in loop" --> Orchestrate
-    Orchestrate --> ReplicationReport
-    EntryPointPy -- "Calls in loop" --> BiasAnalysis
-    BiasAnalysis -- "Modifies" --> ReplicationReport
-
-    %% New: Aggregation happens after reprocessing loop, within EM's control
-    EntryPointPy -- "Calls after loop" --> AggregatorInternal
-    AggregatorInternal --> ReplResults
-    AggregatorInternal --> ExpResults
-
-    %% Original Finalization Steps (executed once by overall experiment_manager.py)
-    EntryPointPy -- "Finalizes" --> LogManagerRebuild
-    LogManagerRebuild --> BatchRunLog
-    EntryPointPy -- "Finalizes" --> LogManagerFinalize
-    LogManagerFinalize --> BatchRunLog
-
-    %% 3. Group nodes into subgraphs
-    subgraph "Workflow 3: Update an Experiment"
-        direction TB
-        EntryPointPS
-        EntryPointPy
-        subgraph "Reprocessing Actions (Orchestrated by experiment_manager.py)"
-            direction TB
-            Orchestrate
-            ReplicationReport
-            BiasAnalysis
-        end
-        subgraph "Aggregation After Reprocessing Loop"
-            direction TB
-            AggregatorInternal
-            ReplResults
-            ExpResults
-        end
-        subgraph "Overall Script Finalization"
-            direction TB
-            LogManagerRebuild
-            BatchRunLog
-            LogManagerFinalize
-        end
+    %% Details of reprocessing, shown as a separate conceptual block
+    subgraph "Internal Reprocessing Details"
+      direction TB
+      Orchestrate["orchestrate_replication.py<br/>(Loops over each run)"]:::layer_green
+      Aggregator["experiment_aggregator.py<br/>(Generates new summaries)"]:::layer_green
     end
+    
+    %% 2. Connections
+    EntryPointPS --> PreAudit
+    PreAudit --> Decision
+    
+    Decision -- "VALIDATED" --> Prompt
+    Decision -- "NEEDS_REPROCESS" --> Reprocess
+    Decision -- "INVALID" --> Stop
+    
+    Prompt -- "Yes" --> Reprocess
+    Prompt -- "No" --> Stop
+    
+    Reprocess -- "Internally calls" --> Orchestrate
+    Reprocess -- " " --> Aggregator
+    
+    Reprocess --> PostAudit
 
-    %% 4. Styling
+    %% 3. Styling
     classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef decision fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef user_interaction fill:#d9534f,stroke:#d43f3a,color:#fff;
     classDef entry_py fill:#f0ad4e,stroke:#eea236,color:#333;
     classDef layer_green fill:#5cb85c,stroke:#4cae4c,color:#fff;
-    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
-    classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;
-    classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef stop_node fill:#fff,stroke:#d9534f,color:#d9534f;
+    
+    class Stop stop_node;

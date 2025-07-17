@@ -124,7 +124,8 @@ In addition to the per-replication table, the audit provides an `Overall Summary
 
 #### Workflow 3: Update an Experiment
 
-This workflow allows you to re-run the data processing and analysis stages on an existing experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag. This action first prompts for user confirmation, then regenerates the primary report (`replication_report.txt`) for each run and performs a full re-aggregation, ensuring that all summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`) are also brought up to date.
+This workflow allows you to re-run the data processing and analysis stages on an existing experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag.
+It first performs an audit. If the experiment has analysis errors, it proceeds to update it. If the experiment is already `VALIDATED`, it will prompt for user confirmation before forcing a full reprocessing. This action regenerates the primary report (`replication_report.txt`) for each run and performs a full re-aggregation, ensuring all summary files are brought up to date.
 
 {{diagram:docs/diagrams/architecture_workflow_3_update_experiment.mmd | scale=2.5 | width=111%}}
 

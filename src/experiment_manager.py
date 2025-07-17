@@ -1087,11 +1087,20 @@ def main():
                     sys.exit(AUDIT_ABORTED_BY_USER)
 
             elif audit_result_code == AUDIT_NEEDS_REPROCESS or force_reprocess_once:
+                # If forcing a reprocess on a clean experiment, the payload will be empty.
+                # We must populate it with all run directories to ensure they are processed.
+                if force_reprocess_once and not payload_details:
+                    print(f"\n{C_YELLOW}Forcing reprocess on a VALIDATED experiment. All runs will be updated.{C_RESET}")
+                    all_run_dirs = sorted([p for p in Path(final_output_dir).glob("run_*") if p.is_dir()])
+                    payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
+
                 confirm = 'Y'
+                # The PowerShell wrappers already prompt the user. This prompt is for direct script execution.
                 if not (is_migration_run or force_reprocess_once):
-                    confirm = input(f"\n{C_YELLOW}Do you wish to proceed with the update? (Y/N): {C_RESET}").strip().upper()
+                    confirm = input(f"\n{C_YELLOW}The experiment is ready for an update. Do you wish to proceed? (Y/N): {C_RESET}").strip().upper()
                 else:
-                    print(f"\n{C_YELLOW}Automatically proceeding with update as part of migration/forced run.{C_RESET}")
+                    # When called by a wrapper with --reprocess or during migration, we proceed automatically.
+                    print(f"\n{C_YELLOW}Automatically proceeding with update as part of migration or a forced reprocess run.{C_RESET}")
 
                 if force_reprocess_once: force_reprocess_once = False # Only force once
 

@@ -104,12 +104,12 @@ git checkout -b fix/correct-data-parsing-error
 
 Write your code, update data, or adjust documentation as needed.
 
-*   **Code**: Modify the Python files in `src/` or `tests/`. The pre-commit hooks will automatically handle formatting (Black) and linting (Flake8).
-*   **Data**: The project's ground truth is stored in the `data/` directory, particularly the file containing the 5,000 historical individuals and their verified birth data. If you are adding or correcting entries, edit this source file directly. Changes here are significant, so please justify them clearly in your pull request.
-*   **Documentation**: The project's main documentation is generated from source files in the `docs/` directory.
-    -   To edit the main documentation, modify `docs/DOCUMENTATION.template.md` and its diagram files.
-    -   To edit this contribution guide, modify the `CONTRIBUTING.md` file at the project root.
-    -   The `pdm run build-docs` command (run by the pre-commit hook) will automatically generate the final `docs/DOCUMENTATION.md`, `docs/DOCUMENTATION.docx`, and `docs/CONTRIBUTING.docx`. **Do not edit generated files directly.**
+*   **Code**: Modify the Python files in `src/` or `tests/`. Pre-commit hooks handle formatting and linting.
+*   **Data**: Edit the source file in the `data/` directory. Justify changes to this ground-truth data in your pull request.
+*   **Documentation**: Source files are located in both the project root and the `docs/` directory.
+    -   To edit the main documentation, modify `docs/DOCUMENTATION.template.md` and its diagram sources in `docs/diagrams/`.
+    -   To edit this guide, `CHANGELOG.md`, or `LICENSE.md`, modify the files in the project root.
+    -   The `pdm run build-docs` command generates all final `.md` and `.docx` files inside the `docs/` folder. **Do not edit generated files directly.**
 
 ### 3. Run the Test Suite
 

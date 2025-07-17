@@ -425,11 +425,15 @@ def main():
         if not convert_to_docx(pypandoc, readme_docx, project_root, source_md_content=pandoc_content):
             sys.exit(1)
         
-        contrib_md_path = os.path.join(project_root, 'docs/CONTRIBUTING.md')
-        if os.path.exists(contrib_md_path):
-            contrib_docx_path = os.path.join(project_root, 'docs/CONTRIBUTING.docx')
-            if not convert_to_docx(pypandoc, contrib_docx_path, project_root, source_md_path=contrib_md_path):
-                sys.exit(1)
+        # Convert root-level markdown files to DOCX in the docs/ directory
+        root_md_files = ["CONTRIBUTING.md", "CHANGELOG.md", "LICENSE.md"]
+        for md_filename in root_md_files:
+            source_path = os.path.join(project_root, md_filename)
+            if os.path.exists(source_path):
+                output_filename = os.path.splitext(md_filename)[0] + ".docx"
+                output_path = os.path.join(project_root, 'docs', output_filename)
+                if not convert_to_docx(pypandoc, output_path, project_root, source_md_path=source_path):
+                    sys.exit(1)
         
         print(f"\n{Colors.GREEN}{Colors.BOLD}All documents built successfully.{Colors.RESET}")
 
