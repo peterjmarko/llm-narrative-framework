@@ -5,6 +5,39 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.3.2 (2025-07-17)
+
+### Refactor
+
+- **output**: improve console readability and state handling
+
+This commit introduces several user experience improvements and refines
+the experiment manager's state handling:
+
+- **Enhanced `NEW_NEEDED` state handling**: The `experiment_manager.py` now
+  prioritizes the `NEW_NEEDED` state, allowing it to directly initiate
+  new experiment runs without an initial, potentially misleading, audit
+  report when the target directory is empty. This prevents premature abortion
+  of new experiments.
+
+- **Improved progress reporting**: The `experiment_manager.py` now provides
+  a "Time Remaining" metric alongside "Time Elapsed" and "ETA" during new
+  replication runs, offering more granular progress insight.
+
+- **Standardized stage names**: Updated the stage names printed by
+  `orchestrate_replication.py` to "Build LLM Queries" and "Analyze LLM Performance"
+  for consistency with script names and improved clarity.
+
+- **Refined console output formatting**: Implemented consistent newline
+  and indentation formatting for file and directory paths across
+  `migrate_experiment.ps1`, `analyze_study.ps1`, `src/experiment_manager.py`,
+  `src/experiment_aggregator.py`, `src/replication_log_manager.py`,
+  `src/patch_old_experiment.py`, and `src/restore_config.py`. This significantly
+  enhances the readability of console logs.
+
+- **Documentation updates**: Reflected all new features and output
+  enhancements in `CONTRIBUTING.md` and `docs/DOCUMENTATION.template.md`.
+
 ## v2.3.1 (2025-07-17)
 
 ### Fix
