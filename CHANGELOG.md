@@ -5,6 +5,37 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.3.1 (2025-07-17)
+
+### Fix
+
+- **migration**: enhance robustness and user feedback
+
+This commit addresses several issues to improve the reliability and clarity
+of the experiment migration workflow:
+
+- **Fix `rebuild_reports.py` argument parsing**: `rebuild_reports.py` now correctly
+  accepts `--reprocess`, `--run_output_dir`, and `--quiet` arguments,
+  resolving the `unrecognized arguments` error during migration's re-processing step.
+  This allows `experiment_manager.py` to use `rebuild_reports.py` as a single-run
+  worker for individual replication report regeneration.
+
+- **Fix `experiment_manager.py` full replication repair**: Corrected a `NameError`
+  in `_run_full_replication_repair` where the `run_dir` variable was not
+  re-defined after deleting and recreating a run directory. The fix ensures
+  the newly created directory's path is correctly identified for subsequent
+  bias analysis and logging.
+
+- **Improve `tqdm` progress bar width**: Adjusted `tqdm` calls in `experiment_manager.py`
+  to set a fixed column width (80 characters) for progress bars, ensuring consistent
+  and readable output in various terminal environments.
+
+- **Add post-migration audit in `migrate_experiment.ps1`**: Introduced a final
+  `--verify-only` audit step at the end of the `migrate_experiment.ps1` script.
+  This provides explicit, automated confirmation to the user that the entire
+  migration and self-healing process has completed successfully, showing the
+  "VALIDATED" status for all runs and the "COMPLETE" experiment aggregation status.
+
 ## v2.3.0 (2025-07-17)
 
 ### Feat
