@@ -50,7 +50,7 @@ The result is a clean dataset of personality profiles where the connection to th
 
 The project's architecture can be understood through four different views: the code architecture, the workflows, the data flow, and the experimental logic.
 
-### Code Architecture Diagrams
+### Code Architecture Diagram
 The codebase can be divided into the following components:
 
 1.  **Main User Entry Points**: The PowerShell scripts that users directly execute to initiate various workflows (e.g., `run_experiment.ps1`, `analyze_study.ps1`).
@@ -63,11 +63,9 @@ The codebase can be divided into the following components:
 
 5.  **Shared Utilities**: Helper scripts and modules, like `config_loader.py`, that provide common functionality and are imported by multiple other scripts across different workflows.
 
-#### Codebase Architecture
-This diagram provides a comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.
-
 <div align="center">
-  <img src="images/codebase_architecture.png" width="111%">
+  <p>Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.</p>
+  <img src="images/codebase_architecture.png" width="100%">
 </div>
 
 ### Workflow Diagrams
@@ -104,7 +102,8 @@ Each replication executes a seven-stage pipeline:
 7.  **Finalize Replication**: Finally, `experiment_aggregator.py` is called on the run directory. It parses the newly created report and generates the `REPLICATION_results.csv` summary, marking the replication as fully complete and valid.
 
 <div align="center">
-  <img src="images/architecture_workflow_1_run_experiment.png" width="111%">
+  <p>Workflow 1: Run an Experiment. The primary workflow for generating new experimental data.</p>
+  <img src="images/architecture_workflow_1_run_experiment.png" width="100%">
 </div>
 
 #### Workflow 2: Audit an Experiment
@@ -112,7 +111,8 @@ Each replication executes a seven-stage pipeline:
 This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag. The full audit report, including subprocess outputs, is also saved to `audit_log.txt` within the audited directory.
 
 <div align="center">
-  <img src="images/architecture_workflow_2_audit_experiment.png" width="111%">
+  <p>Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.</p>
+  <img src="images/architecture_workflow_2_audit_experiment.png" width="100%">
 </div>
 
 ##### Interpreting the Audit Report
@@ -146,7 +146,8 @@ This workflow allows you to re-run the data processing and analysis stages on an
 It first performs an audit. If the experiment has analysis errors, it proceeds to update it. If the experiment is already `VALIDATED`, it will prompt for user confirmation before forcing a full reprocessing. This action regenerates the primary report (`replication_report.txt`) for each run and performs a full re-aggregation, ensuring all summary files are brought up to date.
 
 <div align="center">
-  <img src="images/architecture_workflow_3_update_experiment.png" width="111%">
+  <p>Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.</p>
+  <img src="images/architecture_workflow_3_update_experiment.png" width="100%">
 </div>
 
 #### Workflow 4: Migrate Old Experiment Data
@@ -163,7 +164,8 @@ The PowerShell entry point (`migrate_experiment.ps1`) now performs four key step
 4.  **Final Validation Audit**: After the `experiment_manager.py` completes its work and the experiment is deemed `COMPLETE`, `migrate_experiment.ps1` runs a final read-only audit on the newly migrated experiment. This provides explicit confirmation that the migration process was successful and the data is fully `VALIDATED`.
 
 <div align="center">
-  <img src="images/architecture_workflow_4_migrate_data.png" width="111%">
+  <p>Workflow 4: Migrate Old Experiment Data. provides a safe, non-destructive process to transform older or malformed experimental data to the current pipeline's format.</p>
+  <img src="images/architecture_workflow_4_migrate_data.png" width="100%">
 </div>
 
 #### Workflow 5: Analyze a Study
@@ -171,7 +173,8 @@ The PowerShell entry point (`migrate_experiment.ps1`) now performs four key step
 This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
 
 <div align="center">
-  <img src="images/architecture_workflow_5_analyze_study.png" width="111%">
+  <p>Workflow 5: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.</p>
+  <img src="images/architecture_workflow_5_analyze_study.png" width="100%">
 </div>
 
 ### Data Flow Diagram
@@ -179,7 +182,8 @@ This workflow is used after all experiments are complete to aggregate results an
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
 <div align="center">
-  <img src="images/architecture_data_flow.png" width="90%">
+  <p>Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.</p>
+  <img src="images/architecture_data_flow.png" width="75%">
 </div>
 
 ### Experimental Logic Flowchart
@@ -187,7 +191,8 @@ This diagram shows how data artifacts (files) are created and transformed by the
 This diagram illustrates the scientific methodology for a single replication run.
 
 <div align="center">
-  <img src="images/architecture_experimental_logic.png" width="70%">
+  <p>Experimental Logic Flowchart: Scientific methodology for a single replication run.</p>
+  <img src="images/architecture_experimental_logic.png" width="65%">
 </div>
 
 ## Experimental Hierarchy
@@ -204,7 +209,7 @@ The project's experiments are organized in a logical hierarchy:
 This logical hierarchy is reflected in the physical layout of the repository:
 
 <div align="center">
-  <img src="images/directory_structure.png" width="111%">
+  <img src="images/directory_structure.png" width="90%">
 </div>
 
 ## Setup and Installation

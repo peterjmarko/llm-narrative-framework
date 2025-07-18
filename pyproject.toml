@@ -33,6 +33,7 @@ dev = [
     "pdm>=2.20.1",
     "pytest-mock>=3.14.1",
     "commitizen>=3.31.0",
+    "python-docx>=0.8.11", # Added for DOCX post-processing
 ]
 
 [tool.pdm]

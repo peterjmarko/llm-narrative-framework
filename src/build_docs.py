@@ -190,23 +190,24 @@ def check_diagrams_are_up_to_date(project_root):
 def build_readme_content(project_root, flavor='viewer'):
     """
     Builds the full DOCUMENTATION.md content by processing the template,
-    injecting diagram placeholders and including other files.
+    injecting custom placeholders.
     """
     template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
     with open(template_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # --- Process diagram placeholders ---
-    # {{diagram:path/to/diagram.mmd}}
-    def replace_diagram_placeholder(match, flavor='viewer'):
-        diagram_source_rel_path = match.group(1).strip()
-        attributes_str = match.group(2) or ""
-
-        # Path must be relative to DOCUMENTATION.md, which is in the docs/ dir
+    # --- Helper for diagram-related paths ---
+    def _get_diagram_paths(diagram_source_rel_path):
         base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
-        image_rel_path = f"images/{base_name}.png"
-        
-        # Parse attributes like 'width=110%' into a dictionary
+        viewer_image_path = f"images/{base_name}.png"
+        pandoc_image_path = f"images/{base_name}.png" # For Pandoc's native image syntax (relative to docs/)
+        return viewer_image_path, pandoc_image_path
+
+    # --- Function to render a single diagram's Markdown or return raw path/attrs ---
+    # This will be called both by the main re.sub for {{diagram:}} and internally by {{grouped_figure:}}
+    def _render_single_diagram(diagram_source_rel_path, attributes_str, current_flavor, raw_pandoc_info_only=False):
+        viewer_image_path, pandoc_image_path = _get_diagram_paths(diagram_source_rel_path)
+
         attr_dict = {}
         if attributes_str:
             pairs = [p.strip() for p in attributes_str.split('|')]
@@ -215,28 +216,76 @@ def build_readme_content(project_root, flavor='viewer'):
                     key, value = pair.split('=', 1)
                     attr_dict[key.strip().lower()] = value.strip()
 
-        if flavor == 'pandoc':
-            # For DOCX: Generate Pandoc-style attributes string, e.g., {width="110%"}
-            pandoc_attr_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
-            pandoc_attributes = "{" + " ".join(pandoc_attr_parts) + "}" if pandoc_attr_parts else ""
-            # Pandoc syntax does not use a space before the attributes
-            return f"![]({image_rel_path}){pandoc_attributes}"
+        pandoc_attr_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
+        pandoc_attributes_string = "{" + " ".join(pandoc_attr_parts) + "}" if pandoc_attr_parts else ""
+
+        if raw_pandoc_info_only:
+            # For internal use by grouped_figure, return path and attribute string
+            return pandoc_image_path, pandoc_attributes_string
+
+        if current_flavor == 'pandoc':
+            return f"![]({pandoc_image_path}){pandoc_attributes_string}"
         else: # 'viewer' flavor
-            # For MD viewers: Generate a standard HTML <img> tag, which works everywhere.
             html_attrs_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
             html_attrs = " ".join(html_attrs_parts)
-            # Center the image using a div container
-            return f'<div align="center">\n  <img src="{image_rel_path}" {html_attrs.strip()}>\n</div>'
+            return f'<div align="center">\n  <img src="{viewer_image_path}" {html_attrs.strip()}>\n</div>'
 
-    
-    # Updated regex to capture the optional attribute part after a pipe |
-    # Use a lambda to pass the 'flavor' parameter to the placeholder function
+    # --- Process {{grouped_figure:...}} placeholders FIRST ---
+    # {{grouped_figure:diagram_path|attr1=val1|caption=Caption Text}}
+    def replace_grouped_figure_placeholder(match):
+        current_flavor = flavor # Use the outer 'flavor'
+        full_spec = match.group(1).strip()
+        
+        # Split by the first ' | caption=' to separate diagram_info from actual caption
+        diagram_info_part, *caption_part_list = re.split(r'\s*\|\s*caption=', full_spec, 1)
+
+        # Parse diagram info and attributes
+        diagram_parts = [p.strip() for p in diagram_info_part.split('|')]
+        diagram_source_rel_path = diagram_parts[0]
+        
+        attr_dict = {}
+        for part in diagram_parts[1:]:
+            if '=' in part:
+                key, value = part.split('=', 1)
+                attr_dict[key.strip().lower()] = value.strip()
+        
+        caption_text = caption_part_list[0] if caption_part_list else ""
+
+        # Render the nested diagram using the helper function to get raw path and attributes.
+        diagram_specific_attrs = '|'.join([f'{k}={v}' for k, v in attr_dict.items() if k not in ['caption']])
+        
+        # Call _render_single_diagram with the new flag to get path and attributes string, not full ![]()
+        diagram_image_path, diagram_attributes_string = _render_single_diagram(diagram_source_rel_path, diagram_specific_attrs, current_flavor='pandoc', raw_pandoc_info_only=True)
+
+        if current_flavor == 'pandoc':
+            # For DOCX, combine caption (markdown) and image into Pandoc's native figure syntax.
+            # The URL part of the outer figure is the image path, followed by attributes for the figure.
+            return f"![{caption_text}]({diagram_image_path}){diagram_attributes_string}"
+        else: # viewer flavor
+            # For MD viewers, render as an HTML block for center alignment and clarity.
+            html_attrs_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k not in ['scale', 'caption']]
+            html_attrs = " ".join(html_attrs_parts)
+            
+            clean_caption = re.sub(r'^\s*#+\s*', '', caption_text, flags=re.MULTILINE)
+            viewer_image_path, _ = _get_diagram_paths(diagram_source_rel_path)
+
+            return f'<div align="center">\n  <p>{clean_caption}</p>\n  <img src="{viewer_image_path}" {html_attrs.strip()}>\n</div>'
+
+    # Process grouped_figure FIRST to ensure its internal diagram is handled before main diagram re.sub
+    content = re.sub(r'\{\{grouped_figure:(.*?)\}\}', 
+                     replace_grouped_figure_placeholder, 
+                     content, flags=re.DOTALL) # Ensure DOTALL is here
+
+    # --- Process standalone {{diagram:...}} placeholders ---
+    # These will only be processed if they are NOT inside a {{grouped_figure}}
+    def replace_standalone_diagram_placeholder(match):
+        return _render_single_diagram(match.group(1), match.group(2) or "", flavor)
+
     content = re.sub(r'\{\{diagram:(.*?)(?:\|(.*?))?\}\}', 
-                     lambda m: replace_diagram_placeholder(m, flavor=flavor), 
+                     replace_standalone_diagram_placeholder, 
                      content)
 
-    # --- Process include placeholders ---
-    # {{include:path/to/file.txt}}
+    # --- Process {{include:...}} placeholders ---
     def replace_include_placeholder(match):
         include_rel_path = match.group(1)
         include_abs_path = os.path.join(project_root, include_rel_path)
@@ -248,11 +297,23 @@ def build_readme_content(project_root, flavor='viewer'):
             
     content = re.sub(r'\{\{include:(.*?)\}\}', replace_include_placeholder, content)
 
+    # --- Process {{pagebreak}} placeholders ---
+    def replace_pagebreak_placeholder(match):
+        if flavor == 'pandoc':
+            return r'\\newpage'
+        else:
+            return ''
+
+    content = re.sub(r'\{\{pagebreak\}\}', replace_pagebreak_placeholder, content)
+
     return content
 
 
 def render_all_diagrams(project_root, force_render=False):
-    """Renders all diagrams found in the template, returning True on success."""
+    """
+    Renders all diagrams found in the template, including those in {{grouped_figure}},
+    returning True on success.
+    """
     template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
     with open(template_path, 'r', encoding='utf-8') as f:
         content = f.read()
@@ -261,14 +322,39 @@ def render_all_diagrams(project_root, force_render=False):
     images_dir = os.path.join(project_root, 'docs', 'images')
     os.makedirs(images_dir, exist_ok=True)
     
-    all_diagrams_ok = True
+    diagrams_to_render = set() # Store (source_path, attributes_str) tuples to avoid duplicates
+
+    # Find standalone {{diagram:...}} placeholders
     for placeholder in re.finditer(r'\{\{diagram:(.*?)(?:\|(.*?))?\}\}', content):
         diagram_source_rel_path = placeholder.group(1).strip()
-        base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
-        image_rel_path = os.path.join('docs', 'images', f"{base_name}.png")
+        attributes_str = placeholder.group(2) or ""
+        diagrams_to_render.add((diagram_source_rel_path, attributes_str))
+
+    # Find diagrams inside {{grouped_figure:...}} placeholders
+    # Need to parse the full spec to extract the diagram_source_rel_path and its attributes
+    for placeholder in re.finditer(r'\{\{grouped_figure:(.*?)\}\}', content, flags=re.DOTALL):
+        full_spec = placeholder.group(1).strip()
         
+        # This parsing logic reuses the attribute extraction from build_readme_content
+        diagram_info_part, *caption_part_list = re.split(r'\s*\|\s*caption=', full_spec, 1)
+        diagram_parts = [p.strip() for p in diagram_info_part.split('|')]
+        diagram_source_rel_path = diagram_parts[0]
+        
+        # Reconstruct attributes string from diagram_parts[1:] for rendering purposes
+        attr_dict = {}
+        for part in diagram_parts[1:]:
+            if '=' in part:
+                key, value = part.split('=', 1)
+                attr_dict[key.strip().lower()] = value.strip()
+        reconstructed_attributes_str = '|'.join([f'{k}={v}' for k,v in attr_dict.items()])
+
+        diagrams_to_render.add((diagram_source_rel_path, reconstructed_attributes_str))
+        
+    all_diagrams_ok = True
+    for diagram_source_rel_path, attributes_str in diagrams_to_render:
+        base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
+        image_abs_path = os.path.join(project_root, 'docs', 'images', f"{base_name}.png")
         source_abs_path = os.path.join(project_root, diagram_source_rel_path)
-        image_abs_path = os.path.join(project_root, image_rel_path)
         
         should_render = False
         if force_render:
@@ -285,10 +371,10 @@ def render_all_diagrams(project_root, force_render=False):
                     print(f"    - Skipping {Colors.CYAN}{os.path.basename(diagram_source_rel_path)}{Colors.RESET} (up-to-date)")
             except FileNotFoundError:
                 print(f"    - {Colors.YELLOW}WARNING: Source file not found for comparison: {diagram_source_rel_path}. Will attempt to render.{Colors.RESET}")
-                should_render = True
+                # If source is missing, we must render or it'll fail later.
+                should_render = True 
 
         if should_render:
-            attributes_str = placeholder.group(2) or ""
             if diagram_source_rel_path.endswith('.mmd'):
                 scale_match = re.search(r'scale=([\d\.]+)', attributes_str)
                 scale = scale_match.group(1) if scale_match else '1.8'
@@ -298,7 +384,10 @@ def render_all_diagrams(project_root, force_render=False):
                 font_size = 22 if 'replication_report_format' in diagram_source_rel_path else 20 if 'analysis_log_format' in diagram_source_rel_path else 36
                 if not render_text_diagram(source_abs_path, image_abs_path, project_root, font_size=font_size):
                     all_diagrams_ok = False
-
+            else:
+                print(f"    - {Colors.YELLOW}WARNING: Unknown diagram type for {Colors.CYAN}{os.path.basename(diagram_source_rel_path)}{Colors.RESET}. Skipping rendering.{Colors.RESET}")
+                # Do not set all_diagrams_ok = False here unless you want the build to fail for unknown types.
+    
     if not all_diagrams_ok:
         print(f"\n{Colors.RED}{Colors.BOLD}--- BUILD FAILED: One or more diagrams could not be rendered. ---{Colors.RESET}")
     
@@ -316,18 +405,24 @@ def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path=Non
     logical_source_name = os.path.basename(source_md_path) if source_md_path else os.path.basename(output_docx_path).replace('.docx', '.md')
     output_filename = os.path.basename(output_docx_path)
     
-    # Base the resource path on the *output* file's location. This is more reliable.
-    if 'docs' in os.path.normpath(output_docx_path):
+    # Base the resource path on the directory containing the Markdown input file for Pandoc.
+    # This is standard for Pandoc's native image syntax.
+    if source_md_path:
+        resource_path = os.path.dirname(source_md_path)
+    else: # If content is passed as string (like DOCUMENTATION.md), assume it's from docs/
         resource_path = os.path.join(project_root, 'docs')
-    else:
-        resource_path = project_root
 
     print(f"    - Converting '{Colors.CYAN}{logical_source_name}{Colors.RESET}' to DOCX...")
     
     permission_error_printed = False
     while True:
         try:
-            extra_args = ['--standalone', '--resource-path', resource_path]
+            reference_docx_path = os.path.join(project_root, 'docs', 'custom_reference.docx')
+            extra_args = [
+                '--standalone',
+                '--resource-path', resource_path, # Use project_root as resource base
+                f'--reference-doc={reference_docx_path}'
+            ]
             
             # Use the correct pypandoc function based on the provided source
             if source_md_content:

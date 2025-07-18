@@ -20,8 +20,9 @@ __pycache__/
 # Ignore generated document and image files
 # The .template.md is the source of truth and is tracked by Git.
 docs/DOCUMENTATION.md
-*.docx
 docs/images/*.png
+*.docx
+!docs/custom_reference.docx # Explicitly allow the custom reference document
 
 
 # Intermediate and temporary files used by the pipeline

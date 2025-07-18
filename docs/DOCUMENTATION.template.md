@@ -50,7 +50,7 @@ The result is a clean dataset of personality profiles where the connection to th
 
 The project's architecture can be understood through four different views: the code architecture, the workflows, the data flow, and the experimental logic.
 
-### Code Architecture Diagrams
+### Code Architecture Diagram
 The codebase can be divided into the following components:
 
 1.  **Main User Entry Points**: The PowerShell scripts that users directly execute to initiate various workflows (e.g., `run_experiment.ps1`, `analyze_study.ps1`).
@@ -63,10 +63,7 @@ The codebase can be divided into the following components:
 
 5.  **Shared Utilities**: Helper scripts and modules, like `config_loader.py`, that provide common functionality and are imported by multiple other scripts across different workflows.
 
-#### Codebase Architecture
-This diagram provides a comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.
-
-{{diagram:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=111%}}
+{{grouped_figure:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.}}
 
 ### Workflow Diagrams
 The project's functionality is organized into five primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
@@ -101,13 +98,13 @@ Each replication executes a seven-stage pipeline:
 
 7.  **Finalize Replication**: Finally, `experiment_aggregator.py` is called on the run directory. It parses the newly created report and generates the `REPLICATION_results.csv` summary, marking the replication as fully complete and valid.
 
-{{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=111%}}
+{{grouped_figure:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 1: Run an Experiment. The primary workflow for generating new experimental data.}}
 
 #### Workflow 2: Audit an Experiment
 
 This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag. The full audit report, including subprocess outputs, is also saved to `audit_log.txt` within the audited directory.
 
-{{diagram:docs/diagrams/architecture_workflow_2_audit_experiment.mmd | scale=2.5 | width=111%}}
+{{grouped_figure:docs/diagrams/architecture_workflow_2_audit_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.}}
 
 ##### Interpreting the Audit Report
 The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It outputs a summary table with a high-level status for each replication run. The `Details` column provides granular error codes that pinpoint the exact problem. The final `Audit Result` and `Recommendation` suggest the next steps, if any.
@@ -139,7 +136,7 @@ In addition to the per-replication table, the audit provides an `Overall Summary
 This workflow allows you to re-run the data processing and analysis stages on an existing experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag.
 It first performs an audit. If the experiment has analysis errors, it proceeds to update it. If the experiment is already `VALIDATED`, it will prompt for user confirmation before forcing a full reprocessing. This action regenerates the primary report (`replication_report.txt`) for each run and performs a full re-aggregation, ensuring all summary files are brought up to date.
 
-{{diagram:docs/diagrams/architecture_workflow_3_update_experiment.mmd | scale=2.5 | width=111%}}
+{{grouped_figure:docs/diagrams/architecture_workflow_3_update_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.}}
 
 #### Workflow 4: Migrate Old Experiment Data
 
@@ -154,25 +151,25 @@ The PowerShell entry point (`migrate_experiment.ps1`) now performs four key step
     *   **Self-Healing Loop**: After pre-processing, the manager enters its standard `Verify -> Act` loop. If it detects remaining issues that reprocessing could not fix (e.g., missing raw response files), it will prompt the user to run the necessary repairs until the experiment is fully `VALIDATED`.
 4.  **Final Validation Audit**: After the `experiment_manager.py` completes its work and the experiment is deemed `COMPLETE`, `migrate_experiment.ps1` runs a final read-only audit on the newly migrated experiment. This provides explicit confirmation that the migration process was successful and the data is fully `VALIDATED`.
 
-{{diagram:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=111%}}
+{{grouped_figure:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data. provides a safe, non-destructive process to transform older or malformed experimental data to the current pipeline's format.}}
 
 #### Workflow 5: Analyze a Study
 
 This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
 
-{{diagram:docs/diagrams/architecture_workflow_5_analyze_study.mmd | scale=2.5 | width=111%}}
+{{grouped_figure:docs/diagrams/architecture_workflow_5_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
 
 ### Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
 
-{{diagram:docs/diagrams/architecture_data_flow.mmd | scale=2.5 | width=90%}}
+{{grouped_figure:docs/diagrams/architecture_data_flow.mmd | scale=2.5 | width=75% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.}}
 
 ### Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-{{diagram:docs/diagrams/architecture_experimental_logic.mmd | scale=2.5 | width=70%}}
+{{grouped_figure:docs/diagrams/architecture_experimental_logic.mmd | scale=2.5 | width=65% | caption=Experimental Logic Flowchart: Scientific methodology for a single replication run.}}
 
 ## Experimental Hierarchy
 
@@ -187,7 +184,7 @@ The project's experiments are organized in a logical hierarchy:
 
 This logical hierarchy is reflected in the physical layout of the repository:
 
-{{diagram:docs/diagrams/directory_structure.txt | scale=2.5 | width=111%}}
+{{diagram:docs/diagrams/directory_structure.txt | scale=2.5 | width=90%}}
 
 ## Setup and Installation
 
