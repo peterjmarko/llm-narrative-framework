@@ -45,6 +45,7 @@ import pandas as pd
 import numpy as np
 import logging
 import json
+import glob
 from io import StringIO
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s (run_bias_analysis): %(message)s')
@@ -139,17 +140,23 @@ def main():
     if not args.verbose:
         logging.getLogger().setLevel(logging.WARNING)
 
-    report_files = [f for f in os.listdir(args.replication_dir) if f.startswith("replication_report_") and f.endswith(".txt")]
-    if not report_files:
-        logging.error(f"No replication_report_*.txt file found in {args.replication_dir}. Aborting.")
+    metrics_filepath = os.path.join(args.replication_dir, "analysis_inputs", "replication_metrics.json")
+    if not os.path.exists(metrics_filepath):
+        logging.error(f"Metrics file not found at {metrics_filepath}. Aborting bias analysis.")
+        # Create a dummy report to prevent the orchestrator from thinking this stage needs to be re-run.
+        # This indicates a failure upstream that should be fixed there.
+        report_files = glob.glob(os.path.join(args.replication_dir, "replication_report_*.txt"))
+        if not report_files:
+             # If no report exists at all, create one noting the failure.
+            fail_report_path = os.path.join(args.replication_dir, f"replication_report_{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}_FAILED.txt")
+            with open(fail_report_path, 'w') as f:
+                f.write("Bias analysis failed: metrics JSON file not found.")
         return
-
-    report_filepath = os.path.join(args.replication_dir, sorted(report_files)[-1])
 
     df_long = build_long_format_df(args.replication_dir, args.k_value)
 
     if df_long is None or df_long.empty:
-        logging.warning("DataFrame is empty or could not be built. Writing null bias metrics to report to prevent looping.")
+        logging.warning("DataFrame is empty or could not be built. Writing null bias metrics.")
         bias_metrics = {
             "top1_pred_bias_std": None,
             "true_false_score_diff": None,
@@ -158,32 +165,18 @@ def main():
         bias_metrics = calculate_bias_metrics(df_long, args.k_value)
 
     try:
-        with open(report_filepath, 'r', encoding='utf-8') as f:
-            report_content = f.read()
+        with open(metrics_filepath, 'r', encoding='utf-8') as f:
+            report_data = json.load(f)
 
-        json_start_tag = "<<<METRICS_JSON_START>>>"
-        json_end_tag = "<<<METRICS_JSON_END>>>"
-        start_idx = report_content.find(json_start_tag)
-        end_idx = report_content.find(json_end_tag)
-
-        if start_idx == -1 or end_idx == -1:
-            logging.error(f"Could not find JSON block in {report_filepath}. Aborting update.")
-            return
-
-        json_string = report_content[start_idx + len(json_start_tag):end_idx].strip()
-        report_data = json.loads(json_string)
+        # Inject the new metrics
         report_data["positional_bias_metrics"] = bias_metrics
-        new_json_string = json.dumps(report_data, indent=4)
-        new_report_content = (
-            report_content[:start_idx + len(json_start_tag)] + "\n" + new_json_string + "\n" + report_content[end_idx:]
-        )
 
-        with open(report_filepath, 'w', encoding='utf-8') as f:
-            f.write(new_report_content)
-        logging.info(f"Successfully updated bias metrics in {report_filepath}")
+        with open(metrics_filepath, 'w', encoding='utf-8') as f:
+            json.dump(report_data, f, indent=4)
+        logging.info(f"Successfully updated metrics with bias analysis in {metrics_filepath}")
 
     except Exception as e:
-        logging.error(f"Failed to update report file {report_filepath}: {e}", exc_info=True)
+        logging.error(f"Failed to read/write metrics file {metrics_filepath}: {e}", exc_info=True)
 
 if __name__ == "__main__":
     main()

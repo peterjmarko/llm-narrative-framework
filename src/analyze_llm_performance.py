@@ -683,11 +683,17 @@ def main():
             'n_valid_responses': 0
         }
 
-        # Print success/JSON markers so the orchestrator considers this stage complete
+        # Define the output path for the metrics JSON file
+        metrics_filename = get_config_value(APP_CONFIG, 'Filenames', 'replication_metrics_json', fallback='replication_metrics.json')
+        metrics_filepath = os.path.join(analysis_inputs_dir, metrics_filename)
+        try:
+            with open(metrics_filepath, 'w', encoding='utf-8') as f:
+                json.dump(summary_data, f, indent=4)
+        except IOError as e:
+            logging.error(f"Could not write null metrics to {metrics_filepath}: {e}")
+
+        # Print success marker for the orchestrator
         print("\nANALYZER_VALIDATION_SUCCESS\n")
-        print("\n<<<METRICS_JSON_START>>>")
-        print(json.dumps(summary_data, indent=4))
-        print("<<<METRICS_JSON_END>>>")
         sys.exit(0) # Exit successfully
 
     if k_val_from_map_func is None:
@@ -886,9 +892,18 @@ def main():
         # Fallback for backward compatibility: count the loaded mappings
         summary_data['n_valid_responses'] = len(mappings_list) if mappings_list is not None else 0
 
-    print("\n<<<METRICS_JSON_START>>>")
-    print(json.dumps(summary_data))
-    print("<<<METRICS_JSON_END>>>")
+    # Define the output path for the metrics JSON file
+    metrics_filename = get_config_value(APP_CONFIG, 'Filenames', 'replication_metrics_json', fallback='replication_metrics.json')
+    metrics_filepath = os.path.join(analysis_inputs_dir, metrics_filename)
+
+    # Save the metrics to the JSON file
+    try:
+        with open(metrics_filepath, 'w', encoding='utf-8') as f:
+            json.dump(summary_data, f, indent=4)
+        if not args.quiet:
+            print(f"Successfully saved metrics to: {metrics_filepath}")
+    except IOError as e:
+        print(f"Error: Could not write metrics to {metrics_filepath}. Reason: {e}")
 
 if __name__ == "__main__":
     main()

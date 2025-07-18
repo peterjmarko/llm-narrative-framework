@@ -82,17 +82,21 @@ The project's functionality is organized into five primary workflows, each initi
 
 This is the primary workflow for generating new experimental data. The PowerShell entry point (`run_experiment.ps1`) calls the Python batch controller (`experiment_manager.py`), which in turn executes a loop of single replications using `orchestrate_replication.py`.
 
-Each replication executes the four core pipeline stages in sequence:
+Each replication executes a seven-stage pipeline:
 
-1.  **Build LLM Queries**: `orchestrate_replication.py` first calls `build_llm_queries.py`. This script samples personalities from the master database (without replacement) and orchestrates the `query_generator.py` worker to create the prompt, a ground-truth mapping, and an audit manifest for each trial.
+1.  **Build LLM Queries**: `orchestrate_replication.py` calls `build_llm_queries.py` to sample personalities and generate trial data, queries, and manifests.
 
-2.  **LLM Interaction**: Next, `run_llm_sessions.py` is called. It manages sending each generated query to the LLM via the `llm_prompter.py` worker and saves the responses.
+2.  **LLM Interaction**: `run_llm_sessions.py` is called to manage sending each query to the LLM and saving the raw responses.
 
-3.  **Response Processing**: `process_llm_responses.py` parses the raw text responses from the LLM into a structured table of similarity scores.
+3.  **Response Processing**: `process_llm_responses.py` parses the LLM's raw text responses into structured score and mapping files.
 
-4.  **Analyze LLM Performance**: `analyze_llm_performance.py` performs the statistical analysis for the replication, generating a base report with key metrics (MRR, Top-1 Accuracy, etc.) and an embedded JSON block.
-5.  **Run Bias Analysis**: `run_bias_analysis.py` then reads the base report, calculates positional bias metrics, and injects them into the report's JSON block, saving the updated file.
-6.  **Finalize Replication**: Finally, `experiment_aggregator.py` is called on the single run directory to generate the machine-readable `REPLICATION_results.csv` summary, marking the replication as fully complete.
+4.  **Analyze Performance**: `analyze_llm_performance.py` calculates the core performance metrics (MRR, Top-1 Accuracy, etc.) and saves them to a machine-readable `replication_metrics.json` file.
+
+5.  **Run Bias Analysis**: `run_bias_analysis.py` reads the `replication_metrics.json` file, calculates positional bias, and injects these new metrics back into the file.
+
+6.  **Generate Report**: The orchestrator generates the final, human-readable `replication_report.txt` by combining run parameters with the finalized data from `replication_metrics.json`.
+
+7.  **Finalize Replication**: Finally, `experiment_aggregator.py` is called on the run directory. It parses the newly created report and generates the `REPLICATION_results.csv` summary, marking the replication as fully complete and valid.
 
 <div align="center">
   <img src="images/architecture_workflow_1_run_experiment.png" width="111%">

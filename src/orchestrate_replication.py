@@ -268,48 +268,54 @@ def main():
         all_stage_outputs.append(output4)
         if rc4 != 0: raise err4
 
-        # --- REPORT GENERATION (MOVED) ---
-        # The base report is now created immediately after Stage 4.
-        # This allows Stage 5 to read and modify it.
-        # Clear any old report files first
-        for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
-            os.remove(old_report)
-        report_filename = f"replication_report_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
-        report_path = os.path.join(run_specific_dir_path, report_filename)
-        
-        # Assemble the report content
-        # (This is a simplified version of the logic previously in the `finally` block)
-        base_query_prompt_content = "--- Base query not loaded for brevity ---" # Simplified for this snippet
-        metrics_json_str = None
-        metrics_data = {}
-        analysis_summary_text = ""
-        # The full, complex logic for assembling the report header, params, and summary text would go here.
-        # For the sake of this change, we are assuming this logic is moved from the `finally` block.
-        
-        # Write the initial report file
-        with open(report_path, 'w', encoding='utf-8') as f:
-            # The full report content generation logic (previously in `finally`) would be here.
-            # We will use a placeholder for now, as the full block is very large.
-            f.write(f"--- PRELIMINARY REPORT for {os.path.basename(run_specific_dir_path)} ---\n")
-            f.write(output4) # Write the captured analysis output.
-        logging.info(f"Generated preliminary report: {report_path}")
-        
         # --- Stage 5: Run Bias Analysis ---
+        # This stage now reads and writes to the metrics.json file created by Stage 4.
         k_val = int(get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int, fallback=10))
         cmd5 = [sys.executable, bias_script, run_specific_dir_path, "--k_value", str(k_val)]
         if not args.quiet: cmd5.append("--verbose")
         output5, rc5, err5 = run_script(cmd5, "5. Run Bias Analysis", quiet=args.quiet)
         all_stage_outputs.append(output5)
         if rc5 != 0:
-            logging.warning(f"Stage 5 (Run Bias Analysis) failed but is non-critical. Error:\n{output5}")
+            # This is now considered a potential failure point if it can't update the metrics file.
+            logging.error(f"Stage 5 (Run Bias Analysis) failed. The final report may lack bias metrics. Error:\n{output5}")
+            # Decide if this should be a critical failure. For now, we'll log and continue.
 
-        # --- Stage 6: Finalize Replication (create REPLICATION_results.csv) ---
-        cmd6 = [sys.executable, aggregator_script, run_specific_dir_path, "--mode", "hierarchical"]
-        output6, rc6, err6 = run_script(cmd6, "6. Finalize Replication", quiet=args.quiet)
-        all_stage_outputs.append(output6)
-        if rc6 != 0:
-            logging.warning(f"Stage 6 (Finalize Replication) failed. The REPLICATION_results.csv may be missing.")
-            # This is not a critical failure for the run itself, but for the overall experiment health.
+        # --- Stage 6: Generate Final Report ---
+        # This stage generates the human-readable report from all prior artifacts.
+        # This MUST run before the aggregator so the aggregator has a report to parse.
+        stage_title = "6. Generate Final Report"
+        header = (f"\n\n{'='*80}\n### STAGE: {stage_title} ###\n{'='*80}\n\n")
+        print(f"--- Running Stage: {stage_title} ---")
+        
+        # Clear any old report files first.
+        for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
+            os.remove(old_report)
+
+        report_filename = f"replication_report_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
+        report_path = os.path.join(run_specific_dir_path, report_filename)
+        
+        try:
+            metrics_filepath = os.path.join(run_specific_dir_path, 'analysis_inputs', 'replication_metrics.json')
+            with open(metrics_filepath, 'r') as f: metrics_data = json.load(f)
+
+            with open(report_path, 'w', encoding='utf-8') as f:
+                f.write("REPLICATION RUN REPORT\n" + "="*80 + "\n")
+                f.write(f"Run Directory: {os.path.basename(run_specific_dir_path)}\n")
+                f.write(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M%S')}\nStatus: PENDING\n")
+                f.write("### Machine-Readable Metrics (JSON) ###\n<<<METRICS_JSON_START>>>\n")
+                f.write(json.dumps(metrics_data, indent=4) + "\n<<<METRICS_JSON_END>>>\n")
+            
+            output6 = header + f"Successfully generated report shell: {report_path}"
+            all_stage_outputs.append(output6)
+        except Exception as e:
+            logging.error(f"Failed during Stage 6 (Report Generation): {e}")
+            raise
+
+        # --- Stage 7: Create Replication Summary ---
+        cmd7 = [sys.executable, aggregator_script, run_specific_dir_path, "--mode", "hierarchical"]
+        output7, rc7, err7 = run_script(cmd7, "7. Create Replication Summary", quiet=args.quiet)
+        all_stage_outputs.append(output7)
+        if rc7 != 0: raise err7
 
         pipeline_status = "COMPLETED"
 
@@ -331,33 +337,34 @@ def main():
         # The logic for this is now consolidated with the success path.
         pass
 
-    # --- FINAL REPORT GENERATION (Consolidated) ---
-    # This block now runs on both success and failure to ensure a report is always generated.
-    # It reads the latest report file (which may have been updated by Stage 5) and enriches it
-    # with the full run logs.
-    # After the main try...except block, append the full logs to the report that was
-    # created and finalized by the stage scripts (Stages 4, 5, and 6).
+    # --- Finalization: Update Report Status and Append Logs ---
+    # This block runs regardless of success or failure. It finds the report
+    # created in Stage 6 and updates its status and appends full logs.
     latest_report_files = sorted(glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')))
     if latest_report_files:
         report_path = latest_report_files[-1]
         try:
-            with open(report_path, 'a', encoding='utf-8') as report_file:
-                # Append a clear separator and all the raw stage logs for debugging purposes.
-                report_file.write("\n\n\n" + "="*80)
-                report_file.write("\n### FULL STAGE LOGS ###\n")
-                report_file.write("="*80)
-                report_file.write("".join(all_stage_outputs))
+            # First, append the full logs to the existing file
+            with open(report_path, 'a', encoding='utf-8') as f:
+                f.write("\n\n" + "="*80 + "\n### FULL STAGE LOGS ###\n" + "="*80)
+                f.write("".join(all_stage_outputs))
+            
+            # Then, read the entire file and replace the status line
+            with open(report_path, 'r+', encoding='utf-8') as f:
+                content = f.read()
+                content = re.sub(r"^(Status: PENDING)$", f"Status: {pipeline_status}", content, flags=re.MULTILINE)
+                f.seek(0)
+                f.write(content)
+                f.truncate()
         except IOError as e:
-            logging.error(f"Could not append logs to final report {report_path}: {e}")
+            logging.error(f"Could not update final report {report_path}: {e}")
     else:
-        # If no report exists (e.g., pipeline failed before Stage 4), create a minimal failure report.
-        report_filename = f"replication_report_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}_FAILED.txt"
-        report_path = os.path.join(run_specific_dir_path, report_filename)
-        with open(report_path, 'w', encoding='utf-8') as report_file:
-            report_file.write(f"--- REPLICATION FAILED: {pipeline_status} ---\n")
-            report_file.write("".join(all_stage_outputs))
+        # If no report exists (major failure before Stage 6), create a simple failure log.
+        fail_log_path = os.path.join(run_specific_dir_path, 'orchestration_FAILURE.log')
+        with open(fail_log_path, 'w', encoding='utf-8') as f:
+             f.write(f"PIPELINE {pipeline_status}\n\n" + "".join(all_stage_outputs))
 
-    logging.info(f"Replication run finished. Report saved in directory: {os.path.basename(run_specific_dir_path)}")
+    logging.info(f"Replication run finished. Final status: {pipeline_status}")
 
 
 if __name__ == "__main__":

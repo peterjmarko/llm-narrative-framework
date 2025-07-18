@@ -20,8 +20,9 @@ graph TD
     AllMappings[("all_mappings.txt")]:::artifact
     AnalyzePerformance["4. analyze_llm_performance.py"]:::script
     BiasAnalysis["5. run_bias_analysis.py"]:::script
-    Aggregator["6. experiment_aggregator.py"]:::script
+    ReplicationMetrics[("replication_metrics.json")]:::artifact
     ReplicationReport[("replication_report.txt")]:::artifact
+    Aggregator["7. experiment_aggregator.py"]:::script
 
     %% 2. Define connections
     EntryPoint --> BatchManager
@@ -35,10 +36,11 @@ graph TD
     ReplicationOrchestrator --> ProcessResponses
     ReplicationOrchestrator --> AnalyzePerformance
     ReplicationOrchestrator --> BiasAnalysis
+    ReplicationOrchestrator -- "6. Generates Report" --> ReplicationReport
     ReplicationOrchestrator --> Aggregator
 
     %% Add invisible links to force the visual order of the stages
-    BuildQueries ~~~ RunSessions ~~~ ProcessResponses ~~~ AnalyzePerformance ~~~ BiasAnalysis ~~~ Aggregator
+    BuildQueries ~~~ RunSessions ~~~ ProcessResponses ~~~ AnalyzePerformance ~~~ BiasAnalysis ~~~ ReplicationReport ~~~ Aggregator
 
     BatchManager -- "Finalizes Batch" --> FinalAggregator
     FinalAggregator --> ExpResults
@@ -54,8 +56,11 @@ graph TD
     ProcessResponses --> AllMappings
     AllScores --> AnalyzePerformance
     AllMappings --> AnalyzePerformance
-    AnalyzePerformance --> ReplicationReport
-    BiasAnalysis -- "Modifies" --> ReplicationReport
+    AnalyzePerformance --> ReplicationMetrics
+    ReplicationMetrics --> BiasAnalysis
+    BiasAnalysis -- "Updates" --> ReplicationMetrics
+    ReplicationMetrics --> ReplicationReport
+    ReplicationReport --> Aggregator
 
     %% 3. Group nodes into subgraphs using their IDs
     subgraph "Workflow 1: Run an Experiment"
@@ -83,6 +88,7 @@ graph TD
             AnalyzePerformance
             BiasAnalysis
             Aggregator
+            ReplicationMetrics
             ReplicationReport
             ReplResults
         end
