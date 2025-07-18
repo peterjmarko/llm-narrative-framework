@@ -11,6 +11,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **resilience**: implement atomic replications and parallel new runs
 
+This commit resolves all known bugs related to experiment resilience,
+state handling, and race conditions, resulting in a significantly more
+robust and correct pipeline.
+
+- **Atomic Replications**: `orchestrate_replication.py` is now fully atomic.
+  It manages a 6-stage pipeline, including a "Finalize Replication"
+  stage that generates the `REPLICATION_results.csv` file. This ensures
+  that any replication completing the orchestrator is 100% `VALIDATED`,
+  eliminating the need for a final reprocessing step after new runs.
+
+- **Corrected State Priority**: Fixed the state-detection logic in
+  `experiment_manager.py` to prioritize `REPAIR` over `NEW`. This
+  ensures that existing, interrupted runs are always fixed before new
+  ones are created, correcting a critical flaw in the resume logic.
+
+- **Resolved Parallel Repair Race Conditions**:
+  - Fixed a race condition where parallel repair workers conflicted
+    over a shared temp directory by creating unique, process-ID-based
+    temp directories in `run_llm_sessions.py`.
+  - Fixed a race condition where parallel workers for the same replication
+    attempted to delete the same report file. The `REPAIR` mode now
+    decouples parallel session fetching from serial reprocessing.
+
+- **Fixed Full Repair Deadlock**: Resolved a file-locking issue on Windows
+  that caused the `FULL REPLICATION REPAIR` mode to hang, by ensuring
+  file handles are properly closed during the audit phase.
+
+- **Enhanced Progress Spinner**: The live spinner in `llm_prompter.py` now
+  displays comprehensive progress for the entire replication, including the
+  current trial number, total trials, elapsed time, and ETR.
+
+- **Documentation Overhaul**: Updated all relevant docstrings, `DOCUMENTATION.md`,
+  and architecture diagrams (`workflow_1`, `codebase_architecture`) to
+  accurately reflect the new 6-stage atomic replication pipeline.
+
 ## v2.4.0 (2025-07-17)
 
 ### Feat
