@@ -1,32 +1,41 @@
+# Overwrite 'README.md' with the following content:
+
 # A Resilient Framework for Large-Scale LLM Experimentation
 
 A comprehensive research framework for conducting Large Language Model (LLM) experiments with statistical analysis, hierarchical data aggregation, and resilient, self-healing workflow management.
 
 ## 🚀 Quick Start
 
-\\\powershell
-# Run a complete experiment (outputs to a new timestamped directory)
-.\run_experiment.ps1
+```powershell
+# 1. Configure your experiment in config.ini
 
-# Analyze the results of all experiments in the default output folder
-.\analyze_study.ps1 -StudyDirectory output/new_experiments
+# 2. Run a complete experimental batch
+# Results are saved to a new timestamped directory in output/new_experiments/
+./run_experiment.ps1
 
-# View the final analysis log
-Get-Content output/new_experiments/anova/STUDY_analysis_log.txt
-\\\
+# 3. Organize completed experiments into a study folder
+# (e.g., move them to output/studies/My_First_Study/)
 
-## 📊 What This Framework Does
+# 4. Analyze the entire study
+./analyze_study.ps1 -StudyDirectory output/studies/My_First_Study
 
-- **LLM Personality Matching**: Generate and process personality-based queries
-- **Statistical Analysis**: ANOVA, bias detection, significance testing
-- **Batch Processing**: Handle multiple experiments and replications
-- **Automated Reports**: Generate comprehensive analysis reports
+# 5. View the final, publication-ready analysis
+Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
+```
+
+## ✨ Key Features
+
+-   **Automated Batch Execution**: Run hundreds of replications with intelligent self-healing to resume interrupted experiments.
+-   **Parallel LLM Sessions**: Maximizes throughput by running multiple LLM API calls concurrently, significantly speeding up data collection.
+-   **Guaranteed Reproducibility**: Automatically archives the `config.ini` file with every run, permanently linking results to the exact parameters that generated them.
+-   **Hierarchical Analysis & Aggregation**: Performs a bottom-up aggregation of all data, generating level-aware summary files for a fully auditable research archive.
+-   **Powerful Reprocessing Engine**: Re-run data processing and analysis on existing results without repeating expensive LLM calls, making it easy to apply analysis updates or bug fixes.
 
 ## 🔧 Requirements
 
-- Python 3.11+
-- PDM package manager
-- PowerShell (Windows/Linux/macOS)
+-   Python 3.8+
+-   PDM package manager
+-   PowerShell (Core) for Windows, Linux, or macOS
 
 ## 📚 Documentation & Resources
 
@@ -38,13 +47,6 @@ Get-Content output/new_experiments/anova/STUDY_analysis_log.txt
 
 **[⚖️ License](LICENSE.md)** - GPL v3.0 license terms.
 
-## 🎯 Core Workflow
-
-1. **Generate LLM Queries** → 2. **Process Responses** → 3. **Statistical Analysis** → 4. **Reports**
-
-Built for reproducible psychological research with LLMs.
-
 ---
 
 **For detailed setup instructions and comprehensive documentation, see [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)**
-

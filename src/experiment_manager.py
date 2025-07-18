@@ -711,7 +711,7 @@ def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, qui
     except Exception as e:
         return rep_num, False, f"An unexpected error occurred in replication worker {rep_num}: {e}"
 
-def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, bias_script, sessions_script, max_workers):
+def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, bias_script, sessions_script):
     """Executes 'NEW' mode by calling orchestrator, which is now parallelized."""
     print(f"{C_CYAN}--- Entering NEW Mode: Creating missing replications ---{C_RESET}")
     
@@ -756,84 +756,39 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_scr
 
     return True
 
-def _session_worker(run_dir, sessions_script_path, index, quiet, force_rerun=False):
-    """Worker function to run a single LLM session for a given index."""
-    cmd = [sys.executable, sessions_script_path, "--run_output_dir", run_dir, "--indices", str(index)]
-    if force_rerun:
-        cmd.append("--force-rerun")
-    else:
-        # For new runs, we should always continue, not restart, if interrupted mid-replication.
-        cmd.append("--continue-run")
+# This '_session_worker' function is no longer needed here and has been moved into orchestrate_replication.py's logic.
 
-    if quiet: cmd.append("--quiet")
-    
-    try:
-        # Capture all output to prevent jumbled logs from parallel processes
-        result = subprocess.run(cmd, check=True, text=True, capture_output=True)
-        return run_dir, index, True, None
-    except subprocess.CalledProcessError as e:
-        error_log = f"LLM session FAILED for index {index} in {os.path.basename(run_dir)}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
-        return run_dir, index, False, error_log
-
-def _run_repair_mode(runs_to_repair, sessions_script_path, orchestrator_script_path, bias_script_path, quiet, max_workers):
-    """Executes a two-phase 'REPAIR' mode: parallel session fetch, then serial reprocessing."""
+def _run_repair_mode(runs_to_repair, sessions_script_path, orchestrator_script_path, bias_script_path, quiet):
+    """Delegates repair work to the orchestrator for each failed run."""
     print(f"{C_YELLOW}--- Entering REPAIR Mode: Fixing {len(runs_to_repair)} run(s) with missing responses ---{C_RESET}")
 
-    # Phase 1: Run all LLM session repairs in parallel
-    all_tasks = []
     for run_info in runs_to_repair:
-        for index in run_info.get("failed_indices", []):
-            all_tasks.append((run_info["dir"], index))
-    if not all_tasks:
-        print("No specific failed indices found to repair."); return True
+        run_dir = run_info["dir"]
+        failed_indices = run_info.get("failed_indices", [])
+        if not failed_indices:
+            continue
 
-    print(f"Attempting to repair {len(all_tasks)} failed API calls across all runs.")
-    successful_sessions, failed_sessions = 0, 0
-    repaired_dirs = set()
+        print(f"\n--- Repairing {len(failed_indices)} session(s) in: {os.path.basename(run_dir)} ---")
+        
+        # Call the orchestrator in --reprocess mode and pass the specific indices to fix.
+        # The orchestrator is now responsible for the parallel execution.
+        cmd = [
+            sys.executable, orchestrator_script_path,
+            "--reprocess",
+            "--run_output_dir", run_dir,
+            "--indices"
+        ] + [str(i) for i in failed_indices]
+        
+        if quiet:
+            cmd.append("--quiet")
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        task_func = partial(_session_worker, sessions_script_path=sessions_script_path, quiet=quiet, force_rerun=True)
-        future_to_task = {executor.submit(task_func, run_dir=task[0], index=task[1]): task for task in all_tasks}
-
-        for future in tqdm(as_completed(future_to_task), total=len(all_tasks), desc="Repairing Sessions", ncols=80):
-            run_dir, index, success, error_log = future.result()
-            if success:
-                successful_sessions += 1
-                repaired_dirs.add(run_dir)
-            else:
-                failed_sessions += 1
-                logging.error(error_log)
-    
-    print(f"Session repair complete: {successful_sessions} successful, {failed_sessions} failed.")
-    if failed_sessions > 0: return False # Abort if any session repair failed
-
-    # Phase 2: Reprocess each affected directory once, serially
-    if not repaired_dirs: return True
-    print(f"\n--- Reprocessing {len(repaired_dirs)} run(s) with newly repaired data... ---")
-    
-    for i, run_dir in enumerate(sorted(list(repaired_dirs))):
-        print(f"\n--- Reprocessing run {i+1}/{len(repaired_dirs)}: {os.path.basename(run_dir)} ---")
         try:
-            # Reprocess the main analysis
-            reprocess_cmd = [sys.executable, orchestrator_script_path, "--reprocess", "--run_output_dir", run_dir]
-            if quiet: reprocess_cmd.append("--quiet")
-            subprocess.run(reprocess_cmd, check=True, capture_output=True, text=True)
-
-            # Run bias analysis to finalize the report
-            config_path = os.path.join(run_dir, 'config.ini.archived')
-            if os.path.exists(config_path):
-                config = configparser.ConfigParser()
-                config.read(config_path)
-                k_value = config.getint('Study', 'group_size', fallback=config.getint('Study', 'k_per_query', fallback=0))
-                if k_value > 0:
-                    bias_cmd = [sys.executable, bias_script_path, run_dir, "--k_value", str(k_value)]
-                    if not quiet: bias_cmd.append("--verbose")
-                    subprocess.run(bias_cmd, check=True, capture_output=True, text=True)
-            else:
-                logging.warning(f"No archived config for {os.path.basename(run_dir)}, bias analysis skipped.")
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Post-repair reprocessing FAILED for {os.path.basename(run_dir)}.\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}")
-            return False # A single reprocessing failure fails the whole step
+            # The orchestrator will now handle its own progress display.
+            subprocess.run(cmd, check=True)
+        except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
+            logging.error(f"Repair failed for {os.path.basename(run_dir)}.")
+            if isinstance(e, KeyboardInterrupt): sys.exit(AUDIT_ABORTED_BY_USER)
+            return False # A single failure halts the entire repair operation.
             
     return True
 
@@ -1029,7 +984,6 @@ def main():
                         help="Optional. The target directory for the experiment. If not provided, a unique directory will be created.")
     parser.add_argument('--start-rep', type=int, default=1, help="First replication number for new runs.")
     parser.add_argument('--end-rep', type=int, default=None, help="Last replication number for new runs.")
-    parser.add_argument('--max-workers', type=int, default=10, help="Max parallel workers for repair mode.")
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose per-replication status updates.')
     parser.add_argument('--notes', type=str, help='Optional notes for the reports.')
     parser.add_argument('--max-loops', type=int, default=10, help="Safety limit for state-machine loops.")
@@ -1107,7 +1061,7 @@ def main():
 
             if state_overall_status == "NEW_NEEDED":
                 print(f"{C_CYAN}--- Experiment is NEW. Proceeding to create replications. ---{C_RESET}")
-                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script, bias_analysis_script, sessions_script, args.max_workers)
+                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script, bias_analysis_script, sessions_script)
                 current_action_taken = True
             else: # If not NEW_NEEDED, then the directory is not empty, so it's safe to run a proper audit
                 # Print the detailed audit report if an action is potentially needed or if explicitly requested.
@@ -1146,7 +1100,7 @@ def main():
                         if full_replication_repairs:
                             success = _run_full_replication_repair(full_replication_repairs, orchestrator_script, bias_analysis_script, not args.verbose)
                         elif session_repairs: # Only run session repairs if no full replication repairs are needed/attempted
-                            success = _run_repair_mode(session_repairs, sessions_script, orchestrator_script, bias_analysis_script, not args.verbose, args.max_workers)
+                            success = _run_repair_mode(session_repairs, sessions_script, orchestrator_script, bias_analysis_script, not args.verbose)
                         current_action_taken = True
                     else:
                         print(f"\n{C_RED}Repair aborted by user. Exiting.{C_RESET}")

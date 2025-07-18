@@ -189,17 +189,31 @@ This approach, demonstrated in `tests/test_experiment_aggregator.py`, is the req
 
 ### 4. Commit Your Changes
 
-This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This ensures clear, automated versioning and changelog generation.
+This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This ensures clear, automated versioning and changelog generation. All commits should be made using the following file-based workflow.
 
-To bypass potential issues with interactive prompts, all commits should be made using a file-based workflow.
+1.  **Update and Build Documentation (Pre-Commit)**
+    Before staging any files, ensure all documentation is synchronized with your changes. This includes updating docstrings, diagrams, and the main `DOCUMENTATION.template.md`.
 
-1.  **Stage your changes**:
+    a. **Build all documentation files**:
+       This command generates the final `DOCUMENTATION.md` and other formats from their source templates.
+       ```bash
+       pdm run build-docs
+       ```
+
+    b. **Verify the status**:
+       Check `git status` to ensure that all your code changes *and* the newly generated documentation files are ready to be committed. This is a critical sanity check.
+       ```bash
+       git status
+       ```
+
+2.  **Stage Your Changes**:
+    Once you have verified that all intended files are present, stage everything for the commit.
     ```bash
     git add .
     ```
 
-2.  **Create the Commit Message**:
-    Create a temporary file named `commit.txt` in the project root. Write your full commit message inside, following the Conventional Commits format. This file is ignored by Git (via `.gitignore`) and can be deleted after the commit is made.
+3.  **Create the Commit Message**:
+    Create a temporary file named `commit.txt` in the project root. Write your full commit message inside, following the Conventional Commits format. This file is ignored by Git (via `.gitignore`).
 
     **Example `commit.txt`:**
     ```
@@ -212,11 +226,11 @@ To bypass potential issues with interactive prompts, all commits should be made 
     This provides a more nuanced view of model performance beyond MRR and Top-1 accuracy, especially for imbalanced results.
     ```
 
-3.  **Create the Commit from the File**:
+4.  **Create the Commit from the File**:
+    Use the `-F` flag to create the commit from your prepared message file.
     ```bash
     git commit -F commit.txt
     ```
-    This command creates the commit using your detailed, well-formatted message.
 
 ### 5. Releasing a New Version (Maintainers Only)
 

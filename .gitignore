@@ -18,6 +18,8 @@ __pycache__/
 /tests/archive/
 
 # Ignore generated document and image files
+# The .template.md is the source of truth and is tracked by Git.
+docs/DOCUMENTATION.md
 *.docx
 docs/images/*.png
 

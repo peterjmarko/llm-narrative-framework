@@ -69,6 +69,11 @@ import shutil
 import json
 import glob
 import configparser
+from concurrent.futures import ThreadPoolExecutor, as_completed
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, *args, **kwargs): return iterable
 
 # --- Setup ---
 try:
@@ -177,6 +182,7 @@ def main():
     parser.add_argument("--reprocess", action="store_true", help="Re-process existing responses.")
     parser.add_argument("--run_output_dir", type=str, default=None, help="Path to a specific run output directory for reprocessing.")
     parser.add_argument("--base_output_dir", type=str, default=None, help="The base directory where the new run folder should be created.")
+    parser.add_argument("--indices", type=int, nargs='+', help="A specific list of trial indices to run. If provided, only these trials will be executed.")
     
     args = parser.parse_args()
     
@@ -230,8 +236,8 @@ def main():
     aggregator_script = os.path.join(src_dir, 'experiment_aggregator.py')
 
     try:
+        # Stage 1: Build Queries (only for new runs)
         if not args.reprocess:
-            # Stages 1 & 2 for a new run
             cmd1 = [sys.executable, build_script, "--run_output_dir", run_specific_dir_path]
             if args.quiet: cmd1.append("--quiet")
             if args.base_seed: cmd1.extend(["--base_seed", str(args.base_seed)])
@@ -239,79 +245,109 @@ def main():
             output1, rc1, err1 = run_script(cmd1, "1. Build LLM Queries", quiet=args.quiet)
             all_stage_outputs.append(output1)
             if rc1 != 0: raise err1
-            
-            cmd2 = [sys.executable, run_sessions_script, "--run_output_dir", run_specific_dir_path]
-            if args.quiet: cmd2.append("--quiet")
-            output2, rc2, err2 = run_script(cmd2, "2. Run LLM Sessions", quiet=args.quiet)
-            all_stage_outputs.append(output2)
-            if rc2 != 0: raise err2
-        else:
-            logging.info("Skipping Stage 1 (Build LLM Queries) and Stage 2 (Run LLM Sessions) due to --reprocess flag.")
 
+        # Stage 2: Run LLM Sessions (Parallel by default)
+        stage_title = "2. Run LLM Sessions (Parallel)"
+        header = (f"\n\n{'='*80}\n### STAGE: {stage_title} ###\n{'='*80}\n\n")
+        print(f"--- Running Stage: {stage_title} ---")
+
+        # Determine which indices to run based on the mode.
+        if args.indices:
+            # Repair mode: run only the specified failed indices.
+            indices_to_run = args.indices
+            force_rerun = True # Force re-run for failed trials.
+        else:
+            # New/Continue mode: find all queries and run only those without responses.
+            queries_dir = os.path.join(run_specific_dir_path, "session_queries")
+            query_files = glob.glob(os.path.join(queries_dir, "llm_query_*.txt"))
+            
+            # Robustly parse indices from filenames
+            all_indices = []
+            for f in query_files:
+                match = re.search(r'_(\d+)\.txt$', f)
+                if match:
+                    all_indices.append(int(match.group(1)))
+            all_indices.sort()
+            
+            indices_to_run = []
+            responses_dir = os.path.join(run_specific_dir_path, "session_responses")
+            for i in all_indices:
+                if not os.path.exists(os.path.join(responses_dir, f"llm_response_{i:03d}.txt")):
+                    indices_to_run.append(i)
+            force_rerun = False # Don't force re-run, just continue.
+
+        if not indices_to_run:
+            all_stage_outputs.append(header + "All required LLM response files already exist. Nothing to do.")
+        else:
+            max_workers = get_config_value(APP_CONFIG, 'LLM', 'max_parallel_sessions', value_type=int, fallback=10)
+            
+            def session_worker(index):
+                cmd = [sys.executable, run_sessions_script, "--run_output_dir", run_specific_dir_path, "--indices", str(index), "--quiet"]
+                if force_rerun: cmd.append("--force-rerun")
+                else: cmd.append("--continue-run")
+                try:
+                    subprocess.run(cmd, check=True, text=True, capture_output=True)
+                    return (index, True, None)
+                except subprocess.CalledProcessError as e:
+                    return (index, False, f"LLM session FAILED for index {index}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}")
+
+            all_logs = [header]
+            failed_sessions = 0
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                tasks = {executor.submit(session_worker, i) for i in indices_to_run}
+                for future in tqdm(as_completed(tasks), total=len(tasks), desc="Processing LLM Sessions", ncols=80):
+                    _, success, log = future.result()
+                    if not success:
+                        failed_sessions += 1
+                        all_logs.append(log)
+            
+            all_stage_outputs.append("\n".join(all_logs))
+            if failed_sessions > 0:
+                raise Exception(f"{failed_sessions} LLM session(s) failed. See logs for details.")
+
+        # The rest of the pipeline proceeds only after sessions are complete.
         # Stage 3: Process LLM Responses
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]
         if args.quiet: cmd3.append("--quiet")
         output3, rc3, err3 = run_script(cmd3, "3. Process LLM Responses", quiet=args.quiet)
         all_stage_outputs.append(output3)
-
-        stage3_successful = (rc3 == 0) or ("PROCESSOR_VALIDATION_SUCCESS" in output3 and int(re.search(r"<<<PARSER_SUMMARY:(\d+):", output3).group(1)) > 0)
-        if not stage3_successful:
-            logging.error("Stage 3 (Process LLM Responses) failed critically.")
-            raise err3 if err3 else subprocess.CalledProcessError(rc3, cmd3, output=output3)
-
+        if rc3 != 0: raise err3
+        
+        n_valid_str = (re.search(r"<<<PARSER_SUMMARY:(\d+):", output3) or ['0','0'])[1]
+        
         # Stage 4: Analyze Performance
-        n_valid = int(re.search(r"<<<PARSER_SUMMARY:(\d+):", output3).group(1)) if re.search(r"<<<PARSER_SUMMARY:(\d+):", output3) else -1
-        cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path]
+        cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path, "--num_valid_responses", n_valid_str]
         if args.quiet: cmd4.append("--quiet")
-        if n_valid != -1: cmd4.extend(["--num_valid_responses", str(n_valid)])
         output4, rc4, err4 = run_script(cmd4, "4. Analyze LLM Performance", quiet=args.quiet)
         all_stage_outputs.append(output4)
         if rc4 != 0: raise err4
 
-        # --- Stage 5: Run Bias Analysis ---
-        # This stage now reads and writes to the metrics.json file created by Stage 4.
+        # Stage 5: Run Bias Analysis
         k_val = int(get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int, fallback=10))
         cmd5 = [sys.executable, bias_script, run_specific_dir_path, "--k_value", str(k_val)]
         if not args.quiet: cmd5.append("--verbose")
         output5, rc5, err5 = run_script(cmd5, "5. Run Bias Analysis", quiet=args.quiet)
         all_stage_outputs.append(output5)
-        if rc5 != 0:
-            # This is now considered a potential failure point if it can't update the metrics file.
-            logging.error(f"Stage 5 (Run Bias Analysis) failed. The final report may lack bias metrics. Error:\n{output5}")
-            # Decide if this should be a critical failure. For now, we'll log and continue.
+        if rc5 != 0: raise err5
 
-        # --- Stage 6: Generate Final Report ---
-        # This stage generates the human-readable report from all prior artifacts.
-        # This MUST run before the aggregator so the aggregator has a report to parse.
-        stage_title = "6. Generate Final Report"
-        header = (f"\n\n{'='*80}\n### STAGE: {stage_title} ###\n{'='*80}\n\n")
-        print(f"--- Running Stage: {stage_title} ---")
-        
-        # Clear any old report files first.
-        for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
-            os.remove(old_report)
-
-        report_filename = f"replication_report_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
-        report_path = os.path.join(run_specific_dir_path, report_filename)
-        
+        # Stage 6: Generate Final Report
+        stage_title_6 = "6. Generate Final Report"
+        header_6 = (f"\n\n{'='*80}\n### STAGE: {stage_title_6} ###\n{'='*80}\n\n")
+        print(f"--- Running Stage: {stage_title_6} ---")
+        for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')): os.remove(old_report)
+        report_path = os.path.join(run_specific_dir_path, f"replication_report_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
         try:
-            metrics_filepath = os.path.join(run_specific_dir_path, 'analysis_inputs', 'replication_metrics.json')
-            with open(metrics_filepath, 'r') as f: metrics_data = json.load(f)
-
+            with open(os.path.join(run_specific_dir_path, 'analysis_inputs', 'replication_metrics.json'), 'r') as f: metrics_data = json.load(f)
             with open(report_path, 'w', encoding='utf-8') as f:
-                f.write("REPLICATION RUN REPORT\n" + "="*80 + "\n")
-                f.write(f"Run Directory: {os.path.basename(run_specific_dir_path)}\n")
-                f.write(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M%S')}\nStatus: PENDING\n")
+                f.write(f"REPLICATION RUN REPORT\n{'='*80}\n")
+                f.write(f"Run Directory: {os.path.basename(run_specific_dir_path)}\nDate: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M%S')}\nStatus: PENDING\n")
                 f.write("### Machine-Readable Metrics (JSON) ###\n<<<METRICS_JSON_START>>>\n")
                 f.write(json.dumps(metrics_data, indent=4) + "\n<<<METRICS_JSON_END>>>\n")
-            
-            output6 = header + f"Successfully generated report shell: {report_path}"
-            all_stage_outputs.append(output6)
+            all_stage_outputs.append(header_6 + f"Successfully generated report shell: {report_path}")
         except Exception as e:
-            logging.error(f"Failed during Stage 6 (Report Generation): {e}")
-            raise
+            logging.error(f"Failed during Stage 6 (Report Generation): {e}"); raise
 
-        # --- Stage 7: Create Replication Summary ---
+        # Stage 7: Create Replication Summary
         cmd7 = [sys.executable, aggregator_script, run_specific_dir_path, "--mode", "hierarchical"]
         output7, rc7, err7 = run_script(cmd7, "7. Create Replication Summary", quiet=args.quiet)
         all_stage_outputs.append(output7)

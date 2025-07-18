@@ -12,7 +12,7 @@ graph TD
     BuildQueries["1. build_llm_queries.py"]:::script
     QueryGenerator["query_generator.py"]:::script
     LLMQueries[("llm_query_XXX.txt")]:::artifact
-    RunSessions["2. run_llm_sessions.py"]:::script
+    RunSessions["2. run_llm_sessions.py<br/>(Called in parallel for each trial)"]:::script
     LLMPrompter["llm_prompter.py"]:::script
     LLMResponses[("llm_response_XXX.txt")]:::artifact
     ProcessResponses["3. process_llm_responses.py"]:::script
