@@ -5,6 +5,23 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.4.2 (2025-07-18)
+
+### Fix
+
+- **pipeline**: restore correct replication pipeline sequence
+
+    This fix corrects a regression introduced during a previous refactoring. The `orchestrate_replication.py` script was calling `experiment_aggregator.py` before the necessary `replication_report.txt` was generated, causing the aggregation to fail silently.
+
+    This resulted in incomplete replication runs that required an immediate and unnecessary `UPDATE` cycle to fix.
+
+    The correct sequence is now restored within the orchestrator:
+    1.  Core analysis stages (1-5) are run to produce `replication_metrics.json`.
+    2.  A new Stage 6 generates the `replication_report.txt` from the finalized metrics.
+    3.  A new Stage 7 calls `experiment_aggregator.py`, which can now successfully parse the report to create `REPLICATION_results.csv`.
+
+    This ensures each replication is atomically complete and valid upon creation.
+
 ## v2.4.1 (2025-07-18)
 
 ### Fix
