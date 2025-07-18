@@ -33,9 +33,10 @@ invoked with explicit flags for specific, one-time actions.
 
 Modes of Operation:
 -   **Default (State Machine)**: Intelligently identifies the experiment's state
-    (e.g., `NEW`, `REPAIR_NEEDED`, `REPROCESS_NEEDED`) and automatically
-    initiates the correct action. It continuously loops until the experiment
-    is complete, ensuring self-healing from interruptions. When running new
+    with a clear priority (`REPAIR` > `REPROCESS` > `NEW`). It automatically
+    initiates the correct action, ensuring that existing interrupted runs
+    are always fixed before new ones are created. It continuously loops until
+    the experiment is complete, providing robust self-healing. When running new
     replications, it provides real-time ETA updates including "Time Elapsed"
     and "Time Remaining".
 -   **`--reprocess`**: Forces a full re-processing (update) of all analysis
@@ -448,64 +449,66 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
 
 def _get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -> tuple[str, list, dict]:
     """
-    High-level state machine driver.
+    High-level state machine driver with correct state priority.
 
     Returns:
         A tuple containing:
         - str: The high-level state of the experiment (e.g., "REPAIR_NEEDED").
-        - list: The detailed payload required for the action (e.g., list of failed runs).
+        - list: The detailed payload for the action (e.g., list of failed runs).
         - dict: A granular map of {run_name: (status, details)} for every run.
     """
     run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
-    run_paths_by_name = {p.name: p for p in run_dirs}
+    
+    # Handle the brand-new experiment case first.
+    if not run_dirs:
+        return "NEW_NEEDED", [], {}
 
-    # Perform granular audit for all existing run directories.
+    run_paths_by_name = {p.name: p for p in run_dirs}
     granular = {p.name: _verify_single_run_completeness(p) for p in run_dirs}
     fails = {n: (s, d) for n, (s, d) in granular.items() if s != "VALIDATED"}
 
-    # If there are not enough physical run directories, the state is unambiguously NEW_NEEDED.
-    if len(run_dirs) < expected_reps:
-        return "NEW_NEEDED", [], granular # Ensure 3 values are always returned
-
-    # If we have enough directories, but no run directories exist (edge case, but handled)
-    if not run_dirs:
-        return "COMPLETE", [], granular # Ensure 3 values are always returned
-
-    if not fails: # All existing runs are VALIDATED
-        return "COMPLETE", [], granular # Ensure 3 values are always returned
-
-    # Categorize runs for precise repair actions
-    runs_needing_session_repair = [] # Missing responses, can re-run sessions
-    runs_needing_full_replication_repair = [] # Missing queries/manifests, or other critical early-stage issues
-
-    for run_name, (status, details_list) in granular.items():
+    # --- State Priority 1: REPAIR_NEEDED ---
+    # Check for critical issues that require re-running parts of the pipeline.
+    runs_needing_session_repair = []
+    runs_needing_full_replication_repair = []
+    for run_name, (status, details_list) in fails.items():
         if status == "RESPONSE_ISSUE":
             run_path = run_paths_by_name[run_name]
             query_indices = _get_file_indices(run_path, FILE_MANIFEST["query_files"])
             response_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
-            failed_indices = list(query_indices - response_indices)
-            if failed_indices: # Only add if there are actual missing responses
+            failed_indices = sorted(list(query_indices - response_indices))
+            if failed_indices:
                 runs_needing_session_repair.append({"dir": str(run_path), "failed_indices": failed_indices, "repair_type": "session_repair"})
-        elif status in {"QUERY_ISSUE", "CONFIG_ISSUE", "INVALID_NAME", "FATAL_ISSUE", "UNKNOWN"}:
-            # These indicate problems early in the pipeline or severe configuration issues
-            # For these, we need a full replication re-run.
+        elif status in {"QUERY_ISSUE", "CONFIG_ISSUE", "INVALID_NAME"}:
             runs_needing_full_replication_repair.append({"dir": str(run_paths_by_name[run_name]), "repair_type": "full_replication_repair"})
-        # ANALYSIS_ISSUE runs are implicitly handled by REPROCESS_NEEDED status, not individual repair.
 
-    # Determine overall state based on priority: full repair > session repair > reprocess
     if runs_needing_full_replication_repair:
         return "REPAIR_NEEDED", runs_needing_full_replication_repair, granular
-    elif runs_needing_session_repair:
+    if runs_needing_session_repair:
         return "REPAIR_NEEDED", runs_needing_session_repair, granular
-    
-    # If no repair candidates (neither full nor session repair), then any remaining failures are reprocessing issues.
-    # `fails` still contains all non-VALIDATED runs (e.g., ANALYSIS_ISSUE if not handled by repair categories).
-    if fails:
-        details = [{"dir": str(run_paths_by_name[name])} for name in fails.keys()]
-        return "REPROCESS_NEEDED", details, granular
 
-    # This should logically be covered by 'if not fails' earlier, but as a fallback:
-    return "COMPLETE", [], granular
+    # --- State Priority 2: REPROCESS_NEEDED ---
+    # If no critical repairs are needed, check for analysis issues.
+    if any(status == "ANALYSIS_ISSUE" for status, _ in fails.values()):
+        analysis_fails = [
+            {"dir": str(run_paths_by_name[name])}
+            for name, (status, _) in fails.items()
+            if status == "ANALYSIS_ISSUE"
+        ]
+        return "REPROCESS_NEEDED", analysis_fails, granular
+
+    # --- State Priority 3: NEW_NEEDED ---
+    # If all existing runs are valid but there are not enough of them.
+    if not fails and len(run_dirs) < expected_reps:
+        return "NEW_NEEDED", [], granular
+
+    # --- State Priority 4: COMPLETE ---
+    # If all existing runs are valid and the count is correct.
+    if not fails and len(run_dirs) >= expected_reps:
+        return "COMPLETE", [], granular
+        
+    # Fallback for any unhandled state.
+    return "UNKNOWN", [], granular
 
 # --- Mode Execution Functions ---
 
@@ -741,42 +744,72 @@ def _repair_worker(run_dir, sessions_script_path, index, quiet):
     try:
         # Run quietly, capture output to prevent jumbled logs
         result = subprocess.run(cmd, check=True, text=True, capture_output=True)
-        return index, True, None
+        return run_dir, index, True, None
     except subprocess.CalledProcessError as e:
-        error_log = f"REPAIR FAILED for index {index} in {os.path.basename(run_dir)}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
-        return index, False, error_log
+        error_log = f"LLM session repair FAILED for index {index} in {os.path.basename(run_dir)}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
+        return run_dir, index, False, error_log
 
-def _run_repair_mode(runs_to_repair, sessions_script_path, quiet, max_workers):
-    """Executes the 'REPAIR' mode to fix missing API responses."""
+def _run_repair_mode(runs_to_repair, sessions_script_path, orchestrator_script_path, bias_script_path, quiet, max_workers):
+    """Executes a two-phase 'REPAIR' mode: parallel session fetch, then serial reprocessing."""
     print(f"{C_YELLOW}--- Entering REPAIR Mode: Fixing {len(runs_to_repair)} run(s) with missing responses ---{C_RESET}")
-    
+
+    # Phase 1: Run all LLM session repairs in parallel
     all_tasks = []
     for run_info in runs_to_repair:
         for index in run_info.get("failed_indices", []):
             all_tasks.append((run_info["dir"], index))
-            
     if not all_tasks:
-        print("No specific failed indices found to repair.")
-        return True
+        print("No specific failed indices found to repair."); return True
 
     print(f"Attempting to repair {len(all_tasks)} failed API calls across all runs.")
-    successful_repairs = 0
-    failed_repairs = 0
-    
+    successful_sessions, failed_sessions = 0, 0
+    repaired_dirs = set()
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         task_func = partial(_repair_worker, sessions_script_path=sessions_script_path, quiet=quiet)
         future_to_task = {executor.submit(task_func, run_dir=task[0], index=task[1]): task for task in all_tasks}
 
         for future in tqdm(as_completed(future_to_task), total=len(all_tasks), desc="Repairing Sessions", ncols=80):
-            index, success, error_log = future.result()
+            run_dir, index, success, error_log = future.result()
             if success:
-                successful_repairs += 1
+                successful_sessions += 1
+                repaired_dirs.add(run_dir)
             else:
-                failed_repairs += 1
+                failed_sessions += 1
                 logging.error(error_log)
     
-    print(f"Repair complete: {successful_repairs} successful, {failed_repairs} failed.")
-    return failed_repairs == 0
+    print(f"Session repair complete: {successful_sessions} successful, {failed_sessions} failed.")
+    if failed_sessions > 0: return False # Abort if any session repair failed
+
+    # Phase 2: Reprocess each affected directory once, serially
+    if not repaired_dirs: return True
+    print(f"\n--- Reprocessing {len(repaired_dirs)} run(s) with newly repaired data... ---")
+    
+    for i, run_dir in enumerate(sorted(list(repaired_dirs))):
+        print(f"\n--- Reprocessing run {i+1}/{len(repaired_dirs)}: {os.path.basename(run_dir)} ---")
+        try:
+            # Reprocess the main analysis
+            reprocess_cmd = [sys.executable, orchestrator_script_path, "--reprocess", "--run_output_dir", run_dir]
+            if quiet: reprocess_cmd.append("--quiet")
+            subprocess.run(reprocess_cmd, check=True, capture_output=True, text=True)
+
+            # Run bias analysis to finalize the report
+            config_path = os.path.join(run_dir, 'config.ini.archived')
+            if os.path.exists(config_path):
+                config = configparser.ConfigParser()
+                config.read(config_path)
+                k_value = config.getint('Study', 'group_size', fallback=config.getint('Study', 'k_per_query', fallback=0))
+                if k_value > 0:
+                    bias_cmd = [sys.executable, bias_script_path, run_dir, "--k_value", str(k_value)]
+                    if not quiet: bias_cmd.append("--verbose")
+                    subprocess.run(bias_cmd, check=True, capture_output=True, text=True)
+            else:
+                logging.warning(f"No archived config for {os.path.basename(run_dir)}, bias analysis skipped.")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Post-repair reprocessing FAILED for {os.path.basename(run_dir)}.\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}")
+            return False # A single reprocessing failure fails the whole step
+            
+    return True
 
 def _run_full_replication_repair(runs_to_repair, orchestrator_script, bias_script, quiet):
     """Deletes and fully regenerates runs with critical issues (e.g., missing queries, config issues)."""
@@ -1087,7 +1120,7 @@ def main():
                         if full_replication_repairs:
                             success = _run_full_replication_repair(full_replication_repairs, orchestrator_script, bias_analysis_script, not args.verbose)
                         elif session_repairs: # Only run session repairs if no full replication repairs are needed/attempted
-                            success = _run_repair_mode(session_repairs, sessions_script, not args.verbose, args.max_workers)
+                            success = _run_repair_mode(session_repairs, sessions_script, orchestrator_script, bias_analysis_script, not args.verbose, args.max_workers)
                         current_action_taken = True
                     else:
                         print(f"\n{C_RED}Repair aborted by user. Exiting.{C_RESET}")

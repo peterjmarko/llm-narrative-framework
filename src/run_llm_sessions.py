@@ -28,11 +28,14 @@ the LLM by invoking the `llm_prompter.py` worker script in a loop.
 Key Features:
 -   **Batch Processing**: Iterates through all `llm_query_XXX.txt` files in a
     directory and orchestrates a worker for each one.
--   **Smart Console Output**: In default mode, it provides verbose logging. In
-    `--quiet` mode (used by the main pipeline), it displays a clean, single-line
-    progress bar with completion stats and an Estimated Time Remaining (ETR).
+-   **Smart Console Output**: In default mode, it provides verbose logging. It
+    also calculates and passes detailed progress metrics (current trial, total
+    trials, elapsed time, ETR) to the worker script, enabling its enhanced
+    real-time status spinner.
 -   **Resilient Operation**: Supports resuming interrupted runs (`--continue-run`)
-    and re-running specific failed queries (`--force-rerun --indices ...`).
+    and re-running specific failed queries (`--force-rerun --indices ...`). It
+    also creates unique, process-ID-based temporary directories to ensure
+    safe, parallel execution during multi-threaded repair operations.
 -   **Artifact Management**: Manages the I/O, passing queries to the worker and
     saving the final text response and full JSON response to correctly named
     files in the `session_responses` directory.
@@ -197,9 +200,14 @@ def main():
 
 
     # --- Setup temporary directory for worker files ---
-    temp_dir_path = os.path.join(script_dir, "temp")
+    # Create a unique temp directory for this process instance to avoid race conditions during parallel repairs.
+    base_temp_dir = os.path.join(script_dir, "temp")
+    process_id = os.getpid()
+    temp_dir_path = os.path.join(base_temp_dir, f"pid_{process_id}")
+
     try:
         os.makedirs(temp_dir_path, exist_ok=True)
+        # Initial cleanup of files within the unique temp dir (though usually unnecessary if we clean up properly at the end)
         for temp_file_basename in [TEMP_INPUT_QUERY_FILE_BASENAME, TEMP_OUTPUT_RESPONSE_FILE_BASENAME, TEMP_OUTPUT_ERROR_FILE_BASENAME]:
             stray_file = os.path.join(temp_dir_path, temp_file_basename)
             if os.path.exists(stray_file):
@@ -207,6 +215,9 @@ def main():
     except OSError as e:
         logging.error(f"Could not create or clean temporary directory at {temp_dir_path}: {e}")
         sys.exit(1)
+
+    # Calculate relative temp path for the worker command (relative to script_dir/worker_cwd)
+    relative_temp_dir = os.path.relpath(temp_dir_path, script_dir)
 
     temp_query_path_abs = os.path.join(temp_dir_path, TEMP_INPUT_QUERY_FILE_BASENAME)
     temp_response_path_abs = os.path.join(temp_dir_path, TEMP_OUTPUT_RESPONSE_FILE_BASENAME)
@@ -307,11 +318,18 @@ def main():
                 with open(final_error_filepath_abs, 'w', encoding='utf-8') as f_err_orch: f_err_orch.write(f"Orchestrator failed to prepare input query file: {e_io}"); continue
 
             worker_cwd = os.path.dirname(llm_prompter_path)
+            average_time_per_trial = total_elapsed_time / successful_sessions if successful_sessions > 0 else 0
+            
             worker_cmd = [
                 sys.executable, llm_prompter_path, f"{current_index:03d}",
-                "--input_query_file", os.path.join("temp", TEMP_INPUT_QUERY_FILE_BASENAME),
-                "--output_response_file", os.path.join("temp", TEMP_OUTPUT_RESPONSE_FILE_BASENAME),
-                "--output_error_file", os.path.join("temp", TEMP_OUTPUT_ERROR_FILE_BASENAME)
+                "--input_query_file", os.path.join(relative_temp_dir, TEMP_INPUT_QUERY_FILE_BASENAME),
+                "--output_response_file", os.path.join(relative_temp_dir, TEMP_OUTPUT_RESPONSE_FILE_BASENAME),
+                "--output_error_file", os.path.join(relative_temp_dir, TEMP_OUTPUT_ERROR_FILE_BASENAME),
+                # Pass progress metrics to the worker for enhanced spinner display
+                "--current_trial", str(successful_sessions + failed_sessions + skipped_sessions + 1),
+                "--total_trials", str(total_trials),
+                "--total_elapsed_time", str(total_elapsed_time),
+                "--average_time_per_trial", str(average_time_per_trial)
             ]
             
             # --- MODIFICATION START ---
@@ -431,6 +449,14 @@ def main():
     except KeyboardInterrupt:
         logging.info("\nOrchestration interrupted by user (Ctrl+C).")
     finally:
+        # Clean up the unique temporary directory
+        if os.path.exists(temp_dir_path):
+            try:
+                shutil.rmtree(temp_dir_path)
+                logging.debug(f"Cleaned up temporary directory: {temp_dir_path}")
+            except OSError as e:
+                logging.warning(f"Could not remove temporary directory {temp_dir_path}: {e}")
+
         # The orchestrator is now responsible for printing the final newline.
         # This script must not print a newline, so the orchestrator can overwrite its last status message.
         total_processed_this_run = successful_sessions + failed_sessions

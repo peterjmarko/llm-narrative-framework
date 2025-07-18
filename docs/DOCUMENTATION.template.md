@@ -32,7 +32,7 @@ The result is a clean dataset of personality profiles where the connection to th
 
 ## Key Features
 
--   **Automated Batch Execution**: The `experiment_manager.py` script, driven by a simple PowerShell wrapper, manages entire experimental batches. It can run hundreds of replications, intelligently skipping completed ones to resume interrupted runs, and provides real-time ETA updates including "Time Elapsed" and "Time Remaining".
+-   **Automated Batch Execution**: The `experiment_manager.py` script, driven by a simple PowerShell wrapper, manages entire experimental batches. It can run hundreds of replications, intelligently skipping completed ones to resume interrupted runs, and provides real-time progress updates, including a detailed spinner showing individual trial timers and overall replication batch ETA.
 -   **Powerful Reprocessing Engine**: The manager's `--reprocess` mode allows for re-running the data processing and analysis stages on existing results without repeating expensive LLM calls. This makes it easy to apply analysis updates or bug fixes across an entire experiment.
 -   **Guaranteed Reproducibility**: On every new run, the `config.ini` file is automatically archived in the run's output directory, permanently linking the results to the exact parameters that generated them.
 -   **Standardized, Comprehensive Reporting**: Each replication produces a `replication_report.txt` file containing run parameters, status, a human-readable statistical summary, and a machine-parsable JSON block with all key metrics. This format is identical for new runs and reprocessed runs.
