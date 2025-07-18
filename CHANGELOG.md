@@ -5,6 +5,19 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.4.3 (2025-07-18)
+
+### Perf
+
+- **pipeline**: parallelize LLM sessions for new runs
+
+This commit introduces parallel execution for the LLM session stage (Stage 2) for all new replication runs, significantly speeding up data collection.
+
+- The parallel worker logic, previously only used for repairs in the experiment manager, has been centralized within `orchestrate_replication.py`.
+- This new parallel execution is controlled by the `max_parallel_sessions` parameter in `config.ini`.
+- The obsolete `--max-workers` command-line argument has been removed from `experiment_manager.py`.
+- All relevant documentation, including README.md, workflow diagrams, and configuration details, has been updated to reflect these changes.
+
 ## v2.4.2 (2025-07-18)
 
 ### Fix
