@@ -4,37 +4,56 @@ graph TD
     BatchManager["experiment_manager.py<br/>(Manages Batch)"]:::layer_orange
     LogManager["replication_log_manager.py"]:::danger
     BatchLog[("batch_run_log.csv")]:::artifact
-    BiasAnalysis["run_bias_analysis.py"]:::script
-    Aggregator["experiment_aggregator.py"]:::script
+    FinalAggregator["experiment_aggregator.py"]:::script
     ReplResults[("REPLICATION_results.csv")]:::artifact
     ExpResults[("EXPERIMENT_results.csv")]:::artifact
     
     ReplicationOrchestrator["orchestrate_replication.py"]:::layer_green
     BuildQueries["1. build_llm_queries.py"]:::script
     QueryGenerator["query_generator.py"]:::script
+    LLMQueries[("llm_query_XXX.txt")]:::artifact
     RunSessions["2. run_llm_sessions.py"]:::script
     LLMPrompter["llm_prompter.py"]:::script
+    LLMResponses[("llm_response_XXX.txt")]:::artifact
     ProcessResponses["3. process_llm_responses.py"]:::script
+    AllScores[("all_scores.txt")]:::artifact
+    AllMappings[("all_mappings.txt")]:::artifact
     AnalyzePerformance["4. analyze_llm_performance.py"]:::script
+    BiasAnalysis["5. run_bias_analysis.py"]:::script
+    Aggregator["6. experiment_aggregator.py"]:::script
     ReplicationReport[("replication_report.txt")]:::artifact
 
     %% 2. Define connections
     EntryPoint --> BatchManager
-    BatchManager -- "Calls" --> ReplicationOrchestrator
-    BatchManager --> LogManager
+    BatchManager -- "Calls in Loop" --> ReplicationOrchestrator
+    BatchManager -- "Finalizes Batch" --> LogManager
     LogManager --> BatchLog
-    BatchManager --> BiasAnalysis
-    BatchManager -- "Finalizes" --> Aggregator
-    Aggregator --> ReplResults
-    Aggregator --> ExpResults
-
+    
+    %% The orchestrator now handles the full 6-stage replication pipeline
     ReplicationOrchestrator --> BuildQueries
     ReplicationOrchestrator --> RunSessions
     ReplicationOrchestrator --> ProcessResponses
     ReplicationOrchestrator --> AnalyzePerformance
+    ReplicationOrchestrator --> BiasAnalysis
+    ReplicationOrchestrator --> Aggregator
+
+    %% Add invisible links to force the visual order of the stages
+    BuildQueries ~~~ RunSessions ~~~ ProcessResponses ~~~ AnalyzePerformance ~~~ BiasAnalysis ~~~ Aggregator
+
+    BatchManager -- "Finalizes Batch" --> FinalAggregator
+    FinalAggregator --> ExpResults
+    Aggregator --> ReplResults
 
     BuildQueries --> QueryGenerator
+    BuildQueries --> LLMQueries
+    LLMQueries --> RunSessions
     RunSessions --> LLMPrompter
+    RunSessions --> LLMResponses
+    LLMResponses --> ProcessResponses
+    ProcessResponses --> AllScores
+    ProcessResponses --> AllMappings
+    AllScores --> AnalyzePerformance
+    AllMappings --> AnalyzePerformance
     AnalyzePerformance --> ReplicationReport
     BiasAnalysis -- "Modifies" --> ReplicationReport
 
@@ -46,9 +65,7 @@ graph TD
             BatchManager
             LogManager
             BatchLog
-            BiasAnalysis
-            Aggregator
-            ReplResults
+            FinalAggregator
             ExpResults
         end
         
@@ -56,11 +73,18 @@ graph TD
             ReplicationOrchestrator
             BuildQueries
             QueryGenerator
+            LLMQueries
             RunSessions
             LLMPrompter
+            LLMResponses
             ProcessResponses
+            AllScores
+            AllMappings
             AnalyzePerformance
+            BiasAnalysis
+            Aggregator
             ReplicationReport
+            ReplResults
         end
     end
 

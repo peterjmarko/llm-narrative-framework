@@ -88,7 +88,9 @@ Each replication executes the four core pipeline stages in sequence:
 
 3.  **Response Processing**: `process_llm_responses.py` parses the raw text responses from the LLM into a structured table of similarity scores.
 
-4.  **Analyze LLM Performance**: Finally, `analyze_llm_performance.py` performs the final statistical analysis for the replication. It calculates key metrics (MRR, Top-1 Accuracy, effect size), uses non-parametric tests to assess significance against chance, and embeds a comprehensive JSON summary of the results into the final report.
+4.  **Analyze LLM Performance**: `analyze_llm_performance.py` performs the statistical analysis for the replication, generating a base report with key metrics (MRR, Top-1 Accuracy, etc.) and an embedded JSON block.
+5.  **Run Bias Analysis**: `run_bias_analysis.py` then reads the base report, calculates positional bias metrics, and injects them into the report's JSON block, saving the updated file.
+6.  **Finalize Replication**: Finally, `experiment_aggregator.py` is called on the single run directory to generate the machine-readable `REPLICATION_results.csv` summary, marking the replication as fully complete.
 
 {{diagram:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=111%}}
 

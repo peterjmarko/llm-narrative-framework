@@ -37,8 +37,8 @@ Modes of Operation:
     initiates the correct action, ensuring that existing interrupted runs
     are always fixed before new ones are created. It continuously loops until
     the experiment is complete, providing robust self-healing. When running new
-    replications, it provides real-time ETA updates including "Time Elapsed"
-    and "Time Remaining".
+    replications, it now orchestrates the pipeline stages directly to enable
+    parallel execution of LLM API calls, providing a significant speedup.
 -   **`--reprocess`**: Forces a full re-processing (update) of all analysis
     artifacts for an existing experiment. This includes regenerating individual
     replication reports and then re-running the hierarchical aggregation to
@@ -222,7 +222,9 @@ def _check_config_manifest(run_path: Path, k_expected: int, m_expected: int):
 
     try:
         cfg = ConfigParser()
-        cfg.read(cfg_path, encoding="utf-8")
+        # Use a `with open` block to ensure the file handle is always closed, preventing file locks.
+        with open(cfg_path, 'r', encoding='utf-8') as f:
+            cfg.read_file(f)
         if not cfg.sections():
             return "CONFIG_MALFORMED"
     except Exception:
@@ -680,8 +682,37 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
 
     return audit_result_code
 
-def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, bias_script):
-    """Executes the 'NEW' mode to create missing replications."""
+def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, quiet, bias_script):
+    """Worker function to execute one full replication using the orchestrator."""
+    try:
+        # Step 1: Run the main orchestrator for the replication
+        cmd_orch = [sys.executable, orchestrator_script, "--replication_num", str(rep_num), "--base_output_dir", target_dir]
+        if notes: cmd_orch.extend(["--notes", notes])
+        if quiet: cmd_orch.append("--quiet")
+        subprocess.run(cmd_orch, check=True, capture_output=True, text=True)
+        
+        # Step 2: Run bias analysis
+        # Find the newly created directory to pass to the bias script
+        run_dir_pattern = os.path.join(target_dir, f"run_*_rep-{rep_num:02d}_*")
+        run_dirs = glob.glob(run_dir_pattern)
+        if not run_dirs:
+            return rep_num, False, f"Could not find run directory for rep {rep_num} after orchestration."
+        
+        run_dir = run_dirs[0]
+        k_val = get_config_value(APP_CONFIG, 'Study', 'group_size', value_type=int, fallback_key='k_per_query', fallback=10)
+        cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_val)]
+        if not quiet: cmd_bias.append("--verbose")
+        subprocess.run(cmd_bias, check=True, capture_output=True, text=True)
+        
+        return rep_num, True, None
+    except subprocess.CalledProcessError as e:
+        error_details = f"Replication {rep_num} worker failed.\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
+        return rep_num, False, error_details
+    except Exception as e:
+        return rep_num, False, f"An unexpected error occurred in replication worker {rep_num}: {e}"
+
+def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, bias_script, sessions_script, max_workers):
+    """Executes 'NEW' mode by calling orchestrator, which is now parallelized."""
     print(f"{C_CYAN}--- Entering NEW Mode: Creating missing replications ---{C_RESET}")
     
     completed_reps = {int(re.search(r'_rep-(\d+)_', os.path.basename(d)).group(1))
@@ -702,24 +733,14 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_scr
         print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
         print("="*80)
         
+        # The orchestrator is now responsible for the entire replication lifecycle, including parallel sessions.
         cmd_orch = [sys.executable, orchestrator_script, "--replication_num", str(rep_num), "--base_output_dir", target_dir]
         if notes: cmd_orch.extend(["--notes", notes])
         if quiet: cmd_orch.append("--quiet")
         
         try:
             subprocess.run(cmd_orch, check=True)
-            
-            # Run bias analysis
-            search_pattern = os.path.join(target_dir, f'run_*_rep-{rep_num:03d}_*')
-            found_dirs = [d for d in glob.glob(search_pattern) if os.path.isdir(d)]
-            if len(found_dirs) == 1:
-                run_dir = found_dirs[0]
-                k_val = get_config_value(APP_CONFIG, 'Study', 'group_size', value_type=int, fallback_key='k_per_query', fallback=10)
-                cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_val)]
-                if not quiet: cmd_bias.append("--verbose")
-                subprocess.run(cmd_bias, check=True)
-            else:
-                logging.warning(f"Could not find unique run directory for rep {rep_num} to run bias analysis.")
+            # Bias analysis is now handled inside the orchestrator after Stage 4.
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
             logging.error(f"Replication {rep_num} failed or was interrupted.")
@@ -731,22 +752,27 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_scr
         remaining_reps = len(reps_to_run) - (i + 1)
         time_remaining = remaining_reps * avg_time
         eta = datetime.datetime.now() + datetime.timedelta(seconds=time_remaining)
-        print("") # Precede with a new line
-        print(f"{C_GREEN}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | Time Remaining: {str(datetime.timedelta(seconds=int(time_remaining)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
+        print(f"\n{C_GREEN}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | Time Remaining: {str(datetime.timedelta(seconds=int(time_remaining)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
 
     return True
 
-def _repair_worker(run_dir, sessions_script_path, index, quiet):
-    """Worker function to retry a single failed session."""
-    cmd = [sys.executable, sessions_script_path, "--run_output_dir", run_dir, "--indices", str(index), "--force-rerun"]
+def _session_worker(run_dir, sessions_script_path, index, quiet, force_rerun=False):
+    """Worker function to run a single LLM session for a given index."""
+    cmd = [sys.executable, sessions_script_path, "--run_output_dir", run_dir, "--indices", str(index)]
+    if force_rerun:
+        cmd.append("--force-rerun")
+    else:
+        # For new runs, we should always continue, not restart, if interrupted mid-replication.
+        cmd.append("--continue-run")
+
     if quiet: cmd.append("--quiet")
     
     try:
-        # Run quietly, capture output to prevent jumbled logs
+        # Capture all output to prevent jumbled logs from parallel processes
         result = subprocess.run(cmd, check=True, text=True, capture_output=True)
         return run_dir, index, True, None
     except subprocess.CalledProcessError as e:
-        error_log = f"LLM session repair FAILED for index {index} in {os.path.basename(run_dir)}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
+        error_log = f"LLM session FAILED for index {index} in {os.path.basename(run_dir)}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
         return run_dir, index, False, error_log
 
 def _run_repair_mode(runs_to_repair, sessions_script_path, orchestrator_script_path, bias_script_path, quiet, max_workers):
@@ -766,7 +792,7 @@ def _run_repair_mode(runs_to_repair, sessions_script_path, orchestrator_script_p
     repaired_dirs = set()
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        task_func = partial(_repair_worker, sessions_script_path=sessions_script_path, quiet=quiet)
+        task_func = partial(_session_worker, sessions_script_path=sessions_script_path, quiet=quiet, force_rerun=True)
         future_to_task = {executor.submit(task_func, run_dir=task[0], index=task[1]): task for task in all_tasks}
 
         for future in tqdm(as_completed(future_to_task), total=len(all_tasks), desc="Repairing Sessions", ncols=80):
@@ -870,7 +896,7 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, bias_scrip
 
             # After successful orchestration, we must find the newly created directory
             # to run the subsequent bias analysis step, which is critical for validation.
-            search_pattern = os.path.join(base_output_dir, f'run_*_rep-{rep_num:02d}_*')
+            search_pattern = os.path.join(base_output_dir, f'run_*_rep-{rep_num:03d}_*')
             found_dirs = [d for d in glob.glob(search_pattern) if os.path.isdir(d)]
             
             if len(found_dirs) == 1:
@@ -1081,7 +1107,7 @@ def main():
 
             if state_overall_status == "NEW_NEEDED":
                 print(f"{C_CYAN}--- Experiment is NEW. Proceeding to create replications. ---{C_RESET}")
-                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script, bias_analysis_script)
+                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script, bias_analysis_script, sessions_script, args.max_workers)
                 current_action_taken = True
             else: # If not NEW_NEEDED, then the directory is not empty, so it's safe to run a proper audit
                 # Print the detailed audit report if an action is potentially needed or if explicitly requested.

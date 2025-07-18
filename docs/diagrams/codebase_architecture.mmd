@@ -55,18 +55,22 @@ graph LR
     ps_analyze_study --> aggregator
     
     %% Experiment Manager's calls (Solid: Execution)
+    exp_manager --> build_queries
+    exp_manager --> run_sessions
+    exp_manager --> process_responses
+    exp_manager --> analyze_perf
+    exp_manager --> run_bias_analysis
+    exp_manager --> aggregator
     exp_manager --> orchestrate
     exp_manager --> log_manager
-    exp_manager --> run_bias_analysis
-    exp_manager --> aggregator        
-    exp_manager --> patch_old         
-    exp_manager --> rebuild_reports   
+    exp_manager --> patch_old
+    exp_manager --> rebuild_reports
 
-    %% Core Replication Pipeline flow (Solid: Execution)
-    orchestrate --> build_queries
-    orchestrate --> run_sessions
+    %% Orchestrator's role (now primarily for reprocessing)
     orchestrate --> process_responses
     orchestrate --> analyze_perf
+    orchestrate --> run_bias_analysis
+    orchestrate --> aggregator
 
     %% Utility dependencies (Solid: Execution)
     build_queries --> query_gen_util
