@@ -5,6 +5,21 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.5.0 (2025-07-18)
+
+### Feat
+
+- **docs**: Finalize diagram grouping and reference doc inclusion
+
+    This commit introduces the completed solution for grouping diagrams
+    with their captions in the generated DOCX, ensuring they stay on a single page.
+
+    Key changes include:
+    - Implemented grouped_figure placeholder processing in build_docs.py.
+    - Updated documentation template to use grouped_figure.
+    - Added custom_reference.docx to Git for consistent styling and pagination.
+    - Ensured render_all_diagrams processes embedded diagrams.
+
 ## v2.4.3 (2025-07-18)
 
 ### Perf
