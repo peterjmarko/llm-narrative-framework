@@ -5,6 +5,37 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.4.0 (2025-07-17)
+
+### Feat
+
+- **resilience**: enhance repair logic and progress feedback
+
+This commit introduces significant improvements to the framework's
+resilience, error handling, and user feedback during long-running
+experiments.
+
+- **Enhanced Spinner**: The live spinner in `llm_prompter.py` now displays
+  comprehensive progress for the entire replication, including the
+  current trial number, total trials, elapsed time, and estimated time
+  remaining, in addition to the timer for the individual API call.
+
+- **Fixed State-Detection Priority**: Corrected the state-detection logic
+  in `experiment_manager.py` to prioritize `REPAIR` over `NEW`. This
+  ensures that any existing, interrupted replication runs are fully
+  repaired before the manager attempts to create new ones, fixing a
+  critical flaw in the resume logic.
+
+- **Resolved Parallel Repair Race Conditions**:
+  - Fixed a race condition where parallel repair workers would conflict
+    over a shared temporary directory. `run_llm_sessions.py` now creates
+    a unique, process-ID-based temporary directory for each instance.
+  - Fixed a second race condition where parallel workers for the same
+    replication run would attempt to delete the same report file. The
+    repair logic in `experiment_manager.py` now correctly decouples the
+    parallel LLM session fetching from a subsequent, serial reprocessing
+    step for each uniquely affected replication.
+
 ## v2.3.2 (2025-07-17)
 
 ### Refactor
