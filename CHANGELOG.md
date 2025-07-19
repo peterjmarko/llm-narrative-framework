@@ -5,6 +5,26 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.6.0 (2025-07-19)
+
+### Feat
+
+- **framework**: overhaul workflows and improve UX
+
+This commit refactors the core migration workflow to be fully robust and operational. It also introduces significant user experience improvements across all interactive scripts and documentation.
+
+Key changes include:
+- Corrected silent failures in the patching process by improving error propagation from worker scripts.
+- Fixed parsing logic in `restore_config.py` to handle various legacy report formats and correctly select the latest report file.
+- Resolved an infinite loop in the state machine by ensuring the reprocess mode performs a full finalization.
+- Standardized all console headers and prompts for clarity and consistency.
+- Made user prompts robust by looping until valid input is received.
+- Improved and clarified all workflow diagrams (Run, Audit, Update, Migrate) to be more accurate and compact.
+- Added a new decision-tree diagram to the documentation to help users choose the correct workflow.
+- Ensured `run_experiment.ps1` always displays an audit report for existing experiments, improving consistency.
+- Streamlined output by removing redundant final audit steps from the migration script.
+- Updated all relevant script docstrings to reflect the new logic.
+
 ## v2.5.0 (2025-07-18)
 
 ### Feat

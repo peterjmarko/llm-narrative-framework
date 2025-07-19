@@ -1,6 +1,6 @@
 [project]
 name = "llm-personality-matching"
-version = "2.5.0"
+version = "2.6.0"
 description = "A reproducible pipeline for LLM personality matching experiments."
 authors = [
     {name = "Peter Marko", email = "peter.j.marko@gmail.com"},
@@ -83,7 +83,7 @@ ana-stu = "powershell -ExecutionPolicy Bypass -File ./analyze_study.ps1"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "2.5.0"
+version = "2.6.0"
 version_files = [
     "pyproject.toml:version"
 ]
