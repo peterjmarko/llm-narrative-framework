@@ -217,13 +217,26 @@ This project uses **`commitizen`** to enforce the [Conventional Commits](https:/
     git status
     ```
 
-4.  **Stage Your Changes**:
-    Once you have verified that all intended files are present, stage everything for the commit.
+4.  **Run Pre-commit Hooks First (Code Quality & Formatting)**
+    Before building the final documentation, run the `lint` script. This will apply all automatic formatting and code quality checks to your source files, including documentation sources.
+    ```bash
+    pdm run lint
+    ```
+    *(Fix any issues reported and re-run `pdm run lint` until clean. You may need to `git add` any files that were auto-corrected.)*
+
+5.  **Update and Build Documentation**
+    Now that all source files are in their final, linted state, build the documentation. This ensures the generated images and files are perfectly synchronized.
+    ```bash
+    pdm run build-docs
+    ```
+
+6.  **Stage All Final Changes**
+    Stage all your changes, including the auto-formatted source files and the newly generated documentation.
     ```bash
     git add .
     ```
 
-5.  **Create the Commit Message**:
+7.  **Create the Commit Message**:
     Create a temporary file named `commit.txt` in the project root. Write your full commit message inside, following the Conventional Commits format. This file is ignored by Git (via `.gitignore`).
 
     **Example `commit.txt`:**
@@ -237,15 +250,8 @@ This project uses **`commitizen`** to enforce the [Conventional Commits](https:/
     This provides a more nuanced view of model performance beyond MRR and Top-1 accuracy, especially for imbalanced results.
     ```
 
-6.  **Run Pre-commit Hooks (Code Quality & Formatting)**:
-    This is an important step, defined as the `lint` script in `pyproject.toml`. These hooks ensure code quality, formatting, and linting standards are met.
-    ```bash
-    pdm run lint
-    ```
-    *(Fix any issues reported by `pre-commit` and re-run `pdm run lint` until clean. You may need to `git add` fixed files).*
-
-7.  **Create the Commit from the File**:
-    Use the `-F` flag to create the commit from your prepared message file.
+8.  **Create the Commit from the File**:
+    Use the `-F` flag to create the commit from your prepared message file. The pre-commit hooks will run again automatically, but since you've already linted and built, they should all pass instantly.
     ```bash
     git commit -F commit.txt
     ```
@@ -256,17 +262,35 @@ After one or more feature (`feat`) or fix (`fix`) commits have been merged into 
 
 This is a manual, two-step process that uses `commitizen` to automatically bump the version, generate a detailed changelog, and tag the release.
 
-1.  **Ensure you are on the `main` branch and have pulled the latest changes.**
-    ```bash
-    git checkout main
-    git pull origin main
-    ```
+1.  **Prepare for Release (Pre-Flight Check)**
+    a. **Switch to the `main` branch and pull the latest changes.**
+       ```bash
+       git checkout main
+       git pull origin main
+       ```
+    b. **Verify the working directory is clean.** This is a critical step. Run `git status` and ensure there are no uncommitted changes. If there are, commit them or discard them before proceeding.
+       ```bash
+       git status
+       ```
 
 2.  **Run the bump command.**
-    ```bash
-    pdm run cz bump --changelog
-    ```
-    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `CHANGELOG.md`, and creates a new commit and tag.
+    `commitizen` determines the version bump based on the types of commits since the last release (`feat` for a minor bump, `fix` for a patch). Commits like `refactor` or `docs` will be added to the changelog but will not trigger a version bump.
+
+    If a significant change was committed with the wrong type (e.g., a major bug fix was committed as `refactor`), you must first amend the commit message to ensure the version is bumped correctly.
+
+    a. **(If Needed) Amend the commit type:**
+       To change the type of the most recent commit, run:
+       ```bash
+       git commit --amend
+       ```
+       This command will open the last commit message in your default text editor. Simply change the commit type (e.g., from `refactor(...)` to `fix(...)`), then save the file and close the editor.
+
+    b. **Run the bump command:**
+       Once all commits are correctly typed, run the main release command:
+       ```bash
+       pdm run cz bump --changelog
+       ```
+       This command reads all commits since the last tag, determines the correct version increment, updates `pyproject.toml` and `CHANGELOG.md`, and creates a new release commit and tag.
 
 3.  **(Manual Step) Update Changelog Details:**
     The `bump` command only adds the commit *header* to `CHANGELOG.md`. To include the full commit body for clarity, you must add it manually.
