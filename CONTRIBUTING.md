@@ -263,10 +263,23 @@ This is a manual, two-step process that uses `commitizen` to automatically bump 
     ```
 
 2.  **Run the bump command.**
-    ```bash
-    pdm run cz bump --changelog
-    ```
-    This command reads all commits since the last tag, determines the correct version increment (patch, minor, or major), updates `pyproject.toml` and `CHANGELOG.md`, and creates a new commit and tag.
+    `commitizen` determines the version bump based on the types of commits since the last release (`feat` for a minor bump, `fix` for a patch). Commits like `refactor` or `docs` will be added to the changelog but will not trigger a version bump.
+
+    If a significant change was committed with the wrong type (e.g., a major bug fix was committed as `refactor`), you must first amend the commit message to ensure the version is bumped correctly.
+
+    a. **(If Needed) Amend the commit type:**
+       To change the type of the most recent commit, run:
+       ```bash
+       git commit --amend
+       ```
+       This command will open the last commit message in your default text editor. Simply change the commit type (e.g., from `refactor(...)` to `fix(...)`), then save the file and close the editor.
+
+    b. **Run the bump command:**
+       Once all commits are correctly typed, run the main release command:
+       ```bash
+       pdm run cz bump --changelog
+       ```
+       This command reads all commits since the last tag, determines the correct version increment, updates `pyproject.toml` and `CHANGELOG.md`, and creates a new release commit and tag.
 
 3.  **(Manual Step) Update Changelog Details:**
     The `bump` command only adds the commit *header* to `CHANGELOG.md`. To include the full commit body for clarity, you must add it manually.
