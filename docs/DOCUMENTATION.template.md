@@ -147,6 +147,12 @@ This workflow is used after all experiments are complete to aggregate results an
 
 {{grouped_figure:docs/diagrams/architecture_workflow_5_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
 
+#### Workflow 6: Audit a Study
+
+This workflow provides a read-only, consolidated completeness report for all experiments in a study. The `audit_study.ps1` wrapper iterates through each experiment folder and calls `experiment_manager.py` with the `--verify-only` flag (running quietly by default). It then compiles the results into a summary table for the console and a comprehensive `study_audit_log.txt` file in the study directory. This workflow is the primary diagnostic tool for assessing overall study readiness.
+
+{{grouped_figure:docs/diagrams/architecture_workflow_6_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Audit a Study. Consolidated completeness report for all experiments in a study.}}
+
 ### Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
@@ -299,6 +305,18 @@ This calls `experiment_manager.py` with the `--reprocess` flag. This action firs
 
 This script provides a safe, non-destructive workflow to upgrade older, legacy experiment directories to be compatible with the current analysis pipeline. The original data is always preserved.
 
+### Auditing a Study (`audit_study.ps1`)
+
+This script audits all experiments within a study directory to verify their readiness for final analysis. It iterates through each experiment, runs a quiet audit, and presents a consolidated summary report table. This is the recommended first step before running `analyze_study.ps1`.
+
+**To audit a study:**
+Point the script at the top-level directory containing all relevant experiment folders.
+```powershell
+# Example: Audit all experiments located in the "My_First_Study" directory
+.\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
+```
+The summary table will show the status (`VALIDATED`, `NEEDS UPDATE`, etc.) and the recommended action for each experiment. For a detailed, verbose output that shows the full audit for each experiment, add the `-Verbose` switch.
+
 **What it does:**
 The `migrate_experiment.ps1` script automates a copy-then-migrate process:
 
@@ -365,7 +383,9 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 *   **`run_experiment.ps1`**: The primary entry point to run a new experiment or resume/repair an interrupted one.
 
-*   **`audit_experiment.ps1`**: Provides a read-only, detailed completeness report for a specified experiment, acting as the primary diagnostic tool.
+*   **`audit_experiment.ps1`**: Provides a read-only, detailed completeness report for a specified experiment, acting as the primary diagnostic tool for a *single experiment*.
+
+*   **`audit_study.ps1`**: Audits all experiments within a study directory and provides a consolidated report to check for final analysis readiness.
 
 *   **`update_experiment.ps1`**: Re-runs the data processing and analysis stages on existing results, ideal for applying analysis updates or bug fixes.
 

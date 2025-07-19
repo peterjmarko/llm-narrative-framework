@@ -4,6 +4,7 @@ graph LR
         ps_run_exp("run_experiment.ps1")
         ps_update_exp("update_experiment.ps1")
         ps_audit_exp("audit_experiment.ps1")
+        ps_audit_study("audit_study.ps1")
         ps_migrate("migrate_experiment.ps1")
         ps_analyze_study("analyze_study.ps1")
     end
@@ -51,6 +52,7 @@ graph LR
     ps_run_exp --> exp_manager
     ps_update_exp --> exp_manager
     ps_audit_exp --> exp_manager
+    ps_audit_study --> exp_manager
     ps_migrate --> exp_manager
     ps_analyze_study --> aggregator
     
