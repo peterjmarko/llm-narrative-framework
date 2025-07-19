@@ -5,6 +5,30 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.7.0 (2025-07-19)
+
+### Feat
+
+- **audit-study**: introduce study-level audit and enhance output
+
+    This commit introduces a new `audit_study.ps1` script, providing a
+    comprehensive, consolidated audit report across multiple experiments
+    within a study directory.
+
+    Key improvements include:
+    - New `audit_study.ps1` entry point for study-level verification.
+    - All console banners are now consistently capitalized and centered.
+    - Real-time audit progress is displayed in a clear, tabular format (Progress, Experiment, Result).
+    - The final summary report table has improved spacing and uses "Details" as the third column header.
+    - All console output is now captured and saved to a `study_audit_log.txt` file.
+    - Log file timestamps are formatted for human readability post-processing.
+    - Standardized, two-line messages are used when the transcript stops.
+    - Fixed critical runtime errors related to table formatting and transcript handling.
+    - Updated `pyproject.toml` to include `pdm run aud-stu` shortcut.
+    - Added new `architecture_workflow_6_audit_study.mmd` diagram.
+    - Updated `DOCUMENTATION.template.md` to describe the new workflow and its diagram.
+    - Updated `codebase_architecture.mmd` to include the new entry point.
+
 ## v2.6.0 (2025-07-19)
 
 ### Feat
