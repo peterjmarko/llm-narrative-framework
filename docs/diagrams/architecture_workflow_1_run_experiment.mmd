@@ -1,103 +1,29 @@
 graph TD
-    %% 1. Define all nodes first
-    EntryPoint["run_experiment.ps1<br/>(User Entry Point)"]:::entry
-    BatchManager["experiment_manager.py<br/>(Manages Batch)"]:::layer_orange
-    LogManager["replication_log_manager.py"]:::danger
-    BatchLog[("batch_run_log.csv")]:::artifact
-    FinalAggregator["experiment_aggregator.py"]:::script
-    ReplResults[("REPLICATION_results.csv")]:::artifact
-    ExpResults[("EXPERIMENT_results.csv")]:::artifact
+    %% Main Control Flow
+    A[run_experiment.ps1<br>User Entry Point]:::entry --> B{State Machine Loop<br><small>experiment_manager.py</small>}:::layer_orange;
     
-    ReplicationOrchestrator["orchestrate_replication.py"]:::layer_green
-    BuildQueries["1. build_llm_queries.py"]:::script
-    QueryGenerator["query_generator.py"]:::script
-    LLMQueries[("llm_query_XXX.txt")]:::artifact
-    RunSessions["2. run_llm_sessions.py<br/>(Called in parallel for each trial)"]:::script
-    LLMPrompter["llm_prompter.py"]:::script
-    LLMResponses[("llm_response_XXX.txt")]:::artifact
-    ProcessResponses["3. process_llm_responses.py"]:::script
-    AllScores[("all_scores.txt")]:::artifact
-    AllMappings[("all_mappings.txt")]:::artifact
-    AnalyzePerformance["4. analyze_llm_performance.py"]:::script
-    BiasAnalysis["5. run_bias_analysis.py"]:::script
-    ReplicationMetrics[("replication_metrics.json")]:::artifact
-    ReplicationReport[("replication_report.txt")]:::artifact
-    Aggregator["7. experiment_aggregator.py"]:::script
-
-    %% 2. Define connections
-    EntryPoint --> BatchManager
-    BatchManager -- "Calls in Loop" --> ReplicationOrchestrator
-    BatchManager -- "Finalizes Batch" --> LogManager
-    LogManager --> BatchLog
+    B -- "State is INCOMPLETE" --> C["<b>Action: Run/Repair Replication</b>"];
+    C --> B;
     
-    %% The orchestrator now handles the full 6-stage replication pipeline
-    ReplicationOrchestrator --> BuildQueries
-    ReplicationOrchestrator --> RunSessions
-    ReplicationOrchestrator --> ProcessResponses
-    ReplicationOrchestrator --> AnalyzePerformance
-    ReplicationOrchestrator --> BiasAnalysis
-    ReplicationOrchestrator -- "6. Generates Report" --> ReplicationReport
-    ReplicationOrchestrator --> Aggregator
+    B -- "State is COMPLETE" --> F["<b>Action: Finalize Experiment</b><br><small>Generates top-level summaries</small>"]:::script;
+    F --> G((Finish)):::finish_node;
 
-    %% Add invisible links to force the visual order of the stages
-    BuildQueries ~~~ RunSessions ~~~ ProcessResponses ~~~ AnalyzePerformance ~~~ BiasAnalysis ~~~ ReplicationReport ~~~ Aggregator
-
-    BatchManager -- "Finalizes Batch" --> FinalAggregator
-    FinalAggregator --> ExpResults
-    Aggregator --> ReplResults
-
-    BuildQueries --> QueryGenerator
-    BuildQueries --> LLMQueries
-    LLMQueries --> RunSessions
-    RunSessions --> LLMPrompter
-    RunSessions --> LLMResponses
-    LLMResponses --> ProcessResponses
-    ProcessResponses --> AllScores
-    ProcessResponses --> AllMappings
-    AllScores --> AnalyzePerformance
-    AllMappings --> AnalyzePerformance
-    AnalyzePerformance --> ReplicationMetrics
-    ReplicationMetrics --> BiasAnalysis
-    BiasAnalysis -- "Updates" --> ReplicationMetrics
-    ReplicationMetrics --> ReplicationReport
-    ReplicationReport --> Aggregator
-
-    %% 3. Group nodes into subgraphs using their IDs
-    subgraph "Workflow 1: Run an Experiment"
+    subgraph C
         direction TB
-        EntryPoint
-        subgraph "Batch Management Layer"
-            BatchManager
-            LogManager
-            BatchLog
-            FinalAggregator
-            ExpResults
+        Orchestrator["orchestrate_replication.py"]:::layer_green
+        subgraph "Internal Stages & Key Artifacts"
+            direction TB
+            S1["<b>1. Build Queries</b><br><small>Generates Query Files</small>"] --> S2;
+            S2["<b>2. Run LLM Sessions</b><br><small>Generates Response Files</small>"] --> S3;
+            S3["<b>3. Process & Analyze</b><br><small>Generates Report & Metrics</small>"] --> S4;
+            S4["<b>4. Finalize Replication</b><br><small>Generates REPLICATION_results.csv</small>"]
         end
-        
-        subgraph "Single Replication Layer (Called in a loop)"
-            ReplicationOrchestrator
-            BuildQueries
-            QueryGenerator
-            LLMQueries
-            RunSessions
-            LLMPrompter
-            LLMResponses
-            ProcessResponses
-            AllScores
-            AllMappings
-            AnalyzePerformance
-            BiasAnalysis
-            Aggregator
-            ReplicationMetrics
-            ReplicationReport
-            ReplResults
-        end
+        Orchestrator -- "Manages" --> S1;
     end
-
-    %% 4. Styling
+    
+    %% Styling
     classDef entry fill:#337ab7,stroke:#2e6da4,color:#fff;
     classDef layer_orange fill:#f0ad4e,stroke:#eea236,color:#333;
     classDef layer_green fill:#5cb85c,stroke:#4cae4c,color:#fff;
     classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
-    classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;
-    classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef finish_node fill:#fff,stroke:#5cb85c,color:#5cb85c;

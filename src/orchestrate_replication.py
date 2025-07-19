@@ -247,9 +247,8 @@ def main():
             if rc1 != 0: raise err1
 
         # Stage 2: Run LLM Sessions (Parallel by default)
-        stage_title = "2. Run LLM Sessions (Parallel)"
+        stage_title = "2. Run LLM Sessions"
         header = (f"\n\n{'='*80}\n### STAGE: {stage_title} ###\n{'='*80}\n\n")
-        print(f"--- Running Stage: {stage_title} ---")
 
         # Determine which indices to run based on the mode.
         if args.indices:
@@ -279,6 +278,7 @@ def main():
         if not indices_to_run:
             all_stage_outputs.append(header + "All required LLM response files already exist. Nothing to do.")
         else:
+            print(f"--- Running Stage: {stage_title} ---")
             max_workers = get_config_value(APP_CONFIG, 'LLM', 'max_parallel_sessions', value_type=int, fallback=10)
             
             def session_worker(index):

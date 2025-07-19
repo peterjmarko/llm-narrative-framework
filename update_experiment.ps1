@@ -72,8 +72,20 @@ try {
         0 { # AUDIT_ALL_VALID
             # If the experiment is already valid, ask the user if they want to force a reprocess.
             $promptMessage = "`nExperiment is already complete and valid. Do you want to force an update anyway? (Y/N)"
-            $choice = Read-Host -Prompt $promptMessage
-            if ($choice.Trim().ToLower() -ne 'y') {
+            $proceed = $false
+            while ($true) {
+                $choice = Read-Host -Prompt $promptMessage
+                $cleanChoice = $choice.Trim().ToLower()
+                if ($cleanChoice -eq 'y') {
+                    $proceed = $true
+                    break
+                }
+                if ($cleanChoice -eq 'n') {
+                    break
+                }
+            }
+
+            if (-not $proceed) {
                 Write-Host "Update aborted by user." -ForegroundColor Yellow
                 return # Exit the script successfully without doing anything.
             }
@@ -118,7 +130,8 @@ try {
         Write-Warning "Post-update audit failed. The experiment may still have unresolved issues."
     }
 
-    Write-Host "`nExperiment update completed successfully." -ForegroundColor Green
+    Write-Host "`nExperiment update completed successfully for:" -ForegroundColor Green
+    Write-Host $TargetDirectory -ForegroundColor Green
 } catch {
     # The 'throw' statements in the switch block will be caught here.
     Write-Error "An error occurred during the update process: $($_.Exception.Message)"

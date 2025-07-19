@@ -83,26 +83,17 @@ The project's functionality is organized into five primary workflows, each initi
 
 #### Workflow 1: Run an Experiment
 
-This is the primary workflow for generating new experimental data. The PowerShell entry point (`run_experiment.ps1`) calls the Python batch controller (`experiment_manager.py`), which in turn executes a loop of single replications using `orchestrate_replication.py`.
+This is the primary workflow for generating new experimental data or for resuming/repairing an interrupted experiment. The PowerShell entry point (`run_experiment.ps1`) calls the Python batch controller (`experiment_manager.py`), which functions as a state machine. It repeatedly audits the experiment's state and, if incomplete, calls `orchestrate_replication.py` to run or repair the necessary replications. This self-healing loop continues until the experiment is complete, at which point the manager performs a final aggregation.
 
-Each replication executes a seven-stage pipeline:
+The `orchestrate_replication.py` script executes the full pipeline for a single run, which can be conceptually broken into four main stages:
 
-1.  **Build LLM Queries**: `orchestrate_replication.py` calls `build_llm_queries.py` to sample personalities and generate trial data, queries, and manifests.
-
-2.  **LLM Interaction**: `orchestrate_replication.py` now calls `run_llm_sessions.py` in parallel for each trial. This significantly speeds up new runs by making concurrent API calls, up to the limit defined by `max_parallel_sessions` in `config.ini`.
-
-3.  **Response Processing**: `process_llm_responses.py` parses the LLM's raw text responses into structured score and mapping files.
-
-4.  **Analyze Performance**: `analyze_llm_performance.py` calculates the core performance metrics (MRR, Top-1 Accuracy, etc.) and saves them to a machine-readable `replication_metrics.json` file.
-
-5.  **Run Bias Analysis**: `run_bias_analysis.py` reads the `replication_metrics.json` file, calculates positional bias, and injects these new metrics back into the file.
-
-6.  **Generate Report**: The orchestrator generates the final, human-readable `replication_report.txt` by combining run parameters with the finalized data from `replication_metrics.json`.
-
-7.  **Finalize Replication**: Finally, `experiment_aggregator.py` is called on the run directory. It parses the newly created report and generates the `REPLICATION_results.csv` summary, marking the replication as fully complete and valid.
+1.  **Build Queries**: Generates all necessary query files and manifests for each trial.
+2.  **Run LLM Sessions**: Interacts with the LLM API in parallel to get responses.
+3.  **Process & Analyze**: Parses the raw responses and runs all statistical analyses, culminating in a `replication_report.txt`.
+4.  **Finalize Replication**: Creates the `REPLICATION_results.csv` summary, marking the run as valid.
 
 <div align="center">
-  <p>Workflow 1: Run an Experiment. The primary workflow for generating new experimental data.</p>
+  <p>Workflow 1: Run an Experiment, showing the main control loop and the internal replication pipeline.</p>
   <img src="images/architecture_workflow_1_run_experiment.png" width="100%">
 </div>
 
@@ -143,7 +134,8 @@ In addition to the per-replication table, the audit provides an `Overall Summary
 #### Workflow 3: Update an Experiment
 
 This workflow allows you to re-run the data processing and analysis stages on an existing experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag.
-It first performs an audit. If the experiment has analysis errors, it proceeds to update it. If the experiment is already `VALIDATED`, it will prompt for user confirmation before forcing a full reprocessing. This action regenerates the primary report (`replication_report.txt`) for each run and performs a full re-aggregation, ensuring all summary files are brought up to date.
+It first performs an audit. If the experiment has analysis errors, it proceeds to update it. If the experiment is already `VALIDATED`, it will prompt for user confirmation before forcing a full reprocessing.
+The reprocessing is a two-step action: first, `orchestrate_replication.py --reprocess` is called on each individual run to regenerate its `replication_report.txt`; second, `experiment_aggregator.py` is called to perform a full re-aggregation, ensuring all top-level summary files are brought up to date.
 
 <div align="center">
   <p>Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.</p>
@@ -152,19 +144,15 @@ It first performs an audit. If the experiment has analysis errors, it proceeds t
 
 #### Workflow 4: Migrate Old Experiment Data
 
-This utility workflow provides a safe, non-destructive process to transform older or malformed experimental data to the current pipeline's format. The process ensures the original data is left untouched.
+This utility workflow provides a safe, non-destructive process to transform older experimental data into the current pipeline's format, leaving the original data untouched. The `migrate_experiment.ps1` script orchestrates a clear, four-step process:
 
-The PowerShell entry point (`migrate_experiment.ps1`) now performs four key steps:
-
-1.  **Audit Source Experiment**: It first runs a read-only audit on the specified `SourceDirectory` to determine its current state (e.g., `VALIDATED`, `REPROCESS_NEEDED`, `REPAIR_NEEDED`, or `MIGRATION_NEEDED`). Based on this audit, it provides a summary and asks for user confirmation to proceed with the full migration. If the experiment is already `VALIDATED`, it will suggest no action is needed and exit.
-2.  **Copy Experiment Data**: If confirmed, it copies the `SourceDirectory` to a new, timestamped folder within `output/migrated_experiments/`.
-3.  **Transform New Experiment Copy**: It then calls `experiment_manager.py --migrate` on this *new copy*. This initiates a robust, multi-stage process:
-    *   **Migration Pre-processing**: The `--migrate` flag triggers a special sequence that cleans old artifacts, patches legacy configurations, and then performs a deep reprocessing of each replication by calling `orchestrate_replication.py --reprocess`. This critical step regenerates all analysis files from the raw LLM responses using the latest validation logic.
-    *   **Self-Healing Loop**: After pre-processing, the manager enters its standard `Verify -> Act` loop. If it detects remaining issues that reprocessing could not fix (e.g., missing raw response files), it will prompt the user to run the necessary repairs until the experiment is fully `VALIDATED`.
-4.  **Final Validation Audit**: After the `experiment_manager.py` completes its work and the experiment is deemed `COMPLETE`, `migrate_experiment.ps1` runs a final read-only audit on the newly migrated experiment. This provides explicit confirmation that the migration process was successful and the data is fully `VALIDATED`.
+1.  **Audit Source**: A read-only audit is performed on the source directory to assess its state and recommend migration.
+2.  **Copy Data**: After user confirmation, the script creates a clean, timestamped copy of the source experiment in the `output/migrated_experiments/` directory.
+3.  **Transform Copy**: The script calls `experiment_manager.py --migrate` on the new copy. The manager then automates the internal transformation, including patching configurations, reprocessing all runs, and running its self-healing loop until the new experiment copy is valid.
+4.  **Final Validation**: The wrapper script runs a final read-only audit on the newly migrated experiment, providing explicit confirmation that the process was successful.
 
 <div align="center">
-  <p>Workflow 4: Migrate Old Experiment Data. provides a safe, non-destructive process to transform older or malformed experimental data to the current pipeline's format.</p>
+  <p>Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.</p>
   <img src="images/architecture_workflow_4_migrate_data.png" width="100%">
 </div>
 
@@ -278,6 +266,21 @@ A follow-up study is planned to evaluate other powerful, medium-cost models as A
 ### Analysis Settings (`[Analysis]`)
 
 -   **`min_valid_response_threshold`**: Minimum average number of valid responses (`n_valid_responses`) for an experiment to be included in the final analysis. Set to `0` to disable.
+
+## Choosing the Right Workflow: Separation of Concerns
+
+The framework is designed around three primary user actions, each handled by a dedicated script. This separation of concerns ensures that each workflow is simple, predictable, and safe. Use the following diagram and descriptions to choose the correct tool for your task.
+
+<div align="center">
+  <p>Choosing the Right Workflow: Separation of Concerns.</p>
+  <img src="images/decision_tree_workflow.png" width="100%">
+</div>
+
+-   **`run_experiment.ps1` (Data Generation & Repair)**: This is your primary tool. Use it to start a new experiment from scratch or to resume/repair an interrupted one. Its sole focus is to ensure the raw data (queries and LLM responses) is complete according to your `config.ini`.
+
+-   **`update_experiment.ps1` (Analysis Reprocessing)**: Use this *after* your experiment's raw data is complete. It regenerates all reports and summaries from the existing raw data. It is the correct tool for applying analysis bug fixes or adding new metrics without re-running expensive LLM calls.
+
+-   **`migrate_experiment.ps1` (Structural Transformation)**: This is a special utility for upgrading experiments created with older versions of the framework. It safely copies the legacy data and transforms the copy into the modern, compatible format.
 
 ## Core Workflows
 

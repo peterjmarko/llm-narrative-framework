@@ -1,45 +1,40 @@
 graph TD
     %% 1. Nodes
     EntryPointPS["update_experiment.ps1<br/>(User Entry Point)"]:::entry_ps
-    PreAudit["1. Audit Experiment<br/>(calls experiment_manager.py --verify-only)"]:::script
+    PreAudit["1. Audit Experiment<br/><small>calls experiment_manager.py --verify-only</small>"]:::script
     Decision{Audit Result?}:::decision
     Prompt["Prompt User<br/>'Force Update?'"]:::user_interaction
     Stop((Exit)):::stop_node
     
-    Reprocess["2. Reprocess Experiment<br/>(calls experiment_manager.py --reprocess)"]:::entry_py
-    
-    PostAudit["3. Verify Update<br/>(calls experiment_manager.py --verify-only)"]:::script
-
-    %% Details of reprocessing, shown as a separate conceptual block
-    subgraph "Internal Reprocessing Details"
-      direction TB
-      Orchestrate["orchestrate_replication.py<br/>(Loops over each run)"]:::layer_green
-      Aggregator["experiment_aggregator.py<br/>(Generates new summaries)"]:::layer_green
+    subgraph "2. Reprocess Experiment"
+        direction TB
+        ReprocessEntry["experiment_manager.py --reprocess"]:::entry_py
+        Loop["Loops over each replication"]:::process
+        CallOrchestrator["Calls orchestrate_replication.py --reprocess<br/><small>Regenerates reports & REPLICATION_results.csv</small>"]:::layer_green
+        FinalAggregate["Final Aggregation<br/><small>Calls experiment_aggregator.py<br/>Regenerates EXPERIMENT_results.csv</small>"]:::layer_green
     end
     
+    PostAudit["3. Verify Update<br/><small>calls experiment_manager.py --verify-only</small>"]:::script
+
     %% 2. Connections
     EntryPointPS --> PreAudit
     PreAudit --> Decision
     
     Decision -- "VALIDATED" --> Prompt
-    Decision -- "NEEDS_REPROCESS" --> Reprocess
+    Decision -- "NEEDS_REPROCESS" --> ReprocessEntry
     Decision -- "INVALID" --> Stop
     
-    Prompt -- "Yes" --> Reprocess
+    Prompt -- "Yes" --> ReprocessEntry
     Prompt -- "No" --> Stop
     
-    Reprocess -- "Internally calls" --> Orchestrate
-    Reprocess -- " " --> Aggregator
+    ReprocessEntry --> Loop
+    Loop --> CallOrchestrator
+    CallOrchestrator --> Loop
+    ReprocessEntry -- "After loop" --> FinalAggregate
     
-    Reprocess --> PostAudit
+    FinalAggregate --> PostAudit
 
     %% 3. Styling
     classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
     classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
     classDef decision fill:#f0ad4e,stroke:#eea236,color:#333;
-    classDef user_interaction fill:#d9534f,stroke:#d43f3a,color:#fff;
-    classDef entry_py fill:#f0ad4e,stroke:#eea236,color:#333;
-    classDef layer_green fill:#5cb85c,stroke:#4cae4c,color:#fff;
-    classDef stop_node fill:#fff,stroke:#d9534f,color:#d9534f;
-    
-    class Stop stop_node;

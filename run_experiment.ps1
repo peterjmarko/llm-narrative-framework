@@ -124,7 +124,7 @@ function Invoke-Experiment {
 
     # Check the exit code from the Python script.
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "`n!!! The Python batch runner exited with an error. Check the output above. !!!" -ForegroundColor Red
+        Write-Host "`n!!! The Python batch runner exited with an error. Check the output above. !!!" -ForegroundColor Yellow
     } else {
         Write-Host "`n--- PowerShell launcher script finished. ---"
     }

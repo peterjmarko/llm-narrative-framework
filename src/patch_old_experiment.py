@@ -24,11 +24,13 @@ Batch-patches historical experiments by creating missing config archives.
 
 This script serves as a batch controller that recursively scans a target
 directory for all subfolders matching the 'run_*' pattern. For each `run_*`
-directory found, it calls the `restore_config.py` utility.
+directory found, it calls the `restore_config.py` utility. The script now
+includes robust error handling, ensuring that any failure in the worker script
+is immediately reported and halts the entire batch process.
 
-`restore_config.py` then reverse-engineers the `replication_report.txt` to
-generate and save a `config.ini.archived` file, making legacy data compatible
-with modern reprocessing and analysis scripts.
+`restore_config.py` reverse-engineers the `replication_report.txt` to
+generate a `config.ini.archived` file, making legacy data compatible with
+modern reprocessing and analysis scripts.
 """
 
 import os
@@ -68,24 +70,29 @@ def main():
     for run_dir in sorted(run_dirs):
         # The restore script handles the check for existing files,
         # but we can call it unconditionally.
-        try:
-            # We capture output to check if it did any work.
-            result = subprocess.run(
-                [sys.executable, restore_script_path, run_dir],
-                check=True,
-                capture_output=True,
-                text=True,
-                encoding='utf-8'
-            )
-            # If the script printed "Success", it means it did work.
-            if "Success" in result.stdout:
-                patched_count += 1
-                # Print the output from the worker script so the user sees the progress.
-                # This output already contains the desired newline and path format from restore_config.py
-                print(result.stdout.strip())
+        # We now run the patcher with check=False to manually control output and exit.
+        result = subprocess.run(
+            [sys.executable, restore_script_path, run_dir],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            check=False
+        )
 
-        except subprocess.CalledProcessError as e:
-            print(f"\nFailed to process '{os.path.basename(run_dir)}'. Error:\n{e.stderr}")
+        # Always print the output from the worker for full transparency.
+        if result.stdout:
+            print(result.stdout.strip())
+        if result.stderr:
+            print(result.stderr.strip(), file=sys.stderr)
+
+        # If the worker script returned a non-zero exit code, it failed.
+        if result.returncode != 0:
+            print(f"FATAL: Worker script failed for '{os.path.basename(run_dir)}'. Halting patch process.", file=sys.stderr)
+            sys.exit(1) # Exit the patcher with an error code.
+        
+        # Only count as patched if we see the success message.
+        if "Success" in result.stdout:
+            patched_count += 1
 
     print("\n--- Patching complete ---")
     print(f"Scanned {len(run_dirs)} directories.")

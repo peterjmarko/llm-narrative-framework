@@ -1,0 +1,8 @@
+graph TD
+    A{What is the state of your experiment?}:::decision;
+    A -- "I have a new experiment OR<br>an interrupted one with missing<br>queries/responses." --> B["<b>Use:</b> run_experiment.ps1<br/><br/><b>Purpose:</b> Data Generation & Repair<br/><small>Ensures raw data is complete by creating new<br/>replications or re-running failed LLM sessions.</small>"]:::tool;
+    A -- "My experiment's raw data is complete,<br>but I want to re-run the analysis<br>(e.g., apply a bug fix or new metric)." --> C["<b>Use:</b> update_experiment.ps1<br/><br/><b>Purpose:</b> Analysis Reprocessing<br/><small>Regenerates reports and summaries from existing<br/>raw data without making new LLM calls.</small>"]:::tool;
+    A -- "I have data from an old version<br>of this framework that needs<br>to be compatible with the current tools." --> D["<b>Use:</b> migrate_experiment.ps1<br/><br/><b>Purpose:</b> Structural Transformation<br/><small>Safely copies and upgrades legacy<br/>experiment structures and files.</small>"]:::tool;
+
+    classDef decision fill:#f0ad4e,stroke:#eea236,color:#333,font-weight:bold;
+    classDef tool fill:#f7f7f9,stroke:#ccc,color:#333,text-align:left;

@@ -1,71 +1,16 @@
-graph TD
-    %% 1. Define all nodes first
-    EntryPointPS["migrate_experiment.ps1<br/>(User Entry Point)"]:::entry_ps
-    CopyStep("Copies Legacy Directory<br/>to New Timestamped Folder"):::action
-    EntryPointPy["experiment_manager.py<br/>(--migrate Mode)"]:::entry_py
-    
-    PatchOld["patch_old_experiment.py"]:::script
-    RestoreConfig["restore_config.py"]:::script
-    ArchivedConfig[("config.ini.archived")]:::artifact
-    RebuildReports["rebuild_reports.py"]:::script
-    
-    LogManagerRebuild["replication_log_manager.py<br/>(rebuild command)"]:::danger
-    BatchRunLog[("batch_run_log.csv")]:::artifact
-    Aggregator["experiment_aggregator.py<br/>(hierarchical mode)"]:::script
-    ReplResults[("REPLICATION_results.csv")]:::artifact
-    ExpResults[("EXPERIMENT_results.csv")]:::artifact
-    LogManagerFinalize["replication_log_manager.py<br/>(finalize command)"]:::danger
-    FinalAudit["experiment_manager.py<br/>(--verify-only Mode)"]:::script_audit
+graph LR
+    A[<b>1. Audit Source</b><br><small>migrate_experiment.ps1 runs a<br>read-only check on the source directory</small>]:::script --> B{User Confirms?}:::decision;
+    B -- Yes --> C[<b>2. Copy Directory</b><br><small>PowerShell creates a<br>timestamped copy</small>]:::action;
+    C --> D[<b>3. Transform Copy</b><br><small>PowerShell calls experiment_manager.py<br>to upgrade the new copy</small>]:::entry_py;
+    D --> E[<b>4. Final Validation</b><br><small>PowerShell runs a final<br>audit on the new copy</small>]:::script_audit;
+    B -- No --> F((Exit)):::stop_node;
+    E --> G((Success)):::finish_node;
 
-    %% 2. Define connections
-    EntryPointPS --> CopyStep
-    CopyStep -- "Calls manager on new copy" --> EntryPointPy
-    
-    EntryPointPy -- "Orchestrates Step 1" --> PatchOld
-    PatchOld --> RestoreConfig
-    RestoreConfig --> ArchivedConfig
-    ArchivedConfig -- "Read By" --> RebuildReports
-    EntryPointPy -- "Orchestrates Step 2" --> RebuildReports
-    
-    EntryPointPy -- "Finalizes (Step 3)" --> LogManagerRebuild
-    LogManagerRebuild --> BatchRunLog
-    EntryPointPy -- "Finalizes (Step 3)" --> Aggregator
-    Aggregator --> ReplResults
-    Aggregator --> ExpResults
-    EntryPointPy -- "Finalizes (Step 3)" --> LogManagerFinalize
-    LogManagerFinalize --> BatchRunLog
-    EntryPointPS -- "Final Validation Audit" --> FinalAudit
-
-    %% 3. Group nodes into subgraphs
-    subgraph "Workflow 4: Migrate Old Experiment Data"
-        direction TB
-        EntryPointPS
-        CopyStep
-        EntryPointPy
-        subgraph "Migration Steps (Run on new copy)"
-            direction TB
-            PatchOld
-            RestoreConfig
-            ArchivedConfig
-            RebuildReports
-        end
-        subgraph "Post-Migration Finalization (Automated)"
-            direction TB
-            LogManagerRebuild
-            BatchRunLog
-            Aggregator
-            ReplResults
-            ExpResults
-            LogManagerFinalize
-        end
-        FinalAudit
-    end
-
-    %% 4. Styling
-    classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
+    %% Styling
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef decision fill:#d9534f,stroke:#d43f3a,color:#fff;
     classDef action fill:#5cb85c,stroke:#4cae4c,color:#fff;
     classDef entry_py fill:#f0ad4e,stroke:#eea236,color:#333;
-    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
-    classDef danger fill:#d9534f,stroke:#d43f3a,color:#fff;
-    classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;
     classDef script_audit fill:#a7d9f7,stroke:#85b8d9,color:#333;
+    classDef stop_node fill:#fff,stroke:#d9534f,color:#d9534f;
+    classDef finish_node fill:#fff,stroke:#5cb85c,color:#5cb85c;

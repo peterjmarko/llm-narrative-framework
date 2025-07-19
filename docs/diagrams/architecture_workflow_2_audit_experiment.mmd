@@ -1,45 +1,22 @@
 graph TD
-    %% 1. Define all nodes first, including new ones for detail
-    EntryPointAudit["audit_experiment.ps1<br/>(User Entry Point)"]:::entry
-    AuditManager["experiment_manager.py<br/>(Audit Mode)"]:::layer_orange
-
-    subgraph "Data Audited by experiment_manager.py"
-        direction LR
-        ExperimentRoot["Experiment Root<br/>(EXPERIMENT_results.csv, batch_run_log.csv)"]:::artifact
-        ReplicationDirs["Replication Dirs<br/>(run_*, REPLICATION_results.csv, etc.)"]:::artifact
+    subgraph "Control & Output"
+        A[audit_experiment.ps1<br>User Entry Point]:::entry_ps
+        B[experiment_manager.py --verify-only]:::layer_orange
+        
+        A -- "1. Calls" --> B
+        B -- "3. Returns Colored Report" --> A
+        A -- "4. Displays Report" --> Console[Console Display]:::output
+        A -- "5. Saves Clean Report" --> Log[audit_log.txt]:::artifact
+    end
+    
+    subgraph "Data Scanned"
+        Files[(Experiment & Replication Files)]:::artifact
     end
 
-    subgraph "Report Output Handled by audit_experiment.ps1"
-        direction LR
-        ConsoleOut["Console Display<br/>(with colors)"]:::artifact
-        LogFile["audit_log.txt<br/>(clean text)"]:::artifact
-    end
+    B -- "2. Scans" --> Files
 
-    %% 2. Define connections to show the detailed flow
-    EntryPointAudit -- "1. Calls with --force-color" --> AuditManager
-    AuditManager -- "2. Scans" --> ExperimentRoot
-    AuditManager -- "2. Scans" --> ReplicationDirs
-    AuditManager -- "3. Returns colored output stream" --> EntryPointAudit
-    EntryPointAudit -- "4. Displays on" --> ConsoleOut
-    EntryPointAudit -- "5. Strips color & saves to" --> LogFile
-
-    %% 3. Group main components
-    subgraph "Workflow 2: Audit an Experiment"
-        EntryPointAudit
-        AuditManager
-        subgraph " "
-           direction TB
-            ExperimentRoot
-            ReplicationDirs
-        end
-        subgraph " "
-           direction TB
-            ConsoleOut
-            LogFile
-        end
-    end
-
-    %% 4. Styling (from original script)
-    classDef entry fill:#337ab7,stroke:#2e6da4,color:#fff;
+    %% Styling
+    classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
     classDef layer_orange fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef output fill:#f7f7f9,stroke:#ccc,color:#333;
     classDef artifact fill:#f0f0f0,stroke:#ccc,stroke-width:2px,stroke-dasharray: 5 5;

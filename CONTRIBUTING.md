@@ -104,12 +104,11 @@ git checkout -b fix/correct-data-parsing-error
 
 Write your code, update data, or adjust documentation as needed.
 
-*   **Code**: Modify the Python files in `src/` or `tests/`. Pre-commit hooks handle formatting and linting.
+*   **Code**: Modify the Python files in `src/` or `tests/`. As you modify the code, you **must** update the corresponding docstrings to reflect any changes in logic, parameters, or behavior. Pre-commit hooks will handle formatting and linting.
 *   **Data**: Edit the source file in the `data/` directory. Justify changes to this ground-truth data in your pull request.
-*   **Documentation**: Source files are located in both the project root and the `docs/` directory.
-    -   To edit the main documentation, modify `docs/DOCUMENTATION.template.md` and its diagram sources in `docs/diagrams/`.
-    -   To edit this guide, `CHANGELOG.md`, or `LICENSE.md`, modify the files in the project root.
-    -   The `pdm run build-docs` command generates all final `.md` and `.docx` files inside the `docs/` folder. **Do not edit generated files directly.**
+*   **Documentation Templates**: This refers to the high-level project documentation, not docstrings.
+    -   Modify `docs/DOCUMENTATION.template.md` and its diagram sources in `docs/diagrams/`.
+    -   Modify other root-level files like this guide (`CONTRIBUTING.md`) as needed.
 
 ### 3. Run the Test Suite
 
@@ -192,7 +191,7 @@ This approach, demonstrated in `tests/test_experiment_aggregator.py`, is the req
 This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This ensures clear, automated versioning and changelog generation. All commits should be made using the following file-based workflow.
 
 1.  **Update and Build Documentation (Pre-Commit)**
-    Before staging any files, ensure all documentation is synchronized with your changes. This includes updating docstrings, diagrams, and the main `DOCUMENTATION.template.md`.
+    Before staging any files, ensure all project documentation templates (`.template.md`, diagrams) are synchronized with your changes.
 
     a. **Build all documentation files**:
        This command generates the final `DOCUMENTATION.md` and other formats from their source templates.
@@ -206,13 +205,25 @@ This project uses **`commitizen`** to enforce the [Conventional Commits](https:/
        git status
        ```
 
-2.  **Stage Your Changes**:
+2.  **Build All Documentation Files**
+    Once all source materials are up-to-date, run the build command. This generates the final `DOCUMENTATION.md` and other formats from their templates.
+    ```bash
+    pdm run build-docs
+    ```
+
+3.  **Verify the Status**
+    Check `git status` to ensure that all your code changes *and* the newly generated documentation files are present and ready to be committed.
+    ```bash
+    git status
+    ```
+
+4.  **Stage Your Changes**:
     Once you have verified that all intended files are present, stage everything for the commit.
     ```bash
     git add .
     ```
 
-3.  **Create the Commit Message**:
+5.  **Create the Commit Message**:
     Create a temporary file named `commit.txt` in the project root. Write your full commit message inside, following the Conventional Commits format. This file is ignored by Git (via `.gitignore`).
 
     **Example `commit.txt`:**
@@ -226,7 +237,14 @@ This project uses **`commitizen`** to enforce the [Conventional Commits](https:/
     This provides a more nuanced view of model performance beyond MRR and Top-1 accuracy, especially for imbalanced results.
     ```
 
-4.  **Create the Commit from the File**:
+6.  **Run Pre-commit Hooks (Code Quality & Formatting)**:
+    This is an important step, defined as the `lint` script in `pyproject.toml`. These hooks ensure code quality, formatting, and linting standards are met.
+    ```bash
+    pdm run lint
+    ```
+    *(Fix any issues reported by `pre-commit` and re-run `pdm run lint` until clean. You may need to `git add` fixed files).*
+
+7.  **Create the Commit from the File**:
     Use the `-F` flag to create the commit from your prepared message file.
     ```bash
     git commit -F commit.txt

@@ -43,6 +43,33 @@ param (
     [string]$SourceDirectory
 )
 
+# --- Helper function to create standardized headers ---
+function Write-Header {
+    param(
+        [string[]]$Lines,
+        [string]$Color = "White",
+        [int]$Width = 80
+    )
+    $separator = "#" * $Width
+    Write-Host "`n$separator" -ForegroundColor $Color
+    foreach ($line in $Lines) {
+        # Check if the line is too long to be padded.
+        if ($line.Length -gt ($Width - 8)) { # Use 8 to give a little buffer
+            # If too long, print it plainly without attempting to center.
+            Write-Host "### $($line) " -ForegroundColor $Color
+        } else {
+            # Otherwise, use the original centering logic.
+            $paddingLength = $Width - $line.Length - 6 # 3 for '###', 3 for '###'
+            $leftPad = [math]::Floor($paddingLength / 2)
+            $rightPad = [math]::Ceiling($paddingLength / 2)
+            $formattedLine = "###" + (" " * $leftPad) + $line + (" " * $rightPad) + "###"
+            Write-Host $formattedLine -ForegroundColor $Color
+        }
+    }
+    Write-Host $separator -ForegroundColor $Color
+    Write-Host "" # Add a blank line after the header
+}
+
 # --- Auto-detect execution environment ---
 $executable = "python"
 $prefixArgs = @()
@@ -66,9 +93,7 @@ $AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt in 
 # --- Main Script Logic ---
 try {
     # 0. Audit Source Experiment
-    Write-Host "`n======================================================" -ForegroundColor Cyan
-    Write-Host "### Auditing Source Experiment                   ###" -ForegroundColor Cyan
-    Write-Host "======================================================`n" -ForegroundColor Cyan
+    Write-Header -Lines "Auditing Source Experiment" -Color Cyan
 
     $SourcePath = Resolve-Path -Path $SourceDirectory -ErrorAction Stop
     $scriptName = "src/experiment_manager.py"
@@ -106,19 +131,14 @@ try {
             $summaryColor = "Yellow"
         }
         default {
-            Write-Host "`n######################################################" -ForegroundColor Red
-            Write-Host "### Audit FAILED: Unknown or unexpected exit code: ${pythonExitCode}. ###" -ForegroundColor Red
-            Write-Host "######################################################`n" -ForegroundColor Red
+            Write-Header -Lines "Audit FAILED: Unknown or unexpected exit code: ${pythonExitCode}." -Color Red
             Write-Error "Halting migration due to unexpected audit result."
             exit 1
         }
     }
 
     # Print the audit summary banner
-    Write-Host "`n######################################################" -ForegroundColor $summaryColor
-    Write-Host "### Audit Summary:                                 ###" -ForegroundColor $summaryColor
-    Write-Host "### (See detailed report above)                    ###" -ForegroundColor $summaryColor
-    Write-Host "######################################################`n" -ForegroundColor $summaryColor
+    Write-Header -Lines @("Audit Summary:", "(See detailed report above)") -Color $summaryColor
     
     # Print the action message below the banner for better flow
     Write-Host "$summaryMessage" -ForegroundColor $summaryColor
@@ -131,8 +151,19 @@ try {
         Write-Host "`n$(Read-Host "Press Enter to review the audit report, then continue to exit...")`n"
         exit 0
     } else {
-        $confirm = Read-Host "`nDo you wish to proceed with the full migration? (Y/N)"
-        if ($confirm -ne 'Y' -and $confirm -ne 'y') {
+        $proceed = $false
+        while ($true) {
+            $choice = Read-Host "`nDo you wish to proceed with the full migration? (Y/N)"
+            $cleanChoice = $choice.Trim().ToLower()
+            if ($cleanChoice -eq 'y') {
+                $proceed = $true
+                break
+            }
+            if ($cleanChoice -eq 'n') {
+                break
+            }
+        }
+        if (-not $proceed) {
             Write-Host "`nMigration aborted by user." -ForegroundColor Red
             exit 1
         }
@@ -151,9 +182,7 @@ try {
     }
 
     # 2. Copy the experiment to the new location
-    Write-Host "`n======================================================" -ForegroundColor Cyan
-    Write-Host "### Step 1/2: Copying Experiment Data ###" -ForegroundColor Cyan
-    Write-Host "======================================================`n" -ForegroundColor Cyan
+    Write-Header -Lines "Step 1/2: Copying Experiment Data" -Color Cyan
     Write-Host "Source:"
     Write-Host "             $SourcePath"
     Write-Host "Destination:"
@@ -162,9 +191,7 @@ try {
     Write-Host "`nCopy complete."
 
     # 3. Run the migration process on the new copy
-    Write-Host "`n======================================================" -ForegroundColor Cyan
-    Write-Host "### Step 2/2: Transforming New Experiment Copy ###" -ForegroundColor Cyan
-    Write-Host "======================================================`n" -ForegroundColor Cyan
+    Write-Header -Lines "Step 2/2: Transforming New Experiment Copy" -Color Cyan
     
     $scriptName = "src/experiment_manager.py"
     $arguments = "--migrate", $DestinationPath
@@ -175,37 +202,24 @@ try {
 
     # Check if the experiment_manager.py exited with a user-abort code.
     if ($LASTEXITCODE -eq $AUDIT_ABORTED_BY_USER) {
-        Write-Host "`n######################################################" -ForegroundColor Yellow
-        Write-Host "### Migration Process Aborted by User! ###" -ForegroundColor Yellow
-        Write-Host "######################################################`n" -ForegroundColor Yellow
+        Write-Header -Lines "Migration Process Aborted by User!" -Color Yellow
         exit 0 # Exit successfully, as it was a user-initiated graceful abort
     } elseif ($LASTEXITCODE -ne 0) {
         # Any other non-zero exit code is a true error
         throw "ERROR: Migration process failed with exit code ${LASTEXITCODE}."
     }
 
-    # --- Final Validation Audit ---
-    Write-Host "`n--- Running Post-Migration Audit to Verify Changes... ---" -ForegroundColor Cyan
-    $postAuditArgs = "--verify-only", $DestinationPath, "--force-color"
-    $finalPostAuditArgs = $prefixArgs + $scriptName + $postAuditArgs
-    & $executable $finalPostAuditArgs
+    # The experiment_manager.py script has already performed its own final, successful
+    # validation before exiting. A separate audit here is redundant. We can proceed
+    # directly to the success message.
 
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Post-migration audit failed. The experiment may still have unresolved issues."
-    }
-
-    Write-Host "`n######################################################" -ForegroundColor Green
-    Write-Host "### Migration Finished Successfully!             ###" -ForegroundColor Green
-    Write-Host "### Migrated data is in:" -ForegroundColor Green
-    Write-Host "### '$($DestinationPath)'" -ForegroundColor Green
-    Write-Host "######################################################`n" -ForegroundColor Green
+    Write-Header -Lines @("Migration Finished Successfully!", "Migrated data is in:", "'$($DestinationPath)'") -Color Green
 
 }
 catch {
-    Write-Host "`n######################################################" -ForegroundColor Red
-    Write-Host "### MIGRATION FAILED ###" -ForegroundColor Red
-    Write-Host "######################################################" -ForegroundColor Red
-    Write-Error $_.Exception.Message
+    Write-Header -Lines "MIGRATION FAILED" -Color Red
+    # Write the specific exception message in red text for clarity.
+    Write-Host $_.Exception.Message -ForegroundColor Red
     exit 1
 }
 
