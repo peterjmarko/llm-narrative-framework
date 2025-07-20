@@ -10,15 +10,19 @@ graph TD;
     
     subgraph "Workflow 5: Analyze a Study"
         direction TB
-        analyze_study_ps
-        subgraph "Stage 1: Data Aggregation"
+        
+        subgraph "Stage 1: Pre-Analysis Audit"
+            audit_study_ps["audit_study.ps1"]:::Analysis;
+        end
+
+        subgraph "Stage 2: Data Aggregation"
             aggregator["experiment_aggregator.py"]:::Analysis;
             data_repl_csv[("REPLICATION_results.csv")]:::DataArtifact;
             data_exp_csv[("EXPERIMENT_results.csv")]:::DataArtifact;
             data_study_csv[("STUDY_results.csv<br/>(Master Data File)")]:::DataArtifact;
         end
         
-        subgraph "Stage 2: Statistical Analysis"
+        subgraph "Stage 3: Statistical Analysis"
             direction LR
             study_analyzer["study_analysis.py"]:::Analysis;
             subgraph "Generated Artifacts"
@@ -29,7 +33,8 @@ graph TD;
         end
 
         %% === Connections ===
-        analyze_study_ps --> aggregator;
+        analyze_study_ps --> audit_study_ps;
+        audit_study_ps -- "If Audit Passes" --> aggregator;
         aggregator -->|Generates| data_repl_csv;
         aggregator -->|Generates| data_exp_csv;
         aggregator -->|Generates| data_study_csv;

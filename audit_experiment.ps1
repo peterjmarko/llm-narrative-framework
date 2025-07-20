@@ -56,6 +56,41 @@ if (Get-Command pdm -ErrorAction SilentlyContinue) {
     $prefixArgs = "run", "python"
 }
 
+# --- Helper function for post-processing the log file ---
+function Format-LogFile {
+    param([string]$Path)
+    
+    try {
+        if (-not (Test-Path $Path)) { return }
+
+        $lines = Get-Content -Path $Path
+        $newLines = @()
+
+        foreach ($line in $lines) {
+            $newLine = $line
+            if ($line.Trim().StartsWith("Start time:") -or $line.Trim().StartsWith("End time:")) {
+                $parts = $line.Split(':')
+                if ($parts.Length -ge 2) {
+                    $prefix = $parts[0] + ":"
+                    $timestampStr = ($parts[1..($parts.Length - 1)] -join ':').Trim()
+
+                    if ($timestampStr -match "^\d{14}$") {
+                        $dateTimeObj = [datetime]::ParseExact($timestampStr, 'yyyyMMddHHmmss', $null)
+                        $formattedTimestamp = $dateTimeObj.ToString('yyyy-MM-dd HH:mm:ss')
+                        $newLine = "$prefix $formattedTimestamp"
+                    }
+                }
+            }
+            $newLines += $newLine
+        }
+        
+        Set-Content -Path $Path -Value $newLines -Encoding UTF8
+    }
+    catch {
+        # If post-processing fails, do not crash the script. The original log is preserved.
+    }
+}
+
 # --- Define Audit Exit Codes from experiment_manager.py ---
 # These are mapped from the Python script for clarity and robustness.
 $AUDIT_ALL_VALID       = 0 # Experiment is complete and valid.
@@ -145,14 +180,17 @@ try {
             Write-Host "### AUDIT FAILED ###" -ForegroundColor Red
             Write-Host "######################################################`n" -ForegroundColor Red
             Write-Error "Unknown or unexpected exit code from experiment_manager.py: ${pythonExitCode}."
+            Format-LogFile -Path $LogFilePath
             exit 1
         }
     }
+    Format-LogFile -Path $LogFilePath
 }
 catch {
     Write-Host "`n######################################################" -ForegroundColor Red
     Write-Host "### AUDIT FAILED ###" -ForegroundColor Red
     Write-Host "######################################################`n" -ForegroundColor Red
     Write-Error $_.Exception.Message
+    Format-LogFile -Path $LogFilePath
     exit 1
 }

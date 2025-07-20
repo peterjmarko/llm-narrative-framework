@@ -94,21 +94,30 @@ function Format-LogFile {
     param([string]$Path)
     
     try {
-        $content = Get-Content -Path $Path -Raw
-        $regex = '(?m)^(.*(?:Start time|End time): )(\d{14})$'
-        $matches = [regex]::Matches($content, $regex)
-        
-        foreach ($match in $matches) {
-            $fullLine = $match.Value
-            $prefix = $match.Groups[1].Value
-            $timestampStr = $match.Groups[2].Value
-            $dateTimeObj = [datetime]::ParseExact($timestampStr, 'yyyyMMddHHmmss', $null)
-            $formattedTimestamp = $dateTimeObj.ToString('yyyy-MM-dd HH:mm:ss')
-            $newLine = "$prefix$formattedTimestamp"
-            $content = $content.Replace($fullLine, $newLine)
+        if (-not (Test-Path $Path)) { return }
+
+        $lines = Get-Content -Path $Path
+        $newLines = @()
+
+        foreach ($line in $lines) {
+            $newLine = $line
+            if ($line.Trim().StartsWith("Start time:") -or $line.Trim().StartsWith("End time:")) {
+                $parts = $line.Split(':')
+                if ($parts.Length -ge 2) {
+                    $prefix = $parts[0] + ":"
+                    $timestampStr = ($parts[1..($parts.Length - 1)] -join ':').Trim()
+
+                    if ($timestampStr -match "^\d{14}$") {
+                        $dateTimeObj = [datetime]::ParseExact($timestampStr, 'yyyyMMddHHmmss', $null)
+                        $formattedTimestamp = $dateTimeObj.ToString('yyyy-MM-dd HH:mm:ss')
+                        $newLine = "$prefix $formattedTimestamp"
+                    }
+                }
+            }
+            $newLines += $newLine
         }
         
-        Set-Content -Path $Path -Value $content -Encoding UTF8
+        Set-Content -Path $Path -Value $newLines -Encoding UTF8
     }
     catch {
         # If post-processing fails, do not crash the script. The original log is preserved.
@@ -156,34 +165,63 @@ try {
     foreach ($dir in $experimentDirs) {
         $i++
         $arguments = @("--verify-only", $dir.FullName, "--force-color")
+        $output = @()
+        $trueStatus = "UNKNOWN"
+        
         if ($PSBoundParameters['Verbose']) {
-            Write-Host "`n--- Auditing Experiment $($i)/$($experimentDirs.Count) (Verbose): $($dir.Name) ---" -ForegroundColor Yellow
             $arguments += "--verbose"
+            Write-Host "`n--- Auditing Experiment $($i)/$($experimentDirs.Count) (Verbose): $($dir.Name) ---" -ForegroundColor Yellow
             $finalArgs = $prefixArgs + $scriptName + $arguments
-            & $executable $finalArgs # Stream output directly
+            # In verbose mode, tee the output to both the console and a variable for parsing.
+            $output = & $executable $finalArgs 2>&1 | Tee-Object -Variable capturedOutput | ForEach-Object { $_ }
             $exitCode = $LASTEXITCODE
             Write-Host "--- End of Audit for: $($dir.Name) ---" -ForegroundColor Yellow
         }
         else {
-            # In quiet mode, show a single progress line in the table.
             $progress = "$i/$($experimentDirs.Count)"
             $displayName = $dir.Name
             if ($displayName.Length -gt $experimentNameCap) {
                 $displayName = $displayName.Substring(0, $experimentNameCap - 3) + "..."
             }
             Write-Host ("{0,-15} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
-            & $executable $finalArgs *>&1 | Out-Null
+            $finalArgs = $prefixArgs + $scriptName + $arguments
+            $output = & $executable $finalArgs 2>&1
             $exitCode = $LASTEXITCODE
-            if ($exitCode -eq $AUDIT_ALL_VALID) {
-                Write-Host "[ OK ]" -ForegroundColor Green
-            }
-            else {
-                Write-Host "[ FAIL ]" -ForegroundColor Red
+        }
+
+        # --- Consistent Status Parsing Logic (for BOTH modes) ---
+        $finalResultLine = $output | Select-String -Pattern "Audit Result:" | Select-Object -Last 1
+        if ($finalResultLine) {
+            $resultText = $finalResultLine.ToString()
+            if ($resultText -match "PASSED. Experiment is complete and valid.") {
+                $trueStatus = "VALIDATED"
+                if (-not $PSBoundParameters['Verbose']) { Write-Host "[ OK ]" -ForegroundColor Green }
+            } elseif ($resultText -match "PASSED. Experiment is ready for an update.") {
+                $trueStatus = "NEEDS UPDATE"
+                if (-not $PSBoundParameters['Verbose']) { Write-Host "[ FAIL ]" -ForegroundColor Red }
+            } elseif ($resultText -match "FAILED. Critical data is missing or corrupt") {
+                $trueStatus = "NEEDS REPAIR"
+                if (-not $PSBoundParameters['Verbose']) { Write-Host "[ FAIL ]" -ForegroundColor Red }
+            } elseif ($resultText -match "FAILED. Legacy or malformed runs detected.") {
+                $trueStatus = "NEEDS MIGRATION"
+                if (-not $PSBoundParameters['Verbose']) { Write-Host "[ FAIL ]" -ForegroundColor Red }
             }
         }
-        $auditResults += [PSCustomObject]@{ Name = $dir.Name; ExitCode = $exitCode }
+        
+        if ($trueStatus -eq "UNKNOWN") {
+             # If parsing fails, fall back to the exit code for a basic status.
+             if ($exitCode -eq $AUDIT_ALL_VALID) {
+                 $trueStatus = "VALIDATED"
+                 if (-not $PSBoundParameters['Verbose']) { Write-Host "[ OK ]" -ForegroundColor Green }
+             } else {
+                 # A non-zero exit code with unknown text output defaults to a generic failure.
+                 $trueStatus = "NEEDS REPAIR" # A safe default for a non-zero exit
+                 if (-not $PSBoundParameters['Verbose']) { Write-Host "[ FAIL ]" -ForegroundColor Red }
+             }
+        }
 
-        # Update the overall study status. The "worst" status wins.
+        $auditResults += [PSCustomObject]@{ Name = $dir.Name; ExitCode = $exitCode; TrueStatus = $trueStatus }
+
         if ($exitCode -gt $overallStatus -and $exitCode -ne $AUDIT_ABORTED_BY_USER) {
             $overallStatus = $exitCode
         }
@@ -209,12 +247,13 @@ try {
     Write-Host (("-" * $maxNameLength) + $gap + ("-" * $statusWidth) + $gap + ("-" * $detailsWidth))
 
     foreach ($result in $auditResults) {
-        $statusText, $details, $color = switch ($result.ExitCode) {
-            $AUDIT_ALL_VALID       { "VALIDATED", "Ready for analysis.", "Green"; break }
-            $AUDIT_NEEDS_REPROCESS { "NEEDS UPDATE", "Requires update ('update_experiment.ps1').", "Yellow"; break }
-            $AUDIT_NEEDS_REPAIR    { "NEEDS REPAIR", "Requires repair ('run_experiment.ps1').", "Red"; break }
-            $AUDIT_NEEDS_MIGRATION { "NEEDS MIGRATION", "Requires migration ('migrate_experiment.ps1').", "Red"; break }
-            default                { "UNKNOWN", "Manual investigation required.", "Red"; break }
+        # Use the TrueStatus parsed from the output for the summary, ensuring consistency.
+        $statusText, $details, $color = switch ($result.TrueStatus) {
+            "VALIDATED"       { "VALIDATED", "Ready for analysis.", "Green"; break }
+            "NEEDS UPDATE"    { "NEEDS UPDATE", "Requires update ('update_experiment.ps1').", "Yellow"; break }
+            "NEEDS REPAIR"    { "NEEDS REPAIR", "Requires repair ('run_experiment.ps1').", "Red"; break }
+            "NEEDS MIGRATION" { "NEEDS MIGRATION", "Requires migration ('migrate_experiment.ps1').", "Red"; break }
+            default           { "UNKNOWN", "Manual investigation required.", "Red"; break }
         }
         $displayName = $result.Name
         if ($displayName.Length -gt $maxNameLength) {
@@ -226,7 +265,10 @@ try {
     }
 
     # --- Final Conclusion ---
-    if ($overallStatus -eq $AUDIT_ALL_VALID) {
+    # The study is only considered valid if ALL experiments have a TrueStatus of "VALIDATED".
+    $isStudyValidated = ($auditResults | Where-Object { $_.TrueStatus -ne "VALIDATED" }).Count -eq 0
+
+    if ($isStudyValidated) {
         Write-Host "`n$headerLine" -ForegroundColor Green
         Write-Host (Format-HeaderLine "AUDIT FINISHED: STUDY IS VALIDATED") -ForegroundColor Green
         Write-Host (Format-HeaderLine "Recommendation: Run 'analyze_study.ps1' to") -ForegroundColor Green
@@ -244,7 +286,8 @@ try {
     Format-LogFile -Path $LogFilePath
     Write-Host "`nTranscript stopped. Output has been saved in the log file:" -ForegroundColor DarkGray
     Write-Host $LogFilePath -ForegroundColor DarkGray
-    exit 0
+    # Exit with the overall status code. 0 means VALIDATED, non-zero means NOT READY.
+    exit $overallStatus
 }
 catch {
     $headerLine = "#" * 54
@@ -253,9 +296,13 @@ catch {
     Write-Host "$headerLine`n" -ForegroundColor Red
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     
-    Stop-Transcript | Out-Null
-    Format-LogFile -Path $LogFilePath
-    Write-Host "`nTranscript stopped. Output has been saved in the log file:" -ForegroundColor DarkGray
-    Write-Host $LogFilePath -ForegroundColor DarkGray
+    # Only stop the transcript and format the log if it was actually started.
+    # The global $transcript variable is non-null if transcription is active.
+    if ($transcript) {
+        Stop-Transcript | Out-Null
+        Format-LogFile -Path $LogFilePath
+        Write-Host "`nTranscript stopped. Output has been saved in the log file:" -ForegroundColor DarkGray
+        Write-Host $LogFilePath -ForegroundColor DarkGray
+    }
     exit 1
 }

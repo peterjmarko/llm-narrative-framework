@@ -376,7 +376,11 @@ Point the script at the source directory of the legacy experiment. The script wi
 
 ### Analyzing a Study (`analyze_study.ps1`)
 
-After running one or more experiments, this script aggregates all their results and performs the final statistical analysis for the entire study. This is the final step for a study. For organizational purposes, one would typically move all experiment folders belonging to a single study into a common directory (e.g., `output/studies/My_First_Study/`).
+After running one or more experiments, this script aggregates all their results and performs the final statistical analysis for the entire study. This is the final step for a study.
+
+**Important:** Before running the aggregation and analysis, this script first automatically performs a full study audit (by calling `audit_study.ps1`). If any experiment is found to be incomplete, corrupt, or out-of-date, the process will halt with a detailed error report. This ensures that analysis is only performed on a complete and validated set of data.
+
+For organizational purposes, one would typically move all experiment folders belonging to a single study into a common directory (e.g., `output/studies/My_First_Study/`).
 
 **To run the analysis:**
 Point the script at the top-level directory containing all relevant experiment folders. It will provide a clean, high-level summary of its progress.

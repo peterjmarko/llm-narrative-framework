@@ -11,15 +11,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **audit-study**: introduce study-level audit and enhance output
 
+This commit introduces a new `audit_study.ps1` script, providing a
+comprehensive, consolidated audit report across multiple experiments
+within a study directory.
+
+Key improvements include:
+- New `audit_study.ps1` entry point for study-level verification.
+- All console banners are now consistently capitalized and centered.
+- Real-time audit progress is displayed in a clear, tabular format.
+- The final summary report table has improved spacing and uses "Details"
+  as the third column header.
+- All console output is now captured and saved to a `study_audit_log.txt`
+  file.
+- Updated `pyproject.toml` to include `pdm run aud-stu` shortcut.
+- Added new `architecture_workflow_6_audit_study.mmd` diagram.
+- Updated `DOCUMENTATION.template.md` to describe the new workflow and its
+  diagram.
+- Updated codebase architecture diagram to include the new entry point.
+
 ### Fix
 
 - **docs**: add robust page break support for DOCX
+  Added `python-docx` dependency for DOCX post-processing.
+  Created `docx_postprocessor.py` to reliably insert page breaks.
+  Updated `build_docs.py` to call the post-processor, solving
+  Pandoc rendering issues.
+
 - **workflow**: remove unnecessary user prompt in new experiments
+  Modified `experiment_manager.py` to remove the user prompt that was
+  halting the process before the final aggregation for new experiments.
+  This allows for a fully non-interactive completion of new runs.
+
 - **reports**: restore correct replication report format
+  Corrected an issue where the `replication_report.txt` format was
+  corrupted during a previous script update.
 
 ### Refactor
 
 - clean up project files
+  Deleted the obsolete `RESTORE_PRODUCTION.ps1` script.
 
 ## v2.7.0 (2025-07-19)
 

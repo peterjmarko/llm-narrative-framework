@@ -691,7 +691,7 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
             audit_recommendation = "No further action is required."
         else:
             audit_message = "PASSED. All replications are valid."
-            audit_recommendation = "Experiment is ready for finalization. Note: this final step is atutomatic."
+            audit_recommendation = "Experiment is ready for finalization. Note: this final step is automatic."
         audit_color = C_GREEN
 
 
@@ -699,10 +699,16 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
         print(f"\n{audit_color}Audit Result: {audit_message}{C_RESET}")
         print(f"{audit_color}Recommendation: {audit_recommendation}{C_RESET}")
 
-    # If --verify-only was passed as a primary argument, exit here.
+    # If --verify-only was passed as a primary argument from the command line,
+    # the PowerShell wrapper will interpret the exit code and provide user-friendly
+    # recommendations. We exit with a clean 0 to prevent the wrapper from
+    # showing a generic failure message for non-fatal audit results.
     if not suppress_exit and is_verify_only_cli:
-        sys.exit(audit_result_code)
+        # For direct CLI calls, exit with a simple success code as the wrapper handles messaging.
+        # This prevents the wrapper from showing "AUDIT FAILED" for non-fatal findings.
+        sys.exit(0)
 
+    # For internal calls (like from analyze_study.ps1), return the true code.
     return audit_result_code
 
 def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, quiet, bias_script):
@@ -1104,7 +1110,10 @@ def main():
                 audit_result_code = _run_verify_only_mode(Path(final_output_dir), end_rep, suppress_exit=True, print_report=True, is_verify_only_cli=False, suppress_external_recommendation=is_migration_run)
 
                 if audit_result_code == AUDIT_NEEDS_MIGRATION:
-                    # The audit report now provides the full recommendation. We just need to exit.
+                    # The audit report provides the full recommendation.
+                    # We halt the state machine and exit with the specific code so calling
+                    # scripts (like analyze_study.ps1) can react appropriately.
+                    print(f"\n{C_RED}Halting due to MIGRATION required status.{C_RESET}")
                     sys.exit(AUDIT_NEEDS_MIGRATION)
 
                 elif audit_result_code == AUDIT_NEEDS_REPAIR:

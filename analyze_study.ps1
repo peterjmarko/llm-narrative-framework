@@ -21,29 +21,30 @@
 
 <#
 .SYNOPSIS
-    Compiles and analyzes a full study, providing a clean, high-level summary.
+    Audits, compiles, and analyzes a full study, providing a clean, high-level summary.
 
 .DESCRIPTION
     This script is the main entry point for the entire post-processing workflow. It
-    orchestrates the two key analysis scripts in sequence:
-    1.  `experiment_aggregator.py`: To aggregate all individual run data into a master CSV.
-    2.  `study_analysis.py`: To perform statistical analysis on the master CSV.
+    orchestrates three key scripts in sequence:
+    1.  `audit_study.ps1`: To perform a full audit of the study. The script will halt
+        with an error if any experiment is not in a validated state.
+    2.  `experiment_aggregator.py`: To aggregate all individual run data into a master CSV.
+    3.  `study_analysis.py`: To perform statistical analysis on the master CSV.
 
-    By default, it intelligently parses the output from these scripts to provide a
-    clean, high-level summary of the compilation and analysis steps. For detailed,
-    real-time output, use the -Verbose switch.
+    By default, it provides a clean, high-level summary. For detailed, real-time
+    output, use the -Verbose switch.
 
 .PARAMETER StudyDirectory
     The path to the top-level study directory containing experiment folders that need
-    to be analyzed (e.g., 'output/reports'). This is a mandatory parameter.
+    to be analyzed (e.g., 'output/studies'). This is a mandatory parameter.
 
 .EXAMPLE
     # Run analysis with the default high-level summary.
-    .\process_study.ps1 "output/reports/My_Full_Study"
+    .\analyze_study.ps1 "output/studies/My_Full_Study"
 
 .EXAMPLE
     # Run analysis with detailed, real-time output for debugging.
-    .\process_study.ps1 "output/reports/My_Full_Study" -Verbose
+    .\analyze_study.ps1 "output/studies/My_Full_Study" -Verbose
 #>
 [CmdletBinding()]
 param (
@@ -114,6 +115,26 @@ try {
 catch {
     Write-Warning "Could not read or parse model names from config.ini. Full paths will be shown instead. Error: $($_.Exception.Message)"
     $modelNameMap = @{} # Ensure it's an empty hashtable on failure
+}
+
+# --- Function to run the pre-analysis study audit ---
+function Invoke-StudyAudit {
+    param ([string]$StudyDirectory)
+
+    $auditScriptPath = Join-Path $PSScriptRoot "audit_study.ps1"
+    if (-not (Test-Path $auditScriptPath)) {
+        throw "FATAL: audit_study.ps1 script not found at '$auditScriptPath'. Cannot verify study."
+    }
+
+    # Execute the audit script. It will print its own summary report.
+    & $auditScriptPath $StudyDirectory
+
+    if ($LASTEXITCODE -ne 0) {
+        # The audit script's exit code signals the study state.
+        throw "Study audit FAILED. Data is not ready for analysis. Please review the audit report above and address the issues before proceeding."
+    }
+    
+    Write-Host "`nAudit PASSED. Study is validated and ready for analysis. Note: this process is automatic." -ForegroundColor Green
 }
 
 # --- Function to execute a Python script and check for errors ---
@@ -229,14 +250,17 @@ try {
     
     Write-Host "`n######################################################" -ForegroundColor Green
     Write-Host "### Starting Study Processing for:" -ForegroundColor Green
-    Write-Host "### '$($ResolvedPath)'" -ForegroundColor Green # Newline before path
+    Write-Host "### '$($ResolvedPath)'" -ForegroundColor Green
     Write-Host "######################################################`n"
 
-    # --- Step 1: Aggregate All Results into a Master CSV ---
-    Invoke-PythonScript -StepName "1/2: Aggregate Results" -ScriptName "src/experiment_aggregator.py" -Arguments $ResolvedPath
+    # --- Step 1: Run Pre-Analysis Audit ---
+    Invoke-StudyAudit -StudyDirectory $ResolvedPath
 
-    # --- Step 2: Run Final Statistical Analysis ---
-    Invoke-PythonScript -StepName "2/2: Run Final Analysis (ANOVA)" -ScriptName "src/study_analysis.py" -Arguments $ResolvedPath
+    # --- Step 2: Aggregate All Results into a Master CSV ---
+    Invoke-PythonScript -StepName "2/3: Aggregate Results" -ScriptName "src/experiment_aggregator.py" -Arguments $ResolvedPath
+
+    # --- Step 3: Run Final Statistical Analysis ---
+    Invoke-PythonScript -StepName "3/3: Run Final Analysis (ANOVA)" -ScriptName "src/study_analysis.py" -Arguments $ResolvedPath
 
     Write-Host "######################################################" -ForegroundColor Green
     Write-Host "### Study Processing Finished Successfully!" -ForegroundColor Green
