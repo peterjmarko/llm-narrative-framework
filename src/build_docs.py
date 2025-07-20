@@ -56,6 +56,10 @@ Key Features:
     includes a retry loop that waits for locked files (e.g., open in Word)
     to be closed instead of failing immediately.
 
+-   **DOCX Post-Processing**: Calls a helper script (`docx_postprocessor.py`)
+    to reliably insert page breaks into the final `.docx` files, overcoming
+    Pandoc rendering inconsistencies.
+
 Usage:
     # Standard build (uses cache)
     pdm run build-docs
@@ -70,6 +74,16 @@ import subprocess
 import sys
 import argparse
 import time
+
+# Add the script's own directory ('src') to the Python path.
+# This ensures that sibling modules (like docx_postprocessor) can be imported
+# when this script is run from the project root.
+# Add the script's directory to the Python path to ensure local imports work
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+import docx_postprocessor # Import for post-processing DOCX files
 
 # ANSI color codes for better terminal output
 class Colors:
@@ -298,9 +312,10 @@ def build_readme_content(project_root, flavor='viewer'):
     content = re.sub(r'\{\{include:(.*?)\}\}', replace_include_placeholder, content)
 
     # --- Process {{pagebreak}} placeholders ---
+    # This generates a unique marker that can be found and replaced by a post-processor.
     def replace_pagebreak_placeholder(match):
         if flavor == 'pandoc':
-            return r'\\newpage'
+            return '\n---PAGEBREAK---\n' # Unique marker for post-processing
         else:
             return ''
 
@@ -401,47 +416,55 @@ def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path=Non
         print(f"{Colors.RED}ERROR: convert_to_docx requires either a source_md_path or source_md_content.{Colors.RESET}")
         return False
 
-    # Determine a logical filename for logging messages
     logical_source_name = os.path.basename(source_md_path) if source_md_path else os.path.basename(output_docx_path).replace('.docx', '.md')
     output_filename = os.path.basename(output_docx_path)
     
-    # Base the resource path on the directory containing the Markdown input file for Pandoc.
-    # This is standard for Pandoc's native image syntax.
-    if source_md_path:
-        resource_path = os.path.dirname(source_md_path)
-    else: # If content is passed as string (like DOCUMENTATION.md), assume it's from docs/
-        resource_path = os.path.join(project_root, 'docs')
+    resource_path = os.path.dirname(source_md_path) if source_md_path else os.path.join(project_root, 'docs')
 
     print(f"    - Converting '{Colors.CYAN}{logical_source_name}{Colors.RESET}' to DOCX...")
     
     permission_error_printed = False
     while True:
         try:
-            reference_docx_path = os.path.join(project_root, 'docs', 'custom_reference.docx')
-            extra_args = [
+            pandoc_args_base = [
                 '--standalone',
-                '--resource-path', resource_path, # Use project_root as resource base
-                f'--reference-doc={reference_docx_path}'
+                '--resource-path', resource_path,
             ]
+            reference_docx_path = os.path.join(project_root, 'docs', 'custom_reference.docx')
+            if os.path.exists(reference_docx_path):
+                pandoc_args_base.append(f'--reference-doc={reference_docx_path}')
+
+            input_format_with_extensions = 'markdown+latex_macros+raw_attribute'
+            final_pandoc_extra_args = ['-f', input_format_with_extensions] + pandoc_args_base
             
-            # Use the correct pypandoc function based on the provided source
             if source_md_content:
                 pypandoc.convert_text(
-                    source_md_content, 'docx', format='md',
+                    source_md_content, 'docx', format='markdown',
                     outputfile=output_docx_path,
-                    extra_args=extra_args
+                    extra_args=final_pandoc_extra_args
                 )
-            else: # source_md_path must exist
+            else:
                 pypandoc.convert_file(
-                    source_md_path, 'docx',
+                    source_md_path, 'docx', format='markdown',
                     outputfile=output_docx_path,
-                    extra_args=extra_args
+                    extra_args=final_pandoc_extra_args
                 )
             
             if permission_error_printed:
                 print(f"      {Colors.GREEN}File unlocked. Resuming...{Colors.RESET}")
             
             print(f"      {Colors.GREEN}Successfully built '{Colors.CYAN}{output_filename}{Colors.GREEN}'!{Colors.RESET}")
+
+            # --- POST-PROCESSING: Insert Page Breaks ---
+            try:
+                docx_postprocessor.insert_page_breaks_by_marker(output_docx_path, '---PAGEBREAK---')
+            except NameError:
+                # This will catch if the initial import of docx_postprocessor failed
+                print(f"      {Colors.YELLOW}WARNING: docx_postprocessor module not found. Skipping page break insertion.{Colors.RESET}")
+            except Exception as e:
+                print(f"      {Colors.RED}ERROR during post-processing: {e}{Colors.RESET}")
+            # --- END POST-PROCESSING ---
+
             return True
 
         except RuntimeError as e:
@@ -486,7 +509,7 @@ def main():
                 current_content = f.read()
         except FileNotFoundError:
             print(f"    - {Colors.RED}MISSING:{Colors.RESET} docs/DOCUMENTATION.md")
-            diagrams_ok = False # Missing doc file is a failure state
+            diagrams_ok = False
             current_content = ""
 
         content_ok = (current_content == expected_viewer_content)
@@ -500,7 +523,6 @@ def main():
             print(f"\n{Colors.RED}Documentation is out of date. Please run 'pdm run build-docs' and commit the changes.{Colors.RESET}")
             sys.exit(1)
 
-    # --- Build Mode (if not --check) ---
     if not render_all_diagrams(project_root, force_render=args.force_render):
         sys.exit(1)
 
@@ -520,7 +542,6 @@ def main():
         if not convert_to_docx(pypandoc, readme_docx, project_root, source_md_content=pandoc_content):
             sys.exit(1)
         
-        # Convert root-level markdown files to DOCX in the docs/ directory
         root_md_files = ["CONTRIBUTING.md", "CHANGELOG.md", "LICENSE.md"]
         for md_filename in root_md_files:
             source_path = os.path.join(project_root, md_filename)

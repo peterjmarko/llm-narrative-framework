@@ -21,6 +21,7 @@ dependencies = [
     "seaborn",
     "matplotlib",
     "pingouin>=0.5.5",
+    "python-docx", # Added for DOCX post-processing
 ]
 
 [project.optional-dependencies]

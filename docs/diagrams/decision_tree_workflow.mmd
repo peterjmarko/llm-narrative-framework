@@ -1,8 +1,54 @@
 graph TD
-    A{What is the state of your experiment?}:::decision;
-    A -- "I have a new experiment OR<br>an interrupted one with missing<br>queries/responses." --> B["<b>Use:</b> run_experiment.ps1<br/><br/><b>Purpose:</b> Data Generation & Repair<br/><small>Ensures raw data is complete by creating new<br/>replications or re-running failed LLM sessions.</small>"]:::tool;
-    A -- "My experiment's raw data is complete,<br>but I want to re-run the analysis<br>(e.g., apply a bug fix or new metric)." --> C["<b>Use:</b> update_experiment.ps1<br/><br/><b>Purpose:</b> Analysis Reprocessing<br/><small>Regenerates reports and summaries from existing<br/>raw data without making new LLM calls.</small>"]:::tool;
-    A -- "I have data from an old version<br>of this framework that needs<br>to be compatible with the current tools." --> D["<b>Use:</b> migrate_experiment.ps1<br/><br/><b>Purpose:</b> Structural Transformation<br/><small>Safely copies and upgrades legacy<br/>experiment structures and files.</small>"]:::tool;
 
-    classDef decision fill:#f0ad4e,stroke:#eea236,color:#333,font-weight:bold;
-    classDef tool fill:#f7f7f9,stroke:#ccc,color:#333,text-align:left;
+    %% --- Style Definitions ---
+    classDef start_end_node fill:#d4edda,stroke:#155724;
+    classDef decision_node fill:#e9d8fd,stroke:#9467bd,color:#333;
+    classDef case_node fill:#cfe2f3,stroke:#6c93c4,color:#333;
+    classDef instruction_node fill:#dbe9f5,stroke:#8cb3d9,color:#333;
+    classDef purpose_node fill:#f0f0f0,stroke:#9e9e9e,color:#333;
+
+    %% === Nodes for Decision Tree Workflow ===
+    start_node(["Start"]):::start_end_node;
+
+    subgraph "Choosing the Right Workflow: Separation of Concerns"
+        direction TB
+
+        main_decision{"What is the state of your experiment?"}:::decision_node
+
+        %% Branch 1: New/Repair
+        case_1["**I have a new experiment OR\nan interrupted one with missing\nqueries/responses.**"]:::case_node
+        instruction_1["*Use: run_experiment.ps1*"]:::instruction_node
+        purpose_1["Purpose: Data Generation & Repair\nEnsures raw data is complete by creating new replications or re-running failed LLM sessions."]:::purpose_node
+
+        %% Branch 2: Update/Reprocess
+        case_2["**My experiment's raw data is complete,\nbut I want to re-run the analysis\n(e.g., apply a bug fix or new metric).**"]:::case_node
+        instruction_2["*Use: update_experiment.ps1*"]:::instruction_node
+        purpose_2["Purpose: Analysis Reprocessing\nRegenerates reports and summaries from existing raw data without making new LLM calls."]:::purpose_node
+
+        %% Branch 3: Migrate
+        case_3["**I have data from an old version of\nthis framework that needs to be\ncompatible with the current tools.**"]:::case_node
+        instruction_3["*Use: migrate_experiment.ps1*"]:::instruction_node
+        purpose_3["Purpose: Structural Transformation\nSafely copies and upgrades legacy experiment structures and files."]:::purpose_node
+    end
+
+    end_node(["End"]):::start_end_node;
+
+    %% === Connections ===
+    start_node --> main_decision;
+
+    main_decision -- "Condition 1: New/Incomplete Data" --> case_1;
+    main_decision -- "Condition 2: Re-analyze Existing Data" --> case_2;
+    main_decision -- "Condition 3: Legacy Data" --> case_3;
+
+    case_1 --> instruction_1;
+    instruction_1 -.-> purpose_1;
+
+    case_2 --> instruction_2;
+    instruction_2 -.-> purpose_2;
+
+    case_3 --> instruction_3;
+    instruction_3 -.-> purpose_3;
+
+    purpose_1 --> end_node;
+    purpose_2 --> end_node;
+    purpose_3 --> end_node;

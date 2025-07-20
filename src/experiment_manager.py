@@ -679,15 +679,19 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
         audit_message = "FAILED. Critical data is missing or corrupt (queries/responses)."
         audit_recommendation = "Proceed with automatic repair when prompted. If you wish to perform the repair later, exit the prompt and run 'run_experiment.ps1' with the folder path of the experiment."
         audit_color = C_RED
-    elif not (all(s == "VALIDATED" for s in run_statuses) and exp_complete):
+    elif "ANALYSIS_ISSUE" in run_statuses:
         audit_result_code = AUDIT_NEEDS_REPROCESS
         audit_message = "PASSED. Experiment is ready for an update."
         audit_recommendation = "Update experiment to fix analysis files and summaries."
         audit_color = C_YELLOW
-    else: # All validated and complete
+    else:  # All replications are valid.
         audit_result_code = AUDIT_ALL_VALID
-        audit_message = "PASSED. Experiment is complete and valid."
-        audit_recommendation = "No further action is required."
+        if exp_complete:
+            audit_message = "PASSED. Experiment is complete and valid."
+            audit_recommendation = "No further action is required."
+        else:
+            audit_message = "PASSED. All replications are valid."
+            audit_recommendation = "Experiment is ready for finalization. Note: this final step is atutomatic."
         audit_color = C_GREEN
 
 

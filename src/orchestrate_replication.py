@@ -334,18 +334,41 @@ def main():
         stage_title_6 = "6. Generate Final Report"
         header_6 = (f"\n\n{'='*80}\n### STAGE: {stage_title_6} ###\n{'='*80}\n\n")
         print(f"--- Running Stage: {stage_title_6} ---")
-        for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')): os.remove(old_report)
+        
+        # Clean up any old reports before creating the new one.
+        for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
+            os.remove(old_report)
         report_path = os.path.join(run_specific_dir_path, f"replication_report_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
+
         try:
-            with open(os.path.join(run_specific_dir_path, 'analysis_inputs', 'replication_metrics.json'), 'r') as f: metrics_data = json.load(f)
+            # The analyzer's output (output4) contains the human-readable part.
+            # We strip its stale JSON block, as the bias script has updated the metrics on disk.
+            human_readable_part = output4.split("<<<METRICS_JSON_START>>>")[0]
+            
+            # Load the updated metrics from the JSON file patched by the bias script.
+            with open(os.path.join(run_specific_dir_path, 'analysis_inputs', 'replication_metrics.json'), 'r', encoding='utf-8') as f:
+                updated_metrics = json.load(f)
+
+            # Assemble the final, correct report using the human-readable part and the updated JSON.
             with open(report_path, 'w', encoding='utf-8') as f:
-                f.write(f"REPLICATION RUN REPORT\n{'='*80}\n")
-                f.write(f"Run Directory: {os.path.basename(run_specific_dir_path)}\nDate: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M%S')}\nStatus: PENDING\n")
-                f.write("### Machine-Readable Metrics (JSON) ###\n<<<METRICS_JSON_START>>>\n")
-                f.write(json.dumps(metrics_data, indent=4) + "\n<<<METRICS_JSON_END>>>\n")
-            all_stage_outputs.append(header_6 + f"Successfully generated report shell: {report_path}")
+                f.write(human_readable_part.strip())
+                f.write("\n\n\n<<<METRICS_JSON_START>>>\n")
+                f.write(json.dumps(updated_metrics, indent=4))
+                f.write("\n<<<METRICS_JSON_END>>>")
+
+            # The analyzer script likely sets status to COMPLETED, but we need to set a
+            # placeholder that can be updated with the *entire pipeline's* final status.
+            with open(report_path, 'r+', encoding='utf-8') as f:
+                content = f.read()
+                content = re.sub(r"^(Final Status:\s*COMPLETED)$", "Final Status: PENDING", content, flags=re.MULTILINE)
+                f.seek(0)
+                f.write(content)
+                f.truncate()
+            
+            all_stage_outputs.append(header_6 + f"Successfully generated final report: {report_path}")
         except Exception as e:
-            logging.error(f"Failed during Stage 6 (Report Generation): {e}"); raise
+            logging.error(f"Failed during Stage 6 (Report Generation): {e}")
+            raise
 
         # Stage 7: Create Replication Summary
         cmd7 = [sys.executable, aggregator_script, run_specific_dir_path, "--mode", "hierarchical"]
@@ -373,29 +396,25 @@ def main():
         # The logic for this is now consolidated with the success path.
         pass
 
-    # --- Finalization: Update Report Status and Append Logs ---
-    # This block runs regardless of success or failure. It finds the report
-    # created in Stage 6 and updates its status and appends full logs.
+    # --- Finalization: Update Report Status ---
+    # The report is now clean. The only remaining task is to set its final status.
     latest_report_files = sorted(glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')))
     if latest_report_files:
         report_path = latest_report_files[-1]
         try:
-            # First, append the full logs to the existing file
-            with open(report_path, 'a', encoding='utf-8') as f:
-                f.write("\n\n" + "="*80 + "\n### FULL STAGE LOGS ###\n" + "="*80)
-                f.write("".join(all_stage_outputs))
-            
-            # Then, read the entire file and replace the status line
             with open(report_path, 'r+', encoding='utf-8') as f:
                 content = f.read()
-                content = re.sub(r"^(Status: PENDING)$", f"Status: {pipeline_status}", content, flags=re.MULTILINE)
+                # Find and replace the placeholder status written in Stage 6.
+                # This handles both the 'Final Status' line and the simpler 'Status' line for legacy compatibility.
+                content = re.sub(r"^(Final Status:\s*PENDING)$", f"Final Status: {pipeline_status}", content, flags=re.MULTILINE)
+                content = re.sub(r"^(Status:\s*PENDING)$", f"Status: {pipeline_status}", content, flags=re.MULTILINE)
                 f.seek(0)
                 f.write(content)
                 f.truncate()
         except IOError as e:
             logging.error(f"Could not update final report {report_path}: {e}")
     else:
-        # If no report exists (major failure before Stage 6), create a simple failure log.
+        # If no report exists (major failure), create a simple failure log with all captured output.
         fail_log_path = os.path.join(run_specific_dir_path, 'orchestration_FAILURE.log')
         with open(fail_log_path, 'w', encoding='utf-8') as f:
              f.write(f"PIPELINE {pipeline_status}\n\n" + "".join(all_stage_outputs))
