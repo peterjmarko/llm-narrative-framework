@@ -5,6 +5,28 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.8.1 (2025-07-20)
+
+### Fix
+
+- **audit**: ensure robust pre-analysis validation
+
+This commit resolves several critical bugs in the audit and analysis
+workflows to ensure data integrity before statistical analysis.
+
+- `analyze_study.ps1` now performs a mandatory pre-analysis audit
+  and will halt if the study is not fully validated.
+- `audit_study.ps1` now correctly returns a non-zero exit code on
+  failure and uses a more robust parsing logic to provide a
+  consistent and accurate summary report.
+- `experiment_manager.py` was fixed to return the correct, non-zero
+  exit codes for all non-validated states (e.g., MIGRATION), ensuring
+  programmatic checks are reliable.
+- Log file timestamps in both audit scripts are now consistently
+  formatted to be human-readable.
+- All relevant documentation, docstrings, and diagrams have been
+  updated to reflect the new pre-analysis audit workflow.
+
 ## v2.8.0 (2025-07-20)
 
 ### Feat
