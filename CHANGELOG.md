@@ -5,6 +5,22 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.8.0 (2025-07-20)
+
+### Feat
+
+- **audit-study**: introduce study-level audit and enhance output
+
+### Fix
+
+- **docs**: add robust page break support for DOCX
+- **workflow**: remove unnecessary user prompt in new experiments
+- **reports**: restore correct replication report format
+
+### Refactor
+
+- clean up project files
+
 ## v2.7.0 (2025-07-19)
 
 ### Feat
