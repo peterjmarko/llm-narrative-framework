@@ -196,7 +196,12 @@ This project uses **`commitizen`** to enforce the [Conventional Commits](https:/
 
 To commit your changes, follow these steps:
 
-1.  **Prepare Your Files**:
+1.  **Review and Update Documentation (Crucial First Step)**:
+    Before committing, perform a final review of your changes. Ensure that all relevant documentation has been updated to reflect the new state of the code. This includes:
+    *   **Docstrings**: Check that the docstrings in any modified Python functions or modules accurately describe their purpose, parameters, and behavior.
+    *   **High-Level Documentation**: If your changes affect a major workflow or add a new feature, ensure that `docs/DOCUMENTATION.template.md` and any relevant diagrams have been updated.
+
+2.  **Prepare Your Files**:
     a. **Lint and Auto-format**: Run the linter to ensure your code adheres to quality standards and is auto-formatted. Fix any issues reported.
        ```bash
        pdm run lint
@@ -208,24 +213,23 @@ To commit your changes, follow these steps:
        ```
        *If `pdm run build-docs` creates or modifies files (e.g., `DOCUMENTATION.md`, generated images), you will need to stage them.*
 
-2.  **Stage All Changes**:
-    Add all modified, new, and auto-generated files to the Git staging area.
-    ```bash
-    git add .
-    ```
-    *It's a good practice to run `git status` here to confirm all intended changes are staged.*
+3.  **Review and Stage Changes**:
+    a. **Review your changes.** Run `git status` to see a list of all modified, new, and untracked files. This is a crucial sanity check to ensure you know what you are about to commit.
+       ```bash
+       git status
+       ```
+    b. **Stage all changes.** Add all the relevant files to the Git staging area.
+       ```bash
+       git add .
+       ```
 
-3.  **Create the Commit**:
-    The recommended method is using the interactive `commitizen` CLI, which guides you through creating a Conventional Commit message.
-    ```bash
-    pdm run cz commit
-    ```
-    *Pre-commit hooks (including linting, formatting, and documentation checks) will run automatically during this step and must pass for the commit to be finalized.*
+4.  **Create the Commit**:
+    The standard workflow for this project is to prepare your full Conventional Commit message in a `commit.txt` file (which is in `.gitignore`) and then commit using the `-F` flag.
 
-    *Alternatively, for advanced use cases, you can prepare your Conventional Commit message in a `commit.txt` file (which is in `.gitignore`) and then commit:*
     ```bash
     git commit -F commit.txt
     ```
+    *Pre-commit hooks (including linting, formatting, and documentation checks) will run automatically during this step and must pass for the commit to be finalized.*
 
 ### 5. Releasing a New Version (Maintainers Only)
 
@@ -257,7 +261,7 @@ This process uses `commitizen` to automate version bumping, basic changelog entr
 3.  **Enrich the Changelog Details (Manual Step)**:
     The `bump` command initially adds only the commit *header* to `CHANGELOG.md`. To provide complete context, you must manually add the full commit body for relevant entries (e.g., `feat`, `fix`, or other changes you deem important for the release notes).
 
-    a. **Get Commit Details**: View recent commits (`git log -n 5`) to copy the full commit message(s) (header and body) for the changes included in this release. Press 'q' to exit `git log`.
+    a. **Get Commit Details**: The simplest source for the full commit message is the `commit.txt` file you used to create the commit. Alternatively, you can view recent commits with `git log -n 5` and copy the details from there.
     b. **Update `CHANGELOG.md`**: Open `CHANGELOG.md` in your editor. Under the new version heading, paste the full commit message bodies directly below their respective headers (which were automatically added by `cz bump`).
     c. **Save and Amend**: Save `CHANGELOG.md`. Then, amend the release commit to include this manual changelog update:
     ```bash

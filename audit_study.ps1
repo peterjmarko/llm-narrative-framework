@@ -98,40 +98,6 @@ function Format-HeaderLine {
     return "$prefix$content$suffix"
 }
 
-function Format-LogFile {
-    param([string]$Path)
-    
-    try {
-        if (-not (Test-Path $Path)) { return }
-
-        $lines = Get-Content -Path $Path
-        $newLines = @()
-
-        foreach ($line in $lines) {
-            $newLine = $line
-            if ($line.Trim().StartsWith("Start time:") -or $line.Trim().StartsWith("End time:")) {
-                $parts = $line.Split(':')
-                if ($parts.Length -ge 2) {
-                    $prefix = $parts[0] + ":"
-                    $timestampStr = ($parts[1..($parts.Length - 1)] -join ':').Trim()
-
-                    if ($timestampStr -match "^\d{14}$") {
-                        $dateTimeObj = [datetime]::ParseExact($timestampStr, 'yyyyMMddHHmmss', $null)
-                        $formattedTimestamp = $dateTimeObj.ToString('yyyy-MM-dd HH:mm:ss')
-                        $newLine = "$prefix $formattedTimestamp"
-                    }
-                }
-            }
-            $newLines += $newLine
-        }
-        
-        Set-Content -Path $Path -Value $newLines -Encoding UTF8
-    }
-    catch {
-        # If post-processing fails, do not crash the script. The original log is preserved.
-    }
-}
-
 # --- Main Script Logic ---
 try {
     $ResolvedPath = Resolve-Path -Path $StudyDirectory -ErrorAction Stop
@@ -149,17 +115,12 @@ try {
     Write-Host (Format-HeaderLine "RUNNING STUDY AUDIT") -ForegroundColor Cyan
     Write-Host "$headerLine`n" -ForegroundColor Cyan
     Write-Host "Auditing Study Directory: $ResolvedPath`n"
-    Write-Host "Full audit log will be saved to: $LogFilePath`n"
 
     # Find all subdirectories, excluding known output folders like 'anova'.
     $experimentDirs = Get-ChildItem -Path $ResolvedPath -Directory | Where-Object { $_.Name -ne 'anova' }
 
     if ($experimentDirs.Count -eq 0) {
         Write-Host "No experiment directories found in '$ResolvedPath'." -ForegroundColor Yellow
-        Stop-Transcript | Out-Null
-        Format-LogFile -Path $LogFilePath
-        Write-Host "`nTranscript stopped. Output has been saved in the log file:" -ForegroundColor DarkGray
-        Write-Host $LogFilePath -ForegroundColor DarkGray
         exit 0
     }
 
@@ -174,14 +135,11 @@ try {
         $i++
         $arguments = @("--verify-only", $dir.FullName, "--force-color")
         $output = @()
-        $trueStatus = "UNKNOWN"
         
         if ($PSBoundParameters['Verbose']) {
-            $arguments += "--verbose"
             Write-Host "`n--- Auditing Experiment $($i)/$($experimentDirs.Count) (Verbose): $($dir.Name) ---" -ForegroundColor Yellow
             $finalArgs = $prefixArgs + $scriptName + $arguments
-            # In verbose mode, tee the output to both the console and a variable for parsing.
-            $output = & $executable $finalArgs 2>&1 | Tee-Object -Variable capturedOutput | ForEach-Object { $_ }
+            & $executable $finalArgs 2>&1
             $exitCode = $LASTEXITCODE
             Write-Host "--- End of Audit for: $($dir.Name) ---" -ForegroundColor Yellow
         }
@@ -193,11 +151,9 @@ try {
             }
             Write-Host ("{0,-15} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
             $finalArgs = $prefixArgs + $scriptName + $arguments
-            $output = & $executable $finalArgs 2>&1
-            $exitCode = $LASTEXITCODE # Fallback
+            & $executable $finalArgs 2>&1 | Out-Null # Suppress Python output in non-verbose
+            $exitCode = $LASTEXITCODE
         }
-
-        # The exit code is now trusted directly, no parsing needed.
 
         # --- Status Logic based on the now-reliable exit code ---
         $trueStatus, $progressColor = switch ($exitCode) {
@@ -225,21 +181,21 @@ try {
     Write-Output "$c_cyan$(Format-HeaderLine "STUDY AUDIT SUMMARY REPORT")$c_reset"
     Write-Output "$c_cyan$headerLine`n$c_reset"
     
-    # Set fixed widths for better alignment and to prevent wrapping.
-    $maxNameLength = 45
+    # Dynamically determine column width based on the longest experiment name
+    $maxNameLength = ($auditResults.Name | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
+    if ($maxNameLength -lt "Experiment".Length) { $maxNameLength = "Experiment".Length }
+    
     $statusWidth = 20
-    $detailsWidth = 45
     $gap = "   "
 
     # Create header as a single string
-    $headerString = ("{0,-$maxNameLength}" -f "Experiment") + $gap + ("{0,-$statusWidth}" -f "Status") + $gap + ("{0}" -f "Details")
+    $headerString = ("{0,-$maxNameLength}" -f "Experiment") + $gap + ("{0,-$statusWidth}" -f "Status") + $gap + "Details"
     Write-Output $headerString
     # Create underline as a single string
-    $underlineString = ("-" * $maxNameLength) + $gap + ("-" * $statusWidth) + $gap + ("-" * $detailsWidth)
+    $underlineString = ("-" * $maxNameLength) + $gap + ("-" * $statusWidth) + $gap + ("-" * "Details".Length)
     Write-Output $underlineString
 
     foreach ($result in $auditResults) {
-        # Use the TrueStatus parsed from the output for the summary, ensuring consistency.
         $statusText, $details, $colorCode = switch ($result.TrueStatus) {
             "VALIDATED"       { "VALIDATED", "Ready for analysis.", $c_green; break }
             "NEEDS UPDATE"    { "NEEDS UPDATE", "Requires update ('update_experiment.ps1').", $c_yellow; break }
@@ -247,19 +203,15 @@ try {
             "NEEDS MIGRATION" { "NEEDS MIGRATION", "Requires migration ('migrate_experiment.ps1').", $c_red; break }
             default           { "UNKNOWN", "Manual investigation required.", $c_red; break }
         }
-        $displayName = $result.Name
-        if ($displayName.Length -gt $maxNameLength) {
-            $displayName = $displayName.Substring(0, $maxNameLength - 3) + "..."
-        }
         
-        # Build the line as a single string with embedded ANSI color codes
+        $displayName = $result.Name # Use the full, untruncated name
+        
         $statusPart = "$colorCode{0,-$statusWidth}$c_reset" -f $statusText
         $line = ("{0,-$maxNameLength}" -f $displayName) + $gap + $statusPart + $gap + $details
         Write-Output $line
     }
 
     # --- Final Conclusion ---
-    # The study is only considered valid if ALL experiments have a TrueStatus of "VALIDATED".
     $isStudyValidated = ($auditResults | Where-Object { $_.TrueStatus -ne "VALIDATED" }).Count -eq 0
 
     if ($isStudyValidated) {

@@ -76,19 +76,27 @@ try {
 
     # Parse the summary table from the audit output
     $auditLines = $auditOutput | Out-String
+    
     # Filter for lines that are part of the summary table and indicate an issue
-    $summaryLines = $auditLines -split [System.Environment]::NewLine | Where-Object { $_ -match 'NEEDS UPDATE|NEEDS REPAIR|NEEDS MIGRATION' -and $_ -notmatch '^\s*Experiment' -and $_ -notmatch '^\s*-' }
+    $summaryLines = $auditLines -split [System.Environment]::NewLine | Where-Object { $_ -match 'NEEDS UPDATE|NEEDS REPAIR|NEEDS MIGRATION' }
 
-    $nameColumnWidth = 45
+    # Robustly find the start of the "Status" column from the header line
+    $headerLine = $auditLines -split [System.Environment]::NewLine | Where-Object { $_ -match "Experiment\s+Status" } | Select-Object -First 1
+    $statusColumnIndex = if ($headerLine) { $headerLine.IndexOf("Status") } else { -1 }
+
+    if ($statusColumnIndex -lt 0) {
+        throw "Could not parse the header of the audit report. Cannot determine experiments to update."
+    }
+
     foreach ($line in $summaryLines) {
-        if ($line.Length -ge $nameColumnWidth -and $line.Trim().Length -gt 0) {
-            $experimentName = $line.Substring(0, $nameColumnWidth).Trim()
-            if (-not [string]::IsNullOrWhiteSpace($experimentName)) {
-                 if ($line -match "NEEDS UPDATE") {
-                    $experimentsToUpdate += $experimentName
-                } else {
-                    $needsManualFix = $true
-                }
+        # The experiment name is the substring from the start of the line up to the status column.
+        $experimentName = $line.Substring(0, $statusColumnIndex).Trim()
+
+        if (-not [string]::IsNullOrWhiteSpace($experimentName)) {
+             if ($line -match "NEEDS UPDATE") {
+                $experimentsToUpdate += $experimentName
+            } else {
+                $needsManualFix = $true
             }
         }
     }
@@ -118,9 +126,7 @@ try {
         $experimentPath = Join-Path $StudyDirectory $experimentName
         Write-Host "`n--- Updating experiment $i of $($experimentsToUpdate.Count): $experimentName ---" -ForegroundColor Cyan
         
-        # --- CORRECTED SCRIPT CALL ---
         # Call the script directly with named parameters for maximum clarity and robustness.
-        # This avoids splatting issues.
         if ($PSBoundParameters['Verbose']) {
             & $updateScriptPath -TargetDirectory $experimentPath -Verbose
         }
