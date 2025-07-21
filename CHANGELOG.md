@@ -5,6 +5,20 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.9.1 (2025-07-21)
+
+### Fix
+
+- **workflows**: Resolve critical bugs and refine contribution process
+
+This commit addresses a series of cascading bugs in the PowerShell audit and update workflows and refines the contribution guidelines for clarity and correctness.
+
+- The `audit_study.ps1` script no longer truncates long experiment names in its summary table. This was the root cause of the `TargetDirectory` validation error in `update_study.ps1`.
+- The `update_study.ps1` script now uses a more robust method to parse the audit report, making it resilient to formatting variations.
+- The audit summary in `experiment_manager.py` now uses contextual coloring and messaging to provide a clearer user experience during intermediate states like "pending finalization".
+- Fixed an `UnboundLocalError` that would crash post-update audits by reordering the logic in the `_run_verify_only_mode` function.
+- The `CONTRIBUTING.md` document was significantly updated to clarify and correct the standard commit and release workflows, including the use of `commit.txt` and the proper sequence for staging changes.
+
 ## v2.9.0 (2025-07-20)
 
 ### Feat
