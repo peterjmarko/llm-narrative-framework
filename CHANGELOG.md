@@ -5,6 +5,24 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.9.0 (2025-07-20)
+
+### Feat
+
+- Implement lift metrics and comprehensive audit workflows
+
+This commit introduces new "lift" metrics to analyze LLM performance relative to chance.
+It also significantly refactors and enhances the audit and update PowerShell workflows
+to ensure data integrity and consistency across the entire study.
+
+Key changes include:
+- New `mean_mrr_lift`, `mean_top_1_acc_lift`, `mean_top_3_acc_lift` calculated in `analyze_llm_performance.py`.
+- `experiment_aggregator.py` updated to correctly handle new metrics and flatten bias data.
+- `experiment_manager.py` audit logic refined to enforce all required metrics and exit with true status codes.
+- New `update_study.ps1` script for batch updates across studies.
+- `audit_study.ps1` and `analyze_study.ps1` adjusted for robust inter-script communication.
+- Documentation and diagrams (`DOCUMENTATION.template.md`, `.mmd` files) updated to reflect all changes.
+
 ## v2.8.1 (2025-07-20)
 
 ### Fix
