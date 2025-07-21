@@ -5,6 +5,21 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.10.0 (2025-07-21)
+
+### Feat
+
+- **analysis-pipeline**: consolidate analysis stage for clarity
+
+This refactoring addresses user feedback that the analysis pipeline felt fragmented by unifying the core performance analysis and diagnostic bias analysis into a single, user-facing stage named "Analyze LLM Performance".
+
+Key changes include:
+- `orchestrate_replication.py` now manages a 6-stage pipeline, calling both `analyze_llm_performance.py` and `run_bias_analysis.py` under a single header.
+- `experiment_manager.py` has been updated to delegate all analysis responsibilities to the orchestrator, ensuring consistent behavior across all modes (new, reprocess, repair).
+- All relevant documentation, including script descriptions, docstrings, and architectural diagrams (`codebase_architecture`, `workflow_1_run_experiment`, `data_flow`), has been updated to reflect the new, streamlined structure.
+
+This approach preserves the modularity and single-responsibility principle of the underlying scripts while providing a more intuitive and coherent user experience.
+
 ## v2.9.1 (2025-07-21)
 
 ### Fix
