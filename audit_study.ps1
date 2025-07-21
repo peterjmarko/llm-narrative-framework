@@ -58,6 +58,14 @@ if (Get-Command pdm -ErrorAction SilentlyContinue) {
     $prefixArgs = "run", "python"
 }
 
+# --- Define ANSI Color Codes for Rich Text Output ---
+$c = [char]27 # ANSI Escape Character
+$c_reset = "$c[0m"
+$c_green = "$c[92m"
+$c_yellow = "$c[93m"
+$c_red = "$c[91m"
+$c_cyan = "$c[96m"
+
 # --- Define Audit Exit Codes from experiment_manager.py ---
 $AUDIT_ALL_VALID       = 0 # Experiment is complete and valid.
 $AUDIT_NEEDS_REPROCESS = 1 # Experiment needs reprocessing (e.g., analysis issues).
@@ -128,9 +136,9 @@ function Format-LogFile {
 try {
     $ResolvedPath = Resolve-Path -Path $StudyDirectory -ErrorAction Stop
     $LogFilePath = Join-Path $ResolvedPath "study_audit_log.txt"
-
-    # Start a transcript to capture all console output to the log file.
-    Start-Transcript -Path $LogFilePath -Force
+    
+    # The transcript is now managed by the calling script (e.g., update_study.ps1)
+    # to avoid output stream conflicts. This script will now write directly.
 
     $scriptName = "src/experiment_manager.py"
     $auditResults = @()
@@ -186,38 +194,22 @@ try {
             Write-Host ("{0,-15} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
             $finalArgs = $prefixArgs + $scriptName + $arguments
             $output = & $executable $finalArgs 2>&1
-            $exitCode = $LASTEXITCODE
+            $exitCode = $LASTEXITCODE # Fallback
         }
 
-        # --- Consistent Status Parsing Logic (for BOTH modes) ---
-        $finalResultLine = $output | Select-String -Pattern "Audit Result:" | Select-Object -Last 1
-        if ($finalResultLine) {
-            $resultText = $finalResultLine.ToString()
-            if ($resultText -match "PASSED. Experiment is complete and valid.") {
-                $trueStatus = "VALIDATED"
-                if (-not $PSBoundParameters['Verbose']) { Write-Host "[ OK ]" -ForegroundColor Green }
-            } elseif ($resultText -match "PASSED. Experiment is ready for an update.") {
-                $trueStatus = "NEEDS UPDATE"
-                if (-not $PSBoundParameters['Verbose']) { Write-Host "[ FAIL ]" -ForegroundColor Red }
-            } elseif ($resultText -match "FAILED. Critical data is missing or corrupt") {
-                $trueStatus = "NEEDS REPAIR"
-                if (-not $PSBoundParameters['Verbose']) { Write-Host "[ FAIL ]" -ForegroundColor Red }
-            } elseif ($resultText -match "FAILED. Legacy or malformed runs detected.") {
-                $trueStatus = "NEEDS MIGRATION"
-                if (-not $PSBoundParameters['Verbose']) { Write-Host "[ FAIL ]" -ForegroundColor Red }
-            }
+        # The exit code is now trusted directly, no parsing needed.
+
+        # --- Status Logic based on the now-reliable exit code ---
+        $trueStatus, $progressColor = switch ($exitCode) {
+            $AUDIT_ALL_VALID       { "VALIDATED", "Green"; break }
+            $AUDIT_NEEDS_REPROCESS { "NEEDS UPDATE", "Red"; break }
+            $AUDIT_NEEDS_REPAIR    { "NEEDS REPAIR", "Red"; break }
+            $AUDIT_NEEDS_MIGRATION { "NEEDS MIGRATION", "Red"; break }
+            default               { "UNKNOWN", "Red"; break }
         }
-        
-        if ($trueStatus -eq "UNKNOWN") {
-             # If parsing fails, fall back to the exit code for a basic status.
-             if ($exitCode -eq $AUDIT_ALL_VALID) {
-                 $trueStatus = "VALIDATED"
-                 if (-not $PSBoundParameters['Verbose']) { Write-Host "[ OK ]" -ForegroundColor Green }
-             } else {
-                 # A non-zero exit code with unknown text output defaults to a generic failure.
-                 $trueStatus = "NEEDS REPAIR" # A safe default for a non-zero exit
-                 if (-not $PSBoundParameters['Verbose']) { Write-Host "[ FAIL ]" -ForegroundColor Red }
-             }
+        if (-not $PSBoundParameters['Verbose']) {
+            $progressText = if ($progressColor -eq "Green") { "[ OK ]" } else { "[ FAIL ]" }
+            Write-Host $progressText -ForegroundColor $progressColor
         }
 
         $auditResults += [PSCustomObject]@{ Name = $dir.Name; ExitCode = $exitCode; TrueStatus = $trueStatus }
@@ -228,10 +220,10 @@ try {
     }
 
     # --- Print Summary Report ---
-    Write-Host ""
-    Write-Host "`n$headerLine" -ForegroundColor Cyan
-    Write-Host (Format-HeaderLine "STUDY AUDIT SUMMARY REPORT") -ForegroundColor Cyan
-    Write-Host "$headerLine`n" -ForegroundColor Cyan
+    Write-Output ""
+    Write-Output "$c_cyan`n$headerLine$c_reset"
+    Write-Output "$c_cyan$(Format-HeaderLine "STUDY AUDIT SUMMARY REPORT")$c_reset"
+    Write-Output "$c_cyan$headerLine`n$c_reset"
     
     # Set fixed widths for better alignment and to prevent wrapping.
     $maxNameLength = 45
@@ -239,29 +231,31 @@ try {
     $detailsWidth = 45
     $gap = "   "
 
-    # Print header
-    Write-Host ("{0,-$maxNameLength}" -f "Experiment") -NoNewline
-    Write-Host ("$gap{0,-$statusWidth}" -f "Status") -NoNewline
-    Write-Host ("$gap{0}" -f "Details")
-    # Print underline
-    Write-Host (("-" * $maxNameLength) + $gap + ("-" * $statusWidth) + $gap + ("-" * $detailsWidth))
+    # Create header as a single string
+    $headerString = ("{0,-$maxNameLength}" -f "Experiment") + $gap + ("{0,-$statusWidth}" -f "Status") + $gap + ("{0}" -f "Details")
+    Write-Output $headerString
+    # Create underline as a single string
+    $underlineString = ("-" * $maxNameLength) + $gap + ("-" * $statusWidth) + $gap + ("-" * $detailsWidth)
+    Write-Output $underlineString
 
     foreach ($result in $auditResults) {
         # Use the TrueStatus parsed from the output for the summary, ensuring consistency.
-        $statusText, $details, $color = switch ($result.TrueStatus) {
-            "VALIDATED"       { "VALIDATED", "Ready for analysis.", "Green"; break }
-            "NEEDS UPDATE"    { "NEEDS UPDATE", "Requires update ('update_experiment.ps1').", "Yellow"; break }
-            "NEEDS REPAIR"    { "NEEDS REPAIR", "Requires repair ('run_experiment.ps1').", "Red"; break }
-            "NEEDS MIGRATION" { "NEEDS MIGRATION", "Requires migration ('migrate_experiment.ps1').", "Red"; break }
-            default           { "UNKNOWN", "Manual investigation required.", "Red"; break }
+        $statusText, $details, $colorCode = switch ($result.TrueStatus) {
+            "VALIDATED"       { "VALIDATED", "Ready for analysis.", $c_green; break }
+            "NEEDS UPDATE"    { "NEEDS UPDATE", "Requires update ('update_experiment.ps1').", $c_yellow; break }
+            "NEEDS REPAIR"    { "NEEDS REPAIR", "Requires repair ('run_experiment.ps1').", $c_red; break }
+            "NEEDS MIGRATION" { "NEEDS MIGRATION", "Requires migration ('migrate_experiment.ps1').", $c_red; break }
+            default           { "UNKNOWN", "Manual investigation required.", $c_red; break }
         }
         $displayName = $result.Name
         if ($displayName.Length -gt $maxNameLength) {
             $displayName = $displayName.Substring(0, $maxNameLength - 3) + "..."
         }
-        Write-Host ("{0,-$maxNameLength}" -f $displayName) -NoNewline
-        Write-Host ("$gap{0,-$statusWidth}" -f $statusText) -ForegroundColor $color -NoNewline
-        Write-Host ("$gap$details")
+        
+        # Build the line as a single string with embedded ANSI color codes
+        $statusPart = "$colorCode{0,-$statusWidth}$c_reset" -f $statusText
+        $line = ("{0,-$maxNameLength}" -f $displayName) + $gap + $statusPart + $gap + $details
+        Write-Output $line
     }
 
     # --- Final Conclusion ---
@@ -269,23 +263,19 @@ try {
     $isStudyValidated = ($auditResults | Where-Object { $_.TrueStatus -ne "VALIDATED" }).Count -eq 0
 
     if ($isStudyValidated) {
-        Write-Host "`n$headerLine" -ForegroundColor Green
-        Write-Host (Format-HeaderLine "AUDIT FINISHED: STUDY IS VALIDATED") -ForegroundColor Green
-        Write-Host (Format-HeaderLine "Recommendation: Run 'analyze_study.ps1' to") -ForegroundColor Green
-        Write-Host (Format-HeaderLine "complete the final analysis.") -ForegroundColor Green
-        Write-Host "$headerLine`n" -ForegroundColor Green
+        Write-Output "$c_green`n$headerLine$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "AUDIT FINISHED: STUDY IS VALIDATED")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'analyze_study.ps1' to")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "complete the final analysis.")$c_reset"
+        Write-Output "$c_green$headerLine`n$c_reset"
     }
     else {
-        Write-Host "`n$headerLine" -ForegroundColor Red
-        Write-Host (Format-HeaderLine "AUDIT FINISHED: STUDY IS NOT READY") -ForegroundColor Red
-        Write-Host (Format-HeaderLine "Recommendation: Address issues listed above.") -ForegroundColor Red
-        Write-Host "$headerLine`n" -ForegroundColor Red
+        Write-Output "$c_red`n$headerLine$c_reset"
+        Write-Output "$c_red$(Format-HeaderLine "AUDIT FINISHED: STUDY IS NOT READY")$c_reset"
+        Write-Output "$c_red$(Format-HeaderLine "Recommendation: Address issues listed above.")$c_reset"
+        Write-Output "$c_red$headerLine`n$c_reset"
     }
     
-    Stop-Transcript | Out-Null
-    Format-LogFile -Path $LogFilePath
-    Write-Host "`nTranscript stopped. Output has been saved in the log file:" -ForegroundColor DarkGray
-    Write-Host $LogFilePath -ForegroundColor DarkGray
     # Exit with the overall status code. 0 means VALIDATED, non-zero means NOT READY.
     exit $overallStatus
 }
@@ -296,13 +286,5 @@ catch {
     Write-Host "$headerLine`n" -ForegroundColor Red
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     
-    # Only stop the transcript and format the log if it was actually started.
-    # The global $transcript variable is non-null if transcription is active.
-    if ($transcript) {
-        Stop-Transcript | Out-Null
-        Format-LogFile -Path $LogFilePath
-        Write-Host "`nTranscript stopped. Output has been saved in the log file:" -ForegroundColor DarkGray
-        Write-Host $LogFilePath -ForegroundColor DarkGray
-    }
     exit 1
 }

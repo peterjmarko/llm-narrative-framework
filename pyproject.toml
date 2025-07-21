@@ -68,20 +68,22 @@ cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
 lint = "pre-commit run --all-files"
 build-docs = "python src/build_docs.py"
 
-test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
-test-ps-aud = "pwsh tests/audit_experiment.Tests.ps1"
-test-ps-upd = "pwsh ./tests/update_experiment.Tests.ps1"
-test-ps-mig = "pwsh tests/migrate_experiment.Tests.ps1"
-test-ps-stu = "pwsh ./tests/analyze_study.Tests.ps1"
-test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
-
 # Main workflow shortcuts
 run-exp = "powershell -ExecutionPolicy Bypass -File ./run_experiment.ps1"
 aud-exp = "powershell -ExecutionPolicy Bypass -File ./audit_experiment.ps1"
 upd-exp = "powershell -ExecutionPolicy Bypass -File ./update_experiment.ps1"
 mig-exp = "powershell -ExecutionPolicy Bypass -File ./migrate_experiment.ps1"
 aud-stu = "powershell -ExecutionPolicy Bypass -File ./audit_study.ps1"
+upd-stu = "powershell -ExecutionPolicy Bypass -File ./update_study.ps1"
 ana-stu = "powershell -ExecutionPolicy Bypass -File ./analyze_study.ps1"
+
+# Testing shortcuts
+test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
+test-ps-aud = "pwsh tests/audit_experiment.Tests.ps1"
+test-ps-upd = "pwsh ./tests/update_experiment.Tests.ps1"
+test-ps-mig = "pwsh tests/migrate_experiment.Tests.ps1"
+test-ps-stu = "pwsh ./tests/analyze_study.Tests.ps1"
+test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
 
 [tool.commitizen]
 name = "cz_conventional_commits"

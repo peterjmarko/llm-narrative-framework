@@ -14,21 +14,21 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# Filename: src/compile_study_results.py
+# Filename: src/experiment_aggregator.py
 
 """
 Hierarchical Results Compiler for Study-Wide Analysis.
 
 This script is the primary data aggregation tool in the analysis workflow.
 It systematically transforms the raw output from numerous individual replication
-reports into a clean, unified, and analysis-ready dataset.
+runs into a clean, unified, and analysis-ready dataset.
 
 Its core mechanism is a **bottom-up hierarchical compilation**:
 1.  It performs a post-order traversal (`os.walk(..., topdown=False)`) of a
     given study directory.
 2.  At the "leaf" level (individual `run_*` directories), it parses metrics
-    from `replication_report.txt` and experimental parameters from the
-    `config.ini.archived` file. It saves this as a single-row
+    from the final `replication_metrics.json` file and experimental parameters
+    from the `config.ini.archived` file. It saves this as a single-row
     `REPLICATION_results.csv`.
 3.  As it moves up the directory tree, it aggregates the summary CSVs from all
     its child directories. For example, an "experiment" directory will
@@ -66,32 +66,17 @@ except ImportError:
         sys.path.insert(0, current_script_dir)
     from config_loader import APP_CONFIG, get_config_list
 
-def parse_metrics_json(report_content):
+def _flatten_bias_metrics(data):
     """
-    Parses the JSON block from a report, finds the nested 'positional_bias_metrics',
-    and flattens it into the top-level dictionary.
+    Finds a nested 'positional_bias_metrics' dictionary and flattens its
+    contents into the top-level dictionary for easier CSV conversion.
     """
-    json_start_tag = "<<<METRICS_JSON_START>>>"
-    json_end_tag = "<<<METRICS_JSON_END>>>"
-    try:
-        match = re.search(f"{re.escape(json_start_tag)}(.*?){re.escape(json_end_tag)}", report_content, re.DOTALL)
-        if match:
-            json_str = match.group(1).strip()
-            data = json.loads(json_str)
-
-            # Check for the nested bias metrics dictionary and flatten it
-            if 'positional_bias_metrics' in data and isinstance(data['positional_bias_metrics'], dict):
-                # Remove the nested dictionary from the main data
-                bias_metrics = data.pop('positional_bias_metrics')
-                # Add its items to the main data, with a prefix to avoid name collisions
-                for key, value in bias_metrics.items():
-                    data[f"bias_{key}"] = value # e.g., creates 'bias_slope'
-
-            return data
-
-    except json.JSONDecodeError as e:
-        logging.warning(f"  - Warning: Failed to parse JSON in report. Error: {e}")
-    return None
+    if data and 'positional_bias_metrics' in data and isinstance(data.get('positional_bias_metrics'), dict):
+        # Remove the nested dictionary from the main data
+        bias_metrics = data.pop('positional_bias_metrics')
+        # Add its items to the main data.
+        data.update(bias_metrics)
+    return data
 
 def parse_config_params(config_path):
     """
@@ -157,23 +142,30 @@ def run_hierarchical_mode(base_dir):
         print(f"\nProcessing directory:\n{current_dir}")
         level_results = []
         
-        report_files = glob.glob(os.path.join(current_dir, 'replication_report_*.txt'))
-        if report_files and os.path.basename(current_dir).startswith('run_'):
+        # In a run directory, we expect to find the final metrics JSON file.
+        is_run_dir = os.path.basename(current_dir).startswith('run_')
+        metrics_filepath = os.path.join(current_dir, "analysis_inputs", "replication_metrics.json")
+
+        if is_run_dir and os.path.exists(metrics_filepath):
             run_dir_name = os.path.basename(current_dir)
-            logging.info(f"  - Found report in run folder: {run_dir_name}")
-            report_path = report_files[0]
+            logging.info(f"  - Found metrics JSON in run folder: {run_dir_name}")
             config_path = os.path.join(current_dir, 'config.ini.archived')
 
             if not os.path.exists(config_path):
                 logging.warning(f"    - Warning: 'config.ini.archived' not found in {run_dir_name}. Skipping.")
                 continue
 
-            with open(report_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            metrics = parse_metrics_json(content)
+            try:
+                with open(metrics_filepath, 'r', encoding='utf-8') as f:
+                    metrics = json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                logging.warning(f"    - Warning: Could not read or parse {os.path.basename(metrics_filepath)}. Error: {e}. Skipping.")
+                continue
+
+            # Flatten the nested bias metrics for easier CSV output
+            metrics = _flatten_bias_metrics(metrics)
             if not metrics:
-                logging.warning(f"    - Warning: Could not parse metrics from {os.path.basename(report_path)}. Skipping.")
+                logging.warning(f"    - Warning: Parsed metrics are empty. Skipping.")
                 continue
             
             run_params = parse_config_params(config_path)

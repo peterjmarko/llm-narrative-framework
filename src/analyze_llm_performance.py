@@ -854,6 +854,15 @@ def main():
     performance_over_time = [res['mean_rank_of_correct_id'] for res in all_test_results]
     positional_bias_metrics = calculate_positional_bias(performance_over_time)
 
+    # --- Lift Metrics Calculation ---
+    mean_mrr = mrr_analysis.get('mean')
+    mean_top_1_acc = top_1_analysis.get('mean')
+    mean_top_k_acc = top_k_analysis.get('mean')
+
+    mrr_lift = (mean_mrr / mrr_chance) if mrr_chance > 0 and mean_mrr is not None else np.nan
+    top_1_acc_lift = (mean_top_1_acc / top_1_chance) if top_1_chance > 0 and mean_top_1_acc is not None else np.nan
+    top_k_acc_lift = (mean_top_k_acc / top_k_chance) if top_k_chance > 0 and mean_top_k_acc is not None else np.nan
+
     summary_data = {
         # Combined Significance
         'mwu_stouffer_z': stouffer_z,
@@ -872,6 +881,10 @@ def main():
         # Top-K Accuracy
         f'mean_top_{args.top_k_acc}_acc': top_k_analysis.get('mean'),
         f'top_{args.top_k_acc}_acc_p': top_k_analysis.get('wilcoxon_signed_rank_p'),
+        # Lift vs. Chance Metrics
+        'mean_mrr_lift': mrr_lift,
+        'mean_top_1_acc_lift': top_1_acc_lift,
+        f'mean_top_{args.top_k_acc}_acc_lift': top_k_acc_lift,
         # Mean Rank
         'mean_rank_of_correct_id': mean_rank_analysis.get('mean'),
         'rank_of_correct_id_p': mean_rank_analysis.get('wilcoxon_signed_rank_p'),

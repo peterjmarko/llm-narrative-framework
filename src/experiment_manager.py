@@ -192,11 +192,18 @@ FILE_MANIFEST = {
 }
 
 REPORT_REQUIRED_METRICS = {
-    "mean_mrr", "mean_top_1_acc", "mwu_stouffer_z", "mean_effect_size_r",
-    "top1_pred_bias_std", "n_valid_responses"
+    "n_valid_responses", "mwu_stouffer_z", "mwu_stouffer_p", "mwu_fisher_chi2",
+    "mwu_fisher_p", "mean_effect_size_r", "effect_size_r_p", "mean_mrr",
+    "mrr_p", "mean_top_1_acc", "top_1_acc_p", "mean_top_3_acc",
+    "top_3_acc_p", "mean_rank_of_correct_id", "rank_of_correct_id_p",
+    "bias_slope", "bias_intercept", "bias_r_value", "bias_p_value", "bias_std_err",
+    "mean_mrr_lift", "mean_top_1_acc_lift", "mean_top_3_acc_lift"
 }
 
-REPORT_REQUIRED_NESTED_DICTS = {"positional_bias_metrics"}
+# Define required nested dictionaries and the keys they must contain
+REPORT_REQUIRED_NESTED_KEYS = {
+    "positional_bias_metrics": {"top1_pred_bias_std", "true_false_score_diff"}
+}
 
 # --- Verification Helper Functions ---
 
@@ -350,10 +357,15 @@ def _check_report(run_path: Path):
     if missing_metrics:
         return f"REPORT_INCOMPLETE_METRICS: {', '.join(sorted(missing_metrics))}"
 
-    # Check for required nested dictionaries (e.g., from bias analysis)
-    for key in REPORT_REQUIRED_NESTED_DICTS:
-        if not isinstance(j.get(key), dict):
-            return f"REPORT_MISSING_NESTED_DICT: {key}"
+    # Check for required nested dictionaries and their internal keys
+    for nested_key, required_sub_keys in REPORT_REQUIRED_NESTED_KEYS.items():
+        nested_dict = j.get(nested_key)
+        if not isinstance(nested_dict, dict):
+            return f"REPORT_MISSING_NESTED_DICT: {nested_key}"
+
+        missing_sub_keys = required_sub_keys - nested_dict.keys()
+        if missing_sub_keys:
+            return f"REPORT_INCOMPLETE_NESTED_KEYS ({nested_key}): {', '.join(sorted(missing_sub_keys))}"
 
     return "VALID"
 
@@ -681,8 +693,8 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
         audit_color = C_RED
     elif "ANALYSIS_ISSUE" in run_statuses:
         audit_result_code = AUDIT_NEEDS_REPROCESS
-        audit_message = "PASSED. Experiment is ready for an update."
-        audit_recommendation = "Update experiment to fix analysis files and summaries."
+        audit_message = "UPDATE RECOMMENDED. Experiment analysis needs refreshing."
+        audit_recommendation = "Update experiment to fix analysis files and summaries (run 'update_experiment.ps1' with the directory path)."
         audit_color = C_YELLOW
     else:  # All replications are valid.
         audit_result_code = AUDIT_ALL_VALID
@@ -699,16 +711,11 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
         print(f"\n{audit_color}Audit Result: {audit_message}{C_RESET}")
         print(f"{audit_color}Recommendation: {audit_recommendation}{C_RESET}")
 
-    # If --verify-only was passed as a primary argument from the command line,
-    # the PowerShell wrapper will interpret the exit code and provide user-friendly
-    # recommendations. We exit with a clean 0 to prevent the wrapper from
-    # showing a generic failure message for non-fatal audit results.
+    # When called from the CLI, exit with the true audit code so wrapper scripts can react.
     if not suppress_exit and is_verify_only_cli:
-        # For direct CLI calls, exit with a simple success code as the wrapper handles messaging.
-        # This prevents the wrapper from showing "AUDIT FAILED" for non-fatal findings.
-        sys.exit(0)
+        sys.exit(audit_result_code)
 
-    # For internal calls (like from analyze_study.ps1), return the true code.
+    # When called internally, return the true code.
     return audit_result_code
 
 def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, quiet, bias_script):
@@ -883,21 +890,8 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, bias_scrip
             search_pattern = os.path.join(base_output_dir, f'run_*_rep-{rep_num:03d}_*')
             found_dirs = [d for d in glob.glob(search_pattern) if os.path.isdir(d)]
             
-            if len(found_dirs) == 1:
-                run_dir = found_dirs[0]
-                config_path = os.path.join(run_dir, 'config.ini.archived')
-                if os.path.exists(config_path):
-                    config = configparser.ConfigParser()
-                    config.read(config_path)
-                    k_value = config.getint('Study', 'group_size', fallback=config.getint('Study', 'k_per_query', fallback=0))
-                    
-                    cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_value)]
-                    if not quiet: cmd_bias.append("--verbose")
-                    subprocess.run(cmd_bias, check=True)
-                else:
-                    logging.warning(f"No archived config in new directory '{os.path.basename(run_dir)}', cannot run bias analysis.")
-            else:
-                logging.warning(f"Could not find unique run directory for rep {rep_num} after repair. Bias analysis skipped. Run may not be fully VALIDATED.")
+            if not found_dirs:
+                logging.warning(f"Could not find run directory for rep {rep_num} after repair. Run may not be fully VALIDATED.")
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
             logging.error(f"Full replication repair failed for {os.path.basename(run_dir)}.")

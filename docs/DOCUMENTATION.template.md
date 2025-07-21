@@ -66,7 +66,7 @@ The codebase can be divided into the following components:
 {{grouped_figure:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.}}
 
 ### Workflow Diagrams
-The project's functionality is organized into five primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
+The project's functionality is organized into six primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
 
 1.  **Run an Experiment**: The most common action; used for starting a new experiment or resuming/healing an interrupted one.
 
@@ -76,7 +76,11 @@ The project's functionality is organized into five primary workflows, each initi
 
 4.  **Migrate Old Experiment Data**: A utility workflow designed to bring older, legacy experimental data into compliance with the modern pipeline.
 
-5.  **Analyze a Study**: The highest-level analytical tool, used after one or more experiments are complete to aggregate results across multiple experiments and perform comprehensive statistical analysis.
+5.  **Audit a Study**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
+
+6.  **Update a Study**: A batch operation that automatically updates all out-of-date experiments within a study.
+
+7.  **Analyze a Study**: The highest-level analytical tool, used after a study is validated to aggregate results and perform comprehensive statistical analysis.
 
 #### Workflow 1: Run an Experiment
 
@@ -145,18 +149,25 @@ This utility workflow provides a safe, non-destructive process to transform olde
 {{grouped_figure:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
 
 
-#### Workflow 5: Analyze a Study
-
-This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
-
-{{grouped_figure:docs/diagrams/architecture_workflow_5_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
-
-
-#### Workflow 6: Audit a Study
+#### Workflow 5: Audit a Study
 
 This workflow provides a read-only, consolidated completeness report for all experiments in a study. The `audit_study.ps1` wrapper iterates through each experiment folder and calls `experiment_manager.py` with the `--verify-only` flag (running quietly by default). It then compiles the results into a summary table for the console and a comprehensive `study_audit_log.txt` file in the study directory. This workflow is the primary diagnostic tool for assessing overall study readiness.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_6_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Audit a Study. Consolidated completeness report for all experiments in a study.}}
+{{grouped_figure:docs/diagrams/architecture_workflow_5_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
+
+
+#### Workflow 6: Analyze a Study
+
+This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
+
+{{grouped_figure:docs/diagrams/architecture_workflow_6_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
+
+
+#### Workflow 7: Update a Study
+
+This workflow provides a convenient batch operation to update all out-of-date experiments within a study directory. It first runs a full study audit to identify which experiments need updating. If any require more serious intervention (like repair or migration), it halts. Otherwise, it prompts the user for confirmation and then systematically calls `update_experiment.ps1` on each experiment that needs it.
+
+{{grouped_figure:docs/diagrams/architecture_workflow_7_update_study.mmd | scale=2.5 | width=100% | caption=Workflow 7: Update a Study. A batch operation to update all out-of-date experiments in a study.}}
 
 {{pagebreak}}
 ### Data Flow Diagram
@@ -397,7 +408,9 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 *   **`audit_study.ps1`**: Audits all experiments within a study directory and provides a consolidated report to check for final analysis readiness.
 
-*   **`update_experiment.ps1`**: Re-runs the data processing and analysis stages on existing results, ideal for applying analysis updates or bug fixes.
+*   **`update_experiment.ps1`**: Re-runs the data processing and analysis stages on a *single experiment*, ideal for applying analysis updates or bug fixes.
+
+*   **`update_study.ps1`**: A powerful batch script that audits an entire study and calls `update_experiment.ps1` on all experiments that require an update.
 
 *   **`migrate_experiment.ps1`**: Safely migrates a legacy experiment by first copying it to a new timestamped directory and then upgrading the copy to be compatible with the current pipeline.
 
@@ -409,11 +422,11 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 ## Replication Pipeline Scripts
 
-*   **`orchestrate_replication.py`**: The engine for a **single** replication run. It sequentially executes the four pipeline stages below.
+*   **`orchestrate_replication.py`**: The self-contained engine for a **single** replication. It manages the entire lifecycle for one run, including parallel execution of LLM sessions, data processing, final analysis, and bias checking. It can also reprocess or repair a run.
 
-*   **`build_llm_queries.py`**: **Stage 1.** Samples unique personalities from the master database for each trial and calls the `query_generator.py` worker to create the query, mapping, and manifest files.
+*   **`build_llm_queries.py`**: **Stage 1.** Called by the orchestrator. Samples personalities and calls the `query_generator.py` worker to create all files needed for the trials.
 
-*   **`run_llm_sessions.py`**: **Stage 2.** Manages a single LLM session for one trial. It is called in a parallel loop by `orchestrate_replication.py` and orchestrates the `llm_prompter.py` worker to get a response for a single query.
+*   **`run_llm_sessions.py`**: **Stage 2.** Called in a parallel loop by `orchestrate_replication.py`. It manages the LLM API calls for all trials within the replication.
 
 *   **`process_llm_responses.py`**: **Stage 3.** Parses the raw text responses from the LLM into structured score and mapping files.
 

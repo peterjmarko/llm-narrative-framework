@@ -1,0 +1,25 @@
+graph TD
+    subgraph "Workflow 7: Update a Study"
+        direction TB
+        A["update_study.ps1<br/>(User Entry Point)"]:::entry_ps --> B["1. Pre-Update Audit<br/><small>calls audit_study.ps1</small>"]:::script
+        B --> C{"Audit Result?"}:::decision
+        C -->|Needs Repair/Migration| D((Halt & Report Error)):::stop_node
+        C -->|"All Validated"| E["Report 'All Up-to-Date'"]:::layer_green
+        E --> G((Exit)):::stop_node
+        C -->|"Needs Update"| F["List Experiments & Prompt User"]:::user_interaction
+        
+        F -->|No| G
+        F -->|Yes| H["2. Update Experiments<br/><small>Loops, calling update_experiment.ps1 on each</small>"]:::process
+        
+        H --> I["3. Post-Update Verification<br/><small>calls audit_study.ps1</small>"]:::script
+        I --> G
+    end
+    
+    %% Styling
+    classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef decision fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef user_interaction fill:#9b59b6,stroke:#8e44ad,color:#fff;
+    classDef stop_node fill:#e74c3c,stroke:#c0392b,color:#fff;
+    classDef process fill:#f1c40f,stroke:#f39c12,color:#333;
+    classDef layer_green fill:#2ecc71,stroke:#27ae60,color:#fff;

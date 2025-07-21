@@ -127,14 +127,16 @@ function Invoke-StudyAudit {
     }
 
     # Execute the audit script. It will print its own summary report.
+    # The output from this call is already displayed to the console by audit_study.ps1 itself.
     & $auditScriptPath $StudyDirectory
 
+    # If the audit script returned a non-zero exit code, throw an error.
+    # The main try/catch block will then handle the final output.
     if ($LASTEXITCODE -ne 0) {
-        # The audit script's exit code signals the study state.
         throw "Study audit FAILED. Data is not ready for analysis. Please review the audit report above and address the issues before proceeding."
     }
     
-    Write-Host "`nAudit PASSED. Study is validated and ready for analysis. Note: this process is automatic." -ForegroundColor Green
+    Write-Host "`nAudit PASSED. Study is validated and ready for analysis." -ForegroundColor Green
 }
 
 # --- Function to execute a Python script and check for errors ---
@@ -272,7 +274,7 @@ catch {
     Write-Host "`n######################################################" -ForegroundColor Red
     Write-Host "### STUDY PROCESSING FAILED" -ForegroundColor Red
     Write-Host "######################################################" -ForegroundColor Red
-    Write-Error $_.Exception.Message
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red # Print the captured exception message cleanly
     # Exit with a non-zero status code to indicate failure to other automation tools
     exit 1
 }
