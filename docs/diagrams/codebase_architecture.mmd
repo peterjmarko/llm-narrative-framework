@@ -19,8 +19,11 @@ graph TD
             build_queries["build_llm_queries.py"]
             run_sessions["run_llm_sessions.py"]
             process_responses["process_llm_responses.py"]
-            analyze_performance["analyze_llm_performance.py"]
-            run_bias["run_bias_analysis.py"]
+            subgraph "Analyze LLM Performance"
+                direction TB
+                analyze_performance["analyze_llm_performance.py"]
+                run_bias["run_bias_analysis.py"]
+            end
         end
         
         subgraph "Pipeline Workers"
@@ -78,6 +81,7 @@ graph TD
     patch_old --> restore_config
     rebuild_reports --> process_responses
     rebuild_reports --> analyze_performance
+    rebuild_reports --> run_bias
 
     %% --- Import Connections (Dotted Lines) ---
     exp_manager         -.-> config_loader

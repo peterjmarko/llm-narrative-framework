@@ -13,10 +13,12 @@ graph TD
         Orchestrator["orchestrate_replication.py"]:::layer_green
         subgraph "Internal Stages & Key Artifacts"
             direction TB
-            S1["<b>1. Build Queries</b><br><small>Generates Query Files</small>"] --> S2;
-            S2["<b>2. Run LLM Sessions</b><br><small>Generates Response Files</small>"] --> S3;
-            S3["<b>3. Process & Analyze</b><br><small>Generates Report & Metrics</small>"] --> S4;
-            S4["<b>4. Finalize Replication</b><br><small>Generates REPLICATION_results.csv</small>"]
+            S1["<b>1. Build Queries</b><br><small>Generates query files</small>"] --> S2;
+            S2["<b>2. Run LLM Sessions</b><br><small>Generates response files</small>"] --> S3;
+            S3["<b>3. Process LLM Responses</b><br><small>Generates structured scores</small>"] --> S4;
+            S4["<b>4. Analyze LLM Performance</b><br><small>Generates core & bias metrics</small>"] --> S5;
+            S5["<b>5. Generate Final Report</b><br><small>Creates replication_report.txt</small>"] --> S6;
+            S6["<b>6. Create Replication Summary</b><br><small>Creates REPLICATION_results.csv</small>"]
         end
         Orchestrator -- "Manages" --> S1;
     end

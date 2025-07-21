@@ -30,21 +30,19 @@ It operates in two primary modes:
 
 1.  **New Run Mode (default):**
     -   Creates a new, timestamped directory for the replication's artifacts.
-    -   Archives the root `config.ini` file to the new directory for perfect
-        reproducibility.
-    -   Executes the complete six-stage pipeline by calling each script:
-        1. `build_llm_queries.py`: Generates queries and trial data.
-        2. `run_llm_sessions.py`: Interacts with the LLM API.
-        3. `process_llm_responses.py`: Parses LLM responses into scores.
-        4. `analyze_llm_performance.py`: Generates the base report and metrics.
-        5. `run_bias_analysis.py`: Injects bias metrics into the report.
-        6. `experiment_aggregator.py`: Creates the final `REPLICATION_results.csv`.
+    -   Archives the root `config.ini` file for perfect reproducibility.
+    -   Executes a consolidated six-stage pipeline:
+        1.  **Build LLM Queries**: Generates queries and trial data (`build_llm_queries.py`).
+        2.  **Run LLM Sessions**: Interacts with the LLM API (`run_llm_sessions.py`).
+        3.  **Process LLM Responses**: Parses raw responses into structured scores (`process_llm_responses.py`).
+        4.  **Analyze LLM Performance**: A unified stage that first calculates core performance metrics (`analyze_llm_performance.py`) and then calculates and injects diagnostic bias metrics (`run_bias_analysis.py`).
+        5.  **Generate Final Report**: Creates the `replication_report.txt` with all metrics and logs.
+        6.  **Create Replication Summary**: Creates the final `REPLICATION_results.csv` (`experiment_aggregator.py`).
 
 2.  **Reprocess Mode (`--reprocess`):**
     -   Operates on a specified, existing replication directory.
-    -   Skips the expensive query generation and LLM interaction stages (1 & 2).
-    -   Re-runs only the data processing and analysis stages (3 & 4), making it
-        ideal for applying fixes or updates to the analysis logic.
+    -   Skips query generation and LLM interaction (Stages 1 & 2).
+    -   Re-runs only the data processing and analysis pipeline (Stages 3-6) to apply logic updates or fixes.
 
 In both modes, the script's final action is to generate a comprehensive
 `replication_report.txt` file. This report contains all run parameters, the
@@ -188,7 +186,7 @@ def main():
     
     all_stage_outputs = []
     pipeline_status = "FAILED" # Default to FAILED, changed to COMPLETED only on full success
-    output3, output4, output5 = "", "", ""
+    output3, output4 = "", ""
 
     if args.reprocess:
         if not args.run_output_dir or not os.path.isdir(args.run_output_dir):
@@ -247,8 +245,8 @@ def main():
             if rc1 != 0: raise err1
 
         # Stage 2: Run LLM Sessions (Parallel by default)
-        stage_title = "2. Run LLM Sessions"
-        header = (f"\n\n{'='*80}\n### STAGE: {stage_title} ###\n{'='*80}\n\n")
+        stage_title_2 = "2. Run LLM Sessions"
+        header_2 = (f"\n\n{'='*80}\n### STAGE: {stage_title_2} ###\n{'='*80}\n\n")
 
         # Determine which indices to run based on the mode.
         if args.indices:
@@ -276,9 +274,9 @@ def main():
             force_rerun = False # Don't force re-run, just continue.
 
         if not indices_to_run:
-            all_stage_outputs.append(header + "All required LLM response files already exist. Nothing to do.")
+            all_stage_outputs.append(header_2 + "All required LLM response files already exist. Nothing to do.")
         else:
-            print(f"--- Running Stage: {stage_title} ---")
+            print(f"--- Running Stage: {stage_title_2} ---")
             max_workers = get_config_value(APP_CONFIG, 'LLM', 'max_parallel_sessions', value_type=int, fallback=10)
             
             def session_worker(index):
@@ -291,7 +289,7 @@ def main():
                 except subprocess.CalledProcessError as e:
                     return (index, False, f"LLM session FAILED for index {index}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}")
 
-            all_logs = [header]
+            all_logs = [header_2]
             failed_sessions = 0
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 tasks = {executor.submit(session_worker, i) for i in indices_to_run}
@@ -305,7 +303,6 @@ def main():
             if failed_sessions > 0:
                 raise Exception(f"{failed_sessions} LLM session(s) failed. See logs for details.")
 
-        # The rest of the pipeline proceeds only after sessions are complete.
         # Stage 3: Process LLM Responses
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]
         if args.quiet: cmd3.append("--quiet")
@@ -315,25 +312,37 @@ def main():
         
         n_valid_str = (re.search(r"<<<PARSER_SUMMARY:(\d+):", output3) or ['0','0'])[1]
         
-        # Stage 4: Analyze Performance
-        cmd4 = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path, "--num_valid_responses", n_valid_str]
-        if args.quiet: cmd4.append("--quiet")
-        output4, rc4, err4 = run_script(cmd4, "4. Analyze LLM Performance", quiet=args.quiet)
-        all_stage_outputs.append(output4)
-        if rc4 != 0: raise err4
+        # Stage 4: Analyze LLM Performance
+        stage_title_4 = "4. Analyze LLM Performance"
+        print(f"--- Running Stage: {stage_title_4} ---")
+        header_4 = (f"\n\n{'='*80}\n### STAGE: {stage_title_4} ###\n{'='*80}\n\n")
+        all_stage_outputs.append(header_4)
+        
+        # Sub-stage 4a: Core performance metrics
+        print("   - Calculating core performance metrics...")
+        cmd_analyze = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path, "--num_valid_responses", n_valid_str]
+        if args.quiet: cmd_analyze.append("--quiet")
+        # Run subprocess directly to manage console output
+        result4 = subprocess.run(cmd_analyze, capture_output=True, check=False, text=True, encoding='utf-8', errors='replace')
+        output4 = result4.stdout # Keep stdout for report generation
+        all_stage_outputs.append("\n--- Sub-stage: Core Performance Metrics ---\n" + output4 + result4.stderr)
+        if result4.returncode != 0:
+            raise subprocess.CalledProcessError(result4.returncode, cmd_analyze, output=result4.stdout, stderr=result4.stderr)
 
-        # Stage 5: Run Bias Analysis
+        # Sub-stage 4b: Positional bias metrics
+        print("   - Calculating positional bias metrics...")
         k_val = int(get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int, fallback=10))
-        cmd5 = [sys.executable, bias_script, run_specific_dir_path, "--k_value", str(k_val)]
-        if not args.quiet: cmd5.append("--verbose")
-        output5, rc5, err5 = run_script(cmd5, "5. Run Bias Analysis", quiet=args.quiet)
-        all_stage_outputs.append(output5)
-        if rc5 != 0: raise err5
+        cmd_bias = [sys.executable, bias_script, run_specific_dir_path, "--k_value", str(k_val)]
+        if not args.quiet: cmd_bias.append("--verbose")
+        result5 = subprocess.run(cmd_bias, capture_output=True, check=False, text=True, encoding='utf-8', errors='replace')
+        all_stage_outputs.append("\n--- Sub-stage: Positional Bias Metrics ---\n" + result5.stdout + result5.stderr)
+        if result5.returncode != 0:
+            raise subprocess.CalledProcessError(result5.returncode, cmd_bias, output=result5.stdout, stderr=result5.stderr)
 
-        # Stage 6: Generate Final Report
-        stage_title_6 = "6. Generate Final Report"
-        header_6 = (f"\n\n{'='*80}\n### STAGE: {stage_title_6} ###\n{'='*80}\n\n")
-        print(f"--- Running Stage: {stage_title_6} ---")
+        # Stage 5: Generate Final Report
+        stage_title_5 = "5. Generate Final Report"
+        header_5 = (f"\n\n{'='*80}\n### STAGE: {stage_title_5} ###\n{'='*80}\n\n")
+        print(f"--- Running Stage: {stage_title_5} ---")
         
         # Clean up any old reports before creating the new one.
         for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
@@ -365,16 +374,16 @@ def main():
                 f.write(content)
                 f.truncate()
             
-            all_stage_outputs.append(header_6 + f"Successfully generated final report: {report_path}")
+            all_stage_outputs.append(header_5 + f"Successfully generated final report: {report_path}")
         except Exception as e:
-            logging.error(f"Failed during Stage 6 (Report Generation): {e}")
+            logging.error(f"Failed during Stage 5 (Report Generation): {e}")
             raise
 
-        # Stage 7: Create Replication Summary
-        cmd7 = [sys.executable, aggregator_script, run_specific_dir_path, "--mode", "hierarchical"]
-        output7, rc7, err7 = run_script(cmd7, "7. Create Replication Summary", quiet=args.quiet)
-        all_stage_outputs.append(output7)
-        if rc7 != 0: raise err7
+        # Stage 6: Create Replication Summary
+        cmd6 = [sys.executable, aggregator_script, run_specific_dir_path, "--mode", "hierarchical"]
+        output6, rc6, err6 = run_script(cmd6, "6. Create Replication Summary", quiet=args.quiet)
+        all_stage_outputs.append(output6)
+        if rc6 != 0: raise err6
 
         pipeline_status = "COMPLETED"
 

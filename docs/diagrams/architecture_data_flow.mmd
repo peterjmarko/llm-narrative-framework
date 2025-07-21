@@ -16,7 +16,9 @@ graph TD
             Script3["process_llm<br/>_responses.py"]:::script
         end
         subgraph "3: Single-Run Analysis"
+            direction TB
             Script4["analyze_llm<br/>_performance.py"]:::script
+            Script4b["run_bias<br/>_analysis.py"]:::script
         end
         subgraph "4: Study-Level Aggregation & Analysis"
              Aggregator["experiment_aggregator.py"]:::script
@@ -58,6 +60,9 @@ graph TD
 
     Art3_scores & Art3_mappings_analysis & Art1_archive --> Script4
     Script4 --> Art4_report
+
+    Art3_scores & Art3_mappings_analysis --> Script4b
+    Script4b --> Art4_report
 
     Art4_report --> BatchRunLog
     Art4_report --> Aggregator

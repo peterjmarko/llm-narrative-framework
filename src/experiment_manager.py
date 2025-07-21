@@ -901,13 +901,8 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, bias_scrip
                 if result.stderr:
                     logging.error(f"Orchestrate Replication STDERR for {run_basename}:\n{result.stderr}")
 
-            # After successful orchestration, we must find the newly created directory
-            # to run the subsequent bias analysis step, which is critical for validation.
-            search_pattern = os.path.join(base_output_dir, f'run_*_rep-{rep_num:03d}_*')
-            found_dirs = [d for d in glob.glob(search_pattern) if os.path.isdir(d)]
-            
-            if not found_dirs:
-                logging.warning(f"Could not find run directory for rep {rep_num} after repair. Run may not be fully VALIDATED.")
+            # The orchestrator is responsible for the full lifecycle, including bias analysis.
+            # No further steps are needed here.
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
             logging.error(f"Full replication repair failed for {os.path.basename(run_dir)}.")
@@ -989,18 +984,9 @@ def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, bi
         if notes: cmd_orch.extend(["--notes", notes])
 
         try:
+            # The orchestrator is now responsible for the entire reprocessing lifecycle,
+            # including calling the bias analysis script.
             subprocess.run(cmd_orch, check=True)
-            config_path = os.path.join(run_dir, 'config.ini.archived')
-            if os.path.exists(config_path):
-                config = configparser.ConfigParser()
-                config.read(config_path)
-                k_value = config.getint('Study', 'group_size', fallback=config.getint('Study', 'k_per_query', fallback=0))
-                if k_value > 0:
-                    cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_value)]
-                    if not quiet: cmd_bias.append("--verbose")
-                    subprocess.run(cmd_bias, check=True)
-            else:
-                logging.warning(f"No archived config in {os.path.basename(run_dir)}, cannot run bias analysis.")
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
             logging.error(f"Reprocessing failed for {os.path.basename(run_dir)}.")
             if isinstance(e, KeyboardInterrupt): sys.exit(1)

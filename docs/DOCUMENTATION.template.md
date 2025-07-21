@@ -86,12 +86,14 @@ The project's functionality is organized into six primary workflows, each initia
 
 This is the primary workflow for generating new experimental data or for resuming/repairing an interrupted experiment. The PowerShell entry point (`run_experiment.ps1`) calls the Python batch controller (`experiment_manager.py`), which functions as a state machine. It repeatedly audits the experiment's state and, if incomplete, calls `orchestrate_replication.py` to run or repair the necessary replications. This self-healing loop continues until the experiment is complete, at which point the manager performs a final aggregation.
 
-The `orchestrate_replication.py` script executes the full pipeline for a single run, which can be conceptually broken into four main stages:
+The `orchestrate_replication.py` script executes the full pipeline for a single run, which is broken into six distinct stages:
 
-1.  **Build Queries**: Generates all necessary query files and manifests for each trial.
+1.  **Build Queries**: Generates all necessary query files and trial manifests.
 2.  **Run LLM Sessions**: Interacts with the LLM API in parallel to get responses.
-3.  **Process & Analyze**: Parses the raw responses and runs all statistical analyses, culminating in a `replication_report.txt`.
-4.  **Finalize Replication**: Creates the `REPLICATION_results.csv` summary, marking the run as valid.
+3.  **Process LLM Responses**: Parses the raw text responses from the LLM into structured score files.
+4.  **Analyze LLM Performance**: A unified two-part process that first calculates core performance metrics and then injects diagnostic bias metrics.
+5.  **Generate Final Report**: Assembles the final `replication_report.txt` from the analysis results and captured logs.
+6.  **Create Replication Summary**: Creates the final `REPLICATION_results.csv`, marking the run as valid.
 
 {{grouped_figure:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=65% | caption=Workflow 1: Run an Experiment, showing the main control loop and the internal replication pipeline.}}
 
@@ -172,7 +174,7 @@ This workflow provides a convenient batch operation to update all out-of-date ex
 {{pagebreak}}
 ### Data Flow Diagram
 
-This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts.
+This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
 
 {{grouped_figure:docs/diagrams/architecture_data_flow.mmd | scale=2.5 | width=75% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.}}
 
@@ -422,7 +424,7 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 ## Replication Pipeline Scripts
 
-*   **`orchestrate_replication.py`**: The self-contained engine for a **single** replication. It manages the entire lifecycle for one run, including parallel execution of LLM sessions, data processing, final analysis, and bias checking. It can also reprocess or repair a run.
+*   **`orchestrate_replication.py`**: The self-contained engine for a **single** replication. It manages the entire lifecycle, including a consolidated 6-stage pipeline: query generation, parallel LLM sessions, response processing, a comprehensive two-part analysis (performance and bias), report generation, and final summary creation. It can also reprocess or repair a run.
 
 *   **`build_llm_queries.py`**: **Stage 1.** Called by the orchestrator. Samples personalities and calls the `query_generator.py` worker to create all files needed for the trials.
 
@@ -430,7 +432,9 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 *   **`process_llm_responses.py`**: **Stage 3.** Parses the raw text responses from the LLM into structured score and mapping files.
 
-*   **`analyze_llm_performance.py`**: **Stage 4.** Performs statistical analysis for the replication and generates the `replication_report.txt` with an embedded JSON block of all metrics.
+*   **`analyze_llm_performance.py`**: **Stage 4 (Part 1).** Performs the primary statistical analysis for the replication. It calculates core performance metrics (MRR, Top-K accuracy) and generates the initial `replication_metrics.json` file, along with a human-readable summary that is captured by the orchestrator for the final report.
+
+*   **`run_bias_analysis.py`**: **Stage 4 (Part 2).** Called by the orchestrator immediately after the primary analysis. It calculates diagnostic metrics for positional bias, reads the `replication_metrics.json` file, injects its new metrics, and overwrites the file to complete the analysis stage.
 
 ## Study-Level Analysis Scripts
 
@@ -445,8 +449,6 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 *   **`llm_prompter.py`**: Handles the direct API call to the specified LLM for a single query, manages retry logic, and returns the raw text response from the API.
 
 ## Maintenance & Utility Scripts
-
-*   **`run_bias_analysis.py`**: Calculates metrics for positional bias and injects them into the `replication_report.txt` JSON block.
 
 *   **`replication_log_manager.py`**: Manages the `batch_run_log.csv` file, with commands to rebuild it from scratch or finalize it with a summary.
 
