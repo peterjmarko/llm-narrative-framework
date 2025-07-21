@@ -1,5 +1,5 @@
 graph TD
-    subgraph "Workflow 7: Update a Study"
+    subgraph "Workflow 6: Update a Study"
         direction TB
         A["update_study.ps1<br/>(User Entry Point)"]:::entry_ps --> B["1. Pre-Update Audit<br/><small>calls audit_study.ps1</small>"]:::script
         B --> C{"Audit Result?"}:::decision

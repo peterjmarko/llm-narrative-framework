@@ -1,0 +1,106 @@
+graph TD
+    subgraph Input Data
+        P_DB["personalities_db...txt"]
+        BQ["base_query.txt"]
+        CFG["config.ini"]
+    end
+
+    subgraph "Experiment Lifecycle & Analysis"
+        direction LR
+
+        subgraph "1. Experiment Initialization & Audit"
+            direction TB
+            EM1[experiment_manager.py]
+        end
+
+        subgraph "2. Replication Pipeline"
+            direction TB
+            BRQ[build_llm_queries.py]
+            RLS[run_llm_sessions.py]
+            PRS[process_llm_responses.py]
+            ALP[analyze_llm_performance.py]
+        end
+
+        subgraph "3. Study-Level Aggregation"
+            direction TB
+            EA[aggregate_experiments.py]
+            SA[study_analyzer.py]
+        end
+    end
+
+    subgraph "Key Data Artifacts"
+        direction TB
+        MANIFEST[("experiment_manifest.json")]:::manifest
+        SUMMARY([experiment_summary.json]):::summary
+
+        Q[>llm_query_XXX.txt<]:::datafile
+        R[>llm_response_XXX.txt<]:::datafile
+        MAP_SRC[>mappings.txt<]:::datafile
+        TRIAL_MANIFEST[>manifest.txt<]:::datafile
+
+        SCORES[>all_scores.txt<]:::datafile
+        MAP_ANA[>all_mappings.txt<]:::datafile
+        REP_REPORT[>replication_report.txt<]:::datafile
+        
+        BRL{{batch_run_log.csv}}:::aggregate
+        REP_CSV{{REPLICATION_results.csv}}:::aggregate
+        EXP_CSV{{EXPERIMENT_results.csv}}:::aggregate
+        STUDY_CSV{{STUDY_results.csv}}:::aggregate
+        
+        style FINAL_ANALYSIS fill:#dff,stroke:#333,stroke-width:2px
+        FINAL_ANALYSIS(("Final Analysis Output")):::final
+    end
+
+    %% --- Connections ---
+
+    %% Initialization: manager reads inputs and creates manifest/summary
+    CFG --> EM1
+    P_DB --> EM1
+    BQ --> EM1
+    EM1 --> MANIFEST
+    EM1 --> SUMMARY
+
+    %% Replication Pipeline reads from Manifest
+    MANIFEST --> BRQ
+    MANIFEST --> RLS
+    MANIFEST --> ALP
+
+    %% Core Data Flow through Replication Pipeline
+    P_DB --> BRQ
+    BQ --> BRQ
+    BRQ --> Q
+    BRQ --> MAP_SRC
+    BRQ --> TRIAL_MANIFEST
+
+    Q --> RLS
+    RLS --> R
+
+    R --> PRS
+    MAP_SRC --> PRS
+    PRS --> SCORES
+    PRS --> MAP_ANA
+
+    SCORES --> ALP
+    MAP_ANA --> ALP
+    ALP --> REP_REPORT
+
+    %% Aggregation Flow
+    REP_REPORT --> EA
+    MANIFEST --> EA
+    EA --> BRL
+    EA --> REP_CSV
+    REP_CSV --> EA
+    EA --> EXP_CSV
+    EXP_CSV --> EA
+    EA --> STUDY_CSV
+
+    %% Final Analysis
+    STUDY_CSV --> SA
+    SA --> FINAL_ANALYSIS
+
+    %% --- Style Definitions ---
+    classDef manifest fill:#d6eaf8,stroke:#5dade2,color:#333
+    classDef summary fill:#d1f2eb,stroke:#48c9b0,color:#333
+    classDef datafile fill:#fdebd0,stroke:#f39c12,color:#333
+    classDef aggregate fill:#e8daef,stroke:#a569bd,color:#333
+    classDef final fill:#dff,stroke:#155724,color:#333,font-weight:bold

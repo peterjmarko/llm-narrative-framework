@@ -1,0 +1,87 @@
+graph TD
+    subgraph "1. Main User Entry Points"
+        direction LR
+        run_exp_ps1["run_experiment.ps1"]
+        audit_exp_ps1["audit_experiment.ps1"]
+        update_exp_ps1["update_experiment.ps1"]
+        migrate_exp_ps1["migrate_experiment.ps1"]
+        audit_study_ps1["audit_study.ps1"]
+        update_study_ps1["update_study.ps1"]
+        analyze_study_ps1["analyze_study.ps1"]
+    end
+
+    subgraph "2. Experiment Lifecycle"
+        direction TB
+        exp_manager["experiment_manager.py"]
+        orch_rep["orchestrate_replication.py"]
+        
+        subgraph "2.1 Pipeline Stages"
+            direction LR
+            build_queries["build_llm_queries.py"]
+            run_sessions["run_llm_sessions.py"]
+            proc_responses["process_llm_responses.py"]
+            subgraph "Analyze LLM<br/>Performance"
+                analyze_perf["analyze_llm_performance.py"]
+                run_bias["run_bias_analysis.py"]
+            end
+        end
+
+        subgraph "2.2 Pipeline Workers"
+            direction LR
+            query_gen["query_generator.py"]
+            llm_prompt["llm_prompter.py"]
+        end
+        
+        rep_log_manager["replication_log_manager.py"]
+    end
+
+    subgraph "3. Data Migration Processes"
+        direction TB
+        patch_exp["patch_old_experiment.py"]
+        rebuild_rep["rebuild_reports.py"]
+        restore_cfg["restore_config.py"]
+    end
+
+    subgraph "4. Study-Level Analysis"
+        direction TB
+        agg_exp["aggregate_experiments.py"]
+        study_analyzer["study_analyzer.py"]
+    end
+    
+    subgraph "5. Shared Utilities"
+        direction TB
+        cfg_loader["config_loader.py"]
+    end
+
+    %% --- Connections ---
+    %% Entry Points to Manager
+    run_exp_ps1 & audit_exp_ps1 & update_exp_ps1 & migrate_exp_ps1 & audit_study_ps1 & update_study_ps1 --> exp_manager
+
+    %% Manager to Orchestrator
+    exp_manager --> orch_rep
+    exp_manager -.-> rep_log_manager
+    exp_manager -.-> agg_exp
+    
+    %% Orchestrator to Pipeline Stages
+    orch_rep --> build_queries
+    orch_rep --> run_sessions
+    orch_rep --> proc_responses
+    orch_rep --> analyze_perf
+    orch_rep --> run_bias
+    orch_rep --> agg_exp
+
+    %% Pipeline Stages to Workers
+    build_queries --> query_gen
+    run_sessions --> llm_prompt
+    
+    %% Study Analysis Flow
+    analyze_study_ps1 --> agg_exp
+    agg_exp --> study_analyzer
+
+    %% Migration Process Flow
+    patch_exp --> restore_cfg
+    rebuild_rep --> proc_responses
+    rebuild_rep --> analyze_perf
+
+    %% Shared Utilities Imports (Dotted Lines)
+    exp_manager & orch_rep & build_queries & run_sessions & proc_responses & analyze_perf & run_bias & agg_exp & study_analyzer & patch_exp & rebuild_rep & restore_cfg & query_gen & llm_prompt & rep_log_manager -.-> cfg_loader

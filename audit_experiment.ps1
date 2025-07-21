@@ -194,3 +194,5 @@ catch {
     Format-LogFile -Path $LogFilePath
     exit 1
 }
+
+# === End of audit_experiment.ps1 ===

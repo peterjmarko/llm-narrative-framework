@@ -169,7 +169,7 @@ function Invoke-PythonScript {
     }
     else {
                 # By default, parse the output and show a clean, high-level summary.
-        if ($ScriptName -like "*experiment_aggregator.py*") {
+        if ($ScriptName -like "*aggregate_experiments.py*") {
             $processedExperiments = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
             $outputBlock = $output -join "`n"
             $uniqueDisplayNames = $script:modelNameMap.Values | Get-Unique
@@ -214,7 +214,7 @@ function Invoke-PythonScript {
             $output | Select-String -Pattern "Aggregation process finished" | ForEach-Object { $_.Line }
 
         }
-        elseif ($ScriptName -like "*study_analysis.py*") {
+        elseif ($ScriptName -like "*study_analyzer.py*") {
             $metricName = $null
             $conclusion = $null
 
@@ -259,10 +259,10 @@ try {
     Invoke-StudyAudit -StudyDirectory $ResolvedPath
 
     # --- Step 2: Aggregate All Results into a Master CSV ---
-    Invoke-PythonScript -StepName "2/3: Aggregate Results" -ScriptName "src/experiment_aggregator.py" -Arguments $ResolvedPath
+    Invoke-PythonScript -StepName "2/3: Aggregate Results" -ScriptName "src/aggregate_experiments.py" -Arguments $ResolvedPath
 
     # --- Step 3: Run Final Statistical Analysis ---
-    Invoke-PythonScript -StepName "3/3: Run Final Analysis (ANOVA)" -ScriptName "src/study_analysis.py" -Arguments $ResolvedPath
+    Invoke-PythonScript -StepName "3/3: Run Final Analysis (ANOVA)" -ScriptName "src/study_analyzer.py" -Arguments $ResolvedPath
 
     Write-Host "######################################################" -ForegroundColor Green
     Write-Host "### Study Processing Finished Successfully!" -ForegroundColor Green

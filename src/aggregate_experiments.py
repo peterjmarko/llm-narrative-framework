@@ -78,45 +78,6 @@ def _flatten_bias_metrics(data):
         data.update(bias_metrics)
     return data
 
-def parse_config_params(config_path):
-    """
-    Robustly parses key parameters from a config.ini.archived file.
-    It checks for multiple possible section and key names to handle all config versions.
-    """
-    params = {}
-    config = configparser.ConfigParser(allow_no_value=True)
-    try:
-        config.read(config_path)
-
-        def get_robust(section_keys, key_keys, value_type=str, default=None):
-            """Internal helper to find a value across multiple sections and keys."""
-            for section in section_keys:
-                if config.has_section(section):
-                    for key in key_keys:
-                        if config.has_option(section, key):
-                            try:
-                                if value_type == int: return config.getint(section, key)
-                                if value_type == float: return config.getfloat(section, key)
-                                if value_type == bool: return config.getboolean(section, key)
-                                return config.get(section, key)
-                            except (ValueError, TypeError):
-                                continue
-            return default
-
-        # --- TRULY ROBUST PARAMETER EXTRACTION ---
-        params['model'] = get_robust(['Model', 'LLM'], ['model_name', 'model'], default='unknown_model')
-        params['mapping_strategy'] = get_robust(['Study'], ['mapping_strategy'], default='unknown_strategy')
-        params['temperature'] = get_robust(['Model', 'LLM'], ['temperature'], value_type=float, default=0.0)
-        params['k'] = get_robust(['Study'], ['k_per_query', 'num_subjects', 'group_size'], value_type=int, default=0)
-        params['m'] = get_robust(['Study'], ['num_iterations', 'num_trials'], value_type=int, default=0)
-        
-        db_path = get_robust(['General', 'Filenames'], ['personalities_db_path', 'personalities_src'], default='unknown_db.file')
-        params['db'] = os.path.basename(db_path)
-
-    except Exception as e:
-        logging.warning(f"  - Could not fully parse config {os.path.basename(config_path)}. Error: {e}")
-    return params
-
 def write_summary_csv(output_path, results_list):
     if not results_list:
         logging.warning(f"No results to write to {output_path}.")
@@ -149,10 +110,20 @@ def run_hierarchical_mode(base_dir):
         if is_run_dir and os.path.exists(metrics_filepath):
             run_dir_name = os.path.basename(current_dir)
             logging.info(f"  - Found metrics JSON in run folder: {run_dir_name}")
-            config_path = os.path.join(current_dir, 'config.ini.archived')
+            
+            # Manifest is in the experiment's root (parent of the run directory)
+            manifest_path = os.path.join(os.path.dirname(current_dir), 'experiment_manifest.json')
 
-            if not os.path.exists(config_path):
-                logging.warning(f"    - Warning: 'config.ini.archived' not found in {run_dir_name}. Skipping.")
+            if not os.path.exists(manifest_path):
+                logging.warning(f"    - Warning: 'experiment_manifest.json' not found for run {run_dir_name}. Skipping.")
+                continue
+            
+            try:
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    manifest = json.load(f)
+                run_params = manifest.get('parameters', {})
+            except (json.JSONDecodeError, IOError) as e:
+                logging.warning(f"    - Warning: Could not read or parse manifest for {run_dir_name}. Error: {e}. Skipping.")
                 continue
 
             try:
@@ -167,14 +138,21 @@ def run_hierarchical_mode(base_dir):
             if not metrics:
                 logging.warning(f"    - Warning: Parsed metrics are empty. Skipping.")
                 continue
-            
-            run_params = parse_config_params(config_path)
+
+            # Get replication number from the directory name
             rep_match = re.search(r'rep-(\d+)', run_dir_name)
-            run_params['replication'] = int(rep_match.group(1)) if rep_match else 0
             
+            # Combine all data into a single record
             run_data = {'run_directory': run_dir_name}
-            run_data.update(run_params)
-            run_data.update(metrics)
+            run_data.update(run_params) # Add parameters from manifest
+            run_data.update(metrics)    # Add metrics from JSON
+            run_data['replication'] = int(rep_match.group(1)) if rep_match else 0
+            
+            # Rename keys to match the CSV schema in config.ini
+            run_data['model'] = run_data.pop('model_name', None)
+            run_data['k'] = run_data.pop('group_size', None)
+            run_data['m'] = run_data.pop('num_trials', None)
+            
             level_results.append(run_data)
 
         for subdir_name in subdirs:

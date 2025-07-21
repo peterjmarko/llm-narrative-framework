@@ -39,12 +39,13 @@ The result is a clean dataset of personality profiles where the connection to th
 
 -   **Automated Batch Execution**: The `experiment_manager.py` script, driven by a simple PowerShell wrapper, manages entire experimental batches. It can run hundreds of replications, intelligently skipping completed ones to resume interrupted runs, and provides real-time progress updates, including a detailed spinner showing individual trial timers and overall replication batch ETA.
 -   **Powerful Reprocessing Engine**: The manager's `--reprocess` mode allows for re-running the data processing and analysis stages on existing results without repeating expensive LLM calls. This makes it easy to apply analysis updates or bug fixes across an entire experiment.
--   **Guaranteed Reproducibility**: On every new run, the `config.ini` file is automatically archived in the run's output directory, permanently linking the results to the exact parameters that generated them.
+-   **Guaranteed Reproducibility**: On every new experiment, an `experiment_manifest.json` file is created. It immutably stores all core parameters, checksums of the input data (`personalities_db.txt`, `base_query.txt`), and the framework's Git commit hash, ensuring perfect, long-term reproducibility.
+-   **At-a-Glance Status Reporting**: Alongside the manifest, an `experiment_summary.json` file is automatically maintained. It provides a real-time summary of the experiment's health, including replication counts, overall status, and aggregate performance metrics, eliminating the need to manually audit a finished experiment.
 -   **Standardized, Comprehensive Reporting**: Each replication produces a `replication_report.txt` file containing run parameters, status, a human-readable statistical summary, and a machine-parsable JSON block with all key metrics. This format is identical for new runs and reprocessed runs.
--   **Hierarchical Analysis & Aggregation**: The `experiment_aggregator.py` script performs a bottom-up aggregation of all data, generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and a master `STUDY_results.csv`) for a fully auditable research archive.
+-   **Hierarchical Analysis & Aggregation**: The `aggregate_experiments.py` script performs a bottom-up aggregation of all data—reading parameters from each experiment's `experiment_manifest.json`—to generate level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and a master `STUDY_results.csv`).
 -   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `replication_log_manager.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
 -   **Enhanced Console Readability**: All console outputs for file paths, commands, and key statuses are now formatted with consistent newlines and indentation, greatly improving log clarity and user experience during long runs.
--   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `experiment_aggregator.py` prepares a master dataset, which `study_analysis.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
+-   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `aggregate_experiments.py` prepares a master dataset, which `study_analyzer.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
 
 ## Visual Architecture
 
@@ -63,7 +64,7 @@ The codebase can be divided into the following components:
 
 5.  **Shared Utilities**: Helper scripts and modules, like `config_loader.py`, that provide common functionality and are imported by multiple other scripts across different workflows.
 
-{{grouped_figure:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.}}
+{{grouped_figure:docs/diagrams/view_codebase.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.}}
 
 ### Workflow Diagrams
 The project's functionality is organized into six primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
@@ -95,14 +96,14 @@ The `orchestrate_replication.py` script executes the full pipeline for a single 
 5.  **Generate Final Report**: Assembles the final `replication_report.txt` from the analysis results and captured logs.
 6.  **Create Replication Summary**: Creates the final `REPLICATION_results.csv`, marking the run as valid.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=65% | caption=Workflow 1: Run an Experiment, showing the main control loop and the internal replication pipeline.}}
+{{grouped_figure:docs/diagrams/flow_1_run_experiment.mmd | scale=2.5 | width=55% | caption=Workflow 1: Run an Experiment, showing the main control loop and the internal replication pipeline.}}
 
 
 #### Workflow 2: Audit an Experiment
 
 This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag. The full audit report, including subprocess outputs, is also saved to `audit_log.txt` within the audited directory.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_2_audit_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.}}
+{{grouped_figure:docs/diagrams/flow_2_audit_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.}}
 
 ##### Interpreting the Audit Report
 The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It outputs a summary table with a high-level status for each replication run. The `Details` column provides granular error codes that pinpoint the exact problem. The final `Audit Result` and `Recommendation` suggest the next steps, if any.
@@ -113,8 +114,8 @@ The run is complete and all checks passed. No action is needed.
 **INVALID_NAME**  
 The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. The folder must be renamed or repaired via a `run_experiment.ps1` initiated process.
 
-**CONFIG_ISSUE**  
-The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This typically indicates a legacy experiment requiring **migration**.
+**MANIFEST_ISSUE**  
+The experiment's `experiment_manifest.json` is missing or malformed. This is a critical error indicating the experiment's core definition is lost. This may require manual intervention or indicate a legacy experiment needing **migration**.
 
 **QUERY_ISSUE**  
 There is a problem with the fundamental input files needed for an LLM session, such as missing query files or trial manifests. This requires **repair** by running `run_experiment.ps1` (or `migrate_experiment.ps1` if legacy).
@@ -136,53 +137,56 @@ This workflow allows you to re-run the data processing and analysis stages on an
 It first performs an audit. If the experiment has analysis errors, it proceeds to update it. If the experiment is already `VALIDATED`, it will prompt for user confirmation before forcing a full reprocessing.
 The reprocessing is a two-step action: first, `orchestrate_replication.py --reprocess` is called on each individual run to regenerate its `replication_report.txt`; second, `experiment_aggregator.py` is called to perform a full re-aggregation, ensuring all top-level summary files are brought up to date.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_3_update_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.}}
+{{grouped_figure:docs/diagrams/flow_3_update_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.}}
 
 
 #### Workflow 4: Migrate Old Experiment Data
 
-This utility workflow provides a safe, non-destructive process to transform older experimental data into the current pipeline's format, leaving the original data untouched. The `migrate_experiment.ps1` script orchestrates a clear, four-step process:
+This utility workflow provides a safe, non-destructive process to transform older, `config.ini.archived`-based experiments into the modern, manifest-driven format. The `migrate_experiment.ps1` script orchestrates a clear, four-step process:
 
-1.  **Audit Source**: A read-only audit is performed on the source directory to assess its state and recommend migration.
-2.  **Copy Data**: After user confirmation, the script creates a clean, timestamped copy of the source experiment in the `output/migrated_experiments/` directory.
-3.  **Transform Copy**: The script calls `experiment_manager.py --migrate` on the new copy. The manager then automates the internal transformation, including patching configurations, reprocessing all runs, and running its self-healing loop until the new experiment copy is valid.
-4.  **Final Validation**: The wrapper script runs a final read-only audit on the newly migrated experiment, providing explicit confirmation that the process was successful.
+1.  **Audit Source**: A read-only audit is performed on the source directory to confirm it's a legacy experiment.
+2.  **Copy Data**: After user confirmation, the script creates a clean, timestamped copy of the source experiment in the `output/migrated_experiments/` directory. The original data is left untouched.
+3.  **Transform Copy**: The script calls `experiment_manager.py --migrate` on the new copy. The manager orchestrates the transformation:
+    *   **Reverse-Engineer Parameters**: It inspects the legacy artifacts (e.g., `config.ini.archived` files) to deduce the original experimental parameters.
+    *   **Generate Manifest**: It creates a new `experiment_manifest.json` file, freezing these reverse-engineered parameters.
+    *   **Clean & Reprocess**: It removes the obsolete `config.ini.archived` files and reprocesses all runs to ensure they are consistent with the new manifest.
+4.  **Final Validation**: The wrapper runs a final audit, which generates the `experiment_summary.json` and confirms the migration was successful.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
+{{grouped_figure:docs/diagrams/flow_4_migrate_data.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
 
-
+{{pagebreak}}
 #### Workflow 5: Audit a Study
 
 This workflow provides a read-only, consolidated completeness report for all experiments in a study. The `audit_study.ps1` wrapper iterates through each experiment folder and calls `experiment_manager.py` with the `--verify-only` flag (running quietly by default). It then compiles the results into a summary table for the console and a comprehensive `study_audit_log.txt` file in the study directory. This workflow is the primary diagnostic tool for assessing overall study readiness.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_5_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_5_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
 
 
-#### Workflow 6: Analyze a Study
-
-This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
-
-{{grouped_figure:docs/diagrams/architecture_workflow_6_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
-
-
-#### Workflow 7: Update a Study
+#### Workflow 6: Update a Study
 
 This workflow provides a convenient batch operation to update all out-of-date experiments within a study directory. It first runs a full study audit to identify which experiments need updating. If any require more serious intervention (like repair or migration), it halts. Otherwise, it prompts the user for confirmation and then systematically calls `update_experiment.ps1` on each experiment that needs it.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_7_update_study.mmd | scale=2.5 | width=100% | caption=Workflow 7: Update a Study. A batch operation to update all out-of-date experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_6_update_study.mmd | scale=2.5 | width=80% | caption=Workflow 6: Update a Study. A batch operation to update all out-of-date experiments in a study.}}
+
+
+#### Workflow 7: Analyze a Study
+
+This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `aggregate_experiments.py` and then `study_analyzer.py`.
+
+{{grouped_figure:docs/diagrams/flow_7_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 7: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
 
 {{pagebreak}}
 ### Data Flow Diagram
 
-This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
+This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts. The `experiment_manager.py` script now serves as the central point for creating the key `experiment_manifest.json`, which then provides the parameters for the rest of the pipeline.
 
-{{grouped_figure:docs/diagrams/architecture_data_flow.mmd | scale=2.5 | width=75% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.}}
+{{grouped_figure:docs/diagrams/view_data_flow.mmd | scale=2.5 | width=75% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.}}
 
 ### Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-{{grouped_figure:docs/diagrams/architecture_experimental_logic.mmd | scale=2.5 | width=65% | caption=Experimental Logic Flowchart: Scientific methodology for a single replication run.}}
+{{grouped_figure:docs/diagrams/logic_experimental.mmd | scale=2.5 | width=65% | caption=Experimental Logic Flowchart: Scientific methodology for a single replication run.}}
 
 ## Experimental Hierarchy
 
@@ -197,7 +201,7 @@ The project's experiments are organized in a logical hierarchy:
 
 This logical hierarchy is reflected in the physical layout of the repository:
 
-{{diagram:docs/diagrams/directory_structure.txt | scale=2.5 | width=90%}}
+{{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
 
 ## Setup and Installation
 
@@ -229,9 +233,13 @@ pdm run test
 
 > **For Developers:** If you intend to contribute to the project or encounter issues with the simple setup, please see the **[Developer Setup Guide in CONTRIBUTING.md](CONTRIBUTING.md#getting-started-development-environment-setup)** for more detailed instructions and troubleshooting.
 
-## Configuration (`config.ini`)
+## Configuration (`config.ini`) vs. The Experiment Manifest
 
-The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results for guaranteed reproducibility.
+The framework uses two configuration files for different purposes:
+
+-   **`config.ini`**: This is the global configuration file where you define the *default* parameters for running new experiments. It is the primary file you will edit.
+
+-   **`experiment_manifest.json`**: This file is automatically generated at the root of a new experiment directory. It is the immutable, "frozen" record of the *actual* parameters used for that specific experiment, including any command-line overrides. All subsequent audit, repair, and analysis processes use this manifest as the single source of truth, guaranteeing perfect reproducibility.
 
 ### Display Name Settings
 
@@ -270,7 +278,7 @@ A follow-up study is planned to evaluate other powerful, medium-cost models as A
 
 The framework is designed around three primary user actions, each handled by a dedicated script. This separation of concerns ensures that each workflow is simple, predictable, and safe. Use the following diagram and descriptions to choose the correct tool for your task.
 
-{{grouped_figure:docs/diagrams/decision_tree_workflow.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: Separation of Concerns.}}
+{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: Separation of Concerns.}}
 
 -   **`run_experiment.ps1` (Data Generation & Repair)**: This is your primary tool. Use it to start a new experiment from scratch or to resume/repair an interrupted one. Its sole focus is to ensure the raw data (queries and LLM responses) is complete according to your `config.ini`.
 
@@ -322,7 +330,19 @@ This calls `experiment_manager.py` with the `--reprocess` flag. This action firs
 
 ### Migrating Old Experiment Data (`migrate_experiment.ps1`)
 
-This script provides a safe, non-destructive workflow to upgrade older, legacy experiment directories to be compatible with the current analysis pipeline. The original data is always preserved.
+This script provides a safe, non-destructive workflow to upgrade older, `config.ini.archived`-based experiments to the modern, manifest-driven format. The original data is always preserved.
+
+**What it does:**
+The `migrate_experiment.ps1` script automates a copy-then-migrate process:
+
+1.  **Copy**: It takes a source directory and copies it to a new, timestamped folder inside `output/migrated_experiments/`.
+2.  **Migrate**: It then calls `experiment_manager.py --migrate` on this new directory. The manager orchestrates the internal upgrade:
+    *   **Reverse-Engineer Parameters**: It analyzes the old `config.ini.archived` files to determine the original experiment's parameters.
+    *   **Generate Manifest**: It creates a new `experiment_manifest.json`, permanently recording these parameters for the migrated experiment.
+    *   **Clean & Reprocess**: It removes all the old `config.ini.archived` files and re-runs the analysis on every replication to ensure they are consistent with the new manifest.
+    *   **Finalize**: It generates a final `experiment_summary.json` for the now-modern experiment.
+
+This approach leaves the original data completely untouched and brings legacy results into full compliance with the current framework.
 
 ### Auditing a Study (`audit_study.ps1`)
 
@@ -335,25 +355,6 @@ Point the script at the top-level directory containing all relevant experiment f
 .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
 ```
 The summary table will show the status (`VALIDATED`, `NEEDS UPDATE`, etc.) and the recommended action for each experiment. For a detailed, verbose output that shows the full audit for each experiment, add the `-Verbose` switch.
-
-**What it does:**
-The `migrate_experiment.ps1` script automates a copy-then-migrate process:
-
-1.  **Copy**: It takes a source directory and copies it to a new, timestamped folder inside `output/migrated_experiments/`.
-2.  **Migrate**: It then calls `experiment_manager.py --migrate` on this new directory. The manager orchestrates the internal upgrade steps:
-    *   **Patching Configs**: Creating `config.ini.archived` files from old reports.
-    *   **Rebuilding Reports**: Regenerating all reports into the modern format.
-    *   **Finalizing**: Generating clean, modern summary files for the migrated experiment.
-
-This approach leaves the original data completely untouched.
-
-**How to use it:**
-Point the script at the source directory of the legacy experiment. The script will automatically create a timestamped destination folder.
-
-```powershell
-# Migrate data from "Legacy_Experiment_1", saving the result to a new timestamped folder.
-.\migrate_experiment.ps1 -SourceDirectory "output/legacy/Legacy_Experiment_1"
-```
 
 ### Analyzing a Study (`analyze_study.ps1`)
 
@@ -388,7 +389,7 @@ The pipeline generates a consistent, standardized `replication_report.txt` for e
 
 Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
 
-{{diagram:docs/diagrams/replication_report_format.txt}}
+{{diagram:docs/diagrams/format_replication_report.txt}}
 
 **Date Handling by Mode:**
 -   **Normal Mode**: The report title is `REPLICATION RUN REPORT` and the `Date` field shows the time of the original run.
@@ -398,7 +399,7 @@ Each report contains a clear header, the base query used, a human-readable analy
 
 The final analysis script (`study_analysis.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
-{{diagram:docs/diagrams/analysis_log_format.txt}}
+{{diagram:docs/diagrams/format_analysis_log.txt}}
 
 ---
 
@@ -412,19 +413,19 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 *   **`update_experiment.ps1`**: Re-runs the data processing and analysis stages on a *single experiment*, ideal for applying analysis updates or bug fixes.
 
-*   **`update_study.ps1`**: A powerful batch script that audits an entire study and calls `update_experiment.ps1` on all experiments that require an update.
-
 *   **`migrate_experiment.ps1`**: Safely migrates a legacy experiment by first copying it to a new timestamped directory and then upgrading the copy to be compatible with the current pipeline.
+
+*   **`update_study.ps1`**: A powerful batch script that audits an entire study and calls `update_experiment.ps1` on all experiments that require an update.
 
 *   **`analyze_study.ps1`**: Aggregates all results within a study and performs the final statistical analysis (e.g., ANOVA).
 
 ## Main Orchestrator
 
-*   **`experiment_manager.py`**: The top-level controller for an entire experiment, functioning as a state machine. It verifies the experiment's state and automatically takes the correct action (`NEW`, `REPAIR`, `REPROCESS`, or `MIGRATE`) until the experiment is complete. It can also be forced to reprocess an entire experiment via the `--reprocess` command-line flag.
+*   **`experiment_manager.py`**: The top-level controller for an entire experiment. On a new run, it creates the `experiment_manifest.json` and `experiment_summary.json` files. It then functions as a state machine, verifying the experiment's state against the manifest and automatically taking the correct action (`NEW`, `REPAIR`, `REPROCESS`, or `MIGRATE`) until the experiment is complete.
 
 ## Replication Pipeline Scripts
 
-*   **`orchestrate_replication.py`**: The self-contained engine for a **single** replication. It manages the entire lifecycle, including a consolidated 6-stage pipeline: query generation, parallel LLM sessions, response processing, a comprehensive two-part analysis (performance and bias), report generation, and final summary creation. It can also reprocess or repair a run.
+*   **`orchestrate_replication.py`**: The engine for a **single** replication run. It reads its parameters from the experiment-level `experiment_manifest.json` and sequentially executes the pipeline stages below. It now uses numbered stages internally for clarity.
 
 *   **`build_llm_queries.py`**: **Stage 1.** Called by the orchestrator. Samples personalities and calls the `query_generator.py` worker to create all files needed for the trials.
 
@@ -438,9 +439,9 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 ## Study-Level Analysis Scripts
 
-*   **`experiment_aggregator.py`**: Recursively scans a study directory, performing a bottom-up aggregation and generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`).
+*   **`aggregate_experiments.py`**: Recursively scans a study directory, reading parameters from each experiment's `experiment_manifest.json`. It performs a bottom-up aggregation, generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`).
 
-*   **`study_analysis.py`**: Performs the final statistical analysis (Two-Way ANOVA, post-hoc tests) on a study's master CSV file and produces a detailed analysis log and publication-quality boxplots.
+*   **`study_analyzer.py`**: Performs the final statistical analysis (Two-Way ANOVA, post-hoc tests) on a study's master CSV file and produces a detailed analysis log and publication-quality boxplots.
 
 ## Worker Scripts
 
@@ -454,11 +455,11 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 *   **`rebuild_reports.py`**: A powerful utility to regenerate all `replication_report.txt` files from ground-truth data, useful for applying analysis fixes across an entire study.
 
-*   **`patch_old_experiment.py`**: A utility for historical data that calls `restore_config.py` to create `config.ini.archived` files for legacy runs.
+*   **`migrate_helpers.py`**: A non-executable utility module that contains the logic to reverse-engineer parameters from legacy experiments to generate a modern `experiment_manifest.json`.
 
-*   **`restore_config.py`**: Reverse-engineers a `config.ini.archived` file by parsing a legacy `replication_report.txt`.
+*   **`provenance_helper.py`**: A non-executable utility module that calculates file checksums and gets the current Git commit hash to be stored in the `experiment_manifest.json`.
 
-*   **`config_loader.py`**: A central, non-executable utility module for loading settings from `config.ini` and providing them to all other scripts.
+*   **`config_loader.py`**: A central, non-executable utility module for loading default settings from `config.ini` and providing them to other scripts.
 
 *   **`docx_postprocessor.py`**: A helper utility called by `build_docs.py` to reliably insert page breaks into `.docx` files after they are generated by Pandoc.
 

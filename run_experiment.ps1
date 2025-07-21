@@ -80,7 +80,21 @@ param(
 
     # Optional notes for the run.
     [Parameter(Mandatory=$false)]
-    [string]$Notes
+    [string]$Notes,
+
+    # --- Command-line overrides for experiment parameters ---
+    [Parameter(Mandatory=$false, HelpMessage="Override the model name from config.ini.")]
+    [string]$ModelName,
+
+    [Parameter(Mandatory=$false, HelpMessage="Override the temperature from config.ini.")]
+    [double]$Temperature,
+
+    [Parameter(Mandatory=$false, HelpMessage="Override the mapping strategy from config.ini.")]
+    [ValidateSet("correct", "random")]
+    [string]$MappingStrategy,
+
+    [Parameter(Mandatory=$false, HelpMessage="Override the group size (k) from config.ini.")]
+    [int]$GroupSize
 )
 
 # This is the main execution function. It uses the script-level parameters defined above.
@@ -109,6 +123,12 @@ function Invoke-Experiment {
     if ($StartRep) { $pythonArgs += "--start-rep", $StartRep }
     if ($EndRep) { $pythonArgs += "--end-rep", $EndRep }
     if (-not [string]::IsNullOrEmpty($Notes)) { $pythonArgs += "--notes", $Notes }
+
+    # Add command-line overrides for experiment parameters if they were provided
+    if ($PSBoundParameters.ContainsKey('ModelName')) { $pythonArgs += "--model_name", $ModelName }
+    if ($PSBoundParameters.ContainsKey('Temperature')) { $pythonArgs += "--temperature", $Temperature }
+    if ($PSBoundParameters.ContainsKey('MappingStrategy')) { $pythonArgs += "--mapping_strategy", $MappingStrategy }
+    if ($PSBoundParameters.ContainsKey('GroupSize')) { $pythonArgs += "--group_size", $GroupSize }
     
     # Translate the common -Verbose parameter to the internal --verbose for the Python script.
     # $PSBoundParameters contains common parameters when CmdletBinding is used.

@@ -23,13 +23,13 @@ personality_matching/
 │   ├── experiment_aggregator.py    # Stage 4: Aggregates results hierarchically (produces all_results.csv)
 │   ├── experiment_manager.py       # Manages experiment lifecycle (main controller)
 │   ├── llm_prompter.py             # Worker: Interacts with LLM API
+│   ├── migrate_helpers.py          # Utility: Helps migrate legacy experiments
 │   ├── orchestrate_replication.py  # Orchestrates stages for a single replication
-│   ├── patch_old_experiment.py     # Utility: Adds archived configs to old runs
 │   ├── process_llm_responses.py    # Stage 2: Parses LLM responses into scores
+│   ├── provenance_helper.py        # Utility: Generates checksums and Git version
 │   ├── query_generator.py          # Worker: Generates a single LLM query
 │   ├── rebuild_reports.py          # Utility: Regenerates replication reports
 │   ├── replication_log_manager.py  # Manages the batch_run_log.csv
-│   ├── restore_config.py           # Utility: Reverse-engineers config from old reports
 │   ├── run_bias_analysis.py        # Utility: Calculates positional bias metrics
 │   ├── run_llm_sessions.py         # Orchestrates LLM interaction sessions
 │   └── study_analysis.py           # Final: Performs statistical analysis for a study
@@ -41,12 +41,13 @@ personality_matching/
 ├── output/                                     # All generated artifacts from experiments
 │   ├── new_experiments/                        # Contains all new experiments
 │       └── <Experiment_Name>/                          # e.g., "Grok_3_Mini_map=random"
+│           ├── experiment_manifest.json                # Immutable experiment definition
+│           ├── experiment_summary.json                 # Dynamic audit & performance summary
 │           ├── <Replication_Name>/                     # e.g., "run_..._rep-01_..."
 │           │   ├── analysis_inputs/                    # Intermediate data for ANOVA consumption
 │           │   ├── session_queries/                    # Raw LLM queries (JSON and text)
 │           │   ├── session_responses/                  # Raw LLM responses (JSON and text)
 │           │   ├── api_times.log                       # Run times of API calls
-│           │   ├── config.ini.archived                 # Config snapshot for the run
 │           │   ├── replication_report_DATE-TIME.txt    # Detailed report for this run
 │           │   └── REPLICATION_results.csv             # AGGREGATE: Summary of all trials within a replication
 │           ├── batch_run_log.csv                       # Log of all replication runs in an experiment
@@ -58,12 +59,13 @@ personality_matching/
 │           │   ├── diagnostics/                            # Q-Q plots for checking statistical assumptions
 │           │   └── STUDY_analysis_log.txt                  # Comprehensive text report of statistical findings
 │           ├── <Experiment_Name>/                          # e.g., "Grok_3_Mini_map=random"
+│           │   ├── experiment_manifest.json                # Immutable experiment definition
+│           │   ├── experiment_summary.json                 # Dynamic audit & performance summary
 │           │   ├── <Replication_Name>/                     # e.g., "run_..._rep-01_..."
 │           │   │   ├── analysis_inputs/                    # Intermediate data for ANOVA consumption
 │           │   │   ├── session_queries/                    # Raw LLM queries (JSON and text)
 │           │   │   ├── session_responses/                  # Raw LLM responses (JSON and text)
 │           │   │   ├── api_times.log                       # Run times of API calls
-│           │   │   ├── config.ini.archived                 # Config snapshot for the run
 │           │   │   ├── replication_report_DATE-TIME.txt    # Detailed report for this run
 │           │   │   └── REPLICATION_results.csv             # AGGREGATE: Summary of all trials within a replication
 │           │   ├── batch_run_log.csv                       # Log of all replication runs in an experiment

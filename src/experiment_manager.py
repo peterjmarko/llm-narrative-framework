@@ -166,19 +166,6 @@ AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt
 #   CENTRAL FILE MANIFEST & REPORT CRITERIA
 #==============================================================================
 FILE_MANIFEST = {
-    "config": {
-        "path": "config.ini.archived",
-        "type": "config_file",
-        "required_keys": {
-            # canonical_name: [(section, key), (fallback_section, fallback_key), ...]
-            "model_name": [("LLM", "model_name"), ("LLM", "model")],
-            "temperature": [("LLM", "temperature")],
-            "mapping_strategy": [("Study", "mapping_strategy")],
-            "num_subjects": [("Study", "group_size"), ("Study", "k_per_query")],
-            "num_trials": [("Study", "num_trials"), ("Study", "num_iterations")],
-            "personalities_db_path": [("Filenames", "personalities_src")],
-        },
-    },
     "queries_dir":   {"path": "session_queries"},
     "query_files":   {"path": "session_queries/llm_query_*.txt", "pattern": r"llm_query_(\d+)\.txt"},
     "trial_manifests": {"path": "session_queries/llm_query_*_manifest.txt", "pattern": r"llm_query_(\d+)_manifest\.txt"},
@@ -242,53 +229,6 @@ def _count_matrices_in_file(filepath: str, k: int) -> int:
         return 0
 
 # ------------------------------------------------------------------ helpers
-def _check_config_manifest(run_path: Path, k_expected: int, m_expected: int):
-    cfg_path = run_path / FILE_MANIFEST["config"]["path"]
-    required_keys_map = FILE_MANIFEST["config"]["required_keys"]
-
-    try:
-        cfg = ConfigParser()
-        # Use a `with open` block to ensure the file handle is always closed, preventing file locks.
-        with open(cfg_path, 'r', encoding='utf-8') as f:
-            cfg.read_file(f)
-        if not cfg.sections():
-            return "CONFIG_MALFORMED"
-    except Exception:
-        return "CONFIG_MALFORMED"
-
-    # Generic function to find a key's value using the fallback map
-    def _get_value(canonical_name, value_type=str):
-        for section, key in required_keys_map[canonical_name]:
-            if cfg.has_option(section, key):
-                try:
-                    if value_type is int:
-                        return cfg.getint(section, key)
-                    if value_type is float:
-                        return cfg.getfloat(section, key)
-                    return cfg.get(section, key)
-                except (configparser.Error, ValueError):
-                    continue  # Try next fallback
-        return None
-
-    # Check for presence of all required keys
-    missing_keys = [name for name in required_keys_map if _get_value(name) is None]
-    if missing_keys:
-        return f"CONFIG_MISSING_KEYS: {', '.join(missing_keys)}"
-
-    # Validate k and m values against directory name
-    k_cfg = _get_value("num_subjects", value_type=int)
-    m_cfg = _get_value("num_trials", value_type=int)
-
-    mismatched = []
-    if k_cfg != k_expected:
-        mismatched.append(f"k (expected {k_expected}, found {k_cfg})")
-    if m_cfg != m_expected:
-        mismatched.append(f"m (expected {m_expected}, found {m_cfg})")
-
-    if mismatched:
-        return f"CONFIG_MISMATCH: {', '.join(mismatched)}"
-
-    return "VALID"
 
 def _check_file_set(run_path: Path, spec: dict, expected_count: int):
     glob_pattern = spec["path"]
@@ -379,13 +319,6 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
         return "INVALID_NAME", status_details
     k_expected, m_expected = int(name_match.group(1)), int(name_match.group(2))
 
-    # 2. config
-    stat_cfg = _check_config_manifest(run_path, k_expected, m_expected)
-    if stat_cfg != "VALID":
-        status_details.append(stat_cfg)
-    else:
-        status_details.append("config OK")
-
     # 3. queries
     stat_q = _check_file_set(run_path, FILE_MANIFEST["query_files"], m_expected)
     if stat_q != "VALID":
@@ -467,8 +400,6 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
         return "VALIDATED", status_details
     if any("INVALID_NAME" in d for d in status_details):
         return "INVALID_NAME", status_details
-    if any("CONFIG" in d for d in status_details):
-        return "CONFIG_ISSUE", status_details
     # Check for fundamental query file corruption.
     if any("SESSION_QUERIES" in d or "MAPPINGS_MISSING" in d or "MANIFESTS_INCOMPLETE" in d for d in status_details):
         return "QUERY_ISSUE", status_details
@@ -512,7 +443,7 @@ def _get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -
             failed_indices = sorted(list(query_indices - response_indices))
             if failed_indices:
                 runs_needing_session_repair.append({"dir": str(run_path), "failed_indices": failed_indices, "repair_type": "session_repair"})
-        elif status in {"QUERY_ISSUE", "CONFIG_ISSUE", "INVALID_NAME"}:
+        elif status in {"QUERY_ISSUE", "INVALID_NAME"}:
             runs_needing_full_replication_repair.append({"dir": str(run_paths_by_name[run_name]), "repair_type": "full_replication_repair"})
 
     if runs_needing_full_replication_repair:
@@ -727,6 +658,71 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
         print(f"\n{audit_color}Audit Result: {audit_message}{C_RESET}")
         print(f"{audit_color}Recommendation: {audit_recommendation}{C_RESET}")
 
+    # --- Generate experiment_summary.json ---
+    manifest_path = Path(target_dir) / "experiment_manifest.json"
+    summary_path = Path(target_dir) / "experiment_summary.json"
+
+    if manifest_path.exists():
+        with open(manifest_path, 'r') as f:
+            manifest_data = json.load(f)
+
+        complete_runs = [run for run in all_runs_data if run['status'] == "VALIDATED"]
+        
+        # Calculate aggregate performance from complete runs
+        total_valid_responses_agg = 0
+        metric_lists = {
+            "mean_mrr": [], "mean_top_1_acc": [], "mean_top_3_acc": []
+        }
+
+        for run_data in complete_runs:
+            run_path = Path(target_dir) / run_data['name']
+            try:
+                report_path = sorted(run_path.glob("replication_report_*.txt"))[-1]
+                text = report_path.read_text(encoding="utf-8")
+                start = text.index("<<<METRICS_JSON_START>>>")
+                end = text.index("<<<METRICS_JSON_END>>>")
+                j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
+                
+                total_valid_responses_agg += j.get("n_valid_responses", 0)
+                for key in metric_lists:
+                    if key in j:
+                        metric_lists[key].append(j[key])
+            except (IndexError, ValueError, KeyError):
+                continue # Skip runs with bad reports
+
+        aggregate_performance = {
+            "n_replications_included": len(complete_runs),
+            "total_valid_responses": total_valid_responses_agg,
+            "total_possible_responses": len(complete_runs) * manifest_data["parameters"].get("num_trials", 0),
+        }
+        for key, values in metric_lists.items():
+            aggregate_performance[key] = sum(values) / len(values) if values else 0
+
+        summary_data = {
+            "experiment_parameters": manifest_data.get("parameters", {}),
+            "audit_results": {
+                "last_audited_timestamp": datetime.datetime.now().isoformat(),
+                "experiment_status": "COMPLETE" if audit_result_code == AUDIT_ALL_VALID and exp_complete else "INCOMPLETE",
+                "replication_counts": {
+                    "expected": manifest_data.get("parameters", {}).get("num_replications", expected_reps),
+                    "found": len(all_runs_data),
+                    "complete": len(complete_runs),
+                    "failed": len(all_runs_data) - len(complete_runs)
+                },
+                "file_integrity": exp_details,
+            },
+            "aggregate_performance": aggregate_performance
+        }
+        
+        with open(summary_path, 'w') as f:
+            json.dump(summary_data, f, indent=2)
+        
+        if print_report:
+            print(f"\nExperiment summary updated:\n{summary_path}")
+    elif print_report:
+        print(f"\n{C_YELLOW}Skipping summary generation: experiment_manifest.json not found.{C_RESET}")
+
+
     # When called from the CLI, exit with the true audit code so wrapper scripts can react.
     if not suppress_exit and is_verify_only_cli:
         sys.exit(audit_result_code)
@@ -910,58 +906,44 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, bias_scrip
             return False # Indicate failure
     return True
 
-def _run_migrate_mode(target_dir, patch_script, orchestrator_script, verbose=False):
+def _run_migrate_mode(target_dir, orchestrator_script, bias_script, compile_script, log_manager_script, verbose=False):
     """
     Executes a one-time migration process for a legacy experiment directory.
     This mode is destructive and will delete old artifacts.
     """
-    print(f"{C_YELLOW}--- Entering MIGRATE Mode: Transforming experiment at: ---{C_RESET}")
-    print(f"{C_YELLOW}{target_dir}{C_RESET}")
-    run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
+    print(f"{C_YELLOW}--- Entering MIGRATE Mode: Transforming experiment at: {target_dir} ---{C_RESET}")
+    from migrate_helpers import reverse_engineer_parameters
 
-    # Sub-step 1: Clean Artifacts (Run this first to remove corrupt files)
-    print("\n- Cleaning old summary files and corrupted analysis artifacts...")
-    try:
-        files_to_delete = ["final_summary_results.csv", "batch_run_log.csv", "EXPERIMENT_results.csv"]
-        for file in files_to_delete:
-            file_path = target_dir / file
-            if file_path.exists():
-                print(f"  - Deleting old '{file_path.name}'")
-                file_path.unlink()
-
-        for run_dir in run_dirs:
-            for corrupted_file in run_dir.glob("*.txt.corrupted"):
-                corrupted_file.unlink()
-            analysis_inputs_path = run_dir / "analysis_inputs"
-            if analysis_inputs_path.is_dir():
-                shutil.rmtree(analysis_inputs_path)
-        print("  - Cleaning complete.")
-    except Exception as e:
-        logging.error(f"Failed to clean artifacts: {e}")
+    # 1. Create the manifest by reverse-engineering legacy files
+    print("\n- Step 1: Reverse-engineering parameters to create experiment_manifest.json...")
+    manifest_data = reverse_engineer_parameters(str(target_dir))
+    if not manifest_data:
+        print(f"{C_RED}Migration failed: Could not determine experiment parameters.{C_RESET}")
         return False
+    
+    manifest_path = target_dir / "experiment_manifest.json"
+    with open(manifest_path, 'w') as f:
+        json.dump(manifest_data, f, indent=2)
+    print("  - Successfully created experiment_manifest.json.")
 
-    # Sub-step 2: Patch Configs
-    print("\n- Patching legacy configuration files...")
-    try:
-        subprocess.run([sys.executable, patch_script, str(target_dir)], check=True, capture_output=True, text=True)
-        print("  - Patching complete.")
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to patch configs. Stderr:\n{e.stderr}")
-        return False
+    # 2. Clean up old, now-obsolete config files
+    print("\n- Step 2: Cleaning up obsolete per-replication config files...")
+    cleaned_count = 0
+    for old_config in target_dir.glob("run_*/*.ini.archived"):
+        try:
+            old_config.unlink()
+            cleaned_count += 1
+        except OSError as e:
+            logging.warning(f"Could not remove old config {old_config}: {e}")
+    print(f"  - Removed {cleaned_count} legacy 'config.ini.archived' files.")
 
-    # Sub-step 3: Reprocess Each Replication
-    print(f"\n- Reprocessing {len(run_dirs)} individual runs to generate modern reports...")
-    try:
-        for run_dir in tqdm(run_dirs, desc="Reprocessing Runs", ncols=80):
-            cmd = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", str(run_dir)]
-            if not verbose: cmd.append("--quiet")
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
-            if result.returncode != 0:
-                logging.error(f"Failed to reprocess {run_dir.name}. Stderr:\n{result.stderr}")
-                return False
-        print("  - Reprocessing complete.")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred during reprocessing: {e}")
+    # 3. Force a full reprocess to align all reports with the new manifest
+    print("\n- Step 3: Forcing a full reprocess of all runs to align with the new manifest...")
+    all_run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
+    payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
+    
+    if not _run_reprocess_mode(payload_details, "Migrated", not verbose, orchestrator_script, bias_script, compile_script, str(target_dir), log_manager_script):
+        print(f"{C_RED}Migration failed during the reprocessing stage.{C_RESET}")
         return False
 
     print(f"\n{C_GREEN}--- Migration pre-processing complete. ---{C_RESET}")
@@ -1026,6 +1008,13 @@ def main():
     parser.add_argument('--migrate', action='store_true', help="Run a one-time migration workflow for a legacy experiment directory.")
     parser.add_argument('--reprocess', action='store_true', help="Force reprocessing of all runs in an experiment, then finalize.")
     parser.add_argument('--force-color', action='store_true', help=argparse.SUPPRESS) # Hidden from user help
+
+    # Arguments to override config.ini for parallel runs
+    parser.add_argument('--model_name', type=str, help="Override the LLM model name.")
+    parser.add_argument('--temperature', type=float, help="Override the LLM temperature.")
+    parser.add_argument('--mapping_strategy', type=str, choices=['correct', 'random'], help="Override the mapping strategy.")
+    parser.add_argument('--group_size', type=int, help="Override the group size (k).")
+
     args = parser.parse_args()
 
     # Define color constants based on TTY status or the --force-color flag
@@ -1042,12 +1031,15 @@ def main():
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
     sessions_script = os.path.join(current_dir, "run_llm_sessions.py")
     log_manager_script = os.path.join(current_dir, "replication_log_manager.py")
-    compile_script = os.path.join(current_dir, "experiment_aggregator.py")
+    compile_script = os.path.join(current_dir, "aggregate_experiments.py")
     bias_analysis_script = os.path.join(current_dir, "run_bias_analysis.py")
     patch_script = os.path.join(current_dir, "patch_old_experiment.py")
     rebuild_script = os.path.join(current_dir, "rebuild_reports.py")
 
+    from provenance_helper import get_git_commit_hash, calculate_file_checksum
+
     try:
+        # --- Determine Target Directory and Handle Manifest Lifecycle ---
         if args.target_dir:
             final_output_dir = os.path.abspath(args.target_dir)
         else:
@@ -1058,15 +1050,65 @@ def main():
             base_path = os.path.join(PROJECT_ROOT, base_output, new_exp_subdir)
             final_output_dir = os.path.join(base_path, f"{exp_prefix}{timestamp}")
             print(f"{C_CYAN}No target directory specified. Creating default:{C_RESET}\n{final_output_dir}")
+        
+        manifest_path = os.path.join(final_output_dir, "experiment_manifest.json")
+        cli_overrides = {k: v for k, v in vars(args).items() if v is not None and k in ['model_name', 'temperature', 'mapping_strategy', 'group_size']}
 
-        if not os.path.exists(final_output_dir):
+        if not os.path.exists(manifest_path):
             if args.verify_only:
-                print(f"\nDirectory not found:\n{final_output_dir}")
-                sys.exit(1)
-            os.makedirs(final_output_dir)
-            print(f"\nCreated target directory:\n{final_output_dir}")
+                print(f"\n{C_RED}Directory or manifest not found. Cannot verify.{C_RESET}")
+                sys.exit(AUDIT_NEEDS_MIGRATION)
+            
+            if not os.path.exists(final_output_dir):
+                os.makedirs(final_output_dir)
+                print(f"\nCreated target directory:\n{final_output_dir}")
 
-        config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+            print("Creating new experiment_manifest.json...")
+            config = configparser.ConfigParser()
+            config.read(os.path.join(PROJECT_ROOT, 'config.ini'))
+            
+            parameters = {
+                "model_name": cli_overrides.get('model_name', config.get('LLM', 'model_name')),
+                "temperature": cli_overrides.get('temperature', config.getfloat('LLM', 'temperature')),
+                "mapping_strategy": cli_overrides.get('mapping_strategy', config.get('Study', 'mapping_strategy')),
+                "group_size": cli_overrides.get('group_size', config.getint('Study', 'group_size')),
+                "num_trials": config.getint('Study', 'num_trials'),
+                "num_replications": config.getint('Study', 'num_replications')
+            }
+            
+            personalities_db_path = os.path.join(PROJECT_ROOT, config.get('Filenames', 'personalities_src'))
+            base_query_path = os.path.join(PROJECT_ROOT, config.get('Filenames', 'base_query_src'))
+
+            manifest_data = {
+                "parameters": parameters,
+                "provenance": {
+                    "personalities_db_checksum": f"sha256:{calculate_file_checksum(personalities_db_path)}",
+                    "base_query_checksum": f"sha256:{calculate_file_checksum(base_query_path)}",
+                    "framework_version": f"git:{get_git_commit_hash()}"
+                },
+                "metadata": {
+                    "creation_timestamp": datetime.datetime.now().isoformat(),
+                    "user_notes": args.notes or "",
+                    "invoked_command": ' '.join(sys.argv)
+                }
+            }
+            with open(manifest_path, 'w') as f: json.dump(manifest_data, f, indent=2)
+            print("Experiment manifest created successfully.")
+        
+        elif cli_overrides:
+            with open(manifest_path, 'r') as f: manifest_data = json.load(f)
+            params = manifest_data.get("parameters", {})
+            mismatches = [k for k, v in cli_overrides.items() if params.get(k) != v]
+            if mismatches:
+                print(f"{C_RED}FATAL: Command-line parameters conflict with the existing experiment's manifest.{C_RESET}")
+                print(f"Conflicting parameters: {', '.join(mismatches)}")
+                print("To run with new parameters, please start a new experiment in a different directory.")
+                sys.exit(1)
+
+        # Load experiment parameters from the manifest for the run
+        with open(manifest_path, 'r') as f: manifest_data = json.load(f)
+        exp_params = manifest_data.get("parameters", {})
+        config_num_reps = exp_params.get("num_replications", 30)
         end_rep = args.end_rep if args.end_rep is not None else config_num_reps
 
         if args.verify_only:
@@ -1074,7 +1116,7 @@ def main():
             return
 
         if args.migrate:
-            if not _run_migrate_mode(Path(final_output_dir), patch_script, rebuild_script, args.verbose):
+            if not _run_migrate_mode(Path(final_output_dir), orchestrator_script, bias_analysis_script, compile_script, log_manager_script, args.verbose):
                 print(f"{C_RED}--- Migration pre-processing failed. Please review logs. ---{C_RESET}")
                 sys.exit(1)
 
@@ -1149,7 +1191,7 @@ def main():
                         all_run_dirs = sorted([p for p in Path(final_output_dir).glob("run_*") if p.is_dir()])
                         payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
 
-                    confirm = 'Y'
+                    # The PowerShell wrappers already prompt the user. This prompt is for direct script execution.
                     # The PowerShell wrappers already prompt the user. This prompt is for direct script execution.
                     proceed = False
                     if not (is_migration_run or force_reprocess_once):
@@ -1224,6 +1266,9 @@ def main():
         except Exception as e:
             logging.error(f"An error occurred during finalization: {e}")
             sys.exit(1)
+
+        print("\n--- Verifying final experiment state and updating summary... ---")
+        _run_verify_only_mode(Path(final_output_dir), end_rep, suppress_exit=True, print_report=True, is_verify_only_cli=False)
 
         print(f"\n{C_GREEN}Experiment run finished successfully for:{C_RESET}")
         print(f"{C_GREEN}{final_output_dir}{C_RESET}")

@@ -148,3 +148,5 @@ try {
     Write-Error "An error occurred during the study update process: $($_.Exception.Message)"
     exit 1
 }
+
+# === End of update_study.ps1 ===

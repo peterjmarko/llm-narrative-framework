@@ -240,3 +240,5 @@ catch {
     
     exit 1
 }
+
+# === End of audit_study.ps1 ===

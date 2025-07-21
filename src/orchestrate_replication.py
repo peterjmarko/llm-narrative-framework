@@ -67,6 +67,7 @@ import shutil
 import json
 import glob
 import configparser
+import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 try:
     from tqdm import tqdm
@@ -75,7 +76,7 @@ except ImportError:
 
 # --- Setup ---
 try:
-    from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
+    from config_loader import APP_CONFIG, get_config_value, get_config_list, PROJECT_ROOT
 except ImportError:
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     if current_script_dir not in sys.path:
@@ -195,35 +196,42 @@ def main():
         run_specific_dir_path = args.run_output_dir
         logging.info(f"--- REPROCESS MODE for: {os.path.basename(run_specific_dir_path)} ---")
         
-        config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
-        if not os.path.exists(config_path):
-            logging.error(f"FATAL: Archived config not found at {config_path}. Cannot reprocess.")
+        # Manifest is in the experiment's root (parent of the run directory)
+        manifest_path = os.path.join(os.path.dirname(run_specific_dir_path), 'experiment_manifest.json')
+        if not os.path.exists(manifest_path):
+            logging.error(f"FATAL: Experiment manifest not found at {manifest_path}. Cannot reprocess.")
             sys.exit(1)
-        config = configparser.ConfigParser()
-        config.read(config_path)
-        args.num_iterations = config.getint('Study', 'num_trials', fallback=100)
-        args.k_per_query = config.getint('Study', 'group_size', fallback=10)
-    else:
-        # --- Robust Parameter Reading ---
-        model_name = get_config_value(APP_CONFIG, 'LLM', 'model_name', fallback_key='model')
-        temp = get_config_value(APP_CONFIG, 'LLM', 'temperature', value_type=float)
-        db_file = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src')
-        args.num_iterations = get_config_value(APP_CONFIG, 'Study', 'num_trials', fallback_key='num_iterations', value_type=int)
-        args.k_per_query = get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int)
         
-        run_dir_name = generate_run_dir_name(model_name, temp, args.num_iterations, args.k_per_query, db_file, args.replication_num)
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+        params = manifest.get('parameters', {})
+        
+        args.num_iterations = params.get('num_trials', 100)
+        args.k_per_query = params.get('group_size', 10)
+    else:
+        # For a new run, read parameters from the experiment's manifest.
+        base_output_dir = args.base_output_dir
+        manifest_path = os.path.join(base_output_dir, 'experiment_manifest.json')
+        if not os.path.exists(manifest_path):
+            logging.error(f"FATAL: Experiment manifest not found at {manifest_path}. Cannot create new replication.")
+            sys.exit(1)
 
-        # Use the provided base_output_dir if available, otherwise fall back to the config setting
-        if args.base_output_dir:
-            base_output_dir = args.base_output_dir
-        else:
-            # Fallback for standalone runs: use the path from config.ini
-            base_output_dir = os.path.join(PROJECT_ROOT, get_config_value(APP_CONFIG, 'General', 'base_output_dir'))
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+        params = manifest['parameters']
 
+        # Use parameters from manifest to build run directory name and for pipeline stages
+        model_name = params['model_name']
+        temp = params['temperature']
+        args.k_per_query = params['group_size']
+        args.num_iterations = params['num_trials']
+        
+        # The db_file part of the name is now for provenance, so we can use a placeholder.
+        run_dir_name = generate_run_dir_name(model_name, temp, args.num_iterations, args.k_per_query, "db", args.replication_num)
+        
         run_specific_dir_path = os.path.join(base_output_dir, run_dir_name)
         os.makedirs(run_specific_dir_path, exist_ok=True)
         logging.info(f"Created unique output directory: {run_specific_dir_path}")
-        shutil.copy2(os.path.join(PROJECT_ROOT, 'config.ini'), os.path.join(run_specific_dir_path, 'config.ini.archived'))
 
     src_dir = os.path.join(PROJECT_ROOT, 'src')
     build_script = os.path.join(src_dir, 'build_llm_queries.py')
@@ -231,7 +239,7 @@ def main():
     process_script = os.path.join(src_dir, 'process_llm_responses.py')
     analyze_script = os.path.join(src_dir, 'analyze_llm_performance.py')
     bias_script = os.path.join(src_dir, 'run_bias_analysis.py')
-    aggregator_script = os.path.join(src_dir, 'experiment_aggregator.py')
+    aggregator_script = os.path.join(src_dir, 'aggregate_experiments.py')
 
     try:
         # Stage 1: Build Queries (only for new runs)
@@ -331,7 +339,7 @@ def main():
 
         # Sub-stage 4b: Positional bias metrics
         print("   - Calculating positional bias metrics...")
-        k_val = int(get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int, fallback=10))
+        k_val = args.k_per_query
         cmd_bias = [sys.executable, bias_script, run_specific_dir_path, "--k_value", str(k_val)]
         if not args.quiet: cmd_bias.append("--verbose")
         result5 = subprocess.run(cmd_bias, capture_output=True, check=False, text=True, encoding='utf-8', errors='replace')
@@ -380,10 +388,21 @@ def main():
             raise
 
         # Stage 6: Create Replication Summary
-        cmd6 = [sys.executable, aggregator_script, run_specific_dir_path, "--mode", "hierarchical"]
-        output6, rc6, err6 = run_script(cmd6, "6. Create Replication Summary", quiet=args.quiet)
-        all_stage_outputs.append(output6)
-        if rc6 != 0: raise err6
+        stage_title_6 = "6. Create Replication Summary"
+        header_6 = (f"\n\n{'='*80}\n### STAGE: {stage_title_6} ###\n{'='*80}\n\n")
+        print(f"--- Running Stage: {stage_title_6} ---")
+        try:
+            # Re-read the manifest params used for this run
+            manifest_path = os.path.join(os.path.dirname(run_specific_dir_path), 'experiment_manifest.json')
+            with open(manifest_path, 'r') as f:
+                manifest = json.load(f)
+            
+            # The 'updated_metrics' dictionary from Stage 5 has everything we need
+            _create_replication_summary_csv(run_specific_dir_path, manifest['parameters'], updated_metrics)
+            all_stage_outputs.append(header_6 + f"Successfully generated REPLICATION_results.csv")
+        except Exception as e:
+            logging.error(f"Failed during Stage 6 (Replication Summary): {e}")
+            raise
 
         pipeline_status = "COMPLETED"
 
@@ -429,6 +448,34 @@ def main():
              f.write(f"PIPELINE {pipeline_status}\n\n" + "".join(all_stage_outputs))
 
     logging.info(f"Replication run finished. Final status: {pipeline_status}")
+
+def _create_replication_summary_csv(run_dir_path, manifest_params, metrics_data):
+    """Creates the REPLICATION_results.csv file for a single run."""
+    run_dir_name = os.path.basename(run_dir_path)
+    rep_match = re.search(r'rep-(\d+)', run_dir_name)
+    
+    # Combine all data into a single record
+    run_data = {'run_directory': run_dir_name}
+    run_data.update(manifest_params)
+    run_data.update(metrics_data)
+    run_data['replication'] = int(rep_match.group(1)) if rep_match else 0
+    
+    # Rename keys to match the CSV schema
+    run_data['model'] = run_data.pop('model_name', None)
+    run_data['k'] = run_data.pop('group_size', None)
+    run_data['m'] = run_data.pop('num_trials', None)
+    
+    # Write to CSV using pandas to ensure correct header order
+    output_path = os.path.join(run_dir_path, "REPLICATION_results.csv")
+    fieldnames = get_config_list(APP_CONFIG, 'Schema', 'csv_header_order')
+    df = pd.DataFrame([run_data])
+    
+    for col in fieldnames:
+        if col not in df.columns:
+            df[col] = pd.NA
+            
+    df = df[fieldnames]
+    df.to_csv(output_path, index=False)
 
 
 if __name__ == "__main__":
