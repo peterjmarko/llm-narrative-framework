@@ -5,6 +5,19 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.11.0 (2025-07-21)
+
+### Feat
+
+- Implement manifest-driven architecture
+
+- Replaced per-replication 'config.ini.archived' with a single, experiment-level 'experiment_manifest.json' to serve as the immutable source of truth.
+- Introduced 'experiment_summary.json' for at-a-glance experiment status and aggregate results.
+- Refactored all core scripts (manager, orchestrator, aggregator) to use the new manifest-driven workflow.
+- Added command-line parameter overrides to run_experiment.ps1 for parallel experiment execution.
+- Renamed and reorganized documentation diagrams for clarity.
+- Renamed analysis scripts to 'aggregate_experiments.py' and 'study_analyzer.py' for consistency.
+
 ## v2.10.0 (2025-07-21)
 
 ### Feat
