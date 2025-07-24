@@ -192,82 +192,54 @@ This approach, demonstrated in `tests/test_experiment_aggregator.py`, is the req
 
 ### 4. Commit Your Changes
 
-This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification, which ensures clear versioning and automated changelog generation.
+This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This ensures clear versioning and automated changelog generation. The process is simplified into a single, interactive command.
 
-To commit your changes, follow these steps:
-
-1.  **Review and Update Documentation (Crucial First Step)**:
-    Before committing, perform a final review of your changes. Ensure that all relevant documentation has been updated to reflect the new state of the code. This includes:
-    *   **Docstrings**: Check that the docstrings in any modified Python functions or modules accurately describe their purpose, parameters, and behavior.
-    *   **High-Level Documentation**: If your changes affect a major workflow or add a new feature, ensure that `docs/DOCUMENTATION.template.md` and any relevant diagrams have been updated.
-
-2.  **Prepare Your Files**:
-    a. **Lint and Auto-format**: Run the linter to ensure your code adheres to quality standards and is auto-formatted. Fix any issues reported.
-       ```bash
-       pdm run lint
-       ```
-       *If `pdm run lint` modifies any files, you will need to stage them again later.*
-    b. **Build Documentation**: If you've modified documentation templates (`.template.md`) or Mermaid diagrams (`.mmd`), rebuild the final documentation files.
-       ```bash
-       pdm run build-docs
-       ```
-       *If `pdm run build-docs` creates or modifies files (e.g., `DOCUMENTATION.md`, generated images), you will need to stage them.*
-
-3.  **Review and Stage Changes**:
-    a. **Review your changes.** Run `git status` to see a list of all modified, new, and untracked files. This is a crucial sanity check to ensure you know what you are about to commit.
-       ```bash
-       git status
-       ```
-    b. **Stage all changes.** Add all the relevant files to the Git staging area.
-       ```bash
-       git add .
-       ```
-
-4.  **Create the Commit**:
-    The standard workflow for this project is to prepare your full Conventional Commit message in a `commit.txt` file (which is in `.gitignore`) and then commit using the `-F` flag.
-
+1.  **Update Documentation (As Needed)**:
+    Ensure docstrings, `DOCUMENTATION.template.md`, and diagrams are updated to reflect your code changes. If you modify any templates or `.mmd` files, rebuild the documentation first:
     ```bash
-    git commit -F commit.txt
+    pdm run build-docs
     ```
-    *Pre-commit hooks (including linting, formatting, and documentation checks) will run automatically during this step and must pass for the commit to be finalized.*
+
+2.  **Stage Your Changes**:
+    Add all relevant files to the Git staging area.
+    ```bash
+    git add .
+    ```
+
+3.  **Run the Interactive Commit Command**:
+    This single command replaces the need for `commit.txt` and manual linting. It will guide you through creating a perfectly formatted commit message.
+    ```bash
+    pdm run commit
+    ```
+    The tool will prompt you for:
+    *   The type of change (e.g., `feat`, `fix`, `docs`).
+    *   The scope of the change.
+    *   A short description.
+    *   A longer, multi-line description (the commit body).
+    *   Any breaking changes.
+
+    *Pre-commit hooks (including linting and doc checks) will run automatically and must pass for the commit to be finalized.*
 
 ### 5. Releasing a New Version (Maintainers Only)
 
-This process uses `commitizen` to automate version bumping, basic changelog entry, and tagging. A final manual step is required to enrich the changelog with full commit details.
+The release process is fully automated into a single command. It programmatically determines the next version, creates the release commit, generates a detailed changelog, and applies the correct Git tag.
 
-1.  **Prepare for Release (Pre-Flight Check)**:
-    a. Switch to the `main` branch and pull the latest changes.
-       ```bash
-       git checkout main
-       git pull origin main
-       ```
-    b. Verify the working directory is clean.
-       ```bash
-       git status
-       ```
-
-2.  **Run the `cz bump` command**:
-    `commitizen` determines the version bump based on the types of commits since the last release (`feat` for a minor bump, `fix` for a patch). It updates `pyproject.toml`, adds a new basic entry to `CHANGELOG.md`, creates a version commit, and adds a Git tag.
-
-    *If a significant change was committed with the wrong type (e.g., a major bug fix committed as `refactor`), you must first amend the commit message to ensure the version is bumped correctly:*
+1.  **Ensure `main` is up-to-date**:
     ```bash
-    git commit --amend # Change commit type, save, exit
-    ```
-    *Once all commits are correctly typed, run the main release command:*
-    ```bash
-    pdm run cz bump --changelog
+    git checkout main
+    git pull origin main
     ```
 
-3.  **Enrich the Changelog Details (Manual Step)**:
-    The `bump` command initially adds only the commit *header* to `CHANGELOG.md`. To provide complete context, you must manually add the full commit body for relevant entries (e.g., `feat`, `fix`, or other changes you deem important for the release notes).
-
-    a. **Get Commit Details**: The simplest source for the full commit message is the `commit.txt` file you used to create the commit. Alternatively, you can view recent commits with `git log -n 5` and copy the details from there.
-    b. **Update `CHANGELOG.md`**: Open `CHANGELOG.md` in your editor. Under the new version heading, paste the full commit message bodies directly below their respective headers (which were automatically added by `cz bump`).
-    c. **Save and Amend**: Save `CHANGELOG.md`. Then, amend the release commit to include this manual changelog update:
+2.  **Run the Automated Release Command**:
     ```bash
-    git add CHANGELOG.md
-    git commit --amend --no-edit
+    pdm run release
     ```
+    This script handles all the necessary steps:
+    *   Runs `cz bump --dry-run` to determine the correct next version.
+    *   Executes the actual `cz bump` to create the initial release commit and tag.
+    *   Generates a detailed, multi-line changelog entry.
+    *   Amends the release commit to include the detailed changelog.
+    *   Force-moves the Git tag to the final, amended commit.
 
 #### How to Undo a Version Bump
 If you run `cz bump` by mistake or realize a commit was missed, you must manually undo the release before trying again. Follow these steps precisely:

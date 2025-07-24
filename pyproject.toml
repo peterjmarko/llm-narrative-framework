@@ -68,6 +68,11 @@ cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
 lint = "pre-commit run --all-files"
 build-docs = "python src/build_docs.py"
 
+# --- Developer Workflow ---
+commit = {cmd = "cz commit", help = "Create a new commit using the interactive Commitizen prompt."}
+release = {cmd = "python src/finalize_release.py", help = "Finalize a new release (bump, changelog, tag)."}
+# ------------------------
+
 # Main workflow shortcuts
 run-exp = "powershell -ExecutionPolicy Bypass -File ./run_experiment.ps1"
 aud-exp = "powershell -ExecutionPolicy Bypass -File ./audit_experiment.ps1"
