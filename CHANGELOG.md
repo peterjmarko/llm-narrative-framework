@@ -5,6 +5,41 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.12.0 (2025-07-24)
+
+### Feat
+
+- **analysis, core**: enhance analysis workflow and standardize filenames
+
+This commit introduces a major enhancement to the statistical analysis
+pipeline and standardizes core script and documentation filenames for
+improved consistency and maintainability.
+
+Analysis Enhancements (`study_analyzer.py`):
+- Upgraded the statistical model from a Two-Way ANOVA to a full Factorial
+  ANOVA, enabling the analysis of interaction effects between experimental
+  factors.
+- Enhanced the plotting workflow to automatically copy generated boxplots
+  to the central `docs/images/` directory, making them immediately
+  available for inclusion in project documentation via `build_docs.py`.
+
+Filename Standardization & Refactoring:
+- **Core Scripts:** Renamed `src/experiment_aggregator.py` to
+  `src/aggregate_experiments.py` and `src/study_analysis.py` to
+  `src/study_analyzer.py` for clarity. All call-sites and test files
+  have been updated accordingly.
+- **Documentation Diagrams:** Renamed all diagram source files in `docs/diagrams`
+  to a consistent `view_*`, `flow_*`, `logic_*`, `format_*` convention.
+  All references within `DOCUMENTATION.template.md` have been updated.
+- **Utility Script:** Updated `convert_py_to_txt.py` to place its
+  output in `output/project_code_as_text`, aligning with the project's
+  standard of keeping generated artifacts in the `output/` directory.
+
+Documentation & Repository Maintenance:
+- Added `docs/study_article.md` as a source for the main research paper.
+- Updated `.gitignore` to correctly handle new generated files and build
+  artifacts.
+
 ## v2.10.0 (2025-07-21)
 
 ### Feat
