@@ -17,12 +17,11 @@
 # Filename: src/analyze_llm_performance.py
 
 """
-Stage 4 (Part 1): Core Performance Analyzer for a Single Replication.
+Stage 4 (Part 1): Core Performance Calculator for a Single Replication.
 
 This script is the primary quantitative engine of the single-replication pipeline.
 It takes the clean, structured data from Stage 3 and computes a comprehensive
-suite of core performance metrics. It constitutes the first part of the unified
-"Comprehensive Analysis" stage managed by the orchestrator.
+suite of core performance metrics. Its sole responsibility is calculation.
 
 Key Features:
 -   **Final Validation**: Before analysis, it performs a final data integrity
@@ -32,12 +31,10 @@ Key Features:
     meta-analysis techniques (Stouffer's, Fisher's methods).
 -   **Comprehensive Metrics**: Calculates key performance indicators including
     Mean Reciprocal Rank (MRR), Top-K accuracy, and effect sizes.
--   **Structured JSON Output**: Its primary output is the initial `replication_metrics.json`
-    file, containing the core metrics. This file is subsequently augmented by
-    `run_bias_analysis.py`.
--   **Human-Readable Summary**: It also prints a human-readable summary to stdout,
-    which is captured by the orchestrator to form the body of the final
-    `replication_report.txt`.
+-   **Structured JSON Output**: Its only output is the initial `replication_metrics.json`
+    file, containing all core metrics. This file is subsequently augmented by
+    `run_bias_analysis.py` and then consumed by `orchestrate_replication.py`
+    to build the final report. It no longer prints a human-readable summary.
 """
 
 # === Start of src/analyze_llm_performance.py ===
@@ -838,6 +835,36 @@ def main():
             mean_rank_analysis['wilcoxon_signed_rank_p'] = None
     else:
         mean_rank_analysis['wilcoxon_signed_rank_p'] = None
+
+    # --- Human-Readable Summary Output ---
+    if not args.quiet:
+        print("\n\n" + "="*80)
+        print("### OVERALL META-ANALYSIS RESULTS ###")
+        print("="*80)
+        
+        # 1. Combined Significance
+        stouffer_p_str = f"{stouffer_p:.4f}" if stouffer_p is not None else "N/A"
+        fisher_p_str = f"{fisher_p:.4f}" if fisher_p is not None else "N/A"
+        print(f"\n1. Combined Significance of Score Differentiation (N={len(mwu_p_values)}):")
+        print(f"   Stouffer's Method: Combined p-value = {stouffer_p_str}")
+        print(f"   Fisher's Method: Combined p-value = {fisher_p_str}")
+
+        # 2. Effect Size
+        print_metric_analysis(effect_size_analysis, "2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r')", "%.4f")
+        
+        # 3. MRR
+        print_metric_analysis(mrr_analysis, "3. Overall Ranking Performance (MRR)", "%.4f")
+
+        # 4. Top-1 Accuracy
+        print_metric_analysis(top_1_analysis, "4. Overall Ranking Performance (Top-1 Accuracy)", "%.2f%%")
+        
+        # 5. Top-K Accuracy
+        print_metric_analysis(top_k_analysis, f"5. Overall Ranking Performance (Top-{args.top_k_acc} Accuracy)", "%.2f%%")
+        
+        # 6. Bias and Other Metrics
+        print("\n6. Bias and Other Metrics:")
+        print(f"   Top-1 Prediction Bias (StdDev of choice counts): {np.nan_to_num(top1_pred_bias_std):.4f}")
+        print(f"   Mean Score Difference (Correct - Incorrect): {np.nan_to_num(true_false_score_diff):.4f}")
         
     # --- Saving Section ---
     data_output_dir = os.path.dirname(scores_filepath_abs)
@@ -908,6 +935,23 @@ def main():
         # Fallback for backward compatibility: count the loaded mappings
         summary_data['n_valid_responses'] = len(mappings_list) if mappings_list is not None else 0
 
+    # --- Human-Readable Summary Output ---
+    # This must be printed *before* the JSON block so the orchestrator can capture it.
+    if not args.quiet:
+        print("\n\n" + "="*80)
+        print("### OVERALL META-ANALYSIS RESULTS ###")
+        print("="*80)
+        print(f"\n1. Combined Significance of Score Differentiation (N={len(mwu_p_values)}):")
+        print(f"   Stouffer's Method: Combined p-value = {stouffer_p:.4f}" if stouffer_p is not None else "   Stouffer's Method: N/A")
+        print(f"   Fisher's Method: Combined p-value = {fisher_p:.4f}" if fisher_p is not None else "   Fisher's Method: N/A")
+        print_metric_analysis(effect_size_analysis, "2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r')", "%.4f")
+        print_metric_analysis(mrr_analysis, "3. Overall Ranking Performance (MRR)", "%.4f")
+        print_metric_analysis(top_1_analysis, "4. Overall Ranking Performance (Top-1 Accuracy)", "%.2f%%")
+        print_metric_analysis(top_k_analysis, f"5. Overall Ranking Performance (Top-{args.top_k_acc} Accuracy)", "%.2f%%")
+        print("\n6. Bias and Other Metrics:")
+        print(f"   Top-1 Prediction Bias (StdDev of choice counts): {np.nan_to_num(top1_pred_bias_std):.4f}")
+        print(f"   Mean Score Difference (Correct - Incorrect): {np.nan_to_num(true_false_score_diff):.4f}")
+
     # Define the output path for the metrics JSON file
     metrics_filename = get_config_value(APP_CONFIG, 'Filenames', 'replication_metrics_json', fallback='replication_metrics.json')
     metrics_filepath = os.path.join(analysis_inputs_dir, metrics_filename)
@@ -920,6 +964,38 @@ def main():
             print(f"Successfully saved metrics to: {metrics_filepath}")
     except IOError as e:
         print(f"Error: Could not write metrics to {metrics_filepath}. Reason: {e}")
+
+    # --- Human-Readable Summary Output (restored) ---
+    if not args.quiet:
+        print("\n\n" + "="*80)
+        print("### OVERALL META-ANALYSIS RESULTS ###")
+        print("="*80)
+        print(f"\n1. Combined Significance of Score Differentiation (N={len(mwu_p_values)}):")
+        print(f"   Stouffer's Method: Combined p-value = {stouffer_p:.4f}" if stouffer_p is not None else "   Stouffer's Method: N/A")
+        print(f"   Fisher's Method: Combined p-value = {fisher_p:.4f}" if fisher_p is not None else "   Fisher's Method: N/A")
+        print_metric_analysis(effect_size_analysis, "2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r')", "%.4f")
+        print_metric_analysis(mrr_analysis, "3. Overall Ranking Performance (MRR)", "%.4f")
+        print_metric_analysis(top_1_analysis, "4. Overall Ranking Performance (Top-1 Accuracy)", "%.2f%%")
+        print_metric_analysis(top_k_analysis, f"5. Overall Ranking Performance (Top-{args.top_k_acc} Accuracy)", "%.2f%%")
+        print("\n6. Bias and Other Metrics:")
+        print(f"   Top-1 Prediction Bias (StdDev of choice counts): {np.nan_to_num(top1_pred_bias_std):.4f}")
+        print(f"   Mean Score Difference (Correct - Incorrect): {np.nan_to_num(true_false_score_diff):.4f}")
+
+    # --- Human-Readable Summary Output (restored) ---
+    if not args.quiet:
+        print("\n\n" + "="*80)
+        print("### OVERALL META-ANALYSIS RESULTS ###")
+        print("="*80)
+        print(f"\n1. Combined Significance of Score Differentiation (N={len(mwu_p_values)}):")
+        print(f"   Stouffer's Method: Combined p-value = {stouffer_p:.4f}" if stouffer_p is not None else "   Stouffer's Method: N/A")
+        print(f"   Fisher's Method: Combined p-value = {fisher_p:.4f}" if fisher_p is not None else "   Fisher's Method: N/A")
+        print_metric_analysis(effect_size_analysis, "2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r')", "%.4f")
+        print_metric_analysis(mrr_analysis, "3. Overall Ranking Performance (MRR)", "%.4f")
+        print_metric_analysis(top_1_analysis, "4. Overall Ranking Performance (Top-1 Accuracy)", "%.2f%%")
+        print_metric_analysis(top_k_analysis, f"5. Overall Ranking Performance (Top-{args.top_k_acc} Accuracy)", "%.2f%%")
+        print("\n6. Bias and Other Metrics:")
+        print(f"   Top-1 Prediction Bias (StdDev of choice counts): {np.nan_to_num(top1_pred_bias_std):.4f}")
+        print(f"   Mean Score Difference (Correct - Incorrect): {np.nan_to_num(true_false_score_diff):.4f}")
 
 if __name__ == "__main__":
     main()

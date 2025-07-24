@@ -22,10 +22,6 @@ Before cloning the project, ensure these essential tools are installed on your s
     ```bash
     pip install --user commitizen
     ```
-*   **Commitizen**: A tool for standardized commits and automated changelogs. Install it once globally with pip:
-    ```bash
-    pip install --user commitizen
-    ```
 
 ### Step 2: Clone and Set Up the Project
 
@@ -62,7 +58,7 @@ Before cloning the project, ensure these essential tools are installed on your s
     ```
 
 3.  **Install All Dependencies and Tools**:
-    This single command installs everything needed for development: Python packages, dev tools, and pre-commit hooks. The `-d` flag includes all development dependencies.
+    This single command installs everything needed for development: Python packages, dev tools, and pre-commit hooks. The `-G dev` flag includes all development dependencies.
     ```bash
     pdm install -G dev
     ```

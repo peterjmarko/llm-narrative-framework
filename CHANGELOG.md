@@ -5,6 +5,25 @@ All notable changes to the Personality Matching Experiment Framework will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+chore(wip): Preserve current manifest-architecture changes before reset
+
+This commit preserves the current state of changes related to the manifest-driven
+architecture and workflow overhaul, including:
+
+- Updates to CONTRIBUTING.md.
+- Refactored PowerShell wrappers and associated documentation.
+- Changes to core pipeline scripts (`orchestrate_replication.py`, `analyze_llm_performance.py`, `replication_log_manager.py`) for improved report generation and initial timing capture in REPLICATION_results.csv.
+- Introduction of `src/print_config_value.py`.
+- Various other fixes and refinements to the experiment management system and documentation.
+
+This code is currently not in a fully working state and is being committed
+solely to preserve progress on the `feature/manifest-architecture` branch
+before resetting the `main` branch.
+
 ## v2.11.0 (2025-07-21)
 
 ### Feat

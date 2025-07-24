@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env pwsh
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -21,31 +21,44 @@
 
 <#
 .SYNOPSIS
-    Provides a read-only, detailed completeness report for an experiment.
+    Provides a read-only, detailed completeness report for a specified experiment.
 
 .DESCRIPTION
-    This script is a simple wrapper that calls 'experiment_manager.py' with the
-    --verify-only flag. It audits the specified experiment directory and prints a
-    comprehensive report without making any changes.
+    This script calls the core 'experiment_manager.py' in a read-only diagnostic mode.
+    It audits the specified experiment directory and prints a comprehensive report
+    without making any changes. A detailed log is also saved as 'audit_log.txt'
+    inside the audited directory.
+
+    By default, it shows a summary and prompts for confirmation before running.
 
 .PARAMETER TargetDirectory
     The path to the experiment directory to audit. This is a mandatory parameter.
 
+.PARAMETER Force
+    A switch to bypass the confirmation prompt for automated or scripted use.
+
 .PARAMETER Verbose
-    Enables verbose output from the verification process.
+    A switch to enable detailed, real-time output from the underlying Python script.
 
 .EXAMPLE
-    # Run a standard audit on an experiment.
+    # Run a standard interactive audit on an experiment.
     .\audit_experiment.ps1 -TargetDirectory "output/reports/My_Experiment"
 
 .EXAMPLE
-    # Run a detailed audit.
-    .\audit_experiment.ps1 "output/reports/My_Experiment" -Verbose
+    # Run a non-interactive audit for use in an automated script.
+    .\audit_experiment.ps1 -TargetDirectory "output/reports/My_Experiment" -Force
+
+.EXAMPLE
+    # Run a detailed audit with verbose logging.
+    .\audit_experiment.ps1 -TargetDirectory "output/reports/My_Experiment" -Verbose
 #>
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to audit.")]
-    [string]$TargetDirectory
+    [string]$TargetDirectory,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Force
 )
 
 # --- Auto-detect execution environment ---
@@ -101,11 +114,27 @@ $AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt in 
 
 # --- Main Script Logic ---
 try {
+    # --- Display a summary and ask for confirmation (unless -Force is used) ---
+    if (-not $Force.IsPresent) {
+        Write-Host "`n--- Audit Configuration Summary ---" -ForegroundColor Cyan
+        Write-Host "Action:            Audit an EXISTING experiment."
+        Write-Host "Target Directory:  $TargetDirectory"
+        Write-Host "---------------------------------" -ForegroundColor Cyan
+
+        $choice = Read-Host "`nDo you wish to proceed with the audit? (Y/N)"
+        if ($choice.Trim().ToLower() -ne 'y') {
+            Write-Host "Audit aborted by user." -ForegroundColor Yellow
+            Write-Host "" # Add a blank line for separation
+            exit 0 # A clean exit since the user chose to abort.
+        }
+    }
+
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
 
     $scriptName = "src/experiment_manager.py"
-    $arguments = @("--verify-only", $ResolvedPath)
-    if ($Verbose) {
+    # The path must be preceded by the --target_dir flag.
+    $arguments = @("--verify-only", "--target_dir", $ResolvedPath)
+    if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) {
         $arguments += "--verbose"
     }
 
@@ -185,6 +214,9 @@ try {
         }
     }
     Format-LogFile -Path $LogFilePath
+
+    # Add a final blank line for clean separation from the next PS prompt.
+    Write-Host ""
 }
 catch {
     Write-Host "`n######################################################" -ForegroundColor Red
@@ -192,6 +224,9 @@ catch {
     Write-Host "######################################################`n" -ForegroundColor Red
     Write-Error $_.Exception.Message
     Format-LogFile -Path $LogFilePath
+    
+    # Add a final blank line for clean separation from the next PS prompt.
+    Write-Host ""
     exit 1
 }
 

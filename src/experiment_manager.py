@@ -20,82 +20,66 @@
 # Filename: src/experiment_manager.py
 
 """
-State-Machine Controller for Experiments.
+Backend State-Machine Controller for Experiments.
 
-This script is the high-level, intelligent controller for managing an entire
-experiment. It operates as a state machine, continuously verifying the
-experiment's status and automatically taking the correct action until the
-experiment is fully complete and all data is consistent.
+This script is the high-level, intelligent backend controller for managing an
+entire experiment. It is not intended to be run directly by the user. Instead,
+it is called by user-facing PowerShell wrapper scripts (e.g., `run_experiment.ps1`,
+`update_experiment.ps1`).
 
-This self-healing design makes the experiment pipeline resilient to
-interruptions. Its core is a `Verify -> Act` loop, but it can also be
-invoked with explicit flags for specific, one-time actions.
+It operates as a resilient state machine, verifying the experiment's status against
+its `experiment_manifest.json` file and automatically taking the correct action
+(`NEW`, `REPAIR`, `REPROCESS`) until the experiment is complete.
 
-Modes of Operation:
--   **Default (State Machine)**: Intelligently identifies the experiment's state
-    with a clear priority (`REPAIR` > `REPROCESS` > `NEW`). It automatically
-    initiates the correct action, prompting the user for confirmation before
-    performing repairs or updates. It continuously loops until the experiment
-    is complete, providing robust self-healing. When running new replications,
-    it orchestrates the pipeline stages directly to enable parallel execution
-    of LLM API calls, providing a significant speedup.
--   **`--reprocess`**: Forces a full re-processing (update) of all analysis
-    artifacts for an existing experiment. It regenerates individual replication
-    reports and performs a full finalization, creating all summary files.
--   **`--migrate`**: Runs a one-time migration workflow on a copied legacy
-    experiment. It first executes a special pre-processing sequence:
-    1.  **Clean**: Deletes old summary files and corrupted analysis artifacts.
-    2.  **Patch**: Calls `patch_old_experiment.py` to create `config.ini.archived`
-        files by reverse-engineering legacy reports.
-    3.  **Reprocess**: Re-runs the full data processing pipeline for each
-        replication run to generate modern, valid reports.
-    After this pre-processing, it enters the standard state-machine loop to
-    handle any remaining issues, prompting for user confirmation as needed
-    until the experiment is fully `VALIDATED`.
--   **`--verify-only`**: Performs a read-only audit and prints a detailed
-    completeness report without making changes. This is the primary diagnostic
-    tool. It checks for:
-    -   **Configuration Integrity**: Verifies that `config.ini.archived` exists,
-        is valid, and contains all required keys.
-    -   **Replication File Completeness**: Ensures the correct number of core
-        replication files exist (queries, responses, manifests, mappings,
-        and the `REPLICATION_results.csv` summary).
-    -   **Index Consistency**: Confirms a one-to-one match between query and
-        response file indices (e.g., `query_001.txt` -> `response_001.txt`).
-    -   **Analysis Data Validity**: Checks that analysis files contain the
-        correct number of entries, matching the `n_valid_responses` metric
-        from the final report.
-    -   **Report Completeness**: Validates the final report's JSON block,
-        ensuring all required top-level and nested metrics are present.
-    -   **Experiment Aggregation**: Verifies that top-level summary files
-        (`EXPERIMENT_results.csv`, `batch_run_log.csv`) exist and that the
-        log is marked as complete.
+Modes of Operation (as called by wrapper scripts):
+-   **Default (State Machine)**: The core `Verify -> Act` loop. It intelligently
+    identifies the experiment's state and initiates the correct action, prompting
+    the user for confirmation before performing repairs or updates. It continuously
+    loops until the experiment is `COMPLETE`, providing robust self-healing.
+-   **`--reprocess`**: Forces a full re-processing (update) of all analysis artifacts.
+    This is called by `update_experiment.ps1` to regenerate all reports and summary
+    files from existing raw data.
+-   **`--migrate`**: Runs a one-time workflow to upgrade a legacy experiment. It
+    reverse-engineers the old parameters to create a new `experiment_manifest.json`,
+    cleans up obsolete files, and reprocesses all runs to bring them into compliance
+    with the modern framework.
+-   **`--verify-only`**: Performs a read-only audit and prints a detailed completeness
+    report. This is the primary diagnostic tool, called by `audit_experiment.ps1`. It
+    checks for:
+    -   **Manifest Integrity**: Verifies the `experiment_manifest.json` exists and is valid.
+    -   **Replication File Completeness**: Ensures all required files for each replication
+        exist based on the manifest's parameters.
+    -   **Index Consistency**: Confirms a one-to-one match between query and response files.
+    -   **Analysis Data Validity**: Checks that analysis files contain the correct number
+        of entries, matching the `n_valid_responses` metric from the report.
+    -   **Report Completeness**: Validates the final report's JSON block against a
+        schema of required metrics.
+    -   **Experiment Aggregation**: Verifies that top-level summary files exist and
+        that the batch log is finalized.
 
     The audit assigns a status to each replication run. Key statuses include:
     -   **`VALIDATED`**: The run is complete and valid.
-    -   **`CONFIG_ISSUE`**: The archived config is missing or invalid.
-    -   **`QUERY_ISSUE`**: Fundamental input files (queries, manifests) are
-        missing or corrupt. Requires repair via `run_experiment.ps1`.
-    -   **`RESPONSE_ISSUE`**: LLM response files are missing or corrupt.
-        Requires repair via `run_experiment.ps1`.
-    -   **`ANALYSIS_ISSUE`**: Derivative files (reports, analysis data) are
-        corrupt. Can be fixed by reprocessing.
+    -   **`QUERY_ISSUE`**: Fundamental input files are missing or corrupt.
+        Requires repair (call `run_experiment.ps1`).
+    -   **`RESPONSE_ISSUE`**: LLM response files are missing.
+        Requires repair (call `run_experiment.ps1`).
+    -   **`ANALYSIS_ISSUE`**: Derivative files (reports, etc.) are corrupt.
+        Requires an update (call `update_experiment.ps1`).
 
-Usage:
-# Start a brand new experiment in a default, timestamped directory:
-python src/experiment_manager.py
+User Workflows (Correct Usage):
+This script is the backend engine. Users should use the PowerShell scripts in the root directory:
 
-# Run, repair, or resume an existing experiment to completion:
-python src/experiment_manager.py path/to/experiment_dir
+# Run a new experiment or repair an existing one:
+.\\run_experiment.ps1 -TargetDirectory path/to/experiment_dir
 
-# Force a full reprocessing of an existing experiment:
-python src/experiment_manager.py --reprocess path/to/experiment_dir
-
-# Migrate a legacy experiment (after it has been copied to a new location):
-python src/experiment_manager.py --migrate path/to/migrated_copy_dir
+# Update an existing experiment's analysis without re-running LLM calls:
+.\\update_experiment.ps1 -TargetDirectory path/to/experiment_dir
 
 # Audit an experiment without making changes:
-python src/experiment_manager.py --verify-only path/to/experiment_dir
+.\\audit_experiment.ps1 -TargetDirectory path/to/experiment_dir
+
+# Migrate a legacy experiment (after copying it to a new location):
+.\\migrate_experiment.ps1 -SourceDirectory path/to/legacy_experiment
 """
 
 import sys
@@ -818,11 +802,11 @@ def _run_repair_mode(runs_to_repair, sessions_script_path, orchestrator_script_p
 
         print(f"\n--- Repairing {len(failed_indices)} session(s) in: {os.path.basename(run_dir)} ---")
         
-        # Call the orchestrator in --reprocess mode and pass the specific indices to fix.
-        # The orchestrator is now responsible for the parallel execution.
+        # Call the orchestrator, passing the specific indices to fix.
+        # The orchestrator's default mode is smart enough to detect and run
+        # only the missing LLM sessions for the given indices.
         cmd = [
             sys.executable, orchestrator_script_path,
-            "--reprocess",
             "--run_output_dir", run_dir,
             "--indices"
         ] + [str(i) for i in failed_indices]
@@ -974,30 +958,13 @@ def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, bi
             if isinstance(e, KeyboardInterrupt): sys.exit(1)
             return False
 
-    # After all runs are reprocessed, perform a full and final aggregation.
-    print(f"\n{C_CYAN}--- Finalizing experiment summaries... ---{C_RESET}")
-    try:
-        # Rebuild the batch log from the newly updated reports
-        cmd_log_rebuild = [sys.executable, log_manager_script, "rebuild", target_dir]
-        subprocess.run(cmd_log_rebuild, check=True, capture_output=True)
-        
-        # Re-compile the hierarchical results
-        cmd_compile = [sys.executable, compile_script, target_dir, "--mode", "hierarchical"]
-        subprocess.run(cmd_compile, check=True, capture_output=quiet, text=True)
-        
-        # Finalize the batch log with a summary line
-        cmd_log_finalize = [sys.executable, log_manager_script, "finalize", target_dir]
-        subprocess.run(cmd_log_finalize, check=True, capture_output=True)
-
-    except (subprocess.CalledProcessError, Exception) as e:
-        logging.error(f"Failed during final aggregation. Error: {e}")
-        return False
-
+    # After all runs are reprocessed, the main loop will handle the final aggregation.
+    # No finalization is needed here.
     return True
 
 def main():
     parser = argparse.ArgumentParser(description="State-machine controller for running experiments.")
-    parser.add_argument('target_dir', nargs='?', default=None,
+    parser.add_argument('--target_dir', type=str, default=None,
                         help="Optional. The target directory for the experiment. If not provided, a unique directory will be created.")
     parser.add_argument('--start-rep', type=int, default=1, help="First replication number for new runs.")
     parser.add_argument('--end-rep', type=int, default=None, help="Last replication number for new runs.")
@@ -1073,7 +1040,8 @@ def main():
                 "mapping_strategy": cli_overrides.get('mapping_strategy', config.get('Study', 'mapping_strategy')),
                 "group_size": cli_overrides.get('group_size', config.getint('Study', 'group_size')),
                 "num_trials": config.getint('Study', 'num_trials'),
-                "num_replications": config.getint('Study', 'num_replications')
+                "num_replications": config.getint('Study', 'num_replications'),
+                "db": config.get('Filenames', 'personalities_src')
             }
             
             personalities_db_path = os.path.join(PROJECT_ROOT, config.get('Filenames', 'personalities_src'))
@@ -1184,33 +1152,27 @@ def main():
                         sys.exit(AUDIT_ABORTED_BY_USER)
 
                 elif audit_result_code == AUDIT_NEEDS_REPROCESS or force_reprocess_once:
-                    # If forcing a reprocess on a clean experiment, the payload will be empty.
+                    # If this is a forced reprocess on a clean experiment, the payload will be empty.
                     # We must populate it with all run directories to ensure they are processed.
                     if force_reprocess_once and not payload_details:
-                        print(f"\n{C_YELLOW}Forcing reprocess on a VALIDATED experiment. All runs will be updated.{C_RESET}")
                         all_run_dirs = sorted([p for p in Path(final_output_dir).glob("run_*") if p.is_dir()])
                         payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
 
-                    # The PowerShell wrappers already prompt the user. This prompt is for direct script execution.
-                    # The PowerShell wrappers already prompt the user. This prompt is for direct script execution.
-                    proceed = False
-                    if not (is_migration_run or force_reprocess_once):
-                        # The preceding audit report has already provided context.
-                        if _prompt_for_confirmation("\nDo you wish to proceed? (Y/N): "):
-                            proceed = True
-                    else:
-                        # When called by a wrapper with --reprocess or during migration, we proceed automatically.
-                        print(f"\n{C_YELLOW}Automatically proceeding with update as part of migration or a forced reprocess run.{C_RESET}")
-                        proceed = True
-                    
-                    if force_reprocess_once: force_reprocess_once = False # Only force once
+                    # After displaying the audit, always ask for final, informed confirmation.
+                    prompt_message = ""
+                    if audit_result_code == AUDIT_NEEDS_REPROCESS:
+                        prompt_message = "\nExperiment has analysis errors. Proceed with update to fix them? (Y/N): "
+                    else: # This handles a forced update on a VALIDATED experiment.
+                        prompt_message = "\nExperiment is already VALIDATED. Do you want to force an update anyway? (Y/N): "
 
-                    if proceed:
+                    if _prompt_for_confirmation(prompt_message):
                         success = _run_reprocess_mode(payload_details, args.notes, not args.verbose, orchestrator_script, bias_analysis_script, compile_script, final_output_dir, log_manager_script)
                         current_action_taken = True
                     else:
                         print(f"\n{C_RED}Update aborted by user. Exiting.{C_RESET}")
                         sys.exit(AUDIT_ABORTED_BY_USER)
+                    
+                    if force_reprocess_once: force_reprocess_once = False # Only force once
                 
                 elif audit_result_code == AUDIT_ALL_VALID:
                     # If no specific action was triggered and audit is clean, we can finalize.

@@ -23,37 +23,31 @@
 Orchestrator for a Single Experimental Replication.
 
 This script is the engine for executing or reprocessing a single, self-contained
-experimental replication. It is typically called in a loop by the main batch
-runner, `experiment_manager.py`.
+experimental replication. It is called by `experiment_manager.py`.
 
 It operates in two primary modes:
 
 1.  **New Run Mode (default):**
     -   Creates a new, timestamped directory for the replication's artifacts.
-    -   Archives the root `config.ini` file for perfect reproducibility.
     -   Executes a consolidated six-stage pipeline:
-        1.  **Build LLM Queries**: Generates queries and trial data (`build_llm_queries.py`).
-        2.  **Run LLM Sessions**: Interacts with the LLM API (`run_llm_sessions.py`).
-        3.  **Process LLM Responses**: Parses raw responses into structured scores (`process_llm_responses.py`).
-        4.  **Analyze LLM Performance**: A unified stage that first calculates core performance metrics (`analyze_llm_performance.py`) and then calculates and injects diagnostic bias metrics (`run_bias_analysis.py`).
-        5.  **Generate Final Report**: Creates the `replication_report.txt` with all metrics and logs.
-        6.  **Create Replication Summary**: Creates the final `REPLICATION_results.csv` (`experiment_aggregator.py`).
+        1.  **Build LLM Queries**: Generates queries and trial data.
+        2.  **Run LLM Sessions**: Interacts with the LLM API in parallel.
+        3.  **Process LLM Responses**: Parses raw responses into structured scores.
+        4.  **Analyze LLM Performance**: Calculates core and bias metrics, outputting
+            only a `replication_metrics.json` file.
+        5.  **Generate Final Report**: Assembles the final `replication_report.txt`
+            by combining data from the `experiment_manifest.json` (for parameters)
+            and the `replication_metrics.json` (for results).
+        6.  **Create Replication Summary**: Creates the `REPLICATION_results.csv`.
 
 2.  **Reprocess Mode (`--reprocess`):**
-    -   Operates on a specified, existing replication directory.
+    -   Operates on an existing replication directory.
     -   Skips query generation and LLM interaction (Stages 1 & 2).
-    -   Re-runs only the data processing and analysis pipeline (Stages 3-6) to apply logic updates or fixes.
+    -   Re-runs only the data processing and analysis pipeline (Stages 3-6) to
+        apply logic updates or bug fixes to existing data.
 
-In both modes, the script's final action is to generate a comprehensive
-`replication_report.txt` file. This report contains all run parameters, the
-final status, a human-readable summary, a machine-parsable JSON block of all
-metrics, and the full logs from all pipeline stages.
-
-Usage (as called by experiment_manager.py):
-    python src/orchestrate_replication.py --replication_num 1 --base_output_dir path/to/exp
-
-Usage (for manual reprocessing):
-    python src/orchestrate_replication.py --reprocess --run_output_dir path/to/run_dir
+This script is the single source of truth for generating the final replication
+report, ensuring consistency across all run types.
 """
 
 import argparse
@@ -170,6 +164,79 @@ def generate_run_dir_name(model_name, temperature, num_iterations, k_per_query, 
     parts = ["run", timestamp_str, replication_str, model_short, temp_str, db_base, subjects_str, trials_str]
     sanitized_parts = [re.sub(r'[^a-zA-Z0-9_.-]', '_', part) for part in parts]
     return "_".join(sanitized_parts)
+
+def _create_replication_summary_csv(run_dir_path, manifest_params, metrics_data):
+    """Creates the REPLICATION_results.csv file for a single run."""
+    run_dir_name = os.path.basename(run_dir_path)
+    rep_match = re.search(r'rep-(\d+)', run_dir_name)
+    
+    # Combine all data into a single record
+    run_data = {'run_directory': run_dir_name}
+    run_data.update(manifest_params)
+    run_data.update(metrics_data)
+    run_data['replication'] = int(rep_match.group(1)) if rep_match else 0
+    
+    # Rename keys to match the CSV schema
+    run_data['model'] = run_data.pop('model_name', None)
+    run_data['k'] = run_data.pop('group_size', None)
+    run_data['m'] = run_data.pop('num_trials', None)
+    
+    # Write to CSV using pandas to ensure correct header order
+    output_path = os.path.join(run_dir_path, "REPLICATION_results.csv")
+    fieldnames = get_config_list(APP_CONFIG, 'Schema', 'csv_header_order')
+    df = pd.DataFrame([run_data])
+    
+    for col in fieldnames:
+        if col not in df.columns:
+            df[col] = pd.NA
+            
+    df = df[fieldnames]
+    df.to_csv(output_path, index=False)
+
+def _build_human_readable_summary(metrics, params):
+    """Builds the human-readable summary section from final metrics."""
+    k = params.get('group_size', 0)
+    m = params.get('num_trials', 0)
+    top_k_val = get_config_value(APP_CONFIG, 'Analysis', 'top_k_value_for_accuracy', 3)
+    top_k_acc_key = f"mean_top_{top_k_val}_acc"
+
+    # Helper to safely format a metric value, returning "N/A" if it's not a number.
+    def f(key, fmt):
+        val = metrics.get(key)
+        return fmt.format(val) if isinstance(val, (int, float)) else "N/A"
+
+    # Pre-calculate chance levels to avoid division by zero
+    chance_mrr = (1/k * sum(1/i for i in range(1, k + 1))) if k > 0 else 0
+    chance_top1 = 1/k if k > 0 else 0
+    chance_topk = min(top_k_val, k) / k if k > 0 else 0
+
+    summary = f"""
+================================================================================
+### OVERALL META-ANALYSIS RESULTS ###
+================================================================================
+
+1. Combined Significance of Score Differentiation (N={m}):
+   Stouffer's Method: Combined p-value = {f('mwu_stouffer_p', '{:.4f}')}
+   Fisher's Method: Combined p-value = {f('mwu_fisher_p', '{:.4f}')}
+
+2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r') (vs Chance=0.0000):
+   Mean: {f('mean_effect_size_r', '{:.4f}')}, Wilcoxon p-value: p = {f('effect_size_r_p', '{:.3f}')}
+
+3. Overall Ranking Performance (MRR) (vs Chance={chance_mrr:.4f}):
+   Mean: {f('mean_mrr', '{:.4f}')}, Wilcoxon p-value: p = {f('mrr_p', '{:.4f}')}
+
+4. Overall Ranking Performance (Top-1 Accuracy) (vs Chance={chance_top1:.2%}):
+   Mean: {f('mean_top_1_acc', '{:.2%}')}, Wilcoxon p-value: p = {f('top_1_acc_p', '{:.4f}')}
+
+5. Overall Ranking Performance (Top-{top_k_val} Accuracy) (vs Chance={chance_topk:.2%}):
+   Mean: {f(top_k_acc_key, '{:.2%}')}, Wilcoxon p-value: p = {f(top_k_acc_key + '_p', '{:.4f}')}
+
+6. Bias and Other Metrics:
+   Top-1 Prediction Bias (StdDev of choice counts): {f('top1_pred_bias_std', '{:.4f}')}
+   Mean Score Difference (Correct - Incorrect): {f('true_false_score_diff', '{:.4f}')}
+"""
+    return summary.lstrip()
+
 
 def main():
     parser = argparse.ArgumentParser(description="Runs or re-processes a single replication.")
@@ -347,59 +414,20 @@ def main():
         if result5.returncode != 0:
             raise subprocess.CalledProcessError(result5.returncode, cmd_bias, output=result5.stdout, stderr=result5.stderr)
 
-        # Stage 5: Generate Final Report
-        stage_title_5 = "5. Generate Final Report"
-        header_5 = (f"\n\n{'='*80}\n### STAGE: {stage_title_5} ###\n{'='*80}\n\n")
-        print(f"--- Running Stage: {stage_title_5} ---")
-        
-        # Clean up any old reports before creating the new one.
-        for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
-            os.remove(old_report)
-        report_path = os.path.join(run_specific_dir_path, f"replication_report_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
-
-        try:
-            # The analyzer's output (output4) contains the human-readable part.
-            # We strip its stale JSON block, as the bias script has updated the metrics on disk.
-            human_readable_part = output4.split("<<<METRICS_JSON_START>>>")[0]
-            
-            # Load the updated metrics from the JSON file patched by the bias script.
-            with open(os.path.join(run_specific_dir_path, 'analysis_inputs', 'replication_metrics.json'), 'r', encoding='utf-8') as f:
-                updated_metrics = json.load(f)
-
-            # Assemble the final, correct report using the human-readable part and the updated JSON.
-            with open(report_path, 'w', encoding='utf-8') as f:
-                f.write(human_readable_part.strip())
-                f.write("\n\n\n<<<METRICS_JSON_START>>>\n")
-                f.write(json.dumps(updated_metrics, indent=4))
-                f.write("\n<<<METRICS_JSON_END>>>")
-
-            # The analyzer script likely sets status to COMPLETED, but we need to set a
-            # placeholder that can be updated with the *entire pipeline's* final status.
-            with open(report_path, 'r+', encoding='utf-8') as f:
-                content = f.read()
-                content = re.sub(r"^(Final Status:\s*COMPLETED)$", "Final Status: PENDING", content, flags=re.MULTILINE)
-                f.seek(0)
-                f.write(content)
-                f.truncate()
-            
-            all_stage_outputs.append(header_5 + f"Successfully generated final report: {report_path}")
-        except Exception as e:
-            logging.error(f"Failed during Stage 5 (Report Generation): {e}")
-            raise
+        # Stage 5 is now just data gathering. The report is assembled at the end.
+        human_readable_analysis = output4.split("<<<METRICS_JSON_START>>>")[0]
+        with open(os.path.join(run_specific_dir_path, 'analysis_inputs', 'replication_metrics.json'), 'r', encoding='utf-8') as f:
+            updated_metrics = json.load(f)
 
         # Stage 6: Create Replication Summary
         stage_title_6 = "6. Create Replication Summary"
-        header_6 = (f"\n\n{'='*80}\n### STAGE: {stage_title_6} ###\n{'='*80}\n\n")
         print(f"--- Running Stage: {stage_title_6} ---")
         try:
-            # Re-read the manifest params used for this run
             manifest_path = os.path.join(os.path.dirname(run_specific_dir_path), 'experiment_manifest.json')
             with open(manifest_path, 'r') as f:
                 manifest = json.load(f)
-            
-            # The 'updated_metrics' dictionary from Stage 5 has everything we need
             _create_replication_summary_csv(run_specific_dir_path, manifest['parameters'], updated_metrics)
-            all_stage_outputs.append(header_6 + f"Successfully generated REPLICATION_results.csv")
+            all_stage_outputs.append(f"\n--- STAGE {stage_title_6} SUCCEEDED ---")
         except Exception as e:
             logging.error(f"Failed during Stage 6 (Replication Summary): {e}")
             raise
@@ -424,58 +452,108 @@ def main():
         # The logic for this is now consolidated with the success path.
         pass
 
-    # --- Finalization: Update Report Status ---
-    # The report is now clean. The only remaining task is to set its final status.
-    latest_report_files = sorted(glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')))
-    if latest_report_files:
-        report_path = latest_report_files[-1]
+    except (KeyboardInterrupt, subprocess.CalledProcessError, Exception) as e:
+        if isinstance(e, KeyboardInterrupt):
+            pipeline_status = "INTERRUPTED BY USER"
+        else:
+            pipeline_status = "FAILED"
+        
+        # Minimalist error logging
+        logging.error(f"\n\n--- PIPELINE {pipeline_status} ---")
+        if isinstance(e, subprocess.CalledProcessError) and hasattr(e, 'full_log'):
+            all_stage_outputs.append(e.full_log)
+        else:
+            import traceback
+            all_stage_outputs.append(f"\n--- ERROR DETAILS ---\n{traceback.format_exc()}")
+        
+        # The orchestrator still needs to generate a final report, even on failure.
+        # The logic for this is now consolidated with the success path.
+        pass
+
+    # --- Finalization: Assemble and Write Final Report ---
+    for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
+        os.remove(old_report)
+    
+    report_timestamp = datetime.datetime.now()
+    report_filename = f"replication_report_{report_timestamp.strftime('%Y-%m-%d_%H-%M-%S')}.txt"
+    report_path = os.path.join(run_specific_dir_path, report_filename)
+    
+    # --- Gather Data for Report ---
+    run_dir_name = os.path.basename(run_specific_dir_path)
+    manifest_path = os.path.join(os.path.dirname(run_specific_dir_path), 'experiment_manifest.json')
+    with open(manifest_path, 'r') as f:
+        manifest = json.load(f)
+    params = manifest['parameters']
+    
+    original_run_dt = None
+    time_match = re.search(r'run_(\d{8}_\d{6})', run_dir_name)
+    if time_match:
         try:
-            with open(report_path, 'r+', encoding='utf-8') as f:
-                content = f.read()
-                # Find and replace the placeholder status written in Stage 6.
-                # This handles both the 'Final Status' line and the simpler 'Status' line for legacy compatibility.
-                content = re.sub(r"^(Final Status:\s*PENDING)$", f"Final Status: {pipeline_status}", content, flags=re.MULTILINE)
-                content = re.sub(r"^(Status:\s*PENDING)$", f"Status: {pipeline_status}", content, flags=re.MULTILINE)
-                f.seek(0)
-                f.write(content)
-                f.truncate()
-        except IOError as e:
-            logging.error(f"Could not update final report {report_path}: {e}")
-    else:
-        # If no report exists (major failure), create a simple failure log with all captured output.
-        fail_log_path = os.path.join(run_specific_dir_path, 'orchestration_FAILURE.log')
-        with open(fail_log_path, 'w', encoding='utf-8') as f:
-             f.write(f"PIPELINE {pipeline_status}\n\n" + "".join(all_stage_outputs))
+            original_run_dt = datetime.datetime.strptime(time_match.group(1), '%Y%m%d_%H%M%S')
+        except ValueError:
+            pass
+    
+    # --- Build Report Content ---
+    report_title = "REPLICATION RUN REPORT"
+    if args.reprocess:
+        report_title += f" (Reprocessed: {report_timestamp.strftime('%Y-%m-%d %H:%M:%S')})"
 
-    logging.info(f"Replication run finished. Final status: {pipeline_status}")
+    parsing_summary_match = re.search(r"<<<PARSER_SUMMARY:(\d+):(\d+)>>>", output3)
+    parsing_status_str = f"{parsing_summary_match.group(1)}/{parsing_summary_match.group(2)} responses parsed" if parsing_summary_match else "N/A"
+    replication_num_str = str(int(re.search(r'rep-(\d+)', run_dir_name).group(1)))
 
-def _create_replication_summary_csv(run_dir_path, manifest_params, metrics_data):
-    """Creates the REPLICATION_results.csv file for a single run."""
-    run_dir_name = os.path.basename(run_dir_path)
-    rep_match = re.search(r'rep-(\d+)', run_dir_name)
-    
-    # Combine all data into a single record
-    run_data = {'run_directory': run_dir_name}
-    run_data.update(manifest_params)
-    run_data.update(metrics_data)
-    run_data['replication'] = int(rep_match.group(1)) if rep_match else 0
-    
-    # Rename keys to match the CSV schema
-    run_data['model'] = run_data.pop('model_name', None)
-    run_data['k'] = run_data.pop('group_size', None)
-    run_data['m'] = run_data.pop('num_trials', None)
-    
-    # Write to CSV using pandas to ensure correct header order
-    output_path = os.path.join(run_dir_path, "REPLICATION_results.csv")
-    fieldnames = get_config_list(APP_CONFIG, 'Schema', 'csv_header_order')
-    df = pd.DataFrame([run_data])
-    
-    for col in fieldnames:
-        if col not in df.columns:
-            df[col] = pd.NA
+    header_content = f"""
+================================================================================
+ {report_title}
+================================================================================
+Date:            {original_run_dt.strftime('%Y-%m-%d %H:%M:%S') if original_run_dt else 'N/A'}
+Final Status:    {pipeline_status}
+Replication Number: {replication_num_str}
+Run Directory:   {run_dir_name}
+Parsing Status:  {parsing_status_str}
+Report File:     {report_filename}
+""".lstrip()
+
+    base_query_filename = get_config_value(APP_CONFIG, 'Filenames', 'base_query_src')
+    base_query_path = os.path.join(PROJECT_ROOT, base_query_filename) # Corrected path
+    try:
+        with open(base_query_path, 'r', encoding='utf-8') as f:
+            base_query_content = f.read()
+    except FileNotFoundError:
+        base_query_content = "--- BASE QUERY NOT FOUND ---"
+
+    params_content = f"""
+--- Run Parameters ---
+Num Iterations (m): {params.get('num_trials', 'N/A')}
+Items per Query (k): {params.get('group_size', 'N/A')}
+Mapping Strategy: {params.get('mapping_strategy', 'N/A')}
+Personalities Source: {params.get('db', 'N/A')}
+LLM Model:       {params.get('model_name', 'N/A')}
+Run Notes:       {args.notes}
+================================================================================
+
+
+--- Base Query Prompt Used ---
+{base_query_content.strip()}
+-------------------------------
+""".rstrip()
+
+    try:
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(header_content)
+            f.write("\n" + params_content)
             
-    df = df[fieldnames]
-    df.to_csv(output_path, index=False)
+            if 'updated_metrics' in locals():
+                human_readable_summary = _build_human_readable_summary(updated_metrics, params)
+                f.write(human_readable_summary)
+                f.write("\n\n<<<METRICS_JSON_START>>>\n")
+                f.write(json.dumps(updated_metrics, indent=4))
+                f.write("\n<<<METRICS_JSON_END>>>")
+            else:
+                f.write("\n\n--- PIPELINE FAILED: LOGS ---\n")
+                f.write("".join(all_stage_outputs))
+    except IOError as e:
+        logging.error(f"FATAL: Could not write final report to {report_path}: {e}")
 
 
 if __name__ == "__main__":

@@ -54,46 +54,57 @@ from datetime import datetime
 
 def parse_report_file(report_path):
     """Parses a single report file to extract all necessary fields for the log."""
-    # This function remains the same as it's the core parsing logic.
     with open(report_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     params = {}
-    metrics = {'mean_mrr': 'N/A', 'mean_top_1_acc': 'N/A'}
+    metrics = {}
 
     def extract(pattern, text):
-        match = re.search(pattern, text, re.IGNORECASE)
+        match = re.search(pattern, text, re.MULTILINE)
         return match.group(1).strip() if match else None
 
-    params['run_directory'] = extract(r"Run Directory:\s*(.*)", content)
-    params['status'] = extract(r"Final Status:\s*(.*)", content)
-    params['parsing_status'] = extract(r"Parsing Status:\s*(.*)", content)
-
-    if params['run_directory']:
-        rep_match = re.search(r"rep-(\d+)", params['run_directory'])
-        params['replication'] = rep_match.group(1) if rep_match else 'N/A'
-        time_match = re.search(r'run_(\d{8}_\d{6})', params['run_directory'])
-        params['start_time'] = datetime.strptime(time_match.group(1), '%Y%m%d_%H%M%S') if time_match else None
+    # --- Extract from Header ---
+    params['run_directory'] = extract(r"^Run Directory:\s*(run_.*)", content)
+    params['status'] = extract(r"^Final Status:\s*(.*)", content)
+    params['parsing_status'] = extract(r"^Parsing Status:\s*(.*)", content)
+    params['replication'] = extract(r"^Replication Number:\s*(\d+)", content)
     
+    start_time_str = extract(r"^Date:\s*(.*)", content)
+    start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S') if start_time_str and 'N/A' not in start_time_str else None
+
+    # --- Extract from JSON ---
     json_match = re.search(r"<<<METRICS_JSON_START>>>(.*?)<<<METRICS_JSON_END>>>", content, re.DOTALL)
     if json_match:
         try:
-            json_data = json.loads(json_match.group(1).strip())
-            metrics.update(json_data)
-        except (json.JSONDecodeError, IndexError):
+            metrics = json.loads(json_match.group(1).strip())
+        except json.JSONDecodeError:
             print(f"Warning: Malformed JSON in {os.path.basename(report_path)}")
             
+    # --- EndTime and Duration ---
     end_time = None
-    time_match_end = re.search(r'_(\d{8}-\d{6})\.txt$', os.path.basename(report_path))
-    if time_match_end:
-        end_time = datetime.strptime(time_match_end.group(1), '%Y%m%d-%H%M%S')
-
     duration_str = "N/A"
-    if params.get('start_time') and end_time:
-        duration_seconds = (end_time - params['start_time']).total_seconds()
-        hours, rem = divmod(duration_seconds, 3600)
-        minutes, secs = divmod(rem, 60)
-        duration_str = f"{int(hours):02d}:{int(minutes):02d}:{int(round(secs)):02d}"
+    report_filename = os.path.basename(report_path)
+    time_match_end = re.search(r'_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.txt$', report_filename)
+    if time_match_end:
+        try:
+            report_time = datetime.strptime(time_match_end.group(1), '%Y-%m-%d_%H-%M-%S')
+            
+            # For original runs, EndTime IS the report time.
+            if "(Reprocessed:" not in content:
+                end_time = report_time
+                if start_time:
+                    duration_seconds = (end_time - start_time).total_seconds()
+                    if duration_seconds >= 0:
+                        hours, rem = divmod(duration_seconds, 3600)
+                        minutes, secs = divmod(rem, 60)
+                        duration_str = f"{int(hours):02d}:{int(minutes):02d}:{int(round(secs)):02d}"
+            else:
+                # For reprocessed runs, EndTime and Duration are not applicable.
+                end_time = None
+                duration_str = "N/A"
+        except (ValueError, TypeError):
+            end_time = None
 
     mrr_val = metrics.get('mean_mrr')
     top1_val = metrics.get('mean_top_1_acc')
@@ -101,12 +112,12 @@ def parse_report_file(report_path):
     return {
         'ReplicationNum': params.get('replication', 'N/A'),
         'Status': params.get('status', 'UNKNOWN'),
-        'StartTime': params['start_time'].strftime('%Y-%m-%d %H:%M:%S') if params.get('start_time') else 'N/A',
+        'StartTime': start_time.strftime('%Y-%m-%d %H:%M:%S') if start_time else 'N/A',
         'EndTime': end_time.strftime('%Y-%m-%d %H:%M:%S') if end_time else 'N/A',
         'Duration': duration_str,
         'ParsingStatus': params.get('parsing_status', 'N/A'),
-        'MeanMRR': f"{mrr_val:.4f}" if isinstance(mrr_val, (int, float)) else 'N/A',
-        'MeanTop1Acc': f"{top1_val:.2%}" if isinstance(top1_val, (int, float)) else 'N/A',
+        'MeanMRR': f"{mrr_val:.4f}" if isinstance(mrr_val, (float, int)) else 'N/A',
+        'MeanTop1Acc': f"{top1_val:.2%}" if isinstance(top1_val, (float, int)) else 'N/A',
         'RunDirectory': params.get('run_directory', 'N/A'),
         'ErrorMessage': 'N/A' if params.get('status') == 'COMPLETED' else 'See report'
     }
@@ -227,7 +238,6 @@ def main():
 
     elif args.mode == 'rebuild':
         log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
-        # --- MODIFICATION: Back up instead of deleting ---
         if os.path.exists(log_file_path):
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
             backup_path = f"{log_file_path}.{timestamp}.bak"
@@ -237,21 +247,66 @@ def main():
             except OSError as e:
                 print(f"Error: Could not back up existing log file: {e}", file=sys.stderr)
                 sys.exit(1)
-        # --- END MODIFICATION ---
         
+        # --- Manifest-Aware Refactoring ---
+        # 1. Load the experiment manifest to get global parameters
+        manifest_path = os.path.join(args.output_dir, "experiment_manifest.json")
+        manifest_params = {}
+        try:
+            with open(manifest_path, 'r') as f:
+                manifest_data = json.load(f)
+            manifest_params = manifest_data.get("parameters", {})
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"FATAL: Could not load or parse experiment_manifest.json. Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        # 2. Update fieldnames to include parameters from the manifest
+        param_keys = ['model_name', 'temperature', 'mapping_strategy', 'group_size']
+        # Ensure fieldnames are updated correctly, inserting new keys in a sensible order
+        fieldnames.insert(5, 'model_name')
+        fieldnames.insert(6, 'temperature')
+        fieldnames.insert(7, 'mapping_strategy')
+        fieldnames.insert(8, 'group_size')
+
         report_files = glob.glob(os.path.join(args.output_dir, "run_*", "replication_report_*.txt"))
         if not report_files:
             print("No report files found. Creating empty log.", file=sys.stderr)
-            # Still create an empty log so the pipeline doesn't fail
             write_log_row(log_file_path, {}, fieldnames)
             sys.exit(0)
 
-        # Sort reports by replication number from the filename to ensure correct order
-        report_files.sort(key=lambda p: int(re.search(r'rep-(\d+)', os.path.basename(os.path.dirname(p))).group(1)))
+        # Use a more robust sorting key
+        def get_rep_num_from_path(path):
+            try:
+                dir_name = os.path.basename(os.path.dirname(path))
+                match = re.search(r'rep-(\d+)', dir_name)
+                return int(match.group(1)) if match else 9999
+            except (ValueError, TypeError, AttributeError):
+                return 9999
+        report_files.sort(key=get_rep_num_from_path)
 
+        # 3. For each report, merge its data with the manifest parameters
         for report_path in report_files:
-            log_entry = parse_report_file(report_path)
-            write_log_row(log_file_path, log_entry, fieldnames)
+            try:
+                log_entry = parse_report_file(report_path)
+                # Inject the global parameters from the manifest into each log row
+                for key in param_keys:
+                    log_entry[key] = manifest_params.get(key, 'N/A')
+                
+                write_log_row(log_file_path, log_entry, fieldnames)
+            except Exception as e:
+                # If any report fails to parse, print a detailed error and continue.
+                # This prevents a single bad report from crashing the entire process.
+                print(f"\nERROR: Failed to parse report file: {report_path}", file=sys.stderr)
+                print(f"       Reason: {e}", file=sys.stderr)
+                # Write a placeholder error row to the log for diagnostics
+                error_entry = {fn: 'N/A' for fn in fieldnames}
+                error_entry.update({
+                    'ReplicationNum': 'ERR',
+                    'Status': 'PARSE_FAILED',
+                    'RunDirectory': os.path.basename(os.path.dirname(report_path)),
+                    'ErrorMessage': f"Parsing failed: {e}"
+                })
+                write_log_row(log_file_path, error_entry, fieldnames)
         print(f"Successfully rebuilt {os.path.basename(log_file_path)} from {len(report_files)} reports.")
 
     elif args.mode == 'finalize':

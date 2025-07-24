@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env pwsh
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -21,45 +21,41 @@
 
 <#
 .SYNOPSIS
-    Updates an experiment by regenerating all analysis reports and summary files.
+    Updates an existing experiment by regenerating all analysis reports and summary files.
 
 .DESCRIPTION
-    This script serves as a user-friendly wrapper for 'src/experiment_manager.py' with the '--reprocess' flag.
-    It first runs a preliminary audit. If the audit finds issues that can be fixed by reprocessing,
-    it proceeds automatically. If the audit finds the experiment is already complete and valid,
-    it will prompt the user for confirmation before forcing a full update.
+    This script calls the core 'experiment_manager.py' with the '--reprocess' flag.
+    It's the ideal tool for applying analysis updates or bug fixes without re-running
+    expensive LLM API calls.
 
-    This process involves two main steps:
-    1. Regenerating the primary report ('replication_report.txt') for each individual run.
-    2. Re-running the hierarchical aggregation to update all summary files ('REPLICATION_results.csv', 'EXPERIMENT_results.csv').
-
-    This is the ideal tool for applying analysis updates or bug fixes without repeating expensive LLM API calls,
-    as it ensures the entire data hierarchy is consistent.
+    By default, it shows a summary and prompts for confirmation before running. It will
+    warn you if you are forcing an update on an already valid experiment.
 
 .PARAMETER TargetDirectory
-    (Required) The full path to the experiment directory that you want to update. This is a positional
-    parameter, so you can provide the path directly after the script name.
+    (Required) The path to the experiment directory to update.
+
+.PARAMETER Force
+    A switch to bypass the confirmation prompt for automated or scripted use.
 
 .PARAMETER Notes
-    (Optional) A string containing notes to embed in the run logs and reports. This is useful for
-    documenting why the reprocessing was performed.
+    (Optional) A string of notes to embed in the reports, useful for documenting why
+    the update was performed.
 
 .PARAMETER Verbose
-    (Optional) A switch parameter that enables detailed, real-time logging from the underlying Python
-    scripts during the reprocessing phase.
+    (Optional) A switch to enable detailed, real-time logging from the underlying Python script.
 
 .EXAMPLE
-    # Reprocess the experiment located in 'output/reports/MyStudy/Experiment_1'
-    .\update_experiment.ps1 -TargetDirectory "output/reports/MyStudy/Experiment_1"
+    # Interactively update an experiment
+    .\update_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250721_175416"
 
 .EXAMPLE
-    # Reprocess the same experiment with verbose output and notes
-    .\update_experiment.ps1 "output/reports/MyStudy/Experiment_1" -Notes "Applied fix to MRR calculation" -Verbose
+    # Force a non-interactive update with notes for an automated script
+    .\update_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250721_175416" -Notes "Applied new bias metric" -Force
 #>
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to update.")]
+    [Parameter(Mandatory = $true, HelpMessage = "Path to the experiment directory to update.")]
     [ValidateScript({
         if (-not (Test-Path $_ -PathType Container)) {
             throw "The specified TargetDirectory does not exist or is not a directory: $_"
@@ -69,94 +65,91 @@ param(
     [string]$TargetDirectory,
 
     [Parameter(Mandatory = $false)]
-    [string]$Notes
+    [string]$Notes,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Force
 )
 
-# --- Auto-detect execution environment ---
-$executable = "python"
-$prefixArgs = @()
-if (Get-Command pdm -ErrorAction SilentlyContinue) {
-    $executable = "pdm"
-    $prefixArgs = "run", "python"
-}
+# This invocation guard ensures the main execution logic is only triggered
+# when the script is run directly (not dot-sourced).
+if ($MyInvocation.InvocationName -ne '.') {
 
-try {
-    Write-Host "--- Auditing experiment before update... ---" -ForegroundColor Cyan
-    # Always force color for consistent output handling from Python script
-    $auditArgs = @("src/experiment_manager.py", "--verify-only", $TargetDirectory, "--force-color")
+    # Use the built-in $PSScriptRoot variable.
+    $ScriptRoot = $PSScriptRoot
 
-    # Execute and capture the output to display it, but crucially check $LASTEXITCODE
-    & $executable $prefixArgs $auditArgs
-    $auditExitCode = $LASTEXITCODE
-
-    switch ($auditExitCode) {
-        0 { # AUDIT_ALL_VALID
-            # If the experiment is already valid, ask the user if they want to force a reprocess.
-            $promptMessage = "`nExperiment is already complete and valid. Do you want to force an update anyway? (Y/N)"
-            $proceed = $false
-            while ($true) {
-                $choice = Read-Host -Prompt $promptMessage
-                $cleanChoice = $choice.Trim().ToLower()
-                if ($cleanChoice -eq 'y') {
-                    $proceed = $true
-                    break
-                }
-                if ($cleanChoice -eq 'n') {
-                    break
-                }
-            }
-
-            if (-not $proceed) {
-                Write-Host "Update aborted by user." -ForegroundColor Yellow
-                return # Exit the script successfully without doing anything.
-            }
-            # If 'y', proceed to the reprocess step.
-            Write-Host "`nProceeding with forced update as requested..." -ForegroundColor Cyan
-        }
-        1 { # AUDIT_NEEDS_REPROCESS
-            # The audit confirmed an update is needed. Let the user know we're proceeding.
-            Write-Host "`nAn update is required to fix analysis files. Proceeding..." -ForegroundColor Cyan
-        }
-        2 { # AUDIT_NEEDS_REPAIR
-            # The audit script already printed the reason and recommendation. Exit with a failure code.
-            exit 1
-        }
-        3 { # AUDIT_NEEDS_MIGRATION
-            # The audit script already printed the reason and recommendation. Exit with a failure code.
-            exit 1
-        }
-        default {
-            throw "Audit script failed unexpectedly with exit code $auditExitCode. Cannot proceed."
-        }
+    # --- Auto-detect execution environment ---
+    $executable = "python"
+    $prefixArgs = @()
+    if (Get-Command pdm -ErrorAction SilentlyContinue) {
+        Write-Host "PDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+        $executable = "pdm"
+        $prefixArgs = "run", "python"
+    }
+    else {
+        Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
     }
 
-    Write-Host "`n--- Starting experiment reprocessing... ---" -ForegroundColor Cyan
-    $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory)
-    # The --verbose flag from the wrapper is passed here, not to the audit.
-    if ($Verbose.IsPresent) {
-        $procArgs += "--verbose"
+    # Ensure console output uses UTF-8 to correctly display any special characters.
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+    # --- Display a summary and ask for confirmation (unless -Force is used) ---
+    if (-not $Force.IsPresent) {
+        Write-Host "`n--- Update Configuration Summary ---" -ForegroundColor Cyan
+        Write-Host "Action:            Update an EXISTING experiment (regenerate reports)."
+        Write-Host "Target Directory:  $TargetDirectory"
+        if ($Notes) { Write-Host "Notes:             $Notes" -ForegroundColor Yellow }
+        Write-Host "------------------------------------" -ForegroundColor Cyan
+
+        $choice = Read-Host "`nDo you wish to proceed with the update? (Y/N)"
+        if ($choice.Trim().ToLower() -ne 'y') {
+            Write-Host "Update aborted by user." -ForegroundColor Yellow
+            Write-Host "" # Add a blank line for separation
+            exit 0
+        }
     }
-    if ($Notes) { $procArgs += "--notes", $Notes }
+    
+    Write-Host "`n--- Launching Experiment Manager (Update Mode) ---" -ForegroundColor Cyan
 
-    # Add --force-color for the reprocessing step as well
-    $procArgs += "--force-color"
+    $pythonScriptPath = Join-Path $ScriptRoot "src/experiment_manager.py"
+    $pythonArgs = @($pythonScriptPath)
 
-    & $executable $prefixArgs $procArgs
-    if ($LASTEXITCODE -ne 0) { throw "Re-processing failed with exit code $LASTEXITCODE" }
-
-    Write-Host "`n--- Running post-update audit to verify changes... ---" -ForegroundColor Cyan
-    & $executable $prefixArgs $auditArgs
-    if ($LASTEXITCODE -ne 0) {
-        # The update should result in a valid state (exit code 0). If not, something is wrong.
-        Write-Warning "Post-update audit failed. The experiment may still have unresolved issues."
+    # Core arguments for this script
+    $pythonArgs += "--reprocess"
+    $pythonArgs += "--target_dir", $TargetDirectory
+    
+    # Optional arguments
+    if ($PSBoundParameters.ContainsKey('Notes')) { $pythonArgs += "--notes", $Notes }
+    if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) {
+        $pythonArgs += "--verbose"
     }
 
-    Write-Host "`nExperiment update completed successfully for:" -ForegroundColor Green
-    Write-Host $TargetDirectory -ForegroundColor Green
-} catch {
-    # The 'throw' statements in the switch block will be caught here.
-    Write-Error "An error occurred during the update process: $($_.Exception.Message)"
-    exit 1
+    $finalArgs = $prefixArgs + $pythonArgs
+
+    try {
+        & $executable $finalArgs
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -eq 0) {
+            Write-Host "`nExperiment update completed successfully for:" -ForegroundColor Green
+            Write-Host $TargetDirectory -ForegroundColor Green
+        } 
+        elseif ($exitCode -eq 99) {
+            # This is the special exit code for a user-initiated abort from the Python script.
+            # The Python script has already printed the "aborted by user" message,
+            # so we just exit gracefully here.
+        }
+        else {
+            # Any other non-zero exit code is a genuine error.
+            throw "Experiment Manager exited with an error."
+        }
+
+    } catch {
+        Write-Host "`n!!! $($_.Exception.Message) Check the output above. !!!" -ForegroundColor Yellow
+    }
+
+    # Add a final blank line for clean separation from the next PS prompt.
+    Write-Host ""
 }
 
 # === End of update_experiment.ps1 ===

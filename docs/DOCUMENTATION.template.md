@@ -425,7 +425,7 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 ## Replication Pipeline Scripts
 
-*   **`orchestrate_replication.py`**: The engine for a **single** replication run. It reads its parameters from the experiment-level `experiment_manifest.json` and sequentially executes the pipeline stages below. It now uses numbered stages internally for clarity.
+*   **`orchestrate_replication.py`**: The engine for a **single** replication run. It reads parameters from the `experiment_manifest.json` and executes the six-stage pipeline. Crucially, it assembles the final `replication_report.txt` by combining parameters from the manifest, results from the `replication_metrics.json` file, and logs from all pipeline stages.
 
 *   **`build_llm_queries.py`**: **Stage 1.** Called by the orchestrator. Samples personalities and calls the `query_generator.py` worker to create all files needed for the trials.
 
@@ -433,7 +433,7 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 *   **`process_llm_responses.py`**: **Stage 3.** Parses the raw text responses from the LLM into structured score and mapping files.
 
-*   **`analyze_llm_performance.py`**: **Stage 4 (Part 1).** Performs the primary statistical analysis for the replication. It calculates core performance metrics (MRR, Top-K accuracy) and generates the initial `replication_metrics.json` file, along with a human-readable summary that is captured by the orchestrator for the final report.
+*   **`analyze_llm_performance.py`**: **Stage 4 (Part 1).** The core quantitative calculator. It performs the primary statistical analysis, and its *only* output is the `replication_metrics.json` file, which contains all calculated metrics. It no longer produces a human-readable summary.
 
 *   **`run_bias_analysis.py`**: **Stage 4 (Part 2).** Called by the orchestrator immediately after the primary analysis. It calculates diagnostic metrics for positional bias, reads the `replication_metrics.json` file, injects its new metrics, and overwrites the file to complete the analysis stage.
 
