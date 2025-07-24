@@ -70,6 +70,7 @@ Usage:
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import argparse
@@ -201,15 +202,11 @@ def check_diagrams_are_up_to_date(project_root):
     
     return all_up_to_date
 
-def build_readme_content(project_root, flavor='viewer'):
+def process_markdown_content(content, project_root, flavor='viewer'):
     """
-    Builds the full DOCUMENTATION.md content by processing the template,
-    injecting custom placeholders.
+    Processes a string of markdown content, replacing custom placeholders for
+    diagrams, figures, includes, and page breaks.
     """
-    template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
-    with open(template_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-
     # --- Helper for diagram-related paths ---
     def _get_diagram_paths(diagram_source_rel_path):
         base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
@@ -323,17 +320,35 @@ def build_readme_content(project_root, flavor='viewer'):
 
     return content
 
-
-def render_all_diagrams(project_root, force_render=False):
+def build_readme_content(project_root, flavor='viewer'):
     """
-    Renders all diagrams found in the template, including those in {{grouped_figure}},
-    returning True on success.
+    Builds the full DOCUMENTATION.md content by processing the template.
+    This is a convenience wrapper around process_markdown_content.
     """
     template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
     with open(template_path, 'r', encoding='utf-8') as f:
         content = f.read()
+    return process_markdown_content(content, project_root, flavor)
+
+def render_all_diagrams(project_root, force_render=False, template_files=None):
+    """
+    Scans all specified template files for diagram placeholders, then renders
+    or copies them as needed. Returns True on success.
+    """
+    if template_files is None:
+        template_files = ['docs/DOCUMENTATION.template.md']
 
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Processing Diagrams ---{Colors.RESET}")
+    
+    content_to_scan = ""
+    for file_rel_path in template_files:
+        try:
+            with open(os.path.join(project_root, file_rel_path), 'r', encoding='utf-8') as f:
+                content_to_scan += f.read() + "\n"
+        except FileNotFoundError:
+            print(f"    - {Colors.YELLOW}WARNING: Template file for diagram scan not found: {file_rel_path}{Colors.RESET}")
+
+    content = content_to_scan
     images_dir = os.path.join(project_root, 'docs', 'images')
     os.makedirs(images_dir, exist_ok=True)
     
@@ -399,9 +414,18 @@ def render_all_diagrams(project_root, force_render=False):
                 font_size = 22 if 'replication_report_format' in diagram_source_rel_path else 20 if 'analysis_log_format' in diagram_source_rel_path else 36
                 if not render_text_diagram(source_abs_path, image_abs_path, project_root, font_size=font_size):
                     all_diagrams_ok = False
+            elif diagram_source_rel_path.endswith(('.png', '.jpg', '.jpeg')):
+                print(f"    - Copying pre-generated image: {Colors.CYAN}{os.path.basename(diagram_source_rel_path)}{Colors.RESET}")
+                try:
+                    shutil.copy2(source_abs_path, image_abs_path) # copy2 preserves metadata like mtime
+                except FileNotFoundError:
+                    print(f"    - {Colors.RED}ERROR: Source image not found at {source_abs_path}{Colors.RESET}")
+                    all_diagrams_ok = False
+                except Exception as e:
+                    print(f"    - {Colors.RED}ERROR: Failed to copy {os.path.basename(diagram_source_rel_path)}: {e}{Colors.RESET}")
+                    all_diagrams_ok = False
             else:
-                print(f"    - {Colors.YELLOW}WARNING: Unknown diagram type for {Colors.CYAN}{os.path.basename(diagram_source_rel_path)}{Colors.RESET}. Skipping rendering.{Colors.RESET}")
-                # Do not set all_diagrams_ok = False here unless you want the build to fail for unknown types.
+                print(f"    - {Colors.YELLOW}WARNING: Unknown diagram type for {Colors.CYAN}{os.path.basename(diagram_source_rel_path)}{Colors.RESET}. Skipping processing.{Colors.RESET}")
     
     if not all_diagrams_ok:
         print(f"\n{Colors.RED}{Colors.BOLD}--- BUILD FAILED: One or more diagrams could not be rendered. ---{Colors.RESET}")
@@ -523,7 +547,12 @@ def main():
             print(f"\n{Colors.RED}Documentation is out of date. Please run 'pdm run build-docs' and commit the changes.{Colors.RESET}")
             sys.exit(1)
 
-    if not render_all_diagrams(project_root, force_render=args.force_render):
+    # Define which files have placeholders that might contain diagrams
+    files_with_diagrams = [
+        'docs/DOCUMENTATION.template.md',
+        'docs/study_article.md'
+    ]
+    if not render_all_diagrams(project_root, force_render=args.force_render, template_files=files_with_diagrams):
         sys.exit(1)
 
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Markdown for Viewers ---{Colors.RESET}")
@@ -538,17 +567,39 @@ def main():
         import pypandoc
         pandoc_content = build_readme_content(project_root, flavor='pandoc')
         
-        readme_docx = os.path.join(project_root, 'docs/DOCUMENTATION.docx')
-        if not convert_to_docx(pypandoc, readme_docx, project_root, source_md_content=pandoc_content):
+        # --- 1. Convert the main documentation (from in-memory content) ---
+        readme_docx_path = os.path.join(project_root, 'docs/DOCUMENTATION.docx')
+        if not convert_to_docx(pypandoc, readme_docx_path, project_root, source_md_content=pandoc_content):
             sys.exit(1)
         
-        root_md_files = ["CONTRIBUTING.md", "CHANGELOG.md", "LICENSE.md"]
-        for md_filename in root_md_files:
-            source_path = os.path.join(project_root, md_filename)
+        # --- 2. Convert other markdown files, processing placeholders where needed ---
+        files_to_convert = {
+            "CONTRIBUTING.md": False,
+            "CHANGELOG.md": False,
+            "LICENSE.md": False,
+            "docs/study_article.md": True  # This file contains placeholders
+        }
+        
+        for rel_path, process_placeholders in files_to_convert.items():
+            source_path = os.path.join(project_root, rel_path)
             if os.path.exists(source_path):
-                output_filename = os.path.splitext(md_filename)[0] + ".docx"
+                base_filename = os.path.basename(rel_path)
+                output_filename = os.path.splitext(base_filename)[0] + ".docx"
                 output_path = os.path.join(project_root, 'docs', output_filename)
-                if not convert_to_docx(pypandoc, output_path, project_root, source_md_path=source_path):
+                
+                content_to_convert = None
+                path_to_convert = source_path
+
+                if process_placeholders:
+                    with open(source_path, 'r', encoding='utf-8') as f:
+                        raw_content = f.read()
+                    # Process its content to handle placeholders
+                    content_to_convert = process_markdown_content(raw_content, project_root, flavor='pandoc')
+                    path_to_convert = None # Ensure we use content, not path
+
+                if not convert_to_docx(pypandoc, output_path, project_root, 
+                                       source_md_path=path_to_convert, 
+                                       source_md_content=content_to_convert):
                     sys.exit(1)
         
         print(f"\n{Colors.GREEN}{Colors.BOLD}All documents built successfully.{Colors.RESET}")

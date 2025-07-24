@@ -1040,10 +1040,10 @@ def main():
 
     # --- Script Paths ---
     orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
-    sessions_script = os.path.join(current_dir, "run_llm_sessions.py")
-    log_manager_script = os.path.join(current_dir, "replication_log_manager.py")
-    compile_script = os.path.join(current_dir, "experiment_aggregator.py")
-    bias_analysis_script = os.path.join(current_dir, "run_bias_analysis.py")
+    process_script = os.path.join(src_dir, 'process_llm_responses.py')
+    analyze_script = os.path.join(src_dir, 'analyze_llm_performance.py')
+    bias_script = os.path.join(src_dir, 'run_bias_analysis.py')
+    aggregator_script = os.path.join(src_dir, 'experiment_aggregator.py')
     patch_script = os.path.join(current_dir, "patch_old_experiment.py")
     rebuild_script = os.path.join(current_dir, "rebuild_reports.py")
 

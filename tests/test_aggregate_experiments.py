@@ -30,9 +30,9 @@ import configparser
 import json
 
 # Import the functions from the module we are testing
-from src.experiment_aggregator import main as compile_main, parse_config_params
+from src.aggregate_experiments import main as compile_main, parse_config_params
 
-class TestExperimentAggregatorScript(unittest.TestCase):
+class TestAggregateExperimentsScript(unittest.TestCase):
 
     def setUp(self):
         """Set up a temporary directory for each test."""
@@ -79,7 +79,7 @@ class TestExperimentAggregatorScript(unittest.TestCase):
             metrics_data={'mwu_stouffer_p': 0.88} # No bias metrics
         )
         
-        with patch.object(sys, 'argv', ['experiment_aggregator.py', study_dir]):
+        with patch.object(sys, 'argv', ['aggregate_experiments.py', study_dir]):
             compile_main()
 
         study_output_path = os.path.join(study_dir, "STUDY_results.csv")
@@ -99,7 +99,7 @@ class TestExperimentAggregatorScript(unittest.TestCase):
         """Test script handles a non-existent directory correctly."""
         invalid_path = os.path.join(self.test_dir, "non_existent")
         
-        with patch.object(sys, 'argv', ['experiment_aggregator.py', invalid_path]):
+        with patch.object(sys, 'argv', ['aggregate_experiments.py', invalid_path]):
             compile_main()
             
         mock_log_error.assert_called_with(f"Error: The specified directory does not exist: {invalid_path}")

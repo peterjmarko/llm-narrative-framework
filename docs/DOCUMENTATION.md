@@ -41,10 +41,10 @@ The result is a clean dataset of personality profiles where the connection to th
 -   **Powerful Reprocessing Engine**: The manager's `--reprocess` mode allows for re-running the data processing and analysis stages on existing results without repeating expensive LLM calls. This makes it easy to apply analysis updates or bug fixes across an entire experiment.
 -   **Guaranteed Reproducibility**: On every new run, the `config.ini` file is automatically archived in the run's output directory, permanently linking the results to the exact parameters that generated them.
 -   **Standardized, Comprehensive Reporting**: Each replication produces a `replication_report.txt` file containing run parameters, status, a human-readable statistical summary, and a machine-parsable JSON block with all key metrics. This format is identical for new runs and reprocessed runs.
--   **Hierarchical Analysis & Aggregation**: The `experiment_aggregator.py` script performs a bottom-up aggregation of all data, generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and a master `STUDY_results.csv`) for a fully auditable research archive.
+-   **Hierarchical Analysis & Aggregation**: The `aggregate_experiments.py` script performs a bottom-up aggregation of all data, generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and a master `STUDY_results.csv`) for a fully auditable research archive.
 -   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `replication_log_manager.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
 -   **Enhanced Console Readability**: All console outputs for file paths, commands, and key statuses are now formatted with consistent newlines and indentation, greatly improving log clarity and user experience during long runs.
--   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `experiment_aggregator.py` prepares a master dataset, which `study_analysis.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
+-   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `aggregate_experiments.py` prepares a master dataset, which `study_analyzer.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
 
 ## Visual Architecture
 
@@ -65,7 +65,7 @@ The codebase can be divided into the following components:
 
 <div align="center">
   <p>Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.</p>
-  <img src="images/codebase_architecture.png" width="100%">
+  <img src="images/view_codebase.png" width="100%">
 </div>
 
 ### Workflow Diagrams
@@ -100,7 +100,7 @@ The `orchestrate_replication.py` script executes the full pipeline for a single 
 
 <div align="center">
   <p>Workflow 1: Run an Experiment, showing the main control loop and the internal replication pipeline.</p>
-  <img src="images/architecture_workflow_1_run_experiment.png" width="65%">
+  <img src="images/flow_1_run_experiment.png" width="65%">
 </div>
 
 
@@ -110,7 +110,7 @@ This workflow provides a read-only, detailed completeness report for an experime
 
 <div align="center">
   <p>Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.</p>
-  <img src="images/architecture_workflow_2_audit_experiment.png" width="100%">
+  <img src="images/flow_2_audit_experiment.png" width="100%">
 </div>
 
 ##### Interpreting the Audit Report
@@ -147,7 +147,7 @@ The reprocessing is a two-step action: first, `orchestrate_replication.py --repr
 
 <div align="center">
   <p>Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.</p>
-  <img src="images/architecture_workflow_3_update_experiment.png" width="100%">
+  <img src="images/flow_3_update_experiment.png" width="100%">
 </div>
 
 
@@ -162,7 +162,7 @@ This utility workflow provides a safe, non-destructive process to transform olde
 
 <div align="center">
   <p>Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.</p>
-  <img src="images/architecture_workflow_4_migrate_data.png" width="100%">
+  <img src="images/flow_4_migrate_data.png" width="100%">
 </div>
 
 
@@ -172,17 +172,17 @@ This workflow provides a read-only, consolidated completeness report for all exp
 
 <div align="center">
   <p>Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.</p>
-  <img src="images/architecture_workflow_5_audit_study.png" width="100%">
+  <img src="images/flow_5_audit_study.png" width="100%">
 </div>
 
 
 #### Workflow 6: Analyze a Study
 
-This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
+This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `aggregate_experiments.py` and then `study_analyzer.py`.
 
 <div align="center">
   <p>Workflow 6: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.</p>
-  <img src="images/architecture_workflow_6_analyze_study.png" width="100%">
+  <img src="images/flow_6_analyze_study.png" width="100%">
 </div>
 
 
@@ -192,7 +192,7 @@ This workflow provides a convenient batch operation to update all out-of-date ex
 
 <div align="center">
   <p>Workflow 7: Update a Study. A batch operation to update all out-of-date experiments in a study.</p>
-  <img src="images/architecture_workflow_7_update_study.png" width="100%">
+  <img src="images/flow_7_update_study.png" width="100%">
 </div>
 
 
@@ -202,7 +202,7 @@ This diagram shows how data artifacts (files) are created and transformed by the
 
 <div align="center">
   <p>Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.</p>
-  <img src="images/architecture_data_flow.png" width="75%">
+  <img src="images/view_data_flow.png" width="75%">
 </div>
 
 ### Experimental Logic Flowchart
@@ -211,7 +211,7 @@ This diagram illustrates the scientific methodology for a single replication run
 
 <div align="center">
   <p>Experimental Logic Flowchart: Scientific methodology for a single replication run.</p>
-  <img src="images/architecture_experimental_logic.png" width="65%">
+  <img src="images/logic_experimental.png" width="65%">
 </div>
 
 ## Experimental Hierarchy
@@ -228,7 +228,7 @@ The project's experiments are organized in a logical hierarchy:
 This logical hierarchy is reflected in the physical layout of the repository:
 
 <div align="center">
-  <img src="images/directory_structure.png" width="90%">
+  <img src="images/view_directory_structure.png" width="90%">
 </div>
 
 ## Setup and Installation
@@ -304,7 +304,7 @@ The framework is designed around three primary user actions, each handled by a d
 
 <div align="center">
   <p>Choosing the Right Workflow: Separation of Concerns.</p>
-  <img src="images/decision_tree_workflow.png" width="100%">
+  <img src="images/logic_workflow_chooser.png" width="100%">
 </div>
 
 -   **`run_experiment.ps1` (Data Generation & Repair)**: This is your primary tool. Use it to start a new experiment from scratch or to resume/repair an interrupted one. Its sole focus is to ensure the raw data (queries and LLM responses) is complete according to your `config.ini`.
@@ -424,7 +424,7 @@ The pipeline generates a consistent, standardized `replication_report.txt` for e
 Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
 
 <div align="center">
-  <img src="images/replication_report_format.png" >
+  <img src="images/format_replication_report.png" >
 </div>
 
 **Date Handling by Mode:**
@@ -433,10 +433,10 @@ Each report contains a clear header, the base query used, a human-readable analy
 
 ### Study Analysis Log Format
 
-The final analysis script (`study_analysis.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
+The final analysis script (`study_analyzer.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
 <div align="center">
-  <img src="images/analysis_log_format.png" >
+  <img src="images/format_analysis_log.png" >
 </div>
 
 ---
@@ -477,9 +477,9 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 ## Study-Level Analysis Scripts
 
-*   **`experiment_aggregator.py`**: Recursively scans a study directory, performing a bottom-up aggregation and generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`).
+*   **`aggregate_experiments.py`**: Recursively scans a study directory, performing a bottom-up aggregation and generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`).
 
-*   **`study_analysis.py`**: Performs the final statistical analysis (Two-Way ANOVA, post-hoc tests) on a study's master CSV file and produces a detailed analysis log and publication-quality boxplots.
+*   **`study_analyzer.py`**: Performs the final statistical analysis (Two-Way ANOVA, post-hoc tests) on a study's master CSV file and produces a detailed analysis log and publication-quality boxplots.
 
 ## Worker Scripts
 

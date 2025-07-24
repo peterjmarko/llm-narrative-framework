@@ -14,7 +14,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# Filename: src/experiment_aggregator.py
+# Filename: src/aggregate_experiments.py
 
 """
 Hierarchical Results Compiler for Study-Wide Analysis.
@@ -40,10 +40,10 @@ Its core mechanism is a **bottom-up hierarchical compilation**:
 
 The final output is a set of perfectly structured, level-aware CSV files that
 create a fully auditable data archive, ready for the final statistical
-analysis phase (`analyze_study_results.py`).
+analysis phase (`study_analyzer.py`).
 
-Usage (typically called by process_study.ps1):
-    python src/compile_study_results.py /path/to/study_directory
+Usage (typically called by analyze_study.ps1):
+    python src/aggregate_experiments.py /path/to/study_directory
 """
 
 import os
@@ -227,5 +227,5 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/compile_study_results.py ===
+# === End of src/aggregate_experiments.py ===
 

@@ -231,7 +231,7 @@ def main():
     process_script = os.path.join(src_dir, 'process_llm_responses.py')
     analyze_script = os.path.join(src_dir, 'analyze_llm_performance.py')
     bias_script = os.path.join(src_dir, 'run_bias_analysis.py')
-    aggregator_script = os.path.join(src_dir, 'experiment_aggregator.py')
+    aggregator_script = os.path.join(src_dir, 'aggregate_experiments.py')
 
     try:
         # Stage 1: Build Queries (only for new runs)

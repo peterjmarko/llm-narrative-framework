@@ -57,8 +57,8 @@ import argparse
 # Add any other directories you want to skip.
 EXCLUDE_SCAN_DIRS = {".venv", "archive", "__pycache__", "scripts_txt", "project_code_as_txt"}
 
-# Name of the subdirectory to create at the project root for the .txt files
-TXT_OUTPUT_SUBDIR_NAME = "project_code_as_txt"
+# Path relative to the project root for the .txt files
+TXT_OUTPUT_SUBDIR_NAME = "output/project_code_as_txt"
 # Name of the sub-subdirectory within TXT_OUTPUT_SUBDIR_NAME for archiving previous versions
 ARCHIVE_SUBDIR_NAME = "Archive"
 # --- End Configuration ---

@@ -41,10 +41,10 @@ The result is a clean dataset of personality profiles where the connection to th
 -   **Powerful Reprocessing Engine**: The manager's `--reprocess` mode allows for re-running the data processing and analysis stages on existing results without repeating expensive LLM calls. This makes it easy to apply analysis updates or bug fixes across an entire experiment.
 -   **Guaranteed Reproducibility**: On every new run, the `config.ini` file is automatically archived in the run's output directory, permanently linking the results to the exact parameters that generated them.
 -   **Standardized, Comprehensive Reporting**: Each replication produces a `replication_report.txt` file containing run parameters, status, a human-readable statistical summary, and a machine-parsable JSON block with all key metrics. This format is identical for new runs and reprocessed runs.
--   **Hierarchical Analysis & Aggregation**: The `experiment_aggregator.py` script performs a bottom-up aggregation of all data, generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and a master `STUDY_results.csv`) for a fully auditable research archive.
+-   **Hierarchical Analysis & Aggregation**: The `aggregate_experiments.py` script performs a bottom-up aggregation of all data, generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and a master `STUDY_results.csv`) for a fully auditable research archive.
 -   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `replication_log_manager.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
 -   **Enhanced Console Readability**: All console outputs for file paths, commands, and key statuses are now formatted with consistent newlines and indentation, greatly improving log clarity and user experience during long runs.
--   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `experiment_aggregator.py` prepares a master dataset, which `study_analysis.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
+-   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `aggregate_experiments.py` prepares a master dataset, which `study_analyzer.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
 
 ## Visual Architecture
 
@@ -63,7 +63,7 @@ The codebase can be divided into the following components:
 
 5.  **Shared Utilities**: Helper scripts and modules, like `config_loader.py`, that provide common functionality and are imported by multiple other scripts across different workflows.
 
-{{grouped_figure:docs/diagrams/codebase_architecture.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.}}
+{{grouped_figure:docs/diagrams/view_codebase.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.}}
 
 ### Workflow Diagrams
 The project's functionality is organized into six primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
@@ -95,14 +95,14 @@ The `orchestrate_replication.py` script executes the full pipeline for a single 
 5.  **Generate Final Report**: Assembles the final `replication_report.txt` from the analysis results and captured logs.
 6.  **Create Replication Summary**: Creates the final `REPLICATION_results.csv`, marking the run as valid.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_1_run_experiment.mmd | scale=2.5 | width=65% | caption=Workflow 1: Run an Experiment, showing the main control loop and the internal replication pipeline.}}
+{{grouped_figure:docs/diagrams/flow_1_run_experiment.mmd | scale=2.5 | width=65% | caption=Workflow 1: Run an Experiment, showing the main control loop and the internal replication pipeline.}}
 
 
 #### Workflow 2: Audit an Experiment
 
 This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag. The full audit report, including subprocess outputs, is also saved to `audit_log.txt` within the audited directory.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_2_audit_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.}}
+{{grouped_figure:docs/diagrams/flow_2_audit_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.}}
 
 ##### Interpreting the Audit Report
 The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It outputs a summary table with a high-level status for each replication run. The `Details` column provides granular error codes that pinpoint the exact problem. The final `Audit Result` and `Recommendation` suggest the next steps, if any.
@@ -136,7 +136,7 @@ This workflow allows you to re-run the data processing and analysis stages on an
 It first performs an audit. If the experiment has analysis errors, it proceeds to update it. If the experiment is already `VALIDATED`, it will prompt for user confirmation before forcing a full reprocessing.
 The reprocessing is a two-step action: first, `orchestrate_replication.py --reprocess` is called on each individual run to regenerate its `replication_report.txt`; second, `experiment_aggregator.py` is called to perform a full re-aggregation, ensuring all top-level summary files are brought up to date.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_3_update_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.}}
+{{grouped_figure:docs/diagrams/flow_3_update_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.}}
 
 
 #### Workflow 4: Migrate Old Experiment Data
@@ -148,41 +148,41 @@ This utility workflow provides a safe, non-destructive process to transform olde
 3.  **Transform Copy**: The script calls `experiment_manager.py --migrate` on the new copy. The manager then automates the internal transformation, including patching configurations, reprocessing all runs, and running its self-healing loop until the new experiment copy is valid.
 4.  **Final Validation**: The wrapper script runs a final read-only audit on the newly migrated experiment, providing explicit confirmation that the process was successful.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_4_migrate_data.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
+{{grouped_figure:docs/diagrams/flow_4_migrate_data.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
 
 
 #### Workflow 5: Audit a Study
 
 This workflow provides a read-only, consolidated completeness report for all experiments in a study. The `audit_study.ps1` wrapper iterates through each experiment folder and calls `experiment_manager.py` with the `--verify-only` flag (running quietly by default). It then compiles the results into a summary table for the console and a comprehensive `study_audit_log.txt` file in the study directory. This workflow is the primary diagnostic tool for assessing overall study readiness.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_5_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_5_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
 
 
 #### Workflow 6: Analyze a Study
 
-This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `experiment_aggregator.py` and then `study_analysis.py`.
+This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `aggregate_experiments.py` and then `study_analyzer.py`.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_6_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
+{{grouped_figure:docs/diagrams/flow_6_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
 
 
 #### Workflow 7: Update a Study
 
 This workflow provides a convenient batch operation to update all out-of-date experiments within a study directory. It first runs a full study audit to identify which experiments need updating. If any require more serious intervention (like repair or migration), it halts. Otherwise, it prompts the user for confirmation and then systematically calls `update_experiment.ps1` on each experiment that needs it.
 
-{{grouped_figure:docs/diagrams/architecture_workflow_7_update_study.mmd | scale=2.5 | width=100% | caption=Workflow 7: Update a Study. A batch operation to update all out-of-date experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_7_update_study.mmd | scale=2.5 | width=100% | caption=Workflow 7: Update a Study. A batch operation to update all out-of-date experiments in a study.}}
 
 {{pagebreak}}
 ### Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
 
-{{grouped_figure:docs/diagrams/architecture_data_flow.mmd | scale=2.5 | width=75% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.}}
+{{grouped_figure:docs/diagrams/view_data_flow.mmd | scale=2.5 | width=75% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.}}
 
 ### Experimental Logic Flowchart
 
 This diagram illustrates the scientific methodology for a single replication run.
 
-{{grouped_figure:docs/diagrams/architecture_experimental_logic.mmd | scale=2.5 | width=65% | caption=Experimental Logic Flowchart: Scientific methodology for a single replication run.}}
+{{grouped_figure:docs/diagrams/logic_experimental.mmd | scale=2.5 | width=65% | caption=Experimental Logic Flowchart: Scientific methodology for a single replication run.}}
 
 ## Experimental Hierarchy
 
@@ -197,7 +197,7 @@ The project's experiments are organized in a logical hierarchy:
 
 This logical hierarchy is reflected in the physical layout of the repository:
 
-{{diagram:docs/diagrams/directory_structure.txt | scale=2.5 | width=90%}}
+{{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=90%}}
 
 ## Setup and Installation
 
@@ -270,7 +270,7 @@ A follow-up study is planned to evaluate other powerful, medium-cost models as A
 
 The framework is designed around three primary user actions, each handled by a dedicated script. This separation of concerns ensures that each workflow is simple, predictable, and safe. Use the following diagram and descriptions to choose the correct tool for your task.
 
-{{grouped_figure:docs/diagrams/decision_tree_workflow.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: Separation of Concerns.}}
+{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: Separation of Concerns.}}
 
 -   **`run_experiment.ps1` (Data Generation & Repair)**: This is your primary tool. Use it to start a new experiment from scratch or to resume/repair an interrupted one. Its sole focus is to ensure the raw data (queries and LLM responses) is complete according to your `config.ini`.
 
@@ -388,7 +388,7 @@ The pipeline generates a consistent, standardized `replication_report.txt` for e
 
 Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
 
-{{diagram:docs/diagrams/replication_report_format.txt}}
+{{diagram:docs/diagrams/format_replication_report.txt}}
 
 **Date Handling by Mode:**
 -   **Normal Mode**: The report title is `REPLICATION RUN REPORT` and the `Date` field shows the time of the original run.
@@ -396,9 +396,9 @@ Each report contains a clear header, the base query used, a human-readable analy
 
 ### Study Analysis Log Format
 
-The final analysis script (`study_analysis.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
+The final analysis script (`study_analyzer.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
-{{diagram:docs/diagrams/analysis_log_format.txt}}
+{{diagram:docs/diagrams/format_analysis_log.txt}}
 
 ---
 
@@ -438,9 +438,9 @@ The final analysis script (`study_analysis.py`) produces a comprehensive log fil
 
 ## Study-Level Analysis Scripts
 
-*   **`experiment_aggregator.py`**: Recursively scans a study directory, performing a bottom-up aggregation and generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`).
+*   **`aggregate_experiments.py`**: Recursively scans a study directory, performing a bottom-up aggregation and generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`).
 
-*   **`study_analysis.py`**: Performs the final statistical analysis (Two-Way ANOVA, post-hoc tests) on a study's master CSV file and produces a detailed analysis log and publication-quality boxplots.
+*   **`study_analyzer.py`**: Performs the final statistical analysis (Two-Way ANOVA, post-hoc tests) on a study's master CSV file and produces a detailed analysis log and publication-quality boxplots.
 
 ## Worker Scripts
 
