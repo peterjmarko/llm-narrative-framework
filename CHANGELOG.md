@@ -1,5 +1,67 @@
 # Changelog
 
+## 2.13.0 (2025-07-24)
+
+### Bump
+
+- **version 2.12.0 → 2.13.0**
+
+### Features
+
+- **automate release process and simplify commit workflow**
+  This commit introduces a fully automated release process and simplifies the
+  commit workflow, significantly improving developer experience and reducing
+  the potential for manual error.
+  
+  Key Changes:
+  -   **Automated Release (`pdm run release`)**:
+      -   Introduced `src/finalize_release.py`, a new script that
+          orchestrates the entire release process.
+      -   The script programmatically determines the next version, runs `cz bump`,
+          generates a detailed changelog with full commit bodies, amends the
+          release commit, and correctly moves the Git tag.
+      -   This replaces a multi-step, error-prone manual process with a single,
+          non-interactive command.
+  
+  -   **Simplified Commits (`pdm run commit`)**:
+      -   Introduced a new `pdm run commit` shortcut that uses `cz commit` for an
+          interactive, guided commit experience.
+      -   This makes the manual creation of `commit.txt` obsolete.
+  
+  -   **Updated Documentation**:
+      -   Overhauled the "Commit Your Changes" and "Releasing a New Version"
+          sections in `CONTRIBUTING.md` to reflect the new, simpler two-step
+          (`commit` -> `release`) process.
+  
+  -   **Cleanup**:
+      -   Removed temporary refactoring scripts (`rename_diagrams.ps1`,
+        `update_doc_references.ps1`) that are no longer needed.This commit introduces a fully automated release process and simplifies the
+  commit workflow, significantly improving developer experience and reducing
+  the potential for manual error.
+  
+  Key Changes:
+  -   **Automated Release (`pdm run release`)**:
+      -   Introduced `src/finalize_release.py`, a new script that
+          orchestrates the entire release process.
+      -   The script programmatically determines the next version, runs `cz bump`,
+          generates a detailed changelog with full commit bodies, amends the
+          release commit, and correctly moves the Git tag.
+      -   This replaces a multi-step, error-prone manual process with a single,
+          non-interactive command.
+  
+  -   **Simplified Commits (`pdm run commit`)**:
+      -   Introduced a new `pdm run commit` shortcut that uses `cz commit` for an
+          interactive, guided commit experience.
+      -   This makes the manual creation of `commit.txt` obsolete.
+  
+  -   **Updated Documentation**:
+      -   Overhauled the "Commit Your Changes" and "Releasing a New Version"
+          sections in `CONTRIBUTING.md` to reflect the new, simpler two-step
+          (`commit` -> `release`) process.
+  
+  -   **Cleanup**:
+      -   Removed temporary refactoring scripts (`rename_diagrams.ps1`,
+        `update_doc_references.ps1`) that are no longer needed.
 All notable changes to the Personality Matching Experiment Framework will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
