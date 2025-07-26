@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.0.2 (2025-07-26)
+
+### Bump
+
+- **version 3.0.1 → 3.0.2**
+
+### Refactor
+
+- **organize utility scripts into a dedicated scripts/ directory**
+  This commit improves the project structure by separating core application logic from developer utility scripts.
+  
+  -   Creates a new top-level `scripts/` directory.
+  -   Moves project maintenance scripts (e.g., `build_docs`, `lint_file_headers`, `finalize_release`) from `src/` to `scripts/`.
+  -   Deletes obsolete scripts (`rebuild_reports.py`, `verify_experiment_completeness.py`) and their corresponding tests to reduce clutter.
+  -   Updates `pyproject.toml` to reflect the new script paths for PDM commands.
+  
+  This change enhances clarity by enforcing a clean separation of concerns, making the codebase easier to navigate.
 ## 3.0.1 (2025-07-26)
 
 ### Bump
