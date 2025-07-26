@@ -11,7 +11,7 @@ graph TD
         ReprocessEntry["experiment_manager.py --reprocess"]:::entry_py
         Loop["Loops over each replication"]:::process
         CallOrchestrator["Calls orchestrate_replication.py --reprocess<br/><small>Regenerates analysis artifacts (metrics JSON, report, CSV)</small>"]:::layer_green
-        FinalAggregate["Final Aggregation<br/><small>Calls experiment_aggregator.py<br/>Regenerates EXPERIMENT_results.csv</small>"]:::layer_green
+        FinalAggregate["Final Aggregation<br/><small>Calls compile_experiment_results.py<br/>Regenerates EXPERIMENT_results.csv</small>"]:::layer_green
     end
     
     PostAudit["3. Verify Update<br/><small>calls experiment_manager.py --verify-only</small>"]:::script

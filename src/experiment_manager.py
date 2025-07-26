@@ -1027,7 +1027,7 @@ def main():
             return
 
         if args.migrate:
-            if not _run_migrate_mode(Path(final_output_dir), patch_script, rebuild_script, args.verbose):
+            if not _run_migrate_mode(Path(final_output_dir), patch_script, orchestrator_script, args.verbose):
                 print(f"{C_RED}--- Migration pre-processing failed. Please review logs. ---{C_RESET}")
                 sys.exit(1)
 

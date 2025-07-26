@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: check-docs-updated
         name: Check if documentation is up-to-date
-        entry: python -m pdm run python src/build_docs.py --check
+        entry: python -m pdm run python scripts/build_docs.py --check
         language: system
         pass_filenames: false
         files: ^(docs/DOCUMENTATION\.template\.md|docs/diagrams/.*\.(mmd|txt))$
