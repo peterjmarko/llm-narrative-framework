@@ -17,34 +17,34 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: analyze_study.ps1
+# Filename: process_study.ps1
 
 <#
 .SYNOPSIS
-    Audits, compiles, and analyzes a full study, providing a clean, high-level summary.
+    Audits, compiles, and analyzes a full study.
 
 .DESCRIPTION
     This script is the main entry point for the entire post-processing workflow. It
-    orchestrates three key scripts in sequence:
-    1.  `audit_study.ps1`: To perform a full audit of the study. The script will halt
-        with an error if any experiment is not in a validated state.
-    2.  `aggregate_experiments.py`: To aggregate all individual run data into a master CSV.
-    3.  `study_analyzer.py`: To perform statistical analysis on the master CSV.
+    orchestrates three key Python scripts in sequence:
+    1.  `audit_study.ps1`: Performs a full audit of the study. The script will halt
+        if any experiment is not in a validated state.
+    2.  `compile_study_results.py`: Compiles all experiment data into a master CSV.
+    3.  `study_analyzer.py`: Performs statistical analysis on the master CSV.
 
     By default, it provides a clean, high-level summary. For detailed, real-time
     output, use the -Verbose switch.
 
 .PARAMETER StudyDirectory
     The path to the top-level study directory containing experiment folders that need
-    to be analyzed (e.g., 'output/studies'). This is a mandatory parameter.
+    to be processed (e.g., 'output/studies'). This is a mandatory parameter.
 
 .EXAMPLE
-    # Run analysis with the default high-level summary.
-    .\analyze_study.ps1 "output/studies/My_Full_Study"
+    # Process a study with the default high-level summary.
+    .\process_study.ps1 "output/studies/My_Full_Study"
 
 .EXAMPLE
-    # Run analysis with detailed, real-time output for debugging.
-    .\analyze_study.ps1 "output/studies/My_Full_Study" -Verbose
+    # Process a study with detailed, real-time output for debugging.
+    .\process_study.ps1 "output/studies/My_Full_Study" -Verbose
 #>
 [CmdletBinding()]
 param (
@@ -258,8 +258,8 @@ try {
     # --- Step 1: Run Pre-Analysis Audit ---
     Invoke-StudyAudit -StudyDirectory $ResolvedPath
 
-    # --- Step 2: Aggregate All Results into a Master CSV ---
-    Invoke-PythonScript -StepName "2/3: Aggregate Results" -ScriptName "src/aggregate_experiments.py" -Arguments $ResolvedPath
+    # --- Step 2: Compile All Results into a Master CSV ---
+    Invoke-PythonScript -StepName "2/3: Compile Study Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
 
     # --- Step 3: Run Final Statistical Analysis ---
     Invoke-PythonScript -StepName "3/3: Run Final Analysis (ANOVA)" -ScriptName "src/study_analyzer.py" -Arguments $ResolvedPath
@@ -279,4 +279,4 @@ catch {
     exit 1
 }
 
-# === End of analyze_study.ps1 ===
+# === End of process_study.ps1 ===

@@ -17,7 +17,7 @@
 # Filename: src/compile_experiment_results.py
 
 """
-Experiment Results Compiler.
+Experiment-Level Results Compiler.
 
 This script compiles results from all individual replication runs within a single
 experiment directory into a unified `EXPERIMENT_results.csv` file.
@@ -26,8 +26,11 @@ It takes an experiment directory as input, searches its subdirectories for all
 `REPLICATION_results.csv` files, and concatenates them into a single,
 comprehensive dataset for that experiment.
 
-This is a crucial step for finalizing an experiment and preparing it for
-study-level aggregation.
+This script is called by `experiment_manager.py` during the finalization stage
+of an experiment run.
+
+Usage:
+    python src/compile_experiment_results.py /path/to/experiment_directory
 """
 
 import os

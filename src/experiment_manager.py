@@ -20,82 +20,25 @@
 # Filename: src/experiment_manager.py
 
 """
-State-Machine Controller for Experiments.
+State-Machine Controller for a Single Experiment.
 
 This script is the high-level, intelligent controller for managing an entire
-experiment. It operates as a state machine, continuously verifying the
-experiment's status and automatically taking the correct action until the
-experiment is fully complete and all data is consistent.
+experiment. It operates as a state machine, verifying the experiment's status
+and automatically taking the correct action (`NEW`, `REPAIR`, `REPROCESS`, or
+`MIGRATE`) until the experiment is fully complete.
 
-This self-healing design makes the experiment pipeline resilient to
-interruptions. Its core is a `Verify -> Act` loop, but it can also be
-invoked with explicit flags for specific, one-time actions.
+Its core function is to orchestrate `orchestrate_replication.py` to create or
+repair individual replication runs. Once all replications are valid, it performs
+a finalization step by calling `compile_experiment_results.py` to generate the
+top-level summary CSV for the experiment.
 
-Modes of Operation:
--   **Default (State Machine)**: Intelligently identifies the experiment's state
-    with a clear priority (`REPAIR` > `REPROCESS` > `NEW`). It automatically
-    initiates the correct action, prompting the user for confirmation before
-    performing repairs or updates. It continuously loops until the experiment
-    is complete, providing robust self-healing. When running new replications,
-    it orchestrates the pipeline stages directly to enable parallel execution
-    of LLM API calls, providing a significant speedup.
--   **`--reprocess`**: Forces a full re-processing (update) of all analysis
-    artifacts for an existing experiment. It regenerates individual replication
-    reports and performs a full finalization, creating all summary files.
--   **`--migrate`**: Runs a one-time migration workflow on a copied legacy
-    experiment. It first executes a special pre-processing sequence:
-    1.  **Clean**: Deletes old summary files and corrupted analysis artifacts.
-    2.  **Patch**: Calls `patch_old_experiment.py` to create `config.ini.archived`
-        files by reverse-engineering legacy reports.
-    3.  **Reprocess**: Re-runs the full data processing pipeline for each
-        replication run to generate modern, valid reports.
-    After this pre-processing, it enters the standard state-machine loop to
-    handle any remaining issues, prompting for user confirmation as needed
-    until the experiment is fully `VALIDATED`.
--   **`--verify-only`**: Performs a read-only audit and prints a detailed
-    completeness report without making changes. This is the primary diagnostic
-    tool. It checks for:
-    -   **Configuration Integrity**: Verifies that `config.ini.archived` exists,
-        is valid, and contains all required keys.
-    -   **Replication File Completeness**: Ensures the correct number of core
-        replication files exist (queries, responses, manifests, mappings,
-        and the `REPLICATION_results.csv` summary).
-    -   **Index Consistency**: Confirms a one-to-one match between query and
-        response file indices (e.g., `query_001.txt` -> `response_001.txt`).
-    -   **Analysis Data Validity**: Checks that analysis files contain the
-        correct number of entries, matching the `n_valid_responses` metric
-        from the final report.
-    -   **Report Completeness**: Validates the final report's JSON block,
-        ensuring all required top-level and nested metrics are present.
-    -   **Experiment Aggregation**: Verifies that top-level summary files
-        (`EXPERIMENT_results.csv`, `batch_run_log.csv`) exist and that the
-        log is marked as complete.
+It supports several modes:
+- **Default (State Machine)**: Intelligently runs, resumes, or repairs an experiment.
+- **`--reprocess`**: Forces a full re-processing of all analysis artifacts.
+- **`--migrate`**: Transforms a legacy experiment into the modern format.
+- **`--verify-only`**: Performs a read-only audit and prints a detailed report.
 
-    The audit assigns a status to each replication run. Key statuses include:
-    -   **`VALIDATED`**: The run is complete and valid.
-    -   **`CONFIG_ISSUE`**: The archived config is missing or invalid.
-    -   **`QUERY_ISSUE`**: Fundamental input files (queries, manifests) are
-        missing or corrupt. Requires repair via `run_experiment.ps1`.
-    -   **`RESPONSE_ISSUE`**: LLM response files are missing or corrupt.
-        Requires repair via `run_experiment.ps1`.
-    -   **`ANALYSIS_ISSUE`**: Derivative files (reports, analysis data) are
-        corrupt. Can be fixed by reprocessing.
-
-Usage:
-# Start a brand new experiment in a default, timestamped directory:
-python src/experiment_manager.py
-
-# Run, repair, or resume an existing experiment to completion:
-python src/experiment_manager.py path/to/experiment_dir
-
-# Force a full reprocessing of an existing experiment:
-python src/experiment_manager.py --reprocess path/to/experiment_dir
-
-# Migrate a legacy experiment (after it has been copied to a new location):
-python src/experiment_manager.py --migrate path/to/migrated_copy_dir
-
-# Audit an experiment without making changes:
-python src/experiment_manager.py --verify-only path/to/experiment_dir
+Usage examples are provided in the main project `DOCUMENTATION.md`.
 """
 
 import sys

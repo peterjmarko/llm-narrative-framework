@@ -66,6 +66,8 @@ cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
 # ------------------------------------
 
 lint = "pre-commit run --all-files"
+lint-headers = {cmd = "python src/lint_file_headers.py --fix ./src/*.py ./tests/*.py ./*.ps1", help = "Fix headers and footers on all project scripts."}
+check-headers = {cmd = "python src/lint_file_headers.py ./src/*.py ./tests/*.py ./*.ps1", help = "Check headers and footers on all project scripts."}
 build-docs = "python src/build_docs.py"
 
 # --- Developer Workflow ---

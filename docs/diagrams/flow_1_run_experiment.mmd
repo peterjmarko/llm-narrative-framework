@@ -1,29 +1,27 @@
 graph TD
-    %% Main Control Flow
     A[run_experiment.ps1<br>User Entry Point]:::entry --> B{State Machine Loop<br><small>experiment_manager.py</small>}:::layer_orange;
     
-    B -- "State is INCOMPLETE" --> C["<b>Action: Run/Repair Replication</b>"];
+    B -- "State is INCOMPLETE" --> C;
     C --> B;
     
-    B -- "State is COMPLETE" --> F["<b>Action: Finalize Experiment</b><br><small>Generates top-level summaries</small>"]:::script;
+    B -- "State is COMPLETE" --> F["<b>Action: Finalize Experiment</b><br><small>via compile_experiment_results.py</small>"]:::script;
     F --> G((Finish)):::finish_node;
 
-    subgraph C
+    subgraph C [Action: Run/Repair Replication]
         direction TB
         Orchestrator["orchestrate_replication.py"]:::layer_green
-        subgraph "Internal Stages & Key Artifacts"
+        subgraph InternalStages [Internal Stages]
             direction TB
-            S1["<b>1. Build Queries</b><br><small>Generates query files</small>"] --> S2;
-            S2["<b>2. Run LLM Sessions</b><br><small>Generates response files</small>"] --> S3;
-            S3["<b>3. Process LLM Responses</b><br><small>Generates structured scores</small>"] --> S4;
-            S4["<b>4. Analyze LLM Performance</b><br><small>Generates core & bias metrics</small>"] --> S5;
-            S5["<b>5. Generate Final Report</b><br><small>Creates replication_report.txt</small>"] --> S6;
-            S6["<b>6. Create Replication Summary</b><br><small>Creates REPLICATION_results.csv</small>"]
+            S1["<b>1. Build Queries</b><br><small>via build_llm_queries.py</small>"] --> S2;
+            S2["<b>2. Run LLM Sessions</b><br><small>via run_llm_sessions.py</small>"] --> S3;
+            S3["<b>3. Process LLM Responses</b><br><small>via process_llm_responses.py</small>"] --> S4;
+            S4["<b>4. Analyze Performance</b><br><small>via analyze_llm_performance.py<br>+ run_bias_analysis.py</small>"] --> S5;
+            S5["<b>5. Generate Report</b><br><small>via generate_replication_report.py</small>"] --> S6;
+            S6["<b>6. Compile Replication Results</b><br><small>via compile_replication_results.py</small>"]
         end
-        Orchestrator -- "Manages" --> S1;
+        Orchestrator -- Manages --> InternalStages;
     end
     
-    %% Styling
     classDef entry fill:#337ab7,stroke:#2e6da4,color:#fff;
     classDef layer_orange fill:#f0ad4e,stroke:#eea236,color:#333;
     classDef layer_green fill:#5cb85c,stroke:#4cae4c,color:#fff;

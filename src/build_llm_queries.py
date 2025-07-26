@@ -20,26 +20,21 @@
 # Filename: src/build_llm_queries.py
 
 """
-Orchestrates the generation of all query sets for a single replication.
+Stage 1: LLM Query Builder.
 
-This script is the first stage of the experimental pipeline, responsible for
-creating all the trials for one replication. It orchestrates `query_generator.py`
-in a loop to produce a batch of unique queries.
+This script is the first stage of the replication pipeline. It is responsible
+for creating all the necessary query and ground-truth files for a single
+replication run.
 
 Key Workflow:
-1.  Loads the master list of all personalities.
-2.  Loads the list of personalities already used in the experiment to ensure
-    sampling is done without replacement.
-3.  For the specified number of iterations (`m`):
-    a. Samples `k` unique, available personalities from the master list.
-    b. Writes this subset to a temporary file.
-    c. Invokes `query_generator.py` as a subprocess, passing it the temporary
-       file and a derived seed for deterministic shuffling.
-    d. Collects the output files from the worker (query, mapping, manifest)
-       and places them in the final `session_queries` directory with the
-       correct numbering.
-4.  After the loop, it updates the `used_personality_indices.txt` log with all
-    personalities selected during this run.
+1.  Samples unique personalities from the master database without replacement.
+2.  Calls the `query_generator.py` worker script in a loop to create the
+    individual trial files (`llm_query_XXX.txt`, `_manifest.txt`, etc.).
+3.  Copies the master `base_query.txt` into the run's `session_queries`
+    directory for archival and reporting purposes.
+4.  Creates the aggregated `mappings.txt` file for the entire replication.
+
+It is called by `orchestrate_replication.py`.
 """
 
 # === Start of src/build_queries.py ===

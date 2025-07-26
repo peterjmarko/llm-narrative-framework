@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: utilities/convert_py_to_txt.py
+# Filename: src/convert_py_to_txt.py
 
 """
 Python to Text Conversion Utility (convert_py_to_txt.py)
@@ -51,6 +51,26 @@ import pathlib
 import shutil
 import os
 import argparse
+import sys
+
+class TxtColors:
+    """ANSI color codes for terminal output."""
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+def cprint(text, color=None):
+    """Prints text in a specified color if the output is a TTY."""
+    if color and sys.stdout.isatty():
+        print(f"{color}{text}{TxtColors.ENDC}")
+    else:
+        print(text)
 
 # --- Configuration ---
 # Directories to explicitly exclude from the search for script files (relative to project root)
@@ -78,29 +98,29 @@ def archive_previous_txt_versions(project_root_path: pathlib.Path,
     archive_base_dir = source_dir / archive_subdir_name  # e.g., project_code_as_txt/Archive
 
     if not source_dir.exists() or not source_dir.is_dir():
-        print(f"Info: Source directory '{source_dir.resolve()}' for archiving does not exist. Nothing to archive.")
+        cprint(f"Info: Source directory '{source_dir.resolve()}' for archiving does not exist. Nothing to archive.", TxtColors.CYAN)
         return
 
     # 1. Ensure archive_base_dir exists and is a directory.
     if archive_base_dir.is_file():  # If it's a file, remove it
-        print(f"Warning: Archive path '{archive_base_dir.resolve()}' is a file. Removing it to create a directory.")
+        cprint(f"Warning: Archive path '{archive_base_dir.resolve()}' is a file. Removing it to create a directory.", TxtColors.WARNING)
         try:
             archive_base_dir.unlink()
         except OSError as e:
-            print(f"Error: Could not remove file '{archive_base_dir.resolve()}': {e}. Archiving aborted.")
+            cprint(f"Error: Could not remove file '{archive_base_dir.resolve()}': {e}. Archiving aborted.", TxtColors.FAIL)
             return
     elif archive_base_dir.exists() and not archive_base_dir.is_dir(): # Exists but not a file and not a dir (e.g. broken symlink)
-        print(f"Warning: Archive path '{archive_base_dir.resolve()}' is an unexpected item. Attempting to remove with shutil.rmtree.")
+        cprint(f"Warning: Archive path '{archive_base_dir.resolve()}' is an unexpected item. Attempting to remove with shutil.rmtree.", TxtColors.WARNING)
         try:
             shutil.rmtree(archive_base_dir) # More forceful removal
         except OSError as e:
-            print(f"Error: Could not remove item '{archive_base_dir.resolve()}': {e}. Archiving aborted.")
+            cprint(f"Error: Could not remove item '{archive_base_dir.resolve()}': {e}. Archiving aborted.", TxtColors.FAIL)
             return
 
     try:
         archive_base_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        print(f"Error: Could not create/ensure archive directory '{archive_base_dir.resolve()}': {e}. Archiving aborted.")
+        cprint(f"Error: Could not create/ensure archive directory '{archive_base_dir.resolve()}': {e}. Archiving aborted.", TxtColors.FAIL)
         return
 
     print(f"\nArchiving contents of '{source_dir.resolve()}' to '{archive_base_dir.resolve()}' (merging/overwriting)...")
@@ -133,19 +153,19 @@ def archive_previous_txt_versions(project_root_path: pathlib.Path,
                 archived_items_count += 1
         except TypeError as te: # Specifically catch if dirs_exist_ok is not supported
             if "dirs_exist_ok" in str(te):
-                print(f"Error: Archiving directory '{item_path.name}' failed. This script requires Python 3.8+ for the 'dirs_exist_ok' feature in shutil.copytree. Please upgrade Python or modify the script for older versions.")
+                cprint(f"Error: Archiving directory '{item_path.name}' failed. This script requires Python 3.8+ for the 'dirs_exist_ok' feature in shutil.copytree. Please upgrade Python or modify the script for older versions.", TxtColors.FAIL)
                 error_count +=1
             else:
-                print(f"Error archiving '{item_path.resolve()}' to '{destination_path.resolve()}': {te}")
+                cprint(f"Error archiving '{item_path.resolve()}' to '{destination_path.resolve()}': {te}", TxtColors.FAIL)
                 error_count += 1
         except Exception as e:
-            print(f"Error archiving '{item_path.resolve()}' to '{destination_path.resolve()}': {e}")
+            cprint(f"Error archiving '{item_path.resolve()}' to '{destination_path.resolve()}': {e}", TxtColors.FAIL)
             error_count += 1
 
-    print(f"Archiving summary: {archived_items_count} items from '{source_dir.name}' processed for archiving into '{archive_base_dir.name}'.")
+    cprint(f"Archiving summary: {archived_items_count} items from '{source_dir.name}' processed for archiving into '{archive_base_dir.name}'.", TxtColors.GREEN)
     if error_count > 0:
-        print(f"Archiving encountered {error_count} errors during item copying.")
-    print("--- End Archiving ---")
+        cprint(f"Archiving encountered {error_count} errors during item copying.", TxtColors.WARNING)
+    cprint("--- End Archiving ---", TxtColors.BLUE)
 
 
 def convert_scripts_to_txt(project_root_path, output_subdir_name, exclude_dirs, depth):
@@ -170,7 +190,7 @@ def convert_scripts_to_txt(project_root_path, output_subdir_name, exclude_dirs, 
             return
 
     print(f"\nScanning for .py and .ps1 files in: {project_root_path.resolve()} with depth={depth}")
-    print(f"Excluding directories: {', '.join(sorted(list(exclude_dirs))) if exclude_dirs else 'None'}")
+    cprint(f"Excluding directories: {', '.join(sorted(list(exclude_dirs))) if exclude_dirs else 'None'}", TxtColors.CYAN)
 
     copied_count = 0
     error_count = 0
@@ -218,12 +238,12 @@ def convert_scripts_to_txt(project_root_path, output_subdir_name, exclude_dirs, 
                 print(f"Error: Could not copy '{script_file_path}' to '{target_txt_path}': {e}")
                 error_count += 1
 
-    print("\n--- Conversion Summary ---")
-    print(f"Script files (.py, .ps1) found and copied as .txt: {copied_count}")
-    print(f"Errors during copy/directory creation: {error_count}")
+    cprint("\n--- Conversion Summary ---", TxtColors.HEADER)
+    cprint(f"Script files (.py, .ps1) found and copied as .txt: {copied_count}", TxtColors.GREEN)
+    cprint(f"Errors during copy/directory creation: {error_count}", TxtColors.WARNING if error_count > 0 else TxtColors.GREEN)
     if error_count > 0:
-        print("Please review error messages above.")
-    print(f"Output directory: {output_dir.resolve()}")
+        cprint("Please review error messages above.", TxtColors.FAIL)
+    cprint(f"Output directory: {output_dir.resolve()}", TxtColors.BLUE)
 
 
 def main():
@@ -257,16 +277,16 @@ def main():
         print(f"Error: The specified project directory does not exist or is not a directory: '{project_directory}'")
         return
 
-    print(f"Using project root: {project_directory}")
+    cprint(f"Using project root: {project_directory}", TxtColors.BLUE)
 
     # --- Archiving Step ---
-    print(f"Starting archiving process for TXT files in: {project_directory / TXT_OUTPUT_SUBDIR_NAME}")
+    print(f"\n--- Starting Archiving Process ---")
     archive_previous_txt_versions(project_directory, TXT_OUTPUT_SUBDIR_NAME, ARCHIVE_SUBDIR_NAME)
 
     # --- Conversion Step ---
-    print(f"\nStarting script to TXT conversion for project: {project_directory}")
+    print(f"\n--- Starting Script Conversion ---")
     convert_scripts_to_txt(project_directory, TXT_OUTPUT_SUBDIR_NAME, EXCLUDE_SCAN_DIRS, args.depth)
-    print("\nConversion process finished.")
+    cprint("\nConversion process finished.", TxtColors.GREEN)
 
 
 if __name__ == "__main__":  # pragma: no cover

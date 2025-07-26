@@ -1,49 +1,52 @@
 graph TD
     subgraph "Input Data"
         direction LR
-        Input_PDB["personalities_db<br/>1-5000.txt"]:::input
-        Input_Query["base_query.txt"]:::input
-        Input_Config["config.ini"]:::input
+        Input_PDB["personalities_db<br/>1-5000.txt"]
+        Input_Query["base_query.txt"]
+        Input_Config["config.ini"]
     end
 
     subgraph "Core Data Pipeline Flow"
         direction LR
         subgraph "1: Generation"
-             Script1["build_llm_queries.py"]:::script
+             Script1["build_llm_queries.py"]
         end
         subgraph "2: Execution & Processing"
-            Script2["run_llm<br/>_sessions.py"]:::script
-            Script3["process_llm<br/>_responses.py"]:::script
+            Script2["run_llm<br/>_sessions.py"]
+            Script3["process_llm<br/>_responses.py"]
         end
         subgraph "3: Single-Run Analysis"
             direction TB
-            Script4["analyze_llm<br/>_performance.py"]:::script
-            Script4b["run_bias<br/>_analysis.py"]:::script
+            Script4["analyze_llm<br/>_performance.py"]
+            Script4b["run_bias<br/>_analysis.py"]
+            Script5["generate_replication<br/>_report.py"]
+            Script6["compile_replication<br/>_results.py"]
         end
         subgraph "4: Study-Level Aggregation & Analysis"
-             Aggregator["experiment_aggregator.py"]:::script
-             StudyAnalyzer["study_analysis.py"]:::script
+             CompilerExp["compile_experiment<br/>_results.py"]
+             CompilerStudy["compile_study<br/>_results.py"]
+             StudyAnalyzer["study_analysis.py"]
         end
     end
 
     subgraph "Key Data Artifacts"
         direction LR
-        Art1_archive[("config.ini.archived")]:::artifact
-        Art1_query["llm_query_XXX.txt"]:::artifact
-        Art1_mappings_src[("mappings.txt<br/>(source)")]:::artifact
-        Art1_manifest[("manifest.txt")]:::artifact
-        Art2_response["llm_response_XXX.txt"]:::artifact
-        Art3_scores["all_scores.txt"]:::artifact
-        Art3_mappings_analysis["all_mappings.txt<br/>(for analysis)"]:::artifact
-        Art4_report["replication_report.txt"]:::artifact
-        BatchRunLog[("batch_run_log.csv")]:::artifact
-        RepResultsCSV[("REPLICATION_results.csv")]:::artifact
-        ExpResultsCSV[("EXPERIMENT_results.csv")]:::artifact
-        StudyResultsCSV[("STUDY_results.csv")]:::artifact
-        FinalOutputs(("STUDY_analysis_log.txt<br/>Boxplots/<br/>Diagnostics/")):::final
+        Art_metrics[("replication_metrics.json")]
+        Art1_archive[("config.ini.archived")]
+        Art1_query["llm_query_XXX.txt"]
+        Art1_mappings_src[("mappings.txt<br/>(source)")]
+        Art1_manifest[("manifest.txt")]
+        Art2_response["llm_response_XXX.txt"]
+        Art3_scores["all_scores.txt"]
+        Art3_mappings_analysis["all_mappings.txt<br/>(for analysis)"]
+        Art4_report["replication_report.txt"]
+        BatchRunLog[("batch_run_log.csv")]
+        RepResultsCSV[("REPLICATION_results.csv")]
+        ExpResultsCSV[("EXPERIMENT_results.csv")]
+        StudyResultsCSV[("STUDY_results.csv")]
+        FinalOutputs(("STUDY_analysis_log.txt<br/>Boxplots/<br/>Diagnostics/"))
     end
 
-    %% Connections reflecting data flow
     Input_PDB & Input_Query & Input_Config --> Script1
     Input_Config --> Art1_archive
 
@@ -59,23 +62,54 @@ graph TD
     Script3 --> Art3_mappings_analysis
 
     Art3_scores & Art3_mappings_analysis & Art1_archive --> Script4
-    Script4 --> Art4_report
+    Script4 --> Art_metrics
 
-    Art3_scores & Art3_mappings_analysis --> Script4b
-    Script4b --> Art4_report
+    Art_metrics --> Script4b
 
+    Art_metrics & Art1_archive & Input_Query --> Script5
+    Script5 --> Art4_report
+
+    Art_metrics & Art1_archive --> Script6
+    Script6 --> RepResultsCSV
+    
+    RepResultsCSV --> CompilerExp
+    CompilerExp --> ExpResultsCSV
+    
     Art4_report --> BatchRunLog
-    Art4_report --> Aggregator
-    Art1_archive --> Aggregator
+    ExpResultsCSV --> CompilerStudy
 
-    Aggregator --> RepResultsCSV
-    Aggregator --> ExpResultsCSV
-    Aggregator --> StudyResultsCSV
+    CompilerStudy --> StudyResultsCSV
 
     StudyResultsCSV --> StudyAnalyzer
     StudyAnalyzer --> FinalOutputs
 
-    classDef input fill:#cde4ff,stroke:#6c93be,color:#333
-    classDef script fill:#ffe8d6,stroke:#e59866,color:#333
-    classDef artifact fill:#e9ecef,stroke:#adb5bd,color:#333
-    classDef final fill:#d4edda,stroke:#155724,color:#333 font-weight:bold
+    style Input_PDB fill:#cde4ff,stroke:#6c93be,color:#333
+    style Input_Query fill:#cde4ff,stroke:#6c93be,color:#333
+    style Input_Config fill:#cde4ff,stroke:#6c93be,color:#333
+    
+    style Script1 fill:#ffe8d6,stroke:#e59866,color:#333
+    style Script2 fill:#ffe8d6,stroke:#e59866,color:#333
+    style Script3 fill:#ffe8d6,stroke:#e59866,color:#333
+    style Script4 fill:#ffe8d6,stroke:#e59866,color:#333
+    style Script4b fill:#ffe8d6,stroke:#e59866,color:#333
+    style Script5 fill:#ffe8d6,stroke:#e59866,color:#333
+    style Script6 fill:#ffe8d6,stroke:#e59866,color:#333
+    style CompilerExp fill:#ffe8d6,stroke:#e59866,color:#333
+    style CompilerStudy fill:#ffe8d6,stroke:#e59866,color:#333
+    style StudyAnalyzer fill:#ffe8d6,stroke:#e59866,color:#333
+    
+    style Art_metrics fill:#e9ecef,stroke:#adb5bd,color:#333
+    style Art1_archive fill:#e9ecef,stroke:#adb5bd,color:#333
+    style Art1_query fill:#e9ecef,stroke:#adb5bd,color:#333
+    style Art1_mappings_src fill:#e9ecef,stroke:#adb5bd,color:#333
+    style Art1_manifest fill:#e9ecef,stroke:#adb5bd,color:#333
+    style Art2_response fill:#e9ecef,stroke:#adb5bd,color:#333
+    style Art3_scores fill:#e9ecef,stroke:#adb5bd,color:#333
+    style Art3_mappings_analysis fill:#e9ecef,stroke:#adb5bd,color:#333
+    style Art4_report fill:#e9ecef,stroke:#adb5bd,color:#333
+    style BatchRunLog fill:#e9ecef,stroke:#adb5bd,color:#333
+    style RepResultsCSV fill:#e9ecef,stroke:#adb5bd,color:#333
+    style ExpResultsCSV fill:#e9ecef,stroke:#adb5bd,color:#333
+    style StudyResultsCSV fill:#e9ecef,stroke:#adb5bd,color:#333
+    
+    style FinalOutputs fill:#d4edda,stroke:#155724,color:#333

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -23,31 +23,21 @@
 Orchestrator for a Single Experimental Replication.
 
 This script is the engine for executing or reprocessing a single, self-contained
-experimental replication. It is typically called in a loop by the main batch
-runner, `experiment_manager.py`.
+experimental replication. It manages the entire lifecycle by calling a dedicated
+script for each of the six pipeline stages.
 
-It operates in two primary modes:
+It is typically called by `experiment_manager.py`.
 
-1.  **New Run Mode (default):**
-    -   Creates a new, timestamped directory for the replication's artifacts.
-    -   Archives the root `config.ini` file for perfect reproducibility.
-    -   Executes a consolidated six-stage pipeline:
-        1.  **Build LLM Queries**: Generates queries and trial data (`build_llm_queries.py`).
-        2.  **Run LLM Sessions**: Interacts with the LLM API (`run_llm_sessions.py`).
-        3.  **Process LLM Responses**: Parses raw responses into structured scores (`process_llm_responses.py`).
-        4.  **Analyze LLM Performance**: A unified stage that first calculates core performance metrics (`analyze_llm_performance.py`) and then calculates and injects diagnostic bias metrics (`run_bias_analysis.py`).
-        5.  **Generate Final Report**: Creates the `replication_report.txt` with all metrics and logs.
-        6.  **Create Replication Summary**: Creates the final `REPLICATION_results.csv` (`experiment_aggregator.py`).
+Pipeline Stages:
+1.  `build_llm_queries.py`: Generates all trial queries and supporting files.
+2.  `run_llm_sessions.py`: Executes parallel API calls to the LLM.
+3.  `process_llm_responses.py`: Parses raw text responses into structured data.
+4.  `analyze_llm_performance.py` & `run_bias_analysis.py`: Calculate metrics.
+5.  `generate_replication_report.py`: Creates the final formatted text report.
+6.  `compile_replication_results.py`: Creates the final single-row summary CSV.
 
-2.  **Reprocess Mode (`--reprocess`):**
-    -   Operates on a specified, existing replication directory.
-    -   Skips query generation and LLM interaction (Stages 1 & 2).
-    -   Re-runs only the data processing and analysis pipeline (Stages 3-6) to apply logic updates or fixes.
-
-In both modes, the script's final action is to generate a comprehensive
-`replication_report.txt` file. This report contains all run parameters, the
-final status, a human-readable summary, a machine-parsable JSON block of all
-metrics, and the full logs from all pipeline stages.
+It can also operate in a `--reprocess` mode, which re-runs only the data
+processing and analysis stages (3-6) on existing raw data.
 
 Usage (as called by experiment_manager.py):
     python src/orchestrate_replication.py --replication_num 1 --base_output_dir path/to/exp

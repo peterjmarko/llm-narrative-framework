@@ -17,27 +17,17 @@
 # Filename: src/analyze_llm_performance.py
 
 """
-Stage 4 (Part 1): Core Performance Analyzer for a Single Replication.
+Stage 4 (Part 1): Core Performance Analyzer.
 
-This script is the primary quantitative engine of the single-replication pipeline.
-It takes the clean, structured data from Stage 3 and computes a comprehensive
-suite of core performance metrics. It constitutes the first part of the unified
-"Comprehensive Analysis" stage managed by the orchestrator.
+This script is the primary quantitative engine for a single replication. It takes
+the clean, structured data from Stage 3 and computes a comprehensive suite of
+core performance metrics (MRR, Top-K accuracy, effect sizes, etc.).
 
-Key Features:
--   **Final Validation**: Before analysis, it performs a final data integrity
-    check, cross-validating the mappings against their original manifests.
--   **Statistical Rigor**: It uses appropriate non-parametric tests (Mann-Whitney U,
-    Wilcoxon) to assess performance against chance and combines p-values using
-    meta-analysis techniques (Stouffer's, Fisher's methods).
--   **Comprehensive Metrics**: Calculates key performance indicators including
-    Mean Reciprocal Rank (MRR), Top-K accuracy, and effect sizes.
--   **Structured JSON Output**: Its primary output is the initial `replication_metrics.json`
-    file, containing the core metrics. This file is subsequently augmented by
-    `run_bias_analysis.py`.
--   **Human-Readable Summary**: It also prints a human-readable summary to stdout,
-    which is captured by the orchestrator to form the body of the final
-    `replication_report.txt`.
+Its sole output is the initial `replication_metrics.json` file, which contains
+the calculated core metrics. This file is subsequently read and augmented by
+the bias analysis script (`run_bias_analysis.py`).
+
+It is called by `orchestrate_replication.py`.
 """
 
 # === Start of src/analyze_llm_performance.py ===

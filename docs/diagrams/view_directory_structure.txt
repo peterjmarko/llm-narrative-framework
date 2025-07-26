@@ -17,22 +17,21 @@ personality_matching/
 └── update_experiment.ps1       # ENTRY POINT: Re-run analysis for an existing experiment
 |
 ├── src/                        # All Python source code for the project
-│   ├── analyze_llm_performance.py  # Stage 3: Calculates final metrics for a replication
-│   ├── build_llm_queries.py        # Stage 1: Generates queries and ground truth
-│   ├── config_loader.py            # Loads configuration files
-│   ├── experiment_aggregator.py    # Stage 4: Aggregates results hierarchically (produces all_results.csv)
-│   ├── experiment_manager.py       # Manages experiment lifecycle (main controller)
-│   ├── llm_prompter.py             # Worker: Interacts with LLM API
-│   ├── orchestrate_replication.py  # Orchestrates stages for a single replication
-│   ├── patch_old_experiment.py     # Utility: Adds archived configs to old runs
-│   ├── process_llm_responses.py    # Stage 2: Parses LLM responses into scores
-│   ├── query_generator.py          # Worker: Generates a single LLM query
-│   ├── rebuild_reports.py          # Utility: Regenerates replication reports
-│   ├── replication_log_manager.py  # Manages the batch_run_log.csv
-│   ├── restore_config.py           # Utility: Reverse-engineers config from old reports
-│   ├── run_bias_analysis.py        # Utility: Calculates positional bias metrics
-│   ├── run_llm_sessions.py         # Orchestrates LLM interaction sessions
-│   └── study_analysis.py           # Final: Performs statistical analysis for a study
+│   ├── aggregate_experiments.py      # Aggregates experiments into a study summary
+│   ├── analyze_llm_performance.py  # Stage 4a: Calculates core metrics
+│   ├── build_llm_queries.py        # Stage 1: Generates all trial queries
+│   ├── compile_experiment_results.py # Compiles all replications for an experiment
+│   ├── compile_replication_results.py# Stage 6: Compiles results for one replication
+│   ├── experiment_manager.py       # Main controller for a single experiment
+│   ├── generate_replication_report.py# Stage 5: Creates the final text report
+│   ├── llm_prompter.py             # Worker: Handles a single API call
+│   ├── orchestrate_replication.py  # Orchestrates the 6 stages for one replication
+│   ├── process_llm_responses.py    # Stage 3: Parses LLM text responses
+│   ├── query_generator.py          # Worker: Generates a single query file
+│   ├── replication_log_manager.py  # Manages batch_run_log.csv
+│   ├── run_bias_analysis.py        # Stage 4b: Calculates bias metrics
+│   ├── run_llm_sessions.py         # Stage 2: Manages parallel LLM API calls
+│   └── study_analyzer.py           # Final: Performs statistical analysis for a study
 |
 ├── data/                               # Source personality databases & prompt templates
 │   ├── personalities_db_1-5000.txt     # Main personalities database used in experiments
@@ -41,7 +40,7 @@ personality_matching/
 ├── output/                                     # All generated artifacts from experiments
 │   ├── new_experiments/                        # Contains all new experiments
 │       └── <Experiment_Name>/                          # e.g., "Grok_3_Mini_map=random"
-│           ├── <Replication_Name>/                     # e.g., "run_..._rep-01_..."
+│           ├── <Replication_Name>/                     # e.g., "run_..._rep-01_..._rps-030_mps-random"
 │           │   ├── analysis_inputs/                    # Intermediate data for ANOVA consumption
 │           │   ├── session_queries/                    # Raw LLM queries (JSON and text)
 │           │   ├── session_responses/                  # Raw LLM responses (JSON and text)

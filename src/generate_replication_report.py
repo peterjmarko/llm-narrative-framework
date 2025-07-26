@@ -17,21 +17,21 @@
 # Filename: src/generate_replication_report.py
 
 """
-Stage 5: Final Report Generator for a Single Replication.
+Stage 5: Replication Report Generator.
 
 This script is responsible for the fifth stage of the replication pipeline:
 generating the final, comprehensive `replication_report.txt`.
 
-It reads the final, authoritative `replication_metrics.json` file (which contains
-all core and bias metrics) and the `config.ini.archived` file from a given
-run directory. It then assembles a complete report containing:
-1.  A detailed header with all run parameters and metadata.
-2.  The base LLM query prompt used for the run.
-3.  A human-readable summary of the key meta-analysis results.
-4.  The full, machine-parsable JSON block of all metrics.
+It reads the final, authoritative `replication_metrics.json` file and the
+`config.ini.archived` file from a given run directory. It then assembles a
+complete report containing a detailed header, the base LLM query, a human-readable
+summary of key results, and the full, machine-parsable JSON block of all metrics.
 
 This modular approach ensures that report generation is a distinct, testable
-step in the pipeline.
+step in the pipeline. It is called by `orchestrate_replication.py`.
+
+Usage:
+    python src/generate_replication_report.py --run_output_dir /path/to/run_dir ...
 """
 
 import os

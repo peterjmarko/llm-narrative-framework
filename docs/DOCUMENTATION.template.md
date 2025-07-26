@@ -41,7 +41,7 @@ The result is a clean dataset of personality profiles where the connection to th
 -   **Powerful Reprocessing Engine**: The manager's `--reprocess` mode allows for re-running the data processing and analysis stages on existing results without repeating expensive LLM calls. This makes it easy to apply analysis updates or bug fixes across an entire experiment.
 -   **Guaranteed Reproducibility**: On every new run, the `config.ini` file is automatically archived in the run's output directory, permanently linking the results to the exact parameters that generated them.
 -   **Standardized, Comprehensive Reporting**: Each replication produces a `replication_report.txt` file containing run parameters, status, a human-readable statistical summary, and a machine-parsable JSON block with all key metrics. This format is identical for new runs and reprocessed runs.
--   **Hierarchical Analysis & Aggregation**: The `aggregate_experiments.py` script performs a bottom-up aggregation of all data, generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and a master `STUDY_results.csv`) for a fully auditable research archive.
+-   **Hierarchical Analysis & Aggregation**: The pipeline uses a set of dedicated compiler scripts for a fully auditable, bottom-up aggregation of results. `compile_replication_results.py` creates a summary for each run, `compile_experiment_results.py` combines those into an experiment-level summary, and finally `aggregate_experiments.py` creates a master `STUDY_results.csv` for the entire study.
 -   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `replication_log_manager.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
 -   **Enhanced Console Readability**: All console outputs for file paths, commands, and key statuses are now formatted with consistent newlines and indentation, greatly improving log clarity and user experience during long runs.
 -   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `aggregate_experiments.py` prepares a master dataset, which `study_analyzer.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
@@ -80,7 +80,7 @@ The project's functionality is organized into six primary workflows, each initia
 
 6.  **Update a Study**: A batch operation that automatically updates all out-of-date experiments within a study.
 
-7.  **Analyze a Study**: The highest-level analytical tool, used after a study is validated to aggregate results and perform comprehensive statistical analysis.
+7.  **Process a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
 
 #### Workflow 1: Run an Experiment
 
@@ -158,11 +158,11 @@ This workflow provides a read-only, consolidated completeness report for all exp
 {{grouped_figure:docs/diagrams/flow_5_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
 
 
-#### Workflow 6: Analyze a Study
+#### Workflow 6: Process a Study
 
-This workflow is used after all experiments are complete to aggregate results and perform statistical analysis for the study. The `analyze_study.ps1` wrapper calls `aggregate_experiments.py` and then `study_analyzer.py`.
+This workflow is used after all experiments are complete to audit, compile, and analyze the entire study. The `process_study.ps1` wrapper calls `audit_study.ps1`, `compile_study_results.py`, and then `study_analyzer.py`.
 
-{{grouped_figure:docs/diagrams/flow_6_analyze_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Analyze a Study. Aggregates results of all experiments and performs statistical analysis for the study.}}
+{{grouped_figure:docs/diagrams/flow_6_process_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Process a Study. Audits, compiles, and analyzes all experiments in a study.}}
 
 
 #### Workflow 7: Update a Study
@@ -355,11 +355,11 @@ Point the script at the source directory of the legacy experiment. The script wi
 .\migrate_experiment.ps1 -SourceDirectory "output/legacy/Legacy_Experiment_1"
 ```
 
-### Analyzing a Study (`analyze_study.ps1`)
+### Processing a Study (`process_study.ps1`)
 
-After running one or more experiments, this script aggregates all their results and performs the final statistical analysis for the entire study. This is the final step for a study.
+This script orchestrates the entire post-processing workflow for a study. It audits all experiments, compiles their results, and performs the final statistical analysis. This is the final step for a study.
 
-**Important:** Before running the aggregation and analysis, this script first automatically performs a full study audit (by calling `audit_study.ps1`). If any experiment is found to be incomplete, corrupt, or out-of-date, the process will halt with a detailed error report. This ensures that analysis is only performed on a complete and validated set of data.
+**Important:** This script first automatically performs a full study audit (by calling `audit_study.ps1`). If any experiment is found to be incomplete, corrupt, or out-of-date, the process will halt with a detailed error report. This ensures that compilation and analysis are only performed on a complete and validated set of data.
 
 For organizational purposes, one would typically move all experiment folders belonging to a single study into a common directory (e.g., `output/studies/My_First_Study/`).
 
@@ -367,8 +367,8 @@ For organizational purposes, one would typically move all experiment folders bel
 Point the script at the top-level directory containing all relevant experiment folders. It will provide a clean, high-level summary of its progress.
 
 ```powershell
-# Example: Analyze all experiments located in the "My_First_Study" directory
-.\analyze_study.ps1 -StudyDirectory "output/studies/My_First_Study"
+# Example: Process all experiments located in the "My_First_Study" directory
+.\process_study.ps1 -StudyDirectory "output/studies/My_First_Study"
 ```
 For detailed, real-time logs, add the `-Verbose` switch.
 
@@ -416,29 +416,35 @@ The final analysis script (`study_analyzer.py`) produces a comprehensive log fil
 
 *   **`migrate_experiment.ps1`**: Safely migrates a legacy experiment by first copying it to a new timestamped directory and then upgrading the copy to be compatible with the current pipeline.
 
-*   **`analyze_study.ps1`**: Aggregates all results within a study and performs the final statistical analysis (e.g., ANOVA).
+*   **`process_study.ps1`**: Audits, compiles, and analyzes all results within a study, performing the final statistical analysis (e.g., ANOVA).
 
 ## Main Orchestrator
 
-*   **`experiment_manager.py`**: The top-level controller for an entire experiment, functioning as a state machine. It verifies the experiment's state and automatically takes the correct action (`NEW`, `REPAIR`, `REPROCESS`, or `MIGRATE`) until the experiment is complete. It can also be forced to reprocess an entire experiment via the `--reprocess` command-line flag.
+*   **`experiment_manager.py`**: The top-level controller for an entire experiment, functioning as a state machine. It verifies the experiment's state and automatically takes the correct action (`NEW`, `REPAIR`, `REPROCESS`, or `MIGRATE`) until the experiment is complete. It calls **`compile_experiment_results.py`** to generate the final summary for the experiment.
 
 ## Replication Pipeline Scripts
 
-*   **`orchestrate_replication.py`**: The self-contained engine for a **single** replication. It manages the entire lifecycle, including a consolidated 6-stage pipeline: query generation, parallel LLM sessions, response processing, a comprehensive two-part analysis (performance and bias), report generation, and final summary creation. It can also reprocess or repair a run.
+*   **`orchestrate_replication.py`**: The engine for a **single** replication. It manages the entire lifecycle by calling the dedicated scripts for each of the six pipeline stages. It can also reprocess or repair a run.
 
-*   **`build_llm_queries.py`**: **Stage 1.** Called by the orchestrator. Samples personalities and calls the `query_generator.py` worker to create all files needed for the trials.
+*   **`build_llm_queries.py`**: **Stage 1.** Called by the orchestrator. Samples personalities, creates all trial query files, and copies the `base_query.txt` into the run directory.
 
-*   **`run_llm_sessions.py`**: **Stage 2.** Called in a parallel loop by `orchestrate_replication.py`. It manages the LLM API calls for all trials within the replication.
+*   **`run_llm_sessions.py`**: **Stage 2.** Called in a parallel loop by the orchestrator. Manages LLM API calls for all trials.
 
-*   **`process_llm_responses.py`**: **Stage 3.** Parses the raw text responses from the LLM into structured score and mapping files.
+*   **`process_llm_responses.py`**: **Stage 3.** Parses raw text responses from the LLM into structured score and mapping files.
 
-*   **`analyze_llm_performance.py`**: **Stage 4 (Part 1).** Performs the primary statistical analysis for the replication. It calculates core performance metrics (MRR, Top-K accuracy) and generates the initial `replication_metrics.json` file, along with a human-readable summary that is captured by the orchestrator for the final report.
+*   **`analyze_llm_performance.py`**: **Stage 4 (Part 1).** Performs the primary statistical analysis, calculating core performance metrics (MRR, Top-K) and creating the initial `replication_metrics.json`.
 
-*   **`run_bias_analysis.py`**: **Stage 4 (Part 2).** Called by the orchestrator immediately after the primary analysis. It calculates diagnostic metrics for positional bias, reads the `replication_metrics.json` file, injects its new metrics, and overwrites the file to complete the analysis stage.
+*   **`run_bias_analysis.py`**: **Stage 4 (Part 2).** Calculates diagnostic bias metrics and injects them into `replication_metrics.json`, completing the analysis.
+
+*   **`generate_replication_report.py`**: **Stage 5.** A new, dedicated script that reads the final `replication_metrics.json` and `config.ini.archived` to produce the complete, formatted `replication_report.txt`.
+
+*   **`compile_replication_results.py`**: **Stage 6.** A new, dedicated script that reads the final metrics and config to produce the single-row `REPLICATION_results.csv` for the run.
 
 ## Study-Level Analysis Scripts
 
-*   **`aggregate_experiments.py`**: Recursively scans a study directory, performing a bottom-up aggregation and generating level-aware summary files (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, and `STUDY_results.csv`).
+*   **`compile_experiment_results.py`**: Compiles all `REPLICATION_results.csv` files from a single experiment's `run_*` subdirectories into a unified `EXPERIMENT_results.csv`. Called by `experiment_manager.py`.
+
+*   **`aggregate_experiments.py`**: Scans a study directory and aggregates all `EXPERIMENT_results.csv` files from its subdirectories into a master `STUDY_results.csv` for final analysis.
 
 *   **`study_analyzer.py`**: Performs the final statistical analysis (Two-Way ANOVA, post-hoc tests) on a study's master CSV file and produces a detailed analysis log and publication-quality boxplots.
 

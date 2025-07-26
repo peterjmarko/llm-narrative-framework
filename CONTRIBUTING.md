@@ -125,7 +125,7 @@ The test suite is divided into two parts, one for the Python source code and one
 
 *   **PowerShell Tests**: Due to specific environmental challenges with traditional PowerShell testing frameworks (like Pester's advanced features), a custom, bare-bones testing harness is used for the orchestration scripts. This ensures maximum compatibility and reliability.
 
-    -   To test the study analysis script (`analyze_study.ps1`):
+    -   To test the study processing script (`process_study.ps1`):
         ````bash
         pdm run test-ps-stu
         ````
@@ -217,6 +217,8 @@ This project uses **`commitizen`** to enforce the [Conventional Commits](https:/
     *   A short description.
     *   A longer, multi-line description (the commit body).
     *   Any breaking changes.
+
+    > **Pasting Text:** To paste content from your clipboard into the interactive prompt, **right-click** in the terminal window. Standard `Ctrl+V` may not work.
 
     *Pre-commit hooks (including linting and doc checks) will run automatically and must pass for the commit to be finalized.*
 

@@ -17,7 +17,7 @@
 # Filename: src/summarize_replication.py
 
 """
-Stage 6: Replication Summarizer.
+Stage 6: Replication Results Compiler.
 
 This script is responsible for the sixth and final stage of the replication
 pipeline. It creates a single-row summary CSV file for a single replication run.
@@ -27,8 +27,11 @@ the specified run directory, combines all parameters and metrics into a single
 record, and writes it to `REPLICATION_results.csv`.
 
 This creates a standardized, machine-readable artifact for each run, which can
-then be aggregated at the experiment and study levels by the
-`aggregate_experiments.py` script.
+then be aggregated at the experiment and study levels. It is called by
+`orchestrate_replication.py`.
+
+Usage:
+    python src/compile_replication_results.py /path/to/run_directory
 """
 
 import os
