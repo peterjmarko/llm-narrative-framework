@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.0.1 (2025-07-26)
+
+### Bump
+
+- **version 3.0.0 → 3.0.1**
+
+### Fixes
+
+- **resolve bugs in migration and repair workflows**
+  This series of fixes addresses several critical bugs discovered during the validation of the experiment management workflows.
+  
+  -   **Migration:** The config restoration script (`restore_config.py`) now correctly parses `k` (group_size) and `m` (num_trials) from the run directory name itself, making it robust against report formatting changes and fixing a critical `CONFIG_MISMATCH` failure.
+  
+  -   **Repair/Update:** Corrected argument passing in `experiment_manager.py` for repair and reprocess modes, resolving `NameError` exceptions.
+  
+  -   **Diagnostics:** The audit recommendation messages are now context-aware, providing clearer instructions when run as a standalone tool.
+  
+  -   **Logging:** Redirected `tqdm` progress bars in `orchestrate_replication.py` to stdout to prevent them from being logged as errors during repair operations.
+
+### Style
+
+- **enforce standard script header and footer format**
 ## 3.0.0 (2025-07-26)
 
 ### Bump
