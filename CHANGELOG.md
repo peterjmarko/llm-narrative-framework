@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.14.0 (2025-07-26)
+
+### Bump
+
+- **version 2.13.0 → 2.14.0**
+
+### Features
+
+- **overhaul pipeline, clean data, and expand documentation**
+  - Refactored the results pipeline to use dedicated compiler scripts for each stage (replication, experiment), improving modularity.
+  - Cleaned up the data/ directory, removing numerous obsolete database and sample files to rely on a single source.
+  - Fixed a critical bug preventing the base LLM query from appearing in the final replication report.
+  - Improved formatting and terminology in the replication report for better readability and consistency.
+  - Added new documentation, including a data README, study supplement, and cover letter.
+  - Expanded testing with a new Bayesian analysis test.
+  - Reorganized historical data into a new pilot_studies/ directory.
 ## 2.13.0 (2025-07-24)
 
 ### Bump
