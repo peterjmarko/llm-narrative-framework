@@ -637,7 +637,12 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
         audit_color = C_RED
     elif audit_result_code == AUDIT_NEEDS_REPAIR:
         audit_message = "FAILED. Critical data is missing or corrupt (queries/responses)."
-        audit_recommendation = "Proceed with automatic repair when prompted. If you wish to perform the repair later, exit the prompt and run 'run_experiment.ps1' with the folder path of the experiment."
+        if is_verify_only_cli:
+            # Direct recommendation for standalone audit
+            audit_recommendation = "Run 'run_experiment.ps1' on the target directory to automatically repair the experiment."
+        else:
+            # Contextual recommendation for internal audit (when a prompt will follow)
+            audit_recommendation = "Proceed with automatic repair when prompted. If this fails, re-run 'run_experiment.ps1' on the target directory."
         audit_color = C_RED
     elif audit_result_code == AUDIT_NEEDS_REPROCESS:
         audit_message = "UPDATE RECOMMENDED. Experiment analysis needs refreshing."
@@ -754,7 +759,7 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_scr
 
 # This '_session_worker' function is no longer needed here and has been moved into orchestrate_replication.py's logic.
 
-def _run_repair_mode(runs_to_repair, sessions_script_path, orchestrator_script_path, bias_script_path, quiet):
+def _run_repair_mode(runs_to_repair, orchestrator_script_path, quiet):
     """Delegates repair work to the orchestrator for each failed run."""
     print(f"{C_YELLOW}--- Entering REPAIR Mode: Fixing {len(runs_to_repair)} run(s) with missing responses ---{C_RESET}")
 
@@ -788,7 +793,7 @@ def _run_repair_mode(runs_to_repair, sessions_script_path, orchestrator_script_p
             
     return True
 
-def _run_full_replication_repair(runs_to_repair, orchestrator_script, bias_script, quiet):
+def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet):
     """Deletes and fully regenerates runs with critical issues (e.g., missing queries, config issues)."""
     print(f"{C_RED}--- Entering FULL REPLICATION REPAIR Mode: Deleting and regenerating {len(runs_to_repair)} run(s) with critical issues ---{C_RESET}")
 
@@ -912,7 +917,7 @@ def _run_migrate_mode(target_dir, patch_script, orchestrator_script, verbose=Fal
     print("The manager will now proceed with final checks to finalize the migration.")
     return True
 
-def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, bias_script, compile_script, target_dir, log_manager_script):
+def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, compile_script, target_dir, log_manager_script):
     """Executes 'REPROCESS' mode to fix corrupted analysis files."""
     print(f"{C_YELLOW}--- Entering REPROCESS Mode: Fixing {len(runs_to_reprocess)} run(s) with corrupt analysis ---{C_RESET}")
 
@@ -944,7 +949,7 @@ def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, bi
         subprocess.run(cmd_log_rebuild, check=True, capture_output=True)
         
         # Re-compile the hierarchical results
-        cmd_compile = [sys.executable, compile_script, target_dir, "--mode", "hierarchical"]
+        cmd_compile = [sys.executable, compile_script, target_dir]
         subprocess.run(cmd_compile, check=True, capture_output=quiet, text=True)
         
         # Finalize the batch log with a summary line
@@ -1081,9 +1086,9 @@ def main():
                     print(f"\n{C_YELLOW}{info_message}{C_RESET}\n")
                     if _prompt_for_confirmation("Do you wish to proceed? (Y/N): "):
                         if full_replication_repairs:
-                            success = _run_full_replication_repair(full_replication_repairs, orchestrator_script, bias_analysis_script, not args.verbose)
+                            success = _run_full_replication_repair(full_replication_repairs, orchestrator_script, not args.verbose)
                         elif session_repairs: # Only run session repairs if no full replication repairs are needed/attempted
-                            success = _run_repair_mode(session_repairs, sessions_script, orchestrator_script, bias_analysis_script, not args.verbose)
+                            success = _run_repair_mode(session_repairs, orchestrator_script, not args.verbose)
                         current_action_taken = True
                     else:
                         print(f"\n{C_RED}Repair aborted by user. Exiting.{C_RESET}")
@@ -1112,7 +1117,7 @@ def main():
                     if force_reprocess_once: force_reprocess_once = False # Only force once
 
                     if proceed:
-                        success = _run_reprocess_mode(payload_details, args.notes, not args.verbose, orchestrator_script, bias_analysis_script, compile_script, final_output_dir, log_manager_script)
+                        success = _run_reprocess_mode(payload_details, args.notes, not args.verbose, orchestrator_script, compile_experiment_script, final_output_dir, log_manager_script)
                         current_action_taken = True
                     else:
                         print(f"\n{C_RED}Update aborted by user. Exiting.{C_RESET}")

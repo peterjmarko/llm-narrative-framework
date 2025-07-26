@@ -50,18 +50,16 @@ def parse_report_header(report_content):
                 return match.group(1).strip()
         return default
 
-    # Define modern and legacy patterns for each parameter.
-    patterns_model = [r"Model Name:\s*(.*)", r"LLM Model:\s*(.*)", r"Model:\s*(.*)"]
-    patterns_mapping = [r"Mapping Strategy:\s*(.*)"]
-    patterns_k = [r"Group Size \(k\):\s*(\d+)", r"Items per Query \(k\):\s*(\d+)", r"k_per_query:\s*(\d+)"]
-    patterns_m = [r"Num Trials \(m\):\s*(\d+)", r"Num Iterations \(m\):\s*(\d+)"]
-    patterns_db = [r"Personalities DB:\s*(.*)", r"Personalities Source:\s*(.*)"]
-    patterns_run_dir = [r"Run Directory:\s*(.*)"]
+    # Define modern and legacy patterns for each parameter. The `\s+` handles variable whitespace.
+    patterns_model = [r"Model Name:\s+(.*)", r"LLM Model:\s+(.*)", r"Model:\s+(.*)"]
+    patterns_mapping = [r"Mapping Strategy:\s+(.*)"]
+    patterns_k = [r"Group Size \(k\):\s+(\d+)", r"Items per Query \(k\):\s+(\d+)", r"k_per_query:\s+(\d+)"]
+    patterns_m = [r"Num Trials \(m\):\s+(\d+)", r"Num Iterations \(m\):\s+(\d+)"]
+    patterns_db = [r"Personalities DB:\s+(.*)", r"Personalities Source:\s+(.*)"]
+    patterns_run_dir = [r"Run Directory:\s+(.*)"]
 
     params['model_name'] = extract_robust(patterns_model, report_content)
     params['mapping_strategy'] = extract_robust(patterns_mapping, report_content)
-    params['group_size'] = extract_robust(patterns_k, report_content, default='0')
-    params['num_trials'] = extract_robust(patterns_m, report_content, default='0')
     params['personalities_src'] = extract_robust(patterns_db, report_content)
     
     run_directory = extract_robust(patterns_run_dir, report_content)
@@ -71,9 +69,18 @@ def parse_report_header(report_content):
         
         rep_match = re.search(r"_rep-(\d+)", run_directory)
         params['replication'] = rep_match.group(1) if rep_match else '0'
+
+        # Robustly parse k and m from the directory name itself
+        k_match = re.search(r"_sbj-(\d+)", run_directory)
+        params['group_size'] = k_match.group(1) if k_match else '0'
+
+        m_match = re.search(r"_trl-(\d+)", run_directory)
+        params['num_trials'] = m_match.group(1) if m_match else '0'
     else:
         params['temperature'] = '0.0'
         params['replication'] = '0'
+        params['group_size'] = '0'
+        params['num_trials'] = '0'
 
     return params
 

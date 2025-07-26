@@ -289,7 +289,7 @@ def main():
             failed_sessions = 0
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 tasks = {executor.submit(session_worker, i) for i in indices_to_run}
-                for future in tqdm(as_completed(tasks), total=len(tasks), desc="Processing LLM Sessions", ncols=80):
+                for future in tqdm(as_completed(tasks), total=len(tasks), desc="Processing LLM Sessions", ncols=80, file=sys.stdout):
                     _, success, log = future.result()
                     if not success:
                         failed_sessions += 1
