@@ -1,5 +1,5 @@
-#!/usr/bin/env powershell
-# -*-- coding: utf-8 -*-
+#!/usr/bin/env pwsh
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -148,3 +148,5 @@ try {
     Write-Error "An error occurred during the study update process: $($_.Exception.Message)"
     exit 1
 }
+
+# === End of update_study.ps1 ===

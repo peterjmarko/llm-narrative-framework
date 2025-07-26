@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_experiment_aggregator.py
+# Filename: tests/test_aggregate_experiments.py
 
 import unittest
 from unittest.mock import patch, MagicMock
@@ -125,4 +125,4 @@ class TestAggregateExperimentsScript(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_experiment_aggregator.py ===
+# === End of tests/test_aggregate_experiments.py ===

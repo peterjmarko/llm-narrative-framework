@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -14,7 +14,10 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# Filename: src/summarize_replication.py
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: src/compile_replication_results.py
 
 """
 Stage 6: Replication Results Compiler.
@@ -155,3 +158,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# === End of src/compile_replication_results.py ===

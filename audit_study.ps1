@@ -1,5 +1,5 @@
-#!/usr/bin/env powershell
-# -*-- coding: utf-8 -*-
+#!/usr/bin/env pwsh
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -240,3 +240,5 @@ catch {
     
     exit 1
 }
+
+# === End of audit_study.ps1 ===

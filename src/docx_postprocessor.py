@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -65,3 +65,5 @@ def insert_page_breaks_by_marker(docx_path: str, marker_text: str):
 
     except Exception as e:
         print(f"      ERROR: Failed to post-process DOCX '{os.path.basename(docx_path)}': {e}")
+
+# === End of src/docx_postprocessor.py ===

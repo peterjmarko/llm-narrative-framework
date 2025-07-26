@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env pwsh
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -194,3 +194,5 @@ catch {
     Format-LogFile -Path $LogFilePath
     exit 1
 }
+
+# === End of audit_experiment.ps1 ===

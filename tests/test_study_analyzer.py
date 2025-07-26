@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_study_analysis.py
+# Filename: tests/test_study_analyzer.py
 
 import unittest
 from unittest.mock import patch, MagicMock
@@ -327,4 +327,4 @@ class TestStudyAnalyzerScript(unittest.TestCase):
         self.assertIn("Example Usage:", help_output)
         self.assertIn("python src/study_analyzer.py path/to/your/study_folder/", help_output)
 
-# === End of tests/test_study_analysis.py ===
+# === End of tests/test_study_analyzer.py ===

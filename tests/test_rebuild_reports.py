@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -19,7 +19,6 @@
 #
 # Filename: tests/test_rebuild_reports.py
 
-# tests/test_rebuild_reports.py
 import configparser
 import subprocess
 from pathlib import Path

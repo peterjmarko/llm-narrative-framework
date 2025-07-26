@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -18,8 +18,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 # Filename: tests/test_replication_log_manager.py
-
-# tests/test_replication_log_manager.py
 
 from pathlib import Path
 from unittest.mock import patch
@@ -183,4 +181,4 @@ class TestLogManagerMain:
         assert log_file.exists()
         assert len(log_file.read_text().strip().splitlines()) == 1  # Header only
 
-# === End of tests/test_replication_replication_log_manager.py ===
+# === End of tests/test_replication_log_manager.py ===
