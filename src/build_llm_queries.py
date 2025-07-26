@@ -291,6 +291,18 @@ def main():
             start_index = get_next_start_index(final_queries_output_dir, "llm_query_")
             logging.info(f"Continuing run, starting new files with global index {start_index}.")
 
+        # --- Copy Base Query (AFTER cleanup) ---
+        base_query_src_filename = get_config_value(APP_CONFIG, 'Filenames', 'base_query_src', fallback="base_query.txt")
+        base_query_src_path = os.path.join(PROJECT_ROOT, "data", base_query_src_filename)
+        base_query_dest_path = os.path.join(final_queries_output_dir, "llm_query_base.txt")
+        if os.path.exists(base_query_src_path):
+            # Only copy if it doesn't already exist (for 'continue' mode)
+            if not os.path.exists(base_query_dest_path):
+                shutil.copy2(base_query_src_path, base_query_dest_path)
+                logging.info(f"Copied base query to: {os.path.basename(base_query_dest_path)}")
+        else:
+            logging.warning(f"Master base query file not found at: {base_query_src_path}. Report will show 'NOT FOUND'.")
+
         master_personalities_src_path = os.path.join(PROJECT_ROOT, "data", args.master_personalities_file)
         logging.info(f"Loading master personalities from: {master_personalities_src_path}")
         master_personalities_df, original_master_header = load_all_personalities_df(master_personalities_src_path)

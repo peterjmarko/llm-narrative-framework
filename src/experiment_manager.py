@@ -373,9 +373,10 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
     status_details = []
 
     # 1. name validity
-    name_match = re.match(r"run_.*_sbj-(\d+)_trl-(\d+)$", run_path.name)
-    if not name_match:
-        status_details = [f"{run_path.name} != run_*_sbj-NN_trl-NNN"]
+    # This regex now correctly handles the new format without a trailing '$' to allow for the new parts.
+    name_match = re.search(r"sbj-(\d+)_trl-(\d+)", run_path.name)
+    if not run_path.name.startswith("run_") or not name_match:
+        status_details = [f"{run_path.name} does not match required run_*_sbj-NN_trl-NNN* pattern"]
         return "INVALID_NAME", status_details
     k_expected, m_expected = int(name_match.group(1)), int(name_match.group(2))
 
@@ -763,7 +764,7 @@ def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, qui
     except Exception as e:
         return rep_num, False, f"An unexpected error occurred in replication worker {rep_num}: {e}"
 
-def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, bias_script, sessions_script):
+def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script):
     """Executes 'NEW' mode by calling orchestrator, which is now parallelized."""
     print(f"{C_CYAN}--- Entering NEW Mode: Creating missing replications ---{C_RESET}")
     
@@ -1039,13 +1040,17 @@ def main():
         C_RESET = '\033[0m'
 
     # --- Script Paths ---
-    orchestrator_script = os.path.join(current_dir, "orchestrate_replication.py")
+    # Define src_dir relative to the project root for robustness.
+    src_dir = os.path.join(PROJECT_ROOT, "src")
+    orchestrator_script = os.path.join(src_dir, "orchestrate_replication.py")
     process_script = os.path.join(src_dir, 'process_llm_responses.py')
     analyze_script = os.path.join(src_dir, 'analyze_llm_performance.py')
     bias_script = os.path.join(src_dir, 'run_bias_analysis.py')
-    aggregator_script = os.path.join(src_dir, 'experiment_aggregator.py')
-    patch_script = os.path.join(current_dir, "patch_old_experiment.py")
-    rebuild_script = os.path.join(current_dir, "rebuild_reports.py")
+    # Script to compile results for a single experiment.
+    compile_experiment_script = os.path.join(src_dir, 'compile_experiment_results.py')
+    log_manager_script = os.path.join(src_dir, 'replication_log_manager.py')
+    patch_script = os.path.join(src_dir, "patch_old_experiment.py")
+    rebuild_script = os.path.join(src_dir, "rebuild_reports.py")
 
     try:
         if args.target_dir:
@@ -1099,7 +1104,7 @@ def main():
 
             if state_overall_status == "NEW_NEEDED":
                 print(f"{C_CYAN}--- Experiment is NEW. Proceeding to create replications. ---{C_RESET}")
-                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script, bias_analysis_script, sessions_script)
+                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, orchestrator_script)
                 current_action_taken = True
             else: # If not NEW_NEEDED, then the directory is not empty, so it's safe to run a proper audit.
                 # Always run and print the audit report for existing experiments to ensure consistent user feedback.
@@ -1216,8 +1221,8 @@ def main():
             print(f"\n--- {log_message} ---")
             subprocess.run([sys.executable, log_manager_script, "rebuild", final_output_dir], check=True, capture_output=True)
             
-            print("--- Compiling final statistical summary... ---")
-            subprocess.run([sys.executable, compile_script, final_output_dir, "--mode", "hierarchical"], check=True, capture_output=True)
+            print("--- Compiling final experiment summary... ---")
+            subprocess.run([sys.executable, compile_experiment_script, final_output_dir], check=True, capture_output=True)
             
             print("--- Finalizing batch log with summary... ---")
             subprocess.run([sys.executable, log_manager_script, "finalize", final_output_dir], check=True, capture_output=True)

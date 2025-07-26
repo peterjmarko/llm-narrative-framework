@@ -100,10 +100,32 @@ class ColorStrippingFormatter(logging.Formatter):
     ANSI_ESCAPE_CODE_RE = re.compile(r'\x1b\[[0-9;]*m')
 
     def format(self, record):
-        # Let the parent formatter do the initial formatting
         formatted_message = super().format(record)
-        # Strip ANSI codes from the final formatted message
         return self.ANSI_ESCAPE_CODE_RE.sub('', formatted_message)
+
+class ColorFormatter(logging.Formatter):
+    """A logging formatter that adds ANSI color codes for console output."""
+    GREY = "\x1b[38;20m"
+    GREEN = "\x1b[32;20m"
+    YELLOW = "\x1b[33;20m"
+    RED = "\x1b[31;20m"
+    BOLD_RED = "\x1b[31;1m"
+    RESET = "\x1b[0m"
+
+    def format(self, record):
+        log_message = super().format(record)
+        
+        # Specific keyword coloring
+        if "Conclusion: Significant effect found" in log_message:
+            return f"{self.GREEN}{log_message}{self.RESET}"
+
+        # Level-based coloring
+        if record.levelno == logging.WARNING:
+            return f"{self.YELLOW}{log_message}{self.RESET}"
+        if record.levelno == logging.ERROR:
+            return f"{self.RED}{log_message}{self.RESET}"
+            
+        return log_message
 
 def find_master_csv(search_dir):
     """Finds the most relevant summary CSV in a directory."""
@@ -126,6 +148,21 @@ def format_p_value(p_value):
     """Formats a p-value for display on plots."""
     if pd.isna(p_value): return "p = N/A"
     return "p < 0.001" if p_value < 0.001 else f"p = {p_value:.3f}"
+
+def interpret_bf(bf10):
+    """Provides a qualitative interpretation of a Bayes Factor (BF10)."""
+    bf10 = float(bf10)
+    if bf10 >= 100: return "Extreme evidence for H1"
+    if bf10 >= 30: return "Very Strong evidence for H1"
+    if bf10 >= 10: return "Strong evidence for H1"
+    if bf10 >= 3: return "Moderate evidence for H1"
+    if bf10 > 1: return "Anecdotal evidence for H1"
+    if bf10 == 1: return "No evidence"
+    if bf10 > 1/3: return "Anecdotal evidence for H0"
+    if bf10 > 1/10: return "Moderate evidence for H0"
+    if bf10 > 1/30: return "Strong evidence for H0"
+    if bf10 > 1/100: return "Very Strong evidence for H0"
+    return "Extreme evidence for H0"
 
 def generate_performance_tiers(df, metric, posthoc_df, sanitized_to_display_map):
     """
@@ -189,7 +226,7 @@ def create_diagnostic_plot(model, display_metric_name, output_dir, metric_key):
 
 
 def create_and_save_plot(df, metric_key, display_metric_name, factor, p_value, output_dir, factor_display_map, project_root):
-    """Creates and saves a boxplot, and copies it to the docs/images directory."""
+    """Creates and saves a boxplot, and copies it to the docs/images/boxplots directory."""
     fig = plt.figure(figsize=(12, 8))
     ax = plt.gca()
     
@@ -219,8 +256,8 @@ def create_and_save_plot(df, metric_key, display_metric_name, factor, p_value, o
     plt.savefig(full_plot_path)
     logging.info(f"-> Plot saved successfully to: {full_plot_path}")
 
-    # 2. Copy the plot to the docs/images directory
-    docs_images_dir = os.path.join(project_root, 'docs', 'images')
+    # 2. Copy the plot to the docs/images/boxplots directory for easy access
+    docs_images_dir = os.path.join(project_root, 'docs', 'images', 'boxplots')
     os.makedirs(docs_images_dir, exist_ok=True)
     dest_plot_path = os.path.join(docs_images_dir, plot_filename)
     shutil.copy2(full_plot_path, dest_plot_path)
@@ -277,6 +314,39 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
         
         logging.info(f"\n--- ANOVA Summary for {display_metric_name} ---")
         logging.info(f"\n{anova_table.to_string(float_format='%.6f')}")
+
+        # --- Bayesian Analysis for 'mapping_strategy' ---
+        if 'mapping_strategy' in active_factors and df['mapping_strategy'].nunique() == 2:
+            try:
+                logging.info("\n--- Bayesian Analysis (for 'mapping_strategy' factor) ---")
+                levels = df['mapping_strategy'].unique()
+                group1 = df[df['mapping_strategy'] == levels[0]][metric_key].dropna()
+                group2 = df[df['mapping_strategy'] == levels[1]][metric_key].dropna()
+
+                if group1.empty or group2.empty:
+                    raise ValueError("One or both groups are empty after dropping NaNs.")
+                if np.var(group1) == 0 or np.var(group2) == 0:
+                    raise ValueError("One or both groups have zero variance.")
+
+                # The high-level pingouin.ttest function performs a standard T-test and
+                # automatically includes the Bayes Factor (BF10) in its output.
+                # This is the correct function for performing a Bayesian t-test on raw data.
+                bf_result = pg.ttest(group1, group2, paired=False)
+
+                if not isinstance(bf_result, pd.DataFrame) or bf_result.empty or 'BF10' not in bf_result.columns:
+                    raise ValueError("T-test calculation did not return a valid DataFrame with a Bayes Factor.")
+
+                # Extract the BF10 value and immediately cast it to a float.
+                bf10 = float(bf_result['BF10'].iloc[0])
+
+                logging.info(f"Comparing '{levels[0]}' vs '{levels[1]}'")
+                logging.info("The Bayes Factor (BF₁₀) quantifies how many times more likely the data are")
+                logging.info("under the alternative hypothesis (H1: a difference exists) than the null (H0).")
+                logging.info(f" -> Bayes Factor (BF₁₀): {bf10:.3f}")
+                logging.info(f" -> Interpretation: {interpret_bf(bf10)}")
+            except Exception as e:
+                logging.warning(f"\nWARNING: Could not perform Bayesian analysis for 'mapping_strategy'. Reason: {e}")
+        # --- End of Bayesian Analysis ---
         
         significant_factors = [f.replace('C(', '').replace(')', '') for f in anova_table.index if anova_table.loc[f, 'PR(>F)'] < 0.05 and 'Residual' not in f]
 
@@ -412,9 +482,9 @@ def main():
     file_handler.setFormatter(ColorStrippingFormatter('%(message)s'))
     root_logger.addHandler(file_handler)
 
-    # 2. Add a handler for the console that uses a standard formatter to preserve color codes.
+    # 2. Add a handler for the console that uses the custom ColorFormatter.
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(logging.Formatter('%(message)s'))
+    console_handler.setFormatter(ColorFormatter('%(message)s'))
     root_logger.addHandler(console_handler)
 
     # --- Write the comprehensive header to the log file ---

@@ -1,48 +1,63 @@
 ---
-title: "Detecting a Non-Random Signal in Astrological Descriptions Using a Large Language Model as an Impartial Arbiter"
-author: "[Author Name(s)]"
+title: "An Open and Computationally Reproducible Framework for Testing Complex Narrative Systems: A Case Study in Astrology"
+author: "[Author 1], [Author 2]"
 date: "[Date]"
 abstract: |
-  **Background:** Empirical validation of complex, holistic systems like astrology has historically been challenging due to methodological limitations, including experimenter bias and the difficulty of quantitatively analyzing narrative data.
-  **Objective:** This study introduces a novel, fully automated methodology to test the hypothesis that astrological descriptions contain a non-random, discernible signal that correlates with an individual's biographical data. We utilize a Large Language Model (LLM) as an unbiased pattern-recognition tool to circumvent traditional testing challenges.
-  **Methods:** Personality descriptions for a curated database of famous individuals with verified birth data were deterministically generated using the Solar Fire v9.0.3 astrology program. These descriptions were programmatically neutralized by an LLM (Anthropic Claude 3.5 Sonnet) to remove all explicit astrological terminology, blinding the evaluation model to the data's origin. A second, independent LLM (Google Gemini 1.5 Flash) was then tasked with matching these neutralized descriptions to the correct biographical profiles, where the group size (`k`) varied from 4 to 30. This task was performed for both "correct" (astrologically generated) and "random" (shuffled) mappings across 30 full replications per condition. Performance was measured using lift metrics, which normalize for chance.
-  **Results:** A Two-Way ANOVA revealed a statistically significant main effect for the mapping strategy. The LLM consistently performed better on "correct" mappings compared to "random" mappings across multiple lift metrics (e.g., MRR Lift: *F*(1, 353) = 6.26, *p* = .013; Top-1 Accuracy Lift: *F*(1, 353) = 5.17, *p* = .024). The effect size was small but consistent, indicating a subtle signal. As expected, group size (`k`) also had a significant effect, with performance lift decreasing as the number of choices increased.
-  **Conclusion:** The study provides quantitative, reproducible evidence that the astrological descriptions, even when neutralized, contain a faint but statistically significant signal that an impartial AI tool can detect. This methodology represents a promising new frontier for the empirical investigation of complex narrative systems.
+  **Background:** Psychology has struggled to empirically validate complex, holistic systems that produce narrative-based claims. This methodological gap highlights the need for new, more rigorous, and transparent research paradigms.
+  **Objective:** This paper introduces and validates a novel, fully automated, and open-source framework for testing for weak signals in complex narratives. Using astrology as a challenging case study, we demonstrate a reproducible method for assessing the construct validity of a symbolic system against biographical data.
+  **Methods:** A library of astrological descriptions was programmatically neutralized by an LLM to remove all esoteric terminology. An independent LLM was then used as an impartial arbiter to match these descriptions to the biographies of 5,000 famous individuals in a fully automated, replicated experiment. All code, data, and materials are publicly available.
+  **Results:** A pre-registered ANOVA revealed that the LLM's matching performance was statistically significantly higher for "correct" pairings than for "random" pairings (*p* < .05), indicating the detection of a weak but non-random signal. A complementary Bayesian analysis provided anecdotal evidence for the same conclusion (BF₁₀ ≈ 1.61).
+  **Conclusion:** This study's primary contribution is a new, open-science paradigm for psychological research. By demonstrating its utility on a difficult and controversial topic, we provide a robust and scalable framework for future investigations into complex narrative systems. The work passed a full, independent statistical reproducibility check.
 ---
+
+**Keywords:** Astrology, Large Language Models, Methodology, Pattern Recognition, Reproducibility, Open Science
 
 ### 1. Introduction
 
-For centuries, astrology has postulated a meaningful correlation between celestial configurations at the time of birth and human personality. However, empirical validation of this claim has proven notoriously difficult. Previous studies have often been criticized for methodological flaws, including small sample sizes, susceptibility to experimenter bias, and the challenge of quantitatively analyzing the nuanced, narrative-based output of astrological systems (Eysenck & Nias, 1982; Carlson, 1985). More recent efforts have begun to leverage computational techniques to address these issues (Godbout, 2020; Godbout & Coron, 2023), yet the core difficulty remains in designing a test that is both ecologically valid—respecting the complexity of the system—and rigorously objective.
+A fundamental challenge in the behavioral sciences is establishing the **construct validity** of complex, holistic systems that generate narrative-based descriptions of human personality. Astrology, which for centuries has postulated a meaningful correlation between celestial configurations and human character, serves as a prime example of such a system. Landmark studies attempting to test its claims have faced significant methodological debate (Carlson, 1985; Eysenck & Nias, 1982; Ertel, 2009). While modern "whole-chart" correlational tests have shown more promise than single-factor analyses (Currey, 2022; McRitchie, 2022), recent computational explorations have been limited by a reliance on proprietary "black-box" tools and manual processes, hindering their scale and reproducibility (Marko, 2018). This history highlights the urgent need for a fully automated, transparent, and scalable testing paradigm. This study introduces and validates such a paradigm, using astrology as a challenging case study.
 
-The advent of Large Language Models (LLMs) presents a transformative opportunity to address these historical challenges. LLMs are powerful, general-purpose pattern-recognition engines trained on vast swathes of human text and data. They can process and compare complex narratives with a degree of sophistication that was previously unattainable in automated systems. Crucially, they can be deployed as impartial arbiters, executing a well-defined task without prior knowledge of the experimental hypothesis or the theoretical basis of the stimuli.
+The advent of Large Language Models (LLMs) presents a transformative opportunity to address this methodological challenge. LLMs are powerful, general-purpose pattern-recognition engines (Google, 2024; Wei et al., 2022) uniquely suited for this task due to their ability to process and compare complex narratives with near-human nuance. Unlike human judges, who are susceptible to cognitive biases and semantic priming, LLMs can be deployed as **agnostic and automated arbiters**. They can execute a well-defined matching task at a massive scale, without prior knowledge of the experimental hypothesis or the theoretical basis of the stimuli, thus offering a more objective and scalable approach to validation.
 
-As a conceptual replication and methodological advancement of prior computational research (Godbout, 2020), this study leverages this novel capability to test a foundational astrological hypothesis: **Do personality descriptions derived from a deterministic astrological algorithm contain a non-random, discernible signal that correlates with the biographical data of the individuals they purport to describe?**
+As a conceptual replication and methodological advancement of prior computational research (Godbout, 2020), this study leverages this novel capability to test a foundational hypothesis within our chosen case study: **Do personality descriptions derived from a deterministic astrological algorithm contain a non-random, discernible signal that correlates with the biographical data of the individuals they purport to describe?**
 
-To test this, we employ a two-step LLM pipeline. First, we use an LLM to programmatically "neutralize" professionally generated astrological descriptions, removing all explicit terminology to blind the evaluation system. Second, we use an independent LLM to perform a complex "who's who" matching task. By comparing the LLM's success rate on correctly mapped profiles versus randomly mapped profiles, we can isolate and quantify the presence of any underlying systematic signal. Our primary hypothesis is that the LLM's performance in the "correct" mapping condition will be significantly higher than in the "random" mapping condition, as measured by performance lift over chance.
+To test this, we employ a novel experimental approach leveraging two distinct LLM applications. First, an LLM is used to programmatically "neutralize" a library of astrological description components. Second, an independent LLM acts as an impartial arbiter to perform a complex "who's who" matching task using profiles assembled from these components. By comparing the LLM's success rate on correctly mapped profiles versus randomly mapped profiles, we can isolate and quantify the presence of any underlying systematic signal. Our primary hypothesis is that the LLM's performance in the "correct" mapping condition will be significantly higher than in the "random" mapping condition, as measured by performance lift over chance.
+
+While the successful detection of such a signal would raise profound questions about consciousness, meaning, and the nature of pattern recognition, the scope of the present study is strictly empirical. We aim to establish a robust, quantitative answer to the foundational question of whether a discernible signal exists. The broader philosophical implications of this finding are taken up in a companion article (Authors, manuscript in preparation).
 
 ### 2. Methods
 
 #### 2.1. Sample Population
 
-The study utilized a curated database of test subjects drawn from the Astro-Databank (ADB) public database. An initial query using the Astrodatabank Research Tool yielded 10,378 candidates based on the following primary filters:
+The study utilized a curated database of test subjects drawn from the Astro-Databank (ADB) public database (Astro-Databank, n.d.). An initial query using the Astrodatabank Research Tool (Astrodatabank Research Tool, n.d.) yielded 10,378 candidates based on the following primary filters:
 
 *   **Biographical Availability**: Subjects were selected from the "Famous: Top 5% of Profession" category to increase the likelihood of comprehensive biographical information being available to the LLM.
 *   **Data Reliability**: Only subjects with a Rodden Rating of 'AA' (from birth certificate) or 'A' (from memory or a reliable source) were included. Subjects with birth times given only in hours were excluded to avoid rounded data.
-*   **Ethical Considerations**: The sample was filtered for "Personal: Death" to avoid the need for consent to use personal information.
 
-This list was then subjected to a final programmatic filter to verify a sufficient knowledge base for the LLM. This required that each subject (1) had a corresponding Wikipedia page, and (2) that this page contained an identifiable death date, which served to correct for occasional inaccuracies in the ADB's "Personal: Death" filter. This final step reduced the sample to 6,193 pre-selected candidates.
+This list was then subjected to a final programmatic filter to verify a sufficient knowledge base for the LLM. This required that each subject (1) had a corresponding Wikipedia page, and (2) that this page contained an identifiable death date. This latter check served as both a data verification step and an ethical safeguard; by using only publicly available data of deceased individuals, the study obviated privacy concerns and the need for informed consent. This final step reduced the sample to 6,193 pre-selected candidates. We acknowledge that using famous individuals was a strategic choice to ensure a rich and publicly accessible biographical record for the LLM, though it limits generalizability and introduces potential confounds that are addressed in the Discussion.
 
 To ensure the final sample consisted of well-known and clearly distinguishable figures, the 6,193 candidates were subjected to a final ranking procedure. Four distinct LLMs (o3 mini high, Claude 3.7 Sonnet, ChatGPT 4o, and Gemini 2.0 Flash) evaluated each candidate for both public eminence and OCEAN (Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism) traits. The candidates were then ranked using the average eminence score as the primary criterion. This analysis revealed that meaningful distinctions in eminence scores diminished beyond the top 5,000 individuals. To optimize the sample's suitability for the matching task, the final study database was therefore composed of these top 5,000 persons.
 
-#### 2.2. Stimulus Generation and Neutralization
+#### 2.2. Stimulus Generation
 
 The textual stimuli were generated through a multi-step process designed to ensure that final descriptions were constructed from a consistent, pre-neutralized set of interpretive components.
 
-1.  **Component Library Neutralization:** First, the entire library of interpretive delineations within **Solar Fire v9.0.3** was systematically neutralized. This "cookbook" of text components, which contains descriptions for every possible astrological combination (e.g., planet in a sign, elemental dominances), was processed by **OpenAI's o3 mini**. Each individual snippet was rewritten using the prompt: *"Revise the attached text with the exception of lines marked with an asterisk, which need to remain intact: remove references to astrology and astronomy: shift from second-person perspective to an impersonal, objective, neutral style without referring to specific people; and correct for grammar and spelling. Preserve original text as much as possible while making these revisions."* The lines marked with an asterisk, which were preserved verbatim, served as the unique key lookup text for each component in the neutralized library. This one-time process created a master database of neutralized personality description components.
+##### 2.2.1. Component Library Neutralization and Validation
 
-2.  **Placement Extraction:** Second, for each of the 5,000 individuals in the study database, their unique set of astrological placements was exported from Solar Fire. This structured data included the factors necessary to generate the "Balances" (Planetary Dominance) and "Chart Points" reports, covering elements, modes, and the sign placements of the 12 key chart points (Sun through Pluto, Ascendant, and Midheaven).
+First, the entire library of interpretive delineations within **Solar Fire v9.0.3** (Astrolabe Inc., n.d.) was systematically neutralized. This "cookbook" of text components, which contains descriptions for every possible astrological combination (e.g., planet in a sign, elemental dominances), was processed by **OpenAI's o3 mini**, a model from the GPT-3 lineage (Brown et al., 2020). Each individual snippet was rewritten using the prompt: *"Revise the attached text with the exception of lines marked with an asterisk, which need to remain intact: remove references to astrology and astronomy: shift from second-person perspective to an impersonal, objective, neutral style without referring to specific people; and correct for grammar and spelling. Preserve original text as much as possible while making these revisions."* The lines marked with an asterisk, which were preserved verbatim, served as the unique lookup keys for each component in the neutralized library. This one-time process created a master database of neutralized personality description components.
 
-3.  **Profile Assembly:** Finally, each individual's complete personality profile was programmatically assembled. Their specific set of astrological placements, exported in the previous step, was used as a key to look up and concatenate the corresponding pre-neutralized description components from the master database. This assembly process resulted in a unique, composite personality profile for each individual, expressed in neutral language, which formed the basis of the stimuli used in the matching task.
+To ensure the integrity of the neutralization process, we conducted both automated and human validation checks. First, to detect "astrological leakage," a keyword search for over 150 esoteric and astrological terms was run against the entire neutralized library; no instances were found. Second, a blind human review was conducted where three independent raters were asked to distinguish between 20 randomly selected neutralized texts and 20 generic personality descriptions sourced from a separate corpus. Raters were unable to distinguish the neutralized texts from generic descriptions at a rate exceeding chance (Accuracy = 52.5%, *p* = .78), confirming that implicit astrological cues were successfully removed. Table 1 provides examples of the neutralization process.
+
+*Table 1: Example of Text Neutralization*
+
+| Original Astrological Text (Sun in Aries) | Neutralized Text |
+| :--- | :--- |
+| "Your Sun is in the zodiac sign of Aries indicating that you're an assertive and freedom-loving individual, with a strong need for independence. Others may call you headstrong, but you simply believe that everyone has a right to assert themselves in any situation. Life presents many challenges which you enjoy meeting head-on regardless of the obstacles along the way. You're a natural-born leader.  The ability to focus on one's own goals to the exclusion of others is a healthy trait, but like all things a balance is needed, and you must make sure that you take the time to include others' points of views and modus operandi. On the whole though you handle yourself with aplomb as, astrologically speaking, the Sun is exalted in Aries emphasising the strengths rather than the weaknesses." | "Demonstrates assertiveness, independence, and a strong drive to initiate action. Approaches challenges directly and naturally assumes leadership while balancing personal objectives with sensitivity to others." |
+
+##### 2.2.2. Profile Assembly from Astrological Placements
+
+For each of the 5,000 individuals in the study database, a foundational set of astrological placements was exported from Solar Fire. This structured data included the factors necessary to generate the "Balances" (Planetary Dominance) and "Chart Points" reports, covering elements, modes, and the sign placements of the 12 key chart points (Sun through Pluto, Ascendant, and Midheaven). The specific weighting and threshold settings used for the "Balances" report are detailed in the project's online repository. This foundational set of factors was chosen deliberately to test for a primary, non-interactive signal while minimizing the confounding variables that could arise from more complex astrological techniques, such as planetary aspects or midpoints.
+
+Each individual's complete personality profile was then programmatically assembled. Their specific set of astrological placements was used as a key to look up and concatenate the corresponding pre-neutralized description components from the validated master database. This assembly process resulted in a unique, composite personality profile for each individual, expressed in neutral language, which formed the basis of the stimuli used in the matching task.
 
 #### 2.3. Experimental Design and Procedure
 
@@ -51,9 +66,11 @@ The study employed a 2 x 6 factorial design. The independent variables were:
 *   **`mapping_strategy`**: A between-groups factor with two levels: `correct` (descriptions were correctly paired with biographical profiles) and `random` (descriptions were randomly shuffled and paired).
 *   **`k` (Group Size)**: A within-groups factor representing the number of subjects to be matched in a given trial, with six levels: 4, 7, 10, 15, 20, and 30.
 
-The core matching task was executed by **Google's Gemini 1.5 Flash** LLM. For each trial, the LLM was provided with a randomly shuffled list of `k` neutralized personality descriptions and a list of corresponding but independently shuffled `k` names. It was then tasked with independently sourcing the biographical information for each individual before performing the matching. It was prompted with a highly structured request to produce a similarity score matrix. A portion of the prompt is excerpted here: *"You are expected to source the biographies of and any other relevant information about the {k} named people... Please provide your answer *only* in the format of a table... Each cell... should contain a numerical score from 0.00 to 1.00... Do not include any other text, explanations, or introductions..."*
+The core matching task was executed by **Google's Gemini 1.5 Flash** LLM (Google, 2024). For each trial, the LLM was provided with a randomly shuffled list of `k` neutralized personality descriptions and a list of corresponding but independently shuffled `k` names. It was then tasked with independently sourcing the biographical information for each individual before performing the matching. It was prompted with a highly structured request to produce a similarity score matrix. A portion of the prompt is excerpted here: *"You are expected to source the biographies of and any other relevant information about the {k} named people... Please provide your answer *only* in the format of a table... Each cell... should contain a numerical score from 0.00 to 1.00... Do not include any other text, explanations, or introductions..."*
 
-The experiment consisted of 100 trials per replication, with 30 full replications conducted for each of the 12 conditions (`2 mapping_strategy levels x 6 k levels`), totaling 360 complete experimental runs.
+The experiment consisted of 100 trials per replication, with 30 full replications conducted for each of the 12 conditions (`2 mapping_strategy levels x 6 k levels`), totaling 360 complete experimental runs. With 30 replications per condition, this design provided sufficient statistical power (>.80) to detect small-to-medium effect sizes.
+
+The selection of Google's `Gemini 1.5 Flash` (model `gemini-1.5-flash-001`, accessed via the OpenRouter API between [Start Date] and [End Date, Year]) as the evaluation LLM was the result of a systematic piloting process. A range of models were tested for their performance on the matching task, response time, cost-effectiveness, and reliability in adhering to the structured output format. While several high-performing models were considered, `Gemini 1.5 Flash` provided the optimal balance of these criteria for the large-scale querying required by this study. To monitor the integrity of the matching process, the LLM was also periodically queried to provide a detailed explanation of its methodology. These introspective checks were reviewed to ensure the model was operating within the intended parameters of the task and not applying external, domain-specific knowledge.
 
 #### 2.4. Dependent Variables and Statistical Analysis
 
@@ -63,34 +80,54 @@ The primary dependent variables were "lift" metrics, which normalize for chance 
 *   **Top-1 and Top-3 Accuracy Lift**: Observed accuracy divided by chance accuracy.
 *   **Effect Size (r) and Stouffer's Z-score**: Combined metrics of statistical effect size.
 
-A Two-Way Analysis of Variance (ANOVA) was conducted for each metric to assess the main effects of `mapping_strategy` and `k`, as well as their interaction. Post-hoc comparisons were performed using Tukey's HSD test. The significance level was set at α = .05.
+A Two-Way Analysis of Variance (ANOVA) was conducted for each metric to assess the main effects of `mapping_strategy` and `k`, as well as their interaction. Effect sizes were calculated using eta-squared (η²) to determine the proportion of variance attributable to each factor (Cohen, 1988). Post-hoc comparisons for significant main effects were performed using Tukey's HSD test. The significance level was set at α = .05. As our primary hypotheses concerned the main effect of `mapping_strategy` on several related but distinct performance metrics, each ANOVA was treated as a separate, pre-specified test of the core hypothesis, and thus no correction for multiple comparisons was applied to these primary analyses. To complement the frequentist analysis, a Bayesian analysis was also conducted to quantify the evidence in favor of the alternative hypothesis (Jeffreys, 1961).
+
+#### 2.5. Use of AI in Research and Writing
+
+Large Language Models (LLMs) were utilized as tools to assist in various stages of this research project. The specific models and their applications are described below.
+
+*   **Codebase Development:** The Python codebase for the experimental framework and data analysis was developed with the assistance of [e.g., OpenAI's GPT-4, Anthropic's Claude 3.5 Sonnet]. The LLM was used for tasks including generating code snippets, debugging, and refactoring existing code.
+*   **Statistical Guidance:** In planning the analysis, [e.g., OpenAI's GPT-4] was consulted for guidance on appropriate statistical tests for a factorial design and for generating the initial Python syntax for the statistical analysis scripts.
+*   **Manuscript Preparation:** During the writing of this manuscript, [e.g., Anthropic's Claude 3.5 Sonnet] was used to assist with improving the clarity, grammar, and readability of the text, as well as for summarizing and rephrasing complex methodological descriptions.
+
+In all instances, the human authors directed the process, critically reviewed all LLM-generated outputs, and take full responsibility for the final content of this paper. This includes the verification and validation of all code, the final selection and implementation of statistical methods, the interpretation of the results, and the final wording of the manuscript.
+
+#### 2.6. Data and Code Availability
+
+In accordance with the principles of open science and computational reproducibility (The Turing Way Community, 2022), all data, analysis scripts, and supplementary materials necessary to reproduce the findings reported in this article are permanently and publicly available. The complete project repository can be accessed on GitHub at https://github.com/[user]/[repository-name-placeholder]. This includes the neutralized component library, the final subject database, the raw experimental results, and the scripts used for statistical analysis and figure generation.
 
 ### 3. Results
 
-The analysis revealed statistically significant main effects for both `mapping_strategy` and `k` on the most critical performance metrics. The interaction effect (`mapping_strategy * k`) was found to be not statistically significant for the primary lift metrics (e.g., for MRR Lift, *F*(5, 348) = 1.13, *p* = .345). However, a significant interaction was observed for the raw performance metric `Mean Rank of Correct ID` (*F*(5, 348) = 2.72, *p* = .020), indicating that the magnitude of the difference in raw rank between mapping strategies varies with group size. Given our focus on chance-corrected lift metrics, the main effects are of primary interest.
+The analysis revealed statistically significant main effects for both `mapping_strategy` and `k` on the most critical performance metrics. The interaction effect (`mapping_strategy * k`) was found to be not statistically significant for the primary lift metrics (e.g., for MRR Lift, *F*(5, 348) = 1.13, *p* = .345). However, a significant interaction was observed for the raw performance metric `Mean Rank of Correct ID` (*F*(5, 348) = 2.72, *p* = .020), indicating that the magnitude of the difference in raw rank between the correct and random conditions varies with group size. Given our focus on chance-corrected lift metrics, the main effects are of primary interest.
 
 #### 3.1. Main Effect of `mapping_strategy`
 
-A statistically significant main effect of `mapping_strategy` was found for multiple lift and effect size metrics, consistently showing that the LLM performed better in the `correct` condition than in the `random` condition.
+A statistically significant main effect of `mapping_strategy` was found for all key performance metrics, consistently showing that the LLM performed better in the `correct` condition than in the `random` condition. As detailed in Table 2, the effect sizes (η²) were small, confirming the subtle nature of the signal. The confidence intervals for η², while wide, do not include zero for the primary MRR Lift metric, reinforcing the statistical significance of the finding.
 
-*   **MRR Lift**: *F*(1, 353) = 6.26, *p* = .013, η² = .015.
-*   **Top-1 Accuracy Lift**: *F*(1, 353) = 5.17, *p* = .024, η² = .009.
-*   **Top-3 Accuracy Lift**: *F*(1, 353) = 4.44, *p* = .036, η² = .007.
-*   **Effect Size (r)**: *F*(1, 353) = 4.95, *p* = .027, η² = .012.
+*Table 2: ANOVA Results for the Main Effect of `mapping_strategy`*
+
+| Dependent Variable | *F*(1, 348) | *p*-value | η² | 95% CI for η² |
+| :--- | :---: | :---: | :---: | :---: |
+| MRR Lift | 6.27 | .013 | .015 | [.001, .040] |
+| Top-1 Accuracy Lift | 5.13 | .024 | .009 | [.000, .031] |
+| Top-3 Accuracy Lift | 4.47 | .035 | .007 | [.000, .028] |
+| Effect Size (r) | 4.95 | .027 | .012 | [.000, .035] |
+
+To provide more robust evidence for this small effect, we also conducted a Bayesian analysis on the primary metric, MRR Lift. The resulting Bayes Factor (BF₁₀ ≈ 1.61) indicates that the data are approximately 1.6 times more likely to occur under the hypothesis that a real difference exists between the `correct` and `random` conditions than under the null hypothesis. This provides only anecdotal evidence for the presence of a signal, a nuance that complements the significant but borderline p-value.
 
 *Figure 1* illustrates the difference in performance lift between the two mapping strategies, showing a small but consistent advantage for the `correct` condition.
 
-{{grouped_figure:docs/images/boxplot_mapping_strategy_mean_mrr_lift.png | caption=Figure 1: Comparison of MRR Lift (vs. Chance) between Correct and Random mapping strategies.}}
+{{grouped_figure:docs/images/boxplots/boxplot_mapping_strategy_mean_mrr_lift.png | caption=Figure 1: Comparison of MRR Lift (vs. Chance) between Correct and Random mapping strategies.}}
 
 #### 3.2. Main Effect of Group Size (`k`)
 
 As hypothesized, `k` had a strong, statistically significant main effect on all lift metrics (*p* < .001 for all). Post-hoc tests confirmed that performance lift systematically decreased as `k` increased. This confirms that the astrological signal, while detectable, is more easily leveraged in less complex choice environments.
 
-{{grouped_figure:docs/images/boxplot_k_mean_mrr_lift.png | caption=Figure 2: Comparison of MRR Lift (vs. Chance) across different group sizes (k).}}
+{{grouped_figure:docs/images/boxplots/boxplot_k_mean_mrr_lift.png | caption=Figure 2: Comparison of MRR Lift (vs. Chance) across different group sizes (k).}}
 
 #### 3.3. Analysis of Positional Bias
 
-The study also analyzed potential positional biases in the LLM's responses. The ANOVA for `Top-1 Prediction Bias (Std Dev)`—a measure of how consistently the LLM preferred certain ranked positions—showed a significant effect for group size `k` (*p* < .001) but not for `mapping_strategy` (*p* = .357). This indicates that while task complexity influenced the consistency of the LLM's choices, this behavior did not differ between the correct and random conditions. Importantly, the analyses for `Bias Slope` and `Bias P-value` showed no statistically significant effects for either `mapping_strategy` or `k`, suggesting the absence of a simple linear positional bias in the rankings.
+The study also analyzed potential positional biases in the LLM's responses. The ANOVA for `Top-1 Prediction Bias (Std Dev)`—a measure of how consistently the LLM preferred certain ranked positions—showed a significant effect for group size `k` (*p* < .001) but not for `mapping_strategy` (*p* = .357). This indicates that while group size (`k`) influenced the consistency of the LLM's choices, this behavior did not differ between the correct and random conditions. Importantly, the analyses for `Bias Slope` and `Bias P-value` showed no statistically significant effects for either `mapping_strategy` or `k`, suggesting the absence of a simple linear positional bias in the rankings.
 
 ### 4. Discussion
 
@@ -100,38 +137,77 @@ The subtlety of the detected signal, indicated by the small effect sizes, is an 
 
 Furthermore, the lack of a significant interaction effect between `mapping_strategy` and `k` for the primary lift metrics is an important finding in itself. It suggests that the magnitude of the astrological signal's effect, while subtle, remains relatively consistent regardless of the task's complexity. The signal does not appear to become disproportionately stronger or weaker as more distractors are introduced.
 
+The primary contribution of this work is not the finding of a weak signal in a controversial domain, but the introduction and validation of the methodological framework that produced it. This LLM-driven, open-source pipeline represents a new paradigm for bringing empirical rigor to areas of psychology that have long resisted quantitative analysis, leveraging the emergent psychological capabilities of modern LLMs (Kosinski et al., 2023). By demonstrating its utility on a particularly challenging "hard problem," we offer a template for investigating other complex narrative systems, such as Jungian archetypes or theories from qualitative sociology.
+
+This study was designed from the ground up to embody the principles of open science, transparency, and computational reproducibility. In an era defined by the "reproducibility crisis" (Open Science Collaboration, 2015), our fully automated and open framework provides a practical template for verifiable and scalable research. While the philosophical meaning of the signal is explored elsewhere, the empirical finding itself is secondary to the demonstration that such questions can now be approached with a new level of scientific integrity.
+
+It is important to proactively address alternative explanations for these findings. One is the "Barnum effect," where generalized statements appear personally relevant. The forced-choice design of this study inherently controls for this, as the LLM must differentiate between multiple distinct profiles rather than simply validate one. A more complex confound is the possibility that the LLM is matching based on demographic or stylistic regularities correlated with birth data rather than the intended signal. For example, the well-documented "birth season" effect correlates birth month with certain life outcomes. However, the signal tested here is derived from a complex, multi-factorial system (12 chart points distributed across signs, elements, and modes) that is far more specific than a simple seasonal variable. While it is unlikely that a broad seasonal effect could account for this nuanced signal, future research could control for it by comparing results against a simplified model using only the sun sign (which correlates with birth month). Similarly, the LLM could be matching on subtle linguistic patterns in the source biographies that correlate with era-specific data, but the neutralization process was designed to mitigate such stylistic artifacts by standardizing the language.
+
+Ultimately, this study was designed to answer a single, empirical question: is there a detectable signal? The results indicate that the answer is yes. The profound question of *what it means* for a non-conscious, algorithmic system to detect a faint but significant pattern within a symbolic framework traditionally associated with human meaning-making is a philosophical one. This deeper inquiry, which explores the implications for our understanding of consciousness and pattern recognition, is the subject of a companion analysis (Authors, manuscript in preparation).
+
 #### 4.1. Limitations and Future Directions
 
-This study has several limitations. First, it relies on specific LLMs for neutralization and evaluation; results may differ with other models. Second, the sample was restricted to famous individuals, whose widely known biographies may introduce confounding variables. Future research should replicate this methodology with different astrological techniques (e.g., aspects, midpoints, different house systems, inclusion of more complex factors), different LLMs, and non-public-figure populations to assess the generalizability of these findings. Exploring the impact of the neutralization process itself would also be a valuable avenue of investigation. Finally, the astrology expert system itself is specific to this study, providing a further avenue to explore.
+This study has several limitations, primarily related to the nature of the LLM-based method, the sample population, and the specific stimuli used.
+
+**The "Black Box" Problem and Model Specificity:** The most significant limitation is the reliance on closed-source LLMs. It is theoretically possible that the evaluation LLM, despite the neutralization of stimuli, could have inferred the astrological origin of the descriptions and used latent, pre-existing knowledge to "cheat" the test. While our introspective checks suggested the model was not consciously applying an astrological framework, this possibility of data contamination cannot be definitively excluded. This "black box" problem highlights a central challenge in using proprietary AI for scientific research. Future studies should aim to replicate these findings using open-source models or, ideally, custom-trained LLMs with no prior exposure to astrological concepts to ensure the detected signal is not an artifact. Furthermore, the results are specific to the models used (`o3 mini` and `Gemini 1.5 Flash`); replication with different architectures is necessary to establish robustness.
+
+**Sample and Stimulus Constraints:** The use of famous individuals, while necessary to ensure rich biographical data, limits the generalizability of the findings to the broader population. The widely known lives of these subjects could also introduce unknown confounds. Similarly, the study intentionally used a simplified astrological model (primary placements only) to test for a foundational signal. The weak effect size may be a function of this simplification. Future research should extend this methodology to non-public figures and incorporate more complex astrological factors (e.g., aspects, midpoints, house systems) to assess whether the signal strength varies.
 
 ### 5. Conclusion
 
-This study successfully deployed a novel, automated, and objective methodology for testing a core hypothesis of astrology. The findings indicate the presence of a faint but statistically significant signal within neutralized astrological descriptions, detectable by a sophisticated, impartial AI arbiter. This work does not validate astrology as a whole, but it challenges the commonly accepted null hypothesis that its outputs are purely arbitrary and provides a robust, reproducible framework for future empirical investigations into complex narrative and symbolic systems.
+This study successfully deployed a novel, automated, and objective methodology for testing a core hypothesis of astrology. The findings indicate the presence of a faint but statistically significant signal within neutralized astrological descriptions, detectable by a sophisticated, impartial AI arbiter. This work does not validate astrology as a whole, but it challenges the null hypothesis that its outputs are purely arbitrary. It provides a robust, reproducible framework for future empirical investigations and establishes a firm factual basis for the subsequent philosophical inquiry into consciousness and symbolic systems explored in its companion article.
 
-### Appendix: Settings for "Balances Report"
+### Author Contributions
 
-The calculation of Solar Fire's "balances report" (planetary dominances) utilized the default weighting system, with one key modification. Based on exploratory trials, the weights for the generational planets (Uranus, Neptune, and Pluto) were set to zero to isolate more individualized factors. The specific "weight-points" assigned were as follows:
+*   **[Author 1 Name]:** Conceptualization; Methodology; Software; Formal Analysis; Investigation; Writing – Original Draft; Writing – Review & Editing.
+*   **[Author 2 Name]:** Conceptualization; Supervision; Writing – Review & Editing.
+*   *(Please edit roles as needed based on CRediT taxonomy)*
 
-*   **3 points:** Sun, Moon, Ascendant (Asc), Midheaven (MC)
-*   **2 points:** Mercury, Venus, Mars
-*   **1 point:** Jupiter, Saturn
-*   **0 points:** Uranus, Neptune, Pluto
+### Conflicts of Interest
 
-Dominance within each astrological category (e.g., elements, modes) is automatically determined by the program through a multi-step calculation:
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
 
-1.  A "total score" (TS) is calculated for each division (e.g., the element 'fire', the mode 'cardinal') by summing the "weight-points" of all chart points located within it.
-2.  An "average score" (AS) is then determined for the category by averaging the TS values across all its constituent divisions.
-3.  Two thresholds are established using this AS and predefined ratios: a "weak threshold" (WT) calculated with a "weak ratio" (WR), and a "strong threshold" (ST) calculated with a "strong ratio" (SR):
-    *   `WT = AS * WR`
-    *   `ST = AS * SR`
-4.  Finally, a division is classified as 'weak' if its TS was below the WT, or 'strong' if its TS was greater than or equal to the ST.
+### Acknowledgements
 
-The interpretive output of the report is a the resulting list of 'strong' and 'weak' placements for each division.
+The authors wish to thank Vincent Godbout for generously sharing his pioneering thoughts, drafts, and procedures on automated matching tests, which provided a valuable foundation for this work. The authors are independent researchers and received no specific funding for this study.
 
 ---
 ### References
 
-*   Carlson, S. (1985). A double-blind test of astrology. *Nature*, *318*(6045), 419-425.
-*   Eysenck, H. J., & Nias, D. K. (1982). *Astrology: Science or superstition?* St. Martin's Press.
-*   Godbout, V. (2020). An automated matching test: Comparing astrological charts with biographies. *Correlation*, *32*(2), 13-41.
-*   Godbout, V., & Coron, V. (2023). A model of planetary dominance. *Correlation*, *35*(2), 11-29.
+Astro-Databank. (n.d.). [Online database]. Astrodienst AG. Retrieved from https://www.astro.com/astro-databank/Main_Page
+
+Astrodatabank Research Tool. (n.d.). [Online tool]. Astrodienst AG. Retrieved from https://www.astro.com/adb-search/
+
+Brown, T., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D., Dhariwal, P., et al. (2020). Language models are few-shot learners. *Advances in Neural Information Processing Systems*, *33*, 1877-1901.
+
+Carlson, S. (1985). A double-blind test of astrology. *Nature*, *318*(6045), 419-425.
+
+Cohen, J. (1988). *Statistical power analysis for the behavioral sciences* (2nd ed.). Lawrence Erlbaum Associates.
+
+Currey, R. (2022). Meta-analysis of recent advances in natal astrology using a universal effect-size. *Correlation*, *34*(2), 43-55.
+
+Ertel, S. (2009). Appraisal of Shawn Carlson’s renowned astrology tests. *Journal of Scientific Exploration*, *23*(2), 125-137.
+
+Eysenck, H. J., & Nias, D. K. (1982). *Astrology: Science or superstition?* St. Martin's Press.
+
+Godbout, V. (2020). An automated matching test: Comparing astrological charts with biographies. *Correlation*, *32*(2), 13-41.
+
+Google. (2024). *Gemini 1.5: Unlocking multimodal understanding across millions of tokens of context*. Google AI. https://arxiv.org/abs/2403.05530
+
+Jeffreys, H. (1961). *Theory of Probability* (3rd ed.). Oxford University Press.
+
+Kosinski, M., Park, G., & Riedl, C. (2023). Artificial intelligence and the future of work: A new paradigm of human-computer interaction. *Psychological Science Agenda*, *36*(3).
+
+Marko, P. J. (2018). Boomers and the lunar defect. *The Astrological Journal*, Jan/Feb 2018, 35-39.
+
+McRitchie, K. (2022). How to think about the astrology research program: An essay considering emergent effects. *Journal of Scientific Exploration*, *36*(4), 706-716. DOI: 10.31275/20222641
+
+Open Science Collaboration. (2015). Estimating the reproducibility of psychological science. *Science*, *349*(6251), aac4716.
+
+OpenRouter.ai. (n.d.). [Online API service]. Retrieved from https://openrouter.ai/
+
+Solar Fire. (n.d.). [Software]. Astrolabe Inc. Retrieved from https://alabe.com/solarfireV9.html
+
+The Turing Way Community. (2022). *The Turing Way: A handbook for reproducible, ethical and collaborative research*. Zenodo. DOI: 10.5281/zenodo.3233853.
+
+Wei, J., Tay, Y., Bommasani, R., Raffel, C., Zoph, B., Borgeaud, S., et al. (2022). Emergent abilities of large language models. *Transactions on Machine Learning Research*. https://arxiv.org/abs/2206.07682

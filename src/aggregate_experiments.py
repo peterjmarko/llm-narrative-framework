@@ -137,45 +137,14 @@ def write_summary_csv(output_path, results_list):
     logging.info(f"  -> Generated summary:\n    {output_path} ({len(df)} rows)")
 
 def run_hierarchical_mode(base_dir):
-    logging.info(f"Running in hierarchical mode on:\n{base_dir}")
+    logging.info(f"Running in hierarchical aggregation mode on:\n{base_dir}")
     for current_dir, subdirs, files in os.walk(base_dir, topdown=False):
+        # Skip the individual run directories themselves, as they are now handled by summarize_replication.py
+        if os.path.basename(current_dir).startswith('run_'):
+            continue
+
         print(f"\nProcessing directory:\n{current_dir}")
         level_results = []
-        
-        # In a run directory, we expect to find the final metrics JSON file.
-        is_run_dir = os.path.basename(current_dir).startswith('run_')
-        metrics_filepath = os.path.join(current_dir, "analysis_inputs", "replication_metrics.json")
-
-        if is_run_dir and os.path.exists(metrics_filepath):
-            run_dir_name = os.path.basename(current_dir)
-            logging.info(f"  - Found metrics JSON in run folder: {run_dir_name}")
-            config_path = os.path.join(current_dir, 'config.ini.archived')
-
-            if not os.path.exists(config_path):
-                logging.warning(f"    - Warning: 'config.ini.archived' not found in {run_dir_name}. Skipping.")
-                continue
-
-            try:
-                with open(metrics_filepath, 'r', encoding='utf-8') as f:
-                    metrics = json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
-                logging.warning(f"    - Warning: Could not read or parse {os.path.basename(metrics_filepath)}. Error: {e}. Skipping.")
-                continue
-
-            # Flatten the nested bias metrics for easier CSV output
-            metrics = _flatten_bias_metrics(metrics)
-            if not metrics:
-                logging.warning(f"    - Warning: Parsed metrics are empty. Skipping.")
-                continue
-            
-            run_params = parse_config_params(config_path)
-            rep_match = re.search(r'rep-(\d+)', run_dir_name)
-            run_params['replication'] = int(rep_match.group(1)) if rep_match else 0
-            
-            run_data = {'run_directory': run_dir_name}
-            run_data.update(run_params)
-            run_data.update(metrics)
-            level_results.append(run_data)
 
         for subdir_name in subdirs:
             summary_path = None
