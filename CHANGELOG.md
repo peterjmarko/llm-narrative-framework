@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.0.0 (2025-07-26)
+
+### Bump
+
+- **version 2.14.0 → 3.0.0**
+
+### Features
+
+- **add header linter and refactor compilation workflow**
+  - Refactored the results pipeline into dedicated compiler scripts (compile_replication_results.py, compile_experiment_results.py, compile_study_results.py) for improved modularity.
+  - Created a new linter script (lint_file_headers.py) to programmatically enforce a standard header/footer format across all project scripts.
+  - Renamed the study workflow entry point to process_study.ps1 to more accurately reflect its audit-compile-analyze function.
+  - Fixed critical bugs, including the missing base query in reports and several Mermaid diagram rendering errors.
+  - Updated all documentation, diagrams, and docstrings to align with the new architecture.
+  
+  BREAKING CHANGE: The user entry point 'analyze_study.ps1' has been renamed to 'process_study.ps1'. Any scripts or user workflows that called the old script by name will need to be updated.
 ## 2.14.0 (2025-07-26)
 
 ### Bump
