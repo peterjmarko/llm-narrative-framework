@@ -1,5 +1,33 @@
 # Changelog
 
+## 3.1.0 (2025-07-27)
+
+### Bump
+
+- **version 3.0.3 → 3.1.0**
+
+### Features
+
+- **introduce new_experiment.ps1 and refactor manager**
+  This commit introduces a clearer, user-intent-driven workflow for experiment creation and significantly refactors the main controller for improved clarity and maintainability.
+  
+  New Feature:
+  - Adds `new_experiment.ps1`, a dedicated script for creating new experiments from the global `config.ini`. This separates the "create" action from the "repair/resume" action, which remains with `run_experiment.ps1`.
+  
+  Refactoring:
+  - The monolithic `main()` function in `experiment_manager.py` has been broken down into three logical, private helper functions:
+    - `_setup_environment_and_paths()`
+    - `_handle_experiment_state()`
+    - `_run_finalization()`
+  - This refactoring makes the main execution flow a clean three-step process (setup, loop, finalize).
+  - All global color variables have been eliminated. Color information is now passed explicitly via a `colors` dictionary, making dependencies clear.
+  
+  Improvements:
+  - Console output for new experiments is cleaner, with consistent banners, colors, and spacing for a more readable user experience.
+  - All documentation, diagrams, and help text have been updated to reflect the new workflow.
+  
+  Fixed:
+  - Corrected a bug in the timestamp formatting (`%Ym%d` -> `%Y%m%d`) that caused incorrect directory naming for new experiments.
 ## 3.0.3 (2025-07-26)
 
 ### Bump
