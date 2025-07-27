@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.0.3 (2025-07-26)
+
+### Bump
+
+- **version 3.0.2 → 3.0.3**
+
+### Fixes
+
+- **resolve critical audit bug and standardize UI**
+  This commit resolves a critical bug in the audit logic and standardizes the user interface across all PowerShell scripts for a consistent user experience.
+  
+  -   **Audit Logic:** Fixed a major bug in `experiment_manager.py` that caused it to incorrectly validate experiments with missing report files, especially within a study context. The audit now correctly identifies all file-level issues.
+  
+  -   **UI Standardization:**
+      -   Standardized all user-facing banners in `audit_study.ps1`, `update_study.ps1`, and `process_study.ps1` to a consistent 80-column format.
+      -   Centralized banner printing for single-experiment audits into `experiment_manager.py`, simplifying `audit_experiment.ps1` into a pure launcher.
+      -   Improved layout and color-coding in `process_study.ps1` for clearer step-by-step progress.
+  
+  -   **Parameter Consistency:** Standardized the main directory parameter to `-TargetDirectory` across all study-level scripts and their documentation.
 ## 3.0.2 (2025-07-26)
 
 ### Bump
