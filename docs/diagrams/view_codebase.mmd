@@ -1,6 +1,7 @@
 graph TD
     subgraph "1. Main User Entry Points"
         direction LR
+        new_experiment_ps1["new_experiment.ps1"]
         run_experiment_ps1["run_experiment.ps1"]
         audit_experiment_ps1["audit_experiment.ps1"]
         update_experiment_ps1["update_experiment.ps1"]
@@ -57,6 +58,7 @@ graph TD
     end
     
     %% --- Main Workflow Connections ---
+    new_experiment_ps1 --> exp_manager
     run_experiment_ps1 --> exp_manager
     update_experiment_ps1 --> exp_manager
     audit_experiment_ps1 --> exp_manager

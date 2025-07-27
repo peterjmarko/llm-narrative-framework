@@ -21,46 +21,40 @@
 
 <#
 .SYNOPSIS
-    Runs a complete experimental batch by orchestrating the Python backend.
+    Repairs or resumes an existing experiment by running missing replications.
 
 .DESCRIPTION
-    This script is the main user entry point for running a full experimental batch.
-    It serves as a user-friendly wrapper for the state-machine controller,
-    `experiment_manager.py`.
+    This script is the main entry point for REPAIRING or RESUMING an existing
+    experiment. It serves as a user-friendly wrapper for the state-machine controller,
+    `experiment_manager.py`, operating on a specified target directory.
 
-    The controller will automatically run, repair, or reprocess an experiment
-    until it is complete. This script provides a simple interface for starting
-    that process, translating PowerShell parameters (like -Verbose) into the
-    appropriate arguments for the Python backend.
+    The controller will automatically detect and execute only the missing or
+    incomplete parts of the experiment until all raw data is present.
+
+    To create a new experiment from scratch, use 'new_experiment.ps1'.
 
 .PARAMETER TargetDirectory
-    The target directory for the experiment. Can be an existing directory or one to
-    be created. If not provided, a unique directory is created based on config.ini settings.
+    The path to the existing experiment directory that needs to be repaired or resumed.
 
 .PARAMETER Notes
-    A string of notes to embed in the experiment's reports and logs.
+    A string of notes to embed in the reports and logs of any newly generated replications.
 
 .PARAMETER StartRep
-    The replication number to start from (e.g., 1).
+    The replication number to start from (e.g., 15). Useful for resuming a specific portion of a large batch.
 
 .PARAMETER EndRep
     The replication number to end at (e.g., 30).
 
 .PARAMETER Verbose
     A switch to enable detailed, real-time output from all underlying Python scripts.
-    By default, output is a high-level summary.
 
 .EXAMPLE
-    # Run a full batch defined in config.ini.
-    .\run_experiment.ps1
+    # Resume an interrupted experiment, completing all missing replications.
+    .\run_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250728_103000"
 
 .EXAMPLE
-    # Run a batch, organizing results into a specific directory with notes.
-    .\run_experiment.ps1 -TargetDirectory "output/reports/My_Llama3_Study" -Notes "First run with random mapping"
-
-.EXAMPLE
-    # Run only replications 5 through 10 with detailed logging for debugging.
-    .\run_experiment.ps1 -StartRep 5 -EndRep 10 -Verbose
+    # Run only replications 15 through 20 in a specific experiment directory.
+    .\run_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250728_103000" -StartRep 15 -EndRep 20 -Verbose
 #>
 
 [CmdletBinding()]

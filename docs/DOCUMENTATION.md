@@ -307,7 +307,9 @@ The framework is designed around three primary user actions, each handled by a d
   <img src="images/logic_workflow_chooser.png" width="100%">
 </div>
 
--   **`run_experiment.ps1` (Data Generation & Repair)**: This is your primary tool. Use it to start a new experiment from scratch or to resume/repair an interrupted one. Its sole focus is to ensure the raw data (queries and LLM responses) is complete according to your `config.ini`.
+-   **`new_experiment.ps1` (Data Generation)**: This is the dedicated tool for creating a new experiment. It reads the global `config.ini` and generates a new, timestamped experiment directory from scratch.
+
+-   **`run_experiment.ps1` (Data Repair & Resumption)**: Use this for an *existing* experiment. It is your primary tool to resume an interrupted run or to repair one with missing data. Its sole focus is to ensure the raw data (queries and LLM responses) is complete.
 
 -   **`update_experiment.ps1` (Analysis Reprocessing)**: Use this *after* your experiment's raw data is complete. It regenerates all reports and summaries from the existing raw data. It is the correct tool for applying analysis bug fixes or adding new metrics without re-running expensive LLM calls.
 
@@ -317,14 +319,26 @@ The framework is designed around three primary user actions, each handled by a d
 
 The project is orchestrated by several PowerShell wrapper scripts that handle distinct user workflows, from running new experiments to analyzing and migrating data.
 
-### Running an Experiment (`run_experiment.ps1`)
+### Creating a New Experiment (`new_experiment.ps1`)
 
-This PowerShell script is the primary entry point for executing a full experimental batch based on the settings in `config.ini`. It provides a clean, high-level summary of progress by default.
+This is the primary entry point for creating and running a new experiment from scratch. It reads the global `config.ini`, generates a new timestamped directory, and executes the full batch of replications.
 
-**To run a standard experiment:**
-This will execute the full batch of replications defined in `config.ini` and place the results in a new, timestamped experiment directory.
+**To create a new experiment:**
 ```powershell
-.\run_experiment.ps1
+.\new_experiment.ps1
+```
+
+For detailed, real-time logging, add the `-Verbose` switch.
+
+### Repairing or Resuming an Experiment (`run_experiment.ps1`)
+
+This script is used to work with an *existing* experiment directory. It can resume an interrupted batch or repair runs with missing data.
+
+**To resume an interrupted experiment:**
+Point the script at the target directory. It will automatically detect and run only the missing replications.
+```powershell
+# Resume an interrupted experiment in the specified folder
+.\run_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250712_081954"
 ```
 
 **Common Examples:**
@@ -443,7 +457,9 @@ The final analysis script (`study_analyzer.py`) produces a comprehensive log fil
 
 ## User Entry Points
 
-*   **`run_experiment.ps1`**: The primary entry point to run a new experiment or resume/repair an interrupted one.
+*   **`new_experiment.ps1`**: The primary entry point for creating and running a new experiment from scratch.
+
+*   **`run_experiment.ps1`**: The entry point to resume an interrupted experiment or repair an existing one.
 
 *   **`audit_experiment.ps1`**: Provides a read-only, detailed completeness report for a specified experiment, acting as the primary diagnostic tool for a *single experiment*.
 

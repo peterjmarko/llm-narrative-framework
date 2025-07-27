@@ -4,25 +4,22 @@
 
 [Date]
 
-The Editorial Board,
-*Meta-Psychology*
+The Managing Board,
+Peer Community in Psychology
 
-**Subject: Submission of a new manuscript for consideration: "[Your Article's Title]"**
+**Subject: Submission of a preprint for evaluation and recommendation: "[Your Article's Title]"**
 
-Dear Editors,
+Dear Drs. Bottesini, Howard, Moore, Syed, and Tackett,
 
-We are pleased to submit our manuscript, "**[Your Article's Title]**," for consideration for publication in *Meta-Psychology*. This paper introduces a novel, fully transparent, and computationally reproducible framework for the empirical investigation of complex narrative systems, a significant challenge within psychological science.
+We are pleased to submit our preprint, "**[Your Article's Title]**," for evaluation and potential recommendation by Peer Community in Psychology. This manuscript introduces a novel, computationally reproducible framework that directly addresses the challenge of bringing empirical rigor to the study of complex, narrative-based systems within psychological science.
 
-Our work is a direct response to the journal's call for contributions that advance psychology as a science. We present not just a study, but a complete open-science paradigm. By leveraging a Large Language Model (LLM) as an automated arbiter, we demonstrate how a controversial and methodologically difficult topic—astrology—can be approached with unprecedented rigor. Our primary contribution is the open-source software and methodology itself, which is designed to be adapted for other "hard-to-quantify" domains in psychology.
+This work was designed from its inception to embody the principles of transparency and reproducibility that are at the heart of the PCI initiative. In accordance with your submission guidelines, we have made the entire research workflow publicly available. The submission includes a complete public repository containing all raw data, analysis scripts, the neutralized component library, and detailed documentation. We have also included a completed TOP disclosure table in the manuscript's appendix.
 
-This manuscript is a perfect fit for *Meta-Psychology* because it embodies the journal's core principles:
-1.  **Extreme Transparency:** The entire research workflow, from data curation to the final analysis script, is publicly available and documented. Our submission is designed to be seamlessly integrated with your OSF-based review process.
-2.  **Statistical Reproducibility:** We are confident our work will meet the standards of your statistical reproduction team and earn the reproducibility badge, a feature that was a key factor in our decision to submit to your journal.
-3.  **Methodological Advancement:** The paper's central focus is the introduction of a new method and software tool for the field, one that directly addresses the challenges of bias and reproducibility.
+As a challenging case study to validate our framework, we apply it to the domain of astrology. Our findings indicate the presence of a faint but statistically significant signal, a result we interpret with appropriate caution using both frequentist and Bayesian analyses. We believe that demonstrating that even a highly contentious "hard problem" can be approached with objective, verifiable methods is a powerful testament to the value of this open-science paradigm.
 
-We deliberately chose a challenging case study to demonstrate the robustness of our open-science framework. We believe this work will be of great interest to your readership and will contribute to the ongoing conversation about how psychological science can be made more rigorous and transparent.
+We understand that PCI Psychology employs a rigorous, multi-stage review process, and we are confident that our work will meet your high standards for methodological and analytical soundness. We have suggested several potential Recommenders with expertise in computational methods, psychometrics, and open science in the submission form to assist the process.
 
-Thank you for your time and consideration.
+Thank you for considering our work for recommendation. We believe it is an excellent fit for your mission and will be of great interest to the community.
 
 Sincerely,
 

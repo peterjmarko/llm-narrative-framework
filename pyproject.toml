@@ -76,6 +76,7 @@ release = {cmd = "python scripts/finalize_release.py", help = "Finalize a new re
 # ------------------------
 
 # Main workflow shortcuts
+new-exp = "powershell -ExecutionPolicy Bypass -File ./new_experiment.ps1"
 run-exp = "powershell -ExecutionPolicy Bypass -File ./run_experiment.ps1"
 aud-exp = "powershell -ExecutionPolicy Bypass -File ./audit_experiment.ps1"
 upd-exp = "powershell -ExecutionPolicy Bypass -File ./update_experiment.ps1"

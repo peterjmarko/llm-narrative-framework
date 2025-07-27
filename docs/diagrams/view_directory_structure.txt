@@ -13,7 +13,8 @@ personality_matching/
 ├── analyze_study.ps1           # ENTRY POINT: Analyze a completed study's results
 ├── audit_experiment.ps1        # ENTRY POINT: Audit an experiment's completeness
 ├── migrate_experiment.ps1      # ENTRY POINT: Migrate old experiment data
-├── run_experiment.ps1          # ENTRY POINT: Run a new or existing experiment batch
+├── new_experiment.ps1          # ENTRY POINT: Create a new experiment from scratch
+├── run_experiment.ps1          # ENTRY POINT: Repair or resume an existing experiment
 └── update_experiment.ps1       # ENTRY POINT: Re-run analysis for an existing experiment
 |
 ├── src/                        # All Python source code for the project

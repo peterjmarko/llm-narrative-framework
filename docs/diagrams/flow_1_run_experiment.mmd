@@ -1,5 +1,5 @@
 graph TD
-    A[run_experiment.ps1<br>User Entry Point]:::entry --> B{State Machine Loop<br><small>experiment_manager.py</small>}:::layer_orange;
+    A["<b>new_experiment.ps1</b><br>User Entry Point (for new runs)<br><small><i>run_experiment.ps1 is used for repair/resume</i></small>"]:::entry --> B{State Machine Loop<br><small>experiment_manager.py</small>}:::layer_orange;
     
     B -- "State is INCOMPLETE" --> C;
     C --> B;
