@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: update_study.ps1
-
 <#
 .SYNOPSIS
     Updates all out-of-date experiments within a study directory in a single batch operation.
@@ -35,7 +33,7 @@
     If updates are needed, it will list the affected experiments, ask for a single user confirmation,
     and then sequentially call 'update_experiment.ps1' on each one.
 
-.PARAMETER StudyDirectory
+.PARAMETER TargetDirectory
     The path to the study directory containing multiple experiment folders.
 
 .PARAMETER Verbose
@@ -43,13 +41,35 @@
 
 .EXAMPLE
     # Run an update on a study, which will first audit and then prompt for confirmation.
-    .\update_study.ps1 -StudyDirectory "output/studies/My_First_Study"
+    .\update_study.ps1 -TargetDirectory "output/studies/My_First_Study"
 #>
+
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the study directory to update.")]
-    [string]$StudyDirectory
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target study directory to update.")]
+    [string]$TargetDirectory
 )
+
+function Format-Banner {
+    param(
+        [string]$Message,
+        [int]$TotalWidth = 80
+    )
+    $prefix = "###"
+    $suffix = "###"
+    $contentWidth = $TotalWidth - $prefix.Length - $suffix.Length
+    $paddedMessage = " $Message "
+    
+    # Simple centering logic
+    $paddingTotal = $contentWidth - $paddedMessage.Length
+    if ($paddingTotal -lt 0) { $paddingTotal = 0 }
+    $paddingLeft = [Math]::Floor($paddingTotal / 2)
+    $paddingRight = $contentWidth - $paddedMessage.Length - $paddingLeft
+    
+    $content = (" " * $paddingLeft) + $paddedMessage + (" " * $paddingRight)
+    
+    return "$prefix$content$suffix"
+}
 
 # --- Auto-detect execution environment ---
 $executable = "python"
@@ -66,7 +86,7 @@ try {
     $auditScriptPath = Join-Path $ScriptRoot "audit_study.ps1"
     
     # Run the audit script and capture its output
-    $auditOutput = & $auditScriptPath -StudyDirectory $StudyDirectory -ErrorAction Stop
+    $auditOutput = & $auditScriptPath -TargetDirectory $TargetDirectory -ErrorAction Stop
 
     # Explicitly write the captured output to the console so the user can see the summary
     $auditOutput | Write-Host
@@ -123,7 +143,7 @@ try {
     $i = 0
     foreach ($experimentName in $experimentsToUpdate) {
         $i++
-        $experimentPath = Join-Path $StudyDirectory $experimentName
+        $experimentPath = Join-Path $TargetDirectory $experimentName
         Write-Host "`n--- Updating experiment $i of $($experimentsToUpdate.Count): $experimentName ---" -ForegroundColor Cyan
         
         # Call the script directly with named parameters for maximum clarity and robustness.
@@ -140,12 +160,19 @@ try {
     }
 
     Write-Host "`n--- Running post-update audit to verify all changes... ---" -ForegroundColor Cyan
-    & $auditScriptPath -StudyDirectory $StudyDirectory
+    & $auditScriptPath -TargetDirectory $TargetDirectory
     
-    Write-Host "`nStudy update completed successfully." -ForegroundColor Green
+    $headerLine = "#" * 80
+    Write-Host "`n$headerLine" -ForegroundColor Green
+    Write-Host (Format-Banner "Study Update Completed Successfully") -ForegroundColor Green
+    Write-Host "$headerLine" -ForegroundColor Green
 
 } catch {
-    Write-Error "An error occurred during the study update process: $($_.Exception.Message)"
+    $headerLine = "#" * 80
+    Write-Host "`n$headerLine" -ForegroundColor Red
+    Write-Host (Format-Banner "STUDY UPDATE FAILED") -ForegroundColor Red
+    Write-Host "$headerLine" -ForegroundColor Red
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 

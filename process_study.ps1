@@ -34,7 +34,7 @@
     By default, it provides a clean, high-level summary. For detailed, real-time
     output, use the -Verbose switch.
 
-.PARAMETER StudyDirectory
+.PARAMETER TargetDirectory
     The path to the top-level study directory containing experiment folders that need
     to be processed (e.g., 'output/studies'). This is a mandatory parameter.
 
@@ -48,9 +48,31 @@
 #>
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the top-level study directory.")]
-    [string]$StudyDirectory
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target top-level study directory.")]
+    [string]$TargetDirectory
 )
+
+# --- Helper Functions ---
+function Format-Banner {
+    param(
+        [string]$Message,
+        [int]$TotalWidth = 80
+    )
+    $prefix = "###"
+    $suffix = "###"
+    $contentWidth = $TotalWidth - $prefix.Length - $suffix.Length
+    $paddedMessage = " $Message "
+    
+    # Simple centering logic
+    $paddingTotal = $contentWidth - $paddedMessage.Length
+    if ($paddingTotal -lt 0) { $paddingTotal = 0 }
+    $paddingLeft = [Math]::Floor($paddingTotal / 2)
+    $paddingRight = $contentWidth - $paddedMessage.Length - $paddingLeft
+    
+    $content = (" " * $paddingLeft) + $paddedMessage + (" " * $paddingRight)
+    
+    return "$prefix$content$suffix"
+}
 
 # --- Auto-detect execution environment ---
 $executable = "python"
@@ -119,7 +141,7 @@ catch {
 
 # --- Function to run the pre-analysis study audit ---
 function Invoke-StudyAudit {
-    param ([string]$StudyDirectory)
+    param ([string]$TargetDirectory)
 
     $auditScriptPath = Join-Path $PSScriptRoot "audit_study.ps1"
     if (-not (Test-Path $auditScriptPath)) {
@@ -128,7 +150,7 @@ function Invoke-StudyAudit {
 
     # Execute the audit script. It will print its own summary report.
     # The output from this call is already displayed to the console by audit_study.ps1 itself.
-    & $auditScriptPath $StudyDirectory
+    & $auditScriptPath $TargetDirectory -Quiet
 
     # If the audit script returned a non-zero exit code, throw an error.
     # The main try/catch block will then handle the final output.
@@ -151,8 +173,8 @@ function Invoke-PythonScript {
     $finalArgs = $prefixArgs + $ScriptName + $Arguments
 
     # Use -join to correctly format the command for logging
-    Write-Host "[${StepName}] Executing:"
-    Write-Host "  $executable $($finalArgs -join ' ')" # Indent the command path
+    Write-Host "[${StepName}] Executing:" -ForegroundColor Yellow
+    Write-Host "  $executable $($finalArgs -join ' ')"
 
     # Execute the command with its final argument list, capturing output
     $output = & $executable $finalArgs 2>&1
@@ -241,22 +263,26 @@ function Invoke-PythonScript {
         }
     }
 
-    Write-Host "Step '${StepName}' completed successfully."
+    Write-Host "Step '${StepName}' completed successfully." -ForegroundColor Green
     Write-Host ""
 }
 
 # --- Main Script Logic ---
 try {
     # Resolve the path to ensure it's absolute and check for existence
-    $ResolvedPath = Resolve-Path -Path $StudyDirectory -ErrorAction Stop
+    $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
     
-    Write-Host "`n######################################################" -ForegroundColor Green
+    $headerLine = "#" * 80
+    Write-Host "`n$headerLine" -ForegroundColor Green
     Write-Host "### Starting Study Processing for:" -ForegroundColor Green
     Write-Host "### '$($ResolvedPath)'" -ForegroundColor Green
-    Write-Host "######################################################`n"
+    Write-Host "$headerLine`n" -ForegroundColor Green
 
     # --- Step 1: Run Pre-Analysis Audit ---
-    Invoke-StudyAudit -StudyDirectory $ResolvedPath
+    Write-Host "[1/3: Pre-Analysis Audit] Executing:" -ForegroundColor Yellow
+    Invoke-StudyAudit -TargetDirectory $ResolvedPath
+    Write-Host "Step '1/3: Pre-Analysis Audit' completed successfully." -ForegroundColor Green
+    Write-Host ""
 
     # --- Step 2: Compile All Results into a Master CSV ---
     Invoke-PythonScript -StepName "2/3: Compile Study Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
@@ -264,16 +290,17 @@ try {
     # --- Step 3: Run Final Statistical Analysis ---
     Invoke-PythonScript -StepName "3/3: Run Final Analysis (ANOVA)" -ScriptName "src/study_analyzer.py" -Arguments $ResolvedPath
 
-    Write-Host "######################################################" -ForegroundColor Green
-    Write-Host "### Study Processing Finished Successfully!" -ForegroundColor Green
-    Write-Host "######################################################`n"
-    Write-Host "Final analysis logs and plots are located in:`n'$($ResolvedPath)\anova'" # Newline before path
+    $headerLine = "#" * 80
+    Write-Host "$headerLine" -ForegroundColor Green
+    Write-Host (Format-Banner "Study Processing Finished Successfully!") -ForegroundColor Green
+    Write-Host "$headerLine`n" -ForegroundColor Green
 
 }
 catch {
-    Write-Host "`n######################################################" -ForegroundColor Red
-    Write-Host "### STUDY PROCESSING FAILED" -ForegroundColor Red
-    Write-Host "######################################################" -ForegroundColor Red
+    $headerLine = "#" * 80
+    Write-Host "`n$headerLine" -ForegroundColor Red
+    Write-Host (Format-Banner "STUDY PROCESSING FAILED") -ForegroundColor Red
+    Write-Host "$headerLine" -ForegroundColor Red
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red # Print the captured exception message cleanly
     # Exit with a non-zero status code to indicate failure to other automation tools
     exit 1

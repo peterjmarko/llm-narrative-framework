@@ -524,163 +524,181 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, suppress_exit: b
     """
     Runs a read-only verification and prints a detailed summary table.
     Can suppress exiting for internal use by the state machine.
-
-    Args:
-        target_dir (Path): The root directory of the experiment to verify.
-        expected_reps (int): The number of expected replications for the experiment.
-        suppress_exit (bool): If True, prevents the function from calling sys.exit().
-                              Useful when called internally by the state machine.
-        print_report (bool): If True, prints the detailed audit report to console.
-        is_verify_only_cli (bool): True if the function was called directly via --verify-only CLI arg.
-        suppress_external_recommendation (bool): If True, suppresses the "Please run X" message
-                                                 when called internally by a wrapper script.
-
+    ...
     Returns:
         int: An audit exit code (AUDIT_ALL_VALID, AUDIT_NEEDS_REPROCESS, etc.).
     """
     if print_report:
+        print(f"\n{C_CYAN}{'#'*80}{C_RESET}")
+        print(f"{C_CYAN}{_format_header('Running Experiment Audit')}{C_RESET}")
+        print(f"{C_CYAN}{'#'*80}{C_RESET}")
         print(f"\n--- Verifying Data Completeness in: ---")
         print(f"{target_dir}")
     run_dirs = sorted([p for p in glob.glob(os.path.join(target_dir, 'run_*')) if os.path.isdir(p)])
 
+    audit_result_code = AUDIT_ALL_VALID # Default to valid
+
     if not run_dirs:
         if print_report:
-            print("No 'run_*' directories found. Nothing to verify.")
-            print(f"{C_YELLOW}Cannot determine status. This may be a new or empty experiment directory.{C_RESET}")
-        return AUDIT_NEEDS_MIGRATION
-
-    all_runs_data = []
-    total_expected_trials = 0
-    total_valid_responses = 0
-    total_complete_runs = 0
-
-    for run_dir_path in run_dirs:
-        run_dir = Path(run_dir_path)
-        status, details = _verify_single_run_completeness(run_dir)
-
-        if status == "VALIDATED":
-            total_complete_runs += 1
-
-        # Get total expected trials and actual valid responses for the summary
-        try:
-            # Total possible trials is still derived from the folder name
-            total_expected_trials += int(re.match(r".*_trl-(\d+)$", run_dir.name).group(1))
-            
-            # Actual valid responses comes from the JSON report, the single source of truth
-            n_valid_in_run = 0
-            latest_report = sorted(run_dir.glob("replication_report_*.txt"))[-1]
-            text = latest_report.read_text(encoding="utf-8")
-            start = text.index("<<<METRICS_JSON_START>>>")
-            end = text.index("<<<METRICS_JSON_END>>>")
-            j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
-            n_valid_in_run = j.get("n_valid_responses", 0)
-            total_valid_responses += n_valid_in_run
-            
-        except (AttributeError, ValueError, IndexError, json.JSONDecodeError):
-            # If anything goes wrong (bad name, no report, bad JSON),
-            # we just skip adding to the totals for this run.
-            pass
-
-        all_runs_data.append({
-            "name": run_dir.name,
-            "status": status,
-            "details": "; ".join(details)
-        })
-
-    # Set a max width for the directory name column to keep the table compact
-    MAX_NAME_WIDTH = 65
-    max_name_len = min(max(len(run['name']) for run in all_runs_data), MAX_NAME_WIDTH) if all_runs_data else 20
-
-    print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
-    print(f"{'-'*max_name_len} {'-'*20} {'-'*45}")
-    for run in all_runs_data:
-        display_name = run['name']
-        if len(display_name) > max_name_len:
-            display_name = display_name[:max_name_len - 3] + "..."
-
-        status_color = C_GREEN if run['status'] == "VALIDATED" else C_RED
-        print(f"{display_name:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
-
-    # --- Determine result code based on findings from individual runs ---
-    run_statuses = {run['status'] for run in all_runs_data}
-
-    if "INVALID_NAME" in run_statuses or "CONFIG_ISSUE" in run_statuses:
+            print(f"\n{C_YELLOW}Diagnosis: No 'run_*' directories found.{C_RESET}")
+            print("This indicates an empty or critically malformed experiment.")
         audit_result_code = AUDIT_NEEDS_MIGRATION
-    elif "QUERY_ISSUE" in run_statuses or "RESPONSE_ISSUE" in run_statuses:
-        audit_result_code = AUDIT_NEEDS_REPAIR
-    elif "ANALYSIS_ISSUE" in run_statuses:
-        audit_result_code = AUDIT_NEEDS_REPROCESS
-    else:  # All individual replications are valid.
-        audit_result_code = AUDIT_ALL_VALID
-
-    # --- Now check for experiment-level summary files ---
-    exp_complete, exp_details = _verify_experiment_level_files(Path(target_dir))
-
-    # --- Determine final messages and colors based on the combined state ---
-    exp_status_str_base = "COMPLETE" if exp_complete else "INCOMPLETE"
-    exp_status_suffix = ""
-    
-    if exp_complete:
-        exp_status_color = C_GREEN
-        if audit_result_code == AUDIT_NEEDS_REPROCESS:
-            exp_status_color = C_YELLOW
-            exp_status_suffix = " (Outdated)"
-    elif audit_result_code == AUDIT_ALL_VALID:
-        exp_status_color = C_YELLOW
     else:
-        exp_status_color = C_RED
+        all_runs_data = []
+        total_expected_trials = 0
+        total_valid_responses = 0
+        total_complete_runs = 0
 
-    # Determine the final audit message and recommendation
-    if audit_result_code == AUDIT_NEEDS_MIGRATION:
-        audit_message = "FAILED. Legacy or malformed runs detected."
-        audit_recommendation = "Migrate experiment for further processing (run 'migrate_experiment.ps1' with the directory path of the experiment)."
-        audit_color = C_RED
-    elif audit_result_code == AUDIT_NEEDS_REPAIR:
-        audit_message = "FAILED. Critical data is missing or corrupt (queries/responses)."
-        if is_verify_only_cli:
-            # Direct recommendation for standalone audit
-            audit_recommendation = "Run 'run_experiment.ps1' on the target directory to automatically repair the experiment."
-        else:
-            # Contextual recommendation for internal audit (when a prompt will follow)
-            audit_recommendation = "Proceed with automatic repair when prompted. If this fails, re-run 'run_experiment.ps1' on the target directory."
-        audit_color = C_RED
-    elif audit_result_code == AUDIT_NEEDS_REPROCESS:
-        audit_message = "UPDATE RECOMMENDED. Experiment analysis needs refreshing."
-        audit_recommendation = "Update experiment to fix analysis files and summaries (run 'update_experiment.ps1' with the directory path)."
-        audit_color = C_YELLOW
-    elif audit_result_code == AUDIT_ALL_VALID:
-        if exp_complete:
-            audit_message = "PASSED. Experiment is complete and valid."
-            audit_recommendation = "No further action is required."
-        else:
-            audit_message = "PASSED. All replications are valid."
-            audit_recommendation = "Experiment is ready for finalization. Note: this final step is automatic."
-        audit_color = C_GREEN
+        for run_dir_path in run_dirs:
+            run_dir = Path(run_dir_path)
+            status, details = _verify_single_run_completeness(run_dir)
 
-    if print_report:
-        if total_expected_trials > 0:
-            completeness = (total_valid_responses / total_expected_trials) * 100
-            print("\n--- Overall Summary ---")
-            print(f"Experiment Directory: {target_dir}")
-            print(f"Replication Status:")
-            print(f"  - Total Runs Verified:          {len(run_dirs)}")
-            print(f"  - Total Runs Complete (Pipeline): {total_complete_runs}/{len(run_dirs)}")
-            print(f"  - Total Valid LLM Responses:      {total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
-            
-            print(f"Experiment Aggregation Status: {exp_status_color}{exp_status_str_base}{exp_status_suffix}{C_RESET}")
-            
-            if not exp_complete:
-                for detail in exp_details:
-                    print(f"  - {exp_status_color}{detail}{C_RESET}")
+            if status == "VALIDATED":
+                total_complete_runs += 1
+
+            # Get total expected trials and actual valid responses for the summary
+            try:
+                # Total possible trials is still derived from the folder name
+                name_match = re.search(r"_trl-(\d+)", run_dir.name)
+                if name_match:
+                    total_expected_trials += int(name_match.group(1))
+                
+                # Actual valid responses comes from the JSON report, the single source of truth
+                n_valid_in_run = 0
+                # Ensure report exists before trying to read it
+                report_files = sorted(run_dir.glob("replication_report_*.txt"))
+                if report_files:
+                    latest_report = report_files[-1]
+                    text = latest_report.read_text(encoding="utf-8")
+                    start = text.index("<<<METRICS_JSON_START>>>")
+                    end = text.index("<<<METRICS_JSON_END>>>")
+                    j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
+                    n_valid_in_run = j.get("n_valid_responses", 0)
+                    total_valid_responses += n_valid_in_run
+                
+            except (AttributeError, ValueError, IndexError, json.JSONDecodeError):
+                # If anything goes wrong (bad name, no report, bad JSON),
+                # we just skip adding to the totals for this run.
+                pass
+
+            all_runs_data.append({
+                "name": run_dir.name,
+                "status": status,
+                "details": "; ".join(details)
+            })
+
+        # Set a max width for the directory name column to keep the table compact
+        MAX_NAME_WIDTH = 65
+        max_name_len = min(max(len(run['name']) for run in all_runs_data), MAX_NAME_WIDTH) if all_runs_data else 20
+
+        print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
+        print(f"{'-'*max_name_len} {'-'*20} {'-'*45}")
+        for run in all_runs_data:
+            display_name = run['name']
+            if len(display_name) > max_name_len:
+                display_name = display_name[:max_name_len - 3] + "..."
+
+            status_color = C_GREEN if run['status'] == "VALIDATED" else C_RED
+            print(f"{display_name:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
+
+        # --- Determine result code based on findings from individual runs ---
+        run_statuses = {run['status'] for run in all_runs_data}
+
+        if "INVALID_NAME" in run_statuses or "CONFIG_ISSUE" in run_statuses:
+            audit_result_code = AUDIT_NEEDS_MIGRATION
+        elif "QUERY_ISSUE" in run_statuses or "RESPONSE_ISSUE" in run_statuses:
+            audit_result_code = AUDIT_NEEDS_REPAIR
+        elif "ANALYSIS_ISSUE" in run_statuses:
+            audit_result_code = AUDIT_NEEDS_REPROCESS
+        else:  # All individual replications are valid.
+            audit_result_code = AUDIT_ALL_VALID
+
+        # --- Now check for experiment-level summary files ---
+        exp_complete, exp_details = _verify_experiment_level_files(Path(target_dir))
+
+        # --- Determine final messages and colors based on the combined state ---
+        exp_status_str_base = "COMPLETE" if exp_complete else "INCOMPLETE"
+        exp_status_suffix = ""
         
-        print(f"\n{audit_color}Audit Result: {audit_message}{C_RESET}")
-        print(f"{audit_color}Recommendation: {audit_recommendation}{C_RESET}")
+        if exp_complete:
+            exp_status_color = C_GREEN
+            if audit_result_code == AUDIT_NEEDS_REPROCESS:
+                exp_status_color = C_YELLOW
+                exp_status_suffix = " (Outdated)"
+        elif audit_result_code == AUDIT_ALL_VALID:
+            exp_status_color = C_YELLOW
+        else:
+            exp_status_color = C_RED
 
-    # When called from the CLI, exit with the true audit code so wrapper scripts can react.
-    if not suppress_exit and is_verify_only_cli:
-        sys.exit(audit_result_code)
+        # Determine the final audit message and recommendation
+        if audit_result_code == AUDIT_NEEDS_MIGRATION:
+            audit_message = "FAILED. Legacy or malformed runs detected."
+            audit_recommendation = "Migrate experiment for further processing (run 'migrate_experiment.ps1' with the directory path of the experiment)."
+            audit_color = C_RED
+        elif audit_result_code == AUDIT_NEEDS_REPAIR:
+            audit_message = "FAILED. Critical data is missing or corrupt (queries/responses)."
+            if is_verify_only_cli:
+                # Direct recommendation for standalone audit
+                audit_recommendation = "Run 'run_experiment.ps1' on the target directory to automatically repair the experiment."
+            else:
+                # Contextual recommendation for internal audit (when a prompt will follow)
+                audit_recommendation = "Proceed with automatic repair when prompted. If this fails, re-run 'run_experiment.ps1' on the target directory."
+            audit_color = C_RED
+        elif audit_result_code == AUDIT_NEEDS_REPROCESS:
+            audit_message = "UPDATE RECOMMENDED. Experiment analysis needs refreshing."
+            audit_recommendation = "Update experiment to fix analysis files and summaries (run 'update_experiment.ps1' with the directory path)."
+            audit_color = C_YELLOW
+        elif audit_result_code == AUDIT_ALL_VALID:
+            if exp_complete:
+                audit_message = "PASSED. Experiment is complete and valid."
+                audit_recommendation = "No further action is required."
+            else:
+                audit_message = "PASSED. All replications are valid."
+                audit_recommendation = "Experiment is ready for finalization. Note: this final step is automatic."
+            audit_color = C_GREEN
 
-    # When called internally, return the true code.
+        if print_report:
+            if total_expected_trials > 0:
+                completeness = (total_valid_responses / total_expected_trials) * 100 if total_expected_trials > 0 else 0
+                print("\n--- Overall Summary ---")
+                print(f"Experiment Directory: {target_dir}")
+                print(f"Replication Status:")
+                print(f"  - Total Runs Verified:          {len(run_dirs)}")
+                print(f"  - Total Runs Complete (Pipeline): {total_complete_runs}/{len(run_dirs)}")
+                print(f"  - Total Valid LLM Responses:      {total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
+                
+                print(f"Experiment Aggregation Status: {exp_status_color}{exp_status_str_base}{exp_status_suffix}{C_RESET}")
+                
+                if not exp_complete:
+                    for detail in exp_details:
+                        print(f"  - {exp_status_color}{detail}{C_RESET}")
+            
+            print(f"\n{audit_color}Audit Result: {audit_message}{C_RESET}")
+            print(f"{audit_color}Recommendation: {audit_recommendation}{C_RESET}")
+
+    # Print the final summary banner
+    if print_report and is_verify_only_cli:
+        if audit_result_code == AUDIT_ALL_VALID:
+            print(f"\n{C_GREEN}{'#'*80}{C_RESET}")
+            print(f"{C_GREEN}{_format_header('Audit Finished: Experiment is VALIDATED.')}{C_RESET}")
+            print(f"{C_GREEN}{'#'*80}{C_RESET}")
+        elif audit_result_code == AUDIT_NEEDS_REPROCESS:
+            print(f"\n{C_YELLOW}{'#'*80}{C_RESET}")
+            print(f"{C_YELLOW}{_format_header('Audit Finished: Experiment needs UPDATE.')}{C_RESET}")
+            print(f"{C_YELLOW}{_format_header('Recommendation: Run `update_experiment.ps1` to reprocess analysis files.')}{C_RESET}")
+            print(f"{C_YELLOW}{'#'*80}{C_RESET}")
+        elif audit_result_code == AUDIT_NEEDS_REPAIR:
+            print(f"\n{C_RED}{'#'*80}{C_RESET}")
+            print(f"{C_RED}{_format_header('Audit Finished: Experiment needs REPAIR.')}{C_RESET}")
+            print(f"{C_RED}{_format_header('Recommendation: Run `run_experiment.ps1` to fix missing data.')}{C_RESET}")
+            print(f"{C_RED}{'#'*80}{C_RESET}")
+        elif audit_result_code == AUDIT_NEEDS_MIGRATION:
+            print(f"\n{C_RED}{'#'*80}{C_RESET}")
+            print(f"{C_RED}{_format_header('Audit Finished: Experiment needs MIGRATION.')}{C_RESET}")
+            print(f"{C_RED}{_format_header('Recommendation: Run `migrate_experiment.ps1` to upgrade the experiment.')}{C_RESET}")
+            print(f"{C_RED}{'#'*80}{C_RESET}")
+
+    # Always return the code. The main() function is responsible for exiting.
     return audit_result_code
 
 def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, quiet, bias_script):
@@ -1023,8 +1041,8 @@ def main():
         end_rep = args.end_rep if args.end_rep is not None else config_num_reps
 
         if args.verify_only:
-            _run_verify_only_mode(Path(final_output_dir), end_rep, suppress_exit=False, print_report=True, is_verify_only_cli=True)
-            return
+            exit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, suppress_exit=True, print_report=True, is_verify_only_cli=True)
+            sys.exit(exit_code)
 
         if args.migrate:
             if not _run_migrate_mode(Path(final_output_dir), patch_script, orchestrator_script, args.verbose):
