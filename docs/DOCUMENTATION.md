@@ -120,19 +120,19 @@ The audit script is the primary diagnostic tool for identifying issues in a fail
 The run is complete and all checks passed. No action is needed.
 
 **INVALID_NAME**  
-The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. The folder must be renamed or repaired via a `run_experiment.ps1` initiated process.
+The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. This requires **repair** by running `repair_experiment.ps1`.
 
 **CONFIG_ISSUE**  
 The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This typically indicates a legacy experiment requiring **migration**.
 
 **QUERY_ISSUE**  
-There is a problem with the fundamental input files needed for an LLM session, such as missing query files or trial manifests. This requires **repair** by running `run_experiment.ps1` (or `migrate_experiment.ps1` if legacy).
+There is a problem with the fundamental input files needed for an LLM session, such as missing query files or trial manifests. This requires **repair** by running `repair_experiment.ps1`.
 
 **RESPONSE_ISSUE**  
-The query files are intact, but one or more corresponding LLM response files are missing. This is typically caused by an interrupted run and requires **repair** by running `run_experiment.ps1` (or `migrate_experiment.ps1` if legacy).
+The query files are intact, but one or more corresponding LLM response files are missing. This is typically caused by an interrupted run and requires **repair** by running `repair_experiment.ps1`.
 
 **ANALYSIS_ISSUE**  
-All core data files (queries, responses) are present, but there is a problem with derivative artifacts like analysis files, summary CSVs, or the final report. This also includes cases where all replications are valid but the top-level experiment aggregation files (`EXPERIMENT_results.csv`, etc.) are missing. This state requires an **update** and can be fixed by running `repair_experiment.ps1`.
+All core data files (queries, responses) are present, but there is a problem with derivative artifacts like analysis files, summary CSVs, or the final report. This also includes cases where all replications are valid but the top-level experiment aggregation files (`EXPERIMENT_results.csv`, etc.) are missing. This requires an **update** by running `repair_experiment.ps1`.
 
 The `Details` string provides specific error flags, such as `MANIFESTS_INCOMPLETE`, `QUERY_RESPONSE_INDEX_MISMATCH`, or `REPORT_INCOMPLETE_METRICS`, which help diagnose the root cause quickly.
 

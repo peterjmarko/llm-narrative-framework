@@ -58,7 +58,7 @@ Before cloning the project, ensure these essential tools are installed on your s
     ```
 
 3.  **Install All Dependencies and Tools**:
-    This single command installs everything needed for development: Python packages, dev tools, and pre-commit hooks. The `-d` flag includes all development dependencies.
+    This single command installs everything needed for development: Python packages, dev tools, and pre-commit hooks. The `-G dev` flag installs the "dev" dependency group, which includes all development tools.
     ```bash
     pdm install -G dev
     ```
@@ -263,7 +263,10 @@ If you run `cz bump` by mistake or realize a commit was missed, you must manuall
     *   **`pyproject.toml`**: Open this file and revert the `version` key in **both** the `[project]` and `[tool.commitizen]` sections to its original value (e.g., from `2.3.0` back to `2.2.1`).
     *   **`CHANGELOG.md`**: Open this file and delete the new version entry that was added at the top.
 
-After these steps, your repository is clean. You can now make any additional changes (like fixing the `changelog_file` path in `pyproject.toml`), stage them, and then run `pdm run cz bump --changelog` again.
+After these steps, your repository is clean. You can now make any additional changes, stage them, and then run the automated release command again.
+    ```bash
+    pdm run release
+    ```
 
 ### 6. Submit a Pull Request
 
