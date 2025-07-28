@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.3.0 (2025-07-28)
+
+### Bump
+
+- **version 3.2.0 → 3.3.0**
+
+### Features
+
+- **standardize audit banners and streamline repair workflow**
+  Introduces a more intelligent and user-friendly repair workflow with consistent, clear console output.
+  
+  Key changes:
+  - Adds a new AUDIT_NEEDS_AGGREGATION state to experiment_manager.py. This allows repair_experiment.ps1 to perform a fast re-aggregation for experiment-level corruption instead of unnecessarily reprocessing all replications.
+  - Standardizes all audit results (success, failure, and update) into a consistent 4-line banner format for improved readability.
+  - The audit banner's "Recommendation" line is now automatically suppressed during non-interactive repair flows, providing cleaner output.
+  - The final success message for all repair actions is now the standardized "PASSED" banner, ensuring a consistent user experience.
 ## 3.2.0 (2025-07-28)
 
 ### Bump
