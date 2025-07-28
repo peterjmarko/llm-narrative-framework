@@ -1,0 +1,26 @@
+graph TD
+    EntryPointPS["<b>repair_experiment.ps1</b><br/>(User Entry Point)"]:::entry_ps --> PreAudit["1. Audit Experiment<br/><small>calls experiment_manager.py --verify-only</small>"]:::script;
+    
+    PreAudit --> Decision{Audit Result?}:::decision;
+    
+    Decision -- "VALIDATED" --> Prompt["Prompt User<br/>'Force Action?'<br/><small>(Repair / Update / Aggregate)</small>"]:::user_interaction;
+    Decision -- "NEEDS_REPAIR / NEEDS_UPDATE" --> AutoRepair["2. Run Automatic Repair/Update<br/><small>calls experiment_manager.py --non-interactive</small>"]:::layer_green;
+    Decision -- "INVALID" --> Stop((Exit)):::stop_node;
+    
+    Prompt -- "Force Repair" --> ForceRepair["Force Full Repair<br/><small>Deletes responses, then calls<br/>experiment_manager.py --non-interactive</small>"]:::layer_orange;
+    Prompt -- "Force Update" --> ForceUpdate["Force Full Update<br/><small>calls experiment_manager.py --reprocess</small>"]:::layer_orange;
+    Prompt -- "No" --> Stop;
+    
+    AutoRepair --> Finalize["3. Finalize Experiment<br/><small>Python script aggregates results</small>"]:::script;
+    ForceRepair --> Finalize;
+    ForceUpdate --> Finalize;
+    Finalize --> Finish((Success)):::finish_node;
+
+    classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef decision fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef user_interaction fill:#9b59b6,stroke:#8e44ad,color:#fff;
+    classDef stop_node fill:#e74c3c,stroke:#c0392b,color:#fff;
+    classDef layer_green fill:#2ecc71,stroke:#27ae60,color:#fff;
+    classDef layer_orange fill:#e67e22,stroke:#d35400,color:#fff;
+    classDef finish_node fill:#fff,stroke:#5cb85c,color:#5cb85c;

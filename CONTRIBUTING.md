@@ -22,10 +22,6 @@ Before cloning the project, ensure these essential tools are installed on your s
     ```bash
     pip install --user commitizen
     ```
-*   **Commitizen**: A tool for standardized commits and automated changelogs. Install it once globally with pip:
-    ```bash
-    pip install --user commitizen
-    ```
 
 ### Step 2: Clone and Set Up the Project
 
@@ -137,7 +133,7 @@ The test suite is divided into two parts, one for the Python source code and one
         ````bash
         pdm run test-ps-mig
         ````
-    -   To test the main experiment runner (`run_experiment.ps1`):
+    -   To test the main experiment runner (`new_experiment.ps1`):
         ````bash
         pdm run test-ps-exp
         ````
@@ -200,13 +196,19 @@ This project uses **`commitizen`** to enforce the [Conventional Commits](https:/
     pdm run build-docs
     ```
 
-2.  **Stage Your Changes**:
+2.  **Review Your Changes**:
+    Check `git status` to ensure your understanding of the changes made since the last commit aligns with what will be committed. Adjust files as needed before staging.
+    ```bash
+    git status
+    ```
+
+3.  **Stage Your Changes**:
     Add all relevant files to the Git staging area.
     ```bash
     git add .
     ```
 
-3.  **Run the Interactive Commit Command**:
+4.  **Run the Interactive Commit Command**:
     This single command replaces the need for `commit.txt` and manual linting. It will guide you through creating a perfectly formatted commit message.
     ```bash
     pdm run commit

@@ -27,13 +27,13 @@ maintaining the experiment's batch log. It is called by `experiment_manager.py`
 at key stages of a run to ensure the log is always accurate and complete.
 
 Core Commands:
--   `start`: Initializes a new experiment. It archives any existing log file
+-   `start`: Initializes a new experiment. It overwrites any existing log file
     and creates a fresh `batch_run_log.csv` with only a header.
 
 -   `rebuild`: The primary method for ensuring log integrity. It scans the
     experiment directory, parses every `replication_report.txt`, and builds a
-    new, clean log from scratch, ensuring it perfectly reflects the state of
-    all completed replications.
+    new, clean log from scratch by overwriting the existing file. This ensures
+    the log perfectly reflects the state of all completed replications.
 
 -   `finalize`: A safe, idempotent command to complete the log. It strips any
     pre-existing summary from the file, then recalculates and appends a fresh
@@ -208,51 +208,35 @@ def main():
     
     if args.mode == 'start':
         log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
-        if os.path.exists(log_file_path):
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            backup_path = f"{log_file_path}.{timestamp}.bak"
-            try:
-                # Back up the old log by moving it
-                os.rename(log_file_path, backup_path)
-                print(f"Archived existing log to:\n{backup_path}")
-            except OSError as e:
-                print(f"Error: Could not back up existing log file: {e}", file=sys.stderr)
-                sys.exit(1)
-        # Create a new, empty log with only a header
-        write_log_row(log_file_path, {}, fieldnames) # Pass empty dict to just write header
-        # The write_log_row needs a slight modification to handle this
+        # Overwrite any existing log file by opening in 'w' mode.
+        with open(log_file_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
         print("Initialized new batch run log with header.")
 
     # The 'update' command has been removed.
 
     elif args.mode == 'rebuild':
         log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
-        # --- MODIFICATION: Back up instead of deleting ---
-        if os.path.exists(log_file_path):
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            backup_path = f"{log_file_path}.{timestamp}.bak"
-            try:
-                os.rename(log_file_path, backup_path)
-                print(f"Backed up existing log to:\n{backup_path}\nbefore rebuild.")
-            except OSError as e:
-                print(f"Error: Could not back up existing log file: {e}", file=sys.stderr)
-                sys.exit(1)
-        # --- END MODIFICATION ---
-        
         report_files = glob.glob(os.path.join(args.output_dir, "run_*", "replication_report_*.txt"))
+
+        # Overwrite any existing log by opening in 'w' mode. This removes the need for backups.
+        with open(log_file_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+
+            if report_files:
+                # Sort reports by replication number to ensure correct order
+                report_files.sort(key=lambda p: int(re.search(r'rep-(\d+)', os.path.basename(os.path.dirname(p))).group(1)))
+
+                for report_path in report_files:
+                    log_entry = parse_report_file(report_path)
+                    writer.writerow(log_entry)
+        
         if not report_files:
-            print("No report files found. Creating empty log.", file=sys.stderr)
-            # Still create an empty log so the pipeline doesn't fail
-            write_log_row(log_file_path, {}, fieldnames)
-            sys.exit(0)
-
-        # Sort reports by replication number from the filename to ensure correct order
-        report_files.sort(key=lambda p: int(re.search(r'rep-(\d+)', os.path.basename(os.path.dirname(p))).group(1)))
-
-        for report_path in report_files:
-            log_entry = parse_report_file(report_path)
-            write_log_row(log_file_path, log_entry, fieldnames)
-        print(f"Successfully rebuilt {os.path.basename(log_file_path)} from {len(report_files)} reports.")
+            print("No report files found. An empty log with a header has been created.", file=sys.stderr)
+        else:
+            print(f"Successfully rebuilt {os.path.basename(log_file_path)} from {len(report_files)} reports.")
 
     elif args.mode == 'finalize':
         log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")

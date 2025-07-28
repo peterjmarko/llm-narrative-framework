@@ -1,5 +1,5 @@
 graph TD
-    A["<b>new_experiment.ps1</b><br>User Entry Point (for new runs)<br><small><i>run_experiment.ps1 is used for repair/resume</i></small>"]:::entry --> B{State Machine Loop<br><small>experiment_manager.py</small>}:::layer_orange;
+    A["<b>new_experiment.ps1</b><br>User Entry Point"]:::entry --> B{State Machine Loop<br><small>experiment_manager.py</small>}:::layer_orange;
     
     B -- "State is INCOMPLETE" --> C;
     C --> B;
@@ -7,7 +7,7 @@ graph TD
     B -- "State is COMPLETE" --> F["<b>Action: Finalize Experiment</b><br><small>via compile_experiment_results.py</small>"]:::script;
     F --> G((Finish)):::finish_node;
 
-    subgraph C [Action: Run/Repair Replication]
+    subgraph C [Action: Run New Replication]
         direction TB
         Orchestrator["orchestrate_replication.py"]:::layer_green
         subgraph InternalStages [Internal Stages]

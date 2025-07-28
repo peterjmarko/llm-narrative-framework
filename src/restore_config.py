@@ -20,17 +20,16 @@
 # Filename: src/restore_config.py
 
 """
-Reverse-engineers a config.ini.archived file from a legacy report.
+Reverse-engineers a `config.ini.archived` file from a `replication_report.txt`.
 
 This single-purpose utility operates on a single run directory. It reads a
-human-readable 'replication_report.txt' file, parses key experimental
-parameters using a robust set of regular expressions, and writes them into a
-new, structured 'config.ini.archived' file.
+human-readable report file, parses key experimental parameters using a robust
+set of regular expressions, and writes them into a new, structured
+`config.ini.archived` file.
 
-It is designed to handle multiple legacy report formats. If more than one report
-exists in a directory, it deterministically selects the most recent one to
-ensure the restored parameters are as accurate as possible. The script is called
-in a loop by `patch_old_experiment.py` to upgrade legacy datasets.
+This script is a key part of the framework's self-healing capabilities,
+allowing a corrupted or missing config file to be rebuilt from other artifacts.
+It is also used by `patch_old_experiment.py` to upgrade legacy datasets.
 """
 
 import os
@@ -125,14 +124,14 @@ def main():
     }
     config['Study'] = {
         'mapping_strategy': params['mapping_strategy'],
-        'group_size': params['group_size'],
-        'num_trials': params['num_trials']
+        'group_size': str(int(params['group_size'])),
+        'num_trials': str(int(params['num_trials']))
     }
     config['Filenames'] = {
         'personalities_src': params['personalities_src']
     }
     config['Replication'] = {
-        'replication': params['replication']     # Add replication number
+        'replication': str(int(params['replication']))     # Add replication number
     }
     config['General'] = {
         'base_output_dir': 'output' # A sensible default

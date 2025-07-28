@@ -577,7 +577,8 @@ def main():
             "CONTRIBUTING.md": False,
             "CHANGELOG.md": False,
             "LICENSE.md": False,
-            "docs/study_article.md": True  # This file contains placeholders
+            "docs/study_article.md": True,  # This file contains placeholders
+            "docs/cover_letter.md": True    # This file may contain placeholders
         }
         
         for rel_path, process_placeholders in files_to_convert.items():

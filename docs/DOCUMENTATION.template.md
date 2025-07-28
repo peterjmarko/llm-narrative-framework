@@ -82,9 +82,9 @@ The project's functionality is organized into six primary workflows, each initia
 
 7.  **Process a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
 
-#### Workflow 1: Run an Experiment
+#### Workflow 1: Create a New Experiment
 
-This is the primary workflow for generating new experimental data or for resuming/repairing an interrupted experiment. The PowerShell entry point (`run_experiment.ps1`) calls the Python batch controller (`experiment_manager.py`), which functions as a state machine. It repeatedly audits the experiment's state and, if incomplete, calls `orchestrate_replication.py` to run or repair the necessary replications. This self-healing loop continues until the experiment is complete, at which point the manager performs a final aggregation.
+This is the primary workflow for generating new experimental data. The PowerShell entry point (`new_experiment.ps1`) calls the Python batch controller (`experiment_manager.py`). The manager creates a new, timestamped directory and runs the full set of replications from scratch.
 
 The `orchestrate_replication.py` script executes the full pipeline for a single run, which is broken into six distinct stages:
 
@@ -95,7 +95,7 @@ The `orchestrate_replication.py` script executes the full pipeline for a single 
 5.  **Generate Final Report**: Assembles the final `replication_report.txt` from the analysis results and captured logs.
 6.  **Create Replication Summary**: Creates the final `REPLICATION_results.csv`, marking the run as valid.
 
-{{grouped_figure:docs/diagrams/flow_1_run_experiment.mmd | scale=2.5 | width=65% | caption=Workflow 1: Run an Experiment, showing the main control loop and the internal replication pipeline.}}
+{{grouped_figure:docs/diagrams/flow_1_new_experiment.mmd | scale=2.5 | width=65% | caption=Workflow 1: Create a New Experiment, showing the main control loop and the internal replication pipeline.}}
 
 
 #### Workflow 2: Audit an Experiment
@@ -130,13 +130,14 @@ The `Details` string provides specific error flags, such as `MANIFESTS_INCOMPLET
 In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Aggregation Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`), confirming whether the last aggregation step for the experiment was successfully completed.
 
 
-#### Workflow 3: Update an Experiment
+#### Workflow 3: Repair or Update an Experiment
 
-This workflow allows you to re-run the data processing and analysis stages on an existing experiment without repeating expensive LLM calls. The `update_experiment.ps1` wrapper calls `experiment_manager.py` with the `--reprocess` flag.
-It first performs an audit. If the experiment has analysis errors, it proceeds to update it. If the experiment is already `VALIDATED`, it will prompt for user confirmation before forcing a full reprocessing.
-The reprocessing is a two-step action: first, `orchestrate_replication.py --reprocess` is called on each individual run to regenerate its `replication_report.txt`; second, `experiment_aggregator.py` is called to perform a full re-aggregation, ensuring all top-level summary files are brought up to date.
+This workflow is the main "fix-it" tool for any existing experiment. The `repair_experiment.ps1` script is an intelligent wrapper around `experiment_manager.py`. It first performs a full audit to diagnose the experiment's state.
 
-{{grouped_figure:docs/diagrams/flow_3_update_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Update an Experiment. Re-runs the data processing and analysis stages on an existing experiment.}}
+-   If the audit finds missing data or outdated analysis files, the script proceeds to automatically apply the correct repair.
+-   If the audit finds the experiment is already complete and valid, it becomes interactive, presenting a menu that allows the user to force a full data repair, an analysis update, or a simple re-aggregation of results.
+
+{{grouped_figure:docs/diagrams/flow_3_repair_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Repair or Update an Experiment, showing both automatic and interactive repair paths.}}
 
 
 #### Workflow 4: Migrate Old Experiment Data
@@ -162,21 +163,21 @@ This workflow provides a read-only, consolidated completeness report for all exp
 
 This workflow is used after all experiments are complete to audit, compile, and analyze the entire study. The `process_study.ps1` wrapper calls `audit_study.ps1`, `compile_study_results.py`, and then `study_analyzer.py`.
 
-{{grouped_figure:docs/diagrams/flow_6_process_study.mmd | scale=2.5 | width=100% | caption=Workflow 6: Process a Study. Audits, compiles, and analyzes all experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_6_process_study.mmd | scale=2.5 | width=80% | caption=Workflow 6: Process a Study. Audits, compiles, and analyzes all experiments in a study.}}
 
 
 #### Workflow 7: Update a Study
 
 This workflow provides a convenient batch operation to update all out-of-date experiments within a study directory. It first runs a full study audit to identify which experiments need updating. If any require more serious intervention (like repair or migration), it halts. Otherwise, it prompts the user for confirmation and then systematically calls `update_experiment.ps1` on each experiment that needs it.
 
-{{grouped_figure:docs/diagrams/flow_7_update_study.mmd | scale=2.5 | width=100% | caption=Workflow 7: Update a Study. A batch operation to update all out-of-date experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_7_update_study.mmd | scale=2.5 | width=80% | caption=Workflow 7: Update a Study. A batch operation to update all out-of-date experiments in a study.}}
 
 {{pagebreak}}
 ### Data Flow Diagram
 
 This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
 
-{{grouped_figure:docs/diagrams/view_data_flow.mmd | scale=2.5 | width=75% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.}}
+{{grouped_figure:docs/diagrams/view_data_flow.mmd | scale=2.5 | width=70% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.}}
 
 ### Experimental Logic Flowchart
 
@@ -268,17 +269,20 @@ A follow-up study is planned to evaluate other powerful, medium-cost models as A
 
 ## Choosing the Right Workflow: Separation of Concerns
 
-The framework is designed around three primary user actions, each handled by a dedicated script. This separation of concerns ensures that each workflow is simple, predictable, and safe. Use the following diagram and descriptions to choose the correct tool for your task.
+The framework is designed around a clear "Create -> Check -> Fix" model, with a dedicated script for each user intent. This separation of concerns ensures that each workflow is simple, predictable, and safe.
 
-{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: Separation of Concerns.}}
+{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: A guide to the new intent-driven scripts.}}
 
--   **`new_experiment.ps1` (Data Generation)**: This is the dedicated tool for creating a new experiment. It reads the global `config.ini` and generates a new, timestamped experiment directory from scratch.
+-   **`new_experiment.ps1` (Create)**: Use this to create a new experiment from scratch based on the global `config.ini`. This is your starting point for generating new data.
 
--   **`run_experiment.ps1` (Data Repair & Resumption)**: Use this for an *existing* experiment. It is your primary tool to resume an interrupted run or to repair one with missing data. Its sole focus is to ensure the raw data (queries and LLM responses) is complete.
+-   **`audit_experiment.ps1` (Check)**: Use this read-only tool to get a detailed status report on any existing experiment. It is your primary diagnostic tool and will tell you if any further action is needed.
 
--   **`update_experiment.ps1` (Analysis Reprocessing)**: Use this *after* your experiment's raw data is complete. It regenerates all reports and summaries from the existing raw data. It is the correct tool for applying analysis bug fixes or adding new metrics without re-running expensive LLM calls.
+-   **`repair_experiment.ps1` (Fix & Update)**: Use this for any existing experiment that needs to be fixed or updated. It is the main "fix-it" tool that can:
+    *   Automatically repair missing data (like LLM responses).
+    *   Automatically update outdated analysis files.
+    *   Allow you to interactively force a full data re-run or analysis update on a complete, valid experiment.
 
--   **`migrate_experiment.ps1` (Structural Transformation)**: This is a special utility for upgrading experiments created with older versions of the framework. It safely copies the legacy data and transforms the copy into the modern, compatible format.
+-   **`migrate_experiment.ps1` (Upgrade)**: This is a special utility for upgrading experiments created with older versions of the framework. It safely copies the legacy data and transforms the copy into the modern, compatible format.
 
 ## Core Workflows
 
@@ -286,53 +290,39 @@ The project is orchestrated by several PowerShell wrapper scripts that handle di
 
 ### Creating a New Experiment (`new_experiment.ps1`)
 
-This is the primary entry point for creating and running a new experiment from scratch. It reads the global `config.ini`, generates a new timestamped directory, and executes the full batch of replications.
-
-**To create a new experiment:**
-```powershell
-.\new_experiment.ps1
-```
-
-For detailed, real-time logging, add the `-Verbose` switch.
-
-### Repairing or Resuming an Experiment (`run_experiment.ps1`)
-
-This script is used to work with an *existing* experiment directory. It can resume an interrupted batch or repair runs with missing data.
-
-**To resume an interrupted experiment:**
-Point the script at the target directory. It will automatically detect and run only the missing replications.
-```powershell
-# Resume an interrupted experiment in the specified folder
-.\run_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250712_081954"
-```
-
-**Common Examples:**
+This is the entry point for creating a new experiment from scratch. It reads `config.ini`, generates a timestamped directory, and runs the full batch.
 
 ```powershell
-# Run a new experiment (will be saved in output/new_experiments/experiment_DATE_TIME/)
-.\run_experiment.ps1
-
-# Resume an interrupted experiment by running only replications 15 through 30
-# (Replace 'experiment_...' with the actual folder name of your experiment)
-.\run_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250712_081954" -StartRep 15 -EndRep 30
-
-# Run a full experiment with detailed, real-time logging for debugging purposes
-.\run_experiment.ps1 -Verbose
+# Create and run a new experiment
+.\new_experiment.ps1 -Verbose
 ```
-> **Note:** The main wrapper scripts use PowerShell. While PowerShell is pre-installed on Windows and available for macOS and Linux, the core scientific logic is contained in cross-platform Python scripts.
 
-### Updating an Experiment (`update_experiment.ps1`)
+### Auditing an Experiment (`audit_experiment.ps1`)
 
-This script allows you to re-run the data processing and analysis stages on an existing, complete experiment without repeating expensive LLM calls. It's the ideal tool for applying analysis updates, bug fixes, or new metrics to your results.
-
-**To update an experiment:**
-Point the script at the directory of the experiment you wish to reprocess.
+This is the primary diagnostic tool. It performs a read-only check and provides a detailed status report for the specified experiment.
 
 ```powershell
-# Update an experiment in the Study_2/Experiment_3/ directory
-.\update_experiment.ps1 -TargetDirectory "output/reports/Study_2/Experiment_3"
+# Get a status report for an existing experiment
+.\audit_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
 ```
-This calls `experiment_manager.py` with the `--reprocess` flag. This action first regenerates the primary report for each replication and then performs a full re-aggregation, ensuring all summary files are consistent and up-to-date. For detailed, real-time logs, add the `-Verbose` switch.
+
+### Repairing or Updating an Experiment (`repair_experiment.ps1`)
+
+This is the main "fix-it" tool for any existing experiment. It automatically diagnoses and fixes issues.
+
+**To automatically fix a broken or incomplete experiment:**
+The script will run an audit, identify the problem (e.g., missing responses, outdated analysis), and automatically apply the correct fix.
+```powershell
+# Automatically repair a broken experiment
+.\repair_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
+```
+
+**To interactively force an action on a valid experiment:**
+If you run the script on a complete and valid experiment, it will present an interactive menu allowing you to force a full data repair or analysis update.
+```powershell
+# Run on a valid experiment to bring up the interactive force menu
+.\repair_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
+```
 
 ### Migrating Old Experiment Data (`migrate_experiment.ps1`)
 
@@ -418,15 +408,13 @@ The final analysis script (`study_analyzer.py`) produces a comprehensive log fil
 
 ## User Entry Points
 
-*   **`new_experiment.ps1`**: The primary entry point for creating and running a new experiment from scratch.
+*   **`new_experiment.ps1`**: **(Create)** The primary entry point for creating and running a new experiment from scratch.
 
-*   **`run_experiment.ps1`**: The entry point to resume an interrupted experiment or repair an existing one.
+*   **`audit_experiment.ps1`**: **(Check)** Provides a read-only, detailed completeness report for a specified experiment, acting as the primary diagnostic tool for a *single experiment*.
 
-*   **`audit_experiment.ps1`**: Provides a read-only, detailed completeness report for a specified experiment, acting as the primary diagnostic tool for a *single experiment*.
+*   **`repair_experiment.ps1`**: **(Fix & Update)** The main "fix-it" tool to automatically repair, resume, or update an existing experiment. It becomes interactive if run on an already valid experiment.
 
 *   **`audit_study.ps1`**: Audits all experiments within a study directory and provides a consolidated report to check for final analysis readiness.
-
-*   **`update_experiment.ps1`**: Re-runs the data processing and analysis stages on a *single experiment*, ideal for applying analysis updates or bug fixes.
 
 *   **`update_study.ps1`**: A powerful batch script that audits an entire study and calls `update_experiment.ps1` on all experiments that require an update.
 

@@ -24,7 +24,7 @@ Backend State-Machine Controller for a Single Experiment.
 
 This script is the high-level, intelligent backend controller for managing the
 entire lifecycle of a single experiment. It is invoked by user-facing
-PowerShell wrappers (e.g., `new_experiment.ps1`, `run_experiment.ps1`).
+PowerShell wrappers (e.g., `new_experiment.ps1`, `repair_experiment.ps1`).
 
 It operates as a state machine: when pointed at an experiment directory, it
 verifies the experiment's status and automatically takes the correct action
@@ -100,7 +100,8 @@ def _create_new_experiment_directory(colors):
     
     os.makedirs(final_output_dir)
     # This message is now clearer for the new_experiment.ps1 workflow.
-    print(f"{C_CYAN}New experiment directory created:\n{final_output_dir}{C_RESET}\n")
+    relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
+    print(f"{C_CYAN}New experiment directory created:\n{relative_path}{C_RESET}\n")
     
     return final_output_dir
 
@@ -472,7 +473,11 @@ def _get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -
             failed_indices = sorted(list(query_indices - response_indices))
             if failed_indices:
                 runs_needing_session_repair.append({"dir": str(run_path), "failed_indices": failed_indices, "repair_type": "session_repair"})
-        elif status in {"QUERY_ISSUE", "CONFIG_ISSUE", "INVALID_NAME"}:
+        elif status == "CONFIG_ISSUE":
+            # This is now a distinct, less destructive repair type.
+            run_path = run_paths_by_name[run_name] # Correctly get the path using the run's name
+            runs_needing_session_repair.append({"dir": str(run_path), "repair_type": "config_repair"})
+        elif status in {"QUERY_ISSUE", "INVALID_NAME"}:
             runs_needing_full_replication_repair.append({"dir": str(run_paths_by_name[run_name]), "repair_type": "full_replication_repair"})
 
     if runs_needing_full_replication_repair:
@@ -536,7 +541,7 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
 
     return is_complete, details
 
-def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress_exit: bool = False, print_report: bool = True, is_verify_only_cli: bool = False, suppress_external_recommendation: bool = False) -> int:
+def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress_exit: bool = False, print_report: bool = True, is_verify_only_cli: bool = False, suppress_external_recommendation: bool = False, suppress_header: bool = False) -> int:
     """
     Runs a read-only verification and prints a detailed summary table.
     Can suppress exiting for internal use by the state machine.
@@ -546,11 +551,13 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
     """
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = colors.values()
     if print_report:
-        print(f"\n{C_CYAN}{'#'*80}{C_RESET}")
-        print(f"{C_CYAN}{_format_header('Running Experiment Audit')}{C_RESET}")
-        print(f"{C_CYAN}{'#'*80}{C_RESET}")
+        relative_path = os.path.relpath(target_dir, PROJECT_ROOT)
+        if not suppress_header:
+            print(f"\n{C_CYAN}{'#'*80}{C_RESET}")
+            print(f"{C_CYAN}{_format_header('Running Experiment Audit')}{C_RESET}")
+            print(f"{C_CYAN}{'#'*80}{C_RESET}")
         print(f"\n--- Verifying Data Completeness in: ---")
-        print(f"{target_dir}")
+        print(f"{relative_path}")
     run_dirs = sorted([p for p in glob.glob(os.path.join(target_dir, 'run_*')) if os.path.isdir(p)])
 
     audit_result_code = AUDIT_ALL_VALID # Default to valid
@@ -580,18 +587,20 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
                 if name_match:
                     total_expected_trials += int(name_match.group(1))
                 
-                # Actual valid responses comes from the JSON report, the single source of truth
+                # Actual valid responses comes from the JSON report, but ONLY if the run is fully validated.
                 n_valid_in_run = 0
-                # Ensure report exists before trying to read it
-                report_files = sorted(run_dir.glob("replication_report_*.txt"))
-                if report_files:
-                    latest_report = report_files[-1]
-                    text = latest_report.read_text(encoding="utf-8")
-                    start = text.index("<<<METRICS_JSON_START>>>")
-                    end = text.index("<<<METRICS_JSON_END>>>")
-                    j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
-                    n_valid_in_run = j.get("n_valid_responses", 0)
-                    total_valid_responses += n_valid_in_run
+                if status == "VALIDATED":
+                    try:
+                        latest_report = sorted(run_dir.glob("replication_report_*.txt"))[-1]
+                        text = latest_report.read_text(encoding="utf-8")
+                        start = text.index("<<<METRICS_JSON_START>>>")
+                        end = text.index("<<<METRICS_JSON_END>>>")
+                        j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
+                        n_valid_in_run = j.get("n_valid_responses", 0)
+                    except (IndexError, ValueError, KeyError):
+                        n_valid_in_run = 0 # Don't trust the report if it's malformed
+                
+                total_valid_responses += n_valid_in_run
                 
             except (AttributeError, ValueError, IndexError, json.JSONDecodeError):
                 # If anything goes wrong (bad name, no report, bad JSON),
@@ -604,26 +613,26 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
                 "details": "; ".join(details)
             })
 
-        # Set a max width for the directory name column to keep the table compact
-        MAX_NAME_WIDTH = 65
-        max_name_len = min(max(len(run['name']) for run in all_runs_data), MAX_NAME_WIDTH) if all_runs_data else 20
+        if print_report:
+            # Set a max width for the directory name column to keep the table compact
+            MAX_NAME_WIDTH = 65
+            max_name_len = min(max(len(run['name']) for run in all_runs_data), MAX_NAME_WIDTH) if all_runs_data else 20
 
-        print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
-        print(f"{'-'*max_name_len} {'-'*20} {'-'*45}")
-        for run in all_runs_data:
-            display_name = run['name']
-            if len(display_name) > max_name_len:
-                display_name = display_name[:max_name_len - 3] + "..."
+            print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
+            print(f"{'-'*max_name_len} {'-'*20} {'-'*45}")
+            for run in all_runs_data:
+                display_name = run['name']
+                if len(display_name) > max_name_len:
+                    display_name = display_name[:max_name_len - 3] + "..."
 
-            status_color = C_GREEN if run['status'] == "VALIDATED" else C_RED
-            print(f"{display_name:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
+                status_color = C_GREEN if run['status'] == "VALIDATED" else C_RED
+                print(f"{display_name:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
 
         # --- Determine result code based on findings from individual runs ---
         run_statuses = {run['status'] for run in all_runs_data}
 
-        if "INVALID_NAME" in run_statuses or "CONFIG_ISSUE" in run_statuses:
-            audit_result_code = AUDIT_NEEDS_MIGRATION
-        elif "QUERY_ISSUE" in run_statuses or "RESPONSE_ISSUE" in run_statuses:
+        # A config issue or invalid name is a critical but repairable error, not a migration issue.
+        if "INVALID_NAME" in run_statuses or "CONFIG_ISSUE" in run_statuses or "QUERY_ISSUE" in run_statuses or "RESPONSE_ISSUE" in run_statuses:
             audit_result_code = AUDIT_NEEDS_REPAIR
         elif "ANALYSIS_ISSUE" in run_statuses:
             audit_result_code = AUDIT_NEEDS_REPROCESS
@@ -653,17 +662,12 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
             audit_recommendation = "Migrate experiment for further processing (run 'migrate_experiment.ps1' with the directory path of the experiment)."
             audit_color = C_RED
         elif audit_result_code == AUDIT_NEEDS_REPAIR:
-            audit_message = "FAILED. Critical data is missing or corrupt (queries/responses)."
-            if is_verify_only_cli:
-                # Direct recommendation for standalone audit
-                audit_recommendation = "Run 'run_experiment.ps1' on the target directory to automatically repair the experiment."
-            else:
-                # Contextual recommendation for internal audit (when a prompt will follow)
-                audit_recommendation = "Proceed with automatic repair when prompted. If this fails, re-run 'run_experiment.ps1' on the target directory."
+            audit_message = "FAILED. Critical data is missing or corrupt."
+            audit_recommendation = "Diagnosis: Experiment requires a data repair."
             audit_color = C_RED
         elif audit_result_code == AUDIT_NEEDS_REPROCESS:
-            audit_message = "UPDATE RECOMMENDED. Experiment analysis needs refreshing."
-            audit_recommendation = "Update experiment to fix analysis files and summaries (run 'update_experiment.ps1' with the directory path)."
+            audit_message = "UPDATE RECOMMENDED. Experiment analysis is outdated."
+            audit_recommendation = "Diagnosis: Experiment requires an analysis update."
             audit_color = C_YELLOW
         elif audit_result_code == AUDIT_ALL_VALID:
             if exp_complete:
@@ -677,12 +681,13 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
         if print_report:
             if total_expected_trials > 0:
                 completeness = (total_valid_responses / total_expected_trials) * 100 if total_expected_trials > 0 else 0
+                relative_path = os.path.relpath(target_dir, PROJECT_ROOT)
                 print(f"\n{C_CYAN}--- Overall Summary ---{C_RESET}")
-                print(f"Experiment Directory: {target_dir}")
+                print(f"Experiment Directory: {relative_path}")
                 print(f"Replication Status:")
-                print(f"  - Total Runs Verified:          {len(run_dirs)}")
-                print(f"  - Total Runs Complete (Pipeline): {total_complete_runs}/{len(run_dirs)}")
-                print(f"  - Total Valid LLM Responses:      {total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
+                print(f"  - {'Total Runs Verified:':<32}{len(run_dirs)}")
+                print(f"  - {'Total Runs Complete (Pipeline):':<32}{total_complete_runs}/{len(run_dirs)}")
+                print(f"  - {'Total Valid LLM Responses:':<32}{total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
                 
                 print(f"Experiment Aggregation Status: {exp_status_color}{exp_status_str_base}{exp_status_suffix}{C_RESET}")
                 
@@ -691,29 +696,8 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
                         print(f"  - {exp_status_color}{detail}{C_RESET}")
             
             print(f"\n{audit_color}Audit Result: {audit_message}{C_RESET}")
-            print(f"{audit_color}Recommendation: {audit_recommendation}{C_RESET}")
 
-    # Print the final summary banner
-    if print_report and is_verify_only_cli:
-        if audit_result_code == AUDIT_ALL_VALID:
-            print(f"\n{C_GREEN}{'#'*80}{C_RESET}")
-            print(f"{C_GREEN}{_format_header('Audit Finished: Experiment is VALIDATED.')}{C_RESET}")
-            print(f"{C_GREEN}{'#'*80}{C_RESET}")
-        elif audit_result_code == AUDIT_NEEDS_REPROCESS:
-            print(f"\n{C_YELLOW}{'#'*80}{C_RESET}")
-            print(f"{C_YELLOW}{_format_header('Audit Finished: Experiment needs UPDATE.')}{C_RESET}")
-            print(f"{C_YELLOW}{_format_header('Recommendation: Run `update_experiment.ps1` to reprocess analysis files.')}{C_RESET}")
-            print(f"{C_YELLOW}{'#'*80}{C_RESET}")
-        elif audit_result_code == AUDIT_NEEDS_REPAIR:
-            print(f"\n{C_RED}{'#'*80}{C_RESET}")
-            print(f"{C_RED}{_format_header('Audit Finished: Experiment needs REPAIR.')}{C_RESET}")
-            print(f"{C_RED}{_format_header('Recommendation: Run `run_experiment.ps1` to fix missing data.')}{C_RESET}")
-            print(f"{C_RED}{'#'*80}{C_RESET}")
-        elif audit_result_code == AUDIT_NEEDS_MIGRATION:
-            print(f"\n{C_RED}{'#'*80}{C_RESET}")
-            print(f"{C_RED}{_format_header('Audit Finished: Experiment needs MIGRATION.')}{C_RESET}")
-            print(f"{C_RED}{_format_header('Recommendation: Run `migrate_experiment.ps1` to upgrade the experiment.')}{C_RESET}")
-            print(f"{C_RED}{'#'*80}{C_RESET}")
+    # Final summary banner has been removed for a cleaner UI.
 
     # Always return the code. The main() function is responsible for exiting.
     return audit_result_code
@@ -834,9 +818,31 @@ def _run_repair_mode(runs_to_repair, orchestrator_script_path, quiet, colors):
 
 def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet, colors):
     """Deletes and fully regenerates runs with critical issues (e.g., missing queries, config issues)."""
+def _run_config_repair(runs_to_repair, restore_config_script, colors):
+    """Repairs missing or malformed config.ini.archived files by restoring them from reports."""
+    C_CYAN, C_YELLOW, C_RESET = colors['cyan'], colors['yellow'], colors['reset']
+    print(f"{C_YELLOW}--- Entering CONFIG REPAIR Mode: Restoring config for {len(runs_to_repair)} run(s) ---{C_RESET}")
+    
+    for run_info in runs_to_repair:
+        run_dir_path = run_info["dir"]
+        print(f"\n- Restoring config for {os.path.basename(run_dir_path)}...")
+        try:
+            cmd = [sys.executable, restore_config_script, run_dir_path]
+            # Capture output unless there's an error, to keep the log clean.
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            print(f"  {C_CYAN}Success.{C_RESET}")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to restore config for {os.path.basename(run_dir_path)}.")
+            logging.error(f"Stderr:\n{e.stderr}")
+            return False # Halt on failure
+    return True
+
+def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet, colors):
+    """Deletes and fully regenerates runs with critical issues (e.g., missing queries, config issues)."""
+    C_YELLOW = colors['yellow']
     C_RED = colors['red']
     C_RESET = colors['reset']
-    print(f"{C_RED}--- Entering FULL REPLICATION REPAIR Mode: Deleting and regenerating {len(runs_to_repair)} run(s) with critical issues ---{C_RESET}")
+    print(f"{C_YELLOW}--- Entering FULL REPLICATION REPAIR Mode: Deleting and regenerating {len(runs_to_repair)} run(s) with critical issues ---{C_RESET}")
 
     for i, run_info in enumerate(runs_to_repair):
         run_dir_path_str = run_info["dir"]
@@ -847,9 +853,9 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet, col
         capture_output_flag = False 
 
         header_text = f" REGENERATING REPLICATION {run_basename} ({i+1}/{len(runs_to_repair)}) "
-        print("\n" + "="*80)
-        print(f"{C_RED}{header_text.center(78)}{C_RESET}")
-        print("="*80)
+        print(f"\n{C_CYAN}{'='*80}{C_RESET}")
+        print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
+        print(f"{C_CYAN}{'='*80}{C_RESET}")
 
         # Step 1: Extract replication number from directory name
         rep_num_match = re.search(r'_rep-(\d+)_', run_basename)
@@ -985,33 +991,41 @@ def _handle_experiment_state(state_overall_status, payload_details, final_output
     success = True
     should_break = False
 
-    # This is an existing experiment, so print the verification header.
-    line_separator = "#" * 80
-    print(f"\n{C_CYAN}{line_separator}{C_RESET}")
-    verification_header = _format_header(f"VERIFICATION CYCLE {loop_count}/{max_loops}")
-    print(f"{C_CYAN}{verification_header}{C_RESET}")
-    print(f"{C_CYAN}{line_separator}{C_RESET}")
+    # In interactive mode (the default), print a verification header and the full audit.
+    # In non-interactive mode (for automatic repairs), get the audit code silently.
+    should_print_report = not args.non_interactive
+    if should_print_report:
+        line_separator = "#" * 80
+        print(f"\n{C_CYAN}{line_separator}{C_RESET}")
+        verification_header = _format_header(f"VERIFICATION CYCLE {loop_count}/{max_loops}")
+        print(f"{C_CYAN}{verification_header}{C_RESET}")
+        print(f"{C_CYAN}{line_separator}{C_RESET}")
     
-    # Always run and print the audit report for existing experiments.
-    audit_result_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=True, is_verify_only_cli=False, suppress_external_recommendation=is_migration_run)
+    # Always run the audit logic, but only print the report if not in non-interactive mode.
+    # The header is suppressed if the report body is suppressed.
+    audit_result_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print_report, is_verify_only_cli=False, suppress_external_recommendation=is_migration_run, suppress_header=not should_print_report)
 
     if audit_result_code == AUDIT_NEEDS_MIGRATION:
         print(f"\n{C_RED}Halting due to MIGRATION required status.{C_RESET}")
         sys.exit(AUDIT_NEEDS_MIGRATION)
 
     elif audit_result_code == AUDIT_NEEDS_REPAIR:
+        config_repairs = [d for d in payload_details if d.get("repair_type") == "config_repair"]
         full_replication_repairs = [d for d in payload_details if d.get("repair_type") == "full_replication_repair"]
         session_repairs = [d for d in payload_details if d.get("repair_type") == "session_repair"]
-        if full_replication_repairs: repair_type_message = "critical issues (e.g., missing queries/configs). This may involve re-running entire replications."
-        elif session_repairs: repair_type_message = "missing LLM responses. This involves re-running specific LLM sessions."
-        else: repair_type_message = "unspecified issues requiring repair."
-        info_message = f"The experiment requires repair due to {repair_type_message}"
-        if is_migration_run: info_message = f"Migration has uncovered issues requiring repair due to {repair_type_message}"
-        print(f"\n{C_YELLOW}{info_message}{C_RESET}\n")
-        if _prompt_for_confirmation("Do you wish to proceed? (Y/N): "):
-            if full_replication_repairs:
+        
+        # In non-interactive mode, just proceed. Otherwise, prompt the user.
+        if args.non_interactive or _prompt_for_confirmation("The experiment requires repair. Do you wish to proceed? (Y/N): "):
+            if args.non_interactive:
+                # The PowerShell wrapper now handles the "Proceeding" message.
+                pass
+            
+            # Execute repairs in order of severity
+            if config_repairs:
+                success = _run_config_repair(config_repairs, script_paths['restore_config'], colors)
+            if success and full_replication_repairs:
                 success = _run_full_replication_repair(full_replication_repairs, orchestrator_script, not args.verbose, colors)
-            elif session_repairs:
+            if success and session_repairs:
                 success = _run_repair_mode(session_repairs, orchestrator_script, not args.verbose, colors)
             action_taken = True
         else:
@@ -1025,7 +1039,9 @@ def _handle_experiment_state(state_overall_status, payload_details, final_output
             payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
         proceed = False
         if not (is_migration_run or force_reprocess_once):
-            if _prompt_for_confirmation("\nDo you wish to proceed? (Y/N): "):
+            if args.non_interactive or _prompt_for_confirmation("\nDo you wish to proceed? (Y/N): "):
+                if args.non_interactive:
+                    print(f"\n{C_YELLOW}Automatically proceeding with update in non-interactive mode.{C_RESET}")
                 proceed = True
         else:
             print(f"\n{C_YELLOW}Automatically proceeding with update as part of migration or a forced reprocess run.{C_RESET}")
@@ -1069,8 +1085,19 @@ def _run_finalization(final_output_dir, script_paths, colors):
         
         print("--- Finalizing batch log with summary... ---")
         subprocess.run([sys.executable, script_paths['log_manager'], "finalize", final_output_dir], check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        # Provide more context on subprocess failures
+        logging.error("A child process failed during the finalization stage.")
+        # Use os.path.basename to keep the command clean and readable
+        command_str = " ".join([os.path.basename(arg) if i == 1 else arg for i, arg in enumerate(e.cmd)])
+        logging.error(f"Command: {command_str}")
+        if e.stderr:
+            logging.error(f"Stderr:\n{e.stderr}")
+        if e.stdout:
+            logging.error(f"Stdout:\n{e.stdout}")
+        sys.exit(1)
     except Exception as e:
-        logging.error(f"An error occurred during finalization: {e}")
+        logging.error(f"An unexpected error occurred during finalization: {e}")
         sys.exit(1)
 
 def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, compile_script, target_dir, log_manager_script, colors):
@@ -1083,9 +1110,9 @@ def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, co
     for i, run_info in enumerate(runs_to_reprocess):
         run_dir = run_info["dir"]
         header_text = f" RE-PROCESSING {os.path.basename(run_dir)} ({i+1}/{len(runs_to_reprocess)}) "
-        print("\n" + "="*80)
+        print(f"\n{C_CYAN}{'='*80}{C_RESET}")
         print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
-        print("="*80)
+        print(f"{C_CYAN}{'='*80}{C_RESET}")
 
         cmd_orch = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", run_dir]
         if quiet: cmd_orch.append("--quiet")
@@ -1100,25 +1127,8 @@ def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, co
             if isinstance(e, KeyboardInterrupt): sys.exit(1)
             return False
 
-    # After all runs are reprocessed, perform a full and final aggregation.
-    print(f"\n{C_CYAN}--- Finalizing experiment summaries... ---{C_RESET}")
-    try:
-        # Rebuild the batch log from the newly updated reports
-        cmd_log_rebuild = [sys.executable, log_manager_script, "rebuild", target_dir]
-        subprocess.run(cmd_log_rebuild, check=True, capture_output=True)
-        
-        # Re-compile the hierarchical results
-        cmd_compile = [sys.executable, compile_script, target_dir]
-        subprocess.run(cmd_compile, check=True, capture_output=quiet, text=True)
-        
-        # Finalize the batch log with a summary line
-        cmd_log_finalize = [sys.executable, log_manager_script, "finalize", target_dir]
-        subprocess.run(cmd_log_finalize, check=True, capture_output=True)
-
-    except (subprocess.CalledProcessError, Exception) as e:
-        logging.error(f"Failed during final aggregation. Error: {e}")
-        return False
-
+    # The main loop will handle the final aggregation.
+    print(f"\n{C_CYAN}--- All replications reprocessed successfully. ---{C_RESET}")
     return True
 
 def _setup_environment_and_paths():
@@ -1153,7 +1163,8 @@ def _setup_environment_and_paths():
         'orchestrator': os.path.join(PROJECT_ROOT, "src", "orchestrate_replication.py"),
         'compile_experiment': os.path.join(PROJECT_ROOT, "src", 'compile_experiment_results.py'),
         'log_manager': os.path.join(PROJECT_ROOT, "src", 'replication_log_manager.py'),
-        'patch': os.path.join(PROJECT_ROOT, "src", "patch_old_experiment.py")
+        'patch': os.path.join(PROJECT_ROOT, "src", "patch_old_experiment.py"),
+        'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_config.py")
     }
 
     # --- Directory setup ---
@@ -1199,6 +1210,8 @@ def main():
     parser.add_argument('--migrate', action='store_true', help="Run a one-time migration workflow for a legacy experiment directory.")
     parser.add_argument('--reprocess', action='store_true', help="Force reprocessing of all runs in an experiment, then finalize.")
     parser.add_argument('--force-color', action='store_true', help=argparse.SUPPRESS) # Hidden from user help
+    parser.add_argument('--non-interactive', action='store_true', help="Run in non-interactive mode, suppressing user prompts for confirmation.")
+    parser.add_argument('--quiet', action='store_true', help="Suppress all non-essential output from the audit. Used for scripting.")
     args = parser.parse_args()
 
     # Define color constants based on TTY status or the --force-color flag
@@ -1217,7 +1230,8 @@ def main():
         'orchestrator': os.path.join(PROJECT_ROOT, "src", "orchestrate_replication.py"),
         'compile_experiment': os.path.join(PROJECT_ROOT, "src", 'compile_experiment_results.py'),
         'log_manager': os.path.join(PROJECT_ROOT, "src", 'replication_log_manager.py'),
-        'patch': os.path.join(PROJECT_ROOT, "src", "patch_old_experiment.py")
+        'patch': os.path.join(PROJECT_ROOT, "src", "patch_old_experiment.py"),
+        'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_config.py")
     }
     colors = {
         'cyan': C_CYAN, 'green': C_GREEN, 'yellow': C_YELLOW, 'red': C_RED, 'reset': C_RESET
@@ -1233,7 +1247,8 @@ def main():
                     sys.exit(1)
                 # If a specific target is given but doesn't exist, create it.
                 os.makedirs(final_output_dir)
-                print(f"\nCreated specified target directory:\n{final_output_dir}")
+                relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
+                print(f"\nCreated specified target directory:\n{relative_path}")
         else:
             # If no target is given, we are explicitly in "new experiment" mode.
             # This mode is incompatible with flags that operate on existing data.
@@ -1246,7 +1261,9 @@ def main():
         end_rep = args.end_rep if args.end_rep is not None else config_num_reps
 
         if args.verify_only:
-            exit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=True, is_verify_only_cli=True)
+            # When --verify-only is called from the CLI, print the report unless --quiet is also passed.
+            should_print = not args.quiet
+            exit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print, is_verify_only_cli=True)
             sys.exit(exit_code)
 
         if args.migrate:
@@ -1289,16 +1306,9 @@ def main():
                 sys.exit(1)
             
             if action_taken and success:
-                # After a successful action, re-verify to see if we're done or if more work is needed.
-                # Suppress the "Verifying results..." message if the next step will be the finalization message.
-                new_audit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=False)
-                if new_audit_code == AUDIT_ALL_VALID:
-                    # If we are now valid, break the loop to proceed to finalization.
-                    break
-                else:
-                    # If issues persist, print a status update before the next full verification cycle.
-                    new_state_overall_status, _, _ = _get_experiment_state(Path(final_output_dir), end_rep, verbose=False)
-                    print(f"\n{C_YELLOW}--- Action successful, but issues persist (Current state: {new_state_overall_status}). Continuing verification... ---{C_RESET}")
+                # After a successful action, we assume the state is now valid and break the loop
+                # to proceed directly to finalization. This prevents a redundant audit report.
+                break
 
 
         if loop_count >= args.max_loops:
@@ -1307,8 +1317,9 @@ def main():
 
         _run_finalization(final_output_dir, script_paths, colors)
 
+        relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
         print(f"\n{C_GREEN}Experiment run finished successfully for:{C_RESET}")
-        print(f"{C_GREEN}{final_output_dir}{C_RESET}")
+        print(f"{C_GREEN}{relative_path}{C_RESET}")
         print()
 
     except KeyboardInterrupt:

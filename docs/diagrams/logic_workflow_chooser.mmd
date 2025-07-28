@@ -1,5 +1,4 @@
 graph TD
-
     %% --- Style Definitions ---
     classDef start_end_node fill:#d4edda,stroke:#155724;
     classDef decision_node fill:#e9d8fd,stroke:#9467bd,color:#333;
@@ -15,25 +14,21 @@ graph TD
 
         main_decision{"What is your goal?"}:::decision_node
 
-        %% Branch 1: New Experiment
-        case_1["**I want to create a brand new experiment.**"]:::case_node
+        %% Branch 1: Create
+        case_1["**Create**<br/>I want to generate new data from scratch."]:::case_node
         instruction_1["*Use: new_experiment.ps1*"]:::instruction_node
-        purpose_1["Purpose: Data Generation\nCreates a new, timestamped experiment directory and runs it from scratch."]:::purpose_node
         
-        %% Branch 2: Incomplete/Interrupted Data
-        case_2["**I have an interrupted experiment with missing data (e.g., LLM responses).**"]:::case_node
-        instruction_2["*Use: run_experiment.ps1*"]:::instruction_node
-        purpose_2["Purpose: Data Repair & Resumption\nCompletes an existing experiment by running only the missing or failed parts."]:::purpose_node
+        %% Branch 2: Check
+        case_2["**Check**<br/>I want to see the status of an existing experiment."]:::case_node
+        instruction_2["*Use: audit_experiment.ps1*"]:::instruction_node
 
-        %% Branch 3: Update/Reprocess
-        case_3["**My experiment's raw data is complete,\nbut I want to re-run the analysis\n(e.g., apply a bug fix or new metric).**"]:::case_node
-        instruction_3["*Use: update_experiment.ps1*"]:::instruction_node
-        purpose_3["Purpose: Analysis Reprocessing\nRegenerates reports and summaries from existing raw data without making new LLM calls."]:::purpose_node
+        %% Branch 3: Fix / Update
+        case_3["**Fix or Update**<br/>I have an experiment that is broken, incomplete, or needs its analysis updated."]:::case_node
+        instruction_3["*Use: repair_experiment.ps1*"]:::instruction_node
 
-        %% Branch 4: Migrate
-        case_4["**I have data from an old version of\nthis framework that needs to be\ncompatible with the current tools.**"]:::case_node
+        %% Branch 4: Upgrade
+        case_4["**Upgrade**<br/>I have legacy data that needs to be made compatible with the current tools."]:::case_node
         instruction_4["*Use: migrate_experiment.ps1*"]:::instruction_node
-        purpose_4["Purpose: Structural Transformation\nSafely copies and upgrades legacy experiment structures and files."]:::purpose_node
     end
 
     end_node(["End"]):::start_end_node;
@@ -41,24 +36,17 @@ graph TD
     %% === Connections ===
     start_node --> main_decision;
 
-    main_decision -- "1. Create New Data" --> case_1;
-    main_decision -- "2. Fix Existing Data" --> case_2;
-    main_decision -- "3. Re-analyze Existing Data" --> case_3;
-    main_decision -- "4. Upgrade Legacy Data" --> case_4;
+    main_decision --> case_1;
+    main_decision --> case_2;
+    main_decision --> case_3;
+    main_decision --> case_4;
 
     case_1 --> instruction_1;
-    instruction_1 -.-> purpose_1;
-
     case_2 --> instruction_2;
-    instruction_2 -.-> purpose_2;
-
     case_3 --> instruction_3;
-    instruction_3 -.-> purpose_3;
-
     case_4 --> instruction_4;
-    instruction_4 -.-> purpose_4;
-
-    purpose_1 --> end_node;
-    purpose_2 --> end_node;
-    purpose_3 --> end_node;
-    purpose_4 --> end_node;
+    
+    instruction_1 --> end_node;
+    instruction_2 --> end_node;
+    instruction_3 --> end_node;
+    instruction_4 --> end_node;
