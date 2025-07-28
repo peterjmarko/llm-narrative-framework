@@ -117,10 +117,11 @@ except ImportError as e:
 
 # Audit exit codes for --verify-only mode and internal signals
 AUDIT_ALL_VALID = 0
-AUDIT_NEEDS_REPROCESS = 1
-AUDIT_NEEDS_REPAIR = 2
-AUDIT_NEEDS_MIGRATION = 3
-AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt
+AUDIT_NEEDS_REPROCESS = 1 # Replications have analysis issues
+AUDIT_NEEDS_REPAIR = 2      # Replications have data issues (query/response)
+AUDIT_NEEDS_MIGRATION = 3   # Experiment is legacy format
+AUDIT_NEEDS_AGGREGATION = 4 # Replications are valid, but experiment summary is not
+AUDIT_ABORTED_BY_USER = 99  # Specific exit code when user aborts via prompt
 
 #==============================================================================
 #   CENTRAL FILE MANIFEST & REPORT CRITERIA
@@ -541,7 +542,7 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
 
     return is_complete, details
 
-def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress_exit: bool = False, print_report: bool = True, is_verify_only_cli: bool = False, suppress_external_recommendation: bool = False, suppress_header: bool = False) -> int:
+def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress_exit: bool = False, print_report: bool = True, is_verify_only_cli: bool = False, suppress_recommendation: bool = False, suppress_header: bool = False) -> int:
     """
     Runs a read-only verification and prints a detailed summary table.
     Can suppress exiting for internal use by the state machine.
@@ -642,6 +643,12 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
         # --- Now check for experiment-level summary files ---
         exp_complete, exp_details = _verify_experiment_level_files(Path(target_dir))
 
+        # --- Downgrade status if replications are valid but experiment is not finalized ---
+        if audit_result_code == AUDIT_ALL_VALID and not exp_complete:
+            # This state means the replications are fine, but the final aggregation step
+            # is missing. This requires a targeted aggregation, not a full reprocess.
+            audit_result_code = AUDIT_NEEDS_AGGREGATION
+
         # --- Determine final messages and colors based on the combined state ---
         exp_status_str_base = "COMPLETE" if exp_complete else "INCOMPLETE"
         exp_status_suffix = ""
@@ -651,31 +658,33 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
             if audit_result_code == AUDIT_NEEDS_REPROCESS:
                 exp_status_color = C_YELLOW
                 exp_status_suffix = " (Outdated)"
-        elif audit_result_code == AUDIT_ALL_VALID:
+        elif audit_result_code == AUDIT_NEEDS_REPROCESS:
+            # Covers the case where reps are valid but aggregation is missing.
             exp_status_color = C_YELLOW
         else:
+            # Covers repair needed, migration needed, or other errors.
             exp_status_color = C_RED
 
         # Determine the final audit message and recommendation
         if audit_result_code == AUDIT_NEEDS_MIGRATION:
-            audit_message = "FAILED. Legacy or malformed runs detected."
-            audit_recommendation = "Migrate experiment for further processing (run 'migrate_experiment.ps1' with the directory path of the experiment)."
+            audit_message = "Audit Result: Experiment needs MIGRATION."
+            audit_recommendation = "Recommendation: Run `migrate_experiment.ps1` to upgrade the experiment."
             audit_color = C_RED
         elif audit_result_code == AUDIT_NEEDS_REPAIR:
-            audit_message = "FAILED. Critical data is missing or corrupt."
-            audit_recommendation = "Diagnosis: Experiment requires a data repair."
+            audit_message = "Audit Result: Experiment needs REPAIR."
+            audit_recommendation = "Recommendation: Run `repair_experiment.ps1` to fix the experiment."
             audit_color = C_RED
         elif audit_result_code == AUDIT_NEEDS_REPROCESS:
-            audit_message = "UPDATE RECOMMENDED. Experiment analysis is outdated."
-            audit_recommendation = "Diagnosis: Experiment requires an analysis update."
-            audit_color = C_YELLOW
+            audit_message = "Audit Result: Experiment needs UPDATE."
+            audit_recommendation = "Recommendation: Run `repair_experiment.ps1` to update the experiment."
+            audit_color = C_RED
+        elif audit_result_code == AUDIT_NEEDS_AGGREGATION:
+            audit_message = "Audit Result: Experiment needs FINALIZATION."
+            audit_recommendation = "Recommendation: Run `repair_experiment.ps1` to finalize the experiment."
+            audit_color = C_RED
         elif audit_result_code == AUDIT_ALL_VALID:
-            if exp_complete:
-                audit_message = "PASSED. Experiment is complete and valid."
-                audit_recommendation = "No further action is required."
-            else:
-                audit_message = "PASSED. All replications are valid. Proceeding with experiment finalization."
-                audit_recommendation = "No action is required."
+            audit_message = "Audit Result: PASSED. Experiment is complete and valid."
+            audit_recommendation = "Recommendation: No further action is required."
             audit_color = C_GREEN
 
         if print_report:
@@ -688,14 +697,31 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
                 print(f"  - {'Total Runs Verified:':<32}{len(run_dirs)}")
                 print(f"  - {'Total Runs Complete (Pipeline):':<32}{total_complete_runs}/{len(run_dirs)}")
                 print(f"  - {'Total Valid LLM Responses:':<32}{total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
-                
+
                 print(f"Experiment Aggregation Status: {exp_status_color}{exp_status_str_base}{exp_status_suffix}{C_RESET}")
-                
+
                 if not exp_complete:
                     for detail in exp_details:
                         print(f"  - {exp_status_color}{detail}{C_RESET}")
+
+            # --- Print Final Banner ---
+            banner_char = "#"
+            total_width = 80
+            line = audit_color + (banner_char * total_width) + C_RESET
             
-            print(f"\n{audit_color}Audit Result: {audit_message}{C_RESET}")
+            padding_width = total_width - len("###" * 2) - 2
+            msg_line = f"### {audit_message.center(padding_width)} ###"
+
+            print(f"\n{line}")
+            print(f"{audit_color}{msg_line}{C_RESET}")
+            
+            # The recommendation line is only printed if not suppressed.
+            if not suppress_recommendation:
+                rec_line = f"### {audit_recommendation.center(padding_width)} ###"
+                print(f"{audit_color}{rec_line}{C_RESET}")
+            
+            print(f"{line}")
+            print() # Add final blank line
 
     # Final summary banner has been removed for a cleaner UI.
 
@@ -1003,7 +1029,7 @@ def _handle_experiment_state(state_overall_status, payload_details, final_output
     
     # Always run the audit logic, but only print the report if not in non-interactive mode.
     # The header is suppressed if the report body is suppressed.
-    audit_result_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print_report, is_verify_only_cli=False, suppress_external_recommendation=is_migration_run, suppress_header=not should_print_report)
+    audit_result_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print_report, is_verify_only_cli=False, suppress_recommendation=(args.non_interactive or is_migration_run), suppress_header=not should_print_report)
 
     if audit_result_code == AUDIT_NEEDS_MIGRATION:
         print(f"\n{C_RED}Halting due to MIGRATION required status.{C_RESET}")
@@ -1263,7 +1289,7 @@ def main():
         if args.verify_only:
             # When --verify-only is called from the CLI, print the report unless --quiet is also passed.
             should_print = not args.quiet
-            exit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print, is_verify_only_cli=True)
+            exit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print, is_verify_only_cli=True, suppress_recommendation=args.non_interactive)
             sys.exit(exit_code)
 
         if args.migrate:

@@ -43,7 +43,7 @@ The result is a clean dataset of personality profiles where the connection to th
 -   **Standardized, Comprehensive Reporting**: Each replication produces a `replication_report.txt` file containing run parameters, status, a human-readable statistical summary, and a machine-parsable JSON block with all key metrics. This format is identical for new runs and reprocessed runs.
 -   **Hierarchical Analysis & Aggregation**: The pipeline uses a set of dedicated compiler scripts for a fully auditable, bottom-up aggregation of results. `compile_replication_results.py` creates a summary for each run, `compile_experiment_results.py` combines those into an experiment-level summary, and finally `aggregate_experiments.py` creates a master `STUDY_results.csv` for the entire study.
 -   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `replication_log_manager.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
--   **Enhanced Console Readability**: All console outputs for file paths, commands, and key statuses are now formatted with consistent newlines and indentation, greatly improving log clarity and user experience during long runs.
+-   **Standardized Console Banners**: All audit results, whether for success, failure, or a required update, are now presented in a consistent, easy-to-read, 4-line colored banner, providing clear and unambiguous status reports.
 -   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `aggregate_experiments.py` prepares a master dataset, which `study_analyzer.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
 
 ## Visual Architecture
@@ -123,7 +123,7 @@ There is a problem with the fundamental input files needed for an LLM session, s
 The query files are intact, but one or more corresponding LLM response files are missing. This is typically caused by an interrupted run and requires **repair** by running `run_experiment.ps1` (or `migrate_experiment.ps1` if legacy).
 
 **ANALYSIS_ISSUE**  
-All core data files (queries, responses) are present, but there is a problem with derivative artifacts like analysis files, summary CSVs, or the final report. This requires an **update** (reprocessing) and can be fixed by running `update_experiment.ps1`.
+All core data files (queries, responses) are present, but there is a problem with derivative artifacts like analysis files, summary CSVs, or the final report. This also includes cases where all replications are valid but the top-level experiment aggregation files (`EXPERIMENT_results.csv`, etc.) are missing. This state requires an **update** and can be fixed by running `repair_experiment.ps1`.
 
 The `Details` string provides specific error flags, such as `MANIFESTS_INCOMPLETE`, `QUERY_RESPONSE_INDEX_MISMATCH`, or `REPORT_INCOMPLETE_METRICS`, which help diagnose the root cause quickly.
 
@@ -280,7 +280,7 @@ The framework is designed around a clear "Create -> Check -> Fix" model, with a 
 -   **`repair_experiment.ps1` (Fix & Update)**: Use this for any existing experiment that needs to be fixed or updated. It is the main "fix-it" tool that can:
     *   Automatically repair missing data (like LLM responses).
     *   Automatically update outdated analysis files.
-    *   Allow you to interactively force a full data re-run or analysis update on a complete, valid experiment.
+    *   Allow you to interactively force a full data re-run, analysis update, or result re-aggregation on a complete, valid experiment.
 
 -   **`migrate_experiment.ps1` (Upgrade)**: This is a special utility for upgrading experiments created with older versions of the framework. It safely copies the legacy data and transforms the copy into the modern, compatible format.
 
@@ -318,7 +318,11 @@ The script will run an audit, identify the problem (e.g., missing responses, out
 ```
 
 **To interactively force an action on a valid experiment:**
-If you run the script on a complete and valid experiment, it will present an interactive menu allowing you to force a full data repair or analysis update.
+If you run the script on a complete and valid experiment, it will present an interactive menu allowing you to force one of three actions:
+*   **Full Data Repair**: A destructive action that deletes all LLM responses and re-runs the API calls.
+*   **Analysis Update**: A safe action that re-runs only the analysis and reporting stages on existing data.
+*   **Re-aggregation**: A fast action that re-creates only the top-level experiment summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`). This is useful for fixing experiment-level corruption without re-running any analysis.
+
 ```powershell
 # Run on a valid experiment to bring up the interactive force menu
 .\repair_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"

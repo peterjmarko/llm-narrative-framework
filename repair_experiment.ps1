@@ -87,6 +87,27 @@ param(
 )
 
 function Invoke-RepairExperiment {
+    function Invoke-FinalizeExperiment-Local {
+        # This nested function handles the three-step finalization process.
+        # It uses variables from the parent scope ($TargetDirectory, $executable, $prefixArgs).
+        Write-Host "`n--- Rebuilding batch run log from replication data... ---" -ForegroundColor Cyan
+        $logRebuildArgs = @("src/replication_log_manager.py", "rebuild", $TargetDirectory)
+        & $executable $prefixArgs $logRebuildArgs
+        if ($LASTEXITCODE -ne 0) { throw "Log rebuild failed with exit code $LASTEXITCODE" }
+
+        Write-Host "`n--- Compiling final experiment summary... ---" -ForegroundColor Cyan
+        $aggArgs = @("src/compile_experiment_results.py", $TargetDirectory)
+        & $executable $prefixArgs $aggArgs
+        if ($LASTEXITCODE -ne 0) { throw "Result aggregation failed with exit code $LASTEXITCODE" }
+
+        Write-Host "`n--- Finalizing batch run log with summary... ---" -ForegroundColor Cyan
+        $logFinalizeArgs = @("src/replication_log_manager.py", "finalize", $TargetDirectory)
+        & $executable $prefixArgs $logFinalizeArgs
+        if ($LASTEXITCODE -ne 0) { throw "Log finalization failed with exit code $LASTEXITCODE" }
+        
+        # The calling function is responsible for the final success message/audit.
+    }
+    
     $nonInteractive = $false
     # --- Auto-detect execution environment ---
     $executable = "python"
@@ -101,18 +122,33 @@ function Invoke-RepairExperiment {
 
     try {
         Write-Host "--- Auditing experiment to determine required action... ---" -ForegroundColor Cyan
+        # In an automatic flow, the audit result determines the action.
+        # If the audit is valid (exit code 0), it becomes an interactive flow.
+        $isInteractive = $false
         $auditArgs = @("src/experiment_manager.py", "--verify-only", $TargetDirectory, "--force-color")
-        & $executable $prefixArgs $auditArgs
+        
+        # We need to peek at the exit code first to decide if we should suppress the recommendation
+        # on the *first* audit display.
+        $peekResult = & $executable $prefixArgs $auditArgs | Out-Null
         $auditExitCode = $LASTEXITCODE
 
-        $action = ""
+        if ($auditExitCode -ne 0) {
+            # This is an automatic repair flow. Re-run the audit with the recommendation suppressed.
+            $auditArgs += "--non-interactive"
+        } else {
+            # This is an interactive flow.
+            $isInteractive = $true
+        }
+        
+        # Now display the correctly formatted audit report.
+        & $executable $prefixArgs $auditArgs
+
+        $actionTaken = $false
+        $procArgs = $null
+
         switch ($auditExitCode) {
             0 { # AUDIT_ALL_VALID
-                # The experiment is valid. Show the full audit report before prompting for a forced action.
-                Write-Host "`n--- Experiment Audit ---" -ForegroundColor Cyan
-                $fullAuditArgs = @("src/experiment_manager.py", "--verify-only", $TargetDirectory, "--force-color")
-                & $executable $prefixArgs $fullAuditArgs
-
+                # The audit report is already on screen.
                 $prompt = @"
 
 Experiment is already complete and valid.
@@ -127,100 +163,68 @@ Enter your choice (1, 2, 3, or N)
 "@
                 $choice = Read-Host -Prompt $prompt
                 switch ($choice.Trim().ToLower()) {
-                    '1' {
-                        # Display a two-line, colored confirmation prompt.
+                    '1' { # Force Full Repair
                         Write-Host "WARNING: This will delete all LLM responses in '$TargetDirectory' and re-run them." -ForegroundColor Red
                         Write-Host "Are you absolutely sure that you want to OVERWRITE the existing LLM responses? (Type 'YES' to confirm): " -NoNewline -ForegroundColor Red
                         $confirm = Read-Host
-                        
                         if ($confirm.Trim() -ceq 'YES') {
-                            Write-Host "" # Add a blank line for clean separation.
-                            Write-Host "Deleting LLM responses..." -ForegroundColor Yellow
+                            Write-Host ""; Write-Host "Deleting LLM responses..." -ForegroundColor Yellow
                             Get-ChildItem -Path $TargetDirectory -Filter "llm_response_*.txt" -Recurse | Remove-Item -Force
-                            Write-Host "`nForcing data repair..." -ForegroundColor Cyan
-                            $action = "repair"
-                            $nonInteractive = $true # Set the flag to skip the next prompt
-                        } else {
-                            Write-Host "" # Add a blank line for clean separation.
-                            Write-Host "Action aborted by user." -ForegroundColor Yellow
-                            Write-Host "" # Add a final blank line before returning to the PS prompt.
-                            return
-                        }
+                            Write-Host "`n--- Starting experiment repair/resumption... ---" -ForegroundColor Cyan
+                            $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
+                        } else { Write-Host "`nAction aborted by user." -ForegroundColor Yellow; return }
                     }
-                    '2' {
-                        Write-Host "`nProceeding with forced update (full reprocess) as requested..." -ForegroundColor Cyan
-                        $action = "reprocess"
+                    '2' { # Force Full Update
+                        Write-Host "`n--- Starting experiment reprocessing... ---" -ForegroundColor Cyan
+                        $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
                     }
-                    '3' {
-                        Write-Host "`nProceeding with forced aggregation only..." -ForegroundColor Cyan
-                        $action = "aggregate_only"
+                    '3' { # Force Aggregation
+                        Write-Host "`n--- Starting experiment finalization... ---" -ForegroundColor Cyan
+                        Invoke-FinalizeExperiment-Local
+                        $actionTaken = $true
                     }
-                    'n' {
-                        Write-Host "No action taken." -ForegroundColor Yellow
-                        Write-Host ""
-                        return
-                    }
-                    default {
-                        Write-Warning "Invalid choice. No action taken."
-                        Write-Host ""
-                        return
-                    }
+                    'n' { Write-Host "No action taken." -ForegroundColor Yellow; return }
+                    default { Write-Warning "Invalid choice. No action taken."; return }
                 }
             }
             1 { # AUDIT_NEEDS_REPROCESS
-                $action = "reprocess"
-                $nonInteractive = $true
+                Write-Host "`n--- Starting experiment reprocessing... ---" -ForegroundColor Cyan
+                $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
             }
             2 { # AUDIT_NEEDS_REPAIR
-                $action = "repair"
-                $nonInteractive = $true
+                Write-Host "`n--- Starting experiment repair/resumption... ---" -ForegroundColor Cyan
+                $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
             }
             3 { # AUDIT_NEEDS_MIGRATION
-                Write-Error "This experiment is a legacy version and requires migration. Please run 'migrate_experiment.ps1' on this directory."
-                exit 1
+                Write-Error "This experiment is a legacy version and requires migration. Please run 'migrate_experiment.ps1' on this directory."; exit 1
             }
-            default {
-                throw "Audit script failed unexpectedly with exit code $auditExitCode. Cannot proceed."
+            4 { # AUDIT_NEEDS_AGGREGATION
+                Write-Host "`n--- Starting experiment finalization... ---" -ForegroundColor Cyan
+                Invoke-FinalizeExperiment-Local
+                $actionTaken = $true
             }
+            default { throw "Audit script failed unexpectedly with exit code $auditExitCode. Cannot proceed." }
         }
 
-        # Execute the determined action
-        if ($action -eq "reprocess") {
-            Write-Host "`n--- Starting experiment reprocessing... ---" -ForegroundColor Cyan
-            $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory)
-            if ($Verbose.IsPresent) { $procArgs += "--verbose" }
-            if ($Notes) { $procArgs += "--notes", $Notes }
-            $procArgs += "--force-color"
-
-            & $executable $prefixArgs $procArgs
-            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Re-processing failed with exit code $LASTEXITCODE" }
-
-        } elseif ($action -eq "repair") {
-            Write-Host "`n--- Starting experiment repair/resumption... ---" -ForegroundColor Cyan
-            $procArgs = @("src/experiment_manager.py", $TargetDirectory)
-            if ($nonInteractive) { $procArgs += "--non-interactive" }
+        # If a python process was configured, run it now.
+        if ($procArgs) {
             if ($StartRep) { $procArgs += "--start-rep", $StartRep }
             if ($EndRep) { $procArgs += "--end-rep", $EndRep }
             if ($Notes) { $procArgs += "--notes", $Notes }
             if ($Verbose.IsPresent) { $procArgs += "--verbose" }
             
             & $executable $prefixArgs $procArgs
-            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Repair failed with exit code $LASTEXITCODE" }
-        
-        } elseif ($action -eq "aggregate_only") {
-            Write-Host "`n--- Finalizing batch run log... ---" -ForegroundColor Cyan
-            $logArgs = @("src/replication_log_manager.py", "finalize", $TargetDirectory)
-            & $executable $prefixArgs $logArgs
-            if ($LASTEXITCODE -ne 0) { throw "Log finalization failed with exit code $LASTEXITCODE" }
-
-            Write-Host "`n--- Aggregating experiment results... ---" -ForegroundColor Cyan
-            $aggArgs = @("src/compile_experiment_results.py", $TargetDirectory)
-            & $executable $prefixArgs $aggArgs
-            if ($LASTEXITCODE -ne 0) { throw "Result aggregation failed with exit code $LASTEXITCODE" }
+            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Repair process failed with exit code $LASTEXITCODE" }
+            $actionTaken = $true
         }
 
-        # The Python script now handles its own final success message and trailing newline.
-        # No extra output is needed from the PowerShell wrapper.
+        # If any action was successfully taken, run a final verification to confirm the new state.
+        if ($actionTaken) {
+            Write-Host "`n--- Verifying final experiment state... ---" -ForegroundColor Cyan
+            $finalAuditArgs = @("src/experiment_manager.py", "--verify-only", $TargetDirectory, "--force-color")
+            & $executable $prefixArgs $finalAuditArgs
+        }
+
     } catch {
         Write-Error "An error occurred during the repair/update process: $($_.Exception.Message)"
         exit 1
