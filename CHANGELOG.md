@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.2.0 (2025-07-28)
+
+### Bump
+
+- **version 3.1.0 → 3.2.0**
+
+### Features
+
+- **Introduce new Create/Check/Fix user interface**
+  This commit overhauls the user workflow to be more intuitive and robust by adopting a "Create -> Check -> Fix" model. It deprecates the confusing `run_experiment.ps1` and `update_experiment.ps1` scripts in favor of a single, intelligent `repair_experiment.ps1` tool.
+  
+  Key Changes:
+  - New `repair_experiment.ps1`: A unified "fix-it" script for all existing experiments. It automatically detects and fixes issues (e.g., missing data, outdated analysis) and provides an interactive prompt to force actions on already valid experiments.
+  - Deprecations: `run_experiment.ps1` and `update_experiment.ps1` are now removed.
+  - Smarter Backend (`experiment_manager.py`):
+    - Implemented non-destructive config file repair.
+    - Streamlined the main state-machine loop to eliminate redundant audit reports for a cleaner UI.
+  - Bug Fixes:
+    - Corrected an issue in `restore_config.py` that wrote numbers with incorrect zero-padding.
+    - Removed the creation of unnecessary `.bak` files from `replication_log_manager.py`.
+  - Documentation Overhaul:
+    - Updated `DOCUMENTATION.template.md`, `CONTRIBUTING.md`, and all relevant diagrams to reflect the new workflow.
+    - Updated script docstrings.
+    - Added `cover_letter.md` to the DOCX build process in `build_docs.py`.
+    - Renamed `study_supplement.md` to `study_supplements.md` for clarity.
 ## 3.1.0 (2025-07-27)
 
 ### Bump
