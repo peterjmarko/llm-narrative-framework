@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.3.1 (2025-07-28)
+
+### Bump
+
+- **version 3.3.0 → 3.3.1**
+
+### Documentation
+
+- **update contribution and release guidelines**
+  Aligns CONTRIBUTING.md with the automated pdm run release script and clarifies dependency installation instructions.
+
+### Fixes
+
+- **harden powershell wrappers and improve messaging**
+  - Hardens PowerShell wrappers (audit, migrate) by trimming and validating the -TargetDirectory path to prevent crashes from whitespace or invalid paths.
+  - Fixes argument passing to the Python backend in migrate_experiment.ps1.
+  - Resolves an unhandled state bug in experiment_manager.py that caused migration to fail during finalization.
+  - Refines user-facing prompts and removes redundant banners for a cleaner UX.
+  - Corrects a Mermaid diagram parsing error.
 ## 3.3.0 (2025-07-28)
 
 ### Bump
