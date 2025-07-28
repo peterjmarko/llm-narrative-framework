@@ -93,27 +93,32 @@ function Format-LogFile {
 
 # --- Main Script Logic ---
 try {
+    # Clean and validate the input path to prevent errors from hidden characters or typos.
+    $TargetDirectory = $TargetDirectory.Trim()
+    if (-not (Test-Path $TargetDirectory -PathType Container)) {
+        throw "The specified TargetDirectory '$TargetDirectory' does not exist as a directory relative to the current location: '$(Get-Location)'"
+    }
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
 
     $scriptName = "src/experiment_manager.py"
-    $arguments = @("--verify-only", $ResolvedPath)
+    # Build the argument list for the python script itself.
+    $pythonScriptArgs = @($ResolvedPath, "--verify-only")
     if ($Verbose) {
-        $arguments += "--verbose"
+        $pythonScriptArgs += "--verbose"
     }
     # Force the python script to generate color for stream processing
-    $arguments += "--force-color"
-    $finalArgs = $prefixArgs + $scriptName + $arguments
+    $pythonScriptArgs += "--force-color"
 
     # Define the log file path
     $LogFilePath = Join-Path $ResolvedPath "audit_log.txt"
     Write-Host "`nAudit report will be saved to: $LogFilePath" -ForegroundColor DarkCyan
     if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
 
-    Write-Host "Executing: $executable $($finalArgs -join ' ')"
+    Write-Host "Executing: $executable $($prefixArgs -join ' ') $scriptName $($pythonScriptArgs -join ' ')"
 
     # Execute the python script, stream its output to both the console and the log file,
     # and capture the exit code.
-    & $executable $finalArgs *>&1 | Tee-Object -FilePath $LogFilePath
+    & $executable $prefixArgs $scriptName $pythonScriptArgs *>&1 | Tee-Object -FilePath $LogFilePath
     $pythonExitCode = $LASTEXITCODE
 
     Format-LogFile -Path $LogFilePath
@@ -126,7 +131,10 @@ catch {
     Write-Host "### AUDIT FAILED ###" -ForegroundColor Red
     Write-Host "######################################################`n" -ForegroundColor Red
     Write-Error $_.Exception.Message
-    Format-LogFile -Path $LogFilePath
+    # Only attempt to format the log if the path was successfully created and exists.
+    if ($LogFilePath -and (Test-Path $LogFilePath)) {
+        Format-LogFile -Path $LogFilePath
+    }
     exit 1
 }
 

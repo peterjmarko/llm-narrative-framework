@@ -152,11 +152,11 @@ function Invoke-RepairExperiment {
                 $prompt = @"
 
 Experiment is already complete and valid.
-Do you want to force an action?
+Do you still want to proceed with repair?
 
-(1) Force Full Repair: Deletes all LLM responses and re-runs API calls. (Expensive & Destructive)
-(2) Force Full Update: Re-runs analysis on existing data for all replications. (Safe)
-(3) Force Aggregation Only: Re-creates only the top-level summary files. (Fastest)
+(1) Full Repair: Deletes all LLM responses and re-runs all API calls. (Expensive & Destructive)
+(2) Full Update: Re-runs analysis on existing data for all replications. (Quick & Safe)
+(3) Aggregation Only: Re-creates only the top-level summary files. (Fastest)
 (N) No Action
 
 Enter your choice (1, 2, 3, or N)

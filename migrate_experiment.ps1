@@ -24,23 +24,23 @@
     Copies a legacy experiment to a new, timestamped directory and upgrades it.
 
 .DESCRIPTION
-    This script performs a safe, non-destructive migration. It takes a source
+    This script performs a safe, non-destructive migration. It takes a target
     legacy experiment directory, copies it to a new timestamped folder within
     'output/migrated_experiments/', and then runs the migration process on the
     new copy. The original data is left untouched.
 
-.PARAMETER SourceDirectory
+.PARAMETER TargetDirectory
     The path to the root of the old experiment directory that needs to be migrated.
 
 .EXAMPLE
     # Copy and migrate "Legacy_Experiment_1"
     # This creates a folder like "output/migrated_experiments/Legacy_Experiment_1_migrated_20250712_103000"
-    .\migrate_experiment.ps1 -SourceDirectory "output/legacy/Legacy_Experiment_1"
+    .\migrate_experiment.ps1 -TargetDirectory "output/legacy/Legacy_Experiment_1"
 #>
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the source legacy experiment directory to migrate.")]
-    [string]$SourceDirectory
+    [string]$TargetDirectory
 )
 
 # --- Helper function to create standardized headers ---
@@ -92,43 +92,65 @@ $AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt in 
 
 # --- Main Script Logic ---
 try {
-    # 0. Audit Source Experiment
-    Write-Header -Lines "Auditing Source Experiment" -Color Cyan
+    # Clean and validate the input path to prevent errors from hidden characters or typos.
+    $TargetDirectory = $TargetDirectory.Trim()
+    if (-not (Test-Path $TargetDirectory -PathType Container)) {
+        throw "The specified TargetDirectory '$TargetDirectory' does not exist as a directory relative to the current location: '$(Get-Location)'"
+    }
+    
+    # 0. Audit Target Experiment
 
-    $SourcePath = Resolve-Path -Path $SourceDirectory -ErrorAction Stop
+    $TargetPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
     $scriptName = "src/experiment_manager.py"
-    $auditArgs = "--verify-only", $SourcePath
-    $finalAuditArgs = $prefixArgs + $scriptName + $auditArgs
+    # Corrected argument order: path must come before the flag for the parser.
+    $pythonScriptArgs = $TargetPath, "--verify-only"
 
-    Write-Host "Auditing: $executable $($finalAuditArgs -join ' ')"
-    & $executable $finalAuditArgs
+    # Execute by passing executable, prefix args, script name, and script args separately.
+    # This robustly handles argument splatting in PowerShell.
+    Write-Host "Auditing..." -ForegroundColor DarkGray
+    & $executable $prefixArgs $scriptName $pythonScriptArgs
 
     $pythonExitCode = $LASTEXITCODE # Capture exit code from the audit command
 
-    # Determine message and color based on audit result
-    $summaryMessage = ""
-    $summaryColor = "Green"
-    $shouldExitImmediately = $false
+    # This helper function standardizes the Y/N prompt.
+    function Confirm-Proceed {
+        param([string]$Prompt)
+        while ($true) {
+            $choice = Read-Host -Prompt $Prompt
+            if ($choice.Trim().ToLower() -eq 'y') { return $true }
+            if ($choice.Trim().ToLower() -eq 'n') { return $false }
+        }
+    }
 
+    # Handle user interaction based on the audit result.
     switch ($pythonExitCode) {
         $AUDIT_ALL_VALID {
-            $summaryMessage = "Experiment is in mint condition. No action is required by this script."
-            $summaryColor = "Green"
-            $shouldExitImmediately = $true
+            # The audit report itself is the message. Give user option to force migration.
+            $prompt = "`nExperiment is already complete and valid. Do you still want to force a migration? (Y/N): "
+            if (-not (Confirm-Proceed -Prompt $prompt)) {
+                Write-Host "`nNo action taken." -ForegroundColor Yellow
+                exit 0
+            }
         }
         $AUDIT_NEEDS_REPROCESS {
-            $summaryMessage = "Reprocessing Recommended. This script will perform a full migration, which involves first copying the data and then transforming the new copy."
-            $summaryDetails = "For analysis updates *without* migration, use 'update_experiment.ps1' instead."
-            $summaryColor = "Yellow"
+            Write-Host "`nReprocessing Recommended. This script will copy the data then perform a migration." -ForegroundColor Yellow
+            Write-Host "For analysis updates *without* migration, use 'repair_experiment.ps1' instead." -ForegroundColor Yellow
+            if (-not (Confirm-Proceed -Prompt "`nDo you wish to proceed? (Y/N): ")) {
+                Write-Host "`nMigration aborted by user." -ForegroundColor Red; exit 1
+            }
         }
         $AUDIT_NEEDS_REPAIR {
-            $summaryMessage = "Critical Repair Recommended. This script will attempt to fix issues via a full migration, which involves first copying the data and then transforming the new copy."
-            $summaryDetails = "For automatic repair *without* migration, use 'run_experiment.ps1' instead."
-            $summaryColor = "Red"
+            Write-Host "`nCritical Repair Recommended. This script will copy the data then perform a migration." -ForegroundColor Red
+            Write-Host "For automatic repair *without* migration, use 'repair_experiment.ps1' instead." -ForegroundColor Red
+            if (-not (Confirm-Proceed -Prompt "`nDo you wish to proceed? (Y/N): ")) {
+                Write-Host "`nMigration aborted by user." -ForegroundColor Red; exit 1
+            }
         }
         $AUDIT_NEEDS_MIGRATION {
-            $summaryMessage = "Migration Required. This script will proceed with a full migration, which involves first copying the data and then transforming the new copy."
-            $summaryColor = "Yellow"
+            Write-Host "`nMigration Required. This script will copy the data then perform a migration." -ForegroundColor Yellow
+            if (-not (Confirm-Proceed -Prompt "`nDo you wish to proceed? (Y/N): ")) {
+                Write-Host "`nMigration aborted by user." -ForegroundColor Red; exit 1
+            }
         }
         default {
             Write-Header -Lines "Audit FAILED: Unknown or unexpected exit code: ${pythonExitCode}." -Color Red
@@ -136,43 +158,12 @@ try {
             exit 1
         }
     }
-
-    # Print the audit summary banner
-    Write-Header -Lines @("Audit Summary:", "(See detailed report above)") -Color $summaryColor
-    
-    # Print the action message below the banner for better flow
-    Write-Host "$summaryMessage" -ForegroundColor $summaryColor
-    if ($summaryDetails) {
-        Write-Host "$summaryDetails" -ForegroundColor $summaryColor
-    }
-
-    # Prompt for user review and then confirmation if needed
-    if ($shouldExitImmediately) {
-        Write-Host "`n$(Read-Host "Press Enter to review the audit report, then continue to exit...")`n"
-        exit 0
-    } else {
-        $proceed = $false
-        while ($true) {
-            $choice = Read-Host "`nDo you wish to proceed with the full migration? (Y/N)"
-            $cleanChoice = $choice.Trim().ToLower()
-            if ($cleanChoice -eq 'y') {
-                $proceed = $true
-                break
-            }
-            if ($cleanChoice -eq 'n') {
-                break
-            }
-        }
-        if (-not $proceed) {
-            Write-Host "`nMigration aborted by user." -ForegroundColor Red
-            exit 1
-        }
-    }
+    # If script execution reaches this point, the user has confirmed they want to proceed.
 
     # 1. Resolve source and automatically determine destination
-    $SourceBaseName = (Get-Item -Path $SourcePath).Name
+    $TargetBaseName = (Get-Item -Path $TargetPath).Name
     $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $NewFolderName = "${SourceBaseName}_migrated_${Timestamp}"
+    $NewFolderName = "${TargetBaseName}_migrated_${Timestamp}"
     $DestinationParent = "output/migrated_experiments"
     $DestinationPath = Join-Path -Path $DestinationParent -ChildPath $NewFolderName
 
@@ -183,22 +174,20 @@ try {
 
     # 2. Copy the experiment to the new location
     Write-Header -Lines "Step 1/2: Copying Experiment Data" -Color Cyan
-    Write-Host "Source:"
-    Write-Host "             $SourcePath"
-    Write-Host "Destination:"
-    Write-Host "             $DestinationPath"
-    Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
+    $relativeSource = (Resolve-Path $TargetPath -Relative).TrimStart(".\")
+    # The destination path is already a relative string; display it before creation.
+    Write-Host "Source:      $relativeSource"
+    Write-Host "Destination: $DestinationPath"
+    Copy-Item -Path $TargetPath -Destination $DestinationPath -Recurse -Force
     Write-Host "`nCopy complete."
 
     # 3. Run the migration process on the new copy
     Write-Header -Lines "Step 2/2: Transforming New Experiment Copy" -Color Cyan
     
     $scriptName = "src/experiment_manager.py"
-    $arguments = "--migrate", $DestinationPath
-    $finalArgs = $prefixArgs + $scriptName + $arguments
+    $pythonScriptArgs = $DestinationPath, "--migrate", "--quiet"
 
-    Write-Host "Executing: $executable $($finalArgs -join ' ')"
-    & $executable $finalArgs
+    & $executable $prefixArgs $scriptName $pythonScriptArgs
 
     # Check if the experiment_manager.py exited with a user-abort code.
     if ($LASTEXITCODE -eq $AUDIT_ABORTED_BY_USER) {
@@ -209,17 +198,26 @@ try {
         throw "ERROR: Migration process failed with exit code ${LASTEXITCODE}."
     }
 
-    # The experiment_manager.py script has already performed its own final, successful
-    # validation before exiting. A separate audit here is redundant. We can proceed
-    # directly to the success message.
+    # Run a final, conclusive audit on the newly migrated directory to verify success.
+    $finalAuditArgs = $DestinationPath, "--verify-only", "--force-color"
+    & $executable $prefixArgs $scriptName $finalAuditArgs
 
-    Write-Header -Lines @("Migration Finished Successfully!", "Migrated data is in:", "'$($DestinationPath)'") -Color Green
+    if ($LASTEXITCODE -ne 0) {
+        # This should not happen if the manager succeeded, but it's a critical safety check.
+        Write-Header -Lines @("VALIDATION FAILED!", "Migration completed, but the final result is not valid.", "Please check the audit report above for details.") -Color Red
+        exit 1
+    }
+
+    # The final audit report serves as the success message.
+    $relativeDest = (Resolve-Path $DestinationPath -Relative).TrimStart(".\")
+    Write-Host "`nMigration process complete. Migrated data is in: '$relativeDest'`n" -ForegroundColor Green
 
 }
 catch {
     Write-Header -Lines "MIGRATION FAILED" -Color Red
-    # Write the specific exception message in red text for clarity.
-    Write-Host $_.Exception.Message -ForegroundColor Red
+    # Handle both string errors from 'throw' and full exception objects.
+    $errorMessage = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { $_ }
+    Write-Host $errorMessage -ForegroundColor Red
     exit 1
 }
 

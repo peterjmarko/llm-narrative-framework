@@ -542,7 +542,7 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
 
     return is_complete, details
 
-def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress_exit: bool = False, print_report: bool = True, is_verify_only_cli: bool = False, suppress_recommendation: bool = False, suppress_header: bool = False) -> int:
+def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress_exit: bool = False, print_report: bool = True, is_verify_only_cli: bool = False, suppress_recommendation: bool = False, suppress_header: bool = False, quiet_mode: bool = False) -> int:
     """
     Runs a read-only verification and prints a detailed summary table.
     Can suppress exiting for internal use by the state machine.
@@ -551,7 +551,7 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
         int: An audit exit code (AUDIT_ALL_VALID, AUDIT_NEEDS_REPROCESS, etc.).
     """
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = colors.values()
-    if print_report:
+    if print_report and not quiet_mode:
         relative_path = os.path.relpath(target_dir, PROJECT_ROOT)
         if not suppress_header:
             print(f"\n{C_CYAN}{'#'*80}{C_RESET}")
@@ -658,11 +658,11 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
             if audit_result_code == AUDIT_NEEDS_REPROCESS:
                 exp_status_color = C_YELLOW
                 exp_status_suffix = " (Outdated)"
-        elif audit_result_code == AUDIT_NEEDS_REPROCESS:
-            # Covers the case where reps are valid but aggregation is missing.
+        elif audit_result_code == AUDIT_NEEDS_REPROCESS or audit_result_code == AUDIT_NEEDS_AGGREGATION:
+            # Covers cases that need an update or just finalization.
             exp_status_color = C_YELLOW
         else:
-            # Covers repair needed, migration needed, or other errors.
+            # Covers repair needed or other critical errors.
             exp_status_color = C_RED
 
         # Determine the final audit message and recommendation
@@ -681,7 +681,7 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
         elif audit_result_code == AUDIT_NEEDS_AGGREGATION:
             audit_message = "Audit Result: Experiment needs FINALIZATION."
             audit_recommendation = "Recommendation: Run `repair_experiment.ps1` to finalize the experiment."
-            audit_color = C_RED
+            audit_color = C_YELLOW # This was already correct, but confirming it.
         elif audit_result_code == AUDIT_ALL_VALID:
             audit_message = "Audit Result: PASSED. Experiment is complete and valid."
             audit_recommendation = "Recommendation: No further action is required."
@@ -940,12 +940,13 @@ def _run_migrate_mode(target_dir, patch_script, orchestrator_script, colors, ver
     C_GREEN = colors['green']
     C_YELLOW = colors['yellow']
     C_RESET = colors['reset']
+    relative_path = os.path.relpath(target_dir, PROJECT_ROOT)
     print(f"{C_YELLOW}--- Entering MIGRATE Mode: Transforming experiment at: ---{C_RESET}")
-    print(f"{C_YELLOW}{target_dir}{C_RESET}")
+    print(f"{C_YELLOW}{relative_path}{C_RESET}")
     run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
 
     # Sub-step 1: Clean Artifacts (Run this first to remove corrupt files)
-    print("\n- Cleaning old summary files and corrupted analysis artifacts...")
+    print("\n- Cleaning old summary files and analysis artifacts...")
     try:
         files_to_delete = ["final_summary_results.csv", "batch_run_log.csv", "EXPERIMENT_results.csv"]
         for file in files_to_delete:
@@ -1020,7 +1021,7 @@ def _handle_experiment_state(state_overall_status, payload_details, final_output
     # In interactive mode (the default), print a verification header and the full audit.
     # In non-interactive mode (for automatic repairs), get the audit code silently.
     should_print_report = not args.non_interactive
-    if should_print_report:
+    if should_print_report and not is_migration_run:
         line_separator = "#" * 80
         print(f"\n{C_CYAN}{line_separator}{C_RESET}")
         verification_header = _format_header(f"VERIFICATION CYCLE {loop_count}/{max_loops}")
@@ -1028,8 +1029,9 @@ def _handle_experiment_state(state_overall_status, payload_details, final_output
         print(f"{C_CYAN}{line_separator}{C_RESET}")
     
     # Always run the audit logic, but only print the report if not in non-interactive mode.
-    # The header is suppressed if the report body is suppressed.
-    audit_result_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print_report, is_verify_only_cli=False, suppress_recommendation=(args.non_interactive or is_migration_run), suppress_header=not should_print_report)
+    # The header is suppressed if the report body is suppressed. The quiet_mode flag
+    # is set for migrations to suppress the main audit banner during internal verification.
+    audit_result_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print_report, is_verify_only_cli=False, suppress_recommendation=(args.non_interactive or is_migration_run), suppress_header=not should_print_report, quiet_mode=is_migration_run)
 
     if audit_result_code == AUDIT_NEEDS_MIGRATION:
         print(f"\n{C_RED}Halting due to MIGRATION required status.{C_RESET}")
@@ -1079,6 +1081,12 @@ def _handle_experiment_state(state_overall_status, payload_details, final_output
         else:
             print(f"\n{C_RED}Update aborted by user. Exiting.{C_RESET}")
             sys.exit(AUDIT_ABORTED_BY_USER)
+    
+    elif audit_result_code == AUDIT_NEEDS_AGGREGATION:
+        # This state is expected when replications are valid but the experiment isn't finalized.
+        # The correct action is to break the loop and let the finalization step run.
+        print(f"{C_GREEN}--- All replications are valid. Proceeding to finalization. ---{C_RESET}")
+        should_break = True
     
     elif audit_result_code == AUDIT_ALL_VALID:
         print(f"{C_GREEN}--- Experiment is COMPLETE. Proceeding to finalization. ---{C_RESET}")
@@ -1289,7 +1297,7 @@ def main():
         if args.verify_only:
             # When --verify-only is called from the CLI, print the report unless --quiet is also passed.
             should_print = not args.quiet
-            exit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print, is_verify_only_cli=True, suppress_recommendation=args.non_interactive)
+            exit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print, is_verify_only_cli=True, suppress_recommendation=args.non_interactive, quiet_mode=args.quiet)
             sys.exit(exit_code)
 
         if args.migrate:

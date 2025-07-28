@@ -149,7 +149,7 @@ This utility workflow provides a safe, non-destructive process to transform olde
 3.  **Transform Copy**: The script calls `experiment_manager.py --migrate` on the new copy. The manager then automates the internal transformation, including patching configurations, reprocessing all runs, and running its self-healing loop until the new experiment copy is valid.
 4.  **Final Validation**: The wrapper script runs a final read-only audit on the newly migrated experiment, providing explicit confirmation that the process was successful.
 
-{{grouped_figure:docs/diagrams/flow_4_migrate_data.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
+{{grouped_figure:docs/diagrams/flow_4_migrate_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
 
 
 #### Workflow 5: Audit a Study
@@ -319,9 +319,9 @@ The script will run an audit, identify the problem (e.g., missing responses, out
 
 **To interactively force an action on a valid experiment:**
 If you run the script on a complete and valid experiment, it will present an interactive menu allowing you to force one of three actions:
-*   **Full Data Repair**: A destructive action that deletes all LLM responses and re-runs the API calls.
-*   **Analysis Update**: A safe action that re-runs only the analysis and reporting stages on existing data.
-*   **Re-aggregation**: A fast action that re-creates only the top-level experiment summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`). This is useful for fixing experiment-level corruption without re-running any analysis.
+*   **Full Repair**: A destructive action that deletes all LLM responses and re-runs all API calls.
+*   **Full Update**: A safe and quick action that re-runs only the analysis and reporting stages on existing data.
+*   **Aggregation Only**: The fastest action, which re-creates only the top-level experiment summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`).
 
 ```powershell
 # Run on a valid experiment to bring up the interactive force menu
@@ -330,7 +330,7 @@ If you run the script on a complete and valid experiment, it will present an int
 
 ### Migrating Old Experiment Data (`migrate_experiment.ps1`)
 
-This script provides a safe, non-destructive workflow to upgrade older, legacy experiment directories to be compatible with the current analysis pipeline. The original data is always preserved.
+This script provides a safe, non-destructive workflow to upgrade older, legacy experiment directories to be compatible with the current analysis pipeline. The original data is always preserved. While its primary purpose is to upgrade legacy data, it can also be interactively run on a valid, modern experiment to force a full copy-and-reprocess, which can be useful for creating a modified duplicate of an experiment.
 
 ### Auditing a Study (`audit_study.ps1`)
 

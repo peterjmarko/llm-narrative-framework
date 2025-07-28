@@ -1,0 +1,30 @@
+graph TD
+    A[<b>migrate_experiment.ps1</b><br>User Entry Point]:::script --> B[<b>Audit Target Directory</b><br><small>calls experiment_manager.py --verify-only</small>]:::entry_py_alt
+
+    B --> C{Audit Result?}:::decision_alt
+
+    C -- "VALIDATED" --> D("Prompt: Force migration (Y/N)"):::prompt_style
+    C -- "NEEDS REPAIR or MIGRATION" --> E("Prompt: Proceed with migration (Y/N)"):::prompt_style
+
+    D --> F{User Confirms?}:::decision
+    E --> F
+
+    F -- No --> G((Exit)):::stop_node
+
+    F -- Yes --> H[<b>1. Copy Directory</b><br><small>Creates a clean,<br>timestamped copy</small>]:::action
+    H --> I[<b>2. Transform Copy</b><br><small>Calls experiment_manager.py<br>--migrate on the copy</small>]:::entry_py
+    I --> J[<b>3. Final Validation</b><br><small>Runs a final read-only audit<br>on the migrated copy</small>]:::script_audit
+    J --> K((Success)):::finish_node
+
+
+    %% Styling
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef entry_py_alt fill:#a7d9f7,stroke:#85b8d9,color:#333;
+    classDef decision_alt fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef prompt_style fill:#a7d9f7,stroke:#85b8d9,color:#333;
+    classDef decision fill:#d9534f,stroke:#d43f3a,color:#fff;
+    classDef action fill:#5cb85c,stroke:#4cae4c,color:#fff;
+    classDef entry_py fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef script_audit fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef stop_node fill:#fff,stroke:#d9534f,color:#d9534f;
+    classDef finish_node fill:#fff,stroke:#5cb85c,color:#5cb85c;
