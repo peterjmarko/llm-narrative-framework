@@ -1,5 +1,35 @@
 # Changelog
 
+## 3.4.0 (2025-07-29)
+
+### Bump
+
+- **version 3.3.2 → 3.4.0**
+
+### Features
+
+- **overhaul migration workflow and standardize audit engine**
+  This major update started as a refinement of the `migrate_experiment.ps1` script and evolved into a comprehensive overhaul of the project's core diagnostic engine and the user experience across all experiment-level workflows.
+  
+  ### 1. `migrate_experiment.ps1` Overhaul:
+  The script's user interaction, error handling, and diagnostic integration have been completely revamped.
+  - **Improved Clarity:** All user prompts and messages were rewritten to be more intuitive, providing clear recommendations and explaining the non-destructive copy-then-upgrade process.
+  - **Robustness:** Added handling for previously uncaught audit statuses (e.g., `AUDIT_NEEDS_AGGREGATION`), preventing crashes.
+  - **UI Polish:** Fixed numerous UI bugs related to prompt formatting, message coloring, and header consistency.
+  - **Internal Consistency:** Standardized the `-TargetDirectory` parameter across the script and all documentation, and clarified internal terminology (e.g., "Transforming" -> "Upgrading").
+  
+  ### 2. New Diagnostic Engine:
+  The deep dive into migration failures led to a new, simpler, and more robust system-wide audit rule:
+  - A run with a **single error** is considered repairable.
+  - A run with **two or more errors** is flagged as `RUN_CORRUPTED`, correctly triggering a migration recommendation for safety.
+  
+  ### 3. Workflow Standardization & Enhancements:
+  - All action-oriented scripts (`new`, `repair`, `migrate`) now conclude with a consistent, final verification audit.
+  - Standardized UI elements (PDM detection, headers) across all scripts.
+  - The "Total Valid LLM Responses" audit statistic is now color-coded based on performance thresholds (Green >= 80%, Yellow >= 50%, Red < 50%).
+  
+  ### 4. Documentation Overhaul:
+  - All relevant documentation (`DOCUMENTATION.md`, script docstrings, diagrams) has been updated to reflect the new diagnostic logic and improved workflows.
 ## 3.3.2 (2025-07-28)
 
 ### Bump
