@@ -390,12 +390,14 @@ The `migrate_experiment.ps1` script automates a copy-then-migrate process:
 
 This approach leaves the original data completely untouched.
 
+**REPLACE** it with this block:
+```markdown
 **How to use it:**
-Point the script at the source directory of the legacy experiment. The script will automatically create a timestamped destination folder.
+Point the script at the target directory of the experiment you want to migrate. The script will automatically create a timestamped destination folder for the upgraded copy.
 
 ```powershell
-# Migrate data from "Legacy_Experiment_1", saving the result to a new timestamped folder.
-.\migrate_experiment.ps1 -SourceDirectory "output/legacy/Legacy_Experiment_1"
+# Target "Legacy_Experiment_1" for migration, saving the result to a new timestamped folder.
+.\migrate_experiment.ps1 -TargetDirectory "output/legacy/Legacy_Experiment_1"
 ```
 
 ### Processing a Study (`process_study.ps1`)

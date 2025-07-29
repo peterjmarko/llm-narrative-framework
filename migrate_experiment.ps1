@@ -21,16 +21,17 @@
 
 <#
 .SYNOPSIS
-    Copies a legacy experiment to a new, timestamped directory and upgrades it.
+    Targets an experiment directory, creates a safe copy, and upgrades the copy.
 
 .DESCRIPTION
-    This script performs a safe, non-destructive migration. It takes a target
-    legacy experiment directory, copies it to a new timestamped folder within
-    'output/migrated_experiments/', and then runs the migration process on the
-    new copy. The original data is left untouched.
+    This script performs a safe, non-destructive migration. It targets an
+    experiment directory, copies it to a new timestamped folder within
+    'output/migrated_experiments/', and then runs the full migration and
+    validation process on the new copy. The original data is left untouched.
 
 .PARAMETER TargetDirectory
-    The path to the root of the old experiment directory that needs to be migrated.
+    The path to the experiment directory that will be targeted for migration.
+    This original directory will be copied, not modified.
 
 .EXAMPLE
     # Copy and migrate "Legacy_Experiment_1"
@@ -39,7 +40,7 @@
 #>
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the source legacy experiment directory to migrate.")]
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to migrate.")]
     [string]$TargetDirectory
 )
 
@@ -126,30 +127,28 @@ try {
     switch ($pythonExitCode) {
         $AUDIT_ALL_VALID {
             # The audit report itself is the message. Give user option to force migration.
-            $prompt = "`nExperiment is already complete and valid. Do you still want to force a migration? (Y/N): "
+            $prompt = "`nExperiment is already complete and valid. Do you still want to proceed with the migration? (Y/N): "
             if (-not (Confirm-Proceed -Prompt $prompt)) {
                 Write-Host "`nNo action taken." -ForegroundColor Yellow
                 exit 0
             }
         }
         $AUDIT_NEEDS_REPROCESS {
-            Write-Host "`nReprocessing Recommended. This script will copy the data then perform a migration." -ForegroundColor Yellow
-            Write-Host "For analysis updates *without* migration, use 'repair_experiment.ps1' instead." -ForegroundColor Yellow
-            if (-not (Confirm-Proceed -Prompt "`nDo you wish to proceed? (Y/N): ")) {
-                Write-Host "`nMigration aborted by user." -ForegroundColor Red; exit 1
+            Write-Host "`nWe recommend that you exit at the next prompt by typing 'N' and run 'repair_experiment.ps1' instead to update your original data.`nMigration will first copy the data and then update the copy."
+            if (-not (Confirm-Proceed -Prompt "`nDo you still want to proceed with migration? (Y/N)")) {
+                Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; exit 1
             }
         }
         $AUDIT_NEEDS_REPAIR {
-            Write-Host "`nCritical Repair Recommended. This script will copy the data then perform a migration." -ForegroundColor Red
-            Write-Host "For automatic repair *without* migration, use 'repair_experiment.ps1' instead." -ForegroundColor Red
-            if (-not (Confirm-Proceed -Prompt "`nDo you wish to proceed? (Y/N): ")) {
-                Write-Host "`nMigration aborted by user." -ForegroundColor Red; exit 1
+            Write-Host "`nWe recommend that you exit at the next prompt by typing 'N' and run 'repair_experiment.ps1' instead to repair your original data.`nMigration will first copy the data and then repair the copy."
+            if (-not (Confirm-Proceed -Prompt "`nDo you still want to proceed with migration? (Y/N)")) {
+                Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; exit 1
             }
         }
         $AUDIT_NEEDS_MIGRATION {
-            Write-Host "`nMigration Required. This script will copy the data then perform a migration." -ForegroundColor Yellow
+            Write-Host "`nMigration Required. This script will copy the data then perform an upgrade." -ForegroundColor Yellow
             if (-not (Confirm-Proceed -Prompt "`nDo you wish to proceed? (Y/N): ")) {
-                Write-Host "`nMigration aborted by user." -ForegroundColor Red; exit 1
+                Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; exit 1
             }
         }
         default {

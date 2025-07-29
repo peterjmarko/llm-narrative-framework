@@ -695,8 +695,12 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
                 print(f"Experiment Directory: {relative_path}")
                 print(f"Replication Status:")
                 print(f"  - {'Total Runs Verified:':<32}{len(run_dirs)}")
-                print(f"  - {'Total Runs Complete (Pipeline):':<32}{total_complete_runs}/{len(run_dirs)}")
-                print(f"  - {'Total Valid LLM Responses:':<32}{total_valid_responses}/{total_expected_trials} ({completeness:.2f}%)")
+
+                runs_complete_color = C_GREEN if total_complete_runs == len(run_dirs) else C_RED
+                print(f"  - {'Total Runs Complete (Pipeline):':<32}{runs_complete_color}{total_complete_runs}/{len(run_dirs)}{C_RESET}")
+
+                responses_complete_color = C_GREEN if total_valid_responses == total_expected_trials else C_RED
+                print(f"  - {'Total Valid LLM Responses:':<32}{responses_complete_color}{total_valid_responses}/{total_expected_trials} ({completeness:.2f}%){C_RESET}")
 
                 print(f"Experiment Aggregation Status: {exp_status_color}{exp_status_str_base}{exp_status_suffix}{C_RESET}")
 
