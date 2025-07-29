@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.3.2 (2025-07-28)
+
+### Bump
+
+- **version 3.3.1 → 3.3.2**
+
+### Fixes
+
+- **refine migration workflow and audit report UI**
+  This commit resolves several UI inconsistencies and improves the user experience for the migration and audit workflows.
+  
+  Key changes include:
+  - Standardized `migrate_experiment.ps1` to consistently use the `-TargetDirectory` parameter, aligning the code with its documentation.
+  - Reworded user prompts in `migrate_experiment.ps1` to provide clearer recommendations when an experiment needs repair or reprocessing.
+  - Corrected message coloring for prompts and the "aborted by user" notice to improve readability.
+  - Added color-coding to the "Overall Summary" statistics in audit reports for immediate visual feedback on experiment completeness.
 ## 3.3.1 (2025-07-28)
 
 ### Bump
