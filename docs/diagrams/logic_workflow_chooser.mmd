@@ -23,11 +23,11 @@ graph TD
         instruction_2["*Use: audit_experiment.ps1*"]:::instruction_node
 
         %% Branch 3: Fix / Update
-        case_3["**Fix or Update**<br/>I have an experiment that is broken, incomplete, or needs its analysis updated."]:::case_node
+        case_3["**Fix or Update**<br/>I have an experiment with a single, fixable error."]:::case_node
         instruction_3["*Use: repair_experiment.ps1*"]:::instruction_node
 
         %% Branch 4: Upgrade
-        case_4["**Upgrade**<br/>I have legacy data that needs to be made compatible with the current tools."]:::case_node
+        case_4["**Upgrade**<br/>I have a legacy or severely corrupted experiment (multiple errors)."]:::case_node
         instruction_4["*Use: migrate_experiment.ps1*"]:::instruction_node
     end
 

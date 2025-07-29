@@ -21,12 +21,16 @@
 
 <#
 .SYNOPSIS
-    Provides a read-only, detailed completeness report for an experiment.
+    Provides a read-only, detailed completeness report for an existing experiment.
 
 .DESCRIPTION
-    This script is a simple wrapper that calls 'experiment_manager.py' with the
-    --verify-only flag. It audits the specified experiment directory and prints a
-    comprehensive report without making any changes.
+    This script is the primary diagnostic tool for CHECKING the status of any
+    experiment. It performs a comprehensive, read-only audit and prints a
+    detailed report, including a final recommendation for the next appropriate
+    action (e.g., 'repair_experiment.ps1' or 'migrate_experiment.ps1').
+
+    It never makes any changes to the data. The full, detailed output is also
+    saved to an 'audit_log.txt' file inside the target directory.
 
 .PARAMETER TargetDirectory
     The path to the experiment directory to audit. This is a mandatory parameter.
@@ -111,10 +115,9 @@ try {
 
     # Define the log file path
     $LogFilePath = Join-Path $ResolvedPath "audit_log.txt"
-    Write-Host "`nAudit report will be saved to: $LogFilePath" -ForegroundColor DarkCyan
+    $RelativeLogPath = (Resolve-Path $LogFilePath -Relative).TrimStart(".\")
+    Write-Host "`nAudit report will be saved to:`n$RelativeLogPath`n" -ForegroundColor DarkCyan
     if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
-
-    Write-Host "Executing: $executable $($prefixArgs -join ' ') $scriptName $($pythonScriptArgs -join ' ')"
 
     # Execute the python script, stream its output to both the console and the log file,
     # and capture the exit code.

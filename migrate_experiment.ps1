@@ -21,13 +21,15 @@
 
 <#
 .SYNOPSIS
-    Targets an experiment directory, creates a safe copy, and upgrades the copy.
+    Upgrades a legacy or severely corrupted experiment via a safe, non-destructive copy.
 
 .DESCRIPTION
-    This script performs a safe, non-destructive migration. It targets an
-    experiment directory, copies it to a new timestamped folder within
-    'output/migrated_experiments/', and then runs the full migration and
-    validation process on the new copy. The original data is left untouched.
+    This is a powerful safety utility for handling legacy data or any experiment
+    diagnosed with multiple, complex errors. It performs a non-destructive
+    migration by first creating a clean, timestamped copy of the target experiment,
+    then running the full upgrade and validation process on that copy.
+
+    The original data is always left untouched.
 
 .PARAMETER TargetDirectory
     The path to the experiment directory that will be targeted for migration.
@@ -89,6 +91,7 @@ $AUDIT_ALL_VALID       = 0 # Experiment is complete and valid.
 $AUDIT_NEEDS_REPROCESS = 1 # Experiment needs reprocessing (e.g., analysis issues).
 $AUDIT_NEEDS_REPAIR    = 2 # Experiment needs repair (e.g., missing responses, critical files).
 $AUDIT_NEEDS_MIGRATION = 3 # Experiment is legacy or malformed, requires full migration.
+$AUDIT_NEEDS_AGGREGATION = 4 # Replications valid, but experiment-level summary is missing.
 $AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt in experiment_manager.py
 
 # --- Main Script Logic ---
@@ -115,9 +118,11 @@ try {
 
     # This helper function standardizes the Y/N prompt.
     function Confirm-Proceed {
-        param([string]$Prompt)
+        param([string]$Message)
+        # The prompt format is now defined in one place. Read-Host adds the final ':'.
+        $promptText = "$Message (Y/N)"
         while ($true) {
-            $choice = Read-Host -Prompt $Prompt
+            $choice = Read-Host -Prompt $promptText
             if ($choice.Trim().ToLower() -eq 'y') { return $true }
             if ($choice.Trim().ToLower() -eq 'n') { return $false }
         }
@@ -127,27 +132,33 @@ try {
     switch ($pythonExitCode) {
         $AUDIT_ALL_VALID {
             # The audit report itself is the message. Give user option to force migration.
-            $prompt = "`nExperiment is already complete and valid. Do you still want to proceed with the migration? (Y/N): "
-            if (-not (Confirm-Proceed -Prompt $prompt)) {
-                Write-Host "`nNo action taken." -ForegroundColor Yellow
+            $message = "`nExperiment is already complete and valid. Do you still want to proceed with migration?"
+            if (-not (Confirm-Proceed -Message $message)) {
+                Write-Host "`nNo action taken.`n" -ForegroundColor Yellow
                 exit 0
             }
         }
         $AUDIT_NEEDS_REPROCESS {
-            Write-Host "`nWe recommend that you exit at the next prompt by typing 'N' and run 'repair_experiment.ps1' instead to update your original data.`nMigration will first copy the data and then update the copy."
-            if (-not (Confirm-Proceed -Prompt "`nDo you still want to proceed with migration? (Y/N)")) {
+            Write-Host "`nExperiment needs updating. We recommend that you exit at the next prompt ('N') and run 'repair_experiment.ps1' instead to update the original data.`nMigration will first copy the experiment then upgrade this copy."
+            if (-not (Confirm-Proceed -Message "`nDo you still want to proceed with migration?")) {
                 Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; exit 1
             }
         }
         $AUDIT_NEEDS_REPAIR {
-            Write-Host "`nWe recommend that you exit at the next prompt by typing 'N' and run 'repair_experiment.ps1' instead to repair your original data.`nMigration will first copy the data and then repair the copy."
-            if (-not (Confirm-Proceed -Prompt "`nDo you still want to proceed with migration? (Y/N)")) {
+            Write-Host "`nExperiment needs repair. We recommend that you exit at the next prompt ('N') and run 'repair_experiment.ps1' instead to repair your original data.`nMigration will first copy the experiment then upgrade this copy."
+            if (-not (Confirm-Proceed -Message "`nDo you still want to proceed with migration?")) {
+                Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; exit 1
+            }
+        }
+        $AUDIT_NEEDS_AGGREGATION {
+            Write-Host "`nExperiment only needs finalization. We recommend that you exit at the next prompt ('N') and run 'repair_experiment.ps1' instead to finalize the original data.`nMigration will first copy the experiment then upgrade this copy."
+            if (-not (Confirm-Proceed -Message "`nDo you still want to proceed with migration?")) {
                 Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; exit 1
             }
         }
         $AUDIT_NEEDS_MIGRATION {
-            Write-Host "`nMigration Required. This script will copy the data then perform an upgrade." -ForegroundColor Yellow
-            if (-not (Confirm-Proceed -Prompt "`nDo you wish to proceed? (Y/N): ")) {
+            Write-Host "`nMigration Required. This script will copy your original data then perform a full upgrade to complete the migration." -ForegroundColor Yellow
+            if (-not (Confirm-Proceed -Message "`nDo you wish to proceed?")) {
                 Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; exit 1
             }
         }
@@ -181,7 +192,7 @@ try {
     Write-Host "`nCopy complete."
 
     # 3. Run the migration process on the new copy
-    Write-Header -Lines "Step 2/2: Transforming New Experiment Copy" -Color Cyan
+    Write-Header -Lines "Step 2/2: Upgrading New Experiment Copy" -Color Cyan
     
     $scriptName = "src/experiment_manager.py"
     $pythonScriptArgs = $DestinationPath, "--migrate", "--quiet"

@@ -12,8 +12,8 @@ graph TD
     F -- No --> G((Exit)):::stop_node
 
     F -- Yes --> H[<b>1. Copy Directory</b><br><small>Creates a clean,<br>timestamped copy</small>]:::action
-    H --> I[<b>2. Transform Copy</b><br><small>Calls experiment_manager.py<br>--migrate on the copy</small>]:::entry_py
-    I --> J[<b>3. Final Validation</b><br><small>Runs a final read-only audit<br>on the migrated copy</small>]:::script_audit
+    H --> I[<b>2. Upgrade Copy</b><br><small>Calls experiment_manager.py<br>--migrate on the copy</small>]:::entry_py
+    I --> J[<b>3. Final Validation</b><br><small>Runs a final read-only audit<br>on the upgraded copy</small>]:::script_audit
     J --> K((Success)):::finish_node
 
 

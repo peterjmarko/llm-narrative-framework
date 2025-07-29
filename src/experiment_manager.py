@@ -424,22 +424,29 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
     if not (run_path / "REPLICATION_results.csv").exists():
         status_details.append("REPLICATION_RESULTS_MISSING")
 
-    # roll up
-    if all(d.endswith(" OK") for d in status_details):
+    # --- Roll-up Logic: Classify based on the number of issues found ---
+    failures = [d for d in status_details if not d.endswith(" OK")]
+    num_failures = len(failures)
+
+    if num_failures == 0:
         return "VALIDATED", status_details
-    if any("INVALID_NAME" in d for d in status_details):
+    
+    # If there are 2 or more distinct failures, the run is considered corrupted.
+    if num_failures >= 2:
+        return "RUN_CORRUPTED", status_details
+
+    # --- If there is exactly one failure, classify it for targeted repair ---
+    failure = failures[0]
+    if "INVALID_NAME" in failure:
         return "INVALID_NAME", status_details
-    if any("CONFIG" in d for d in status_details):
+    if "CONFIG" in failure:
         return "CONFIG_ISSUE", status_details
-    # Check for fundamental query file corruption.
-    if any("SESSION_QUERIES" in d or "MAPPINGS_MISSING" in d or "MANIFESTS_INCOMPLETE" in d for d in status_details):
+    if any(err in failure for err in ["SESSION_QUERIES", "MAPPINGS_MISSING", "MANIFESTS_INCOMPLETE"]):
         return "QUERY_ISSUE", status_details
-
-    # Check for response file corruption. An index mismatch is a symptom of a response problem if queries are OK.
-    if any("SESSION_RESPONSES" in d or "QUERY_RESPONSE_INDEX_MISMATCH" in d for d in status_details):
+    if any(err in failure for err in ["SESSION_RESPONSES", "QUERY_RESPONSE_INDEX_MISMATCH"]):
         return "RESPONSE_ISSUE", status_details
-
-    # Any other non-fatal issue is a less severe ANALYSIS_ISSUE that can be reprocessed.
+    
+    # Any other single, non-fatal issue is a less severe ANALYSIS_ISSUE.
     return "ANALYSIS_ISSUE", status_details
 
 def _get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -> tuple[str, list, dict]:
@@ -542,18 +549,24 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
 
     return is_complete, details
 
-def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress_exit: bool = False, print_report: bool = True, is_verify_only_cli: bool = False, suppress_recommendation: bool = False, suppress_header: bool = False, quiet_mode: bool = False) -> int:
+def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress_exit: bool = False, print_report: bool = True, is_verify_only_cli: bool = False, non_interactive: bool = False, quiet_mode: bool = False) -> int:
     """
     Runs a read-only verification and prints a detailed summary table.
-    Can suppress exiting for internal use by the state machine.
-    ...
+
+    Args:
+        ...
+        non_interactive (bool): If True, suppresses the main "Running Experiment Audit"
+            header and the final recommendation text. Used when the audit is
+            called from a wrapper script that provides its own context.
+        ...
     Returns:
         int: An audit exit code (AUDIT_ALL_VALID, AUDIT_NEEDS_REPROCESS, etc.).
     """
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = colors.values()
     if print_report and not quiet_mode:
         relative_path = os.path.relpath(target_dir, PROJECT_ROOT)
-        if not suppress_header:
+        # In non-interactive mode, the wrapper script provides its own header.
+        if not non_interactive:
             print(f"\n{C_CYAN}{'#'*80}{C_RESET}")
             print(f"{C_CYAN}{_format_header('Running Experiment Audit')}{C_RESET}")
             print(f"{C_CYAN}{'#'*80}{C_RESET}")
@@ -630,12 +643,15 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
                 print(f"{display_name:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
 
         # --- Determine result code based on findings from individual runs ---
-        run_statuses = {run['status'] for run in all_runs_data}
+        unique_run_statuses = {run['status'] for run in all_runs_data}
 
-        # A config issue or invalid name is a critical but repairable error, not a migration issue.
-        if "INVALID_NAME" in run_statuses or "CONFIG_ISSUE" in run_statuses or "QUERY_ISSUE" in run_statuses or "RESPONSE_ISSUE" in run_statuses:
+        # New Rule: If any run is corrupted (has multiple issues), the entire experiment needs migration.
+        if "RUN_CORRUPTED" in unique_run_statuses:
+            audit_result_code = AUDIT_NEEDS_MIGRATION
+        # Otherwise, follow the standard repair/reprocess hierarchy.
+        elif "INVALID_NAME" in unique_run_statuses or "CONFIG_ISSUE" in unique_run_statuses or "QUERY_ISSUE" in unique_run_statuses or "RESPONSE_ISSUE" in unique_run_statuses:
             audit_result_code = AUDIT_NEEDS_REPAIR
-        elif "ANALYSIS_ISSUE" in run_statuses:
+        elif "ANALYSIS_ISSUE" in unique_run_statuses:
             audit_result_code = AUDIT_NEEDS_REPROCESS
         else:  # All individual replications are valid.
             audit_result_code = AUDIT_ALL_VALID
@@ -668,7 +684,7 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
         # Determine the final audit message and recommendation
         if audit_result_code == AUDIT_NEEDS_MIGRATION:
             audit_message = "Audit Result: Experiment needs MIGRATION."
-            audit_recommendation = "Recommendation: Run `migrate_experiment.ps1` to upgrade the experiment."
+            audit_recommendation = "Recommendation: Proceed with migration to create an upgraded copy."
             audit_color = C_RED
         elif audit_result_code == AUDIT_NEEDS_REPAIR:
             audit_message = "Audit Result: Experiment needs REPAIR."
@@ -699,8 +715,14 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
                 runs_complete_color = C_GREEN if total_complete_runs == len(run_dirs) else C_RED
                 print(f"  - {'Total Runs Complete (Pipeline):':<32}{runs_complete_color}{total_complete_runs}/{len(run_dirs)}{C_RESET}")
 
-                responses_complete_color = C_GREEN if total_valid_responses == total_expected_trials else C_RED
-                print(f"  - {'Total Valid LLM Responses:':<32}{responses_complete_color}{total_valid_responses}/{total_expected_trials} ({completeness:.2f}%){C_RESET}")
+                # Determine color for LLM response rate based on thresholds
+                if completeness >= 80:
+                    responses_color = C_GREEN
+                elif completeness >= 50:
+                    responses_color = C_YELLOW
+                else:
+                    responses_color = C_RED
+                print(f"  - {'Total Valid LLM Responses:':<32}{responses_color}{total_valid_responses}/{total_expected_trials} ({completeness:.2f}%){C_RESET}")
 
                 print(f"Experiment Aggregation Status: {exp_status_color}{exp_status_str_base}{exp_status_suffix}{C_RESET}")
 
@@ -719,8 +741,8 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
             print(f"\n{line}")
             print(f"{audit_color}{msg_line}{C_RESET}")
             
-            # The recommendation line is only printed if not suppressed.
-            if not suppress_recommendation:
+            # The recommendation line is suppressed in non-interactive mode.
+            if not non_interactive:
                 rec_line = f"### {audit_recommendation.center(padding_width)} ###"
                 print(f"{audit_color}{rec_line}{C_RESET}")
             
@@ -945,7 +967,7 @@ def _run_migrate_mode(target_dir, patch_script, orchestrator_script, colors, ver
     C_YELLOW = colors['yellow']
     C_RESET = colors['reset']
     relative_path = os.path.relpath(target_dir, PROJECT_ROOT)
-    print(f"{C_YELLOW}--- Entering MIGRATE Mode: Transforming experiment at: ---{C_RESET}")
+    print(f"{C_YELLOW}--- Entering MIGRATE Mode: Upgrading experiment at: ---{C_RESET}")
     print(f"{C_YELLOW}{relative_path}{C_RESET}")
     run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
 
@@ -1035,7 +1057,14 @@ def _handle_experiment_state(state_overall_status, payload_details, final_output
     # Always run the audit logic, but only print the report if not in non-interactive mode.
     # The header is suppressed if the report body is suppressed. The quiet_mode flag
     # is set for migrations to suppress the main audit banner during internal verification.
-    audit_result_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print_report, is_verify_only_cli=False, suppress_recommendation=(args.non_interactive or is_migration_run), suppress_header=not should_print_report, quiet_mode=is_migration_run)
+    audit_result_code = _run_verify_only_mode(
+        Path(final_output_dir), end_rep, colors,
+        suppress_exit=True,
+        print_report=should_print_report,
+        is_verify_only_cli=False,
+        non_interactive=(args.non_interactive or is_migration_run),
+        quiet_mode=is_migration_run
+    )
 
     if audit_result_code == AUDIT_NEEDS_MIGRATION:
         print(f"\n{C_RED}Halting due to MIGRATION required status.{C_RESET}")
@@ -1301,7 +1330,14 @@ def main():
         if args.verify_only:
             # When --verify-only is called from the CLI, print the report unless --quiet is also passed.
             should_print = not args.quiet
-            exit_code = _run_verify_only_mode(Path(final_output_dir), end_rep, colors, suppress_exit=True, print_report=should_print, is_verify_only_cli=True, suppress_recommendation=args.non_interactive, quiet_mode=args.quiet)
+            exit_code = _run_verify_only_mode(
+                Path(final_output_dir), end_rep, colors,
+                suppress_exit=True,
+                print_report=should_print,
+                is_verify_only_cli=True,
+                non_interactive=args.non_interactive,
+                quiet_mode=args.quiet
+            )
             sys.exit(exit_code)
 
         if args.migrate:

@@ -25,16 +25,16 @@
     experiments or interactively on valid ones.
 
 .DESCRIPTION
-    This is the main "fix-it" tool for any existing experiment. It first runs a
-    comprehensive audit to diagnose the experiment's state.
+    This is the main "fix-it" tool for any experiment with a single, repairable
+    issue. It first runs a comprehensive audit to diagnose the state.
 
-    - If issues are found, it proceeds to automatically apply the correct repair
-      (e.g., re-running a failed LLM session or restoring a missing config file).
-    - If the experiment is already complete and valid, it displays the audit
-      report and presents an interactive menu to allow the user to optionally
-      force a full data repair, an analysis update, or re-aggregation.
+    - If a single, fixable error is found (e.g., missing responses, outdated analysis),
+      it automatically applies the correct repair.
+    - If the experiment is already valid, it becomes interactive, allowing the user
+      to force a data repair, analysis update, or re-aggregation.
 
-    To create a new experiment from scratch, use 'new_experiment.ps1'.
+    After any action, it concludes with a final verification audit. For legacy or
+    severely corrupted experiments (those with multiple errors), use 'migrate_experiment.ps1'.
 
 .PARAMETER TargetDirectory
     (Required) The path to the existing experiment directory that needs to be
@@ -121,7 +121,7 @@ function Invoke-RepairExperiment {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
     try {
-        Write-Host "--- Auditing experiment to determine required action... ---" -ForegroundColor Cyan
+        Write-Host "`n--- Auditing experiment to determine required action... ---" -ForegroundColor Cyan
         # In an automatic flow, the audit result determines the action.
         # If the audit is valid (exit code 0), it becomes an interactive flow.
         $isInteractive = $false
@@ -164,7 +164,7 @@ Enter your choice (1, 2, 3, or N)
                 $choice = Read-Host -Prompt $prompt
                 switch ($choice.Trim().ToLower()) {
                     '1' { # Force Full Repair
-                        Write-Host "WARNING: This will delete all LLM responses in '$TargetDirectory' and re-run them." -ForegroundColor Red
+                        Write-Host "`nWARNING: This will delete all LLM responses in '$TargetDirectory' and re-run the API sessions." -ForegroundColor Red
                         Write-Host "Are you absolutely sure that you want to OVERWRITE the existing LLM responses? (Type 'YES' to confirm): " -NoNewline -ForegroundColor Red
                         $confirm = Read-Host
                         if ($confirm.Trim() -ceq 'YES') {
@@ -172,7 +172,7 @@ Enter your choice (1, 2, 3, or N)
                             Get-ChildItem -Path $TargetDirectory -Filter "llm_response_*.txt" -Recurse | Remove-Item -Force
                             Write-Host "`n--- Starting experiment repair/resumption... ---" -ForegroundColor Cyan
                             $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
-                        } else { Write-Host "`nAction aborted by user." -ForegroundColor Yellow; return }
+                        } else { Write-Host "`nAction aborted by user.`n" -ForegroundColor Yellow; return }
                     }
                     '2' { # Force Full Update
                         Write-Host "`n--- Starting experiment reprocessing... ---" -ForegroundColor Cyan
@@ -183,8 +183,8 @@ Enter your choice (1, 2, 3, or N)
                         Invoke-FinalizeExperiment-Local
                         $actionTaken = $true
                     }
-                    'n' { Write-Host "No action taken." -ForegroundColor Yellow; return }
-                    default { Write-Warning "Invalid choice. No action taken."; return }
+                    'n' { Write-Host "`nNo action taken.`n" -ForegroundColor Yellow; return }
+                    default { Write-Warning "`nInvalid choice. No action taken.`n"; return }
                 }
             }
             1 { # AUDIT_NEEDS_REPROCESS

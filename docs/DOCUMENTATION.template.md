@@ -105,27 +105,22 @@ This workflow provides a read-only, detailed completeness report for an experime
 {{grouped_figure:docs/diagrams/flow_2_audit_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.}}
 
 ##### Interpreting the Audit Report
-The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It outputs a summary table with a high-level status for each replication run. The `Details` column provides granular error codes that pinpoint the exact problem. The final `Audit Result` and `Recommendation` suggest the next steps, if any.
+The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It uses a simple but robust rule to classify problems: the number of distinct errors found in a single replication run.
 
-**VALIDATED**  
-The run is complete and all checks passed. No action is needed.
+**Repairable Issues (Single Error)**
+If a replication run has **exactly one** identifiable problem, it is considered safe to repair in-place. The `Status` column will show a specific, targeted error code:
+*   **`INVALID_NAME`**: The run directory name is malformed.
+*   **`CONFIG_ISSUE`**: The `config.ini.archived` file is missing or has inconsistent parameters.
+*   **`QUERY_ISSUE`**: Core query files or manifests are missing.
+*   **`RESPONSE_ISSUE`**: One or more LLM response files are missing.
+*   **`ANALYSIS_ISSUE`**: All core data is present, but derivative analysis files or reports are missing/outdated.
 
-**INVALID_NAME**  
-The run directory name is malformed and does not match the required `run_*_sbj-NN_trl-NNN` pattern. This requires **repair** by running `repair_experiment.ps1`.
+Any of these single-error states will result in an overall audit recommendation to run **`repair_experiment.ps1`**.
 
-**CONFIG_ISSUE**  
-The run's `config.ini.archived` is missing, corrupted, or lacks required keys. This typically indicates a legacy experiment requiring **migration**.
+**Corrupted Runs (Multiple Errors)**
+If a replication run has **two or more** distinct problems (e.g., a missing config file *and* missing responses), it is flagged with the status `RUN_CORRUPTED`. The presence of even one corrupted run suggests a systemic issue that is safer to handle with a non-destructive copy-and-upgrade workflow. The overall audit will recommend running **`migrate_experiment.ps1`** to create a clean, repaired copy of the experiment.
 
-**QUERY_ISSUE**  
-There is a problem with the fundamental input files needed for an LLM session, such as missing query files or trial manifests. This requires **repair** by running `repair_experiment.ps1`.
-
-**RESPONSE_ISSUE**  
-The query files are intact, but one or more corresponding LLM response files are missing. This is typically caused by an interrupted run and requires **repair** by running `repair_experiment.ps1`.
-
-**ANALYSIS_ISSUE**  
-All core data files (queries, responses) are present, but there is a problem with derivative artifacts like analysis files, summary CSVs, or the final report. This also includes cases where all replications are valid but the top-level experiment aggregation files (`EXPERIMENT_results.csv`, etc.) are missing. This requires an **update** by running `repair_experiment.ps1`.
-
-The `Details` string provides specific error flags, such as `MANIFESTS_INCOMPLETE`, `QUERY_RESPONSE_INDEX_MISMATCH`, or `REPORT_INCOMPLETE_METRICS`, which help diagnose the root cause quickly.
+The `Details` string provides the specific error flags (e.g., `CONFIG_MALFORMED; RESPONSE_ISSUE_INCOMPLETE`) that led to the `RUN_CORRUPTED` classification.
 
 In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Aggregation Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`), confirming whether the last aggregation step for the experiment was successfully completed.
 
@@ -142,12 +137,12 @@ This workflow is the main "fix-it" tool for any existing experiment. The `repair
 
 #### Workflow 4: Migrate Old Experiment Data
 
-This utility workflow provides a safe, non-destructive process to transform older experimental data into the current pipeline's format, leaving the original data untouched. The `migrate_experiment.ps1` script orchestrates a clear, four-step process:
+This utility workflow provides a safe, non-destructive process to upgrade older experimental data into the current pipeline's format, leaving the original data untouched. The `migrate_experiment.ps1` script orchestrates a clear, four-step process:
 
-1.  **Audit Source**: A read-only audit is performed on the source directory to assess its state and recommend migration.
-2.  **Copy Data**: After user confirmation, the script creates a clean, timestamped copy of the source experiment in the `output/migrated_experiments/` directory.
-3.  **Transform Copy**: The script calls `experiment_manager.py --migrate` on the new copy. The manager then automates the internal transformation, including patching configurations, reprocessing all runs, and running its self-healing loop until the new experiment copy is valid.
-4.  **Final Validation**: The wrapper script runs a final read-only audit on the newly migrated experiment, providing explicit confirmation that the process was successful.
+1.  **Audit Target**: A read-only audit is performed on the target directory to assess its state.
+2.  **Copy Data**: After user confirmation, the script creates a clean, timestamped copy of the target experiment in the `output/migrated_experiments/` directory.
+3.  **Upgrade Copy**: The script calls `experiment_manager.py --migrate` on the new copy. This manager automates the entire upgrade, which consists of a *preprocessing* phase (cleaning old artifacts, patching configs, reprocessing all runs) and a *finalizing* phase (generating all modern summary files).
+4.  **Final Validation**: The wrapper script runs a final read-only audit on the newly upgraded experiment, providing explicit confirmation that the process was successful.
 
 {{grouped_figure:docs/diagrams/flow_4_migrate_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
 
@@ -273,16 +268,13 @@ The framework is designed around a clear "Create -> Check -> Fix" model, with a 
 
 {{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: A guide to the new intent-driven scripts.}}
 
--   **`new_experiment.ps1` (Create)**: Use this to create a new experiment from scratch based on the global `config.ini`. This is your starting point for generating new data.
+-   **`new_experiment.ps1` (Create)**: Use this to create a new experiment from scratch. It runs the full pipeline and concludes with a final verification audit.
 
--   **`audit_experiment.ps1` (Check)**: Use this read-only tool to get a detailed status report on any existing experiment. It is your primary diagnostic tool and will tell you if any further action is needed.
+-   **`audit_experiment.ps1` (Check)**: Use this read-only tool to get a detailed status report on any existing experiment. It is your primary diagnostic tool and will recommend the correct next step.
 
--   **`repair_experiment.ps1` (Fix & Update)**: Use this for any existing experiment that needs to be fixed or updated. It is the main "fix-it" tool that can:
-    *   Automatically repair missing data (like LLM responses).
-    *   Automatically update outdated analysis files.
-    *   Allow you to interactively force a full data re-run, analysis update, or result re-aggregation on a complete, valid experiment.
+-   **`repair_experiment.ps1` (Fix & Update)**: Use this for any experiment with a **single, fixable error**. It is the main "fix-it" tool for common issues like resuming an interrupted run or applying analysis updates. It concludes with a final verification audit.
 
--   **`migrate_experiment.ps1` (Upgrade)**: This is a special utility for upgrading experiments created with older versions of the framework. It safely copies the legacy data and transforms the copy into the modern, compatible format.
+-   **`migrate_experiment.ps1` (Upgrade)**: Use this powerful safety utility for any **legacy or severely corrupted experiment** (i.e., one with multiple errors per run). It performs a non-destructive upgrade by creating a clean copy of the experiment and running the full repair and validation process on it, leaving the original data untouched.
 
 ## Core Workflows
 

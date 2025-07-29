@@ -25,12 +25,11 @@
 
 .DESCRIPTION
   This script is the primary entry point for CREATING a new experiment. It reads the
-  main 'config.ini' file, then calls the Python backend to generate a new, timestamped
-  experiment directory and execute the full set of replications as defined.
+  main 'config.ini' file, calls the Python backend to generate a new, timestamped
+  experiment directory, and executes the full set of replications.
 
-  This script does not take a target directory, as its sole purpose is to
-  initiate new experimental runs. To repair or resume an existing experiment, use
-  'repair_experiment.ps1'. To check an experiment's status, use 'audit_experiment.ps1'.
+  Upon successful completion, it automatically runs a final verification audit to
+  provide immediate confirmation of the new experiment's status.
 
 .PARAMETER Notes
     A string of notes to embed in the new experiment's reports and logs.
@@ -57,6 +56,30 @@ param(
 
 # This is the main execution function.
 function Invoke-NewExperiment {
+
+    # --- Helper function to create standardized headers ---
+    function Write-Header {
+        param(
+            [string[]]$Lines,
+            [string]$Color = "White",
+            [int]$Width = 80
+        )
+        $separator = "#" * $Width
+        Write-Host "`n$separator" -ForegroundColor $Color
+        foreach ($line in $Lines) {
+            if ($line.Length -gt ($Width - 8)) {
+                Write-Host "### $($line) " -ForegroundColor $Color
+            } else {
+                $paddingLength = $Width - $line.Length - 6
+                $leftPad = [math]::Floor($paddingLength / 2)
+                $rightPad = [math]::Ceiling($paddingLength / 2)
+                $formattedLine = "###" + (" " * $leftPad) + $line + (" " * $rightPad) + "###"
+                Write-Host $formattedLine -ForegroundColor $Color
+            }
+        }
+        Write-Host $separator -ForegroundColor $Color
+        Write-Host ""
+    }
 
     # --- Auto-detect execution environment ---
     $executable = "python"
@@ -101,10 +124,27 @@ function Invoke-NewExperiment {
 
     # Execute the command with its final argument list
     & $executable $finalArgs
+    $pythonExitCode = $LASTEXITCODE
 
     # Check the exit code from the Python script.
-    if ($LASTEXITCODE -ne 0) {
+    if ($pythonExitCode -ne 0) {
         Write-Host "`n!!! The experiment manager exited with an error. Check the output above. !!!" -ForegroundColor Red
+        exit $pythonExitCode
+    }
+
+    # --- Verification Step ---
+    # After a successful run, find the newly created directory and audit it.
+    try {
+        $basePath = "output\new_experiments"
+        $latestExperiment = Get-ChildItem -Path $basePath -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
+        
+        if ($null -ne $latestExperiment) {
+            Write-Header -Lines "Verifying Final Experiment State" -Color Cyan
+            $finalAuditArgs = @("src/experiment_manager.py", "--verify-only", $latestExperiment.FullName, "--force-color", "--non-interactive")
+            & $executable $prefixArgs $finalAuditArgs
+        }
+    } catch {
+        Write-Warning "Could not automatically verify the new experiment. Please run audit_experiment.ps1 manually."
     }
 }
 
