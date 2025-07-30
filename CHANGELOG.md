@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.6.0 (2025-07-30)
+
+### Bump
+
+- **version 3.5.0 → 3.6.0**
+
+### Features
+
+- **Implement and standardize study-level management scripts**
+  This feature introduces a suite of robust, user-friendly, study-level management scripts and standardizes the UI across the entire framework.
+  
+  New Functionality:
+  - Implemented `repair_study.ps1` to safely audit and automatically fix, update, or finalize all experiments in a study. Includes an interactive "force action" menu for valid studies.
+  - Implemented `migrate_study.ps1` to provide a batch workflow for safely upgrading all legacy or corrupted experiments in a study.
+  
+  UI and Workflow Standardization:
+  - The `-TargetDirectory` parameter is now used consistently across all experiment-level and study-level scripts.
+  - All user-facing PowerShell scripts now use `Tee-Object` to generate useful, complete log files (e.g., `study_repair_log.txt`), replacing the non-functional `Start-Transcript` method.
+  - Standardized all UI messages for colors, wording, relative paths, and banner formatting.
+  
+  Bug Fixes and Refinements:
+  - Added non-interactive and force flags to experiment-level scripts to support the new automated study-level workflows.
+  - Fixed numerous bugs caught during testing, including file locking on exit, incorrect prompts, and faulty audit-parsing logic.
+  
+  Known Issues:
+  - The `migrate_study.ps1` and `migrate_experiment.ps1` scripts incorrectly re-run LLM API calls when forcing a migration on an already valid experiment. This is a non-destructive but unintended behavior that will be addressed in a future release.
 ## 3.5.0 (2025-07-29)
 
 ### Bump
