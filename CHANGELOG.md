@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.5.0 (2025-07-29)
+
+### Bump
+
+- **version 3.4.0 → 3.5.0**
+
+### Features
+
+- **introduce study-level scripts and refactor LLM concurrency**
+  - Refactors LLM session execution for true concurrency by deleting the redundant run_llm_sessions.py and moving its logic into a ThreadPoolExecutor in orchestrate_replication.py.
+  
+  - Introduces new study-level PowerShell scripts (repair_study.ps1, migrate_study.ps1) for robust batch operations (yet untested) and deprecates the old update_study.ps1.
+  
+  - Overhauls audit_study.ps1 to provide a clearer, more reliable summary report by correctly calling the experiment-level audit for each sub-directory.
+  
+  - Fixes critical classification bugs in the experiment_manager.py audit logic to correctly distinguish between states requiring repair, update, or migration.
+  
+  - Updates all documentation, diagrams, and workflow descriptions to reflect the new scripts and simplified 5-stage pipeline.
 ## 3.4.0 (2025-07-29)
 
 ### Bump
