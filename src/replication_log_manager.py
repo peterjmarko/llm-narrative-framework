@@ -50,6 +50,14 @@ import argparse
 import io
 from datetime import datetime
 
+try:
+    from config_loader import PROJECT_ROOT
+except ImportError:
+    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_script_dir not in sys.path:
+        sys.path.insert(0, current_script_dir)
+    from config_loader import PROJECT_ROOT
+
 # --- Core Logic Functions (Shared by all modes) ---
 
 def parse_report_file(report_path):
@@ -177,7 +185,8 @@ def finalize_log(log_file_path):
         f.write('\n')
         f.write('BatchSummary,StartTime,EndTime,TotalDuration,Completed,Failed\n')
         f.write(f'Totals,{summary_start_time},{summary_end_time},{total_duration_str},{completed_count},{failed_count}\n')
-    print(f"Cleaned and appended batch summary to:\n{log_file_path}")
+    relative_path = os.path.relpath(log_file_path, PROJECT_ROOT)
+    print(f"Cleaned and appended batch summary to:\n{relative_path}")
 
 # --- Main Execution ---
 

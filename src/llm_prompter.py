@@ -229,6 +229,8 @@ def main():
                         help=f"Path for the output response file. Default for standalone use only: '{INTERACTIVE_TEST_RESPONSE_FILE}'.")
     parser.add_argument("--output_error_file", default=None,
                         help=f"Path for the output error file. Default for standalone use only: '{INTERACTIVE_TEST_ERROR_FILE}'.")
+    parser.add_argument("--output_json_file", default=None,
+                        help="Path for the raw JSON output file. If not provided, no JSON file will be saved.")
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="Increase verbosity level (-v for INFO, -vv for DEBUG).")
     parser.add_argument("--quiet", action="store_true",
@@ -241,6 +243,8 @@ def main():
                         help="FOR TESTING ONLY: Simulate API outcome instead of making a real call.")
     parser.add_argument("--test_mock_api_content", type=str, default="Default mock content from prompter.",
                         help="FOR TESTING ONLY: String content for a 'success' mock API response.")
+    parser.add_argument("--config_path", default=None,
+                        help="Path to a specific config.ini.archived file for this run.")
     args = parser.parse_args()
 
     # --- Adjust Log Level FIRST ---
@@ -332,13 +336,37 @@ def main():
         sys.exit(1)
     logging.info("LLM Prompter: OPENROUTER_API_KEY loaded.")
 
-    # Get LLM parameters from config
-    model_name_cfg = get_config_value(APP_CONFIG, 'LLM', 'model_name', fallback="google/gemini-1.5-pro-latest")
-    api_endpoint_cfg = get_config_value(APP_CONFIG, 'LLM', 'api_endpoint', fallback='https://openrouter.ai/api/v1/chat/completions')
-    api_timeout_cfg = get_config_value(APP_CONFIG, 'LLM', 'api_timeout_seconds', fallback=120, value_type=int)
-    referer_header_cfg = get_config_value(APP_CONFIG, 'LLM', 'referer_header', fallback="http://localhost:3000")
-    max_tokens_cfg = get_config_value(APP_CONFIG, 'LLM', 'max_tokens', fallback=1000, value_type=int)
-    temperature_cfg = get_config_value(APP_CONFIG, 'LLM', 'temperature', fallback=None, value_type=float)
+    # If a specific config path is given, load it. Otherwise, use the global APP_CONFIG.
+    run_specific_config = APP_CONFIG
+    if args.config_path:
+        if not os.path.exists(args.config_path):
+            logging.error(f"FATAL: Provided config path does not exist: {args.config_path}")
+            sys.exit(1)
+        # Use a new ConfigParser instance to load the run-specific config
+        from configparser import ConfigParser
+        run_specific_config = ConfigParser()
+        run_specific_config.read(args.config_path)
+        logging.info(f"Loaded run-specific configuration from: {args.config_path}")
+
+    # If a specific config path is given, load it. Otherwise, use the global APP_CONFIG.
+    run_specific_config = APP_CONFIG
+    if args.config_path:
+        if not os.path.exists(args.config_path):
+            logging.error(f"FATAL: Provided config path does not exist: {args.config_path}")
+            sys.exit(1)
+        # Use a new ConfigParser instance to load the run-specific config
+        from configparser import ConfigParser
+        run_specific_config = ConfigParser()
+        run_specific_config.read(args.config_path)
+        logging.info(f"Loaded run-specific configuration from: {args.config_path}")
+
+    # Get LLM parameters from the appropriate config
+    model_name_cfg = get_config_value(run_specific_config, 'LLM', 'model_name', fallback_key='model', fallback="google/gemini-1.5-pro-latest")
+    api_endpoint_cfg = get_config_value(run_specific_config, 'LLM', 'api_endpoint', fallback='https://openrouter.ai/api/v1/chat/completions')
+    api_timeout_cfg = get_config_value(run_specific_config, 'LLM', 'api_timeout_seconds', fallback=120, value_type=int)
+    referer_header_cfg = get_config_value(run_specific_config, 'LLM', 'referer_header', fallback="http://localhost:3000")
+    max_tokens_cfg = get_config_value(run_specific_config, 'LLM', 'max_tokens', fallback=1000, value_type=int)
+    temperature_cfg = get_config_value(run_specific_config, 'LLM', 'temperature', fallback=None, value_type=float)
 
     try:
         if not os.path.exists(input_query_file_abs):
@@ -387,10 +415,15 @@ def main():
 
         # ---- Process the result (real or mocked) ----
         if raw_llm_response_json:
-            sys.stdout.write("---LLM_RESPONSE_JSON_START---\n")
-            json.dump(raw_llm_response_json, sys.stdout, ensure_ascii=False)
-            sys.stdout.write("\n---LLM_RESPONSE_JSON_END---\n")
-            sys.stdout.flush()
+            # If an output path is provided, save the full JSON response there.
+            if args.output_json_file:
+                try:
+                    output_json_file_abs = os.path.abspath(args.output_json_file)
+                    with open(output_json_file_abs, 'w', encoding='utf-8') as f_json:
+                        json.dump(raw_llm_response_json, f_json, indent=2, ensure_ascii=False)
+                    logging.info(f"  LLM Prompter: Wrote full JSON to '{os.path.basename(output_json_file_abs)}'.")
+                except IOError as e:
+                    logging.error(f"  LLM Prompter: Failed to write JSON file: {e}")
 
             response_content_to_save = ""
             try:

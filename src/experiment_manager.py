@@ -146,6 +146,7 @@ FILE_MANIFEST = {
     "aggregated_mappings_file": {"path": "session_queries/mappings.txt"},
     "responses_dir": {"path": "session_responses"},
     "response_files":{"path": "session_responses/llm_response_*.txt", "pattern": r"llm_response_(\d+)\.txt"},
+    "response_json_files": {"path": "session_responses/llm_response_*_full.json", "pattern": r"llm_response_(\d+)_full\.json"},
     "analysis_dir":  {"path": "analysis_inputs"},
     "scores_file":   {"path": "analysis_inputs/all_scores.txt"},
     "mappings_file": {"path": "analysis_inputs/all_mappings.txt"},
@@ -371,17 +372,37 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
 
     # 5. Check response files
     expected_responses = m_expected
-    stat_r = _check_file_set(run_path, FILE_MANIFEST["response_files"], expected_responses)
-    if stat_r != "VALID":
-        status_details.append(stat_r)
-    else:
-        # If counts are OK, perform a deeper check for index consistency
+    response_details = []
+
+    # Check file counts first
+    stat_r_txt = _check_file_set(run_path, FILE_MANIFEST["response_files"], expected_responses)
+    stat_r_json = _check_file_set(run_path, FILE_MANIFEST["response_json_files"], expected_responses)
+
+    if stat_r_txt != "VALID":
+        response_details.append(f"TXT: {stat_r_txt}")
+    if stat_r_json != "VALID":
+        response_details.append(f"JSON: {stat_r_json}")
+
+    # If counts seem okay, perform a deeper check for index consistency
+    if not response_details:
         query_indices = _get_file_indices(run_path, FILE_MANIFEST["query_files"])
-        response_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
-        if query_indices != response_indices:
-            status_details.append("QUERY_RESPONSE_INDEX_MISMATCH")
-        else:
-            status_details.append("responses OK")
+        response_txt_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
+        response_json_indices = _get_file_indices(run_path, FILE_MANIFEST["response_json_files"])
+        
+        mismatches = []
+        if query_indices != response_txt_indices:
+            mismatches.append("txt")
+        if query_indices != response_json_indices:
+            mismatches.append("json")
+        
+        if mismatches:
+            response_details.append(f"QUERY_RESPONSE_INDEX_MISMATCH ({','.join(mismatches)})")
+
+    if response_details:
+        # Consolidate all response issues into a single failure string
+        status_details.append(f"SESSION_RESPONSES_ISSUE: {'; '.join(response_details)}")
+    else:
+        status_details.append("responses OK")
 
     # 6. Consolidated Analysis, Report, and Summary Check
     # Any failure in these downstream artifacts is considered a single, non-critical ANALYSIS_ISSUE.
@@ -477,8 +498,18 @@ def _get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -
         if status == "RESPONSE_ISSUE":
             run_path = run_paths_by_name[run_name]
             query_indices = _get_file_indices(run_path, FILE_MANIFEST["query_files"])
-            response_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
-            failed_indices = sorted(list(query_indices - response_indices))
+            
+            # Check for missing indices from both .txt and .json response files
+            response_txt_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
+            response_json_indices = _get_file_indices(run_path, FILE_MANIFEST["response_json_files"])
+
+            # A failed index is any query index that is missing either its .txt or .json response
+            failed_txt_indices = query_indices - response_txt_indices
+            failed_json_indices = query_indices - response_json_indices
+            
+            # Combine them into a single set of unique failed indices
+            failed_indices = sorted(list(failed_txt_indices.union(failed_json_indices)))
+
             if failed_indices:
                 runs_needing_session_repair.append({"dir": str(run_path), "failed_indices": failed_indices, "repair_type": "session_repair"})
         elif status == "CONFIG_ISSUE":

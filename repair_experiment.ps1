@@ -83,10 +83,27 @@ param(
     [string]$Notes,
 
     [Parameter(Mandatory=$false)]
-    [switch]$Force
+    [switch]$Force,
+
+    [Parameter(Mandatory=$false, HelpMessage="Run in non-interactive mode, suppressing user prompts for confirmation.")]
+    [switch]$NonInteractive,
+
+    [Parameter(Mandatory=$false, HelpMessage="Non-interactively forces a full analysis update on a valid experiment.")]
+    [switch]$ForceUpdate,
+    
+    [Parameter(Mandatory=$false, HelpMessage="Non-interactively forces re-aggregation on a valid experiment.")]
+    [switch]$ForceAggregate
 )
 
 function Invoke-RepairExperiment {
+    # --- Auto-detect execution environment ---
+    $executable = "python"
+    $prefixArgs = @()
+    if (Get-Command pdm -ErrorAction SilentlyContinue) {
+        $executable = "pdm"
+        $prefixArgs = "run", "python"
+    }
+
     function Invoke-FinalizeExperiment-Local {
         # This nested function handles the three-step finalization process.
         # It uses variables from the parent scope ($TargetDirectory, $executable, $prefixArgs).
@@ -109,18 +126,40 @@ function Invoke-RepairExperiment {
     }
     
     $nonInteractive = $false
-    # --- Auto-detect execution environment ---
-    $executable = "python"
-    $prefixArgs = @()
-    if (Get-Command pdm -ErrorAction SilentlyContinue) {
-        $executable = "pdm"
-        $prefixArgs = "run", "python"
-    }
-
+    
     # Ensure console output uses UTF-8.
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+    # --- Logging Setup ---
+    $logFileName = "experiment_repair_log.txt"
+    $logFilePath = Join-Path $TargetDirectory $logFileName
+
     try {
+        # Use -Force to overwrite the log file, even if it's read-only.
+        Start-Transcript -Path $logFilePath -Force | Out-Null
+        
+        Write-Host "" # Blank line before message
+        Write-Host "Transcript started. The log file will be saved at:" -ForegroundColor Gray
+        $relativePath = Resolve-Path -Path $logFilePath -Relative
+        Write-Host $relativePath -ForegroundColor Gray
+        # --- Handle non-interactive force flags first ---
+        if ($ForceUpdate.IsPresent) {
+            Write-Host "`n--- Forcing experiment reprocessing... ---" -ForegroundColor Cyan
+            $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
+            & $executable $prefixArgs $procArgs
+            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Forced update process failed with exit code $LASTEXITCODE" }
+            # A final verification is not needed here, as the calling script (`repair_study.ps1`) will do it.
+            return
+        }
+
+        if ($ForceAggregate.IsPresent) {
+            Write-Host "`n--- Forcing experiment re-aggregation... ---" -ForegroundColor Cyan
+            Write-Host "Forcing re-aggregation on a VALIDATED experiment. All summary files will be re-created." -ForegroundColor Yellow
+            Write-Host "--- Entering RE-AGGREGATION Mode ---" -ForegroundColor Yellow
+            Invoke-FinalizeExperiment-Local
+            # A final verification is not needed here, as the calling script (`repair_study.ps1`) will do it.
+            return
+        }
         Write-Host "`n--- Auditing experiment to determine required action... ---" -ForegroundColor Cyan
         # In an automatic flow, the audit result determines the action.
         # If the audit is valid (exit code 0), it becomes an interactive flow.
@@ -148,10 +187,16 @@ function Invoke-RepairExperiment {
 
         switch ($auditExitCode) {
             0 { # AUDIT_ALL_VALID
+                if ($NonInteractive.IsPresent) {
+                    Write-Host "Experiment is already valid. No action needed." -ForegroundColor Green
+                    return
+                }
+
                 # The audit report is already on screen.
+                Write-Host "`nExperiment is already complete and valid." -ForegroundColor Yellow
+                
                 $prompt = @"
 
-Experiment is already complete and valid.
 Do you still want to proceed with repair?
 
 (1) Full Repair: Deletes all LLM responses and re-runs all API calls. (Expensive & Destructive)
@@ -228,6 +273,17 @@ Enter your choice (1, 2, 3, or N)
     } catch {
         Write-Error "An error occurred during the repair/update process: $($_.Exception.Message)"
         exit 1
+    } finally {
+        # Stop the transcript silently to suppress the default message
+        Stop-Transcript | Out-Null
+        
+        # Only print the custom message if a log file was actually created.
+        if (Test-Path -LiteralPath $logFilePath) {
+            Write-Host "`nTranscript stopped. The log file has been saved at:" -ForegroundColor Gray
+            $relativePath = Resolve-Path -Path $logFilePath -Relative
+            Write-Host $relativePath -ForegroundColor Gray
+            Write-Host "" # Add a blank line for spacing
+        }
     }
 }
 

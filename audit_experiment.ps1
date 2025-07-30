@@ -30,7 +30,7 @@
     action (e.g., 'repair_experiment.ps1' or 'migrate_experiment.ps1').
 
     It never makes any changes to the data. The full, detailed output is also
-    saved to an 'audit_log.txt' file inside the target directory.
+    saved to an 'experiment_audit_log.txt' file inside the target directory.
 
 .PARAMETER TargetDirectory
     The path to the experiment directory to audit. This is a mandatory parameter.
@@ -96,6 +96,7 @@ function Format-LogFile {
 }
 
 # --- Main Script Logic ---
+$scriptExitCode = 0
 try {
     # Clean and validate the input path to prevent errors from hidden characters or typos.
     $TargetDirectory = $TargetDirectory.Trim()
@@ -113,11 +114,18 @@ try {
     # Force the python script to generate color for stream processing
     $pythonScriptArgs += "--force-color"
 
-    # Define the log file path
-    $LogFilePath = Join-Path $ResolvedPath "audit_log.txt"
-    # Construct the relative path safely by resolving the existing directory path first.
-    $RelativeLogPath = Join-Path (Resolve-Path $TargetDirectory -Relative) "audit_log.txt"
-    Write-Host "`nAudit report will be saved to:`n$RelativeLogPath`n" -ForegroundColor DarkCyan
+    # Define the log file name
+    $logFileName = "experiment_audit_log.txt"
+    # Create the full, absolute path for file operations
+    $LogFilePath = Join-Path $ResolvedPath $logFileName
+    
+    Write-Host "" # Add blank line for spacing
+    Write-Host "The audit log will be saved to:"
+    # Manually construct the relative path for display, since the file doesn't exist yet.
+    # This uses the user-provided TargetDirectory, which is often already relative.
+    $relativeLogPathForDisplay = Join-Path $TargetDirectory $logFileName
+    Write-Host $relativeLogPathForDisplay
+    
     if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
 
     # Execute the python script, stream its output to both the console and the log file,
@@ -128,7 +136,7 @@ try {
     Format-LogFile -Path $LogFilePath
     
     # The Python script handles all UI. This wrapper just passes the exit code through.
-    exit $pythonExitCode
+    $scriptExitCode = $pythonExitCode
 }
 catch {
     Write-Host "`n######################################################" -ForegroundColor Red
@@ -139,7 +147,16 @@ catch {
     if ($LogFilePath -and (Test-Path $LogFilePath)) {
         Format-LogFile -Path $LogFilePath
     }
-    exit 1
+    $scriptExitCode = 1
+}
+finally {
+    if (Test-Path -LiteralPath $LogFilePath) {
+        Write-Host "`nThe audit log has been saved to:" -ForegroundColor Gray
+        $relativePath = Resolve-Path -Path $LogFilePath -Relative
+        Write-Host $relativePath -ForegroundColor Gray
+        Write-Host "" # Add a blank line for spacing
+    }
 }
 
+exit $scriptExitCode
 # === End of audit_experiment.ps1 ===

@@ -46,12 +46,12 @@ import glob
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 try:
-    from config_loader import APP_CONFIG, get_config_list
+    from config_loader import APP_CONFIG, get_config_list, PROJECT_ROOT
 except ImportError:
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     if current_script_dir not in sys.path:
         sys.path.insert(0, current_script_dir)
-    from config_loader import APP_CONFIG, get_config_list
+    from config_loader import APP_CONFIG, get_config_list, PROJECT_ROOT
 
 def write_summary_csv(output_path, results_list):
     """Writes a list of result dictionaries to a structured CSV file."""
@@ -71,7 +71,8 @@ def write_summary_csv(output_path, results_list):
     
     df = df[fieldnames]
     df.to_csv(output_path, index=False)
-    logging.info(f"  -> Generated experiment summary:\n    {output_path} ({len(df)} rows)")
+    relative_path = os.path.relpath(output_path, PROJECT_ROOT)
+    logging.info(f"  -> Generated experiment summary:\n    {relative_path} ({len(df)} rows)")
 
 def main():
     parser = argparse.ArgumentParser(description="Compile all replication results for a single experiment.")

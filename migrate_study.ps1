@@ -35,7 +35,7 @@
     confirmation, and then sequentially call 'migrate_experiment.ps1' non-interactively on
     each one. Each migration creates a safe, upgraded copy, leaving the original data untouched.
 
-.PARAMETER StudyDirectory
+.PARAMETER TargetDirectory
     The path to the study directory containing multiple experiment folders.
 
 .PARAMETER Verbose
@@ -43,13 +43,13 @@
 
 .EXAMPLE
     # Run a migration on a study, which will first audit and then prompt for confirmation.
-    .\migrate_study.ps1 -StudyDirectory "output/studies/My_Legacy_Study"
+    .\migrate_study.ps1 -TargetDirectory "output/studies/My_Legacy_Study"
 #>
 
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target study directory to migrate.")]
-    [string]$StudyDirectory
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target directory containing one or more experiments.")]
+    [string]$TargetDirectory
 )
 
 function Format-Banner {
@@ -61,12 +61,16 @@ function Format-Banner {
     $suffix = "###"
     $contentWidth = $TotalWidth - $prefix.Length - $suffix.Length
     $paddedMessage = " $Message "
-    
+
+    if ($paddedMessage.Length -ge $contentWidth) {
+        # If the message is too long, just return it without centering.
+        return "$prefix$paddedMessage$suffix"
+    }
+
     $paddingTotal = $contentWidth - $paddedMessage.Length
-    if ($paddingTotal -lt 0) { $paddingTotal = 0 }
     $paddingLeft = [Math]::Floor($paddingTotal / 2)
-    $paddingRight = $contentWidth - $paddedMessage.Length - $paddingLeft
-    
+    $paddingRight = $paddingTotal - $paddingLeft
+
     $content = (" " * $paddingLeft) + $paddedMessage + (" " * $paddingRight)
     
     return "$prefix$content$suffix"
@@ -74,78 +78,138 @@ function Format-Banner {
 
 $ScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
-try {
-    Write-Host "--- Performing pre-migration audit of the entire study... ---" -ForegroundColor Cyan
-    $auditScriptPath = Join-Path $ScriptRoot "audit_study.ps1"
-    
-    # Run the audit script and capture its output
-    $auditOutput = & $auditScriptPath -StudyDirectory $StudyDirectory -ErrorAction Stop
+# --- Logging Setup ---
+$logFileName = "study_migration_log.txt"
+if (-not (Test-Path -Path $TargetDirectory -PathType Container)) {
+    throw "Study directory not found: $TargetDirectory"
+}
+$logFilePath = Join-Path $TargetDirectory $logFileName
 
-    # Explicitly write the captured output to the console so the user can see the summary
-    $auditOutput | Write-Host
+try {
+    # Use -Force to overwrite the log file, even if it's read-only.
+    Start-Transcript -Path $logFilePath -Force | Out-Null
+    
+    Write-Host "" # Blank line before message
+    Write-Host "The migration log will be saved to:" -ForegroundColor Gray
+    $relativePath = Resolve-Path -Path $logFilePath -Relative
+    Write-Host $relativePath -ForegroundColor Gray
+    
+    # --- Auto-detect execution environment ---
+    $executable = "python"
+    $prefixArgs = @()
+    if (Get-Command pdm -ErrorAction SilentlyContinue) {
+        $executable = "pdm"
+        $prefixArgs = "run", "python"
+    }
+
+    # --- Define Audit Exit Codes from experiment_manager.py ---
+    $AUDIT_ALL_VALID       = 0
+    $AUDIT_NEEDS_MIGRATION = 3
+
+    Write-Host "`n--- Performing pre-migration audit of the entire study... ---" -ForegroundColor Cyan
+    $experimentDirs = Get-ChildItem -Path $TargetDirectory -Directory | Where-Object { $_.Name -ne 'anova' }
+    if ($experimentDirs.Count -eq 0) {
+        Write-Host "No experiment directories found in '$TargetDirectory'." -ForegroundColor Yellow
+        return
+    }
 
     $experimentsToMigrate = [System.Collections.Generic.List[string]]::new()
     $needsRepair = $false
 
-    # Parse the summary table from the audit output
-    $auditLines = $auditOutput | Out-String
-    
-    # Find all lines that indicate a non-validated state
-    $problemLines = $auditLines -split [System.Environment]::NewLine | Where-Object { $_ -match 'NEEDS' }
+    # This new loop performs a reliable, quiet audit on each experiment.
+    foreach ($dir in $experimentDirs) {
+        & $executable $prefixArgs src/experiment_manager.py --verify-only --quiet $dir.FullName
+        $exitCode = $LASTEXITCODE
 
-    # Robustly find the start of the "Status" column from the header line
-    $headerLine = $auditLines -split [System.Environment]::NewLine | Where-Object { $_ -match "Experiment\s+Status" } | Select-Object -First 1
-    $statusColumnIndex = if ($headerLine) { $headerLine.IndexOf("Status") } else { -1 }
-
-    if ($statusColumnIndex -lt 0) {
-        throw "Could not parse the header of the audit report. Cannot determine experiments to migrate."
-    }
-
-    foreach ($line in $problemLines) {
-        # The experiment name is the substring from the start of the line up to the status column.
-        $experimentName = $line.Substring(0, $statusColumnIndex).Trim()
-
-        if (-not [string]::IsNullOrWhiteSpace($experimentName)) {
-             if ($line -match "NEEDS MIGRATION") {
-                $experimentsToMigrate.Add($experimentName)
-            } else { # Catches NEEDS REPAIR, NEEDS UPDATE, NEEDS FINALIZATION
-                $needsRepair = $true
-            }
+        if ($exitCode -eq $AUDIT_NEEDS_MIGRATION) {
+            $experimentsToMigrate.Add($dir.Name)
+        } elseif ($exitCode -ne $AUDIT_ALL_VALID) {
+            $needsRepair = $true
         }
     }
 
+    # Now, run the full, visible audit so the user sees the report.
+    $auditScriptPath = Join-Path $ScriptRoot "audit_study.ps1"
+    & $auditScriptPath -TargetDirectory $TargetDirectory -NoLog
+
+    # --- Main Logic branches based on the reliable audit results ---
     if ($needsRepair) {
         throw "Audit found experiments that require repair or update. Please run 'repair_study.ps1' first to ensure the study is in a stable state before migrating."
     }
 
     if ($experimentsToMigrate.Count -eq 0) {
-        Write-Host "`nNo experiments require migration. No action needed." -ForegroundColor Green
-        exit 0
+        Write-Host "`nAll experiments are valid. No migration is required." -ForegroundColor Yellow
+        
+        $prompt = @"
+
+You can force a migration on all experiments in the study. This will create
+a clean, upgraded copy of the entire study in the 'output/migrated_studies/'
+directory, leaving the originals untouched.
+
+(1) Force Migration for all experiments
+(N) No Action
+
+Enter your choice (1 or N)
+"@
+        $choice = Read-Host -Prompt $prompt
+        
+        if ($choice.Trim().ToLower() -eq '1') {
+            # Create a new, timestamped directory for the entire migrated study.
+            $studyBaseName = (Get-Item -Path $TargetDirectory).Name
+            $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+            $newStudyFolderName = "${studyBaseName}_migrated_${timestamp}"
+            $migratedStudyParent = "output/migrated_studies"
+            $migratedStudyPath = Join-Path -Path $migratedStudyParent -ChildPath $newStudyFolderName
+            
+            Write-Host "`nCreating new study directory at: $migratedStudyPath" -ForegroundColor Cyan
+            New-Item -ItemType Directory -Path $migratedStudyPath -Force | Out-Null
+
+            $migrateScriptPath = Join-Path $ScriptRoot "migrate_experiment.ps1"
+            $i = 0
+            foreach ($experimentDir in $experimentDirs) {
+                $i++
+                Write-Host "`n--- Forcing Migration on experiment $i of $($experimentDirs.Count): $($experimentDir.Name) ---" -ForegroundColor Cyan
+                
+                # Pass the new study directory as the destination for the worker script.
+                $migrateArgs = @{
+                    TargetDirectory   = $experimentDir.FullName
+                    DestinationParent = $migratedStudyPath
+                    NonInteractive    = $true
+                }
+                if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
+                & $migrateScriptPath @migrateArgs
+                
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Forced migration failed for experiment: $($experimentDir.Name)."
+                }
+            }
+            Write-Host "`n--- Forced migration process complete. ---" -ForegroundColor Green
+            Write-Host "Migrated study created at: $migratedStudyPath" -ForegroundColor Green
+        } else {
+            Write-Host "`nNo action taken." -ForegroundColor Yellow
+        }
+        return
     }
 
     Write-Host "`nThe following $($experimentsToMigrate.Count) experiment(s) will be migrated:" -ForegroundColor Yellow
     $experimentsToMigrate | ForEach-Object { Write-Host " - $_" }
 
-    $choice = Read-Host "`nDo you wish to proceed with the migration process? (Y/N)"
+    $choice = Read-Host "`nDo you wish to proceed with the migration? (Y/N)"
     if ($choice.Trim().ToLower() -ne 'y') {
-        Write-Host "Migration aborted by user." -ForegroundColor Yellow
-        exit 0
+        Write-Host "`nMigration aborted by user." -ForegroundColor Yellow
+        return
     }
 
     $migrateScriptPath = Join-Path $ScriptRoot "migrate_experiment.ps1"
     $i = 0
     foreach ($experimentName in $experimentsToMigrate) {
         $i++
-        $experimentPath = Join-Path $StudyDirectory $experimentName
+        $experimentPath = Join-Path $TargetDirectory $experimentName
         Write-Host "`n--- Migrating experiment $i of $($experimentsToMigrate.Count): $experimentName ---" -ForegroundColor Cyan
         
-        # Call the migration script non-interactively.
-        if ($PSBoundParameters['Verbose']) {
-            & $migrateScriptPath -TargetDirectory $experimentPath -NonInteractive -Verbose
-        }
-        else {
-            & $migrateScriptPath -TargetDirectory $experimentPath -NonInteractive
-        }
+        $migrateArgs = @{ TargetDirectory = $experimentPath }
+        if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
+        & $migrateScriptPath @migrateArgs
         
         if ($LASTEXITCODE -ne 0) {
             throw "Migration failed for experiment: $experimentName. Halting study migration."
@@ -154,21 +218,29 @@ try {
 
     Write-Host "`n--- Migration process complete. ---" -ForegroundColor Green
     Write-Host "Note: Migrated experiments are created in the 'output/migrated_experiments/' directory." -ForegroundColor Yellow
-    Write-Host "The original study directory is unchanged. You may need to run another audit on the" -ForegroundColor Yellow
-    Write-Host "newly created migrated experiments." -ForegroundColor Yellow
     
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Green
     Write-Host (Format-Banner "Study Migration Completed Successfully") -ForegroundColor Green
-    Write-Host "$headerLine" -ForegroundColor Green
-
+    Write-Host "$headerLine`n" -ForegroundColor Green
 } catch {
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Red
     Write-Host (Format-Banner "STUDY MIGRATION FAILED") -ForegroundColor Red
     Write-Host "$headerLine" -ForegroundColor Red
-    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "ERROR: $($_.Exception.Message)`n" -ForegroundColor Red
     exit 1
+} finally {
+    # Stop the transcript silently to suppress the default message
+    Stop-Transcript | Out-Null
+    
+    # Only print the custom message if a log file was actually created.
+    if (Test-Path -LiteralPath $logFilePath) {
+        Write-Host "`nThe migration log has been saved to:" -ForegroundColor Gray
+        $relativePath = Resolve-Path -Path $logFilePath -Relative
+        Write-Host $relativePath -ForegroundColor Gray
+        Write-Host "" # Add a blank line for spacing
+    }
 }
 
 # === End of migrate_study.ps1 ===

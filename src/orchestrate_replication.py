@@ -279,26 +279,30 @@ def main():
                 query_filepath = os.path.join(run_specific_dir_path, "session_queries", f"llm_query_{index:03d}.txt")
                 final_response_filepath = os.path.join(run_specific_dir_path, "session_responses", f"llm_response_{index:03d}.txt")
                 final_error_filepath = os.path.join(run_specific_dir_path, "session_responses", f"llm_response_{index:03d}.error.txt")
+                final_json_filepath = os.path.splitext(final_response_filepath)[0] + "_full.json"
+                config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
 
+                # The first argument is the positional 'query_identifier'
                 worker_cmd = [sys.executable, llm_prompter_script, f"{index:03d}",
                               "--input_query_file", query_filepath,
                               "--output_response_file", final_response_filepath,
-                              "--output_error_file", final_error_filepath]
+                              "--output_error_file", final_error_filepath,
+                              "--output_json_file", final_json_filepath,
+                              "--config_path", config_path]
                 if args.quiet: worker_cmd.append("--quiet")
                 
                 start_time = time.time()
                 try:
-                    result = subprocess.run(worker_cmd, check=False, cwd=src_dir, stdout=subprocess.PIPE, stderr=None, text=True, encoding='utf-8', errors='replace')
+                    # Use capture_output=True to get both stdout and stderr
+                    result = subprocess.run(worker_cmd, check=False, cwd=src_dir, capture_output=True, text=True, encoding='utf-8', errors='replace')
                     duration = time.time() - start_time
                     if result.returncode == 0:
-                        try: # Save full JSON debug file
-                            json_str = result.stdout.split("---LLM_RESPONSE_JSON_START---")[1].split("---LLM_RESPONSE_JSON_END---")[0].strip()
-                            debug_path = os.path.splitext(final_response_filepath)[0] + "_full.json"
-                            with open(debug_path, 'w', encoding='utf-8') as f: json.dump(json.loads(json_str), f, indent=2)
-                        except (IndexError, json.JSONDecodeError): pass
                         return index, True, None, duration
                     else:
-                        return index, False, f"LLM prompter FAILED for index {index} with exit code {result.returncode}", duration
+                        error_details = f"LLM prompter FAILED for index {index} with exit code {result.returncode}"
+                        if result.stderr:
+                            error_details += f"\n  STDERR: {result.stderr.strip()}"
+                        return index, False, error_details, duration
                 except Exception as e:
                     return index, False, f"Orchestrator worker failed for index {index}: {e}", time.time() - start_time
 

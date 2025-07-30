@@ -46,8 +46,11 @@
 #>
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the study directory to audit.")]
-    [string]$StudyDirectory
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target directory containing one or more experiments.")]
+    [string]$TargetDirectory,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NoLog
 )
 
 # --- Auto-detect execution environment ---
@@ -78,58 +81,68 @@ $AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt in 
 function Format-HeaderLine {
     param(
         [string]$Message,
-        [int]$TotalWidth = 54
+        [int]$TotalWidth = 80
     )
     $prefix = "###"
     $suffix = "###"
     $contentWidth = $TotalWidth - $prefix.Length - $suffix.Length
     $paddedMessage = " $Message "
-    
-    $paddingTotal = $contentWidth - $paddedMessage.Length
-    if ($paddingTotal -lt 0) { $paddingTotal = 0 }
 
+    if ($paddedMessage.Length -ge $contentWidth) {
+        return "$prefix$paddedMessage$suffix"
+    }
+
+    $paddingTotal = $contentWidth - $paddedMessage.Length
     $paddingLeft = [Math]::Floor($paddingTotal / 2)
     $paddingRight = $paddingTotal - $paddingLeft
 
     $content = (" " * $paddingLeft) + $paddedMessage + (" " * $paddingRight)
     
-    # Ensure the content is exactly the right width if there's an off-by-one issue
-    $content = $content.PadRight($contentWidth)
-
     return "$prefix$content$suffix"
 }
 
 # --- Main Script Logic ---
-try {
-    $ResolvedPath = Resolve-Path -Path $StudyDirectory -ErrorAction Stop
-    $LogFilePath = Join-Path $ResolvedPath "study_audit_log.txt"
+$scriptExitCode = 0
+
+if (-not $NoLog.IsPresent) {
+    $LogFilePath = Join-Path -Path $TargetDirectory -ChildPath "study_audit_log.txt"
+    Start-Transcript -Path $LogFilePath -Force | Out-Null
     
-    # The transcript is now managed by the calling script (e.g., update_study.ps1)
-    # to avoid output stream conflicts. This script will now write directly.
+    Write-Host "" # Blank line before message
+    Write-Host "The audit log will be saved to:" -ForegroundColor Gray
+    $relativePath = Resolve-Path -Path $LogFilePath -Relative
+    Write-Host $relativePath -ForegroundColor Gray
+}
+
+try {
+    $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
 
     $scriptName = "src/experiment_manager.py"
     $auditResults = @()
     $overallStatus = $AUDIT_ALL_VALID
-    $headerLine = "#" * 54
+    $headerLine = "#" * 80
 
     Write-Host "`n$headerLine" -ForegroundColor Cyan
     Write-Host (Format-HeaderLine "RUNNING STUDY AUDIT") -ForegroundColor Cyan
     Write-Host "$headerLine`n" -ForegroundColor Cyan
-    Write-Host "Auditing Study Directory: $ResolvedPath`n"
+    Write-Host "Auditing Study Directory:"
+    $relativePathForDisplay = Resolve-Path -Path $TargetDirectory -Relative
+    Write-Host "$relativePathForDisplay`n"
 
     # Find all subdirectories, excluding known output folders like 'anova'.
     $experimentDirs = Get-ChildItem -Path $ResolvedPath -Directory | Where-Object { $_.Name -ne 'anova' }
 
     if ($experimentDirs.Count -eq 0) {
         Write-Host "No experiment directories found in '$ResolvedPath'." -ForegroundColor Yellow
-        exit 0
+        return
     }
 
     # --- Print Real-time Audit Table Header ---
     Write-Host ""
-    $experimentNameCap = 60 # Set a reasonable maximum width for names
-    Write-Host ("{0,-15} {1,-$experimentNameCap} {2}" -f "Progress", "Experiment", "Result")
-    Write-Host ("-" * 15 + " " + "-" * $experimentNameCap + " " + "-" * 8)
+    $progressWidth = 10
+    $experimentNameCap = 40 # Set a reasonable maximum width for names
+    Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} {2}" -f "Progress", "Experiment", "Result")
+    Write-Host ("-" * $progressWidth + " " + "-" * $experimentNameCap + " " + "-" * 8)
 
     $i = 0
     foreach ($dir in $experimentDirs) {
@@ -150,7 +163,7 @@ try {
             if ($displayName.Length -gt $experimentNameCap) {
                 $displayName = $displayName.Substring(0, $experimentNameCap - 3) + "..."
             }
-            Write-Host ("{0,-15} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
+            Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
             $finalArgs = $prefixArgs + $scriptName + $arguments
             & $executable @finalArgs 2>&1 | Out-Null # Suppress Python output in non-verbose
             $exitCode = $LASTEXITCODE
@@ -183,10 +196,8 @@ try {
     Write-Output "$c_cyan$(Format-HeaderLine "STUDY AUDIT SUMMARY REPORT")$c_reset"
     Write-Output "$c_cyan$headerLine`n$c_reset"
     
-    # Dynamically determine column width based on the longest experiment name
-    $maxNameLength = ($auditResults.Name | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
-    if ($maxNameLength -lt "Experiment".Length) { $maxNameLength = "Experiment".Length }
-    
+    # Use a fixed width for the experiment name column to match the real-time table
+    $maxNameLength = 40
     $statusWidth = 20
     $gap = "   "
 
@@ -207,7 +218,10 @@ try {
             default              { "UNKNOWN", "Manual investigation required.", $c_red; break }
         }
         
-        $displayName = $result.Name # Use the full, untruncated name
+        $displayName = $result.Name
+        if ($displayName.Length -gt $maxNameLength) {
+            $displayName = $displayName.Substring(0, $maxNameLength - 3) + "..."
+        }
         
         $statusPart = "$colorCode{0,-$statusWidth}$c_reset" -f $statusText
         $line = ("{0,-$maxNameLength}" -f $displayName) + $gap + $statusPart + $gap + $details
@@ -231,17 +245,32 @@ try {
         Write-Output "$c_red$headerLine`n$c_reset"
     }
     
-    # Exit with the overall status code. 0 means VALIDATED, non-zero means NOT READY.
-    exit $overallStatus
+    # Set the exit code for the script based on the audit result.
+    $scriptExitCode = $overallStatus
 }
 catch {
-    $headerLine = "#" * 54
+    $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Red
     Write-Host (Format-HeaderLine "STUDY AUDIT FAILED") -ForegroundColor Red
     Write-Host "$headerLine`n" -ForegroundColor Red
-    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "ERROR: $($_.Exception.Message)`n" -ForegroundColor Red
     
-    exit 1
+    $scriptExitCode = 1
+}
+finally {
+    # Only stop the transcript if this script was the one that started it.
+    if (-not $NoLog.IsPresent) {
+        Stop-Transcript | Out-Null
+        
+        if (Test-Path -LiteralPath $LogFilePath) {
+            Write-Host "`nThe audit log has been saved to:" -ForegroundColor Gray
+            $relativePath = Resolve-Path -Path $LogFilePath -Relative
+            Write-Host $relativePath -ForegroundColor Gray
+            Write-Host "" # Add a blank line for spacing
+        }
+    }
 }
 
+# Exit with the overall status code. 0 means VALIDATED, non-zero means NOT READY.
+exit $scriptExitCode
 # === End of audit_study.ps1 ===
