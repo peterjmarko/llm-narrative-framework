@@ -385,6 +385,25 @@ If you run the script on a complete and valid experiment, it will present an int
 
 This script provides a safe, non-destructive workflow to upgrade older, legacy experiment directories to be compatible with the current analysis pipeline. The original data is always preserved. While its primary purpose is to upgrade legacy data, it can also be interactively run on a valid, modern experiment to force a full copy-and-reprocess, which can be useful for creating a modified duplicate of an experiment.
 
+**What it does:**
+The `migrate_experiment.ps1` script automates a copy-then-migrate process:
+
+1.  **Copy**: It takes a source directory and copies it to a new, timestamped folder inside `output/migrated_experiments/`.
+2.  **Migrate**: It then calls `experiment_manager.py --migrate` on this new directory. The manager orchestrates the internal upgrade steps:
+    *   **Patching Configs**: Creating `config.ini.archived` files from old reports.
+    *   **Rebuilding Reports**: Regenerating all reports into the modern format.
+    *   **Finalizing**: Generating clean, modern summary files for the migrated experiment.
+
+This approach leaves the original data completely untouched.
+
+**How to use it:**
+Point the script at the target directory of the experiment you want to migrate. The script will automatically create a timestamped destination folder for the upgraded copy.
+
+```powershell
+# Target "Legacy_Experiment_1" for migration, saving the result to a new timestamped folder.
+.\migrate_experiment.ps1 -TargetDirectory "output/legacy/Legacy_Experiment_1"
+```
+
 ### Auditing a Study (`audit_study.ps1`)
 
 This is the main diagnostic tool for a study. It performs a read-only audit of all experiments within a study directory and provides a consolidated summary report and a final recommendation.
@@ -411,17 +430,6 @@ This script provides a safe, batch-migration workflow for a study containing leg
 # Automatically migrate all legacy experiments in a study
 .\migrate_study.ps1 -StudyDirectory "output/studies/My_Legacy_Study"
 ```
-
-**What it does:**
-The `migrate_experiment.ps1` script automates a copy-then-migrate process:
-
-1.  **Copy**: It takes a source directory and copies it to a new, timestamped folder inside `output/migrated_experiments/`.
-2.  **Migrate**: It then calls `experiment_manager.py --migrate` on this new directory. The manager orchestrates the internal upgrade steps:
-    *   **Patching Configs**: Creating `config.ini.archived` files from old reports.
-    *   **Rebuilding Reports**: Regenerating all reports into the modern format.
-    *   **Finalizing**: Generating clean, modern summary files for the migrated experiment.
-
-This approach leaves the original data completely untouched.
 
 **REPLACE** it with this block:
 ```markdown

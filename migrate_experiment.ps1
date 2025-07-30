@@ -216,7 +216,10 @@ try {
     # The destination path is already a relative string; display it before creation.
     Write-Host "Source:      $relativeSource"
     Write-Host "Destination: $DestinationPath"
-    Copy-Item -Path $TargetPath -Destination $DestinationPath -Recurse -Force
+    # Ensure the destination directory exists before copying contents into it.
+    New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
+    # Append '\*' to the source path to copy its contents, not the folder itself.
+    Copy-Item -Path (Join-Path $TargetPath "*") -Destination $DestinationPath -Recurse -Force
     Write-Host "`nCopy complete."
 
     # 3. Run the migration process on the new copy
