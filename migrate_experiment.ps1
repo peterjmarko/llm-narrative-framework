@@ -199,13 +199,13 @@ try {
     }
 
     # --- Logging Setup ---
-    # The log file is created in the NEW destination directory.
+    # The migration log is created in the NEW destination directory.
     $logFileName = "experiment_migration_log.txt"
     $logFilePath = Join-Path $DestinationPath $logFileName
     Start-Transcript -Path $logFilePath -Force | Out-Null
     
     Write-Host "" # Blank line before message
-    Write-Host "Transcript started. The log file will be saved at:" -ForegroundColor Gray
+    Write-Host "The migration log will be saved at:" -ForegroundColor Gray
     # Since the destination path doesn't exist yet, we construct the relative path manually.
     $relativeLogPath = (Join-Path $DestinationParent $NewFolderName $logFileName).Replace("\", "/")
     Write-Host $relativeLogPath -ForegroundColor Gray
@@ -262,12 +262,12 @@ catch {
     exit 1
 }
 finally {
-    # Only try to stop the transcript and print the message if a log file
+    # Only try to stop the transcript and print the message if a migration log
     # was actually created, which implies a transcript was started.
     if ($logFilePath -and (Test-Path -LiteralPath $logFilePath)) {
         Stop-Transcript | Out-Null
         
-        Write-Host "`nTranscript stopped. The log file has been saved at:" -ForegroundColor Gray
+        Write-Host "`nThe migration log has been saved at:" -ForegroundColor Gray
         $relativePath = Resolve-Path -Path $logFilePath -Relative
         Write-Host $relativePath -ForegroundColor Gray
         Write-Host "" # Add a blank line for spacing

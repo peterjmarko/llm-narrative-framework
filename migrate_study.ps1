@@ -207,7 +207,12 @@ Enter your choice (1 or N)
         $experimentPath = Join-Path $TargetDirectory $experimentName
         Write-Host "`n--- Migrating experiment $i of $($experimentsToMigrate.Count): $experimentName ---" -ForegroundColor Cyan
         
-        $migrateArgs = @{ TargetDirectory = $experimentPath }
+        # Add NonInteractive = $true to suppress the redundant confirmation prompt
+        # in the worker script.
+        $migrateArgs = @{
+            TargetDirectory = $experimentPath
+            NonInteractive  = $true
+        }
         if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
         & $migrateScriptPath @migrateArgs
         
