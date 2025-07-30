@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.6.1 (2025-07-30)
+
+### Bump
+
+- **version 3.6.0 → 3.6.1**
+
+### Fixes
+
+- **Correct file copy logic in migrate_experiment.ps1**
+  The migrate_experiment.ps1 script was incorrectly copying the entire source directory into the destination, rather than just its contents. This caused a nested directory structure that made experiment_manager.py fail to find the run_* folders, leading it to incorrectly re-run LLM sessions from scratch.
+  
+  This fix modifies the `Copy-Item` command to use a wildcard path (Join-Path $TargetPath "*"), ensuring only the contents are copied. This resolves the nesting issue and allows the migration workflow to correctly reprocess existing data without unnecessary LLM calls.
+  
+  This change was validated for both migrate_experiment.ps1 and the batch-wrapper migrate_study.ps1.
 ## 3.6.0 (2025-07-30)
 
 ### Bump
