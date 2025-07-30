@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.6.2 (2025-07-30)
+
+### Bump
+
+- **version 3.6.1 → 3.6.2**
+
+### Fixes
+
+- **Prevent double confirmation prompt in migrate_study.ps1**
+  The `migrate_study.ps1` script correctly prompted for user consent but failed to pass this consent to the `migrate_experiment.ps1` script it called in a loop. This resulted in a redundant confirmation prompt for each experiment in the study.
+  
+  This fix adds the `-NonInteractive = $true` flag to the call, ensuring that once study-level migration is approved, the individual experiment migrations proceed automatically without further user interaction.
 ## 3.6.1 (2025-07-30)
 
 ### Bump
