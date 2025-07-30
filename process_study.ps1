@@ -139,27 +139,8 @@ catch {
     $modelNameMap = @{} # Ensure it's an empty hashtable on failure
 }
 
-# --- Function to run the pre-analysis study audit ---
-function Invoke-StudyAudit {
-    param ([string]$TargetDirectory)
-
-    $auditScriptPath = Join-Path $PSScriptRoot "audit_study.ps1"
-    if (-not (Test-Path $auditScriptPath)) {
-        throw "FATAL: audit_study.ps1 script not found at '$auditScriptPath'. Cannot verify study."
-    }
-
-    # Execute the audit script. It will print its own summary report.
-    # The output from this call is already displayed to the console by audit_study.ps1 itself.
-    & $auditScriptPath $TargetDirectory -Quiet
-
-    # If the audit script returned a non-zero exit code, throw an error.
-    # The main try/catch block will then handle the final output.
-    if ($LASTEXITCODE -ne 0) {
-        throw "Study audit FAILED. Data is not ready for analysis. Please review the audit report above and address the issues before proceeding."
-    }
-    
-    Write-Host "`nAudit PASSED. Study is validated and ready for analysis." -ForegroundColor Green
-}
+# This helper function has been removed. The audit logic is now integrated
+# directly into the main script body for improved clarity and robustness.
 
 # --- Function to execute a Python script and check for errors ---
 function Invoke-PythonScript {
@@ -279,8 +260,33 @@ try {
     Write-Host "$headerLine`n" -ForegroundColor Green
 
     # --- Step 1: Run Pre-Analysis Audit ---
-    Write-Host "[1/3: Pre-Analysis Audit] Executing:" -ForegroundColor Yellow
-    Invoke-StudyAudit -TargetDirectory $ResolvedPath
+    Write-Host "[1/3: Pre-Analysis Audit] Verifying study readiness..." -ForegroundColor Yellow
+    $auditScriptPath = Join-Path $PSScriptRoot "audit_study.ps1"
+    if (-not (Test-Path $auditScriptPath)) {
+        throw "FATAL: audit_study.ps1 script not found at '$auditScriptPath'. Cannot verify study."
+    }
+
+    # Run the audit and capture its output to check the final status.
+    # The audit script prints its own report, so we don't need to explicitly write the output here.
+    $auditOutput = & $auditScriptPath -StudyDirectory $TargetDirectory -ErrorAction Stop
+    
+    if ($LASTEXITCODE -ne 0) {
+        # The audit script already prints a clear banner with the error and recommendation.
+        # We just need to halt the processing.
+        throw "Study audit failed. Please address the issues reported above before proceeding."
+    }
+
+    # If the audit passed (exit code 0), check if the study is already fully processed.
+    if (($auditOutput | Out-String) -match "Overall Study Status: COMPLETE") {
+        Write-Host "`nWarning: This study is already marked as COMPLETE." -ForegroundColor Yellow
+        $choice = Read-Host "Re-running will overwrite existing analysis files. Do you wish to proceed? (Y/N)"
+        if ($choice.Trim().ToLower() -ne 'y') {
+            # Throwing an error here is a clean way to exit through the catch block.
+            throw "Processing aborted by user."
+        }
+        Write-Host "Proceeding with re-analysis..." -ForegroundColor Yellow
+    }
+    
     Write-Host "Step '1/3: Pre-Analysis Audit' completed successfully." -ForegroundColor Green
     Write-Host ""
 

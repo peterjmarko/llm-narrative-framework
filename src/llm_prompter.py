@@ -125,24 +125,14 @@ def format_seconds_to_time_str(seconds: float) -> str:
     return f"{int(hours):02d}:{int(minutes):02d}:{int(secs):02d}" if hours > 0 else f"{int(minutes):02d}:{int(secs):02d}"
 
 # --- Helper: Spinner Animation ---
-def animate_spinner(stop_event, query_identifier: str, current_trial: int, total_trials: int, total_elapsed_time: float, average_time_per_trial: float):
+def animate_spinner(stop_event, query_identifier: str):
     start_time = time.time()
     for c in itertools.cycle(SPINNER_FRAMES):
         if stop_event.is_set(): break
         api_elapsed = time.time() - start_time
         
-        # Calculate overall progress metrics
-        remaining_trials = total_trials - current_trial
-        etr_seconds = remaining_trials * average_time_per_trial if average_time_per_trial > 0 else 0
-        
-        # Format for display
-        progress_str = f"Trial {current_trial}/{total_trials}"
-        api_timer_str = f"API: {api_elapsed:.1f}s"
-        elapsed_str = f"Elapsed: {format_seconds_to_time_str(total_elapsed_time)}"
-        etr_str = f"ETR: {format_seconds_to_time_str(etr_seconds)}"
-
         # Write spinner to stderr to keep stdout clean for data
-        status_line = f'\r{c} {progress_str}: Waiting... ({api_timer_str}, {elapsed_str}, {etr_str})'
+        status_line = f'\r{c} Query {query_identifier}: LLM Thinking... [{api_elapsed:.1f}s]'
         sys.stderr.write(status_line)
         sys.stderr.flush()
         time.sleep(SPINNER_INTERVAL)
@@ -154,10 +144,7 @@ def animate_spinner(stop_event, query_identifier: str, current_trial: int, total
 def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endpoint: str,
                         referer: str, timeout_seconds: int, query_identifier: str,
                         max_tokens: Optional[int] = None, temperature: Optional[float] = None,
-                        quiet: bool = False,
-                        # New progress metrics for the spinner
-                        current_trial: int = 0, total_trials: int = 0,
-                        total_elapsed_time: float = 0.0, average_time_per_trial: float = 0.0
+                        quiet: bool = False
                        ) -> Tuple[Optional[Dict[str, Any]], float]:
 
     result_container = {"data": None, "duration": 0.0, "exception": None}
@@ -191,7 +178,7 @@ def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endp
 
     # --- Threading setup ---
     stop_event = threading.Event()
-    spinner_args = (stop_event, query_identifier, current_trial, total_trials, total_elapsed_time, average_time_per_trial)
+    spinner_args = (stop_event, query_identifier)
     spinner_thread = threading.Thread(target=animate_spinner, args=spinner_args, daemon=True)
     api_thread = threading.Thread(target=_api_worker, daemon=True)
 
@@ -254,12 +241,6 @@ def main():
                         help="FOR TESTING ONLY: Simulate API outcome instead of making a real call.")
     parser.add_argument("--test_mock_api_content", type=str, default="Default mock content from prompter.",
                         help="FOR TESTING ONLY: String content for a 'success' mock API response.")
-    # New arguments for enhanced progress display
-    parser.add_argument("--current_trial", type=int, default=0, help=argparse.SUPPRESS)
-    parser.add_argument("--total_trials", type=int, default=0, help=argparse.SUPPRESS)
-    parser.add_argument("--total_elapsed_time", type=float, default=0.0, help=argparse.SUPPRESS)
-    parser.add_argument("--average_time_per_trial", type=float, default=0.0, help=argparse.SUPPRESS)
-
     args = parser.parse_args()
 
     # --- Adjust Log Level FIRST ---
@@ -401,12 +382,7 @@ def main():
                 referer=referer_header_cfg, timeout_seconds=api_timeout_cfg,
                 query_identifier=args.query_identifier,
                 max_tokens=max_tokens_cfg, temperature=temperature_cfg,
-                quiet=args.quiet,
-                # Pass progress metrics to the API caller for the spinner
-                current_trial=args.current_trial,
-                total_trials=args.total_trials,
-                total_elapsed_time=args.total_elapsed_time,
-                average_time_per_trial=args.average_time_per_trial
+                quiet=args.quiet
             )
 
         # ---- Process the result (real or mocked) ----

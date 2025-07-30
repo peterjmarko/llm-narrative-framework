@@ -383,12 +383,24 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
         else:
             status_details.append("responses OK")
 
-    # 6. analysis files
-    if (run_path / FILE_MANIFEST["analysis_dir"]["path"]).exists():
-        # The true number of expected entries in analysis files is not the
-        # count of response files (some may be invalid), but the
-        # 'n_valid_responses' metric stored in the replication report's JSON.
-        expected_entries = None
+    # 6. Consolidated Analysis, Report, and Summary Check
+    # Any failure in these downstream artifacts is considered a single, non-critical ANALYSIS_ISSUE.
+    analysis_ok = True
+    
+    # First, check the final replication summary. If it's missing, it's an analysis issue.
+    if not (run_path / "REPLICATION_results.csv").exists():
+        status_details.append("REPLICATION_RESULTS_MISSING")
+        analysis_ok = False
+    
+    # Second, check the report. A missing or malformed report is also an analysis issue.
+    stat_rep = _check_report(run_path)
+    if stat_rep != "VALID":
+        status_details.append(stat_rep)
+        analysis_ok = False
+
+    # Third, check the intermediate analysis files, but only if the other checks haven't failed.
+    # This prevents error-masking and double-counting.
+    if analysis_ok:
         try:
             latest_report = sorted(run_path.glob("replication_report_*.txt"))[-1]
             text = latest_report.read_text(encoding="utf-8")
@@ -396,33 +408,21 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
             end = text.index("<<<METRICS_JSON_END>>>")
             j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
             expected_entries = j.get("n_valid_responses")
-        except (IndexError, ValueError, KeyError):
-            # This will be caught by the report check later.
-            # We set a placeholder to allow the analysis check to proceed.
-            expected_entries = -1 # An impossible value to ensure failure
 
-        if expected_entries is not None and expected_entries >= 0:
-            stat_a = _check_analysis_files(run_path, expected_entries, k_expected)
-            if stat_a != "VALID":
-                status_details.append(stat_a)
+            if expected_entries is not None and expected_entries >= 0:
+                stat_a = _check_analysis_files(run_path, expected_entries, k_expected)
+                if stat_a != "VALID":
+                    status_details.append(stat_a)
+                    analysis_ok = False
             else:
-                status_details.append("analysis OK")
-        else:
-            # This branch handles cases where the report is missing or lacks the key.
+                status_details.append("ANALYSIS_SKIPPED_BAD_REPORT")
+                analysis_ok = False
+        except (IndexError, ValueError, KeyError):
             status_details.append("ANALYSIS_SKIPPED_BAD_REPORT")
-    else:
-        status_details.append("ANALYSIS_FILES_MISSING")
+            analysis_ok = False
 
-    # 7. report
-    stat_rep = _check_report(run_path)
-    if stat_rep != "VALID":
-        status_details.append(stat_rep)
-    else:
-        status_details.append("report OK")
-
-    # 8. replication-level summary file
-    if not (run_path / "REPLICATION_results.csv").exists():
-        status_details.append("REPLICATION_RESULTS_MISSING")
+    if analysis_ok:
+        status_details.append("analysis OK")
 
     # --- Roll-up Logic: Classify based on the number of issues found ---
     failures = [d for d in status_details if not d.endswith(" OK")]
@@ -645,16 +645,26 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
         # --- Determine result code based on findings from individual runs ---
         unique_run_statuses = {run['status'] for run in all_runs_data}
 
-        # New Rule: If any run is corrupted (has multiple issues), the entire experiment needs migration.
+        # Rule 1: If any run is corrupted (multiple errors in one), it's a migration.
         if "RUN_CORRUPTED" in unique_run_statuses:
             audit_result_code = AUDIT_NEEDS_MIGRATION
-        # Otherwise, follow the standard repair/reprocess hierarchy.
-        elif "INVALID_NAME" in unique_run_statuses or "CONFIG_ISSUE" in unique_run_statuses or "QUERY_ISSUE" in unique_run_statuses or "RESPONSE_ISSUE" in unique_run_statuses:
-            audit_result_code = AUDIT_NEEDS_REPAIR
-        elif "ANALYSIS_ISSUE" in unique_run_statuses:
-            audit_result_code = AUDIT_NEEDS_REPROCESS
-        else:  # All individual replications are valid.
-            audit_result_code = AUDIT_ALL_VALID
+        else:
+            # Rule 2: If there are multiple *types* of critical single errors across
+            # different runs, it's also a migration (indicates systemic issue).
+            critical_error_types = {"INVALID_NAME", "CONFIG_ISSUE", "QUERY_ISSUE", "RESPONSE_ISSUE"}
+            found_critical_types = unique_run_statuses.intersection(critical_error_types)
+
+            if len(found_critical_types) > 1:
+                audit_result_code = AUDIT_NEEDS_MIGRATION
+            elif len(found_critical_types) == 1:
+                # Only one type of critical error exists, which is safe to repair.
+                audit_result_code = AUDIT_NEEDS_REPAIR
+            elif "ANALYSIS_ISSUE" in unique_run_statuses:
+                # No critical errors, but analysis issues exist.
+                audit_result_code = AUDIT_NEEDS_REPROCESS
+            else:
+                # No critical or analysis errors found in any run.
+                audit_result_code = AUDIT_ALL_VALID
 
         # --- Now check for experiment-level summary files ---
         exp_complete, exp_details = _verify_experiment_level_files(Path(target_dir))

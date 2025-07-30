@@ -1,17 +1,17 @@
 graph TD
-    subgraph "Workflow 7: Update a Study"
+    subgraph "Workflow 8: Repair a Study"
         direction TB
-        A["update_study.ps1<br/>(User Entry Point)"]:::entry_ps --> B["1. Pre-Update Audit<br/><small>calls audit_study.ps1</small>"]:::script
+        A["repair_study.ps1<br/>(User Entry Point)"]:::entry_ps --> B["1. Pre-Repair Audit<br/><small>calls audit_study.ps1</small>"]:::script
         B --> C{"Audit Result?"}:::decision
-        C -->|Needs Repair/Migration| D((Halt & Report Error)):::stop_node
+        C -->|Needs Migration| D((Halt & Report Error)):::stop_node
         C -->|"All Validated"| E["Report 'All Up-to-Date'"]:::layer_green
         E --> G((Exit)):::stop_node
-        C -->|"Needs Update"| F["List Experiments & Prompt User"]:::user_interaction
+        C -->|"Needs Repair/Update"| F["List Experiments & Prompt User"]:::user_interaction
         
         F -->|No| G
-        F -->|Yes| H["2. Update Experiments<br/><small>Loops, calling update_experiment.ps1 on each</small>"]:::process
+        F -->|Yes| H["2. Repair Experiments<br/><small>Loops, calling repair_experiment.ps1 on each</small>"]:::process
         
-        H --> I["3. Post-Update Verification<br/><small>calls audit_study.ps1</small>"]:::script
+        H --> I["3. Post-Repair Verification<br/><small>calls audit_study.ps1</small>"]:::script
         I --> G
     end
     

@@ -76,11 +76,13 @@ The project's functionality is organized into six primary workflows, each initia
 
 4.  **Migrate Old Experiment Data**: A utility workflow designed to bring older, legacy experimental data into compliance with the modern pipeline.
 
-5.  **Audit a Study**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
+5.  **Process a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
 
-6.  **Update a Study**: A batch operation that automatically updates all out-of-date experiments within a study.
+7.  **Audit a Study**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
 
-7.  **Process a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
+8.  **Repair a Study**: The primary "fix-it" tool for a study. It audits all experiments and automatically calls `repair_experiment.ps1` on any that need to be resumed, repaired, or updated.
+
+9.  **Migrate a Study**: A batch utility for safely upgrading legacy or corrupted experiments. It audits the study and calls `migrate_experiment.ps1` on any experiments that require it.
 
 #### Workflow 1: Create a New Experiment
 
@@ -147,25 +149,37 @@ This utility workflow provides a safe, non-destructive process to upgrade older 
 {{grouped_figure:docs/diagrams/flow_4_migrate_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
 
 
-#### Workflow 5: Audit a Study
+#### Workflow 5: Process a Study
 
-This workflow provides a read-only, consolidated completeness report for all experiments in a study. The `audit_study.ps1` wrapper iterates through each experiment folder and calls `experiment_manager.py` with the `--verify-only` flag (running quietly by default). It then compiles the results into a summary table for the console and a comprehensive `study_audit_log.txt` file in the study directory. This workflow is the primary diagnostic tool for assessing overall study readiness.
+This workflow is used after all experiments are validated to compile and analyze the entire study. It performs a robust pre-flight check by calling `audit_study.ps1`. If the study is not ready for processing (or is already complete), it will halt with a clear recommendation. Otherwise, it proceeds to compile all results and run the final statistical analysis.
 
-{{grouped_figure:docs/diagrams/flow_5_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
-
-
-#### Workflow 6: Process a Study
-
-This workflow is used after all experiments are complete to audit, compile, and analyze the entire study. The `process_study.ps1` wrapper calls `audit_study.ps1`, `compile_study_results.py`, and then `study_analyzer.py`.
-
-{{grouped_figure:docs/diagrams/flow_6_process_study.mmd | scale=2.5 | width=80% | caption=Workflow 6: Process a Study. Audits, compiles, and analyzes all experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_5_process_study.mmd | scale=2.5 | width=80% | caption=Workflow 5: Process a Study. Audits, compiles, and analyzes all experiments in a study.}}
 
 
-#### Workflow 7: Update a Study
+#### Workflow 7: Audit a Study
 
-This workflow provides a convenient batch operation to update all out-of-date experiments within a study directory. It first runs a full study audit to identify which experiments need updating. If any require more serious intervention (like repair or migration), it halts. Otherwise, it prompts the user for confirmation and then systematically calls `update_experiment.ps1` on each experiment that needs it.
+This script is the primary diagnostic tool for assessing the overall state of a study. It performs a two-part, read-only audit:
 
-{{grouped_figure:docs/diagrams/flow_7_update_study.mmd | scale=2.5 | width=80% | caption=Workflow 7: Update a Study. A batch operation to update all out-of-date experiments in a study.}}
+1.  **Readiness Audit**: It iterates through every experiment folder and runs a quiet, individual audit on each to determine its status (e.g., `VALIDATED`, `NEEDS REPAIR`).
+2.  **Completeness Audit**: It verifies the existence of top-level study artifacts, such as `STUDY_results.csv` and the `anova/` analysis directory.
+
+Based on the combined results from both audits, it presents a consolidated summary table and provides a final, context-aware recommendation for the correct next step.
+
+{{grouped_figure:docs/diagrams/flow_7_audit_study.mmd | scale=2.5 | width=100% | caption=Workflow 7: Audit a Study. Consolidated completeness report for all experiments in a study.}}
+
+
+#### Workflow 8: Repair a Study
+
+This is the main "fix-it" tool for an entire study. It first runs a comprehensive audit to identify all experiments that need to be resumed, repaired, or updated. It will halt if any experiments require migration. Otherwise, it prompts for confirmation and then automatically calls `repair_experiment.ps1` on each experiment that needs attention.
+
+{{grouped_figure:docs/diagrams/flow_8_repair_study.mmd | scale=2.5 | width=80% | caption=Workflow 8: Repair a Study. A batch operation to fix all repairable experiments in a study.}}
+
+
+#### Workflow 9: Migrate a Study
+
+This is a batch utility workflow for safely upgrading an entire study that contains legacy or corrupted experiments. It first runs an audit to identify which experiments require migration. It will halt if any experiments have simple repairable issues, ensuring migrations are performed on an otherwise stable study. After confirmation, it automatically calls `migrate_experiment.ps1` on each required experiment.
+
+{{grouped_figure:docs/diagrams/flow_9_migrate_study.mmd | scale=2.5 | width=80% | caption=Workflow 9: Migrate a Study. A batch operation to upgrade all legacy experiments in a study.}}
 
 {{pagebreak}}
 ### Data Flow Diagram
@@ -264,9 +278,15 @@ A follow-up study is planned to evaluate other powerful, medium-cost models as A
 
 ## Choosing the Right Workflow: Separation of Concerns
 
-The framework is designed around a clear "Create -> Check -> Fix" model, with a dedicated script for each user intent. This separation of concerns ensures that each workflow is simple, predictable, and safe.
+The framework is designed around a clear "Create -> Check -> Fix" model, with dedicated scripts for both individual experiments and entire studies. This separation of concerns ensures that each workflow is simple, predictable, and safe.
 
-{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: A guide to the new intent-driven scripts.}}
+### For a Single Experiment
+
+{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: A guide for single-experiment tasks.}}
+
+### For an Entire Study
+
+{{grouped_figure:docs/diagrams/logic_workflow_chooser_study.mmd | scale=2.5 | width=100% | caption=Choosing the Right Workflow: A guide for study-level tasks.}}
 
 -   **`new_experiment.ps1` (Create)**: Use this to create a new experiment from scratch. It runs the full pipeline and concludes with a final verification audit.
 
@@ -326,15 +346,30 @@ This script provides a safe, non-destructive workflow to upgrade older, legacy e
 
 ### Auditing a Study (`audit_study.ps1`)
 
-This script audits all experiments within a study directory to verify their readiness for final analysis. It iterates through each experiment, runs a quiet audit, and presents a consolidated summary report table. This is the recommended first step before running `analyze_study.ps1`.
+This is the main diagnostic tool for a study. It performs a read-only audit of all experiments within a study directory and provides a consolidated summary report and a final recommendation.
 
-**To audit a study:**
-Point the script at the top-level directory containing all relevant experiment folders.
 ```powershell
-# Example: Audit all experiments located in the "My_First_Study" directory
+# Get a status report for an entire study
 .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
 ```
-The summary table will show the status (`VALIDATED`, `NEEDS UPDATE`, etc.) and the recommended action for each experiment. For a detailed, verbose output that shows the full audit for each experiment, add the `-Verbose` switch.
+
+### Repairing a Study (`repair_study.ps1`)
+
+This is the main "fix-it" tool for a study. It audits the study and automatically calls `repair_experiment.ps1` on any experiment that needs to be resumed, repaired, or updated.
+
+```powershell
+# Automatically fix all repairable experiments in a study
+.\repair_study.ps1 -StudyDirectory "output/studies/My_Broken_Study"
+```
+
+### Migrating a Study (`migrate_study.ps1`)
+
+This script provides a safe, batch-migration workflow for a study containing legacy or corrupted experiments. It audits the study and automatically calls `migrate_experiment.ps1` on each experiment that requires it.
+
+```powershell
+# Automatically migrate all legacy experiments in a study
+.\migrate_study.ps1 -StudyDirectory "output/studies/My_Legacy_Study"
+```
 
 **What it does:**
 The `migrate_experiment.ps1` script automates a copy-then-migrate process:
@@ -412,11 +447,13 @@ The final analysis script (`study_analyzer.py`) produces a comprehensive log fil
 
 *   **`repair_experiment.ps1`**: **(Fix & Update)** The main "fix-it" tool to automatically repair, resume, or update an existing experiment. It becomes interactive if run on an already valid experiment.
 
-*   **`audit_study.ps1`**: Audits all experiments within a study directory and provides a consolidated report to check for final analysis readiness.
+*   **`audit_study.ps1`**: **(Check)** Provides a read-only, two-part audit (readiness and completeness) for an entire study. It is the primary diagnostic tool for a *study*.
 
-*   **`update_study.ps1`**: A powerful batch script that audits an entire study and calls `update_experiment.ps1` on all experiments that require an update.
+*   **`repair_study.ps1`**: **(Fix & Update)** The main "fix-it" tool for a study. Audits and automatically calls `repair_experiment.ps1` on all experiments that need to be resumed, repaired, or updated.
 
-*   **`migrate_experiment.ps1`**: Safely migrates a legacy experiment by first copying it to a new timestamped directory and then upgrading the copy to be compatible with the current pipeline.
+*   **`migrate_study.ps1`**: **(Upgrade)** A batch utility that audits a study and automatically calls `migrate_experiment.ps1` on all legacy or corrupted experiments.
+
+*   **`migrate_experiment.ps1`**: Safely migrates a single legacy experiment by first copying it to a new timestamped directory and then upgrading the copy to be compatible with the current pipeline.
 
 *   **`process_study.ps1`**: Audits, compiles, and analyzes all results within a study, performing the final statistical analysis (e.g., ANOVA).
 

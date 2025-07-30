@@ -85,7 +85,7 @@ function Invoke-NewExperiment {
     $executable = "python"
     $prefixArgs = @()
     if (Get-Command pdm -ErrorAction SilentlyContinue) {
-        Write-Host "PDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+        Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
         $executable = "pdm"
         $prefixArgs = "run", "python"
     }

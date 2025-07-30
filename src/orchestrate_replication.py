@@ -56,6 +56,7 @@ import re
 import shutil
 import json
 import glob
+import time
 import configparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 try:
@@ -246,58 +247,84 @@ def main():
 
         # Determine which indices to run based on the mode.
         if args.indices:
-            # Repair mode: run only the specified failed indices.
             indices_to_run = args.indices
-            force_rerun = True # Force re-run for failed trials.
         else:
-            # New/Continue mode: find all queries and run only those without responses.
             queries_dir = os.path.join(run_specific_dir_path, "session_queries")
             query_files = glob.glob(os.path.join(queries_dir, "llm_query_*.txt"))
-            
-            # Robustly parse indices from filenames
-            all_indices = []
-            for f in query_files:
-                match = re.search(r'_(\d+)\.txt$', f)
-                if match:
-                    all_indices.append(int(match.group(1)))
-            all_indices.sort()
+            all_indices = sorted([int(re.search(r'_(\d+)\.txt$', f).group(1)) for f in query_files if re.search(r'_(\d+)\.txt$', f)])
             
             indices_to_run = []
             responses_dir = os.path.join(run_specific_dir_path, "session_responses")
             for i in all_indices:
                 if not os.path.exists(os.path.join(responses_dir, f"llm_response_{i:03d}.txt")):
                     indices_to_run.append(i)
-            force_rerun = False # Don't force re-run, just continue.
 
         if not indices_to_run:
             all_stage_outputs.append(header_2 + "All required LLM response files already exist. Nothing to do.")
         else:
             print(f"--- Running Stage: {stage_title_2} ---")
             max_workers = get_config_value(APP_CONFIG, 'LLM', 'max_parallel_sessions', value_type=int, fallback=10)
+            llm_prompter_script = os.path.join(src_dir, 'llm_prompter.py')
+
+            # Ensure the response directory exists before starting workers.
+            responses_dir = os.path.join(run_specific_dir_path, get_config_value(APP_CONFIG, 'General', 'responses_subdir', fallback='session_responses'))
+            os.makedirs(responses_dir, exist_ok=True)
             
+            api_times_log_path = os.path.join(run_specific_dir_path, get_config_value(APP_CONFIG, 'Filenames', 'api_times_log', fallback="api_times.log"))
+            if not os.path.exists(api_times_log_path):
+                with open(api_times_log_path, "w", encoding='utf-8') as f:
+                    f.write("Query_ID\tCall_Duration_s\tTotal_Elapsed_s\tEstimated_Time_Remaining_s\n")
+
             def session_worker(index):
-                cmd = [sys.executable, run_sessions_script, "--run_output_dir", run_specific_dir_path, "--indices", str(index), "--quiet"]
-                if force_rerun: cmd.append("--force-rerun")
-                else: cmd.append("--continue-run")
+                query_filepath = os.path.join(run_specific_dir_path, "session_queries", f"llm_query_{index:03d}.txt")
+                final_response_filepath = os.path.join(run_specific_dir_path, "session_responses", f"llm_response_{index:03d}.txt")
+                final_error_filepath = os.path.join(run_specific_dir_path, "session_responses", f"llm_response_{index:03d}.error.txt")
+
+                worker_cmd = [sys.executable, llm_prompter_script, f"{index:03d}",
+                              "--input_query_file", query_filepath,
+                              "--output_response_file", final_response_filepath,
+                              "--output_error_file", final_error_filepath]
+                if args.quiet: worker_cmd.append("--quiet")
+                
+                start_time = time.time()
                 try:
-                    subprocess.run(cmd, check=True, text=True, capture_output=True)
-                    return (index, True, None)
-                except subprocess.CalledProcessError as e:
-                    return (index, False, f"LLM session FAILED for index {index}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}")
+                    result = subprocess.run(worker_cmd, check=False, cwd=src_dir, stdout=subprocess.PIPE, stderr=None, text=True, encoding='utf-8', errors='replace')
+                    duration = time.time() - start_time
+                    if result.returncode == 0:
+                        try: # Save full JSON debug file
+                            json_str = result.stdout.split("---LLM_RESPONSE_JSON_START---")[1].split("---LLM_RESPONSE_JSON_END---")[0].strip()
+                            debug_path = os.path.splitext(final_response_filepath)[0] + "_full.json"
+                            with open(debug_path, 'w', encoding='utf-8') as f: json.dump(json.loads(json_str), f, indent=2)
+                        except (IndexError, json.JSONDecodeError): pass
+                        return index, True, None, duration
+                    else:
+                        return index, False, f"LLM prompter FAILED for index {index} with exit code {result.returncode}", duration
+                except Exception as e:
+                    return index, False, f"Orchestrator worker failed for index {index}: {e}", time.time() - start_time
 
             all_logs = [header_2]
-            failed_sessions = 0
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                tasks = {executor.submit(session_worker, i) for i in indices_to_run}
-                for future in tqdm(as_completed(tasks), total=len(tasks), desc="Processing LLM Sessions", ncols=80, file=sys.stdout):
-                    _, success, log = future.result()
+            failed_sessions, total_elapsed_time, completed_count = 0, 0.0, 0
+            with ThreadPoolExecutor(max_workers=max_workers) as executor, \
+                 tqdm(total=len(indices_to_run), desc="Processing LLM Sessions", ncols=80, file=sys.stderr) as pbar:
+                
+                tasks = {executor.submit(session_worker, i): i for i in indices_to_run}
+                for future in as_completed(tasks):
+                    completed_count += 1
+                    index, success, log, duration = future.result()
+                    total_elapsed_time += duration
                     if not success:
                         failed_sessions += 1
                         all_logs.append(log)
+                    
+                    avg_time = total_elapsed_time / completed_count
+                    eta = avg_time * (len(indices_to_run) - completed_count)
+                    pbar.update(1)
+                    with open(api_times_log_path, "a", encoding='utf-8') as f:
+                        f.write(f"Query_{index:03d}\t{duration:.2f}\t{total_elapsed_time:.2f}\t{eta:.2f}\n")
             
             all_stage_outputs.append("\n".join(all_logs))
             if failed_sessions > 0:
-                raise Exception(f"{failed_sessions} LLM session(s) failed. See logs for details.")
+                raise Exception(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed. See logs for details.")
 
         # Stage 3: Process LLM Responses
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]

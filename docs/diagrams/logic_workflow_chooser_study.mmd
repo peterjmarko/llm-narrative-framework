@@ -1,0 +1,51 @@
+graph TD
+    %% --- Style Definitions (copy from single-experiment chooser for consistency) ---
+    classDef start_end_node fill:#d4edda,stroke:#155724;
+    classDef decision_node fill:#e9d8fd,stroke:#9467bd,color:#333;
+    classDef case_node fill:#cfe2f3,stroke:#6c93c4,color:#333;
+    classDef instruction_node fill:#dbe9f5,stroke:#8cb3d9,color:#333;
+    
+    %% === Nodes for Study-Level Decision Tree ===
+    start_node(["Start"]):::start_end_node;
+
+    subgraph "Choosing the Right Study-Level Workflow"
+        direction TB
+
+        main_decision{"What is your goal for the entire study?"}:::decision_node
+
+        %% Branch 1: Check
+        case_1["**Check**<br/>I want to see the status of all experiments in the study."]:::case_node
+        instruction_1["*Use: audit_study.ps1*"]:::instruction_node
+        
+        %% Branch 2: Fix / Update
+        case_2["**Fix or Update**<br/>I want to fix all repairable, interrupted, or outdated experiments."]:::case_node
+        instruction_2["*Use: repair_study.ps1*"]:::instruction_node
+
+        %% Branch 3: Upgrade
+        case_3["**Upgrade**<br/>I want to upgrade all legacy or severely corrupted experiments."]:::case_node
+        instruction_3["*Use: migrate_study.ps1*"]:::instruction_node
+
+        %% Branch 4: Analyze
+        case_4["**Analyze**<br/>My study is fully validated and I want the final reports and plots."]:::case_node
+        instruction_4["*Use: process_study.ps1*"]:::instruction_node
+    end
+
+    end_node(["End"]):::start_end_node;
+
+    %% === Connections ===
+    start_node --> main_decision;
+
+    main_decision --> case_1;
+    main_decision --> case_2;
+    main_decision --> case_3;
+    main_decision --> case_4;
+
+    case_1 --> instruction_1;
+    case_2 --> instruction_2;
+    case_3 --> instruction_3;
+    case_4 --> instruction_4;
+    
+    instruction_1 --> end_node;
+    instruction_2 --> end_node;
+    instruction_3 --> end_node;
+    instruction_4 --> end_node;

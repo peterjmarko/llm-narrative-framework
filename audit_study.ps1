@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-#-*- coding: utf-8 -*-
+# -*-- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -29,7 +29,7 @@
     consolidated summary report. This helps determine if the entire study is ready for
     final analysis via 'process_study.ps1'.
 
-.PARAMETER TargetDirectory
+.PARAMETER StudyDirectory
     The path to the study directory containing multiple experiment folders.
 
 .PARAMETER Verbose
@@ -38,17 +38,16 @@
 
 .EXAMPLE
     # Run a summary audit on a study.
-    .\audit_study.ps1 -TargetDirectory "output/studies/My_First_Study"
+    .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
 
 .EXAMPLE
     # Run a detailed audit, showing the full report for each experiment.
-    .\audit_study.ps1 -TargetDirectory "output/studies/My_First_Study" -Verbose
+    .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study" -Verbose
 #>
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target study directory to audit.")]
-    [string]$TargetDirectory,
-    [switch]$Quiet
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the study directory to audit.")]
+    [string]$StudyDirectory
 )
 
 # --- Auto-detect execution environment ---
@@ -72,33 +71,37 @@ $AUDIT_ALL_VALID       = 0 # Experiment is complete and valid.
 $AUDIT_NEEDS_REPROCESS = 1 # Experiment needs reprocessing (e.g., analysis issues).
 $AUDIT_NEEDS_REPAIR    = 2 # Experiment needs repair (e.g., missing responses, critical files).
 $AUDIT_NEEDS_MIGRATION = 3 # Experiment is legacy or malformed, requires full migration.
+$AUDIT_NEEDS_AGGREGATION = 4 # Replications are valid, but experiment summary is not
 $AUDIT_ABORTED_BY_USER = 99 # Specific exit code when user aborts via prompt in experiment_manager.py
 
 # --- Helper function for consistent header formatting ---
-function Format-Banner {
+function Format-HeaderLine {
     param(
         [string]$Message,
-        [int]$TotalWidth = 80
+        [int]$TotalWidth = 54
     )
     $prefix = "###"
     $suffix = "###"
     $contentWidth = $TotalWidth - $prefix.Length - $suffix.Length
     $paddedMessage = " $Message "
     
-    # Simple centering logic
     $paddingTotal = $contentWidth - $paddedMessage.Length
     if ($paddingTotal -lt 0) { $paddingTotal = 0 }
+
     $paddingLeft = [Math]::Floor($paddingTotal / 2)
-    $paddingRight = $contentWidth - $paddedMessage.Length - $paddingLeft
-    
+    $paddingRight = $paddingTotal - $paddingLeft
+
     $content = (" " * $paddingLeft) + $paddedMessage + (" " * $paddingRight)
     
+    # Ensure the content is exactly the right width if there's an off-by-one issue
+    $content = $content.PadRight($contentWidth)
+
     return "$prefix$content$suffix"
 }
 
 # --- Main Script Logic ---
 try {
-    $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
+    $ResolvedPath = Resolve-Path -Path $StudyDirectory -ErrorAction Stop
     $LogFilePath = Join-Path $ResolvedPath "study_audit_log.txt"
     
     # The transcript is now managed by the calling script (e.g., update_study.ps1)
@@ -107,10 +110,10 @@ try {
     $scriptName = "src/experiment_manager.py"
     $auditResults = @()
     $overallStatus = $AUDIT_ALL_VALID
-    $headerLine = "#" * 80
+    $headerLine = "#" * 54
 
     Write-Host "`n$headerLine" -ForegroundColor Cyan
-    Write-Host (Format-Banner "RUNNING STUDY AUDIT") -ForegroundColor Cyan
+    Write-Host (Format-HeaderLine "RUNNING STUDY AUDIT") -ForegroundColor Cyan
     Write-Host "$headerLine`n" -ForegroundColor Cyan
     Write-Host "Auditing Study Directory: $ResolvedPath`n"
 
@@ -137,7 +140,7 @@ try {
         if ($PSBoundParameters['Verbose']) {
             Write-Host "`n--- Auditing Experiment $($i)/$($experimentDirs.Count) (Verbose): $($dir.Name) ---" -ForegroundColor Yellow
             $finalArgs = $prefixArgs + $scriptName + $arguments
-            & $executable $finalArgs 2>&1
+            & $executable @finalArgs 2>&1
             $exitCode = $LASTEXITCODE
             Write-Host "--- End of Audit for: $($dir.Name) ---" -ForegroundColor Yellow
         }
@@ -149,17 +152,18 @@ try {
             }
             Write-Host ("{0,-15} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
             $finalArgs = $prefixArgs + $scriptName + $arguments
-            & $executable $finalArgs 2>&1 | Out-Null # Suppress Python output in non-verbose
+            & $executable @finalArgs 2>&1 | Out-Null # Suppress Python output in non-verbose
             $exitCode = $LASTEXITCODE
         }
 
         # --- Status Logic based on the now-reliable exit code ---
         $trueStatus, $progressColor = switch ($exitCode) {
-            $AUDIT_ALL_VALID       { "VALIDATED", "Green"; break }
-            $AUDIT_NEEDS_REPROCESS { "NEEDS UPDATE", "Red"; break }
-            $AUDIT_NEEDS_REPAIR    { "NEEDS REPAIR", "Red"; break }
-            $AUDIT_NEEDS_MIGRATION { "NEEDS MIGRATION", "Red"; break }
-            default               { "UNKNOWN", "Red"; break }
+            $AUDIT_ALL_VALID         { "VALIDATED", "Green"; break }
+            $AUDIT_NEEDS_REPROCESS   { "NEEDS UPDATE", "Yellow"; break }
+            $AUDIT_NEEDS_REPAIR      { "NEEDS REPAIR", "Red"; break }
+            $AUDIT_NEEDS_MIGRATION   { "NEEDS MIGRATION", "Red"; break }
+            $AUDIT_NEEDS_AGGREGATION { "NEEDS FINALIZATION", "Yellow"; break }
+            default                  { "ERROR", "Red"; break }
         }
         if (-not $PSBoundParameters['Verbose']) {
             $progressText = if ($progressColor -eq "Green") { "[ OK ]" } else { "[ FAIL ]" }
@@ -174,11 +178,10 @@ try {
     }
 
     # --- Print Summary Report ---
-    $summaryHeaderLine = "#" * 80
     Write-Output ""
-    Write-Output "$c_cyan`n$summaryHeaderLine$c_reset"
-    Write-Output "$c_cyan$(Format-Banner "STUDY AUDIT SUMMARY REPORT")$c_reset"
-    Write-Output "$c_cyan$summaryHeaderLine`n$c_reset"
+    Write-Output "$c_cyan`n$headerLine$c_reset"
+    Write-Output "$c_cyan$(Format-HeaderLine "STUDY AUDIT SUMMARY REPORT")$c_reset"
+    Write-Output "$c_cyan$headerLine`n$c_reset"
     
     # Dynamically determine column width based on the longest experiment name
     $maxNameLength = ($auditResults.Name | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
@@ -196,11 +199,12 @@ try {
 
     foreach ($result in $auditResults) {
         $statusText, $details, $colorCode = switch ($result.TrueStatus) {
-            "VALIDATED"       { "VALIDATED", "Ready for analysis.", $c_green; break }
-            "NEEDS UPDATE"    { "NEEDS UPDATE", "Requires update ('update_experiment.ps1').", $c_yellow; break }
-            "NEEDS REPAIR"    { "NEEDS REPAIR", "Requires repair ('run_experiment.ps1').", $c_red; break }
-            "NEEDS MIGRATION" { "NEEDS MIGRATION", "Requires migration ('migrate_experiment.ps1').", $c_red; break }
-            default           { "UNKNOWN", "Manual investigation required.", $c_red; break }
+            "VALIDATED"          { "VALIDATED", "Ready for processing.", $c_green; break }
+            "NEEDS UPDATE"       { "NEEDS UPDATE", "Run 'repair_experiment.ps1' to update.", $c_yellow; break }
+            "NEEDS REPAIR"       { "NEEDS REPAIR", "Run 'repair_experiment.ps1' to fix.", $c_red; break }
+            "NEEDS MIGRATION"    { "NEEDS MIGRATION", "Run 'migrate_experiment.ps1' to upgrade.", $c_red; break }
+            "NEEDS FINALIZATION" { "NEEDS FINALIZATION", "Run 'repair_experiment.ps1' to finalize.", $c_yellow; break }
+            default              { "UNKNOWN", "Manual investigation required.", $c_red; break }
         }
         
         $displayName = $result.Name # Use the full, untruncated name
@@ -213,20 +217,18 @@ try {
     # --- Final Conclusion ---
     $isStudyValidated = ($auditResults | Where-Object { $_.TrueStatus -ne "VALIDATED" }).Count -eq 0
 
-    if (-not $Quiet) {
-        $finalHeaderLine = "#" * 80
-        if ($isStudyValidated) {
-            Write-Output "$c_green`n$finalHeaderLine$c_reset"
-            Write-Output "$c_green$(Format-Banner "AUDIT FINISHED: STUDY IS VALIDATED")$c_reset"
-            Write-Output "$c_green$(Format-Banner "Recommendation: Run 'process_study.ps1' to complete the final analysis.")$c_reset"
-            Write-Output "$c_green$finalHeaderLine`n$c_reset"
-        }
-        else {
-            Write-Output "$c_red`n$finalHeaderLine$c_reset"
-            Write-Output "$c_red$(Format-Banner "AUDIT FINISHED: STUDY IS NOT READY")$c_reset"
-            Write-Output "$c_red$(Format-Banner "Recommendation: Address issues listed above.")$c_reset"
-            Write-Output "$c_red$finalHeaderLine`n$c_reset"
-        }
+    if ($isStudyValidated) {
+        Write-Output "$c_green`n$headerLine$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "AUDIT FINISHED: STUDY IS VALIDATED")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'process_study.ps1' to")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "complete the final analysis.")$c_reset"
+        Write-Output "$c_green$headerLine`n$c_reset"
+    }
+    else {
+        Write-Output "$c_red`n$headerLine$c_reset"
+        Write-Output "$c_red$(Format-HeaderLine "AUDIT FINISHED: STUDY IS NOT READY")$c_reset"
+        Write-Output "$c_red$(Format-HeaderLine "Recommendation: Address issues listed above.")$c_reset"
+        Write-Output "$c_red$headerLine`n$c_reset"
     }
     
     # Exit with the overall status code. 0 means VALIDATED, non-zero means NOT READY.

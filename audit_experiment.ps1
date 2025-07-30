@@ -115,7 +115,8 @@ try {
 
     # Define the log file path
     $LogFilePath = Join-Path $ResolvedPath "audit_log.txt"
-    $RelativeLogPath = (Resolve-Path $LogFilePath -Relative).TrimStart(".\")
+    # Construct the relative path safely by resolving the existing directory path first.
+    $RelativeLogPath = Join-Path (Resolve-Path $TargetDirectory -Relative) "audit_log.txt"
     Write-Host "`nAudit report will be saved to:`n$RelativeLogPath`n" -ForegroundColor DarkCyan
     if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
 
