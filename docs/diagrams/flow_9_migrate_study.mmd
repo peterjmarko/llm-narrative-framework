@@ -3,7 +3,7 @@ graph TD
         direction TB
         A["migrate_study.ps1<br/>(User Entry Point)"]:::entry_ps --> B["1. Pre-Migration Audit<br/><small>calls audit_study.ps1</small>"]:::script
         B --> C{"Audit Result?"}:::decision
-        C -->|Needs Repair/Update| D((Halt & Report Error)):::stop_node
+        C -->|"Needs Repair/Update"| D((Halt & Report Error)):::stop_node
         C -->|"No Migrations Needed"| E["Report 'No Action Needed'"]:::layer_green
         E --> G((Exit)):::stop_node
         C -->|"Needs Migration"| F["List Experiments & Prompt User"]:::user_interaction

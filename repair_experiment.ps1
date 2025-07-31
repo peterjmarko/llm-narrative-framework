@@ -139,7 +139,7 @@ function Invoke-RepairExperiment {
         Start-Transcript -Path $logFilePath -Force | Out-Null
         
         Write-Host "" # Blank line before message
-        Write-Host "Transcript started. The log file will be saved at:" -ForegroundColor Gray
+        Write-Host "The repair log will be saved to:" -ForegroundColor Gray
         $relativePath = Resolve-Path -Path $logFilePath -Relative
         Write-Host $relativePath -ForegroundColor Gray
         # --- Handle non-interactive force flags first ---
@@ -279,7 +279,7 @@ Enter your choice (1, 2, 3, or N)
         
         # Only print the custom message if a log file was actually created.
         if (Test-Path -LiteralPath $logFilePath) {
-            Write-Host "`nTranscript stopped. The log file has been saved at:" -ForegroundColor Gray
+            Write-Host "`nThe repair log has been saved to:" -ForegroundColor Gray
             $relativePath = Resolve-Path -Path $logFilePath -Relative
             Write-Host $relativePath -ForegroundColor Gray
             Write-Host "" # Add a blank line for spacing

@@ -8,7 +8,12 @@ graph TD;
         C["2. Compile Study Results<br><small>via compile_study_results.py</small>"]:::step;
         D["3. Analyze Study<br><small>via study_analyzer.py</small>"]:::step;
 
-        B -- "If VALIDATED" --> C;
+        B --> E{"Audit Result?"}:::decision;
+        E -- "Not Validated" --> F((Halt & Report Error)):::stop_node;
+        E -- "Already Complete" --> G{"Prompt User to Overwrite?"}:::decision;
+        G -- "No" --> H((Exit)):::stop_node;
+        G -- "Yes" --> C;
+        E -- "Validated & Ready" --> C;
         C --> D;
     end
 
@@ -29,3 +34,5 @@ graph TD;
     classDef artifact_in fill:#f0f0f0,stroke:#666,color:#333;
     classDef artifact_mid fill:#e9ecef,stroke:#adb5bd,color:#333;
     classDef artifact_out fill:#d4edda,stroke:#155724,color:#333;
+    classDef decision fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef stop_node fill:#e74c3c,stroke:#c0392b,color:#fff;

@@ -77,15 +77,14 @@ release = {cmd = "python scripts/finalize_release.py", help = "Finalize a new re
 
 # Main workflow shortcuts
 new-exp = "powershell -ExecutionPolicy Bypass -File ./new_experiment.ps1"
-run-exp = "powershell -ExecutionPolicy Bypass -File ./run_experiment.ps1"
 aud-exp = "powershell -ExecutionPolicy Bypass -File ./audit_experiment.ps1"
-upd-exp = "powershell -ExecutionPolicy Bypass -File ./update_experiment.ps1"
+rep-exp = "powershell -ExecutionPolicy Bypass -File ./repair_experiment.ps1"
 mig-exp = "powershell -ExecutionPolicy Bypass -File ./migrate_experiment.ps1"
 aud-stu = "powershell -ExecutionPolicy Bypass -File ./audit_study.ps1"
-upd-stu = "powershell -ExecutionPolicy Bypass -File ./update_study.ps1"
-ana-stu = "powershell -ExecutionPolicy Bypass -File ./analyze_study.ps1"
+rep-stu = "powershell -ExecutionPolicy Bypass -File ./repair_study.ps1"
+pro-stu = "powershell -ExecutionPolicy Bypass -File ./process_study.ps1"
 
-# Testing shortcuts
+# Testing shortcuts (Jul 31, 2025: test scripts are out of date)
 test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
 test-ps-aud = "pwsh tests/audit_experiment.Tests.ps1"
 test-ps-upd = "pwsh ./tests/update_experiment.Tests.ps1"

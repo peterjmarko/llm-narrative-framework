@@ -6,6 +6,8 @@ graph TD
         audit_experiment_ps1["audit_experiment.ps1"]
         migrate_experiment_ps1["migrate_experiment.ps1"]
         audit_study_ps1["audit_study.ps1"]
+        repair_study_ps1["repair_study.ps1"]
+        migrate_study_ps1["migrate_study.ps1"]
         process_study_ps1["process_study.ps1"]
     end
 
@@ -47,7 +49,7 @@ graph TD
     subgraph "4. Study-Level Analysis"
         direction TB
         compile_experiment["compile_experiment_results.py"]
-        agg_exps["aggregate_experiments.py"]
+        compile_study_results_py["compile_study_results.py"]
         study_analysis["study_analysis.py"]
     end
 
@@ -62,7 +64,9 @@ graph TD
     audit_experiment_ps1 --> exp_manager
     audit_study_ps1 --> exp_manager
     migrate_experiment_ps1 --> exp_manager
-    process_study_ps1 --> agg_exps
+    repair_study_ps1 --> exp_manager
+    migrate_study_ps1 --> exp_manager
+    process_study_ps1 --> compile_study_results_py
 
     exp_manager --> orchestrator
     exp_manager --> compile_experiment
@@ -81,7 +85,7 @@ graph TD
     build_queries --> query_generator
     run_sessions --> llm_prompter
 
-    agg_exps --> study_analysis
+    compile_study_results_py --> study_analysis
 
     %% --- Migration Workflow Connections ---
     patch_old --> restore_config
@@ -102,7 +106,7 @@ graph TD
     patch_old           -.-> config_loader
     restore_config      -.-> config_loader
     rebuild_reports     -.-> config_loader
-    agg_exps            -.-> config_loader
+    compile_study_results_py -.-> config_loader
     study_analysis      -.-> config_loader
     log_manager         -.-> config_loader
     generate_report     -.-> config_loader

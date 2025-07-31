@@ -3,7 +3,7 @@ graph TD
         direction TB
         A["repair_study.ps1<br/>(User Entry Point)"]:::entry_ps --> B["1. Pre-Repair Audit<br/><small>calls audit_study.ps1</small>"]:::script
         B --> C{"Audit Result?"}:::decision
-        C -->|Needs Migration| D((Halt & Report Error)):::stop_node
+        C -->|"Needs Migration"| D((Halt & Report Error)):::stop_node
         C -->|"All Validated"| E["Report 'All Up-to-Date'"]:::layer_green
         E --> G((Exit)):::stop_node
         C -->|"Needs Repair/Update"| F["List Experiments & Prompt User"]:::user_interaction

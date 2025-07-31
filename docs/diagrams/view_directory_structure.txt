@@ -10,15 +10,17 @@ personality_matching/
 ├── .env                        # Stores private API keys (not committed)
 ├── config.ini                  # Main configuration for running experiments
 |
-├── analyze_study.ps1           # ENTRY POINT: Analyze a completed study's results
-├── audit_experiment.ps1        # ENTRY POINT: Audit an experiment's completeness
-├── migrate_experiment.ps1      # ENTRY POINT: Migrate old experiment data
-├── new_experiment.ps1          # ENTRY POINT: Create a new experiment from scratch
-├── run_experiment.ps1          # ENTRY POINT: Repair or resume an existing experiment
-└── update_experiment.ps1       # ENTRY POINT: Re-run analysis for an existing experiment
+├── audit_experiment.ps1        # ENTRY POINT: Check a single experiment's status
+├── audit_study.ps1             # ENTRY POINT: Check a study's status
+├── migrate_experiment.ps1      # ENTRY POINT: Upgrade a single legacy experiment
+├── migrate_study.ps1           # ENTRY POINT: Upgrade all legacy experiments in a study
+├── new_experiment.ps1          # ENTRY POINT: Create a new experiment
+├── process_study.ps1           # ENTRY POINT: Compile and analyze a full study
+├── repair_experiment.ps1       # ENTRY POINT: Repair/update a single experiment
+└── repair_study.ps1            # ENTRY POINT: Repair all experiments in a study
 |
 ├── src/                        # All Python source code for the project
-│   ├── aggregate_experiments.py      # Aggregates experiments into a study summary
+│   ├── compile_study_results.py      # Aggregates experiments into a study summary
 │   ├── analyze_llm_performance.py  # Stage 4a: Calculates core metrics
 │   ├── build_llm_queries.py        # Stage 1: Generates all trial queries
 │   ├── compile_experiment_results.py # Compiles all replications for an experiment

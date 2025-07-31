@@ -1,38 +1,29 @@
-graph TD;
-
-    %% --- Style Definitions (Consistent with Workflow 5) ---
-    classDef WorkflowEntry fill:#1f77b4,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef Analysis fill:#17becf,stroke:#333,stroke-width:1px,color:#fff;
-    classDef DataArtifact fill:#f0f0f0,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5,color:#333;
-
-    %% === Nodes for Workflow 7: Audit a Study ===
-    audit_study_ps["audit_study.ps1<br/>(User Entry Point)"]:::WorkflowEntry;
-    
+graph TD
     subgraph "Workflow 7: Audit a Study"
-        direction TB
+        A["audit_study.ps1<br>(User Entry Point)"]:::entry_ps
 
-        subgraph "Stage 1: Individual Experiment Audits"
-            direction TB
-            exp_manager_audit["experiment_manager.py<br/>(--verify-only --quiet)"]:::Analysis;
-            exp_repl_files[("Experiment & Replication Files")]:::DataArtifact;
-        end
-        
-        subgraph "Stage 2: Study-Level Report Aggregation & Output"
+        subgraph "Stage 1: Readiness Audit"
             direction LR
-            console_display[("Console Display")];
-            study_audit_log[("study_audit_log.txt")]:::DataArtifact;
+            B["Calls experiment_manager.py --verify-only<br>on each experiment directory"]:::script
+        end
+        
+        C{"Are All Experiments<br>VALIDATED?"}:::decision
+
+        subgraph "Stage 2: Completeness Audit"
+            direction TB
+            D["Checks for final study artifacts:<br>- STUDY_results.csv<br>- anova/boxplots/<br>- anova/diagnostics/"]:::script
         end
 
-        %% === Connections ===
-        %% audit_study.ps1 calls exp_manager.py for each experiment
-        audit_study_ps --> exp_manager_audit;
-        exp_manager_audit -- "Scans" --> exp_repl_files;
-        exp_repl_files -- "Returns Audit Info" --> exp_manager_audit;
-        %% Individual audit results returned to audit_study.ps1
-        exp_manager_audit --> audit_study_ps;
-        
-        %% audit_study.ps1 displays consolidated report
-        audit_study_ps --> console_display;
-        %% audit_study.ps1 saves consolidated report
-        audit_study_ps --> study_audit_log;
+        E["Generates Final Report<br>(Console & Log File)"]:::process
     end
+
+    A --> B
+    B --> C
+    C -- No --> E
+    C -- Yes --> D
+    D --> E
+
+    classDef entry_ps fill:#337ab7,stroke:#2e6da4,color:#fff;
+    classDef script fill:#5bc0de,stroke:#46b8da,color:#fff;
+    classDef decision fill:#f0ad4e,stroke:#eea236,color:#333;
+    classDef process fill:#f1c40f,stroke:#f39c12,color:#333;

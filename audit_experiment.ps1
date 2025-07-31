@@ -60,43 +60,10 @@ if (Get-Command pdm -ErrorAction SilentlyContinue) {
     $prefixArgs = "run", "python"
 }
 
-# --- Helper function for post-processing the log file ---
-function Format-LogFile {
-    param([string]$Path)
-    
-    try {
-        if (-not (Test-Path $Path)) { return }
-
-        $lines = Get-Content -Path $Path
-        $newLines = @()
-
-        foreach ($line in $lines) {
-            $newLine = $line
-            if ($line.Trim().StartsWith("Start time:") -or $line.Trim().StartsWith("End time:")) {
-                $parts = $line.Split(':')
-                if ($parts.Length -ge 2) {
-                    $prefix = $parts[0] + ":"
-                    $timestampStr = ($parts[1..($parts.Length - 1)] -join ':').Trim()
-
-                    if ($timestampStr -match "^\d{14}$") {
-                        $dateTimeObj = [datetime]::ParseExact($timestampStr, 'yyyyMMddHHmmss', $null)
-                        $formattedTimestamp = $dateTimeObj.ToString('yyyy-MM-dd HH:mm:ss')
-                        $newLine = "$prefix $formattedTimestamp"
-                    }
-                }
-            }
-            $newLines += $newLine
-        }
-        
-        Set-Content -Path $Path -Value $newLines -Encoding UTF8
-    }
-    catch {
-        # If post-processing fails, do not crash the script. The original log is preserved.
-    }
-}
-
 # --- Main Script Logic ---
 $scriptExitCode = 0
+$LogFilePath = $null # Initialize to null
+
 try {
     # Clean and validate the input path to prevent errors from hidden characters or typos.
     $TargetDirectory = $TargetDirectory.Trim()
@@ -108,33 +75,29 @@ try {
     $scriptName = "src/experiment_manager.py"
     # Build the argument list for the python script itself.
     $pythonScriptArgs = @($ResolvedPath, "--verify-only")
-    if ($Verbose) {
+    if ($PSBoundParameters['Verbose']) {
         $pythonScriptArgs += "--verbose"
     }
     # Force the python script to generate color for stream processing
     $pythonScriptArgs += "--force-color"
 
-    # Define the log file name
+    # Define the log file name and path
     $logFileName = "experiment_audit_log.txt"
-    # Create the full, absolute path for file operations
     $LogFilePath = Join-Path $ResolvedPath $logFileName
     
     Write-Host "" # Add blank line for spacing
     Write-Host "The audit log will be saved to:"
-    # Manually construct the relative path for display, since the file doesn't exist yet.
-    # This uses the user-provided TargetDirectory, which is often already relative.
     $relativeLogPathForDisplay = Join-Path $TargetDirectory $logFileName
     Write-Host $relativeLogPathForDisplay
     
+    # Remove the old log file if it exists to ensure a clean run
     if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
 
     # Execute the python script, stream its output to both the console and the log file,
-    # and capture the exit code.
+    # and capture the exit code. This is the correct method for this script.
     & $executable $prefixArgs $scriptName $pythonScriptArgs *>&1 | Tee-Object -FilePath $LogFilePath
     $pythonExitCode = $LASTEXITCODE
 
-    Format-LogFile -Path $LogFilePath
-    
     # The Python script handles all UI. This wrapper just passes the exit code through.
     $scriptExitCode = $pythonExitCode
 }
@@ -143,14 +106,22 @@ catch {
     Write-Host "### AUDIT FAILED ###" -ForegroundColor Red
     Write-Host "######################################################`n" -ForegroundColor Red
     Write-Error $_.Exception.Message
-    # Only attempt to format the log if the path was successfully created and exists.
-    if ($LogFilePath -and (Test-Path $LogFilePath)) {
-        Format-LogFile -Path $LogFilePath
-    }
     $scriptExitCode = 1
 }
 finally {
-    if (Test-Path -LiteralPath $LogFilePath) {
+    if ($LogFilePath -and (Test-Path -LiteralPath $LogFilePath)) {
+        # Post-process the log file to remove ANSI escape codes.
+        try {
+            $logContent = Get-Content -Path $LogFilePath -Raw
+            # Regex to match and replace ANSI color codes. `e is the escape character.
+            $cleanedContent = $logContent -replace "`e\[[0-9;]*m", ''
+            Set-Content -Path $LogFilePath -Value $cleanedContent.Trim() -Force
+        }
+        catch {
+            # If cleanup fails, do not crash the script. The original log is preserved.
+            Write-Warning "Could not clean ANSI codes from the log file: $($_.Exception.Message)"
+        }
+
         Write-Host "`nThe audit log has been saved to:" -ForegroundColor Gray
         $relativePath = Resolve-Path -Path $LogFilePath -Relative
         Write-Host $relativePath -ForegroundColor Gray
@@ -159,4 +130,5 @@ finally {
 }
 
 exit $scriptExitCode
+
 # === End of audit_experiment.ps1 ===

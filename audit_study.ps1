@@ -229,9 +229,52 @@ try {
     }
 
     # --- Final Conclusion ---
-    $isStudyValidated = ($auditResults | Where-Object { $_.TrueStatus -ne "VALIDATED" }).Count -eq 0
+    # Part 1: Check if all individual experiments are validated and ready.
+    $isStudyReadyForProcessing = ($auditResults | Where-Object { $_.TrueStatus -ne "VALIDATED" }).Count -eq 0
 
-    if ($isStudyValidated) {
+    # Part 2: Check for the final study-level artifacts.
+    $studyCsvExists = Test-Path (Join-Path $ResolvedPath "STUDY_results.csv")
+    $boxplotsDirExists = Test-Path (Join-Path $ResolvedPath "anova/boxplots")
+    $diagnosticsDirExists = Test-Path (Join-Path $ResolvedPath "anova/diagnostics")
+    $isStudyComplete = $isStudyReadyForProcessing -and $studyCsvExists -and $boxplotsDirExists -and $diagnosticsDirExists
+
+    # If the study is ready for processing, show the completeness audit table.
+    if ($isStudyReadyForProcessing) {
+        $completenessChecks = @(
+            @{ Name = "STUDY_results.csv"; Found = $studyCsvExists },
+            @{ Name = "anova/boxplots/ directory"; Found = $boxplotsDirExists },
+            @{ Name = "anova/diagnostics/ directory"; Found = $diagnosticsDirExists }
+        )
+
+        Write-Output "$c_cyan`n$headerLine$c_reset"
+        Write-Output "$c_cyan$(Format-HeaderLine "STUDY COMPLETENESS AUDIT")$c_reset"
+        Write-Output "$c_cyan$headerLine`n$c_reset"
+
+        $artifactNameWidth = 40
+        $statusWidth = 10
+        $completenessHeader = ("{0,-$artifactNameWidth}" -f "Artifact") + $gap + "Status"
+        Write-Output $completenessHeader
+        $completenessUnderline = ("-" * $artifactNameWidth) + $gap + ("-" * "Status".Length)
+        Write-Output $completenessUnderline
+
+        foreach ($check in $completenessChecks) {
+            $statusText = if ($check.Found) { "[  OK  ]" } else { "[ FAIL ]" }
+            $statusColor = if ($check.Found) { $c_green } else { $c_red }
+            $statusPart = "$statusColor{0,-$statusWidth}$c_reset" -f $statusText
+            $line = ("{0,-$artifactNameWidth}" -f $check.Name) + $gap + $statusPart
+            Write-Output $line
+        }
+    }
+    
+    if ($isStudyComplete) {
+        # Case 1: All experiments are valid AND the final study artifacts exist.
+        Write-Output "$c_green`n$headerLine$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "AUDIT FINISHED: STUDY IS COMPLETE")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "Recommendation: No further action is required.")$c_reset"
+        Write-Output "$c_green$headerLine`n$c_reset"
+    }
+    elseif ($isStudyReadyForProcessing) {
+        # Case 2: All experiments are valid BUT the final study artifacts are missing.
         Write-Output "$c_green`n$headerLine$c_reset"
         Write-Output "$c_green$(Format-HeaderLine "AUDIT FINISHED: STUDY IS VALIDATED")$c_reset"
         Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'process_study.ps1' to")$c_reset"
@@ -239,6 +282,7 @@ try {
         Write-Output "$c_green$headerLine`n$c_reset"
     }
     else {
+        # Case 3: One or more experiments are not ready (need repair, migration, etc.).
         Write-Output "$c_red`n$headerLine$c_reset"
         Write-Output "$c_red$(Format-HeaderLine "AUDIT FINISHED: STUDY IS NOT READY")$c_reset"
         Write-Output "$c_red$(Format-HeaderLine "Recommendation: Address issues listed above.")$c_reset"
@@ -258,19 +302,33 @@ catch {
     $scriptExitCode = 1
 }
 finally {
-    # Only stop the transcript if this script was the one that started it.
-    if (-not $NoLog.IsPresent) {
+    # Only stop the transcript and clean the log if this script was the one that started it.
+    if (-not $NoLog.IsPresent -and (Test-Path -LiteralPath $LogFilePath)) {
         Stop-Transcript | Out-Null
         
-        if (Test-Path -LiteralPath $LogFilePath) {
-            Write-Host "`nThe audit log has been saved to:" -ForegroundColor Gray
-            $relativePath = Resolve-Path -Path $LogFilePath -Relative
-            Write-Host $relativePath -ForegroundColor Gray
-            Write-Host "" # Add a blank line for spacing
+        # Post-process the log file to remove the default transcript header and footer.
+        try {
+            $logContent = Get-Content -Path $LogFilePath -Raw
+            # Regex to find and remove the header block
+            $cleanedContent = $logContent -replace '(?s)\*+\r?\nPowerShell transcript start.*?\*+\r?\n\r?\n', ''
+            # Regex to find and remove the footer block
+            $cleanedContent = $cleanedContent -replace '(?s)\*+\r?\nPowerShell transcript end.*', ''
+            # Overwrite the file with the cleaned content
+            Set-Content -Path $LogFilePath -Value $cleanedContent.Trim() -Force
         }
+        catch {
+            # If cleanup fails, the original log is preserved.
+            Write-Warning "Could not clean the transcript log file: $($_.Exception.Message)"
+        }
+
+        Write-Host "`nThe audit log has been saved to:" -ForegroundColor Gray
+        $relativePath = Resolve-Path -Path $LogFilePath -Relative
+        Write-Host $relativePath -ForegroundColor Gray
+        Write-Host "" # Add a blank line for spacing
     }
 }
 
 # Exit with the overall status code. 0 means VALIDATED, non-zero means NOT READY.
 exit $scriptExitCode
+
 # === End of audit_study.ps1 ===

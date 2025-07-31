@@ -660,7 +660,7 @@ def _run_verify_only_mode(target_dir: Path, expected_reps: int, colors, suppress
 
         if print_report:
             # Set a max width for the directory name column to keep the table compact
-            MAX_NAME_WIDTH = 65
+            MAX_NAME_WIDTH = 40
             max_name_len = min(max(len(run['name']) for run in all_runs_data), MAX_NAME_WIDTH) if all_runs_data else 20
 
             print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")

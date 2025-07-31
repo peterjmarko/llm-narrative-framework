@@ -172,50 +172,11 @@ function Invoke-PythonScript {
     }
     else {
                 # By default, parse the output and show a clean, high-level summary.
-        if ($ScriptName -like "*aggregate_experiments.py*") {
-            $processedExperiments = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-            $outputBlock = $output -join "`n"
-            $uniqueDisplayNames = $script:modelNameMap.Values | Get-Unique
-
-            foreach ($line in $output) {
-                if ($line -match "-> Generated summary:.*EXPERIMENT_results\.csv") {
-                    $experimentDirName = (Split-Path -Path $line -Parent | Split-Path -Leaf)
-
-                    $foundDisplayName = $null
-                    # Find the display name by checking which one matches the folder structure
-                    foreach ($displayName in $uniqueDisplayNames) {
-                        # Convert "Grok 3 Mini" to "Grok_3_Mini" to match folder name style
-                        $folderSearchString = $displayName.Replace(' ', '_')
-                        if ($experimentDirName -match $folderSearchString) {
-                            $foundDisplayName = $displayName
-                            break
-                        }
-                    }
-
-                    if ($foundDisplayName) {
-                        $mappingStrategy = "unknown"
-                        if ($experimentDirName -match 'map=(correct|random)') {
-                            $mappingStrategy = $matches[1]
-                        }
-                        $uniqueExperimentId = "$foundDisplayName-$mappingStrategy"
-
-                        if (-not $processedExperiments.Contains($uniqueExperimentId)) {
-                            Write-Host "  - Aggregating: $foundDisplayName ($($mappingStrategy) map)"
-                            [void]$processedExperiments.Add($uniqueExperimentId)
-                        }
-                    }
-                }
-            }
-            
-            # After the loop, print the final overall summary line
-            $finalSummaryMatch = [regex]::Match($outputBlock, "-> Generated summary:\s*(.*final_summary_results\.csv.*)")
-            if ($finalSummaryMatch.Success) {
-                $finalSummaryLine = $finalSummaryMatch.Groups[1].Value.Trim()
-                Write-Host "  - Generated final study summary:`n    $finalSummaryLine" # Newline before path
-            }
-
-            $output | Select-String -Pattern "Aggregation process finished" | ForEach-Object { $_.Line }
-
+        if ($ScriptName -like "*compile_study_results.py*") {
+            # The Python script is expected to print its own clean summary.
+            # This just prints lines that look like summary lines (starting with 'Found' or '->').
+            $output | Select-String -Pattern "^(Found|  ->)" | ForEach-Object { "  $($_.Line)" }
+            $output | Select-String -Pattern "Study compilation complete." | ForEach-Object { "  $($_.Line)" }
         }
         elseif ($ScriptName -like "*study_analyzer.py*") {
             $metricName = $null
@@ -268,7 +229,7 @@ try {
 
     # Run the audit and capture its output to check the final status.
     # The audit script prints its own report, so we don't need to explicitly write the output here.
-    $auditOutput = & $auditScriptPath -StudyDirectory $TargetDirectory -ErrorAction Stop
+    $auditOutput = & $auditScriptPath -TargetDirectory $TargetDirectory -ErrorAction Stop
     
     if ($LASTEXITCODE -ne 0) {
         # The audit script already prints a clear banner with the error and recommendation.
@@ -290,8 +251,8 @@ try {
     Write-Host "Step '1/3: Pre-Analysis Audit' completed successfully." -ForegroundColor Green
     Write-Host ""
 
-    # --- Step 2: Compile All Results into a Master CSV ---
-    Invoke-PythonScript -StepName "2/3: Compile Study Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
+        # --- Step 2: Compile All Results into a Master CSV ---
+        Invoke-PythonScript -StepName "2/3: Compile Study Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
 
     # --- Step 3: Run Final Statistical Analysis ---
     Invoke-PythonScript -StepName "3/3: Run Final Analysis (ANOVA)" -ScriptName "src/study_analyzer.py" -Arguments $ResolvedPath
