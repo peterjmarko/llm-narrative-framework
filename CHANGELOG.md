@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.7.0 (2025-07-31)
+
+### Bump
+
+- **version 3.6.2 → 3.7.0**
+
+### Features
+
+- **Enhance study-level workflows and align all documentation**
+  This commit introduces a major enhancement to the study-level workflows and brings all project documentation into alignment with the current codebase.
+  
+  Workflow Enhancements:
+  - `audit_study.ps1` now performs a robust two-part audit for both readiness and completeness, with a more transparent report.
+  - Logging across all PowerShell scripts is now standardized and produces clean, reliable log files that correctly capture Python output.
+  - The output parser in `process_study.ps1` has been fixed.
+  
+  Documentation Overhaul:
+  - Updated all workflow and script descriptions in `DOCUMENTATION.template.md` for accuracy and clarity.
+  - Improved document structure and removed redundant sections.
+  - Updated all relevant workflow and architecture diagrams.
+  - Added a "Known Issues and Future Work" section to track the project's roadmap.
 ## 3.6.2 (2025-07-30)
 
 ### Bump
