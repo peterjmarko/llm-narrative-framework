@@ -21,6 +21,7 @@
   - Improved document structure and removed redundant sections.
   - Updated all relevant workflow and architecture diagrams.
   - Added a "Known Issues and Future Work" section to track the project's roadmap.
+
 ## 3.6.2 (2025-07-30)
 
 ### Bump
@@ -33,6 +34,7 @@
   The `migrate_study.ps1` script correctly prompted for user consent but failed to pass this consent to the `migrate_experiment.ps1` script it called in a loop. This resulted in a redundant confirmation prompt for each experiment in the study.
   
   This fix adds the `-NonInteractive = $true` flag to the call, ensuring that once study-level migration is approved, the individual experiment migrations proceed automatically without further user interaction.
+
 ## 3.6.1 (2025-07-30)
 
 ### Bump
@@ -47,6 +49,7 @@
   This fix modifies the `Copy-Item` command to use a wildcard path (Join-Path $TargetPath "*"), ensuring only the contents are copied. This resolves the nesting issue and allows the migration workflow to correctly reprocess existing data without unnecessary LLM calls.
   
   This change was validated for both migrate_experiment.ps1 and the batch-wrapper migrate_study.ps1.
+
 ## 3.6.0 (2025-07-30)
 
 ### Bump
@@ -73,6 +76,7 @@
   
   Known Issues:
   - The `migrate_study.ps1` and `migrate_experiment.ps1` scripts incorrectly re-run LLM API calls when forcing a migration on an already valid experiment. This is a non-destructive but unintended behavior that will be addressed in a future release.
+
 ## 3.5.0 (2025-07-29)
 
 ### Bump
@@ -91,6 +95,7 @@
   - Fixes critical classification bugs in the experiment_manager.py audit logic to correctly distinguish between states requiring repair, update, or migration.
   
   - Updates all documentation, diagrams, and workflow descriptions to reflect the new scripts and simplified 5-stage pipeline.
+
 ## 3.4.0 (2025-07-29)
 
 ### Bump
@@ -121,6 +126,7 @@
   
   ### 4. Documentation Overhaul:
   - All relevant documentation (`DOCUMENTATION.md`, script docstrings, diagrams) has been updated to reflect the new diagnostic logic and improved workflows.
+
 ## 3.3.2 (2025-07-28)
 
 ### Bump
@@ -137,6 +143,7 @@
   - Reworded user prompts in `migrate_experiment.ps1` to provide clearer recommendations when an experiment needs repair or reprocessing.
   - Corrected message coloring for prompts and the "aborted by user" notice to improve readability.
   - Added color-coding to the "Overall Summary" statistics in audit reports for immediate visual feedback on experiment completeness.
+
 ## 3.3.1 (2025-07-28)
 
 ### Bump
@@ -156,6 +163,7 @@
   - Resolves an unhandled state bug in experiment_manager.py that caused migration to fail during finalization.
   - Refines user-facing prompts and removes redundant banners for a cleaner UX.
   - Corrects a Mermaid diagram parsing error.
+
 ## 3.3.0 (2025-07-28)
 
 ### Bump
@@ -172,6 +180,7 @@
   - Standardizes all audit results (success, failure, and update) into a consistent 4-line banner format for improved readability.
   - The audit banner's "Recommendation" line is now automatically suppressed during non-interactive repair flows, providing cleaner output.
   - The final success message for all repair actions is now the standardized "PASSED" banner, ensuring a consistent user experience.
+
 ## 3.2.0 (2025-07-28)
 
 ### Bump
@@ -197,6 +206,7 @@
     - Updated script docstrings.
     - Added `cover_letter.md` to the DOCX build process in `build_docs.py`.
     - Renamed `study_supplement.md` to `study_supplements.md` for clarity.
+
 ## 3.1.0 (2025-07-27)
 
 ### Bump
@@ -225,6 +235,7 @@
   
   Fixed:
   - Corrected a bug in the timestamp formatting (`%Ym%d` -> `%Y%m%d`) that caused incorrect directory naming for new experiments.
+
 ## 3.0.3 (2025-07-26)
 
 ### Bump
@@ -244,6 +255,7 @@
       -   Improved layout and color-coding in `process_study.ps1` for clearer step-by-step progress.
   
   -   **Parameter Consistency:** Standardized the main directory parameter to `-TargetDirectory` across all study-level scripts and their documentation.
+
 ## 3.0.2 (2025-07-26)
 
 ### Bump
@@ -261,6 +273,7 @@
   -   Updates `pyproject.toml` to reflect the new script paths for PDM commands.
   
   This change enhances clarity by enforcing a clean separation of concerns, making the codebase easier to navigate.
+
 ## 3.0.1 (2025-07-26)
 
 ### Bump
@@ -299,6 +312,7 @@
   - Updated all documentation, diagrams, and docstrings to align with the new architecture.
   
   BREAKING CHANGE: The user entry point 'analyze_study.ps1' has been renamed to 'process_study.ps1'. Any scripts or user workflows that called the old script by name will need to be updated.
+
 ## 2.14.0 (2025-07-26)
 
 ### Bump
@@ -315,6 +329,7 @@
   - Added new documentation, including a data README, study supplement, and cover letter.
   - Expanded testing with a new Bayesian analysis test.
   - Reorganized historical data into a new pilot_studies/ directory.
+  
 ## 2.13.0 (2025-07-24)
 
 ### Bump
