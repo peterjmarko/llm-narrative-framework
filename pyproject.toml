@@ -99,4 +99,5 @@ version_files = [
     "pyproject.toml:version"
 ]
 tag_format = "v$version"
+changelog_file = "CHANGELOG.md"
 changelog_format = "keep_a_changelog"
