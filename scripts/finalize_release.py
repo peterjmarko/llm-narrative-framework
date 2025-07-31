@@ -102,83 +102,6 @@ def get_next_version():
         print(f"{C_RED}ERROR: Failed to determine next version.{C_RESET}\n{e.output}")
         sys.exit(1)
 
-def generate_detailed_changelog(new_version, simple_changelog):
-    """Generates a detailed changelog entry and prepends it to the file."""
-    print(f"{C_CYAN}--- Generating detailed changelog for {new_version}... ---{C_RESET}")
-    try:
-        # Get the previous tag to define the commit range
-        previous_tag = subprocess.check_output(
-            ["git", "describe", "--tags", "--abbrev=0", f"{new_version}^"],
-            text=True
-        ).strip()
-
-        # Get commit logs in a parsable format
-        commit_log = subprocess.check_output(
-            ["git", "log", f"{previous_tag}..{new_version}", "--pretty=format:%s%n%b%n--END--"],
-            text=True,
-            encoding='utf-8'
-        ).strip()
-
-        # Group commits by type (feat, fix, etc.)
-        commits_by_type = {}
-        for commit_str in commit_log.split("--END--"):
-            commit_str = commit_str.strip()
-            if not commit_str:
-                continue
-            lines = commit_str.split('\n')
-            header = lines[0]
-            body = "\n".join(lines[1:]).strip()
-            
-            match = re.match(r"(\w+)(?:\(([\w,-]+)\))?:\s*(.+)", header)
-            if not match:
-                continue
-            
-            commit_type, _, subject = match.groups()
-            
-            if commit_type not in commits_by_type:
-                commits_by_type[commit_type] = []
-            
-            entry = f"- **{subject}**"
-            if body:
-                indented_body = "\n".join([f"  {line}" for line in body.split('\n')])
-                entry += f"\n{indented_body}"
-            commits_by_type[commit_type].append(entry)
-
-        # Use the simple changelog from cz bump for the header and Bump section
-        new_changelog_section = [simple_changelog]
-        type_map = {"feat": "Features", "fix": "Fixes", "docs": "Documentation"}
-
-        # Filter out 'chore' commits from the detailed log, as they are in the 'Bump' line
-        commits_by_type.pop("chore", None)
-
-        for commit_type, commits in sorted(commits_by_type.items()):
-            heading = type_map.get(commit_type, commit_type.capitalize())
-            new_changelog_section.append(f"### {heading}\n")
-            new_changelog_section.extend(commits)
-            new_changelog_section.append("") # Add a blank line
-
-        # Read old changelog and prepend the new section
-        changelog_path = 'CHANGELOG.md'
-        with open(changelog_path, 'r', encoding='utf-8') as f:
-            old_content = f.read()
-        
-        # Find the start of the existing content (after the title)
-        header_match = re.search(r"(# Changelog\n\n)", old_content)
-        if header_match:
-            start_of_entries = header_match.end(1)
-            new_content = old_content[:start_of_entries] + "\n".join(new_changelog_section) + old_content[start_of_entries:]
-        else: # Fallback if header is missing
-            new_content = "\n".join(new_changelog_section) + old_content
-
-        with open(changelog_path, 'w', encoding='utf-8') as f:
-            f.write(new_content)
-        
-        print(f"{C_GREEN}Successfully updated {changelog_path}.{C_RESET}")
-
-    except Exception as e:
-        print(f"{C_RED}ERROR: Failed to generate changelog: {e}{C_RESET}")
-        sys.exit(1)
-
 def main():
     """Orchestrates the entire release finalization process."""
     print(f"\n{C_GREEN}Starting automated release process...{C_RESET}")
@@ -189,14 +112,25 @@ def main():
         print(f"\n{C_GREEN}Process finished. Nothing to release.{C_RESET}")
         return
 
-    # Step 2: Run the bump, capturing the simple changelog to stdout
-    simple_changelog = run_command(
+    # Step 2: Run bump with --changelog to get the formatted entry from stdout
+    changelog_entry = run_command(
         ["pdm", "run", "cz", "bump", "--changelog", new_version.lstrip('v')],
-        "Step 1/4: Bumping version and creating initial commit/tag"
+        "Step 1/4: Bumping version, creating initial commit/tag, and generating changelog text"
     )
 
-    # Step 3: Generate the detailed changelog
-    generate_detailed_changelog(new_version, simple_changelog)
+    # Step 3: Prepend the captured changelog to the file with correct spacing
+    print(f"{C_CYAN}--- Updating CHANGELOG.md... ---{C_RESET}")
+    changelog_path = 'CHANGELOG.md'
+    try:
+        with open(changelog_path, 'r+', encoding='utf-8') as f:
+            old_content = f.read()
+            f.seek(0)
+            # Write the entry from cz, add our blank line, then the old content.
+            f.write(changelog_entry.strip() + '\n\n' + old_content)
+        print(f"{C_GREEN}Successfully updated {changelog_path}.{C_RESET}")
+    except Exception as e:
+        print(f"{C_RED}ERROR: Failed to update changelog: {e}{C_RESET}")
+        sys.exit(1)
 
     # Step 4: Finalize by amending the commit and moving the tag
     run_command(
