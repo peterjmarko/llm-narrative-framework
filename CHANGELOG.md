@@ -329,7 +329,7 @@
   - Added new documentation, including a data README, study supplement, and cover letter.
   - Expanded testing with a new Bayesian analysis test.
   - Reorganized historical data into a new pilot_studies/ directory.
-  
+
 ## 2.13.0 (2025-07-24)
 
 ### Bump

@@ -102,7 +102,7 @@ def get_next_version():
         print(f"{C_RED}ERROR: Failed to determine next version.{C_RESET}\n{e.output}")
         sys.exit(1)
 
-def generate_detailed_changelog(new_version):
+def generate_detailed_changelog(new_version, simple_changelog):
     """Generates a detailed changelog entry and prepends it to the file."""
     print(f"{C_CYAN}--- Generating detailed changelog for {new_version}... ---{C_RESET}")
     try:
@@ -144,10 +144,12 @@ def generate_detailed_changelog(new_version):
                 entry += f"\n{indented_body}"
             commits_by_type[commit_type].append(entry)
 
-        # Build the new changelog section
-        today = datetime.now().strftime("%Y-%m-%d")
-        new_changelog_section = [f"## {new_version.lstrip('v')} ({today})\n"]
-        type_map = {"feat": "Features", "fix": "Fixes", "docs": "Documentation", "chore": "Chore"}
+        # Use the simple changelog from cz bump for the header and Bump section
+        new_changelog_section = [simple_changelog]
+        type_map = {"feat": "Features", "fix": "Fixes", "docs": "Documentation"}
+
+        # Filter out 'chore' commits from the detailed log, as they are in the 'Bump' line
+        commits_by_type.pop("chore", None)
 
         for commit_type, commits in sorted(commits_by_type.items()):
             heading = type_map.get(commit_type, commit_type.capitalize())
@@ -187,14 +189,14 @@ def main():
         print(f"\n{C_GREEN}Process finished. Nothing to release.{C_RESET}")
         return
 
-    # Step 2: Run the initial bump (without detailed changelog)
-    run_command(
-        ["pdm", "run", "cz", "bump", new_version.lstrip('v')],
+    # Step 2: Run the bump, capturing the simple changelog to stdout
+    simple_changelog = run_command(
+        ["pdm", "run", "cz", "bump", "--changelog", new_version.lstrip('v')],
         "Step 1/4: Bumping version and creating initial commit/tag"
     )
 
     # Step 3: Generate the detailed changelog
-    generate_detailed_changelog(new_version)
+    generate_detailed_changelog(new_version, simple_changelog)
 
     # Step 4: Finalize by amending the commit and moving the tag
     run_command(
