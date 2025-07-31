@@ -101,3 +101,5 @@ version_files = [
 tag_format = "v$version"
 changelog_file = "CHANGELOG.md"
 changelog_format = "keep_a_changelog"
+changelog_message_builder_cls = "commitizen.message_builder.changelog_message_builder.KeepAChangelogMessageBuilder"
+template = "cz_templates/keep_a_changelog_template.j2"
