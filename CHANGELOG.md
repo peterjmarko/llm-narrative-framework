@@ -1,5 +1,49 @@
 # Changelog
 
+## 3.7.1 (2025-07-31)
+
+### Bump
+
+- **version 3.7.0 → 3.7.1**
+
+### Fixes
+
+- **Revert release process to original stable state**
+  Recent attempts to fix a minor formatting issue in CHANGELOG.md (missing blank line) introduced critical bugs that broke the entire release process.
+  
+  This commit reverts `scripts/finalize_release.py` and `pyproject.toml` to their original, functional state from v3.7.0.
+  
+  This restores the reliable release functionality. The minor formatting issue in the changelog will be addressed separately in a future update.
+- **Ensure correct changelog formatting via release script**
+  The `commitizen` tool was creating poorly formatted changelog entries. Previous attempts to fix this were unsuccessful.
+  
+  This commit implements a definitive fix by giving the `scripts/finalize_release.py` script exclusive control over writing to the changelog.
+  
+  1. `pyproject.toml` is updated to remove the `changelog_file` key, preventing `cz bump` from writing to the file directly.
+  2. `finalize_release.py` is refactored to:
+     - Capture the complete, formatted changelog entry from `cz bump --changelog`.
+     - Delete the broken manual changelog generation logic.
+     - Prepend the captured entry to CHANGELOG.md with the correct trailing blank line.
+- **Ensure correct changelog formatting via release script**
+  The `commitizen` tool was creating poorly formatted and sometimes duplicated entries in CHANGELOG.md. Previous attempts to fix this with templates or hooks were unsuccessful.
+  
+  This commit implements a definitive fix by giving the `scripts/finalize_release.py` script exclusive control over writing to the changelog.
+  
+  1. `pyproject.toml` is updated to remove the `changelog_file` key, preventing `cz bump` from writing to the file.
+  2. `finalize_release.py` is updated to capture the simple changelog output from `cz bump` and combine it with a detailed commit log, creating a single, perfectly formatted entry that it writes to CHANGELOG.md.
+- **Add blank line between release entries via changelog hook**
+  The default `keep_a_changelog` format in commitizen does not include a blank line between release entries. The previous attempt to fix this with a custom template failed because the `template` key is ignored by this format.
+  
+  This commit implements a robust fix using a `changelog_hook`.
+  1. A new script, `scripts/changelog_hook.py`, is introduced to programmatically prepend the new entry to the changelog with correct spacing.
+  2. `pyproject.toml` is updated to use this hook.
+  3. The obsolete `cz_templates/` directory has been removed.
+- **Add blank line between release entries**
+  The default `keep_a_changelog` format in commitizen does not include a blank line between release entries, making the changelog difficult to read.
+  
+  This fix overrides the default by:
+  1. Creating a custom Jinja2 template (`cz_templates/keep_a_changelog_template.j2`) that adds the required trailing newline.
+  2. Updating `pyproject.toml` to use this custom template.
 ## 3.7.0 (2025-07-31)
 
 ### Bump
