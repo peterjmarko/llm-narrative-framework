@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/convert_py_to_txt.py
+# Filename: src/convert_py_to_txt.py
 
 """
 Python to Text Conversion Utility (convert_py_to_txt.py)
@@ -292,4 +292,4 @@ def main():
 if __name__ == "__main__":  # pragma: no cover
     main()
 
-# === End of scripts/convert_py_to_txt.py ===
+# === End of src/convert_py_to_txt.py ===

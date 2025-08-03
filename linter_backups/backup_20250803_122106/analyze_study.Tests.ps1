@@ -1,5 +1,5 @@
-#!/usr/bin/env pwsh
-#-*- coding: utf-8 -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -17,8 +17,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/analyze_study.Tests.ps1
+# Filename: analyze_study.Tests.ps1
 
+# Import the shared test harness
 . (Join-Path $PSScriptRoot "Test-Harness.ps1")
 
 # --- Mock Implementations ---
@@ -81,4 +82,4 @@ Run-Test "config.ini valid but empty display name map should warn" {
 # --- Finalize the run ---
 Finalize-Test-Run
 
-# === End of tests/analyze_study.Tests.ps1 ===
+# === End of analyze_study.Tests.ps1 ===

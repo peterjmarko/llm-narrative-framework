@@ -1,5 +1,5 @@
-#!/usr/bin/env pwsh
-#-*- coding: utf-8 -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
 # Copyright (C) 2025 [Your Name/Institution]
@@ -19,6 +19,7 @@
 #
 # Filename: tests/migrate_experiment.Tests.ps1
 
+# Import the shared test harness
 . (Join-Path $PSScriptRoot "Test-Harness.ps1")
 
 # --- Test-Specific Setup ---

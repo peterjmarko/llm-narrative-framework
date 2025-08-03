@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/lint_file_headers.py
+
 
 """
 A custom linter to enforce a standard header and footer format for all project scripts.

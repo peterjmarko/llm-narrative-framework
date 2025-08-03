@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/finalize_release.py
+# Filename: src/finalize_release.py
 
 """
 Automated Release Finalization Script.
@@ -215,4 +215,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/finalize_release.py ===
+# === End of src/finalize_release.py ===

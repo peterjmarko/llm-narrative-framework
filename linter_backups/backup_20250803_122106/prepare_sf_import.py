@@ -1,23 +1,8 @@
 #!/usr/bin/env python3
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
-# Personality Matching Experiment Framework
+# Helper script to prepare Astro-Databank data for Solar Fire import.
 # Copyright (C) 2025 [Your Name/Institution]
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-# Filename: src/prepare_sf_import.py
 
 """
 This script automates the "Data Preparation" step described in the
@@ -259,5 +244,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     main(args.input_file, args.output_file, args.country_codes_file)
-
-# === End of src/prepare_sf_import.py ===

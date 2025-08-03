@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/list_project_files.py
+# Filename: src/list_project_files.py
 
 """
 Project Structure Reporter (list_project_files.py)
@@ -348,4 +348,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/list_project_files.py ===
+# === End of src/list_project_files.py ===

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/lint_file_headers.py
+# Filename: src/lint_file_headers.py
 
 """
 A custom linter to enforce a standard header and footer format for all project scripts.
@@ -122,192 +122,206 @@ def is_header_line(line):
     stripped = line.strip()
     return not stripped or stripped.startswith(('#!', '#-*-', '#'))
 
-def analyze_file_content(original_content, relative_path):
+def process_file(file_path, project_root, fix=False):
     """
-    Analyzes a file's content and returns its parts and compliance status.
+    Analyzes a file and optionally fixes it. Returns a status string:
+    'VALID', 'INVALID', 'FIXED', 'SKIPPED', or 'ERROR'.
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            original_content = f.read()
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return 'ERROR'
 
-    Returns:
-        dict: A dictionary containing:
-              'is_compliant' (bool),
-              'core_content' (str),
-              'correct_content' (str)
-    """
     lines = original_content.splitlines()
 
-    # Find the end of the header
+    # Find the end of the header (first line that is not a comment/shebang/blank)
     header_end_index = 0
     for i, line in enumerate(lines):
         if not is_header_line(line):
             header_end_index = i
             break
-    else:
+    else: # If loop completes without break, file is all comments/blank
         header_end_index = len(lines)
 
-    # Find the start of the footer
+    # Find the start of the footer (first footer line from the bottom)
     footer_start_index = len(lines)
     for i in range(len(lines) - 1, -1, -1):
         if lines[i].strip().startswith('# === End of'):
             footer_start_index = i
             break
 
+    # The body is everything between the header and the footer.
     core_content = "\n".join(lines[header_end_index:footer_start_index]).strip()
-    
-    _, file_extension = os.path.splitext(relative_path)
-    correct_content = generate_correct_content(core_content, relative_path, file_extension)
 
-    # Normalize line endings for a reliable comparison
-    normalized_original = original_content.replace('\r\n', '\n')
-    is_compliant = (normalized_original == correct_content)
+    relative_path = os.path.relpath(file_path, project_root)
+    _, file_extension = os.path.splitext(file_path)
     
-    return {
-        'is_compliant': is_compliant,
-        'core_content': core_content,
-        'correct_content': correct_content
-    }
+    correct_content = generate_correct_content(core_content, relative_path, file_extension)
+    
+    if not correct_content:
+        return 'SKIPPED' # Unsupported file type
+
+    # Normalize line endings for comparison
+    normalized_original_content = original_content.replace('\r\n', '\n')
+
+    if normalized_original_content != correct_content:
+        if fix:
+            try:
+                with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
+                    f.write(correct_content)
+                return 'FIXED'
+            except Exception as e:
+                print(f"Error writing to {file_path}: {e}")
+                return 'ERROR'
+        else:
+            return 'INVALID'
+    
+    return 'VALID'
 
 def main():
+    # This script no longer uses command-line arguments.
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     
     print(f"\n{Colors.YELLOW}Scanning project for script files...{Colors.ENDC}")
     
-    # --- Initializing result categories ---
     results = {'COMPLIANT': [], 'NON_COMPLIANT': [], 'SKIPPED': [], 'ERROR': [], 'UNSCANNED': []}
-    file_contents = {} # Store file contents to avoid re-reading
-
-    # --- Categorize directories and collect files ---
-    # (Code for this section remains the same as the last correct version)
+    
+    # --- Categorize all top-level directories ---
     explicitly_scanned_dirs = {'scripts', 'src', 'tests'}
     tooling_dirs_to_skip = {'.pytest_cache', '.venv', 'htmlcov', 'node_modules', '.git', '.idea', '.vscode', 'linter_backups'}
+    
     all_top_level_dirs = {item.name for item in os.scandir(project_root) if item.is_dir()}
+    
     unscanned_project_dirs = all_top_level_dirs - explicitly_scanned_dirs - tooling_dirs_to_skip
     results['UNSCANNED'].extend(sorted(list(unscanned_project_dirs)))
+    
+    # Add tooling directories that actually exist to the SKIPPED list
     existing_tooling_dirs = tooling_dirs_to_skip & all_top_level_dirs
     results['SKIPPED'].extend([f"{d}/ (tooling directory)" for d in sorted(list(existing_tooling_dirs))])
+
+    # --- Collect and categorize files ---
     dirs_to_scan = [project_root] + [os.path.join(project_root, d) for d in ['scripts', 'src', 'tests']]
     all_candidate_files = []
     for d in dirs_to_scan:
-        patterns = [os.path.join(d, '**' if d != project_root else '', '*.ps1'), os.path.join(d, '**' if d != project_root else '', '*.py')]
-        for p in patterns: all_candidate_files.extend(glob.glob(p, recursive=True))
+        search_pattern_ps1 = os.path.join(d, '**' if d != project_root else '', '*.ps1')
+        all_candidate_files.extend(glob.glob(search_pattern_ps1, recursive=True))
+        search_pattern_py = os.path.join(d, '**' if d != project_root else '', '*.py')
+        all_candidate_files.extend(glob.glob(search_pattern_py, recursive=True))
     
-    # --- Perform initial scan ---
-    print(f"Found {len(list(set(all_candidate_files)))} candidate files. Analyzing...")
-    for f_path in sorted(list(set(all_candidate_files))):
-        rel_path = os.path.relpath(f_path, project_root).replace(os.sep, '/')
-        if 'archive' in pathlib.Path(f_path).parts:
+    files_to_process = []
+    for f in sorted(list(set(all_candidate_files))):
+        rel_path = os.path.relpath(f, project_root).replace(os.sep, '/')
+        # Check for archive directory first, as it's a broad exclusion
+        if 'archive' in pathlib.Path(f).parts:
             results['SKIPPED'].append(f"{rel_path} (in archive directory)")
-            continue
-        if os.path.basename(f_path) in EXCLUDED_FILENAMES:
+        # Then check for filename-based exclusions
+        elif os.path.basename(f) in EXCLUDED_FILENAMES:
             results['SKIPPED'].append(rel_path)
-            continue
-        try:
-            content = pathlib.Path(f_path).read_text(encoding='utf-8')
-            file_contents[rel_path] = content
-            analysis = analyze_file_content(content, rel_path)
-            if analysis['is_compliant']:
-                results['COMPLIANT'].append(rel_path)
-            else:
-                results['NON_COMPLIANT'].append(rel_path)
-        except Exception:
-            results['ERROR'].append(rel_path)
+        else:
+            files_to_process.append(f)
 
-    # --- Display results and prompt ---
-    # (Code for displaying lists and summary remains the same)
+    print(f"Found {len(files_to_process)} files to analyze.")
+
+    for file_path in files_to_process:
+        status_map = {'VALID': 'COMPLIANT', 'INVALID': 'NON_COMPLIANT'}
+        # Pass fix=False, as this is the initial scan. process_file no longer checks EXCLUDED_FILENAMES
+        raw_status = process_file(file_path, project_root, fix=False)
+        status = status_map.get(raw_status, raw_status)
+        rel_path = os.path.relpath(file_path, project_root).replace(os.sep, '/')
+        results[status].append(rel_path)
+
+    # --- Print Detailed Lists ---
     if results['NON_COMPLIANT']:
         print(f"\n{Colors.YELLOW}🔴 NON-COMPLIANT ({len(results['NON_COMPLIANT'])}):{Colors.ENDC}")
         for f in results['NON_COMPLIANT']: print(f"   - {f}")
+
     if results['COMPLIANT']:
         print(f"\n{Colors.YELLOW}✅ COMPLIANT ({len(results['COMPLIANT'])}):{Colors.ENDC}")
         for f in results['COMPLIANT']: print(f"   - {f}")
+        
     if results['SKIPPED']:
         print(f"\n{Colors.YELLOW}⚪ SKIPPED ({len(results['SKIPPED'])}):{Colors.ENDC}")
         for f in results['SKIPPED']: print(f"   - {f} (excluded by rule)")
+
     if results['UNSCANNED']:
         print(f"\n{Colors.YELLOW}⚫ UNSCANNED ({len(results['UNSCANNED'])}):{Colors.ENDC}")
         for d in results['UNSCANNED']: print(f"   - {d}/ (directory not scanned for scripts)")
+
+    # --- Print High-Level Summary ---
     print(f"\n{Colors.YELLOW}--- Linting Summary ---{Colors.ENDC}")
-    print(f"Total files analyzed: {len(file_contents)}")
-    if results['NON_COMPLIANT']: print(f"🔴 Non-compliant files: {len(results['NON_COMPLIANT'])}")
-    if results['COMPLIANT']: print(f"✅ Compliant files: {len(results['COMPLIANT'])}")
+    print(f"Total scripts found: {len(files_to_process)}")
+    if results['NON_COMPLIANT']: print(f"🔴 Non-compliant scripts: {len(results['NON_COMPLIANT'])}")
+    if results['COMPLIANT']: print(f"✅ Compliant scripts: {len(results['COMPLIANT'])}")
     if results['SKIPPED']: print(f"⚪ Skipped items: {len(results['SKIPPED'])}")
     if results['UNSCANNED']: print(f"⚫ Unscanned directories: {len(results['UNSCANNED'])}")
-    if results['ERROR']: print(f"❌ Error files: {len(results['ERROR'])}")
+    if results['ERROR']: print(f"❌ Error scripts: {len(results['ERROR'])}")
     print("-----------------------\n")
 
-    # --- Safe Fixing Workflow ---
+    # --- Interactive Fix Prompt ---
+    fix_was_run = False
     if results['NON_COMPLIANT']:
-        # ... (prompting logic remains the same)
+        should_fix = False
         try:
-            if input("Do you want to fix the non-compliant files? (Y/N): ").strip().lower() != 'y':
-                raise KeyboardInterrupt
+            prompt = "Do you want to fix the non-compliant files? (Y/N): "
+            response = input(prompt)
+            if response.strip().lower() == 'y':
+                should_fix = True
         except (KeyboardInterrupt, EOFError):
+            should_fix = False
+        
+        if not should_fix:
             print(f"\n{Colors.YELLOW}Operation cancelled by user.{Colors.ENDC}\n")
             sys.exit(1)
 
-        # Backup Stage
+        # --- Backup Stage ---
         print(f"\n{Colors.YELLOW}--- Applying Fixes ---{Colors.ENDC}")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_dir = os.path.join(project_root, "linter_backups", f"backup_{timestamp}")
-        os.makedirs(backup_dir, exist_ok=True)
-        print("Backing up original files...")
-        for rel_path in results['NON_COMPLIANT']:
-            shutil.copy2(os.path.join(project_root, rel_path), os.path.join(backup_dir, os.path.basename(rel_path)))
-        relative_backup_dir = os.path.relpath(backup_dir, project_root).replace(os.sep, '/')
-        print(f"{Colors.GREEN}All {len(results['NON_COMPLIANT'])} original files backed up to: {relative_backup_dir}{Colors.ENDC}\n")
-
-        # Final Confirmation
         try:
-            if input("Proceed with overwriting original files? (Y/N): ").strip().lower() != 'y':
-                raise KeyboardInterrupt
-        except (KeyboardInterrupt, EOFError):
-            print(f"\n{Colors.YELLOW}Operation cancelled. No files were changed.{Colors.ENDC}\n")
+            os.makedirs(backup_dir, exist_ok=True)
+            print("Backing up original files...")
+            for rel_path in results['NON_COMPLIANT']:
+                source_path = os.path.join(project_root, rel_path)
+                dest_path = os.path.join(backup_dir, os.path.basename(source_path))
+                shutil.copy2(source_path, dest_path)
+            # Use relative path for the output message
+            relative_backup_dir = os.path.relpath(backup_dir, project_root).replace(os.sep, '/')
+            print(f"All {len(results['NON_COMPLIANT'])} original files backed up to: {relative_backup_dir}\n")
+        except OSError as e:
+            print(f"Error: Could not create backup directory or copy files: {e}")
             sys.exit(1)
 
-        # Fixing Stage
-        print(f"\n{Colors.YELLOW}--- Validating Fixes ---{Colors.ENDC}")
-        fixed_count, integrity_failures, validation_failures = 0, [], []
+        # --- Final Confirmation ---
+        try:
+            prompt = "Proceed with overwriting original files? (Y/N): "
+            response = input(prompt)
+            if response.strip().lower() != 'y':
+                print(f"\n{Colors.YELLOW}Operation cancelled. Originals restored from backup are untouched.{Colors.ENDC}\n")
+                sys.exit(1)
+        except (KeyboardInterrupt, EOFError):
+            print(f"\n{Colors.YELLOW}Operation cancelled. Originals restored from backup are untouched.{Colors.ENDC}\n")
+            sys.exit(1)
+
+        # --- Fixing Stage ---
+        fix_was_run = True
+        print("") # Add a newline for cleaner output
+        fixed_count = 0
         for rel_path in results['NON_COMPLIANT']:
-            print(f"Validating fix for: {rel_path}")
-            original_content = file_contents[rel_path]
-            analysis = analyze_file_content(original_content, rel_path)
-            new_analysis = analyze_file_content(analysis['correct_content'], rel_path)
-
-            # 1. Integrity Check
-            if analysis['core_content'] != new_analysis['core_content']:
-                print(f"  - {Colors.RED}Integrity Check FAILED. Aborting fix.{Colors.ENDC}")
-                integrity_failures.append(rel_path)
-                continue
-            print(f"  - {Colors.GREEN}Integrity Check PASSED.{Colors.ENDC}")
-
-            # 2. Post-Fix Validation
-            if not new_analysis['is_compliant']:
-                print(f"  - {Colors.RED}Post-Fix Validation FAILED. Aborting fix.{Colors.ENDC}")
-                validation_failures.append(rel_path)
-                continue
-            print(f"  - {Colors.GREEN}Post-Fix Validation PASSED.{Colors.ENDC}")
-            
-            # 3. Overwrite File
-            try:
-                with open(os.path.join(project_root, rel_path), 'w', encoding='utf-8', newline='\n') as f:
-                    f.write(analysis['correct_content'])
-                print(f"🟢 FIXED: {rel_path}\n")
+            full_path = os.path.join(project_root, rel_path)
+            status = process_file(full_path, project_root, fix=True)
+            if status == 'FIXED':
+                print(f"🟢 FIXED: {rel_path}")
                 fixed_count += 1
-            except Exception as e:
-                print(f"❌ FAILED TO WRITE: {rel_path} ({e})\n")
-
-        # Report on fixing results
-        if integrity_failures:
-            print(f"\n{Colors.RED}CRITICAL: {len(integrity_failures)} files failed integrity check and were NOT modified:{Colors.ENDC}")
-            for f in integrity_failures: print(f"   - {f}")
-        if validation_failures:
-            print(f"\n{Colors.RED}ERROR: {len(validation_failures)} files failed post-fix validation and were NOT modified:{Colors.ENDC}")
-            for f in validation_failures: print(f"   - {f}")
-        print(f"\n{Colors.GREEN}Successfully fixed {fixed_count} of {len(results['NON_COMPLIANT'])} non-compliant files.{Colors.ENDC}")
-    else:
-        print(f"\n{Colors.GREEN}All files are compliant.{Colors.ENDC}")
+            else:
+                print(f"❌ FAILED TO FIX: {rel_path} (Status: {status})")
+        
+        print(f"\nSuccessfully fixed {fixed_count} of {len(results['NON_COMPLIANT'])} non-compliant files.")
     
-    print("\nLinting complete.\n")
+    print("\nLinting complete.")
 
 if __name__ == "__main__":
     main()
 
-# === End of scripts/lint_file_headers.py ===
+# === End of src/lint_file_headers.py ===

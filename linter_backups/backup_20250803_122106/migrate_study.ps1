@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: migrate_study.ps1
-
 <#
 .SYNOPSIS
     Migrates all legacy or corrupted experiments within a study directory in a single batch.

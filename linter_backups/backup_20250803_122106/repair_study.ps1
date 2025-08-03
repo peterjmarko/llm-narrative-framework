@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: repair_study.ps1
-
 <#
 .SYNOPSIS
     Repairs, updates, or resumes all incomplete or outdated experiments within a study directory.

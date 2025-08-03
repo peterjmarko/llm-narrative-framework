@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/build_docs.py
+# Filename: src/build_docs.py
 
 """
 Builds all project documentation from source templates and diagrams.
@@ -613,4 +613,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/build_docs.py ===
+# === End of src/build_docs.py ===

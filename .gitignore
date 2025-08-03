@@ -20,10 +20,12 @@ __pycache__/
 # Ignore generated document and image files
 # The .template.md is the source of truth and is tracked by Git.
 docs/DOCUMENTATION.md
-docs/images/*.png
+docs/images/
 *.docx
+docs/**/*.pdf
 !docs/custom_reference.docx # Explicitly allow the custom reference document
-
+/linter_backups/    # Ignore linter backups
+/project_scope_report.md    # Ignore generated project reports
 
 # Intermediate and temporary files used by the pipeline
 /src/temp/

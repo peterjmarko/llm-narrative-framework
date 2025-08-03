@@ -1,24 +1,7 @@
-#!/usr/bin/env pwsh
-#-*- coding: utf-8 -*-
-#
-# Personality Matching Experiment Framework
-# Copyright (C) 2025 [Your Name/Institution]
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 # Filename: tests/run_all_ps_tests.ps1
+# Description: Master runner for all PowerShell test suites with detailed summary.
 
+# --- Configuration ---
 $TestSuites = @(
     "run_experiment.Tests.ps1",
     "audit_experiment.Tests.ps1",
@@ -99,5 +82,3 @@ if ($overallTotalFailures -gt 0) {
     Write-Host "All test suites passed successfully." -ForegroundColor Green
     exit 0
 }
-
-# === End of tests/run_all_ps_tests.ps1 ===

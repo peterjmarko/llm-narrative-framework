@@ -1,23 +1,8 @@
 #!/usr/bin/env python3
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
-# Personality Matching Experiment Framework
+# Pre-processing script to filter the raw Astro-Databank export.
 # Copyright (C) 2025 [Your Name/Institution]
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-# Filename: src/filter_adb_candidates.py
 
 """
 This script performs a two-stage filtering of the raw data export from
@@ -216,5 +201,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# === End of src/filter_adb_candidates.py ===

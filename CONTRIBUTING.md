@@ -188,41 +188,55 @@ This approach, demonstrated in `tests/test_experiment_aggregator.py`, is the req
 
 ### 4. Commit Your Changes
 
-This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This ensures clear versioning and automated changelog generation. The process is simplified into a single, interactive command.
+This project uses a standardized workflow to ensure all code is clean, documented, and properly formatted before being committed. Follow these steps in order.
 
-1.  **Update Documentation (As Needed)**:
-    Ensure docstrings, `DOCUMENTATION.template.md`, and diagrams are updated to reflect your code changes (note: do not modify the `DOCUMENTATION.md` target document directly). If you modify any `.md` or `.mmd` files, rebuild the documentation first:
-    ```bash
-    pdm run build-docs
-    ```
+**Step 1: Lint File Headers**
+Run the header linter. This script will check all Python and PowerShell files for a compliant header/footer and prompt you to fix any issues automatically.
+```bash
+pdm run python scripts/lint_file_headers.py
+```
 
-2.  **Review Your Changes**:
-    Check `git status` to ensure your understanding of the changes made since the last commit aligns with what will be committed. Adjust files as needed before staging.
+**Step 2: Lint Docstrings (Manual Fix)**
+Run the docstring linter. This is a **read-only** tool that will report any missing or incomplete docstrings. You must manually edit the reported files to fix the issues.
+```bash
+# Run a high-level scan first (checks module-level docstrings)
+pdm run python scripts/lint_docstrings.py
+
+# Run a deep scan for a more thorough check of functions and classes
+pdm run python scripts/lint_docstrings.py --deep
+```
+
+**Step 3: Update High-Level Documentation**
+If your changes affect the project's architecture, workflow, or data structures, update the relevant source files:
+-   `docs/DOCUMENTATION.template.md`
+-   Diagram source files in `docs/diagrams/`
+
+**Step 4: Build the Final Documentation**
+After updating any documentation templates or diagrams, you **must** run the build script to generate the final `docs/DOCUMENTATION.md` file.
+```bash
+pdm run build-docs
+```
+
+**Step 5: Stage and Commit Your Changes**
+This project uses **`commitizen`** to enforce Conventional Commits. The final step is to stage your work and use the interactive commit tool.
+
+1.  **Review Your Changes**:
+    Check `git status` to ensure all intended changes are ready.
     ```bash
     git status
     ```
 
-3.  **Stage Your Changes**:
-    Add all relevant files to the Git staging area.
+2.  **Stage Your Changes**:
+    Add all new and modified files to the Git staging area.
     ```bash
     git add .
     ```
 
-4.  **Run the Interactive Commit Command**:
-    This single command replaces the need for `commit.txt` and manual linting. It will guide you through creating a perfectly formatted commit message.
+3.  **Run the Interactive Commit Command**:
+    This command will guide you through creating a perfectly formatted commit message. Pre-commit hooks will run automatically and must pass for the commit to be finalized.
     ```bash
     pdm run commit
     ```
-    The tool will prompt you for:
-    *   The type of change (e.g., `feat`, `fix`, `docs`).
-    *   The scope of the change.
-    *   A short description.
-    *   A longer, multi-line description (the commit body).
-    *   Any breaking changes.
-
-    > **Pasting Text:** To paste content from your clipboard into the interactive prompt, **right-click** in the terminal window. Standard `Ctrl+V` may not work.
-
-    *Pre-commit hooks (including linting and doc checks) will run automatically and must pass for the commit to be finalized.*
 
 ### 5. Releasing a New Version (Maintainers Only)
 
