@@ -1,5 +1,28 @@
 # Changelog
 
+## 3.9.0 (2025-08-03)
+
+### Bump
+
+- **version 3.8.0 → 3.9.0**
+
+### Features
+
+- **add docstring linter and enhance header linter**
+  This release introduces two new linter scripts to enforce code quality and documentation standards, along with significant enhancements to the project's documentation and data organization.
+  
+  Features:
+  - Enhanced Header Linter (`lint_file_headers.py`): Significantly refactored the header linter to be interactive. It now features a safe, two-stage validation check (core content integrity and post-fix compliance) and a timestamped backup system.
+  - New Docstring Linter (`lint_docstrings.py`): Created a new, read-only script using Python's `ast` module to validate docstring presence and length. It supports both high-level and deep scan modes.
+  - New Project Scope Report (`generate_scope_report.py`): Created a new script to generate a quantitative report (`project_scope_report.md`) on the scope of all project assets.
+  
+  Documentation:
+  - Updated `CONTRIBUTING.md`: The commit workflow has been updated to include the new header and docstring linting steps.
+  
+  Refactoring & Bug Fixes:
+  - Refactored `list_project_files.py` to remove redundant script-tallying.
+  - Refactored `generate_scope_report.py` to use `os.walk` for efficient file discovery.
+  - Updated `.gitignore` to correctly exclude generated PDFs and the `docs/images` directory.
 ## 3.8.0 (2025-08-03)
 
 ### Bump
