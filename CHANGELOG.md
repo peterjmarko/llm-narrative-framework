@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.8.0 (2025-08-03)
+
+### Bump
+
+- **version 3.7.1 → 3.8.0**
+
+### Features
+
+- **add data preparation and documentation pipeline**
+  Implements the complete data preparation pipeline to automate the
+  creation of the final personalities database from the raw Astro-Databank
+  export.
+  
+  Key additions include:
+  - `filter_adb_candidates.py`: A new script to perform a multi-stage
+    filtering of the raw data down to the final 5,000 subjects.
+  - `prepare_sf_import.py`: A new script to format the filtered data
+    for import into the Solar Fire software.
+  - New data files (`country_codes.csv`, `filter_adb_raw.csv`, etc.) to
+    support the new filtering and preparation scripts.
+  
+  The project documentation has been significantly updated to reflect these
+  new processes, including the addition of 7 new diagrams for the data
+  preparation phase and a complete refactoring of the diagram naming
+  convention for improved clarity and consistency.
 ## 3.7.1 (2025-07-31)
 
 ### Bump
