@@ -1,0 +1,15 @@
+graph TD
+    A[Start] --> B[Load filter & eminence files into memory];
+    B --> C{Loop through each line in adb_raw_export.txt};
+    C -- "Next Line" --> D{"Valid Birth Time (H:MM)?"};
+    D -- No --> C;
+    D -- Yes --> E{"Birth Year 1900-1999?"};
+    E -- No --> C;
+    E -- Yes --> F{"Passes Master Filter? (Wiki, Death, Not Duplicate)"};
+    F -- No --> C;
+    F -- Yes --> G[Add original line to Stage 1 Candidates list];
+    G --> C;
+    C -- "End of File" --> H["Sort Stage 1 Candidates by Eminence Score (descending)"];
+    H --> I["Select Top 5,000 candidates"];
+    I --> J["Write to adb_filtered_5000.txt with new sequence numbers and cleaned Name/Links"];
+    J --> K[End];

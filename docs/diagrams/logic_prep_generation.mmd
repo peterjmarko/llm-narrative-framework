@@ -1,0 +1,13 @@
+graph TD
+    A[Start] --> B[Load delineations, weights, thresholds];
+    B --> C{Loop through each person in sf_chart_export.csv};
+    C -- "Next Person" --> D[Parse Name, Year, & Point Longitudes];
+    D --> E["Calculate Sign, Element, & Mode Scores (using all 12 points)"];
+    E --> F["Calculate Quadrant & Hemisphere Scores (using 10 planets only)"];
+    F --> G["Apply Thresholds to get Weak/Strong classifications for balances"];
+    G --> H[Get 'Point in Sign' classifications];
+    H --> I[Look up Delineation Text for all classifications];
+    I --> J[Assemble Full Description Text];
+    J --> K[Write Record to personalities_db.txt];
+    K --> C;
+    C -- "End of File" --> L[End];

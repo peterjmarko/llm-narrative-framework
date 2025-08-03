@@ -17,6 +17,7 @@
 - **Ensure correct changelog formatting via release script**
   The `commitizen` tool was creating poorly formatted changelog entries. Previous attempts to fix this were unsuccessful.
   
+#### Previous attempts
   This commit implements a definitive fix by giving the `scripts/finalize_release.py` script exclusive control over writing to the changelog.
   
   1. `pyproject.toml` is updated to remove the `changelog_file` key, preventing `cz bump` from writing to the file directly.
@@ -44,6 +45,7 @@
   This fix overrides the default by:
   1. Creating a custom Jinja2 template (`cz_templates/keep_a_changelog_template.j2`) that adds the required trailing newline.
   2. Updating `pyproject.toml` to use this custom template.
+  
 ## 3.7.0 (2025-07-31)
 
 ### Bump

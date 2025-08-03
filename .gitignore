@@ -33,6 +33,10 @@ docs/images/*.png
 # Temporary file for crafting conventional commit messages (see CONTRIBUTING.md)
 commit.txt
 
+# Intermediate files generated during the data preparation pipeline
+/data/sources/adb_filtered_5000.txt
+/data/sources/sf_data_import.txt
+
 # --- Secrets ---
 # Ignore the .env file, which should contain sensitive API keys.
 # A .env.example file should be created and committed instead.

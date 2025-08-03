@@ -1,0 +1,50 @@
+graph TD
+    subgraph " "
+    style invis stroke-width:0px,fill:transparent
+
+        subgraph "Raw Sources"
+            direction LR
+            A[adb_raw_export.txt]
+            B[filter_adb_raw.csv]
+            C[eminence_scores.csv]
+            D[country_codes.csv]
+        end
+
+        subgraph "Intermediate Artifacts"
+            direction LR
+            F[adb_filtered_5000.txt]
+            G[sf_data_import.txt]
+            H[sf_chart_export.csv]
+            I[sf_delineations_library.txt]
+            J[neutralized_delineations/]
+        end
+
+        subgraph "Final Product"
+            L[personalities_db.txt]
+        end
+    end
+
+    A -- "filters" --> E1[filter_adb_candidates.py]
+    B -- "uses" --> E1
+    C -- "uses" --> E1
+    E1 -- "creates" --> F
+
+    F -- "formats" --> E2[prepare_sf_import.py]
+    D -- "uses" --> E2
+    E2 -- "creates" --> G
+    
+    G -- "imports/exports" --> P1["Solar Fire Software"]
+    P1 -- "creates" --> H
+    P1 -- "creates" --> I
+
+    I -- "sanitizes" --> P2["LLM Neutralization"]
+    P2 -- "creates" --> J
+    
+    H -- "assembles" --> E3[generate_database.py]
+    J -- "uses" --> E3
+    E3 -- "creates" --> L
+
+    classDef file fill:#fef9e7,stroke:#b08d57
+    classDef script fill:#e8f8f5,stroke:#16a085
+    class A,B,C,D,F,G,H,I,J,L file
+    class E1,E2,E3 script

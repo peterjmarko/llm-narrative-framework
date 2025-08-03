@@ -37,7 +37,7 @@ personality_matching/
 │   └── study_analyzer.py           # Final: Performs statistical analysis for a study
 |
 ├── data/                               # Source personality databases & prompt templates
-│   ├── personalities_db_1-5000.txt     # Main personalities database used in experiments
+│   ├── personalities_db.txt            # Main personalities database used in experiments
 │   └── base_query.txt                  # Template for LLM prompts
 |
 ├── output/                                     # All generated artifacts from experiments

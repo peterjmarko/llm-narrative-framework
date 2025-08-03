@@ -71,7 +71,7 @@ except ImportError:
 QUERY_GENERATOR_SCRIPT_NAME = "query_generator.py" 
 
 # Default filenames (these are just the names, paths resolved later)
-DEFAULT_MASTER_PERSONALITIES_FN = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="personalities.txt")
+DEFAULT_MASTER_PERSONALITIES_FN = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="personalities_db.txt")
 # DEFAULT_BASE_QUERY_FN is used by query_generator.py, not directly by build_queries.py
 
 DEFAULT_BASE_OUTPUT_DIR_CFG = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback="output") 

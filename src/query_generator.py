@@ -50,7 +50,7 @@ import unicodedata
 from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 
 # --- Configuration: Default Filenames from config.ini (via config_loader) ---
-DEFAULT_PERSONALITIES_SRC_FN = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="personalities.txt")
+DEFAULT_PERSONALITIES_SRC_FN = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="personalities_db.txt")
 DEFAULT_BASE_QUERY_SRC_FN = get_config_value(APP_CONFIG, 'Filenames', 'base_query_src', fallback="base_query.txt")
 DEFAULT_QGEN_TEMP_PREFIX = get_config_value(APP_CONFIG, 'Filenames', 'qgen_temp_prefix', fallback="", value_type=str)
 DEFAULT_TEMP_SUBSET_FN_QGEN = get_config_value(APP_CONFIG, 'Filenames', 'temp_subset_personalities', fallback="temp_subset_personalities.txt")

@@ -1,0 +1,28 @@
+graph TD
+    A[Start: Study Directory with N Finalized Experiments] --> B{1. Audit Study Readiness};
+    B -- "Fails" --> C[Stop & Report Issues];
+    B -- "Passes" --> D[2. Aggregate Experiment Data];
+    
+    subgraph "Aggregation via compile_study_results.py"
+        direction LR
+        D;
+        I1["(EXPERIMENT_results.csv #1)"] -- "reads" --> D;
+        I2["(EXPERIMENT_results.csv #2)"] -- "reads" --> D;
+        I3["(...)"] -- "reads" --> D;
+        D -- "creates" --> O1["(STUDY_results.csv)"];
+    end
+
+    O1 --> E[3. Perform Statistical Analysis];
+
+    subgraph "Analysis via study_analyzer.py"
+        direction LR
+        E;
+        O1 -- "reads" --> E;
+        E -- "creates" --> O2["(STUDY_analysis_log.txt)"];
+        E -- "creates" --> O3["(anova/ plots & diagnostics)"];
+    end
+
+    O3 --> F[End: Study Processed];
+
+classDef dataNode fill:#fef9e7,stroke:#b08d57;
+class I1,I2,I3,O1,O2,O3 dataNode;

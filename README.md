@@ -6,22 +6,21 @@ A comprehensive research framework for conducting Large Language Model (LLM) exp
 
 ## 🚀 Quick Start
 
-```powershell
+````powershell
 # 1. Configure your experiment in config.ini
 
-# 2. Run a complete experimental batch
+# 2. Create and run a new experiment from scratch
 # Results are saved to a new timestamped directory in output/new_experiments/
-./run_experiment.ps1
+./new_experiment.ps1
 
 # 3. Organize completed experiments into a study folder
 # (e.g., move them to output/studies/My_First_Study/)
 
-# 4. Analyze the entire study
-./analyze_study.ps1 -StudyDirectory output/studies/My_First_Study
+# 4. Process and analyze the entire study
+./process_study.ps1 -StudyDirectory output/studies/My_First_Study
 
 # 5. View the final, publication-ready analysis
 Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
-```
 
 ## ✨ Key Features
 

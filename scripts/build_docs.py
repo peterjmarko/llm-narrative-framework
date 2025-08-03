@@ -550,7 +550,7 @@ def main():
     # Define which files have placeholders that might contain diagrams
     files_with_diagrams = [
         'docs/DOCUMENTATION.template.md',
-        'docs/study_article.md'
+        'docs/article_main_text.md'
     ]
     if not render_all_diagrams(project_root, force_render=args.force_render, template_files=files_with_diagrams):
         sys.exit(1)
@@ -577,8 +577,9 @@ def main():
             "CONTRIBUTING.md": False,
             "CHANGELOG.md": False,
             "LICENSE.md": False,
-            "docs/study_article.md": True,  # This file contains placeholders
-            "docs/cover_letter.md": True    # This file may contain placeholders
+            "docs/article_main_text.md": True,                  # This file may contain placeholders
+            "docs/article_supplementary_material.md": True,     # This file may contain placeholders
+            "docs/article_cover_letter.md": True                # This file may contain placeholders
         }
         
         for rel_path, process_placeholders in files_to_convert.items():

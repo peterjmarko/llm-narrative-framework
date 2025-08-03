@@ -1,0 +1,13 @@
+graph TD
+    A[src/filter_adb_candidates.py] --> B[src/prepare_sf_import.py];
+    B --> C[src/generate_database.py];
+
+    subgraph "Data Preparation Scripts"
+        A
+        B
+        C
+    end
+
+    style A fill:#D5F5E3,stroke:#138D75
+    style B fill:#D5F5E3,stroke:#138D75
+    style C fill:#D5F5E3,stroke:#138D75

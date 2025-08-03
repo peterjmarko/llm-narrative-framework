@@ -191,7 +191,7 @@ This approach, demonstrated in `tests/test_experiment_aggregator.py`, is the req
 This project uses **`commitizen`** to enforce the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. This ensures clear versioning and automated changelog generation. The process is simplified into a single, interactive command.
 
 1.  **Update Documentation (As Needed)**:
-    Ensure docstrings, `DOCUMENTATION.template.md`, and diagrams are updated to reflect your code changes. If you modify any templates or `.mmd` files, rebuild the documentation first:
+    Ensure docstrings, `DOCUMENTATION.template.md`, and diagrams are updated to reflect your code changes (note: do not modify the `DOCUMENTATION.md` target document directly). If you modify any `.md` or `.mmd` files, rebuild the documentation first:
     ```bash
     pdm run build-docs
     ```

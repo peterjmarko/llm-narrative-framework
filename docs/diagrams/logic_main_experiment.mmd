@@ -1,0 +1,24 @@
+graph TD
+    subgraph "Experiment Directory"
+        A["Input: N completed replications<br>(e.g., run_001/, run_002/, ...)"];
+        B["(REPLICATION_results.csv)"];
+        C["(REPLICATION_results.csv)"];
+        D["(...)"];
+    end
+
+    E[Process: Compile Experiment Results<br>via compile_experiment_results.py];
+
+    subgraph "Final Experiment Artifacts"
+        F["(EXPERIMENT_results.csv)"];
+        G["(batch_run_log.csv)"];
+    end
+
+    A --> E;
+    B --> E;
+    C --> E;
+    D --> E;
+    E --> F;
+    E --> G;
+
+classDef dataNode fill:#fef9e7,stroke:#b08d57;
+class B,C,D,F,G dataNode;

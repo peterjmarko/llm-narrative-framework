@@ -9,9 +9,9 @@ To make changes, please edit the template file and then run 'pdm run build-docs'
 ================================================================================
 -->
 
-# A Resilient Framework for Large-Scale LLM Experimentation
+# A Framework for Testing Complex Narrative Systems
 
-This project provides a fully automated, resilient, and reproducible framework for conducting large-scale LLM experiments. It offers an end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
+This project provides a fully automated, resilient, and reproducible framework for conducting large-scale LLM experiments with complex narrative systems. It offers an end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
 
 While the framework is modular and adaptable, its primary application here is to test an LLM's ability to solve a complex "who's who" personality matching task. It is ideal for researchers investigating LLM capabilities and developers who need a robust system for managing and analyzing automated experiments.
 
@@ -26,16 +26,56 @@ The experiment is built upon a custom database of 5,000 famous historical indivi
 *   **Signal Integrity**: Accurate birth data ensures the deterministic generation of consistent personality narratives.
 *   **Task Feasibility**: The public prominence of these individuals makes it plausible that LLMs have encountered their biographical information during training, making the matching task tractable.
 
-To create a uniquely challenging test, we employed a two-step process to generate textual stimuli for each trial:
+To create a uniquely challenging test, we employed a multi-step, deterministic process to generate the textual stimuli:
 
-1.  **Generation**: A commercial astrology program was used as a "black box" function to deterministically map an individual's birth data to a narrative description. The generation was intentionally constrained to a foundational subset of the algorithm's rules (e.g., categorical placements and dominances), creating a signal of limited complexity.
-2.  **Sanitization**: An LLM was then used to programmatically rewrite these descriptions, removing all explicit references to astrology, planets, or other esoteric terms.
+1.  **Source & Filter**: A `Raw Subject Database` of 5,000 famous individuals was derived from the comprehensive Astro-Databank (ADB).
+2.  **Calculation**: This database was processed by a commercial astrology program (Solar Fire) to calculate the precise celestial positions for each person, which were exported into a `Names and Placements` data file.
+3.  **Synthesis**: A custom Python script (`src/data_generation/build_personality_db.py`) then processed this data. Using a set of predefined rules and a `Neutralized Component Library` (a collection of pre-written, non-esoteric descriptive sentences), the script deterministically assembled a unique personality narrative for each individual.
+    - The script's algorithm calculates weighted scores for various astrological factors (elements, modes, quadrants, etc.) and classifies them as 'strong' or 'weak' based on their prominence.
+    - These classifications, along with simple placements, serve as keys to look up and combine the corresponding neutralized descriptions from the component library.
 
-The result is a clean dataset of personality profiles where the connection to the individual's biographical profile is systematic but non-obvious.
+The result is a clean dataset of personality profiles where the connection to an individual's biographical profile is systematic but non-obvious.
 
 **Crucially, this study does not seek to validate astrology.** Instead, it treats the generating program as an arbitrary, complex algorithm. The scientific objective is to determine whether an LLM, a third-party pattern-recognition system, can detect the subtle statistical regularities produced by this algorithm and use them to perform a successful matching task. The findings speak to the profound capabilities of LLMs to find signal in noisy, high-dimensional data, regardless of the source's theoretical basis.
 
-## Key Features
+## Data Preparation Pipeline
+
+The final `personalities_db.txt` used in the experiments is the product of a multi-stage data preparation pipeline. This pipeline begins with a raw, unfiltered data export from the Astro-Databank research database and concludes with the generation of the clean, neutralized personality database. The process involves a combination of manual curation, the use of third-party software (Solar Fire), and a set of dedicated, automated Python scripts.
+
+The pipeline can be understood through the following architectural and logical diagrams.
+
+### Data Preparation: Visual Architecture
+
+<div align="center">
+  <p>Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated database, showing both manual and automated steps.</p>
+  <img src="images/flow_prep_pipeline.png" width="75%">
+</div>
+
+<div align="center">
+  <p>Data Preparation Data Flow: The creation and transformation of data files by the preparation scripts and manual processes.</p>
+  <img src="images/data_prep_flow.png" width="70%">
+</div>
+
+<div align="center">
+  <p>Data Preparation Code Architecture: The sequential execution flow of the three data processing scripts.</p>
+  <img src="images/arch_prep_codebase.png" width="50%">
+</div>
+
+### Data Preparation: Logic Flowcharts
+
+<div align="center">
+  <p>Logic for Filtering (`filter_adb_candidates.py`): The algorithm for filtering the raw data export down to the final 5,000 subjects.</p>
+  <img src="images/logic_prep_filtering.png" width="65%">
+</div>
+
+<div align="center">
+  <p>Logic for Database Generation (`generate_database.py`): The algorithm for calculating personality classifications and assembling the final description text for each subject.</p>
+  <img src="images/logic_prep_generation.png" width="65%">
+</div>
+
+## Main Experiment & Analysis Pipeline
+
+### Key Features
 
 -   **Automated Batch Execution**: The `experiment_manager.py` script, driven by a simple PowerShell wrapper, manages entire experimental batches. It can run hundreds of replications, intelligently skipping completed ones to resume interrupted runs, and provides real-time progress updates, including a detailed spinner showing individual trial timers and overall replication batch ETA.
 -   **Powerful Reprocessing Engine**: The manager's `--reprocess` mode allows for re-running the data processing and analysis stages on existing results without repeating expensive LLM calls. This makes it easy to apply analysis updates or bug fixes across an entire experiment.
@@ -46,12 +86,12 @@ The result is a clean dataset of personality profiles where the connection to th
 -   **Standardized Console Banners**: All audit results, whether for success, failure, or a required update, are now presented in a consistent, easy-to-read, 4-line colored banner, providing clear and unambiguous status reports.
 -   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `compile_study_results.py` prepares a master dataset, which `study_analyzer.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
 
-## Visual Architecture
+### Visual Architecture of the Main Pipeline
 
-The project's architecture can be understood through four different views: the code architecture, the workflows, the data flow, and the experimental logic.
+The main pipeline's architecture can be understood through four different views: the code architecture, the workflows, the data flow, and the experimental logic.
 
-### Code Architecture Diagram
-The codebase can be divided into the following components:
+#### Code Architecture Diagram
+The codebase for the main pipeline can be divided into the following components:
 
 1.  **Main User Entry Points**: The PowerShell scripts that users directly execute to initiate various workflows (e.g., `run_experiment.ps1`, `analyze_study.ps1`).
 
@@ -65,10 +105,10 @@ The codebase can be divided into the following components:
 
 <div align="center">
   <p>Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.</p>
-  <img src="images/view_codebase.png" width="100%">
+  <img src="images/arch_main_codebase.png" width="100%">
 </div>
 
-### Workflow Diagrams
+#### Workflow Diagrams
 The project's functionality is organized into six primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
 
 1.  **Run an Experiment**: The most common action; used for starting a new experiment or resuming/healing an interrupted one.
@@ -102,9 +142,8 @@ The `orchestrate_replication.py` script executes the full pipeline for a single 
 
 <div align="center">
   <p>Workflow 1: Create a New Experiment, showing the main control loop and the internal replication pipeline.</p>
-  <img src="images/flow_1_new_experiment.png" width="65%">
+  <img src="images/flow_main_1_new_experiment.png" width="65%">
 </div>
-
 
 #### Workflow 2: Audit an Experiment
 
@@ -112,7 +151,7 @@ This workflow provides a read-only, detailed completeness report for an experime
 
 <div align="center">
   <p>Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.</p>
-  <img src="images/flow_2_audit_experiment.png" width="100%">
+  <img src="images/flow_main_2_audit_experiment.png" width="100%">
 </div>
 
 ##### Interpreting the Audit Report
@@ -135,7 +174,6 @@ The `Details` string provides the specific error flags (e.g., `CONFIG_MALFORMED;
 
 In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Aggregation Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`), confirming whether the last aggregation step for the experiment was successfully completed.
 
-
 #### Workflow 3: Repair or Update an Experiment
 
 This workflow is the main "fix-it" tool for any existing experiment. The `repair_experiment.ps1` script is an intelligent wrapper around `experiment_manager.py`. It first performs a full audit to diagnose the experiment's state.
@@ -145,9 +183,8 @@ This workflow is the main "fix-it" tool for any existing experiment. The `repair
 
 <div align="center">
   <p>Workflow 3: Repair or Update an Experiment, showing both automatic and interactive repair paths.</p>
-  <img src="images/flow_3_repair_experiment.png" width="100%">
+  <img src="images/flow_main_3_repair_experiment.png" width="100%">
 </div>
-
 
 #### Workflow 4: Migrate Old Experiment Data
 
@@ -160,9 +197,8 @@ This utility workflow provides a safe, non-destructive process to upgrade older 
 
 <div align="center">
   <p>Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.</p>
-  <img src="images/flow_4_migrate_experiment.png" width="100%">
+  <img src="images/flow_main_4_migrate_experiment.png" width="100%">
 </div>
-
 
 #### Workflow 5: Process a Study
 
@@ -170,9 +206,8 @@ This workflow is used after all experiments are validated to compile and analyze
 
 <div align="center">
   <p>Workflow 5: Process a Study. Audits, compiles, and analyzes all experiments in a study.</p>
-  <img src="images/flow_5_process_study.png" width="80%">
+  <img src="images/flow_main_5_process_study.png" width="80%">
 </div>
-
 
 #### Workflow 7: Audit a Study
 
@@ -185,9 +220,8 @@ Based on the combined results from both audits, it presents a consolidated summa
 
 <div align="center">
   <p>Workflow 7: Audit a Study. Consolidated completeness report for all experiments in a study.</p>
-  <img src="images/flow_7_audit_study.png" width="100%">
+  <img src="images/flow_main_7_audit_study.png" width="100%">
 </div>
-
 
 #### Workflow 8: Repair a Study
 
@@ -195,9 +229,8 @@ This is the main "fix-it" tool for an entire study. It first runs a comprehensiv
 
 <div align="center">
   <p>Workflow 8: Repair a Study. A batch operation to fix all repairable experiments in a study.</p>
-  <img src="images/flow_8_repair_study.png" width="80%">
+  <img src="images/flow_main_8_repair_study.png" width="80%">
 </div>
-
 
 #### Workflow 9: Migrate a Study
 
@@ -205,26 +238,36 @@ This is a batch utility workflow for safely upgrading an entire study that conta
 
 <div align="center">
   <p>Workflow 9: Migrate a Study. A batch operation to upgrade all legacy experiments in a study.</p>
-  <img src="images/flow_9_migrate_study.png" width="80%">
+  <img src="images/flow_main_9_migrate_study.png" width="80%">
 </div>
 
 
-### Data Flow Diagram
+#### Data Flow Diagram
 
-This diagram shows how data artifacts (files) are created and transformed by the pipeline scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
+This diagram shows how data artifacts (files) are created and transformed by the main pipeline scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
 
 <div align="center">
-  <p>Data Flow Diagram: Creation and transformation of data artifacts (files) by the pipeline scripts.</p>
-  <img src="images/view_data_flow.png" width="70%">
+  <p>Data Flow Diagram: Creation and transformation of data artifacts (files) by the main pipeline scripts.</p>
+  <img src="images/data_main_flow.png" width="70%">
 </div>
 
-### Experimental Logic Flowchart
+#### Logic Flowcharts
 
-This diagram illustrates the scientific methodology for a single replication run.
+These diagrams illustrate the scientific and procedural methodology at each level of the experimental hierarchy.
 
 <div align="center">
-  <p>Experimental Logic Flowchart: Scientific methodology for a single replication run.</p>
-  <img src="images/logic_experimental.png" width="65%">
+  <p>Replication Logic: The scientific methodology for a single replication run.</p>
+  <img src="images/logic_main_replication.png" width="65%">
+</div>
+
+<div align="center">
+  <p>Experiment Logic: The aggregation of multiple replication results to produce final experiment-level summaries.</p>
+  <img src="images/logic_main_experiment.png" width="65%">
+</div>
+
+<div align="center">
+  <p>Study Logic: The complete workflow for processing a study, from auditing and aggregation to final statistical analysis.</p>
+  <img src="images/logic_main_study.png" width="70%">
 </div>
 
 ## Experimental Hierarchy
@@ -243,6 +286,8 @@ This logical hierarchy is reflected in the physical layout of the repository:
 <div align="center">
   <img src="images/view_directory_structure.png" width="90%">
 </div>
+
+A `data/README.md` file provides detailed explanations for each file in the `data/` directory.
 
 ## Setup and Installation
 
@@ -320,7 +365,8 @@ This framework is under active development. The following is a list of known iss
 *   **Missing Log File for Study Processing**: The `process_study.ps1` workflow, which performs the final data aggregation and analysis, does not currently generate a dedicated log file. This will be added to ensure all major workflows produce a persistent record of their execution.
 *   **Redundant API Calls in Forced Migration**: When forcing a migration on an already `VALIDATED` experiment, the workflow correctly reprocesses the data but also unnecessarily re-runs the LLM API calls. While this is a non-destructive action that is inefficient, it creates a record that is not reflective of the experiment's historical state.
 *   **Unclean Log Files for Migration**: The log files generated by the `migrate_experiment.ps1` and `migrate_study.ps1` scripts currently include the standard PowerShell transcript header and footer. A post-processing step will be implemented to clean these logs.
-*   **Planned - Automated Study Generation (`new_study.ps1`)**: A new workflow is planned to automate the creation of entire studies. This script will read a set of factors to vary from `config.ini` (e.g., a list of models and mapping strategies) and automatically generate the full matrix of experiments required for the study.
+*   **Planned - CLI-Driven and Manifest-Documented Experiments**: A major architectural improvement is planned to move experiment parameter definition from the global `config.ini` to command-line arguments for `new_experiment.ps1`. This will decouple experiment execution from the global configuration, allowing multiple, different experiments to be run concurrently without conflict. The script will then generate an experiment manifest file alongside the results to serve as a permanent, reproducible record of the parameters used. This manifest will also serve as the ground truth for all subsequent `audit`, `repair`, and `migrate` operations, making them significantly more robust and reliable.
+*   **Planned - Automated Study Generation (`new_study.ps1`)**: This new workflow will automate the creation of entire studies. It will read a matrix of factors to vary from `config.ini` (e.g., a list of models and mapping strategies) and then orchestrate the entire process by calling `new_experiment.ps1` with the correct command-line arguments for each required experiment.
 *   **Note on Project Scope**: While the framework includes parallel scripts for experiments and studies (e.g., `repair_experiment.ps1` vs. `repair_study.ps1`), a `process_studies.ps1` script is not planned. A "study" represents the highest level of aggregation and analysis within the project's defined scope, and there is no current use case for aggregating multiple studies into a higher-level meta-analysis.
 
 ## Choosing the Right Workflow: Separation of Concerns

@@ -1,0 +1,27 @@
+graph TD
+    subgraph "Manual & Semi-Automated Processes"
+        style Manual fill:#f9f9f9,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+        A[Scrape Astro-Databank] --> B{adb_raw_export.txt};
+        C[Curate Filter & Eminence Files] --> D{filter_adb_raw.csv};
+        C --> E{eminence_scores.csv};
+        I[Use Solar Fire Software] --> J{sf_chart_export.csv};
+        I --> K{sf_delineations_library.txt};
+        L[Use LLM to Neutralize Text] --> M{neutralized_delineations/};
+    end
+
+    subgraph "Automated Python Scripts"
+        style Automated fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
+        F[src/filter_adb_candidates.py] --> G{adb_filtered_5000.txt};
+        H[src/prepare_sf_import.py] --> I;
+        N[src/generate_database.py] --> O((personalities_db.txt));
+    end
+
+    B --> F;
+    D --> F;
+    E --> F;
+    G --> H;
+    J --> N;
+    M --> N;
+
+    classDef data fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+    class B,D,E,G,J,K,M,O data;
