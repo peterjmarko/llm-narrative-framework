@@ -16,6 +16,14 @@ graph TD
         N[src/generate_database.py] --> O((personalities_db.txt));
     end
 
+    subgraph "Automated Data Audit"
+        style Audit fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
+        P[src/validate_adb_data.py] --> Q{adb_validation_report.csv}
+    end
+
+    B -- "(input for audit)" --> P
+    Q -- "(used for manual cleaning)" --> B
+
     B --> F;
     D --> F;
     E --> F;
@@ -24,4 +32,4 @@ graph TD
     M --> N;
 
     classDef data fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
-    class B,D,E,G,J,K,M,O data;
+    class B,D,E,G,J,K,M,O,Q data;

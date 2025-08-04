@@ -1,13 +1,16 @@
 graph TD
-    A[src/filter_adb_candidates.py] --> B[src/prepare_sf_import.py];
-    B --> C[src/generate_database.py];
-
     subgraph "Data Preparation Scripts"
-        A
-        B
-        C
+        V[src/validate_adb_data.py]
+        A[src/filter_adb_candidates.py]
+        B[src/prepare_sf_import.py]
+        C[src/generate_database.py]
     end
 
+    V -- "creates report for manual cleaning of source data" --> A;
+    A --> B;
+    B --> C;
+
+    style V fill:#fff3cd,stroke:#f1c40f
     style A fill:#D5F5E3,stroke:#138D75
     style B fill:#D5F5E3,stroke:#138D75
     style C fill:#D5F5E3,stroke:#138D75

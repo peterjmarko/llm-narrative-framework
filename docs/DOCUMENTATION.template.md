@@ -28,7 +28,7 @@ The experiment is built upon a custom database of 5,000 famous historical indivi
 
 To create a uniquely challenging test, we employed a multi-step, deterministic process to generate the textual stimuli:
 
-1.  **Source & Filter**: A `Raw Subject Database` of 5,000 famous individuals was derived from the comprehensive Astro-Databank (ADB).
+1.  **Source & Filter**: A `Raw Subject Database` of 5,000 famous individuals was derived from a static snapshot of the Astro-Databank (ADB). To ensure the selection process is fully deterministic and reproducible, filtering relies on a static, pre-computed eminence score for each candidate.
 2.  **Calculation**: This database was processed by a commercial astrology program (Solar Fire) to calculate the precise celestial positions for each person, which were exported into a `Names and Placements` data file.
 3.  **Synthesis**: A custom Python script (`src/data_generation/build_personality_db.py`) then processed this data. Using a set of predefined rules and a `Neutralized Component Library` (a collection of pre-written, non-esoteric descriptive sentences), the script deterministically assembled a unique personality narrative for each individual.
     - The script's algorithm calculates weighted scores for various astrological factors (elements, modes, quadrants, etc.) and classifies them as 'strong' or 'weak' based on their prominence.
@@ -40,7 +40,7 @@ The result is a clean dataset of personality profiles where the connection to an
 
 ## Data Preparation Pipeline
 
-The final `personalities_db.txt` used in the experiments is the product of a multi-stage data preparation pipeline. This pipeline begins with a raw, unfiltered data export from the Astro-Databank research database and concludes with the generation of the clean, neutralized personality database. The process involves a combination of manual curation, the use of third-party software (Solar Fire), and a set of dedicated, automated Python scripts.
+The final `personalities_db.txt` used in the experiments is the product of a multi-stage data preparation pipeline. To ensure perfect reproducibility, this pipeline begins with a static, raw, but fully audited data export from the Astro-Databank research database (included in the repository as `data/sources/adb_raw_export.txt`). This foundational dataset was cleaned using the `src/validate_adb_data.py` script, a powerful utility that programmatically cross-references each entry against live Wikipedia data to verify names and confirm death dates. Because Wikipedia is a dynamic source, this validation script is provided as a quality-assurance tool rather than a part of the deterministic pipeline itself. The subsequent process, which uses the resulting clean data, involves a combination of manual curation, the use of third-party software (Solar Fire), and a set of dedicated, automated Python scripts.
 
 The pipeline can be understood through the following architectural and logical diagrams.
 

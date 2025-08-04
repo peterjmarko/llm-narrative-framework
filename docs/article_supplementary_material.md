@@ -13,6 +13,10 @@ This document provides supplementary material to the main article, "A Framework 
 
 ## Obtaining Birth Data from Astro-Databank
 
+**A Note on Reproducibility:** The Astro-Databank (ADB) is a live research database that is continuously updated with new entries and revisions. Consequently, re-exporting the data from the ADB website today will not yield the exact same raw dataset used in this study, making perfect replication from the original source impossible. While the rest of the data pipeline is fully deterministic, this initial data extraction is the sole exception.
+
+To ensure perfect, bit-for-bit replication of our findings, researchers **must** use the static data export file captured at the time of the original research. This file is included in the project repository as `data/sources/adb_raw_export.txt`. The manual data extraction steps described below are provided for methodological transparency only and are not a required part of the replication process.
+
 The Astro-Databank Research Database is the source of raw birth data. Perform the following procedure to manually obtain an initial database of people.
 
 1. Navigate to https://www.astro.com/adb-search/adb-search/.
@@ -47,59 +51,58 @@ ARN, Name, Born, At, Chart, Links
 
 ## Data Preparation
 
-The raw export of 10,378 candidates must be filtered and formatted before it can be imported into the Solar Fire astrology software. This is a two-step process: first, filtering the raw data down to the final 5,000 subjects, and second, formatting the data for those subjects for import.
+The raw export of 10,378 candidates must first be validated and cleaned, then filtered and formatted before it can be imported into the Solar Fire astrology software. This is a three-step process:
+
+### Preliminary Step: Data Validation and Cleaning
+
+**A Note on Reproducibility and Dynamic Data:** To ensure the highest quality foundational dataset, the raw export (`adb_raw_export.txt`) was first audited by the `src/validate_adb_data.py` script. This script programmatically cross-references each entry against the live English Wikipedia to verify the subject's name, confirm the existence of their page, and validate that a death date is listed. Because Wikipedia's content can change over time, this validation step is not perfectly reproducible. The study's subsequent filtering and analysis steps therefore rely on the static, cleaned version of `adb_raw_export.txt` that resulted from this one-time audit and is included in the repository.
+
+The output of this script is a detailed report flagging any discrepancies. This report was used to manually correct typos and remove invalid entries from the master `adb_raw_export.txt` file, producing the clean source data used in the next step.
 
 ### Step 1: Filtering and Selection
 
+**A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are a foundational asset of this study, stored in the static file `data/sources/eminence_scores.csv`. The generation of these scores was a one-time, non-deterministic process involving interactive querying of multiple LLMs. By treating the resulting scores as a static input, the subsequent filtering and selection process executed by `src/filter_adb_candidates.py` remains fully deterministic and computationally reproducible.
+
 The entire filtering and selection process is automated by the `src/filter_adb_candidates.py` script. This script takes the raw data export (`data/sources/adb_raw_export.txt`) and two curated data files—`data/sources/filter_adb_raw.csv` and `data/sources/eminence_scores.csv`—as input to produce the final list of 5,000 subjects.
 
-First, the script filters the 10,378 raw candidates. A candidate is kept only if all of the following conditions, verified against the source data and the `filter_adb_raw.csv` file, are met:
+First, the script pre-processes the 10,378 raw candidates by cleaning and decoding the raw text to handle formatting issues from the source export (e.g., converting `Nat%20%22King%22%20Cole` to `Nat "King" Cole`). It then filters this clean list. A candidate is kept only if all of the following conditions are met:
 
 1.  **Valid Birth Time**: The `At` field must be present and in a valid `H:MM` or `HH:MM` format.
 2.  **Birth Year**: The birth year must be between 1900 and 1999, inclusive.
-3.  **Verifiable Identity**: The subject must have a corresponding and verifiable Wikipedia page.
-4.  **Confirmed Death**: The subject must have a confirmed death date listed on their Wikipedia page.
-5.  **Unique Entry**: The subject must not be a known duplicate entry within the database.
+3.  **Verifiable Identity**: The subject must have a corresponding and verifiable Wikipedia page (as per `filter_adb_raw.csv`).
+4.  **Confirmed Death**: The subject must have a confirmed death date (as per `filter_adb_raw.csv`).
+5.  **Unique Entry**: The subject must not be a known duplicate (as per `filter_adb_raw.csv`).
 
-This initial pass reduces the sample to 6,193 candidates. The script then performs the final selection using the eminence scores from `eminence_scores.csv`, based on the following rationale:
+This initial pass reduces the sample to 6,193 candidates. The script then performs the final selection using the eminence scores from `eminence_scores.csv`. To ensure a fully deterministic and reproducible outcome, a two-level sorting logic is applied: candidates are first ranked in descending order by their eminence score. To break any ties, candidates with the same score are then sorted in ascending order by their original Astro-Databank Raw Number (ARN).
 
-1.  **Eminence Ranking**: Candidates are ranked in descending order based on their eminence score.
-2.  **Personality Differentiation Check**: A concurrent analysis using LLM-estimated Big Five (OCEAN) personality scores revealed that trait variance became negligible for candidates ranked below the top 5,400 by eminence.
-
-To optimize for both high recognition and personality differentiation, a conservative cutoff was chosen. The script applies this by selecting the **top 5,000** individuals from the eminence ranking. Its final output is the `data/sources/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
+A concurrent analysis using LLM-estimated Big Five (OCEAN) personality scores revealed that trait variance became negligible for candidates ranked below the top 5,400 by eminence. To optimize for both high recognition and personality differentiation, a conservative cutoff was chosen. The script applies this by selecting the **top 5,000** individuals from the final deterministic ranking. Its final output is the `data/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
 
 ### Step 2: Formatting for Solar Fire Import
 
-Once the final 5,000 subjects are selected, their data is transformed into the Comma Quote Delimited (CQD) format required by Solar Fire.
+The process of formatting the 5,000 selected subjects for import into the Solar Fire astrology software is automated by the `src/prepare_sf_import.py` script.
 
-1.  **Extract Geographic and Time Zone Data**
+The script takes two files as input:
+*   `data/adb_filtered_5000.txt`: The clean list of 5,000 subjects from the previous step.
+*   `data/country_codes.csv`: A lookup table to map location codes to full country names.
 
-    *   The link in the `Chart` column contains the geographic data. Extract the following fields by counting backward from the end of the comma-separated `nd1` string within the URL: Time Zone Code (-11), Place (-8), State/Country Code (-7), Longitude (-6), and Latitude (-5).
+It performs the following transformations for each subject:
+1.  **Parses Input**: It reads the subject's name, birth date, time, and chart URL from the filtered data file.
+2.  **Extracts Geographic Data**: It robustly parses the chart URL, extracting detailed geographic and time zone information from the complex `nd1` parameter.
+3.  **Calculates Time Zone**: It correctly interprets both standard (`h...`) and Local Mean Time (`m...`) ADB time zone codes to calculate the required `Zone Time` offset and `Zone Abbreviation`.
+4.  **Formats Fields**: It reformats the name from "Last, First" to "First Last" and the date to the `DD Month YYYY` format required by the import utility.
+5.  **Assembles CQD Record**: It concatenates all processed fields into a final Comma Quote Delimited (CQD) record suitable for direct import into Solar Fire.
 
-2.  **Prepare Fields for Concatenation**
+The script's final output is `data/sources/sf_data_import.txt`, a text file containing the 5,000 records ready for direct import into Solar Fire. The example records below illustrate the transformation performed by the script:
 
-    *   The format of 'Time Zone Code' is one of two possibilities depending on the first character ('TZC Prefix'):
-        *   When 'TZC Prefix' is "h": "THh[MM]", where 'T' is time zone type ("h" for standard time zone and "m" for local mean time), 'H' is the 1-to-2s digit hour offset from UTC, 'h' is the horizontal (E/W) direction of the offset ("+" for "w" and "-" for "e"), and optional MM is the two-digit minute offset (omitted for 0).
-        *   When 'TZC Prefix' is 'm': "TDh[MM]", where 'T' is time zone type, D is the 1-to-3 digit geographic longitude degree of the place determining local time, 'h' is the horizontal (E/W) direction of the offset ("+" for "w" and "-" for "e"), and optional MM is the two-digit geographic longitude minute of the place determining local time (omitted for 0). Note that this 'LMT Longitude' encoded within the 'Time Zone Code' itself might be different from the longitude of the birth place.
-    *   Convert 'Time Zone Code' into 'Zone Abbreviation' and 'Zone Time' as follows:
-        *   'Zone Abbreviation': Use "..." when 'TZC Prefix' is "h" and "LMT" (local mean time) when 'TZC Prefix' is "m".
-        *   'Zone Time': When 'TZC Prefix' is "h", convert HMM to hours and minutes of time while observing the sign defined by the 'h' marker in-between. When 'TZC Prefix' is "m", convert 'LMT Longitude' to time using the standard rate of 15 longitude degrees for each hour of time while observing the sign defined by the 'h' marker.
-    *   Convert 'State/Country Code' to 'Country/State Name' using a lookup table (see `country_codes.csv` in the 'Related Files' section)
-    *   Concatenate the following fields into single Comma Quote Delimited (CQD) entries: Name, Date, Time, Zone Abbreviation, Zone Time, Place Name, Country/State Name, Latitude, Longitude. 
-    *   To illustrate the entire conversion, the ADB string given in the first entry becomes the second entry below ("h" for 'TZC Prefix'):
+*   **Original Data for JFK:**
+    `2421  Kennedy, John F. (https://www.astro.com/astro-databank/Kennedy,_John_F.)	♂	1917-05-29	15:00	(https://www.astro.com/cgi/chart.cgi?lang=e;...nd1=Kennedy,John F.,m,29,5,1917,15:00,h5w,...Brookline,MA (US),71w07,42n20,...)`
+*   **Formatted Output for Solar Fire:**
+    `"John F. Kennedy","29 May 1917","15:00","...","05:00","Brookline","United States","42N20","71W07"`
 
-        `2421  Kennedy, John F. (https://www.astro.com/astro-databank/Kennedy,_John_F.)	♂	1917-05-29	15:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Kennedy,John F.,m,29,5,1917,15:00,h5w,gas,0,Brookline,MA (US),71w07,42n20,u,43,-24500,0)	Adb (https://www.astro.com/astro-databank/Kennedy,_John_F.)`
-
-        `"John F. Kennedy","29 May 1917","15:00","...","05:00","Brookline","United States","42N20","71W07"`
-    
-    *   This second example is when 'TZC Prefix' is "m":
-
-        `464	Balanchine, George (https://www.astro.com/astro-databank/Balanchine,_George)	♂	1904-01-22	12:58	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Balanchine,George,m,22,1,1904,12:58,m30e15,gas,0,St.Petersburg,RU,30e18,59n55,u,3071,1485,0)	Adb (https://www.astro.com/astro-databank/Balanchine,_George)`
-
-        `"George Balanchine","22 Jan 1904","12:58","LMT","-02:01","St.Petersburg","Russia","59N55","30E18"`
-
-    *   Copy the entire column of data and paste it into a text editor.
-    *   Save this as a TXT file (e.g., `sf_data_import.txt`) in an easily-accessible location. For example: Documents > Solar Fire User Files > Import.
+*   **Original Data for George Balanchine:**
+    `464	Balanchine, George (https://www.astro.com/astro-databank/Balanchine,_George)	♂	1904-01-22	12:58	(https://www.astro.com/cgi/chart.cgi?lang=e;...nd1=Balanchine,George,m,22,1,1904,12:58,m30e15,...St.Petersburg,RU,30e18,59n55,...)`
+*   **Formatted Output for Solar Fire:**
+    `"George Balanchine","22 Jan 1904","12:58","LMT","-02:01","St.Petersburg","Russia","59N55","30E18"`
 
 ## Importing to and Exporting from Solar Fire
 

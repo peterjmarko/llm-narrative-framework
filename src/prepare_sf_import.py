@@ -82,6 +82,29 @@ def convert_hours_to_hhmm(decimal_hours: float) -> str:
     
     return f"{sign}{hours:02d}:{minutes:02d}"
 
+
+def format_coordinate(coord_str: str) -> str:
+    """
+    Formats a raw coordinate string (e.g., '42n20', '74w0', '21s4149') into the
+    required DDvMM/DDDhMM format by padding minutes and truncating seconds.
+    """
+    if not coord_str:
+        return ""
+    
+    # Regex to capture degrees, direction, and all subsequent digits (minutes/seconds).
+    match = re.match(r"(\d+)([nswe])(\d+)", coord_str, re.IGNORECASE)
+    
+    if not match:
+        logging.warning(f"Could not parse coordinate string: '{coord_str}'. Returning as is.")
+        return coord_str.upper()
+        
+    degrees, direction, min_sec_digits = match.groups()
+    
+    # Take the first two digits for minutes and pad with a leading zero if needed.
+    minutes = min_sec_digits[:2].zfill(2)
+    
+    return f"{degrees}{direction.upper()}{minutes}"
+
 def parse_tz_code(tz_code: str) -> tuple[str, str]:
     """
     Converts a Time Zone Code into Zone Abbreviation and Zone Time.
@@ -98,11 +121,17 @@ def parse_tz_code(tz_code: str) -> tuple[str, str]:
         if not match:
             raise ValueError(f"Invalid 'h' type TZC: {tz_code}")
         
-        hours, direction, minutes = match.groups()
-        minutes = int(minutes) if minutes else 0
+        hours_str, direction, minutes_str = match.groups()
+        hours = int(hours_str)
+        minutes = int(minutes_str) if minutes_str else 0
         
-        sign = "" if direction == 'w' else "-"
-        zone_time = f"{sign}{int(hours):02d}:{minutes:02d}"
+        # Avoid creating a negative zero "-00:00" for UTC
+        if hours == 0 and minutes == 0:
+            sign = ""
+        else:
+            sign = "" if direction == 'w' else "-"
+        
+        zone_time = f"{sign}{hours:02d}:{minutes:02d}"
         
     elif prefix == 'm': # Local Mean Time
         zone_abbr = "LMT"
@@ -187,7 +216,7 @@ def process_adb_line(line: str, conversion_table: dict) -> list | None:
         # Format: Name, Date, Time, Zone Abbreviation, Zone Time, Place, Country, Latitude, Longitude
         return [
             full_name, formatted_date, time_str, zone_abbr, zone_time,
-            place, country, latitude.upper(), longitude.upper()
+            place, country, format_coordinate(latitude), format_coordinate(longitude)
         ]
 
     except (IndexError, ValueError) as e:
@@ -228,7 +257,7 @@ def main(input_file: str, output_file: str, country_codes_file: str):
         
     try:
         with open(output_file, 'w', encoding='utf-8', newline='') as outfile:
-            writer = csv.writer(outfile, quoting=csv.QUOTE_ALL)
+            writer = csv.writer(outfile, delimiter=',', quoting=csv.QUOTE_ALL)
             writer.writerows(processed_records)
         logging.info(f"Successfully wrote {len(processed_records)} records to {output_file}.")
     except IOError as e:

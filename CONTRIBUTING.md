@@ -82,6 +82,20 @@ python -m pdm add new-package-name
 python -m pdm add -G dev new-dev-package-name
 ```
 
+## Developer Utilities (`scripts/` folder)
+
+The `scripts/` directory contains helper utilities for development, maintenance, and building documentation. You generally do not need to run these directly, as many are called by PDM script shortcuts (e.g., `pdm run build-docs`, `pdm run release`).
+
+*   `build_docs.py`: Orchestrates the entire documentation build process.
+*   `changelog_hook.py`: A pre-commit hook for `commitizen` to ensure changelog entries are correctly formatted.
+*   `convert_py_to_txt.py`: Converts Python scripts into plain text files for embedding as diagrams in documentation.
+*   `docx_postprocessor.py`: A helper for `build_docs.py` that inserts page breaks into generated DOCX files.
+*   `finalize_release.py`: Automates the version bumping and changelog generation process.
+*   `generate_scope_report.py`: Generates a high-level summary of the project's file structure.
+*   `lint_docstrings.py`: Scans the codebase to enforce docstring standards.
+*   `lint_file_headers.py`: Scans the codebase to enforce file header and footer standards.
+*   `list_project_files.py`: Lists project files, typically for debugging or reporting.
+
 ## Contribution Workflow
 
 ### 1. Create a Branch

@@ -5,11 +5,13 @@ graph TD
     D -- No --> C;
     D -- Yes --> E{"Birth Year 1900-1999?"};
     E -- No --> C;
-    E -- Yes --> F{"Passes Master Filter? (Wiki, Death, Not Duplicate)"};
+    E -- Yes --> F{"Passes Master Filter? (Wiki, Death, IsDuplicate Flag)"};
     F -- No --> C;
-    F -- Yes --> G[Add original line to Stage 1 Candidates list];
+    F -- Yes --> F2{"Is Duplicate? (Normalized Name + Date)"};
+    F2 -- "Yes (Skip)" --> C;
+    F2 -- "No (Keep)" --> G[Add to Stage 1 Candidates list];
     G --> C;
-    C -- "End of File" --> H["Sort Stage 1 Candidates by Eminence Score (descending)"];
+    C -- "End of File" --> H["Sort Candidates by Eminence (desc) then ARN (asc)"];
     H --> I["Select Top 5,000 candidates"];
     I --> J["Write to adb_filtered_5000.txt with new sequence numbers and cleaned Name/Links"];
     J --> K[End];

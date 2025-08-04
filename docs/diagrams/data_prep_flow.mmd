@@ -24,6 +24,15 @@ graph TD
         end
     end
 
+    subgraph "Data Auditing (Optional Pre-flight)"
+        direction LR
+        E0[validate_adb_data.py]
+        R[adb_validation_report.csv]
+    end
+
+    A -- "audits" --> E0
+    E0 -- "creates" --> R
+
     A -- "filters" --> E1[filter_adb_candidates.py]
     B -- "uses" --> E1
     C -- "uses" --> E1
@@ -46,5 +55,5 @@ graph TD
 
     classDef file fill:#fef9e7,stroke:#b08d57
     classDef script fill:#e8f8f5,stroke:#16a085
-    class A,B,C,D,F,G,H,I,J,L file
-    class E1,E2,E3 script
+    class A,B,C,D,F,G,H,I,J,L,R file
+    class E0,E1,E2,E3 script

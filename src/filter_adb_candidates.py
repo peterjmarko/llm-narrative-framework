@@ -51,6 +51,25 @@ import csv
 import logging
 import re
 import sys
+from urllib.parse import unquote
+
+def normalize_name_for_deduplication(raw_name: str) -> str:
+    """
+    Normalizes a name for robust duplicate detection.
+    
+    Converts "Last, First Middle" into a sorted tuple of lowercase name parts.
+    e.g., "Desroches Noblecourt, Christiane" -> ('christiane', 'desroches', 'noblecourt')
+    """
+    # Remove anything in parentheses
+    name = re.sub(r'\(.*\)', '', raw_name).strip()
+    
+    # Split into parts, handling both comma and space delimiters
+    parts = re.split(r'[,\s-]+', name)
+    
+    # Filter out empty strings, convert to lowercase, and sort
+    normalized_parts = sorted([part.lower() for part in parts if part])
+    
+    return tuple(normalized_parts)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO,
@@ -123,18 +142,33 @@ def main():
 
     # --- Stage 1: Initial Filtering ---
     stage1_candidates = []
+    processed_identifiers = set() # Set to track processed individuals for deduplication
     logging.info(f"Starting Stage 1: Reading and filtering raw data from {args.input_file}...")
     try:
         with open(args.input_file, 'r', encoding='utf-8') as infile:
             next(infile)  # Skip the header row
             for line in infile:
-                parts = line.strip().split('\t')
+                # Decode URL-encoded characters (e.g., %22 for ") from the raw line
+                decoded_line = unquote(line)
+                parts = decoded_line.strip().split('\t')
                 if len(parts) < 5:
                     continue
 
                 arn = parts[0].strip()
+                raw_name = parts[1].strip()
                 date_str = parts[3].strip()
                 birth_time = parts[4].strip()
+
+                # --- New Duplicate Check ---
+                # Create a unique identifier based on normalized name and birth date
+                normalized_name = normalize_name_for_deduplication(raw_name)
+                unique_identifier = (normalized_name, date_str)
+                
+                if unique_identifier in processed_identifiers:
+                    logging.info(f"Found and skipped duplicate entry for: {raw_name} on {date_str}")
+                    continue
+                processed_identifiers.add(unique_identifier)
+                # --- End of Duplicate Check ---
 
                 # Criterion 1: Birth Time must be a valid HH:MM format
                 if not re.match(r"^\d{1,2}:\d{2}$", birth_time):
@@ -183,8 +217,10 @@ def main():
         else:
             logging.warning(f"ARN {arn} passed Stage 1 but has no eminence score. It will be excluded.")
             
-    # Sort by score (the first element of the tuple) in descending order
-    candidates_with_scores.sort(key=lambda x: x[0], reverse=True)
+    # Sort by score (descending), then by ARN (ascending) for a stable tie-break.
+    # We sort on the negative of the score to achieve descending order for the primary key.
+    # The ARN (parts[0]) is converted to an integer for correct numerical sorting.
+    candidates_with_scores.sort(key=lambda x: (-x[0], int(x[1][0])))
     
     top_5000 = candidates_with_scores[:5000]
     logging.info(f"Stage 2 complete. Selected top {len(top_5000)} candidates.")
@@ -198,7 +234,10 @@ def main():
                 
                 # Clean Name field (column at index 1)
                 if len(parts) > 1:
-                    parts[1] = parts[1].split('(')[0].strip()
+                    # Clean name, normalize whitespace, and fix smart quotes.
+                    cleaned_name = parts[1].split('(')[0].strip()
+                    normalized_name = ' '.join(cleaned_name.split())
+                    parts[1] = normalized_name.replace("’", "'")
 
                 # Clean Links field (the last column)
                 if len(parts) > 6: # Ensure the Links field exists

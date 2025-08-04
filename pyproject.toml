@@ -15,13 +15,15 @@ dependencies = [
     "scipy",
     "statsmodels",
     "networkx",
-    "requests",
+    "requests>=2.32.4",
     "python-dotenv",
-    "tqdm",
+    "tqdm>=4.67.1",
     "seaborn",
     "matplotlib",
     "pingouin>=0.5.5",
     "python-docx", # Added for DOCX post-processing
+    "thefuzz[speedup]>=0.22.1",
+    "beautifulsoup4>=4.13.4",
 ]
 
 [project.optional-dependencies]

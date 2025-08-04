@@ -43,7 +43,7 @@
 43	Dean, James	♂	1931-02-08	09:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Dean,James,m,8,2,1931,09:00,h6w,gas,0,Marion (Grant County),IN (US),85w40,40n34,u,1083,2877,0)	Adb
 44	Said, Edward	♂	1935-11-01	17:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Said,Edward,m,1,11,1935,17:00,h2e,gas,0,Jerusalem,ISRL,35e14,31n46,u,1783,1784,0)	Adb
 45	Britten, Benjamin	♂	1913-11-22	19:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Britten,Benjamin,m,22,11,1913,19:00,h0w,gas,0,Lowestoft,ENG (UK),1e45,52n29,u,1801,1800,0)	Adb
-46	Cole, Nat %22King%22	♂	1919-03-17	03:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Cole,Nat %22King%22,m,17,3,1919,03:00,h6w,gas,0,Montgomery,AL (US),86w18,32n22,u,387,-25400,0)	Adb
+46	Cole, Nat "King"	♂	1919-03-17	03:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Cole,Nat "King",m,17,3,1919,03:00,h6w,gas,0,Montgomery,AL (US),86w18,32n22,u,387,-25400,0)	Adb
 47	Rostropovich, Mstislav Leopoldovich	♂	1927-03-27	15:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Rostropovich,Mstislav Leopoldovich,m,27,3,1927,15:00,h3e,gas,0,Baku,AZE,49e51,40n23,u,3140,3139,0)	Adb
 48	Temple, Shirley	♀	1928-04-23	21:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Temple,Shirley,f,23,4,1928,21:00,h8w,gas,0,Santa Monica,CA (US),118w29,34n01,u,33,-27200,0)	Adb
 49	Townes, Charles Hard	♂	1915-07-28	05:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Townes,Charles Hard,m,28,7,1915,05:00,h5w,gas,0,Greenville,SC (US),82w24,34n51,u,32,-24500,0)	Adb
@@ -71,7 +71,7 @@
 71	Rivers, Joan	♀	1933-06-08	02:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Rivers,Joan,f,8,6,1933,02:00,h4w,gad,0,Brooklyn (Kings County),NY (US),73w56,40n38,u,45,-24500,0)	Adb
 72	Sagan, Carl	♂	1934-11-09	17:05	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Sagan,Carl,m,9,11,1934,17:05,h5w,gas,0,New York,NY (US),74w0,40n43,u,45,-24500,0)	Adb
 73	Hendrix, Jimi	♂	1942-11-27	10:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Hendrix,Jimi,m,27,11,1942,10:15,h7w,gaw,0,Seattle,WA (US),122w20,47n36,u,765,-27200,0)	Adb
-74	Hofmann,  Albert	♂	1906-01-11	15:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Hofmann, Albert,m,11,1,1906,15:00,h1e,gas,0,Baden (AG),SWTZ,8e1924,47n2736,u,2511,2510,0)	Adb
+74	Hofmann, Albert	♂	1906-01-11	15:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Hofmann, Albert,m,11,1,1906,15:00,h1e,gas,0,Baden (AG),SWTZ,8e1924,47n2736,u,2511,2510,0)	Adb
 75	Reinhardt, Django	♂	1910-01-23	15:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Reinhardt,Django,m,23,1,1910,15:00,h0e,gas,0,Liberchies,BEL,4e25,50n31,u,2529,2528,0)	Adb
 76	Bourgeois, Louise	♀	1911-12-25	10:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Bourgeois,Louise,f,25,12,1911,10:00,h0e,gas,0,Paris,FR,2e20,48n52,u,2211,2160,0)	Adb
 77	Furchgott, Robert F.	♂	1916-06-04	02:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Furchgott,Robert F.,m,4,6,1916,02:00,h5w,gas,0,Charleston,SC (US),79w56,32n47,u,32,-24500,0)	Adb
@@ -1371,7 +1371,7 @@
 1371	Seaver, Tom	♂	1944-11-17	06:27	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Seaver,Tom,m,17,11,1944,06:27,h7w,gaw,0,Fresno,CA (US),119w47,36n44,u,33,-27200,0)	Adb
 1372	McAuliffe, Christa	♀	1948-09-02	22:13	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=McAuliffe,Christa,f,2,9,1948,22:13,h4w,gad,0,Boston,MA (US),71w04,42n22,u,43,-24500,0)	Adb
 1373	Negreanu, Daniel	♂	1974-07-26	09:24	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Negreanu,Daniel,m,26,7,1974,09:24,h4w,gad,0,Toronto,ON (CAN),79w23,43n39,u,2015,-24500,0)	Adb
-1374	O’Rourke, Heather	♀	1975-12-27	00:28	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=O’Rourke,Heather,f,27,12,1975,00:28,h8w,gas,0,San Diego,CA (US),117w09,32n43,u,33,-27200,0)	Adb
+1374	O'Rourke, Heather	♀	1975-12-27	00:28	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=O’Rourke,Heather,f,27,12,1975,00:28,h8w,gas,0,San Diego,CA (US),117w09,32n43,u,33,-27200,0)	Adb
 1375	Schwarzhaupt, Elisabeth	♀	1901-01-07	16:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Schwarzhaupt,Elisabeth,f,7,1,1901,16:45,h1e,gas,0,Frankfurt am Main,GER,8e40,50n07,u,2520,-19100,0)	Adb
 1376	Vercors	♂	1902-02-26	17:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Vercors,,m,26,2,1902,17:00,m2e2015,gas,0,Paris,FR,2e20,48n52,u,2211,2160,0)	Adb
 1377	Jonas, Hans	♂	1903-05-10	07:30	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Jonas,Hans,m,10,5,1903,07:30,h1e,gas,0,Mönchengladbach,GER,6e28,51n12,u,2523,2518,0)	Adb
@@ -1992,7 +1992,7 @@
 1992	Cannon, Howard	♂	1912-01-26	23:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Cannon,Howard,m,26,1,1912,23:45,h7w,gas,0,St.George,UT (US),113w35,37n06,u,32,-26300,0)	Adb
 1993	Brooks, Richard	♂	1912-05-18	11:50	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Brooks,Richard,m,18,5,1912,11:50,h5w,gas,0,Philadelphia,PA (US),75w10,39n57,u,1426,-24500,0)	Adb
 1994	Del Duca, Simone	♀	1912-07-18	05:20	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Del Duca,Simone,f,18,7,1912,05:20,h0e,gas,0,St.Maur des Fossés,FR,2e30,48n48,u,2211,2160,0)	Adb
-1995	Bridges,  Lloyd	♂	1913-01-15	10:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Bridges, Lloyd,m,15,1,1913,10:45,h8w,gas,0,San Leandro,CA (US),122w09,37n44,u,33,-27200,0)	Adb
+1995	Bridges, Lloyd	♂	1913-01-15	10:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Bridges, Lloyd,m,15,1,1913,10:45,h8w,gas,0,San Leandro,CA (US),122w09,37n44,u,33,-27200,0)	Adb
 1996	Cohen, Wilbur Joseph	♂	1913-06-10	09:40	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Cohen,Wilbur Joseph,m,10,6,1913,09:40,h6w,gas,0,Milwaukee,WI (US),87w54,43n02,u,371,-25400,0)	Adb
 1997	Zolotow, Charlotte	♀	1915-06-26	11:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Zolotow,Charlotte,f,26,6,1915,11:00,h5w,gas,0,Norfolk,VA (US),76w17,36n51,u,623,-24500,0)	Adb
 1998	Chang, Wah	♂	1917-08-02	23:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Chang,Wah,m,2,8,1917,23:15,h10w30,gas,0,Honolulu,HI (US),157w52,21n18,u,373,60,0)	Adb
@@ -3203,7 +3203,7 @@
 3203	Jeffreys, Anne	♀	1923-01-26	14:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Jeffreys,Anne,f,26,1,1923,14:15,h5w,gas,0,Goldsboro,NC (US),78w0,35n23,u,80,-24500,0)	Adb
 3204	Magrassi Scagno, Blanca	♀	1923-11-29	22:50	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Magrassi Scagno,Blanca,f,29,11,1923,22:50,h7w,gas,0,Tampico,MEX,97w51,22n13,u,3235,-25400,0)	Adb
 3205	Krohg, Sossen	♀	1923-12-18	06:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Krohg,Sossen,f,18,12,1923,06:45,h1e,gas,0,Oslo,NOR,10e45,59n55,u,2327,-19100,0)	Adb
-3206	Groza, Lou %22The Toe%22	♂	1924-01-25	02:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Groza,Lou %22The Toe%22,m,25,1,1924,02:15,h5w,gas,0,Martins Ferry,OH (US),80w43,40n06,u,962,781,0)	Adb
+3206	Groza, Lou "The Toe"	♂	1924-01-25	02:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Groza,Lou "The Toe",m,25,1,1924,02:15,h5w,gas,0,Martins Ferry,OH (US),80w43,40n06,u,962,781,0)	Adb
 3207	Calhoun, Marge	♀	1924-03-20	20:55	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Calhoun,Marge,f,20,3,1924,20:55,h8w,gas,0,Los Angeles,CA (US),118w15,34n03,u,33,-27200,0)	Adb
 3208	Bellon, Yannick	♀	1924-04-06	06:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Bellon,Yannick,f,6,4,1924,06:00,h1e,gad,0,Biarritz,FR,1w34,43n29,u,2163,2160,0)	Adb
 3209	Bacquier, Gabriel	♂	1924-05-17	04:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Bacquier,Gabriel,m,17,5,1924,04:45,h1e,gad,0,Béziers,FR,3e15,43n21,u,2161,2160,0)	Adb
@@ -3542,7 +3542,7 @@
 3542	McKay, Jim	♂	1921-09-24	19:40	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=McKay,Jim,m,24,9,1921,19:40,h4w,gad,0,Continental,PA (US),75w09,39n57,u,1426,-24500,0)	Adb
 3543	Eade, George J.	♂	1921-10-27	11:05	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Eade,George J.,m,27,10,1921,11:05,h6w,gas,0,Lockney,TX (US),101w26,34n07,u,32,-25400,0)	Adb
 3544	Frazier, Dottie	♀	1922-07-16	10:25	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Frazier,Dottie,f,16,7,1922,10:25,h8w,gas,0,Long Beach,CA (US),118w11,33n46,u,33,-27200,0)	Adb
-3545	Hirsch, %22Crazylegs%22	♂	1923-06-17	22:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Hirsch,%22Crazylegs%22,m,17,6,1923,22:45,h6w,gas,0,Wauwatosa,WI (US),88w00,43n03,u,367,-25400,0)	Adb
+3545	Hirsch, "Crazylegs"	♂	1923-06-17	22:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Hirsch,"Crazylegs",m,17,6,1923,22:45,h6w,gas,0,Wauwatosa,WI (US),88w00,43n03,u,367,-25400,0)	Adb
 3546	Drake, Betsy	♀	1923-09-11	07:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Drake,Betsy,f,11,9,1923,07:45,h1e,gad,0,Neuilly sur Seine,FR,2e16,48n53,u,2211,2160,0)	Adb
 3547	Knatchbull, Patricia	♀	1924-02-14	06:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Knatchbull,Patricia,f,14,2,1924,06:00,h0e,gas,0,London,ENG (UK),0w10,51n30,u,1801,1800,0)	Adb
 3548	Kirkwood, James Jr.	♂	1924-08-22	15:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Kirkwood,James Jr.,m,22,8,1924,15:00,h8w,gas,0,Los Angeles,CA (US),118w15,34n03,u,33,-27200,0)	Adb
@@ -3973,7 +3973,7 @@
 3973	Schulz, Erwin	♂	1900-11-27	13:30	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Schulz,Erwin,m,27,11,1900,13:30,h1e,gas,0,Berlin,GER,13e21,52n29,u,2521,-19100,0)	Adb
 3974	Odette, Mary	♀	1901-08-10	10:30	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Odette,Mary,f,10,8,1901,10:30,m2e2015,gas,0,Dieppe,FR,1e05,49n56,u,2271,2160,0)	Adb
 3975	Tréville, Roger	♂	1902-11-27	09:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Tréville,Roger,m,27,11,1902,09:15,m2e2015,gas,0,Paris Arrondissement 8,FR,2e1904,48n5240,u,2211,2160,0)	Adb
-3976	Stribling, W. L. %22Young%22	♂	1904-12-26	21:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Stribling,W. L. %22Young%22,m,26,12,1904,21:15,h6w,gas,0,Bainbridge,GA (US),84w35,30n54,u,634,508,0)	Adb
+3976	Stribling, W. L. "Young"	♂	1904-12-26	21:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Stribling,W. L. "Young",m,26,12,1904,21:15,h6w,gas,0,Bainbridge,GA (US),84w35,30n54,u,634,508,0)	Adb
 3977	Sully, Jeanne	♀	1905-04-15	17:30	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Sully,Jeanne,f,15,4,1905,17:30,m2e2015,gas,0,Paris Arrondissement 5,FR,2e2041,48n5046,u,2211,2160,0)	Adb
 3978	Matray, Maria	♀	1907-07-14	14:15	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Matray,Maria,f,14,7,1907,14:15,h1e,gas,0,Berlin,GER,13e21,52n29,u,2521,-19100,0)	Adb
 3979	Aerts, Jean	♂	1907-09-08	23:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Aerts,Jean,m,8,9,1907,23:00,h0e,gas,0,Laeken,BEL,4e21,50n53,u,2529,2528,0)	Adb
@@ -4944,7 +4944,7 @@
 4944	Tosso, Ricky	♂	1960-02-21	08:55	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Tosso,Ricky,m,21,2,1960,08:55,h5w,gas,0,Barranco,PERU,77w02,12s09,u,2440,2439,0)	Adb
 4945	Tomasini, Alfredo	♂	1964-06-24	15:20	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Tomasini,Alfredo,m,24,6,1964,15:20,h5w,gas,0,Lima,PERU,77w03,12s03,u,2440,2439,0)	Adb
 4946	Epps, Tory	♂	1967-05-28	06:30	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Epps,Tory,m,28,5,1967,06:30,h4w,gad,0,Uniontown (Fayette County),PA (US),79w44,39n54,u,1551,-24500,0)	Adb
-4947	Merle d’Aubigné, Robert	♂	1900-07-23	04:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Merle d’Aubigné,Robert,m,23,7,1900,04:00,m2e2015,gas,0,Neuilly sur Seine,FR,2e16,48n53,u,2211,2160,0)	Adb
+4947	Merle d'Aubigné, Robert	♂	1900-07-23	04:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Merle d’Aubigné,Robert,m,23,7,1900,04:00,m2e2015,gas,0,Neuilly sur Seine,FR,2e16,48n53,u,2211,2160,0)	Adb
 4948	Feld, Fritz	♂	1900-10-15	01:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Feld,Fritz,m,15,10,1900,01:00,h1e,gas,0,Berlin,GER,13e21,52n29,u,2521,-19100,0)	Adb
 4949	Kid, Mary	♀	1901-02-03	04:30	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Kid,Mary,f,3,2,1901,04:30,h1e,gas,0,Hamburg,GER,9e59,53n33,u,2520,-19100,0)	Adb
 4950	Winterfeld, Henry	♂	1901-04-09	08:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Winterfeld,Henry,m,9,4,1901,08:00,h1e,gas,0,Hamburg,GER,9e59,53n33,u,2520,-19100,0)	Adb

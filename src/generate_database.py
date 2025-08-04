@@ -19,6 +19,18 @@
 #
 # Filename: src/generate_database.py
 
+"""
+Generates the final personality database from processed astrological data.
+
+This script is the final step in the data preparation pipeline. It takes the
+chart export from third-party software (`sf_chart_export.csv`) and a library
+of neutralized delineations. For each person, it calculates scores for
+astrological factors (e.g., elemental balances, modes), classifies them, and
+uses these classifications to assemble a sanitized, narrative personality
+description from the delineation library. The final output is the
+`personalities_db.txt` file used in the main experiments.
+"""
+
 import csv
 import math
 from pathlib import Path
