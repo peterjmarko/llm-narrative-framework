@@ -5,7 +5,6 @@ graph TD
         subgraph "Raw Sources"
             direction LR
             A[adb_raw_export.txt]
-            B[filter_adb_raw.csv]
             C[eminence_scores.csv]
             D[country_codes.csv]
         end
@@ -13,6 +12,7 @@ graph TD
         subgraph "Intermediate Artifacts"
             direction LR
             F[adb_filtered_5000.txt]
+            M[missing_eminence_scores.txt]
             G[sf_data_import.txt]
             H[sf_chart_export.csv]
             I[sf_delineations_library.txt]
@@ -34,9 +34,10 @@ graph TD
     E0 -- "creates" --> R
 
     A -- "filters" --> E1[filter_adb_candidates.py]
-    B -- "uses" --> E1
+    R -- "uses" --> E1
     C -- "uses" --> E1
     E1 -- "creates" --> F
+    E1 -- "creates" --> M
 
     F -- "formats" --> E2[prepare_sf_import.py]
     D -- "uses" --> E2
@@ -55,5 +56,5 @@ graph TD
 
     classDef file fill:#fef9e7,stroke:#b08d57
     classDef script fill:#e8f8f5,stroke:#16a085
-    class A,B,C,D,F,G,H,I,J,L,R file
+    class A,C,D,F,G,H,I,J,L,M,R file
     class E0,E1,E2,E3 script

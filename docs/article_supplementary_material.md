@@ -68,9 +68,12 @@ The script filters the raw candidate list based on a sequence of strict criteria
 2.  **Validation Status**: It then keeps only candidates with a `Status` of `OK` in the validation report. This single check implicitly confirms that the candidate has a valid Wikipedia page and a confirmed death date.
 3.  **Birth Time & Year**: It further filters the list to include only those with a validly formatted birth time (`HH:MM`) and a birth year between 1900 and 1999, inclusive.
 
-This initial filtering pass produces a pool of viable candidates. The script then performs the final selection using the eminence scores. To ensure a fully deterministic and reproducible outcome, a two-level sorting logic is applied: candidates are first ranked in descending order by their eminence score. To break any ties, candidates with the same score are then sorted in ascending order by their original Astro-Databank Raw Number (ARN).
+This initial filtering pass produces a pool of viable candidates. The script then performs the final selection using the eminence scores:
+1.  **Score Check**: It first discards any candidates from the viable pool who do not have an associated eminence score. For full transparency, the ARNs of these excluded candidates are saved to `data/reports/missing_eminence_scores.txt`.
+2.  **Ranking**: To ensure a fully deterministic and reproducible outcome, the remaining candidates are ranked using a two-level sorting logic. They are first sorted in descending order by their eminence score. To break any ties, candidates with the same score are then sorted in ascending order by their original Astro-Databank Raw Number (ARN).
+3.  **Selection**: Finally, the script selects the **top 5,000** individuals from this ranked list.
 
-Finally, the script selects the **top 5,000** individuals from this ranked list. Its output is the `data/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
+The script's final output is the `data/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
 
 ### Step 3: Formatting for Solar Fire Import
 

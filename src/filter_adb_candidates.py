@@ -53,6 +53,9 @@ import csv
 import logging
 import re
 import sys
+import shutil
+from datetime import datetime
+from pathlib import Path
 from urllib.parse import unquote
 
 class BColors:
@@ -136,7 +139,27 @@ def main():
     parser.add_argument("-o", "--output-file", default="data/adb_filtered_5000.txt", help="Path for the final 5,000-entry output file.")
     parser.add_argument("--validation-report-file", default="data/reports/adb_validation_report.csv", help="Path to the ADB validation report CSV file.")
     parser.add_argument("--eminence-file", default="data/eminence_scores.csv", help="Path to the eminence scores CSV file.")
+    parser.add_argument("--missing-eminence-log", default="data/reports/missing_eminence_scores.txt", help="Path to log ARNs of candidates missing an eminence score.")
     args = parser.parse_args()
+
+    output_path = Path(args.output_file)
+    if output_path.exists():
+        print("")
+        print(f"{BColors.YELLOW}WARNING: The output file '{output_path}' already exists and will be overwritten.{BColors.ENDC}")
+        confirm = input("Are you sure you want to continue? (Y/N): ").lower()
+        if confirm != 'y':
+            print("\nOperation cancelled by user.\n")
+            sys.exit(0)
+        
+        # Create a timestamped backup before proceeding
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = output_path.with_name(f"{output_path.stem}.{timestamp}{output_path.suffix}.bak")
+            shutil.copy2(output_path, backup_path)
+            logging.info(f"Created backup of existing file at: {backup_path}")
+        except (IOError, OSError) as e:
+            logging.error(f"Failed to create backup file: {e}")
+            sys.exit(1)
 
     print("")
     print(f"{BColors.YELLOW}--- Starting Candidate Filtering ---{BColors.ENDC}")
@@ -228,15 +251,23 @@ def main():
             missing_score_arns.append(arn)
 
     if missing_score_arns:
-        logging.warning(
-            f"{len(missing_score_arns):,} candidates passed Stage 1 but were excluded for lacking an eminence score. "
-            f"ARNs: {', '.join(missing_score_arns)}."
-        )
+        log_path = Path(args.missing_eminence_log)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            with open(log_path, 'w', encoding='utf-8') as f:
+                for arn in sorted(missing_score_arns, key=int):
+                    f.write(f"{arn}\n")
+            
+            logging.warning(f"{len(missing_score_arns):,} candidates were excluded for lacking an eminence score.")
+            logging.warning(f"A list of their ARNs has been saved to: {log_path}")
+        except IOError as e:
+            logging.error(f"Failed to write missing eminence scores log to {log_path}: {e}")
 
     candidates_with_scores.sort(key=lambda x: (-x[0], int(x[1][0])))
     
     final_candidates = candidates_with_scores[:5000]
-    logging.info(f"Stage 2 complete. Selected top {len(final_candidates):,} candidates.")
+    logging.info(f"Stage 2 complete. Selected top {len(final_candidates):,} candidates from the remaining list of {len(candidates_with_scores):,} subjects.")
 
     # --- Final Output Generation ---
     print("")
