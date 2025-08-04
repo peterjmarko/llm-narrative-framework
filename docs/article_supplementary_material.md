@@ -51,33 +51,28 @@ ARN, Name, Born, At, Chart, Links
 
 ## Data Preparation
 
-The raw export of 10,378 candidates must first be validated and cleaned, then filtered and formatted before it can be imported into the Solar Fire astrology software. This is a three-step process:
+The raw export of over 10,000 candidates must be validated, filtered, and formatted before it can be imported into the Solar Fire astrology software. This is an automated, three-step process.
 
-### Preliminary Step: Data Validation and Cleaning
+### Step 1: Data Validation
 
-**A Note on Reproducibility and Dynamic Data:** To ensure the highest quality foundational dataset, the raw export (`adb_raw_export.txt`) was first audited by the `src/validate_adb_data.py` script. This script programmatically cross-references each entry against the live English Wikipedia to verify the subject's name, confirm the existence of their page, and validate that a death date is listed. Because Wikipedia's content can change over time, this validation step is not perfectly reproducible. The study's subsequent filtering and analysis steps therefore rely on the static, cleaned version of `adb_raw_export.txt` that resulted from this one-time audit and is included in the repository.
+**A Note on Reproducibility and Dynamic Data:** To ensure the highest quality foundational dataset, the raw export (`adb_raw_export.txt`) was first audited by the `src/validate_adb_data.py` script. This script programmatically cross-references each entry against the live English Wikipedia to verify the subject's name, confirm the existence of their page, and validate that a death date is listed. Because Wikipedia is a dynamic source, this validation step is not perfectly reproducible. The study's subsequent filtering and analysis steps therefore rely on the static validation report that resulted from this one-time audit, which is included in the project repository as `data/reports/adb_validation_report.csv`. This approach ensures that while the validation itself is dynamic, the filtering process based on its static output is fully reproducible.
 
-The output of this script is a detailed report flagging any discrepancies. This report was used to manually correct typos and remove invalid entries from the master `adb_raw_export.txt` file, producing the clean source data used in the next step.
-
-### Step 1: Filtering and Selection
+### Step 2: Filtering and Selection
 
 **A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are a foundational asset of this study, stored in the static file `data/sources/eminence_scores.csv`. The generation of these scores was a one-time, non-deterministic process involving interactive querying of multiple LLMs. By treating the resulting scores as a static input, the subsequent filtering and selection process executed by `src/filter_adb_candidates.py` remains fully deterministic and computationally reproducible.
 
-The entire filtering and selection process is automated by the `src/filter_adb_candidates.py` script. This script takes the raw data export (`data/sources/adb_raw_export.txt`) and two curated data files—`data/sources/filter_adb_raw.csv` and `data/sources/eminence_scores.csv`—as input to produce the final list of 5,000 subjects.
+The entire filtering and selection process is automated by the `src/filter_adb_candidates.py` script. It takes three files as input: the raw data export (`data/sources/adb_raw_export.txt`), the validation report (`data/reports/adb_validation_report.csv`), and the eminence scores (`data/sources/eminence_scores.csv`).
 
-First, the script pre-processes the 10,378 raw candidates by cleaning and decoding the raw text to handle formatting issues from the source export (e.g., converting `Nat%20%22King%22%20Cole` to `Nat "King" Cole`). It then filters this clean list. A candidate is kept only if all of the following conditions are met:
+The script filters the raw candidate list based on a sequence of strict criteria:
+1.  **Duplicate Check**: The script first identifies and removes any duplicate entries based on a combination of a normalized name and birth date, ensuring each individual is processed only once.
+2.  **Validation Status**: It then keeps only candidates with a `Status` of `OK` in the validation report. This single check implicitly confirms that the candidate has a valid Wikipedia page and a confirmed death date.
+3.  **Birth Time & Year**: It further filters the list to include only those with a validly formatted birth time (`HH:MM`) and a birth year between 1900 and 1999, inclusive.
 
-1.  **Valid Birth Time**: The `At` field must be present and in a valid `H:MM` or `HH:MM` format.
-2.  **Birth Year**: The birth year must be between 1900 and 1999, inclusive.
-3.  **Verifiable Identity**: The subject must have a corresponding and verifiable Wikipedia page (as per `filter_adb_raw.csv`).
-4.  **Confirmed Death**: The subject must have a confirmed death date (as per `filter_adb_raw.csv`).
-5.  **Unique Entry**: The subject must not be a known duplicate (as per `filter_adb_raw.csv`).
+This initial filtering pass produces a pool of viable candidates. The script then performs the final selection using the eminence scores. To ensure a fully deterministic and reproducible outcome, a two-level sorting logic is applied: candidates are first ranked in descending order by their eminence score. To break any ties, candidates with the same score are then sorted in ascending order by their original Astro-Databank Raw Number (ARN).
 
-This initial pass reduces the sample to 6,193 candidates. The script then performs the final selection using the eminence scores from `eminence_scores.csv`. To ensure a fully deterministic and reproducible outcome, a two-level sorting logic is applied: candidates are first ranked in descending order by their eminence score. To break any ties, candidates with the same score are then sorted in ascending order by their original Astro-Databank Raw Number (ARN).
+Finally, the script selects the **top 5,000** individuals from this ranked list. Its output is the `data/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
 
-A concurrent analysis using LLM-estimated Big Five (OCEAN) personality scores revealed that trait variance became negligible for candidates ranked below the top 5,400 by eminence. To optimize for both high recognition and personality differentiation, a conservative cutoff was chosen. The script applies this by selecting the **top 5,000** individuals from the final deterministic ranking. Its final output is the `data/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
-
-### Step 2: Formatting for Solar Fire Import
+### Step 3: Formatting for Solar Fire Import
 
 The process of formatting the 5,000 selected subjects for import into the Solar Fire astrology software is automated by the `src/prepare_sf_import.py` script.
 

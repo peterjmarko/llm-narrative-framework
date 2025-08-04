@@ -1,4 +1,4 @@
-No	Name	Sex	Born	At	Chart	Links
+ARN	Name	Sex	Born	At	Chart	Links
 1	Cugat, Xavier (https://www.astro.com/astro-databank/Cugat,_Xavier)	♂	1900-01-01	07:00	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Cugat,Xavier,m,1,1,1900,07:00,m2e49,gal,0,Gerona,SPAIN,2e49,41n59,u,2544,2539,0)	Adb (https://www.astro.com/astro-databank/Cugat,_Xavier)
 2	Cunningham, Cissy (https://www.astro.com/astro-databank/Cunningham,_Cissy)	♀	1900-01-01	13:45	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Cunningham,Cissy,f,1,1,1900,13:45,h0w,gas,0,Prestonpans,SCOT (UK),3w00,55n57,u,1806,1805,0)	Adb (https://www.astro.com/astro-databank/Cunningham,_Cissy)
 3	Borboni, Paola (https://www.astro.com/astro-databank/Borboni,_Paola)	♀	1900-01-01	18:30	(https://www.astro.com/cgi/chart.cgi?lang=e;hsy=P;muasp=1;nhor=1;act=chmnat;nd1=Borboni,Paola,f,1,1,1900,18:30,h1e,gas,0,Parma,ITALY,10e20,44n48,u,3186,2334,0)	Adb (https://www.astro.com/astro-databank/Borboni,_Paola)

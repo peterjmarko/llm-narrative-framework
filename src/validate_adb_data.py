@@ -314,7 +314,8 @@ def main():
             continue
 
     if not lines_to_process:
-        logging.info("All records in the specified range have already been processed.")
+        print("")
+        logging.info("All records in the specified range have already been processed.\n")
         sort_report_by_arn(output_path, fieldnames)
         return
 
@@ -376,8 +377,8 @@ def main():
         remaining_records = len(all_lines) - total_processed
 
         if not was_interrupted:
-            final_msg = f"Processing of {len(all_lines):,} records finished ({total_ok_count:,} valid). Full report saved at: {output_path}"
-            print(f"{Colors.GREEN}INFO: {final_msg}{Colors.RESET}")
+            final_msg = f"Processing of {len(all_lines):,} records finished ({total_ok_count:,} valid). Full report saved at: {output_path}.\n"
+            print(f"\n{Colors.GREEN}INFO: {final_msg}{Colors.RESET}")
         else:
             final_msg = (
                 f"Process interrupted. {processed_this_session:,} records processed this session. "
