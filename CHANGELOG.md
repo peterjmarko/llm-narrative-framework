@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.10.0 (2025-08-04)
+
+### Bump
+
+- **version 3.9.0 → 3.10.0**
+
+### Features
+
+- **Harden and automate data preparation pipeline**
+  This release focuses on hardening and automating the data preparation pipeline, introducing a new validation script, fixing critical bugs, and updating all relevant documentation to ensure full reproducibility.
+  FEATURES:
+  New Wikipedia Validation Script (src/validate_adb_data.py): Created a powerful, parallelized script to audit the raw ADB data against live Wikipedia pages, with robust interrupt/resume capabilities and a user-friendly console interface.
+  Automated Duplicate Detection (filter_adb_candidates.py): Implemented automated logic to detect and remove complex duplicate entries from the raw data.
+  New Comparison Utility (scripts/validate_import_file.py): Added a new developer script for comparing formatted name/year lists.
+  BUG FIXES:
+  Deterministic Filtering (filter_adb_candidates.py): Fixed a critical reproducibility bug by implementing a stable, two-level sort (eminence, ARN) to resolve ties. Also fixed a bug where URL-encoded characters in names were not decoded.
+  Data Formatting (prepare_sf_import.py): Fixed critical bugs that produced invalid CQD files with missing commas and corrupted latitude/longitude data.
+  Thread Safety (validate_adb_data.py): Fixed a critical race condition caused by the use of a global variable.
+  DOCUMENTATION & HOUSEKEEPING:
+  Documentation Updates: Updated the main article, supplement, and DOCUMENTATION.template.md to reflect the new automated validation process and clarify the project's reproducibility scope regarding static data sources (ADB export, eminence scores).
+  Diagrams: Updated all four data preparation diagrams to include the new validation script and reflect the enhanced filtering logic.
+  CONTRIBUTING.md: Added a new section documenting the purpose of developer utility scripts.
+  Version Control: Removed the intermediate, generated file data/sources/sf_chart_import.csv from Git and updated .gitignore to exclude the new data/reports/ and data/temp/ directories.
+  Dependencies: Added new project dependencies (thefuzz, requests, beautifulsoup4, tqdm).
 ## 3.9.0 (2025-08-03)
 
 ### Bump
