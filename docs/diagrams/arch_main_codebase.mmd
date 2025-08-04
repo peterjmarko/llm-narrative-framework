@@ -19,7 +19,6 @@ graph TD
         subgraph "Pipeline Stages"
             direction TB
             build_queries["build_llm_queries.py"]
-            run_sessions["run_llm_sessions.py"]
             process_responses["process_llm_responses.py"]
             subgraph "Analyze LLM Performance"
                 direction TB
@@ -75,7 +74,7 @@ graph TD
     exp_manager -.-> rebuild_reports
 
     orchestrator --> build_queries
-    orchestrator --> run_sessions
+    orchestrator --> llm_prompter
     orchestrator --> process_responses
     orchestrator --> analyze_performance
     orchestrator --> run_bias
@@ -83,7 +82,6 @@ graph TD
     orchestrator --> compile_replication
 
     build_queries --> query_generator
-    run_sessions --> llm_prompter
 
     compile_study_results_py --> study_analysis
 
@@ -97,7 +95,6 @@ graph TD
     exp_manager         -.-> config_loader
     orchestrator        -.-> config_loader
     build_queries       -.-> config_loader
-    run_sessions        -.-> config_loader
     process_responses   -.-> config_loader
     analyze_performance -.-> config_loader
     run_bias            -.-> config_loader

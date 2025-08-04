@@ -13,7 +13,7 @@ graph TD
         subgraph InternalStages [Internal Stages]
             direction TB
             S1["<b>1. Build Queries</b><br><small>via build_llm_queries.py</small>"] --> S2;
-            S2["<b>2. Run LLM Sessions</b><br><small>via run_llm_sessions.py</small>"] --> S3;
+            S2["<b>2. Run LLM Sessions</b><br><small>via llm_prompter.py</small>"] --> S3;
             S3["<b>3. Process LLM Responses</b><br><small>via process_llm_responses.py</small>"] --> S4;
             S4["<b>4. Analyze Performance</b><br><small>via analyze_llm_performance.py<br>+ run_bias_analysis.py</small>"] --> S5;
             S5["<b>5. Generate Report</b><br><small>via generate_replication_report.py</small>"] --> S6;
