@@ -1,5 +1,35 @@
 # Changelog
 
+## 3.12.0 (2025-08-04)
+
+### Bump
+
+- **version 3.11.0 → 3.12.0**
+
+### Documentation
+
+- **Update diagrams to reflect removal of run_llm_sessions.py**
+  This commit updates three key architecture and workflow diagrams to align with the current system architecture after a recent refactoring.
+  
+  The `run_llm_sessions.py` script was removed, and the `orchestrate_replication.py` script now directly manages parallel calls to the `llm_prompter.py` worker.
+  
+  The following diagrams were modified to reflect this change:
+  - `arch_main_codebase.mmd`
+  - `data_main_flow.mmd`
+  - `flow_main_1_new_experiment.mmd`
+
+### Features
+
+- **Enhance data preparation scripts and documentation**
+  Improves the data preparation pipeline with enhanced script robustness, user safety features, and updated documentation.
+  
+  Key changes include:
+  - Adds interactive confirmation prompts and automated backups to `validate_adb_data.py` and `filter_adb_candidates.py` to prevent accidental file overwrites.
+  - Improves user messaging with clearer instructions and color-coded warnings.
+  - Enhances web scraping logic in the validation script.
+  - Redirects long console logs in the filtering script to a dedicated report file.
+  - Updates all relevant documentation and diagrams to reflect the new script behaviors and data flows.
+  - Adds rules to .gitignore to exclude generated data and backups.
 ## 3.11.0 (2025-08-04)
 
 ### Bump
