@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.11.0 (2025-08-04)
+
+### Bump
+
+- **version 3.10.0 → 3.11.0**
+
+### Features
+
+- **Add validation script and overhaul candidate filtering**
+  This commit introduces a major overhaul of the data preparation pipeline to make it more robust, automated, and reproducible.
+  
+  The core of this change is the new `validate_adb_data.py` script, which programmatically audits the raw data against Wikipedia to produce a static validation report.
+  
+  The `filter_adb_candidates.py` script has been completely rewritten to use this new report for its primary filtering. This change includes:
+  - A corrected, robust, on-the-fly duplicate check.
+  - Significantly improved logging with clear, formatted, and colored stage transitions for better readability.
+  - More accurate reporting of record counts, with thousand-separators for clarity.
+  
+  Finally, all project documentation (`article_main_text.md`, `article_supplementary_material.md`, and `DOCUMENTATION.template.md`) has been updated to reflect this new, more rigorous data preparation workflow.
 ## 3.10.0 (2025-08-04)
 
 ### Bump
