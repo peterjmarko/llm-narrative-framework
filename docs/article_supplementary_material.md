@@ -51,56 +51,27 @@ ARN, Name, Born, At, Chart, Links
 
 ## Data Preparation
 
-The raw export of over 10,000 candidates must be validated, filtered, and formatted before it can be imported into the Solar Fire astrology software. This is an automated, three-step process.
+The raw export of over 10,000 candidates must be validated, filtered, and formatted. This is an automated, four-step process driven by Python scripts.
 
-### Step 1: Data Validation
+### Step 1: Data Validation (Audit)
 
-**A Note on Reproducibility and Dynamic Data:** To ensure the highest quality foundational dataset, the raw export (`adb_raw_export.txt`) was first audited by the `src/validate_adb_data.py` script. This script programmatically cross-references each entry against the live English Wikipedia to verify the subject's name, confirm the existence of their page, and validate that a death date is listed. Because Wikipedia is a dynamic source, this validation step is not perfectly reproducible. The study's subsequent filtering and analysis steps therefore rely on the static validation report that resulted from this one-time audit, which is included in the project repository as `data/reports/adb_validation_report.csv`. This approach ensures that while the validation itself is dynamic, the filtering process based on its static output is fully reproducible.
+**A Note on Reproducibility and Dynamic Data:** The raw export (`adb_raw_export.txt`) was first audited by `src/validate_adb_data.py`. This script cross-references each entry against Wikipedia to verify the name and confirm a death date. Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. The study's pipeline therefore relies on the static report that resulted from this one-time audit, which is included as `data/reports/adb_validation_report.csv`. This ensures the filtering process is fully reproducible.
 
-### Step 2: Filtering and Selection
+### Step 2: Filtering and Selection (`filter_adb_candidates.py`)
 
-**A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are a foundational asset of this study, stored in the static file `data/foundational_assets/eminence_scores.csv`. The generation of these scores was a one-time, non-deterministic process involving interactive querying of multiple LLMs. By treating the resulting scores as a static input, the subsequent filtering and selection process executed by `src/filter_adb_candidates.py` remains fully deterministic and computationally reproducible.
+**A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are stored in the static file `data/foundational_assets/eminence_scores.csv`. The generation of these scores was a one-time process. By treating the scores as a static input, the filtering process remains fully deterministic.
 
-The entire filtering and selection process is automated by the `src/filter_adb_candidates.py` script. It takes three files as input: the raw data export (`data/sources/adb_raw_export.txt`), the validation report (`data/reports/adb_validation_report.csv`), and the eminence scores (`data/foundational_assets/eminence_scores.csv`).
+This step is automated by `src/filter_adb_candidates.py`. It takes the raw data, the validation report, and the eminence scores as input. It filters candidates based on their validation status, a valid birth time, and a birth year between 1900-1999. It then ranks the remaining candidates by eminence score (with ARN as a tie-breaker) and selects the top 5,000. The output is `data/intermediate/adb_filtered_5000.txt`.
 
-The script filters the raw candidate list based on a sequence of strict criteria:
-1.  **Duplicate Check**: The script first identifies and removes any duplicate entries based on a combination of a normalized name and birth date, ensuring each individual is processed only once.
-2.  **Validation Status**: It then keeps only candidates with a `Status` of `OK` in the validation report. This single check implicitly confirms that the candidate has a valid Wikipedia page and a confirmed death date.
-3.  **Birth Time & Year**: It further filters the list to include only those with a validly formatted birth time (`HH:MM`) and a birth year between 1900 and 1999, inclusive.
+### Step 3: Formatting for Import (`prepare_sf_import.py`)
 
-This initial filtering pass produces a pool of viable candidates. The script then performs the final selection using the eminence scores:
-1.  **Score Check**: It first discards any candidates from the viable pool who do not have an associated eminence score. For full transparency, the ARNs of these excluded candidates are saved to `data/reports/missing_eminence_scores.txt`.
-2.  **Ranking**: To ensure a fully deterministic and reproducible outcome, the remaining candidates are ranked using a two-level sorting logic. They are first sorted in descending order by their eminence score. To break any ties, candidates with the same score are then sorted in ascending order by their original Astro-Databank Raw Number (ARN).
-3.  **Selection**: Finally, the script selects the **top 5,000** individuals from this ranked list. Its output is the `data/intermediate/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
+This step, automated by `src/prepare_sf_import.py`, formats the 5,000 selected subjects for import into the Solar Fire astrology software. It parses the data from `adb_filtered_5000.txt`, extracts geographic and time zone information, and assembles a Comma Quote Delimited (CQD) record for each subject. The output is `data/intermediate/sf_data_import.txt`.
 
-The script's final output is the `data/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
+### Step 4: Integration and Cleaning (`create_subject_database.py`)
 
-### Step 3: Formatting for Solar Fire Import
+After the data is processed and exported from Solar Fire as `sf_chart_export.csv`, this crucial integration step is performed by `create_subject_database.py`. The script reads the multi-line chart export, flattens it into one row per subject, and enriches it by cross-referencing other source files (like the eminence scores). Most importantly, it **repairs character encoding issues** that originate from the Solar Fire export process.
 
-The process of formatting the 5,000 selected subjects for import into the Solar Fire astrology software is automated by the `src/prepare_sf_import.py` script.
-
-The script takes two files as input:
-*   `data/intermediate/adb_filtered_5000.txt`: The clean list of 5,000 subjects from the previous step.
-*   `data/foundational_assets/country_codes.csv`: A lookup table to map location codes to full country names.
-
-It performs the following transformations for each subject:
-1.  **Parses Input**: It reads the subject's name, birth date, time, and chart URL from the filtered data file.
-2.  **Extracts Geographic Data**: It robustly parses the chart URL, extracting detailed geographic and time zone information from the complex `nd1` parameter.
-3.  **Calculates Time Zone**: It correctly interprets both standard (`h...`) and Local Mean Time (`m...`) ADB time zone codes to calculate the required `Zone Time` offset and `Zone Abbreviation`.
-4.  **Formats Fields**: It reformats the name from "Last, First" to "First Last" while removing double quotes and the date to the `DD Month YYYY` format required by the import utility.
-5.  **Assembles CQD Record**: It concatenates all processed fields into a final Comma Quote Delimited (CQD) record suitable for direct import into Solar Fire.
-
-The script's final output is `data/sources/sf_data_import.txt`, a text file containing the 5,000 records ready for direct import into Solar Fire. The example records below illustrate the transformation performed by the script:
-
-*   **Original Data for JFK:**
-    `2421  Kennedy, John F. (https://www.astro.com/astro-databank/Kennedy,_John_F.)	♂	1917-05-29	15:00	(https://www.astro.com/cgi/chart.cgi?lang=e;...nd1=Kennedy,John F.,m,29,5,1917,15:00,h5w,...Brookline,MA (US),71w07,42n20,...)`
-*   **Formatted Output for Solar Fire:**
-    `"John F. Kennedy","29 May 1917","15:00","...","05:00","Brookline","United States","42N20","71W07"`
-
-*   **Original Data for George Balanchine:**
-    `464	Balanchine, George (https://www.astro.com/astro-databank/Balanchine,_George)	♂	1904-01-22	12:58	(https://www.astro.com/cgi/chart.cgi?lang=e;...nd1=Balanchine,George,m,22,1,1904,12:58,m30e15,...St.Petersburg,RU,30e18,59n55,...)`
-*   **Formatted Output for Solar Fire:**
-    `"George Balanchine","22 Jan 1904","12:58","LMT","-02:01","St.Petersburg","Russia","59N55","30E18"`
+The final output is `data/processed/subject_db.csv`, a clean, UTF-8 encoded master file that serves as the primary input for the final database generation script.
 
 ## Importing to and Exporting from Solar Fire
 
@@ -312,11 +283,9 @@ Note: Solar Fire uses the term "mode" for what is typically referred to as the "
 
 ## Creating the Personalities Database
 
-Now we have all the components for assembling the personalities database. At the end of the process, this file (`personalities_db.txt`) will contain the names, birth years, and neutralized personality descriptions of 5000 famous historical people. This is the source data for the matching task described in the main article. Creating the file consists of the following three interdependent tasks:
+The final stage of the pipeline assembles the `personalities_db.txt` file. The process involves three conceptual tasks, all of which are automated by the `generate_database.py` script using the clean `data/processed/subject_db.csv` as its main input.
 
-*   Converting the raw astrological data exported from Solar Fire to 'strong' and 'weak' classifications for the six categories (chart points in signs and balances of signs, elements, modes, quadrants, and hemispheres).
-*   Neutralizing the astrological delineations library by removing astrological and other references to blind the LLM performing the matching task.
-*   Compiling the personality descriptions by using the categorical classifications as keys for extracting the relevant components from the neutralized delineations library and appending these to the names and birth years of the 5000 famous individuals.
+The following subsections describe the methodology that the script automates.
 
 ### Creating Divisional Classifications
 
@@ -365,7 +334,7 @@ Using the above settings, the resulting WT and ST values (rounded up to the near
 *   **Modes:** WT 4, ST 10.
 *   **Signs:** WT 0, ST 4.
 
-The interpretive output of this process is the resulting list of 'strong' and 'weak' classifications for each division, which is then used by Solar Fire for report assembly.
+The interpretive output of this process is the resulting list of 'strong' and 'weak' classifications for each division, which is then used by Solar Fire for report assembly. The `generate_database.py` script reimplements this entire classification logic.
 
 #### Divisional Classification Procedure
 
@@ -427,7 +396,7 @@ Once the above information is available, compiling the final personalities datab
 
 The beginning of the personality description becomes: "Stable and enduring, strong values, unyielding, earthy, acquisitive, strong desires. Can be stuck, stubborn, overly possessive, self-indulgent. Agile, versatile, inquisitive, flowing, conversational, airy, many ideas. Can be volatile, superficial, changeable, restless and inconsistent."
 
-This continues with the rest of the delineation components corresponding to weak and strong divisions for the person in question.
+This continues with the rest of the delineation components corresponding to weak and strong divisions for the person in question. This entire lookup and assembly process is performed automatically by the `generate_database.py` script.
 
 The final `personalities_db.txt` is a tab-delimited file containig the following fields: Index, Name, BirthYear, and DescriptionText. For example:
 

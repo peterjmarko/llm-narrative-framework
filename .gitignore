@@ -44,7 +44,8 @@ commit.txt
 /data/sources/sf_data_import.txt
 /data/sources/sf_chart_import.csv
 
-# Generated reports and temporary files
+# Generated reports, backup and temporary files
+/data/backup/
 /data/reports/
 /data/temp/
 

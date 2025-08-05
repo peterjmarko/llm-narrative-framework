@@ -121,15 +121,22 @@ def load_chart_data_map(filepath: Path) -> dict:
             logging.warning(f"Skipping malformed person info line: {block[0]}")
             continue
         
-        name = person_info_parts[0]
+        raw_name = person_info_parts[0]
+        
+        # Attempt to repair mojibake by reversing the incorrect latin-1 decode
+        try:
+            repaired_name = raw_name.encode('latin-1').decode('utf-8')
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            repaired_name = raw_name # Keep original if repair fails
+
         # Key the map with a truncated normalized name to handle export inconsistencies.
-        norm_name_truncated = normalize_name(name)[:25]
+        norm_name_truncated = normalize_name(repaired_name)[:25]
 
         placements_raw = {next(csv.reader([line]))[0]: next(csv.reader([line]))[2] for line in block[2:]}
         placements = {p: placements_raw.get(p, '') for p in chart_points_order}
 
         chart_map[norm_name_truncated] = {
-            "Name": name,
+            "Name": repaired_name, # Use the fixed name for output
             "Date": person_info_parts[1], "Time": person_info_parts[2], "ZoneAbbrev": person_info_parts[3],
             "ZoneTime": person_info_parts[4], "Place": person_info_parts[5], "Country": person_info_parts[6],
             "Latitude": person_info_parts[7], "Longitude": person_info_parts[8],
@@ -143,7 +150,7 @@ def main():
     parser.add_argument("--filtered-5000", default="data/intermediate/adb_filtered_5000.txt")
     parser.add_argument("--eminence-scores", default="data/foundational_assets/eminence_scores.csv")
     parser.add_argument("--raw-export", default="data/sources/adb_raw_export.txt")
-    parser.add_argument("--output-file", default="data/subject_db.csv")
+    parser.add_argument("--output-file", default="data/processed/subject_db.csv")
     args = parser.parse_args()
 
     print("")
@@ -238,6 +245,8 @@ def main():
         for subject in all_subjects:
             subject.pop('OriginalName', None)
 
+        # Ensure the output directory exists before writing
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(args.output_file, 'w', encoding='utf-8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=header)
             writer.writeheader()

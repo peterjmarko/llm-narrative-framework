@@ -19,6 +19,11 @@ graph TD
             J[neutralized_delineations/]
         end
 
+        subgraph "Processed Artifacts"
+            direction LR
+            K[subject_db.csv]
+        end
+
         subgraph "Final Product"
             L[personalities_db.txt]
         end
@@ -50,11 +55,17 @@ graph TD
     I -- "sanitizes" --> P2["LLM Neutralization"]
     P2 -- "creates" --> J
     
-    H -- "assembles" --> E3[generate_database.py]
+    H -- "integrates" --> E4[create_subject_database.py]
+    F -- "integrates" --> E4
+    A -- "integrates" --> E4
+    C -- "integrates" --> E4
+    E4 -- "creates" --> K
+
+    K -- "assembles" --> E3[generate_database.py]
     J -- "uses" --> E3
     E3 -- "creates" --> L
 
     classDef file fill:#fef9e7,stroke:#b08d57
     classDef script fill:#e8f8f5,stroke:#16a085
-    class A,C,D,F,G,H,I,J,L,M,R file
-    class E0,E1,E2,E3 script
+    class A,C,D,F,G,H,I,J,K,L,M,R file
+    class E0,E1,E2,E3,E4 script

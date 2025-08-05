@@ -141,7 +141,7 @@ def calculate_classifications(placements: dict, point_weights: dict, thresholds:
 
 def main():
     parser = argparse.ArgumentParser(description="Generate final personalities DB.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--subject-db", default="data/subject_db.csv", help="Path to the master subject database CSV.")
+    parser.add_argument("--subject-db", default="data/processed/subject_db.csv", help="Path to the master subject database CSV.")
     parser.add_argument("--delineations-dir", default="data/foundational_assets/neutralized_delineations", help="Directory with neutralized delineation CSVs.")
     parser.add_argument("--output-file", default="data/personalities_db.txt", help="Path for the final output database.")
     args = parser.parse_args()
