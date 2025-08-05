@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.13.0 (2025-08-05)
+
+### Bump
+
+- **version 3.12.0 → 3.13.0**
+
+### Features
+
+- **architect data prep pipeline with master subject database**
+  Introduces a master `subject_db.csv` to serve as a single, auditable source of truth for the data generation pipeline. This decouples complex data parsing and integration from the final personality description assembly.
+  
+  - Creates `create_subject_database.py` to flatten and enrich chart data by cross-referencing all source files.
+  - Implements a robust name normalization function that handles encoding errors (mojibake), all quote types, diacritics, and name order.
+  - Replaces manual name corrections for truncation errors with an automated string slicing method.
+  - Refactors `generate_database.py` to use the new, simpler `subject_db.csv` as its input.
+  - Adds user confirmation prompts and automated backups to all data preparation scripts for improved safety.
+  - Consolidates the data directory structure for better organization, moving assets to `foundational_assets` and intermediate files to `intermediate`.
 ## 3.12.0 (2025-08-04)
 
 ### Bump
