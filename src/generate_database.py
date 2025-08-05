@@ -33,14 +33,12 @@ import argparse
 import csv
 import logging
 import math
+import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # --- Constants based on the supplementary material ---
-POINT_WEIGHTS = {"Sun": 3, "Moon": 3, "Ascendant": 3, "Midheaven": 3, "Mercury": 2, "Venus": 2, "Mars": 2, "Jupiter": 1, "Saturn": 1, "Uranus": 0, "Neptune": 0, "Pluto": 0}
-POINTS_FOR_BALANCES = list(POINT_WEIGHTS.keys())
-POINTS_FOR_QUAD_HEMI = [p for p in POINTS_FOR_BALANCES if p not in ['Ascendant', 'Midheaven']]
-THRESHOLDS = {"Signs": {"weak_ratio": 0, "strong_ratio": 2.0}, "Elements": {"weak_ratio": 0.5, "strong_ratio": 1.5}, "Modes": {"weak_ratio": 0.5, "strong_ratio": 1.5}, "Quadrants": {"weak_ratio": 0, "strong_ratio": 1.5}, "Hemispheres": {"weak_ratio": 0, "strong_ratio": 1.4}}
 SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 ELEMENTS_MAP = {"Fire": SIGNS[0::4], "Earth": SIGNS[1::4], "Air": SIGNS[2::4], "Water": SIGNS[3::4]}
 MODES_MAP = {"Cardinal": SIGNS[0::3], "Fixed": SIGNS[1::3], "Mutable": SIGNS[2::3]}
@@ -48,6 +46,39 @@ QUADRANTS_MAP = {"1": SIGNS[0:3], "2": SIGNS[3:6], "3": SIGNS[6:9], "4": SIGNS[9
 HEMISPHERES_MAP = {"Eastern": SIGNS[9:12] + SIGNS[0:3], "Western": SIGNS[3:9], "Northern": SIGNS[0:6], "Southern": SIGNS[6:12]}
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+class bcolors:
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
+def load_point_weights(file_path: Path) -> dict:
+    """Loads point weights from a CSV file."""
+    weights = {}
+    if not file_path.exists():
+        logging.error(f"Point weights file not found: {file_path}")
+        sys.exit(1)
+    with open(file_path, 'r', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        for row in reader:
+            weights[row['Point']] = int(row['Weight'])
+    return weights
+
+def load_thresholds(file_path: Path) -> dict:
+    """Loads balance thresholds from a CSV file."""
+    thresholds = {}
+    if not file_path.exists():
+        logging.error(f"Balance thresholds file not found: {file_path}")
+        sys.exit(1)
+    with open(file_path, 'r', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        for row in reader:
+            thresholds[row['Category']] = {
+                "weak_ratio": float(row['WeakRatio']),
+                "strong_ratio": float(row['StrongRatio'])
+            }
+    return thresholds
 
 def load_delineations(delineations_dir: Path) -> dict:
     delineations = {}
@@ -65,19 +96,22 @@ def load_delineations(delineations_dir: Path) -> dict:
 def get_sign(longitude):
     return SIGNS[math.floor(longitude / 30)]
 
-def calculate_classifications(placements: dict) -> list:
+def calculate_classifications(placements: dict, point_weights: dict, thresholds: dict) -> list:
+    points_for_balances = list(point_weights.keys())
+    points_for_quad_hemi = [p for p in points_for_balances if p not in ['Ascendant', 'Midheaven']]
+    
     classifications = []
     for point, lon in placements.items():
-        if POINT_WEIGHTS.get(point, 0) > 0:
+        if point_weights.get(point, 0) > 0:
             sign = get_sign(lon)
-            classifications.append(f"*{point} In {sign}")
+            classifications.append(f"{point} In {sign}")
 
     def get_category_scores(use_all_points=True):
-        points_to_consider = POINTS_FOR_BALANCES if use_all_points else POINTS_FOR_QUAD_HEMI
+        points_to_consider = points_for_balances if use_all_points else points_for_quad_hemi
         scores = {sign: 0 for sign in SIGNS}
         for point, lon in placements.items():
             if point in points_to_consider:
-                scores[get_sign(lon)] += POINT_WEIGHTS.get(point, 0)
+                scores[get_sign(lon)] += point_weights.get(point, 0)
         return scores
 
     sign_scores_all = get_category_scores(True)
@@ -95,44 +129,82 @@ def calculate_classifications(placements: dict) -> list:
         total_score = sum(scores.values())
         if total_score == 0: continue
         avg_score = total_score / len(scores)
-        weak_thresh = avg_score * THRESHOLDS[category]["weak_ratio"]
-        strong_thresh = avg_score * THRESHOLDS[category]["strong_ratio"]
+        weak_thresh = avg_score * thresholds[category]["weak_ratio"]
+        strong_thresh = avg_score * thresholds[category]["strong_ratio"]
         for division, score in scores.items():
             key_name = f"{category.rstrip('s')} {division}" if category != "Signs" else division
             if weak_thresh > 0 and score < weak_thresh:
-                classifications.append(f"*{key_name} Weak")
+                classifications.append(f"{key_name} Weak")
             if score >= strong_thresh:
-                classifications.append(f"*{key_name} Strong")
+                classifications.append(f"{key_name} Strong")
     return classifications
 
 def main():
     parser = argparse.ArgumentParser(description="Generate final personalities DB.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--subject-db", default="data/subject_db.csv", help="Path to the master subject database CSV.")
-    parser.add_argument("--delineations-dir", default="data/neutralized_delineations", help="Directory with neutralized delineation CSVs.")
+    parser.add_argument("--delineations-dir", default="data/foundational_assets/neutralized_delineations", help="Directory with neutralized delineation CSVs.")
     parser.add_argument("--output-file", default="data/personalities_db.txt", help="Path for the final output database.")
     args = parser.parse_args()
 
-    logging.info("Loading neutralized delineations...")
+    output_path = Path(args.output_file)
+    backup_dir = output_path.parent / 'backup'
+
+    # Check if output file exists and prompt user to overwrite
+    if output_path.exists():
+        print("")
+        print(f"{bcolors.WARNING}WARNING: The output file '{output_path}' already exists and will be overwritten.{bcolors.ENDC}")
+        confirm = input("Do you want to continue? (Y/N): ").lower().strip()
+        if confirm != 'y':
+            print("")
+            logging.info("Operation cancelled by user.\n")
+            sys.exit(0)
+
+        # Create backup directory if it doesn't exist
+        backup_dir.mkdir(exist_ok=True)
+
+        # Create timestamped backup
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_filename = f"{output_path.stem}_backup_{timestamp}{output_path.suffix}"
+        backup_path = backup_dir / backup_filename
+        
+        shutil.copy2(output_path, backup_path)
+        print("")
+        logging.info(f"Backup of existing file created at: {backup_path}")
+
+    data_dir = Path(args.output_file).parent
+    point_weights_path = data_dir / "foundational_assets" / "point_weights.csv"
+    thresholds_path = data_dir / "foundational_assets" / "balance_thresholds.csv"
+
+    logging.info("Loading configuration and delineation files...")
+    point_weights = load_point_weights(point_weights_path)
+    thresholds = load_thresholds(thresholds_path)
     delineations = load_delineations(Path(args.delineations_dir))
 
     logging.info(f"Processing subjects from {args.subject_db}...")
     try:
         with open(args.output_file, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.writer(outfile, delimiter='\t')
+            writer.writerow(['Index', 'Name', 'BirthYear', 'DescriptionText'])
             
             with open(args.subject_db, 'r', encoding='utf-8') as infile:
                 reader = csv.DictReader(infile)
                 for row in reader:
-                    placements = {p: float(row[p]) for p in POINT_WEIGHTS if row.get(p)}
-                    classifications = calculate_classifications(placements)
+                    placements = {p: float(row[p]) for p in point_weights if row.get(p)}
+                    classifications = calculate_classifications(placements, point_weights, thresholds)
                     desc_parts = [delineations.get(c, "") for c in classifications]
                     full_desc = " ".join(part for part in desc_parts if part).strip()
                     writer.writerow([row['Rank'], row['Name'], row['Date'].split()[-1], full_desc])
         
-        logging.info(f"Database generation complete. Final file at: {args.output_file} ✨")
+        print("")
+        print(f"{bcolors.OKGREEN}INFO: Database generation complete. Final file at: {args.output_file} ✨{bcolors.ENDC}")
+        print("")
 
     except Exception as e:
-        logging.error(f"An error occurred: {e}", exc_info=True)
+        import traceback
+        print("")
+        print(f"{bcolors.FAIL}ERROR: An error occurred during database generation.{bcolors.ENDC}")
+        print(f"{bcolors.FAIL}{e}{bcolors.ENDC}\n")
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":
