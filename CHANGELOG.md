@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.15.0 (2025-08-05)
+
+### Bump
+
+- **version 3.14.0 → 3.15.0**
+
+### Features
+
+- **add data integration script and fix encoding**
+  Introduces create_subject_database.py to the data preparation pipeline.
+  
+  This new script integrates the raw Solar Fire chart export with other data sources and fixes critical character encoding errors before generating the master subject_db.csv.
+  
+  - Moves subject_db.csv to a new data/processed/ directory.
+  - Updates all documentation and diagrams to reflect the new 4-step data pipeline.
 ## 3.14.0 (2025-08-05)
 
 ### Bump
