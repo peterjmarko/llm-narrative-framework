@@ -375,8 +375,10 @@ def main():
 
             # Create a timestamped backup before deleting the original
             try:
+                backup_dir = Path('data/backup')
+                backup_dir.mkdir(parents=True, exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = output_path.with_name(f"{output_path.stem}.{timestamp}{output_path.suffix}.bak")
+                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
                 shutil.copy2(output_path, backup_path)
                 print("")
                 logging.info(f"Created backup of existing report at: {backup_path}")

@@ -39,7 +39,8 @@ docs/**/*.pdf
 commit.txt
 
 # Intermediate files generated during the data preparation pipeline
-/data/adb_filtered_5000.txt
+/data/intermediate/
+/data/subject_db.csv
 /data/sources/sf_data_import.txt
 /data/sources/sf_chart_import.csv
 

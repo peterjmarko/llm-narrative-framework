@@ -40,15 +40,22 @@ import argparse
 import csv
 import os
 import re
-from datetime import datetime
-import logging
 import sys
+import shutil
+from datetime import datetime
+from pathlib import Path
+import logging
 from urllib.parse import urlparse, parse_qs
 
+class BColors:
+    """A helper class for terminal colors."""
+    YELLOW = '\033[93m'
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    ENDC = '\033[0m'
+
 # --- Setup Logging ---
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 # --- Helper Functions ---
 def load_country_codes(filepath: str) -> dict:
@@ -178,6 +185,9 @@ def process_adb_line(line: str, conversion_table: dict) -> list | None:
         else:
             full_name = raw_name.strip() # Handle single names
 
+        # Remove all double quotes from the name to prevent import issues
+        full_name = full_name.replace('"', '')
+
         # 3. Transform Date
         formatted_date = datetime.strptime(date_str, "%Y-%m-%d").strftime("%d %B %Y")
         
@@ -231,10 +241,31 @@ def main(input_file: str, output_file: str, country_codes_file: str):
     """
     Main function to read ADB data, process it, and write the SF import file.
     """
+    print("")
+    
+    output_path = Path(output_file)
+    if output_path.exists():
+        print(f"{BColors.YELLOW}WARNING: The output file '{output_path}' already exists and will be overwritten.{BColors.ENDC}")
+        confirm = input("Are you sure you want to continue? (Y/N): ").lower()
+        if confirm != 'y':
+            print("\nOperation cancelled by user.\n")
+            sys.exit(0)
+        
+        # Create a timestamped backup before proceeding
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = output_path.with_name(f"{output_path.stem}.{timestamp}{output_path.suffix}.bak")
+            shutil.copy2(output_path, backup_path)
+            print("")
+            logging.info(f"Created backup of existing file at: {backup_path}")
+        except (IOError, OSError) as e:
+            logging.error(f"Failed to create backup file: {e}")
+            sys.exit(1)
+
     logging.info(f"Loading country codes from: {country_codes_file}")
     country_conversion_table = load_country_codes(country_codes_file)
 
-    logging.info(f"Reading raw ADB data from: {input_file}")
+    logging.info(f"Reading filtered ADB data from: {input_file}")
     logging.info(f"Will write Solar Fire import file to: {output_file}")
     
     processed_records = []
@@ -252,16 +283,19 @@ def main(input_file: str, output_file: str, country_codes_file: str):
         sys.exit(1)
 
     if not processed_records:
-        logging.error("No valid records were processed. Output file will not be created.")
+        print(f"{BColors.RED}No valid records were processed. Output file will not be created.{BColors.ENDC}")
+        print("")
         sys.exit(1)
         
     try:
         with open(output_file, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.writer(outfile, delimiter=',', quoting=csv.QUOTE_ALL)
             writer.writerows(processed_records)
-        logging.info(f"Successfully wrote {len(processed_records)} records to {output_file}.")
+        print(f"{BColors.GREEN}\nSuccessfully wrote {len(processed_records)} records to {output_file}.{BColors.ENDC}")
+        print("")
     except IOError as e:
-        logging.error(f"Failed to write to output file {output_file}: {e}")
+        print(f"{BColors.RED}Failed to write to output file {output_file}: {e}{BColors.ENDC}")
+        print("")
         sys.exit(1)
 
 
@@ -272,7 +306,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-i", "--input-file",
-        default="data/adb_filtered_5000.txt",
+        default="data/intermediate/adb_filtered_5000.txt",
         help="Path to the raw, tab-delimited file exported from ADB."
     )
     parser.add_argument(
@@ -282,7 +316,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-c", "--country-codes-file",
-        default="data/country_codes.csv",
+        default="data/foundational_assets/country_codes.csv",
         help="Path to the country codes conversion CSV file."
     )
     args = parser.parse_args()

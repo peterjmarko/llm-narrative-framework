@@ -30,6 +30,7 @@
   - Redirects long console logs in the filtering script to a dedicated report file.
   - Updates all relevant documentation and diagrams to reflect the new script behaviors and data flows.
   - Adds rules to .gitignore to exclude generated data and backups.
+
 ## 3.11.0 (2025-08-04)
 
 ### Bump
@@ -49,6 +50,7 @@
   - More accurate reporting of record counts, with thousand-separators for clarity.
   
   Finally, all project documentation (`article_main_text.md`, `article_supplementary_material.md`, and `DOCUMENTATION.template.md`) has been updated to reflect this new, more rigorous data preparation workflow.
+
 ## 3.10.0 (2025-08-04)
 
 ### Bump
@@ -73,6 +75,7 @@
   CONTRIBUTING.md: Added a new section documenting the purpose of developer utility scripts.
   Version Control: Removed the intermediate, generated file data/sources/sf_chart_import.csv from Git and updated .gitignore to exclude the new data/reports/ and data/temp/ directories.
   Dependencies: Added new project dependencies (thefuzz, requests, beautifulsoup4, tqdm).
+
 ## 3.9.0 (2025-08-03)
 
 ### Bump
@@ -96,6 +99,7 @@
   - Refactored `list_project_files.py` to remove redundant script-tallying.
   - Refactored `generate_scope_report.py` to use `os.walk` for efficient file discovery.
   - Updated `.gitignore` to correctly exclude generated PDFs and the `docs/images` directory.
+
 ## 3.8.0 (2025-08-03)
 
 ### Bump
@@ -121,6 +125,7 @@
   new processes, including the addition of 7 new diagrams for the data
   preparation phase and a complete refactoring of the diagram naming
   convention for improved clarity and consistency.
+  
 ## 3.7.1 (2025-07-31)
 
 ### Bump

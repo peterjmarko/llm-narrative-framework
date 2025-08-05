@@ -136,9 +136,9 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("-i", "--input-file", default="data/sources/adb_raw_export.txt", help="Path to the raw, tab-delimited file exported from ADB.")
-    parser.add_argument("-o", "--output-file", default="data/adb_filtered_5000.txt", help="Path for the final 5,000-entry output file.")
+    parser.add_argument("-o", "--output-file", default="data/intermediate/adb_filtered_5000.txt", help="Path for the final 5,000-entry output file.")
     parser.add_argument("--validation-report-file", default="data/reports/adb_validation_report.csv", help="Path to the ADB validation report CSV file.")
-    parser.add_argument("--eminence-file", default="data/eminence_scores.csv", help="Path to the eminence scores CSV file.")
+    parser.add_argument("--eminence-file", default="data/foundational_assets/eminence_scores.csv", help="Path to the eminence scores CSV file.")
     parser.add_argument("--missing-eminence-log", default="data/reports/missing_eminence_scores.txt", help="Path to log ARNs of candidates missing an eminence score.")
     args = parser.parse_args()
 
@@ -153,8 +153,10 @@ def main():
         
         # Create a timestamped backup before proceeding
         try:
+            backup_dir = Path('data/backup')
+            backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = output_path.with_name(f"{output_path.stem}.{timestamp}{output_path.suffix}.bak")
+            backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
             shutil.copy2(output_path, backup_path)
             logging.info(f"Created backup of existing file at: {backup_path}")
         except (IOError, OSError) as e:
@@ -274,7 +276,9 @@ def main():
     print(f"{BColors.YELLOW}--- Finishing... ---{BColors.ENDC}")
     logging.info(f"Writing final output to {args.output_file}...")
     try:
-        with open(args.output_file, 'w', encoding='utf-8') as outfile:
+        output_path = Path(args.output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as outfile:
             for i, (score, parts) in enumerate(final_candidates, start=1):
                 if len(parts) > 1:
                     cleaned_name = parts[1].split('(')[0].strip()

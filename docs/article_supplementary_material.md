@@ -59,9 +59,9 @@ The raw export of over 10,000 candidates must be validated, filtered, and format
 
 ### Step 2: Filtering and Selection
 
-**A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are a foundational asset of this study, stored in the static file `data/sources/eminence_scores.csv`. The generation of these scores was a one-time, non-deterministic process involving interactive querying of multiple LLMs. By treating the resulting scores as a static input, the subsequent filtering and selection process executed by `src/filter_adb_candidates.py` remains fully deterministic and computationally reproducible.
+**A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are a foundational asset of this study, stored in the static file `data/foundational_assets/eminence_scores.csv`. The generation of these scores was a one-time, non-deterministic process involving interactive querying of multiple LLMs. By treating the resulting scores as a static input, the subsequent filtering and selection process executed by `src/filter_adb_candidates.py` remains fully deterministic and computationally reproducible.
 
-The entire filtering and selection process is automated by the `src/filter_adb_candidates.py` script. It takes three files as input: the raw data export (`data/sources/adb_raw_export.txt`), the validation report (`data/reports/adb_validation_report.csv`), and the eminence scores (`data/sources/eminence_scores.csv`).
+The entire filtering and selection process is automated by the `src/filter_adb_candidates.py` script. It takes three files as input: the raw data export (`data/sources/adb_raw_export.txt`), the validation report (`data/reports/adb_validation_report.csv`), and the eminence scores (`data/foundational_assets/eminence_scores.csv`).
 
 The script filters the raw candidate list based on a sequence of strict criteria:
 1.  **Duplicate Check**: The script first identifies and removes any duplicate entries based on a combination of a normalized name and birth date, ensuring each individual is processed only once.
@@ -71,7 +71,7 @@ The script filters the raw candidate list based on a sequence of strict criteria
 This initial filtering pass produces a pool of viable candidates. The script then performs the final selection using the eminence scores:
 1.  **Score Check**: It first discards any candidates from the viable pool who do not have an associated eminence score. For full transparency, the ARNs of these excluded candidates are saved to `data/reports/missing_eminence_scores.txt`.
 2.  **Ranking**: To ensure a fully deterministic and reproducible outcome, the remaining candidates are ranked using a two-level sorting logic. They are first sorted in descending order by their eminence score. To break any ties, candidates with the same score are then sorted in ascending order by their original Astro-Databank Raw Number (ARN).
-3.  **Selection**: Finally, the script selects the **top 5,000** individuals from this ranked list.
+3.  **Selection**: Finally, the script selects the **top 5,000** individuals from this ranked list. Its output is the `data/intermediate/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
 
 The script's final output is the `data/adb_filtered_5000.txt` file, which serves as the clean input for the next preparation stage.
 
@@ -80,14 +80,14 @@ The script's final output is the `data/adb_filtered_5000.txt` file, which serves
 The process of formatting the 5,000 selected subjects for import into the Solar Fire astrology software is automated by the `src/prepare_sf_import.py` script.
 
 The script takes two files as input:
-*   `data/adb_filtered_5000.txt`: The clean list of 5,000 subjects from the previous step.
-*   `data/country_codes.csv`: A lookup table to map location codes to full country names.
+*   `data/intermediate/adb_filtered_5000.txt`: The clean list of 5,000 subjects from the previous step.
+*   `data/foundational_assets/country_codes.csv`: A lookup table to map location codes to full country names.
 
 It performs the following transformations for each subject:
 1.  **Parses Input**: It reads the subject's name, birth date, time, and chart URL from the filtered data file.
 2.  **Extracts Geographic Data**: It robustly parses the chart URL, extracting detailed geographic and time zone information from the complex `nd1` parameter.
 3.  **Calculates Time Zone**: It correctly interprets both standard (`h...`) and Local Mean Time (`m...`) ADB time zone codes to calculate the required `Zone Time` offset and `Zone Abbreviation`.
-4.  **Formats Fields**: It reformats the name from "Last, First" to "First Last" and the date to the `DD Month YYYY` format required by the import utility.
+4.  **Formats Fields**: It reformats the name from "Last, First" to "First Last" while removing double quotes and the date to the `DD Month YYYY` format required by the import utility.
 5.  **Assembles CQD Record**: It concatenates all processed fields into a final Comma Quote Delimited (CQD) record suitable for direct import into Solar Fire.
 
 The script's final output is `data/sources/sf_data_import.txt`, a text file containing the 5,000 records ready for direct import into Solar Fire. The example records below illustrate the transformation performed by the script:
@@ -175,7 +175,7 @@ Once chart options and preferences are adjusted, everything is set for a success
 
 Now we need to open all the charts so they can be exported. In the Chart Database dialog, click the arrow next to the 'File' button and select your charts file. If now shown on the list, select 'Other files...' and pick the file from the File Management dialog and click 'Select'. The total number of charts (5000) in the charts file and number of currently selected charts (1) within the file are shown on top. Do not change the sorting of the chart list.
 
-Scroll down to the bottom of the list, and Shift-select the last chart (name). All charts will be highlighted (selected) and '5000' will be shown in the 'Selected' field on top. Click the 'Open...' button: all 5000 charts will be opened one by one and shown on the list of Calculated Charts (note: this will take some time).
+Click the 'All' button: all charts will be highlighted (selected) and '5000' will be shown in the 'Selected' field on top. Click the 'Open...' button: all 5000 charts will be opened one by one and shown on the list of Calculated Charts (note: this could take 15 minutes or more).
 
 ### Exporting Astrological Data
 
@@ -185,7 +185,7 @@ Once all 5000 charts are calculated and added to the list of Calculated Charts, 
 
 Open the 'Export Chart Data' dialog by invoking the 'Chart > Export Charts as Text...' menu item. Check the 'Chart Details' and 'Column Types' boxes, then click the 'Edit ASCII...' button to open the 'ASCII Formet Definitions' dialog. This window is identical to the one encountered during the import process with one important difference: the list of Definitions is specific to the export workflow. Just as for the import, go through the creation of a CQD format and ensure the exact same 9 fields are specified. Name the newly created definition to your preference (e.g., `CQD Export`) and click the 'Save' button to get back to the previous dialog. 
 
-Make sure your new CQD format is selected under the 'Edit ASCII...' button. Select 'Comma Quote (CQD)' for 'Field Delimiters' and 'Export to File' for 'Destination'. Click the 'Browse' button, navigate to a save folder of your choosing, name the export file (e.g., `sf_chart_export.csv`), and click the 'Save' button to get back to the main dialog. Click the 'Export' button to export the chart data to the file. Dismiss the 'Export completed successfully' message and click the 'Quit' button in the main dialog.
+Select 'Chart Points' (first item) under 'Select types of points:-' if not already selected. Make sure your new CQD format is selected under the 'Edit ASCII...' button. Select 'Comma Quote (CQD)' for 'Field Delimiters' and 'Export to File' for 'Destination'. Click the 'Browse' button, navigate to the `data/foundational_assets` folder, name the export file `sf_chart_export.csv`, and click the 'Save' button to get back to the main dialog. Click the 'Export' button to export the chart data to the file. Wait until the program exports all files, then dismiss the 'Export completed successfully' message and click the 'Quit' button in the main dialog.
 
 The format of the exported file is as follows:
 
