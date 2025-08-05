@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.14.0 (2025-08-05)
+
+### Bump
+
+- **version 3.13.0 → 3.14.0**
+
+### Features
+
+- **Refactors `generate_database.py` to be more robust and user-friendly**
+  - The script now dynamically loads point weights and balance thresholds from their respective CSV files in `data/foundational_assets/` instead of using hardcoded values.
+  - Adds a confirmation prompt and a timestamped backup feature to prevent accidental overwrites of `personalities_db.txt`.
+  - Fixes a critical bug where incorrect classification keys were being generated, resulting in empty descriptions in the output database.
+  - Updates documentation and diagrams to reflect the new logic and data flow.
 ## 3.13.0 (2025-08-05)
 
 ### Bump
