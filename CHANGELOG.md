@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.17.1 (2025-08-06)
+
+### Bump
+
+- **version 3.17.0 → 3.17.1**
+
+### Fixes
+
+- **Correct pagination logic to fetch unique pages**
+  Fixes a critical pagination bug in `fetch_adb_data.py` that caused it to repeatedly fetch the first page of results.
+  
+  The original script incorrectly used the complex "initial search" POST request for all pages. This caused the server to re-run the search each time instead of paginating, leading to a corrupt data file with duplicated records.
+  
+  The `fetch_all_data` function is now rewritten to implement the server's correct two-stage API logic:
+  - A complex `POST` request with a full JSON payload is sent once for Page 1.
+  - Simple `GET` requests with query parameters (`uid`, `pageNumber`) are sent for all subsequent pages.
+  
+  This change resolves the data corruption symptoms (the "27 unique codes" issue and the final page "overfetch"). It also includes new diagnostic scripts and documentation updates related to this debugging effort.
 ## 3.17.0 (2025-08-06)
 
 ### Bump
