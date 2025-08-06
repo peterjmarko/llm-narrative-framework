@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.16.0 (2025-08-05)
+
+### Bump
+
+- **version 3.15.0 → 3.16.0**
+
+### Features
+
+- **add automated adb data fetching script**
+  Introduces `src/fetch_adb_data.py` to fully automate the data extraction process from the Astro-Databank website, replacing the previous manual method.
+  
+  The new script handles the entire workflow:
+  - Authenticates with the site using credentials from the .env file.
+  - Scrapes the search page for all required dynamic security tokens.
+  - Constructs and sends a complete JSON payload to the site's internal API.
+  - Parses the paginated JSON responses and saves the detailed data incrementally.
+  
+  Key features include an interactive user prompt with an automatic backup system to prevent accidental data loss.
+  
+  This change also updates all relevant documentation and diagrams (workflow, data flow, and code architecture) to reflect the new, recommended data acquisition pipeline. The .gitignore has been updated to exclude the script's output file and any debugging artifacts.
 ## 3.15.0 (2025-08-05)
 
 ### Bump
