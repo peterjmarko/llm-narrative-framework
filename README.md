@@ -1,12 +1,10 @@
-# Overwrite 'README.md' with the following content:
-
 # A Resilient Framework for Large-Scale LLM Experimentation
 
 A comprehensive research framework for conducting Large Language Model (LLM) experiments with statistical analysis, hierarchical data aggregation, and resilient, self-healing workflow management.
 
 ## 🚀 Quick Start
 
-````powershell
+```powershell
 # 1. Configure your experiment in config.ini
 
 # 2. Create and run a new experiment from scratch
@@ -21,6 +19,7 @@ A comprehensive research framework for conducting Large Language Model (LLM) exp
 
 # 5. View the final, publication-ready analysis
 Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
+```
 
 ## ✨ Key Features
 

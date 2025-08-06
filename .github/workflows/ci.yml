@@ -1,0 +1,55 @@
+# .github/workflows/ci.yml
+
+name: Lint, Build, and Validate
+
+# This workflow runs on every push to the 'main' or 'develop' branches,
+# and on any pull request that targets the 'main' branch.
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # This job will run the full suite of validation checks.
+  validate-project:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest] # Focus on Windows and Linux
+        python-version: ["3.11"]
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      # 1. Get the code from the repository
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # 2. Set up the PDM environment with caching to speed up future runs
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      # 3. Install all project and development dependencies from the lockfile
+      - name: Install dependencies
+        run: pdm install -G dev
+
+      # 4. Run linting checks.
+      #    These are run on the primary 'windows-latest' job only for efficiency.
+      - name: Run Linting Checks
+        if: matrix.os == 'windows-latest'
+        run: |
+          pdm run check-headers
+          pdm run python scripts/lint_docstrings.py
+        shell: pwsh
+
+      # 5. Check if documentation is up-to-date.
+      #    This uses the built-in `--check` flag for a read-only validation.
+      #    Also run on the primary 'windows-latest' job only.
+      - name: Validate Documentation
+        if: matrix.os == 'windows-latest'
+        run: pdm run build-docs --check
+        shell: pwsh

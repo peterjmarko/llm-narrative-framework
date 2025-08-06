@@ -1,115 +1,92 @@
 graph TD
     subgraph "Input Data"
-        direction LR
         Input_PDB["personalities_db.txt"]
         Input_Query["base_query.txt"]
         Input_Config["config.ini"]
     end
 
-    subgraph "Core Data Pipeline Flow"
-        direction LR
-        subgraph "1: Generation"
-             Script1["build_llm_queries.py"]
-        end
-        subgraph "2: Execution & Processing"
-            Script2["llm_prompter.py"]
-            Script3["process_llm<br/>_responses.py"]
-        end
-        subgraph "3: Single-Run Analysis"
-            direction TB
-            Script4["analyze_llm<br/>_performance.py"]
-            Script4b["run_bias<br/>_analysis.py"]
-            Script5["generate_replication<br/>_report.py"]
-            Script6["compile_replication<br/>_results.py"]
-        end
-        subgraph "4: Study-Level Aggregation & Analysis"
-             CompilerExp["compile_experiment<br/>_results.py"]
-             CompilerStudy["compile_study<br/>_results.py"]
-             StudyAnalyzer["study_analysis.py"]
-        end
+    subgraph "Pipeline Scripts"
+        Script1["build_llm_queries.py"]
+        Script2["llm_prompter.py"]
+        Script3["process_llm_responses.py"]
+        Script4["analyze_llm_performance.py"]
+        Script5["run_bias_analysis.py"]
+        Script6["generate_replication_report.py"]
+        Script7["compile_replication_results.py"]
+        Script8["compile_experiment_results.py"]
+        Script9["compile_study_results.py"]
+        Script10["study_analyzer.py"]
     end
 
-    subgraph "Key Data Artifacts"
-        direction LR
+    subgraph "Data Artifacts"
+        Art_archive[("config.ini.archived")]
+        Art_query["llm_query_XXX.txt"]
+        Art_manifest[("manifest.txt")]
+        Art_response["llm_response_XXX.txt"]
+        Art_scores["all_scores.txt"]
         Art_metrics[("replication_metrics.json")]
-        Art1_archive[("config.ini.archived")]
-        Art1_query["llm_query_XXX.txt"]
-        Art1_mappings_src[("mappings.txt<br/>(source)")]
-        Art1_manifest[("manifest.txt")]
-        Art2_response["llm_response_XXX.txt"]
-        Art3_scores["all_scores.txt"]
-        Art3_mappings_analysis["all_mappings.txt<br/>(for analysis)"]
-        Art4_report["replication_report.txt"]
-        BatchRunLog[("batch_run_log.csv")]
-        RepResultsCSV[("REPLICATION_results.csv")]
-        ExpResultsCSV[("EXPERIMENT_results.csv")]
-        StudyResultsCSV[("STUDY_results.csv")]
+        Art_report["replication_report.txt"]
+        Art_rep_results[("REPLICATION_results.csv")]
+        Art_exp_results[("EXPERIMENT_results.csv")]
+        Art_study_results[("STUDY_results.csv")]
+        Art_batch_log[("batch_run_log.csv")]
+    end
+    
+    subgraph "Final Output"
         FinalOutputs(("STUDY_analysis_log.txt<br/>Boxplots/<br/>Diagnostics/"))
     end
 
+    %% --- Data Flow Connections ---
     Input_PDB & Input_Query & Input_Config --> Script1
-    Input_Config --> Art1_archive
-
-    Script1 --> Art1_query
-    Script1 --> Art1_mappings_src
-    Script1 --> Art1_manifest
-
-    Art1_query --> Script2
-    Script2 --> Art2_response
-
-    Art2_response & Art1_mappings_src & Art1_manifest --> Script3
-    Script3 --> Art3_scores
-    Script3 --> Art3_mappings_analysis
-
-    Art3_scores & Art3_mappings_analysis & Art1_archive --> Script4
+    Input_Config --> Art_archive
+    Script1 --> Art_query
+    Script1 --> Art_manifest
+    Art_query --> Script2
+    Script2 --> Art_response
+    Art_response & Art_manifest --> Script3
+    Script3 --> Art_scores
+    Art_scores & Art_archive --> Script4
     Script4 --> Art_metrics
+    Art_metrics --> Script5
+    Art_metrics & Art_archive & Input_Query --> Script6
+    Script6 --> Art_report
+    Art_report --> Art_batch_log
+    Art_metrics & Art_archive --> Script7
+    Script7 --> Art_rep_results
+    Art_rep_results --> Script8
+    Script8 --> Art_exp_results
+    Art_exp_results --> Script9
+    Script9 --> Art_study_results
+    Art_study_results --> Script10
+    Script10 --> FinalOutputs
 
-    Art_metrics --> Script4b
-
-    Art_metrics & Art1_archive & Input_Query --> Script5
-    Script5 --> Art4_report
-
-    Art_metrics & Art1_archive --> Script6
-    Script6 --> RepResultsCSV
+    %% --- Inline Styling ---
+    style Input_PDB fill:#cde4ff,stroke:#6c93be
+    style Input_Query fill:#cde4ff,stroke:#6c93be
+    style Input_Config fill:#cde4ff,stroke:#6c93be
     
-    RepResultsCSV --> CompilerExp
-    CompilerExp --> ExpResultsCSV
-    
-    Art4_report --> BatchRunLog
-    ExpResultsCSV --> CompilerStudy
+    style Script1 fill:#fff3cd,stroke:#f1c40f
+    style Script2 fill:#fff3cd,stroke:#f1c40f
+    style Script3 fill:#fff3cd,stroke:#f1c40f
+    style Script4 fill:#fff3cd,stroke:#f1c40f
+    style Script5 fill:#fff3cd,stroke:#f1c40f
+    style Script6 fill:#fff3cd,stroke:#f1c40f
+    style Script7 fill:#fff3cd,stroke:#f1c40f
+    style Script8 fill:#fff3cd,stroke:#f1c40f
+    style Script9 fill:#fff3cd,stroke:#f1c40f
+    style Script10 fill:#fff3cd,stroke:#f1c40f
 
-    CompilerStudy --> StudyResultsCSV
-
-    StudyResultsCSV --> StudyAnalyzer
-    StudyAnalyzer --> FinalOutputs
-
-    style Input_PDB fill:#cde4ff,stroke:#6c93be,color:#333
-    style Input_Query fill:#cde4ff,stroke:#6c93be,color:#333
-    style Input_Config fill:#cde4ff,stroke:#6c93be,color:#333
+    style Art_archive fill:#e9ecef,stroke:#adb5bd
+    style Art_query fill:#e9ecef,stroke:#adb5bd
+    style Art_manifest fill:#e9ecef,stroke:#adb5bd
+    style Art_response fill:#e9ecef,stroke:#adb5bd
+    style Art_scores fill:#e9ecef,stroke:#adb5bd
+    style Art_metrics fill:#e9ecef,stroke:#adb5bd
+    style Art_report fill:#e9ecef,stroke:#adb5bd
+    style Art_rep_results fill:#e9ecef,stroke:#adb5bd
+    style Art_exp_results fill:#e9ecef,stroke:#adb5bd
+    style Art_study_results fill:#e9ecef,stroke:#adb5bd
+    style Art_batch_log fill:#e9ecef,stroke:#adb5bd
     
-    style Script1 fill:#ffe8d6,stroke:#e59866,color:#333
-    style Script2 fill:#ffe8d6,stroke:#e59866,color:#333
-    style Script3 fill:#ffe8d6,stroke:#e59866,color:#333
-    style Script4 fill:#ffe8d6,stroke:#e59866,color:#333
-    style Script4b fill:#ffe8d6,stroke:#e59866,color:#333
-    style Script5 fill:#ffe8d6,stroke:#e59866,color:#333
-    style Script6 fill:#ffe8d6,stroke:#e59866,color:#333
-    style CompilerExp fill:#ffe8d6,stroke:#e59866,color:#333
-    style CompilerStudy fill:#ffe8d6,stroke:#e59866,color:#333
-    style StudyAnalyzer fill:#ffe8d6,stroke:#e59866,color:#333
+    style FinalOutputs fill:#d4edda,stroke:#155724
     
-    style Art_metrics fill:#e9ecef,stroke:#adb5bd,color:#333
-    style Art1_archive fill:#e9ecef,stroke:#adb5bd,color:#333
-    style Art1_query fill:#e9ecef,stroke:#adb5bd,color:#333
-    style Art1_mappings_src fill:#e9ecef,stroke:#adb5bd,color:#333
-    style Art1_manifest fill:#e9ecef,stroke:#adb5bd,color:#333
-    style Art2_response fill:#e9ecef,stroke:#adb5bd,color:#333
-    style Art3_scores fill:#e9ecef,stroke:#adb5bd,color:#333
-    style Art3_mappings_analysis fill:#e9ecef,stroke:#adb5bd,color:#333
-    style Art4_report fill:#e9ecef,stroke:#adb5bd,color:#333
-    style BatchRunLog fill:#e9ecef,stroke:#adb5bd,color:#333
-    style RepResultsCSV fill:#e9ecef,stroke:#adb5bd,color:#333
-    style ExpResultsCSV fill:#e9ecef,stroke:#adb5bd,color:#333
-    style StudyResultsCSV fill:#e9ecef,stroke:#adb5bd,color:#333
-    
-    style FinalOutputs fill:#d4edda,stroke:#155724,color:#333

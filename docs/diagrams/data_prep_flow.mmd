@@ -1,78 +1,83 @@
 graph TD
-    subgraph " "
-        style invis stroke-width:0px,fill:transparent
-
-        subgraph "Raw Sources"
-            direction LR
-            A[adb_raw_export.txt]
-            A_new[adb_raw_export_fetched.txt]
-            C[eminence_scores.csv]
-            D[country_codes.csv]
-        end
-
-        subgraph "Intermediate Artifacts"
-            direction LR
-            F[adb_filtered_5000.txt]
-            M[missing_eminence_scores.txt]
-            G[sf_data_import.txt]
-            H[sf_chart_export.csv]
-            I[sf_delineations_library.txt]
-            J[neutralized_delineations/]
-        end
-
-        subgraph "Processed Artifacts"
-            direction LR
-            K[subject_db.csv]
-        end
-
-        subgraph "Final Product"
-            L[personalities_db.txt]
-        end
+    subgraph "Data Sources"
+        A_raw[adb_raw_export.txt]
+        A_fetch[adb_raw_export_fetched.txt]
+        C_eminence[eminence_scores.csv]
+        D_country[country_codes.csv]
+        I_delineations[sf_delineations_library.txt]
     end
     
-    subgraph "Automated Data Fetching"
-        F_new[fetch_adb_data.py]
+    subgraph "Pipeline Scripts"
+        S_fetch[fetch_adb_data.py]
+        S_validate[validate_adb_data.py]
+        S_filter[filter_adb_candidates.py]
+        S_prepare[prepare_sf_import.py]
+        S_create[create_subject_db.py]
+        S_generate[generate_personalities_db.py]
     end
 
-    subgraph "Data Auditing (Optional Pre-flight)"
-        E0[validate_adb_data.py]
-        R[adb_validation_report.csv]
+    subgraph "Manual / External Processes"
+        P_sf["Solar Fire Software"]
+        P_llm["LLM Neutralization"]
     end
 
-    F_new -- "creates" --> A_new
+    subgraph "Data Artifacts"
+        R_validation{adb_validation_report.csv}
+        F_filtered{adb_filtered_5000.txt}
+        M_missing{missing_eminence_scores.txt}
+        G_import{sf_data_import.txt}
+        H_export{sf_chart_export.csv}
+        J_neutralized{neutralized_delineations/}
+        K_subject{subject_db.csv}
+    end
 
-    A -- "audits" --> E0
-    E0 -- "creates" --> R
+    subgraph "Final Product"
+        L_final((personalities_db.txt))
+    end
 
-    A -- "(static input)" --> E1[filter_adb_candidates.py]
-    A_new -- "(fetched input)" --> E1
-    R -- "uses" --> E1
-    C -- "uses" --> E1
-    E1 -- "creates" --> F
-    E1 -- "creates" --> M
+    S_fetch --> A_fetch
+    A_raw --> S_validate --> R_validation
+    A_raw -- "static input" --> S_filter
+    A_fetch -. "requires update" .-> S_filter
+    R_validation --> S_filter
+    C_eminence --> S_filter
+    S_filter --> F_filtered
+    S_filter --> M_missing
+    F_filtered & D_country --> S_prepare
+    S_prepare --> G_import
+    G_import --> P_sf
+    P_sf --> H_export
+    P_sf --> I_delineations
+    I_delineations --> P_llm
+    P_llm --> J_neutralized
+    H_export & F_filtered & A_raw & C_eminence --> S_create
+    S_create --> K_subject
+    K_subject & J_neutralized --> S_generate
+    S_generate --> L_final
 
-    F -- "formats" --> E2[prepare_sf_import.py]
-    D -- "uses" --> E2
-    E2 -- "creates" --> G
+    style A_raw fill:#cde4ff,stroke:#6c93be
+    style A_fetch fill:#cde4ff,stroke:#6c93be
+    style C_eminence fill:#cde4ff,stroke:#6c93be
+    style D_country fill:#cde4ff,stroke:#6c93be
+    style I_delineations fill:#cde4ff,stroke:#6c93be
     
-    G -- "imports/exports" --> P1["Solar Fire Software"]
-    P1 -- "creates" --> H
-    P1 -- "creates" --> I
+    style S_fetch fill:#d4edda,stroke:#155724
+    style S_validate fill:#d4edda,stroke:#155724
+    style S_filter fill:#d4edda,stroke:#155724
+    style S_prepare fill:#d4edda,stroke:#155724
+    style S_create fill:#d4edda,stroke:#155724
+    style S_generate fill:#d4edda,stroke:#155724
 
-    I -- "sanitizes" --> P2["LLM Neutralization"]
-    P2 -- "creates" --> J
+    style P_sf fill:#fdebd0,stroke:#e59866
+    style P_llm fill:#fdebd0,stroke:#e59866
+
+    style R_validation fill:#fef9e7,stroke:#b08d57
+    style F_filtered fill:#fef9e7,stroke:#b08d57
+    style M_missing fill:#fef9e7,stroke:#b08d57
+    style G_import fill:#fef9e7,stroke:#b08d57
+    style H_export fill:#fef9e7,stroke:#b08d57
+    style J_neutralized fill:#fef9e7,stroke:#b08d57
+    style K_subject fill:#fef9e7,stroke:#b08d57
+
+    style L_final fill:#a3e4d7,stroke:#0e6251
     
-    H -- "integrates" --> E4[create_subject_database.py]
-    F -- "integrates" --> E4
-    A -- "integrates" --> E4
-    C -- "integrates" --> E4
-    E4 -- "creates" --> K
-
-    K -- "assembles" --> E3[generate_database.py]
-    J -- "uses" --> E3
-    E3 -- "creates" --> L
-
-    classDef file fill:#fef9e7,stroke:#b08d57
-    classDef script fill:#e8f8f5,stroke:#16a085
-    class A,A_new,C,D,F,G,H,I,J,K,L,M,R file
-    class E0,E1,E2,E3,E4,F_new script

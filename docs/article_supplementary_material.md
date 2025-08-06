@@ -73,9 +73,9 @@ This step is automated by `src/filter_adb_candidates.py`. It takes the raw data,
 
 This step, automated by `src/prepare_sf_import.py`, formats the 5,000 selected subjects for import into the Solar Fire astrology software. It parses the data from `adb_filtered_5000.txt`, extracts geographic and time zone information, and assembles a Comma Quote Delimited (CQD) record for each subject. The output is `data/intermediate/sf_data_import.txt`.
 
-### Step 4: Integration and Cleaning (`create_subject_database.py`)
+### Step 4: Integration and Cleaning (`create_subject_db.py`)
 
-After the data is processed and exported from Solar Fire as `sf_chart_export.csv`, this crucial integration step is performed by `create_subject_database.py`. The script reads the multi-line chart export, flattens it into one row per subject, and enriches it by cross-referencing other source files (like the eminence scores). Most importantly, it **repairs character encoding issues** that originate from the Solar Fire export process.
+After the data is processed and exported from Solar Fire as `sf_chart_export.csv`, this crucial integration step is performed by `create_subject_db.py`. The script reads the multi-line chart export, flattens it into one row per subject, and enriches it by cross-referencing other source files (like the eminence scores). Most importantly, it **repairs character encoding issues** that originate from the Solar Fire export process.
 
 The final output is `data/processed/subject_db.csv`, a clean, UTF-8 encoded master file that serves as the primary input for the final database generation script.
 
@@ -289,7 +289,7 @@ Note: Solar Fire uses the term "mode" for what is typically referred to as the "
 
 ## Creating the Personalities Database
 
-The final stage of the pipeline assembles the `personalities_db.txt` file. The process involves three conceptual tasks, all of which are automated by the `generate_database.py` script using the clean `data/processed/subject_db.csv` as its main input.
+The final stage of the pipeline assembles the `personalities_db.txt` file. The process involves three conceptual tasks, all of which are automated by the `generate_personalities_db.py` script using the clean `data/processed/subject_db.csv` as its main input.
 
 The following subsections describe the methodology that the script automates.
 
@@ -340,7 +340,7 @@ Using the above settings, the resulting WT and ST values (rounded up to the near
 *   **Modes:** WT 4, ST 10.
 *   **Signs:** WT 0, ST 4.
 
-The interpretive output of this process is the resulting list of 'strong' and 'weak' classifications for each division, which is then used by Solar Fire for report assembly. The `generate_database.py` script reimplements this entire classification logic.
+The interpretive output of this process is the resulting list of 'strong' and 'weak' classifications for each division, which is then used by Solar Fire for report assembly. The `generate_personalities_db.py` script reimplements this entire classification logic.
 
 #### Divisional Classification Procedure
 
@@ -402,7 +402,7 @@ Once the above information is available, compiling the final personalities datab
 
 The beginning of the personality description becomes: "Stable and enduring, strong values, unyielding, earthy, acquisitive, strong desires. Can be stuck, stubborn, overly possessive, self-indulgent. Agile, versatile, inquisitive, flowing, conversational, airy, many ideas. Can be volatile, superficial, changeable, restless and inconsistent."
 
-This continues with the rest of the delineation components corresponding to weak and strong divisions for the person in question. This entire lookup and assembly process is performed automatically by the `generate_database.py` script.
+This continues with the rest of the delineation components corresponding to weak and strong divisions for the person in question. This entire lookup and assembly process is performed automatically by the `generate_personalities_db.py` script.
 
 The final `personalities_db.txt` is a tab-delimited file containig the following fields: Index, Name, BirthYear, and DescriptionText. For example:
 
@@ -413,6 +413,10 @@ The final `personalities_db.txt` is a tab-delimited file containig the following
 The rest of the Testing Framework is fully automated in Python, as documented herein.
 
 ## Related Files
+
+*   `base_query.txt`
+
+    This file contains the final prompt template used for the LLM matching task. It is the product of a systematic, multi-stage piloting process. Various prompt structures and phrasing were tested to find the version that yielded the most reliable and consistently parsable structured output from the target LLM.
 
 *   `country_codes.csv`
     ```

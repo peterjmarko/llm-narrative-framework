@@ -1,35 +1,64 @@
 graph TD
-    subgraph "Manual & Semi-Automated Processes (Archival)"
-        style Manual fill:#f9f9f9,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-        A[Scrape Astro-Databank] --> B{adb_raw_export.txt};
-        C[Curate Filter & Eminence Files] --> E{eminence_scores.csv};
-        I[Use Solar Fire Software] --> J{sf_chart_export.csv};
-        I --> K{sf_delineations_library.txt};
-        L[Use LLM to Neutralize Text] --> M{neutralized_delineations/};
+    subgraph "Automated Pipeline"
+        F[src/filter_adb_candidates.py]
+        H[src/prepare_sf_import.py]
+        S[src/create_subject_db.py]
+        N[src/generate_personalities_db.py]
     end
 
-    subgraph "Fully Automated Pipeline"
-        style Automated fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
-        F_new[src/fetch_adb_data.py] --> B_new{adb_raw_export_fetched.txt};
-        F[src/filter_adb_candidates.py] --> G{adb_filtered_5000.txt};
-        H[src/prepare_sf_import.py] --> I;
-        N[src/generate_database.py] --> O((personalities_db.txt));
+    subgraph "Manual & External Processes"
+        I[Use Solar Fire Software]
+        L[Use LLM to Neutralize Text]
     end
-
-    subgraph "Data Auditing (Optional)"
-        style Audit fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
-        P[src/validate_adb_data.py] --> Q{adb_validation_report.csv}
-    end
-
-    B -- "(input for audit)" --> P
     
-    B -- "(static input)" --> F;
-    B_new -- "(fetched input)" --> F;
-    Q -- "(used by)" --> F
-    E -- "(used by)" --> F;
-    G --> H;
-    J --> N;
-    M --> N;
+    subgraph "Inputs & Foundational Assets"
+        B_raw{adb_raw_export.txt}
+        Q_report{adb_validation_report.csv}
+        E_scores{eminence_scores.csv}
+        G_filtered{adb_filtered_5000.txt}
+        J_export{sf_chart_export.csv}
+        K_lib{sf_delineations_library.txt}
+        M_neut{neutralized_delineations/}
+        R_db{subject_db.csv}
+    end
 
-    classDef data fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
-    class B,E,G,J,K,M,O,Q,B_new data;
+    subgraph "Final Output"
+        O((personalities_db.txt))
+    end
+
+    B_raw -- "(static input)" --> F
+    Q_report -- "(used by)" --> F
+    E_scores -- "(used by)" --> F
+    F --> G_filtered
+    G_filtered --> H
+    
+    H --> I
+    I --> J_export
+    I --> K_lib
+
+    K_lib --> L
+    L --> M_neut
+    
+    J_export --> S
+    S --> R_db
+    
+    R_db --> N
+    M_neut --> N
+    N --> O
+
+    style F fill:#d4edda,stroke:#155724
+    style H fill:#d4edda,stroke:#155724
+    style S fill:#d4edda,stroke:#155724
+    style N fill:#d4edda,stroke:#155724
+    style I fill:#fdebd0,stroke:#e59866
+    style L fill:#fdebd0,stroke:#e59866
+    style B_raw fill:#fef9e7,stroke:#b08d57
+    style Q_report fill:#fef9e7,stroke:#b08d57
+    style E_scores fill:#fef9e7,stroke:#b08d57
+    style G_filtered fill:#fef9e7,stroke:#b08d57
+    style J_export fill:#fef9e7,stroke:#b08d57
+    style K_lib fill:#fef9e7,stroke:#b08d57
+    style M_neut fill:#fef9e7,stroke:#b08d57
+    style R_db fill:#fef9e7,stroke:#b08d57
+    style O fill:#a3e4d7,stroke:#0e6251
+    

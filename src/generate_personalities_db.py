@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/generate_database.py
+# Filename: src/generate_personalities_db.py
 
 """
 Generates the final personality database from a pre-processed master file.
@@ -210,4 +210,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/generate_database.py ===
+# === End of src/generate_personalities_db.py ===

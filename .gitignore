@@ -49,6 +49,7 @@ commit.txt
 /data/backup/
 /data/reports/
 /data/temp/
+/linter_backups/
 
 # --- Secrets ---
 # Ignore the .env file, which should contain sensitive API keys.

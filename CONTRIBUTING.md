@@ -305,6 +305,34 @@ After these steps, your repository is clean. You can now make any additional cha
 2.  Open a pull request against the `main` branch of the original repository.
 3.  Provide a clear title and a detailed description of your changes. If your PR addresses an existing issue, link to it in the description (e.g., "Closes #123").
 
+### Continuous Integration (CI) Checks
+
+This project is equipped with an automated Continuous Integration (CI) workflow using GitHub Actions. This workflow acts as a guardian for code quality and consistency.
+
+When you submit a pull request, a series of automated checks will be run against your changes. Your pull request **must pass all checks** before it can be merged.
+
+The CI pipeline performs the following key validation steps:
+1.  **Installs Dependencies:** It creates a clean environment on Windows and Linux and installs all project dependencies to ensure compatibility.
+2.  **Runs Linters:** It executes the project's quality-control scripts to ensure your code adheres to our standards:
+    *   `pdm run check-headers`: Verifies that all script files have the correct license and filename header.
+    *   `pdm run python scripts/lint_docstrings.py`: Performs a high-level check for the presence of module docstrings.
+3.  **Validates Documentation:** It runs `pdm run build-docs --check` to confirm that any changes to diagrams or templates have been correctly compiled into the final documentation.
+
+You can—and should—run these same checks locally before committing your code to ensure your pull request will pass.
+
+```powershell
+# Run the same header check the CI does
+pdm run check-headers
+
+# Run the docstring linter
+pdm run python scripts/lint_docstrings.py
+
+# Run the documentation validation
+pdm run build-docs --check
+```
+
+If the CI build fails, please review the logs for the failed step on your pull request page, fix the issues locally, and push the new changes to your branch. This will automatically trigger a new CI run.
+
 ## Reporting Bugs and Suggesting Enhancements
 
 If you find a bug or have an idea for an improvement, please **open an issue** on GitHub.

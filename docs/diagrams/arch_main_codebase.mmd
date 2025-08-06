@@ -2,8 +2,8 @@ graph TD
     subgraph "1. Main User Entry Points"
         direction LR
         new_experiment_ps1["new_experiment.ps1"]
-        repair_experiment_ps1["repair_experiment.ps1"]
         audit_experiment_ps1["audit_experiment.ps1"]
+        repair_experiment_ps1["repair_experiment.ps1"]
         migrate_experiment_ps1["migrate_experiment.ps1"]
         audit_study_ps1["audit_study.ps1"]
         repair_study_ps1["repair_study.ps1"]
@@ -11,101 +11,86 @@ graph TD
         process_study_ps1["process_study.ps1"]
     end
 
-    subgraph "2. Experiment Lifecycle"
-        direction TB
+    subgraph "2. Top-Level Orchestration"
         exp_manager["experiment_manager.py"]
+        compile_study_results_py["compile_study_results.py"]
+        study_analysis["study_analyzer.py"]
+    end
+
+    subgraph "3. Single Replication Pipeline (executed by orchestrator)"
         orchestrator["orchestrate_replication.py"]
         
-        subgraph "Pipeline Stages"
+        subgraph "Pipeline Stages (in order)"
             direction TB
-            build_queries["build_llm_queries.py"]
-            process_responses["process_llm_responses.py"]
-            subgraph "Analyze LLM Performance"
-                direction TB
-                analyze_performance["analyze_llm_performance.py"]
-                run_bias["run_bias_analysis.py"]
-            end
-            generate_report["generate_replication_report.py"]
-            compile_replication["compile_replication_results.py"]
+            stage1["1. build_llm_queries.py"]
+            stage2["2. llm_prompter.py (in parallel)"]
+            stage3["3. process_llm_responses.py"]
+            stage4["4. analyze_llm_performance.py"]
+            stage4b["5. run_bias_analysis.py"]
+            stage5["6. generate_replication_report.py"]
+            stage6["7. compile_replication_results.py"]
         end
-        
-        subgraph "Pipeline Workers"
-            direction TB
-            query_generator["query_generator.py"]
-            llm_prompter["llm_prompter.py"]
-        end
+    end
 
+    subgraph "Utility & Other Scripts"
+        query_generator["query_generator.py"]
         log_manager["replication_log_manager.py"]
-    end
-
-    subgraph "3. Data Migration Processes"
-        direction TB
-        patch_old["patch_old_experiment.py"]
-        restore_config["restore_config.py"]
-        rebuild_reports["rebuild_reports.py"]
-    end
-
-    subgraph "4. Study-Level Analysis"
-        direction TB
         compile_experiment["compile_experiment_results.py"]
-        compile_study_results_py["compile_study_results.py"]
-        study_analysis["study_analysis.py"]
-    end
-
-    subgraph "5. Shared Utilities"
-        direction TB
+        patch_old["patch_old_experiment.py"]
         config_loader["config_loader.py"]
     end
-    
-    %% --- Main Workflow Connections ---
-    new_experiment_ps1 --> exp_manager
-    repair_experiment_ps1 --> exp_manager
-    audit_experiment_ps1 --> exp_manager
-    audit_study_ps1 --> exp_manager
-    migrate_experiment_ps1 --> exp_manager
-    repair_study_ps1 --> exp_manager
-    migrate_study_ps1 --> exp_manager
+
+    %% --- Connections ---
+    new_experiment_ps1 & audit_experiment_ps1 & repair_experiment_ps1 & migrate_experiment_ps1 & audit_study_ps1 & repair_study_ps1 & migrate_study_ps1 --> exp_manager
     process_study_ps1 --> compile_study_results_py
+    compile_study_results_py --> study_analysis
 
     exp_manager --> orchestrator
     exp_manager --> compile_experiment
     exp_manager --> log_manager
     exp_manager -.-> patch_old
-    exp_manager -.-> rebuild_reports
 
-    orchestrator --> build_queries
-    orchestrator --> llm_prompter
-    orchestrator --> process_responses
-    orchestrator --> analyze_performance
-    orchestrator --> run_bias
-    orchestrator --> generate_report
-    orchestrator --> compile_replication
+    %% Sequential Pipeline Execution
+    orchestrator --> stage1
+    stage1 --> stage2
+    stage2 --> stage3
+    stage3 --> stage4
+    stage4 --> stage4b
+    stage4b --> stage5
+    stage5 --> stage6
 
-    build_queries --> query_generator
+    %% Worker Connections
+    stage1 -.-> query_generator
 
-    compile_study_results_py --> study_analysis
+    %% Import Connections (dotted)
+    exp_manager & orchestrator & stage1 & stage2 & stage3 & stage4 & stage4b & stage5 & stage6 & query_generator & log_manager & compile_experiment & compile_study_results_py & study_analysis & patch_old -.-> config_loader
 
-    %% --- Migration Workflow Connections ---
-    patch_old --> restore_config
-    rebuild_reports --> process_responses
-    rebuild_reports --> analyze_performance
-    rebuild_reports --> run_bias
+    %% --- Inline Styling ---
+    style new_experiment_ps1 fill:#cde4ff,stroke:#6c93be
+    style audit_experiment_ps1 fill:#cde4ff,stroke:#6c93be
+    style repair_experiment_ps1 fill:#cde4ff,stroke:#6c93be
+    style migrate_experiment_ps1 fill:#cde4ff,stroke:#6c93be
+    style audit_study_ps1 fill:#cde4ff,stroke:#6c93be
+    style repair_study_ps1 fill:#cde4ff,stroke:#6c93be
+    style migrate_study_ps1 fill:#cde4ff,stroke:#6c93be
+    style process_study_ps1 fill:#cde4ff,stroke:#6c93be
 
-    %% --- Import Connections (Dotted Lines) ---
-    exp_manager         -.-> config_loader
-    orchestrator        -.-> config_loader
-    build_queries       -.-> config_loader
-    process_responses   -.-> config_loader
-    analyze_performance -.-> config_loader
-    run_bias            -.-> config_loader
-    query_generator     -.-> config_loader
-    llm_prompter        -.-> config_loader
-    patch_old           -.-> config_loader
-    restore_config      -.-> config_loader
-    rebuild_reports     -.-> config_loader
-    compile_study_results_py -.-> config_loader
-    study_analysis      -.-> config_loader
-    log_manager         -.-> config_loader
-    generate_report     -.-> config_loader
-    compile_replication -.-> config_loader
-    compile_experiment  -.-> config_loader
+    style exp_manager fill:#fff3cd,stroke:#f1c40f
+    style compile_study_results_py fill:#fff3cd,stroke:#f1c40f
+    style study_analysis fill:#fff3cd,stroke:#f1c40f
+    
+    style orchestrator fill:#fdebd0,stroke:#e59866
+    
+    style stage1 fill:#d4edda,stroke:#155724
+    style stage2 fill:#d4edda,stroke:#155724
+    style stage3 fill:#d4edda,stroke:#155724
+    style stage4 fill:#d4edda,stroke:#155724
+    style stage4b fill:#d4edda,stroke:#155724
+    style stage5 fill:#d4edda,stroke:#155724
+    style stage6 fill:#d4edda,stroke:#155724
+
+    style query_generator fill:#e9ecef,stroke:#adb5bd
+    style log_manager fill:#e9ecef,stroke:#adb5bd
+    style compile_experiment fill:#e9ecef,stroke:#adb5bd
+    style patch_old fill:#e9ecef,stroke:#adb5bd
+    style config_loader fill:#e9ecef,stroke:#adb5bd
