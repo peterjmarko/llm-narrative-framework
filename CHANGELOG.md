@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.17.0 (2025-08-06)
+
+### Bump
+
+- **version 3.16.0 → 3.17.0**
+
+### Features
+
+- **Establish comprehensive documentation and CI workflow**
+  This major update establishes a complete, professional documentation suite and a robust CI workflow.
+  
+  - Rewrites and aligns all architectural diagrams (main and prep pipelines) with a unified, consistent visual style.
+  - Corrects inaccuracies in architectural diagrams to match the actual codebase execution flow.
+  - Implements a new GitHub Actions CI workflow for automated linting and documentation validation.
+  - Creates a `ROADMAP.md` file to track all remaining development work.
+  - Overhauls the main `README.md` and creates a detailed `data/README_DATA.md`.
+  - Documents the new CI workflow in `CONTRIBUTING.md` and `docs/DOCUMENTATION.md`.
+  - Refactors data preparation scripts for clarity (e.g., `generate_database.py` -> `generate_personalities_db.py`) and updates all documentation to match.
 ## 3.16.0 (2025-08-05)
 
 ### Bump
