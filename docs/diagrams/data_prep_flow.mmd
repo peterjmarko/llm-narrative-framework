@@ -1,10 +1,11 @@
 graph TD
     subgraph " "
-    style invis stroke-width:0px,fill:transparent
+        style invis stroke-width:0px,fill:transparent
 
         subgraph "Raw Sources"
             direction LR
             A[adb_raw_export.txt]
+            A_new[adb_raw_export_fetched.txt]
             C[eminence_scores.csv]
             D[country_codes.csv]
         end
@@ -28,17 +29,23 @@ graph TD
             L[personalities_db.txt]
         end
     end
+    
+    subgraph "Automated Data Fetching"
+        F_new[fetch_adb_data.py]
+    end
 
     subgraph "Data Auditing (Optional Pre-flight)"
-        direction LR
         E0[validate_adb_data.py]
         R[adb_validation_report.csv]
     end
 
+    F_new -- "creates" --> A_new
+
     A -- "audits" --> E0
     E0 -- "creates" --> R
 
-    A -- "filters" --> E1[filter_adb_candidates.py]
+    A -- "(static input)" --> E1[filter_adb_candidates.py]
+    A_new -- "(fetched input)" --> E1
     R -- "uses" --> E1
     C -- "uses" --> E1
     E1 -- "creates" --> F
@@ -67,5 +74,5 @@ graph TD
 
     classDef file fill:#fef9e7,stroke:#b08d57
     classDef script fill:#e8f8f5,stroke:#16a085
-    class A,C,D,F,G,H,I,J,K,L,M,R file
-    class E0,E1,E2,E3,E4 script
+    class A,A_new,C,D,F,G,H,I,J,K,L,M,R file
+    class E0,E1,E2,E3,E4,F_new script

@@ -1,35 +1,35 @@
 graph TD
-    subgraph "Manual & Semi-Automated Processes"
+    subgraph "Manual & Semi-Automated Processes (Archival)"
         style Manual fill:#f9f9f9,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
         A[Scrape Astro-Databank] --> B{adb_raw_export.txt};
-        C[Curate Filter & Eminence Files] --> D{filter_adb_raw.csv};
-        C --> E{eminence_scores.csv};
+        C[Curate Filter & Eminence Files] --> E{eminence_scores.csv};
         I[Use Solar Fire Software] --> J{sf_chart_export.csv};
         I --> K{sf_delineations_library.txt};
         L[Use LLM to Neutralize Text] --> M{neutralized_delineations/};
     end
 
-    subgraph "Automated Python Scripts"
+    subgraph "Fully Automated Pipeline"
         style Automated fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
+        F_new[src/fetch_adb_data.py] --> B_new{adb_raw_export_fetched.txt};
         F[src/filter_adb_candidates.py] --> G{adb_filtered_5000.txt};
         H[src/prepare_sf_import.py] --> I;
         N[src/generate_database.py] --> O((personalities_db.txt));
     end
 
-    subgraph "Automated Data Audit"
+    subgraph "Data Auditing (Optional)"
         style Audit fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
         P[src/validate_adb_data.py] --> Q{adb_validation_report.csv}
     end
 
     B -- "(input for audit)" --> P
-    Q -- "(used for manual cleaning)" --> B
-
-    B --> F;
-    D --> F;
-    E --> F;
+    
+    B -- "(static input)" --> F;
+    B_new -- "(fetched input)" --> F;
+    Q -- "(used by)" --> F
+    E -- "(used by)" --> F;
     G --> H;
     J --> N;
     M --> N;
 
     classDef data fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
-    class B,D,E,G,J,K,M,O,Q data;
+    class B,E,G,J,K,M,O,Q,B_new data;

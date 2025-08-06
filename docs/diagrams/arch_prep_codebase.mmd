@@ -1,17 +1,23 @@
 graph TD
-    subgraph "Data Preparation Scripts"
+    subgraph "Optional Pre-flight Scripts"
+        F_new[src/fetch_adb_data.py]
         V[src/validate_adb_data.py]
+    end
+    
+    subgraph "Main Data Preparation Pipeline"
         A[src/filter_adb_candidates.py]
         B[src/prepare_sf_import.py]
         D[src/create_subject_database.py]
         C[src/generate_database.py]
     end
 
-    V -- "creates report for manual cleaning of source data" --> A;
+    F_new -- "creates raw data for" --> A
+    V -- "creates validation report for" --> A;
     A --> B;
     B --> D;
     D --> C;
 
+    style F_new fill:#cce5ff,stroke:#007bff
     style V fill:#fff3cd,stroke:#f1c40f
     style A fill:#D5F5E3,stroke:#138D75
     style B fill:#D5F5E3,stroke:#138D75

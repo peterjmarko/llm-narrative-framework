@@ -43,6 +43,7 @@ commit.txt
 /data/subject_db.csv
 /data/sources/sf_data_import.txt
 /data/sources/sf_chart_import.csv
+/data/sources/adb_raw_export_fetched.txt
 
 # Generated reports, backup and temporary files
 /data/backup/
@@ -81,3 +82,6 @@ Thumbs.db
 # Ignore 'npm install' artifacts
 /node_modules.coverage.*
 node_modules/
+
+# --- Debugging Artifacts ---
+/debug/

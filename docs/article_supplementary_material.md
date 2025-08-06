@@ -13,41 +13,47 @@ This document provides supplementary material to the main article, "A Framework 
 
 ## Obtaining Birth Data from Astro-Databank
 
-**A Note on Reproducibility:** The Astro-Databank (ADB) is a live research database that is continuously updated with new entries and revisions. Consequently, re-exporting the data from the ADB website today will not yield the exact same raw dataset used in this study, making perfect replication from the original source impossible. While the rest of the data pipeline is fully deterministic, this initial data extraction is the sole exception.
+**A Note on Reproducibility:** The Astro-Databank (ADB) is a live research database that is continuously updated. Re-fetching the data today will not yield the exact dataset used in this study. While the data preparation pipeline is fully deterministic, this initial data extraction is the sole exception.
 
-To ensure perfect, bit-for-bit replication of our findings, researchers **must** use the static data export file captured at the time of the original research. This file is included in the project repository as `data/sources/adb_raw_export.txt`. The manual data extraction steps described below are provided for methodological transparency only and are not a required part of the replication process.
+To ensure perfect, bit-for-bit replication of the original findings, researchers **must** use the static export file included in the project repository: `data/sources/adb_raw_export.txt`.
 
-The Astro-Databank Research Database is the source of raw birth data. Perform the following procedure to manually obtain an initial database of people.
+The data fetching process described below has been fully automated. The instructions detail how to use the provided script to generate a new, up-to-date export. The original manual steps are retained at the end of this section for methodological transparency.
 
-1. Navigate to https://www.astro.com/adb-search/adb-search/.
-2. Log in (register for free account if needed).
-3. Under Categories:
+### Automated Data Fetching (Recommended)
 
-    *   Click the arrow before 'Personal' and check 'Death'.
-    *   Click the arrow before 'Notable', then 'Famous'. Check 'Top 5% of Profession'.
+The project includes a Python script, `src/fetch_adb_data.py`, to fully automate scraping the Astro-Databank website.
 
-4. Under Options:
+**Prerequisites:**
+1.  You must have a registered account at `astro.com`.
+2.  Add your credentials to the `.env` file in the project's root directory:
+    ```
+    ADB_USERNAME=your-username-here
+    ADB_PASSWORD=your-password-here
+    ```
 
-    *   Click the arrow before 'Results per Page (100)' and check '500'.
-    *   Click the arrow before 'Ratings (AA, A, B, C)' and uncheck 'B' and 'C'.
+**Execution:**
+Run the script from your terminal. It will log in, perform the search with the required filters (Top 5% Famous, has a Death record, AA/A Rating, etc.), scrape all results, and save them to a new file. The script is resilient, saving data incrementally, and includes an interactive prompt to prevent accidental overwrites, automatically creating a timestamped backup of any existing file.
 
-5. Close the 'FIND' section below by clicking on the 'X' on the right.
-6. Click 'Show Results'.
+```bash
+# Run the script to fetch data
+pdm run python src/fetch_adb_data.py
 
-Over 20 pages of results will be shown. Make sure the two checkboxes on top (Show some Bio, Show Categories) are unchecked to limit the display to the raw birth data.
-
-Copy the table using the browser extension 'Table Capture' with the 'Extract Link URLs From Table Cells' option enabled. Paste the captured data into Excel. Cycle through all pages while repeating this copy-paste action. You will end up with a table having the following columns:
-
+# To bypass the interactive prompt and force an overwrite
+pdm run python src/fetch_adb_data.py --force
 ```
-ARN, Name, Born, At, Chart, Links
-```
+The script produces a rich, tab-separated output file (`data/sources/adb_raw_export_fetched.txt`) with the following columns: `RecNo`, `ARN`, `LastName`, `FirstName`, `Gender`, `Day`, `Month`, `Year`, `Time`, `City`, `CountryState`, `Longitude`, and `Latitude`.
 
-*   **ARN:** ADB Raw Number (sequence number) from 1 to the total number of people found by the search. The entries are in chronological birth order.
-*   **Name:** The full name of the individual (LastName, GivenNames) with an embedded hyperlink to the individual's wiki page (biography) on astro.com. At the end of the field, a male (♂) or female (♀) glyph indicates sex.
-*   **Born:** Date of birth (D MMMM YYYY).
-*   **At:** Time of birth (HH:MM).
-*   **Chart:** Sun glyph with an embedded hyperlink to the individual's astrological chart.
-*   **Links:** 'Adb' with an embedded hyperlink to the individual's wiki page.
+**A Note on Downstream Compatibility:** This new, detailed format is superior for new research but is **not** directly compatible with the downstream processing scripts in this project (`filter_adb_candidates.py`, etc.), which were designed to parse the original, manually-exported `adb_raw_export.txt`. To use a newly fetched file with the existing pipeline, those scripts would need to be adapted.
+
+### Manual Data Extraction (Obsolete)
+
+The following procedure describes the original manual process for obtaining the initial database, which resulted in the static `data/sources/adb_raw_export.txt` file. This method produced a different, less detailed format and is no longer recommended.
+
+1.  Navigate to `https://www.astro.com/adb-search/adb-search/`.
+2.  Manually select the search criteria (Categories: Death, Top 5% of Profession; Options: AA/A Ratings, 500 results per page).
+3.  Execute the search and use a browser extension like 'Table Capture' to copy the results from all pages.
+
+The data obtained through this manual process required significant cleaning and resulted in a file with the columns: `ARN`, `Name`, `Born`, and `At`. The automated script is now the standard method.
 
 ## Data Preparation
 
