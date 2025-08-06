@@ -94,58 +94,76 @@ def login_to_adb(session, username, password):
         sys.exit(1)
 
 def scrape_search_page_data(session):
-    """Scrapes the search page for tokens and parses the categories JS file."""
+    """Scrapes security tokens and dynamically finds the correct category IDs."""
     logging.info("Fetching security tokens and category IDs...")
     page_response = session.get(SEARCH_PAGE_URL, headers={'User-Agent': USER_AGENT}, timeout=REQUEST_TIMEOUT)
     page_response.raise_for_status()
     page_soup = BeautifulSoup(page_response.text, 'html.parser')
 
     stat_script = page_soup.find('script', string=re.compile(r'var stat ='))
-    if not stat_script: raise ValueError("Could not find stat script block on search page.")
-    
-    # Extract the entire stat object as a string, then parse it
+    if not stat_script: raise ValueError("Could not find stat script block.")
     stat_match = re.search(r'var stat\s*=\s*(\{.*?\});', stat_script.string, re.DOTALL)
-    if not stat_match: raise ValueError("Could not extract the stat object.")
-    # The object uses unquoted keys, so we need to add quotes to make it valid JSON
+    if not stat_match: raise ValueError("Could not extract stat object.")
     stat_json_str = re.sub(r'(\w+):', r'"\1":', stat_match.group(1))
     stat_data = json.loads(stat_json_str)
 
     categories_script_tag = page_soup.find('script', src=re.compile(r'categories\.min\.js'))
     if not categories_script_tag: raise ValueError("Could not find categories.min.js script tag.")
     categories_js_url = urljoin(BASE_URL, categories_script_tag['src'])
-
     js_response = session.get(categories_js_url, headers={'User-Agent': USER_AGENT}, timeout=REQUEST_TIMEOUT)
     js_response.raise_for_status()
-    
     match = re.search(r'=\s*(\[.*\]);?', js_response.text, re.DOTALL)
     if not match: raise ValueError("Could not find JSON data in categories.min.js")
     categories_data = json.loads(match.group(1))
 
-    def collect_code_ids(nodes):
+    def find_all_code_ids_in_node(node):
+        """Recursively collects all code_ids from a node and its children."""
         ids = []
-        for node in nodes:
-            if 'code_id' in node: ids.append(node['code_id'])
-            if 'children' in node: ids.extend(collect_code_ids(node['children']))
+        if 'code_id' in node:
+            ids.append(node['code_id'])
+        if 'children' in node:
+            for child in node['children']:
+                ids.extend(find_all_code_ids_in_node(child))
         return ids
 
     def find_node_by_title(nodes, title):
+        """Recursively searches for a node with a specific title."""
         for node in nodes:
-            if node.get('title') == title: return node
+            if node.get('title') == title:
+                return node
             if 'children' in node:
                 found_node = find_node_by_title(node['children'], title)
-                if found_node: return found_node
+                if found_node:
+                    return found_node
         return None
 
-    # Find the "Personal" and "Notable" categories
-    # Based on the browser request, we need to find the right categories
-    # The browser sends: [287, 290, 291, 630, 293, 294, 295, 296, 619]
-    # These appear to be specific personal and notable categories
+    # Define the human-readable titles for the filters we actually want.
+    # These are the exact titles found in the adb_categories_structure.json file.
+    required_top_level_titles = [
+        "Death",                   # From "Personal" category
+        "Top 5% of Profession"     # From "Notable" -> "Famous" category
+    ]
     
-    # For now, we'll use the exact category IDs from the browser request
-    # In a production script, you'd want to dynamically find these based on the category structure
-    category_ids = [287, 290, 291, 630, 293, 294, 295, 296, 619]
-    
-    logging.info(f"Using category IDs: {category_ids}")
+    category_ids = []
+    logging.info("Dynamically searching for required category IDs...")
+    for title in required_top_level_titles:
+        node = find_node_by_title(categories_data, title)
+        if node:
+            # For a "folder" like "Death", we need all code_ids within it.
+            # For a specific item, find_all_code_ids_in_node will just get the one ID.
+            ids_found = find_all_code_ids_in_node(node)
+            category_ids.extend(ids_found)
+            logging.info(f"  - Found '{title}' -> IDs: {ids_found}")
+        else:
+            raise ValueError(f"Could not find required category node for '{title}'. The website structure may have changed.")
+
+    if not category_ids:
+        raise ValueError("Failed to find any category IDs. Aborting.")
+        
+    # Remove duplicates and sort for consistency
+    category_ids = sorted(list(set(category_ids)))
+        
+    logging.info(f"Using dynamically found category IDs: {category_ids}")
     logging.info("Successfully extracted all required page data.")
     return stat_data, category_ids
 
@@ -161,19 +179,19 @@ def parse_results_from_json(json_data):
             spli = item.get('spli', '').split(',')
             
             results.append([
-                str(item.get('recno', '')),
-                str(item.get('lnho', '')),
-                sbli[0] if len(sbli) > 0 else '', # LastName
-                sbli[1] if len(sbli) > 1 else '', # FirstName
-                sbli[2].upper() if len(sbli) > 2 else 'U', # Gender
-                sbli[3] if len(sbli) > 3 else '', # Day
-                sbli[4] if len(sbli) > 4 else '', # Month
-                sbli[5] if len(sbli) > 5 else '', # Year
-                sbli[6] if len(sbli) > 6 else '', # Time
-                spli[0] if len(spli) > 0 else '', # City
-                spli[1] if len(spli) > 1 else '', # Country/State
-                spli[2] if len(spli) > 2 else '', # Longitude
-                spli[3] if len(spli) > 3 else '', # Latitude
+                str(item.get('recno', '')),                 # ARN
+                str(item.get('lnho', '')),                  # ADBNo
+                sbli[0] if len(sbli) > 0 else '',           # LastName
+                sbli[1] if len(sbli) > 1 else '',           # FirstName
+                sbli[2].upper() if len(sbli) > 2 else 'U',  # Gender
+                sbli[3] if len(sbli) > 3 else '',           # Day
+                sbli[4] if len(sbli) > 4 else '',           # Month
+                sbli[5] if len(sbli) > 5 else '',           # Year
+                sbli[6] if len(sbli) > 6 else '',           # Time
+                spli[0] if len(spli) > 0 else '',           # City
+                spli[1] if len(spli) > 1 else '',           # Country/State
+                spli[2].upper() if len(spli) > 2 else '',   # Longitude (e.g., 2E49)
+                spli[3].upper() if len(spli) > 3 else '',   # Latitude (e.g., 41N59)
             ])
         except IndexError as e:
             logging.warning(f"Skipping a record due to parsing error: {e} - Data: {item}")
@@ -181,68 +199,70 @@ def parse_results_from_json(json_data):
             
     return results, total_hits
 
-def fetch_all_data(session, output_path, stat_data, category_ids):
+def fetch_all_data(session, output_path, initial_stat_data, category_ids):
     """Fetches all paginated data from the API, saving results incrementally."""
     logging.info("Starting data extraction from API...")
     pbar = None
-    b_start = 1
+    page_number = 1
     total_hits = 0
     processed_count = 0
 
     try:
         header = [
-            "RecNo", "ARN", "LastName", "FirstName", "Gender", "Day", "Month", "Year",
+            "ARN", "ADBNo", "LastName", "FirstName", "Gender", "Day", "Month", "Year",
             "Time", "City", "CountryState", "Longitude", "Latitude"
         ]
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
             f.write("\t".join(header) + "\n")
 
             while True:
-                timestamp = datetime.now().astimezone().isoformat()
-                options = {
-                    "day": "0", "month": "0", "years-from": "1900", "years-to": "2025",
-                    "private-database": "exclude", "result-limit": "100",
-                    "gender": ["male", "female"], "ratings": ["AA", "A"],
-                    "house-system": "placidus", "orb-0": "10", "orb-60": "6",
-                    "orb-90": "10", "orb-120": "10", "orb-180": "10", "orb-30": "3",
-                    "orb-45": "3", "orb-72": "2", "orb-135": "3", "orb-144": "2",
-                    "orb-150": "3", "orb-parallel": "2", "orb-antiparallel": "2",
-                    "dispositors-and-rulers": "combined",
-                    "intercepted-signs-as-house-rulers": "no",
-                    "north-node": "true", "out-of-sign-aspects": "respect",
-                    "pars-fortunae-formula": "day_night"
-                }
-                
-                stat_for_summary = {**stat_data, "security": "..."}
-                data_summary_dict = {
-                    "categories": category_ids, "categories2": [], "events": [], "events2": [],
-                    "options": options, "filters": {}, "timestamp": timestamp,
-                    "action": "search", "stat": stat_for_summary
-                }
-                data_summary = json.dumps(data_summary_dict, sort_keys=True, separators=(',', ':')).replace('"', "'")
-                
-                query_summary = "Day (any), Month (any), Years 1900 - 2025, Data Set (ADB data), Results per Page (100), Gender (male, female), Ratings (AA, A), House System (Placidus), Orbs (10°, 6°, 10°, 10°, 10°, 3°, 3°, 2°, 3°, 2°, 3°, 1°, 1°), Other (combined, no, true, respect, day/night formula), Categories: Personal (8), Notable (1), "
-
-                payload = {
-                    **data_summary_dict,
-                    "stat": stat_data, "data_summary": data_summary,
-                    "query_summary": query_summary,
-                }
-                if b_start > 1:
-                    payload["b_start"] = str(b_start)
-                
+                # Common headers for all requests
                 headers = {
-                    'Accept': 'application/json, text/javascript, */*; q=0.01', 'Accept-Language': 'en-US,en;q=0.9',
-                    'Connection': 'keep-alive', 'Content-Type': 'application/json; charset=utf-8',
-                    'DNT': '1', 'Origin': BASE_URL, 'Referer': SEARCH_PAGE_URL,
-                    'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Site': 'same-origin',
-                    'User-Agent': USER_AGENT, 'X-Requested-With': 'XMLHttpRequest',
-                    'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Microsoft Edge";v="138"',
-                    'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"'
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'Origin': BASE_URL, 'Referer': SEARCH_PAGE_URL,
+                    'User-Agent': USER_AGENT, 'X-Requested-With': 'XMLHttpRequest'
                 }
                 
-                payload_string = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
-                response = session.post(API_URL, data=payload_string.encode('utf-8'), headers=headers, timeout=REQUEST_TIMEOUT)
+                if page_number == 1:
+                    # First page: POST with full search payload
+                    options = {
+                        "day": "0", "month": "0", "years-from": "1900", "years-to": "2025",
+                        "private-database": "exclude", "result-limit": "100",
+                        "gender": ["male", "female"], "ratings": ["AA", "A"],
+                        "house-system": "placidus", "orb-0": "10", "orb-60": "6",
+                        "orb-90": "10", "orb-120": "10", "orb-180": "10", "orb-30": "3",
+                        "orb-45": "3", "orb-72": "2", "orb-135": "3", "orb-144": "2",
+                        "orb-150": "3", "orb-parallel": "2", "orb-antiparallel": "2",
+                        "dispositors-and-rulers": "combined",
+                        "intercepted-signs-as-house-rulers": "no",
+                        "north-node": "true", "out-of-sign-aspects": "respect",
+                        "pars-fortunae-formula": "day_night"
+                    }
+                    
+                    payload = {
+                        "categories": category_ids, "categories2": [], "events": [], "events2": [],
+                        "options": options, "filters": {}, 
+                        "timestamp": datetime.now().astimezone().isoformat(),
+                        "action": "search", "stat": initial_stat_data
+                    }
+                    
+                    headers['Content-Type'] = 'application/json; charset=utf-8'
+                    response = session.post(API_URL, 
+                                           data=json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode('utf-8'),
+                                           headers=headers, timeout=REQUEST_TIMEOUT)
+                else:
+                    # Subsequent pages: GET with pagination params
+                    params = {
+                        'uid': '31062880',
+                        '': '',  # Empty parameter
+                        'pageSize': '100',
+                        'pageNumber': str(page_number),
+                        '_': str(int(time.time() * 1000))
+                    }
+                    
+                    headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8'
+                    response = session.get(API_URL, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
+                
                 response.raise_for_status()
                 json_response = response.json()
                 
@@ -259,13 +279,17 @@ def fetch_all_data(session, output_path, stat_data, category_ids):
                 
                 processed_count += len(page_results)
                 pbar.update(len(page_results))
+                if processed_count > pbar.total:
+                    pbar.total = processed_count
                 
-                b_start += len(page_results)
-                if b_start > total_hits: break
+                page_number += 1
+                if processed_count >= total_hits and total_hits > 0: break
                 time.sleep(REQUEST_DELAY)
 
     except (requests.exceptions.RequestException, ValueError, KeyError) as e:
-        logging.error(f"\n{Colors.RED}An error occurred: {e}{Colors.RESET}")
+        logging.error(f"\n{Colors.RED}An error occurred during fetch: {e}{Colors.RESET}")
+        import traceback
+        traceback.print_exc()
     except KeyboardInterrupt:
         logging.info(f"\n{Colors.YELLOW}\nProcess interrupted by user. {processed_count:,} records were saved.{Colors.RESET}")
     finally:
@@ -317,8 +341,8 @@ def main():
 
     with requests.Session() as session:
         login_to_adb(session, adb_username, adb_password)
-        stat_data, category_ids = scrape_search_page_data(session)
-        fetch_all_data(session, output_path, stat_data, category_ids)
+        initial_stat_data, category_ids = scrape_search_page_data(session)
+        fetch_all_data(session, output_path, initial_stat_data, category_ids)
 
 if __name__ == "__main__":
     main()

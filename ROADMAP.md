@@ -6,12 +6,13 @@ This document outlines the planned development tasks for the project, categorize
 
 - [ ] **Automate Foundational Assets**
   - [ ] Develop script to generate `eminence_scores.csv`.
-  - [ ] Develop script to generate `country_codes.csv`.
 - [ ] **Integrate Automated Data Fetching**
   - [ ] Update `validate_adb_data.py` to parse the new fetched format.
   - [ ] Update `filter_adb_candidates.py` to parse the new fetched format.
 - [ ] **Automate Delineation Neutralization**
   - [ ] Create `src/neutralize_delineations.py` to process the raw library via LLM.
+- [ ] **Create `new_study.ps1` Workflow**
+  - [ ] Develop a new top-level script to automate the creation of an entire study by running a matrix of experiments.
 - [ ] **Update Test Suite**
   - [ ] Update all PowerShell and Python tests to reflect the current codebase.
   - [ ] Ensure the test suite is robust and provides thorough coverage.
@@ -59,3 +60,4 @@ This document outlines the planned development tasks for the project, categorize
 - [x] Implement a CI workflow with GitHub Actions.
 - [x] Correct and align all architectural diagrams across all project domains.
 - [x] Create a `ROADMAP.md` to track remaining work.
+- [x] Develop script to validate `country_codes.csv`.

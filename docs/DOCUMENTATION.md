@@ -148,6 +148,8 @@ The project's functionality is organized into six primary workflows, each initia
 
 5.  **Process a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
 
+6.  **(Planned) Create a New Study**: A future workflow to automate the creation of an entire study by orchestrating multiple `new_experiment.ps1` runs based on a matrix of factors (e.g., models, mapping strategies).
+
 7.  **Audit a Study**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
 
 8.  **Repair a Study**: The primary "fix-it" tool for a study. It audits all experiments and automatically calls `repair_experiment.ps1` on any that need to be resumed, repaired, or updated.
@@ -234,6 +236,13 @@ This workflow is used after all experiments are validated to compile and analyze
 <div align="center">
   <p>Workflow 5: Process a Study. Audits, compiles, and analyzes all experiments in a study.</p>
   <img src="images/flow_main_5_process_study.png" width="80%">
+</div>
+
+#### Workflow 6: (Planned) Create a New Study
+This workflow is a planned feature. It will provide a top-level script (`new_study.ps1`) to automate the creation of entire studies. It will be designed to read a matrix of factors to vary from `config.ini` (e.g., a list of models and mapping strategies) and then orchestrate the entire process by calling `new_experiment.ps1` for each required experiment.
+
+<div align="center">
+  <img src="images/flow_main_6_new_study.png" width="80%" caption="Workflow 6: (Planned) Create a New Study. A future workflow to automate multi-experiment studies.">
 </div>
 
 #### Workflow 7: Audit a Study

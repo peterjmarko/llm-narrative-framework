@@ -130,6 +130,8 @@ The project's functionality is organized into six primary workflows, each initia
 
 5.  **Process a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
 
+6.  **(Planned) Create a New Study**: A future workflow to automate the creation of an entire study by orchestrating multiple `new_experiment.ps1` runs based on a matrix of factors (e.g., models, mapping strategies).
+
 7.  **Audit a Study**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
 
 8.  **Repair a Study**: The primary "fix-it" tool for a study. It audits all experiments and automatically calls `repair_experiment.ps1` on any that need to be resumed, repaired, or updated.
@@ -202,6 +204,11 @@ This utility workflow provides a safe, non-destructive process to upgrade older 
 This workflow is used after all experiments are validated to compile and analyze the entire study. It performs a robust pre-flight check by calling `audit_study.ps1`. If the study is not ready for processing (or is already complete), it will halt with a clear recommendation. Otherwise, it proceeds to compile all results and run the final statistical analysis.
 
 {{grouped_figure:docs/diagrams/flow_main_5_process_study.mmd | scale=2.5 | width=80% | caption=Workflow 5: Process a Study. Audits, compiles, and analyzes all experiments in a study.}}
+
+#### Workflow 6: (Planned) Create a New Study
+This workflow is a planned feature. It will provide a top-level script (`new_study.ps1`) to automate the creation of entire studies. It will be designed to read a matrix of factors to vary from `config.ini` (e.g., a list of models and mapping strategies) and then orchestrate the entire process by calling `new_experiment.ps1` for each required experiment.
+
+{{diagram:docs/diagrams/flow_main_6_new_study.mmd | scale=2.5 | width=80% | caption=Workflow 6: (Planned) Create a New Study. A future workflow to automate multi-experiment studies.}}
 
 #### Workflow 7: Audit a Study
 
