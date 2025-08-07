@@ -33,6 +33,7 @@ This script replaces the manual data extraction process by:
 """
 
 import argparse
+import csv
 import json
 import logging
 import os
@@ -70,7 +71,8 @@ REQUEST_DELAY = 0.25
 
 def login_to_adb(session, username, password):
     """Logs into Astro-Databank to establish an authenticated session."""
-    logging.info("Attempting to log into Astro-Databank...")
+    print("")
+    logging.info(f"{Colors.YELLOW}Attempting to log into Astro-Databank...{Colors.RESET}")
     try:
         session.get(BASE_URL, headers={'User-Agent': USER_AGENT}, timeout=REQUEST_TIMEOUT)
         time.sleep(REQUEST_DELAY)
@@ -94,12 +96,13 @@ def login_to_adb(session, username, password):
         sys.exit(1)
 
 def scrape_search_page_data(session):
-    """Scrapes security tokens and dynamically finds the correct category IDs."""
-    logging.info("Fetching security tokens and category IDs...")
+    """Scrapes security tokens, finds category IDs, and builds a category name map."""
+    logging.info("Fetching security tokens and category data...")
     page_response = session.get(SEARCH_PAGE_URL, headers={'User-Agent': USER_AGENT}, timeout=REQUEST_TIMEOUT)
     page_response.raise_for_status()
     page_soup = BeautifulSoup(page_response.text, 'html.parser')
 
+    # ... (code to extract stat_data remains the same)
     stat_script = page_soup.find('script', string=re.compile(r'var stat ='))
     if not stat_script: raise ValueError("Could not find stat script block.")
     stat_match = re.search(r'var stat\s*=\s*(\{.*?\});', stat_script.string, re.DOTALL)
@@ -107,6 +110,7 @@ def scrape_search_page_data(session):
     stat_json_str = re.sub(r'(\w+):', r'"\1":', stat_match.group(1))
     stat_data = json.loads(stat_json_str)
 
+    # --- Fetch and Process Category Data ---
     categories_script_tag = page_soup.find('script', src=re.compile(r'categories\.min\.js'))
     if not categories_script_tag: raise ValueError("Could not find categories.min.js script tag.")
     categories_js_url = urljoin(BASE_URL, categories_script_tag['src'])
@@ -115,6 +119,48 @@ def scrape_search_page_data(session):
     match = re.search(r'=\s*(\[.*\]);?', js_response.text, re.DOTALL)
     if not match: raise ValueError("Could not find JSON data in categories.min.js")
     categories_data = json.loads(match.group(1))
+
+    # --- Build a flat map of {id: title} for easy lookups ---
+    category_map = {}
+    def build_category_map(nodes):
+        for node in nodes:
+            if 'code_id' in node and 'title' in node:
+                # Store the key as a string to match the type from the split() operation later.
+                category_map[str(node['code_id'])] = node['title']
+            if 'children' in node:
+                build_category_map(node['children'])
+    build_category_map(categories_data)
+    logging.info(f"Built a lookup map with {len(category_map)} category translations.")
+
+    # --- Save the category map to a CSV file ---
+    output_dir = Path('data/foundational_assets')
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / 'adb_category_map.csv'
+
+    if output_path.exists():
+        logging.info(f"Category map '{output_path}' already exists. Creating a backup before overwriting.")
+        try:
+            backup_dir = Path('data/backup')
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+            shutil.copy2(output_path, backup_path)
+            logging.info(f"  -> Backup created at: {backup_path}")
+        except (IOError, OSError) as e:
+            logging.warning(f"Could not create backup for category map: {e}")
+
+    try:
+        # Sort by the integer value of the ID for a consistent, ordered output file.
+        sorted_categories = sorted(category_map.items(), key=lambda item: int(item[0]))
+        
+        with open(output_path, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['ID', 'CategoryName']) # Write the header
+            writer.writerows(sorted_categories)     # Write the sorted data rows
+        
+        logging.info(f"Successfully saved/updated category map at '{output_path}'.")
+    except (IOError, csv.Error) as e:
+        logging.warning(f"Could not save category map to '{output_path}': {e}")
 
     def find_all_code_ids_in_node(node):
         """Recursively collects all code_ids from a node and its children."""
@@ -137,37 +183,25 @@ def scrape_search_page_data(session):
                     return found_node
         return None
 
-    # Define the human-readable titles for the filters we actually want.
-    # These are the exact titles found in the adb_categories_structure.json file.
-    required_top_level_titles = [
-        "Death",                   # From "Personal" category
-        "Top 5% of Profession"     # From "Notable" -> "Famous" category
-    ]
-    
+    required_top_level_titles = ["Death", "Top 5% of Profession"]
     category_ids = []
+    print("")
     logging.info("Dynamically searching for required category IDs...")
     for title in required_top_level_titles:
         node = find_node_by_title(categories_data, title)
         if node:
-            # For a "folder" like "Death", we need all code_ids within it.
-            # For a specific item, find_all_code_ids_in_node will just get the one ID.
             ids_found = find_all_code_ids_in_node(node)
             category_ids.extend(ids_found)
             logging.info(f"  - Found '{title}' -> IDs: {ids_found}")
         else:
             raise ValueError(f"Could not find required category node for '{title}'. The website structure may have changed.")
-
-    if not category_ids:
-        raise ValueError("Failed to find any category IDs. Aborting.")
-        
-    # Remove duplicates and sort for consistency
     category_ids = sorted(list(set(category_ids)))
         
     logging.info(f"Using dynamically found category IDs: {category_ids}")
     logging.info("Successfully extracted all required page data.")
-    return stat_data, category_ids
+    return stat_data, category_ids, category_map
 
-def parse_results_from_json(json_data):
+def parse_results_from_json(json_data, category_map):
     """Parses the JSON response from the API and extracts subject data."""
     results = []
     if 'data' not in json_data: return results, 0
@@ -178,11 +212,35 @@ def parse_results_from_json(json_data):
             sbli = item.get('sbli', '').split(',')
             spli = item.get('spli', '').split(',')
             
+            # --- Extract data using confirmed keys and validated logic ---
+            last_name = sbli[0] if len(sbli) > 0 else ''
+            first_name = sbli[1] if len(sbli) > 1 else ''
+            
+            # Construct URL slug based on the validated rules from visual evidence.
+            if first_name.strip():
+                # Case 1: Name has a first and last part (e.g., "Busch, Ernst (1900)")
+                # Resulting slug: "Busch,_Ernst_(1900)"
+                first_name_slug = first_name.replace(' ', '_')
+                url_slug = f"{last_name},_{first_name_slug}"
+            else:
+                # Case 2: Name is a single part (e.g., "Vercors")
+                url_slug = last_name
+            
+            link = f"https://www.astro.com/astro-databank/{url_slug}" if url_slug else ''
+
+            rating = item.get('srra', '')
+            bio = item.get('sbio', '')
+            
+            # Translate category IDs to text names.
+            category_ids_str = item.get('ctgs', '')
+            category_names = [category_map.get(cat_id, f"ID_{cat_id}") for cat_id in category_ids_str.split(',') if cat_id]
+            categories_text = ', '.join(category_names)
+
             results.append([
                 str(item.get('recno', '')),                 # ARN
-                str(item.get('lnho', '')),                  # ADBNo
-                sbli[0] if len(sbli) > 0 else '',           # LastName
-                sbli[1] if len(sbli) > 1 else '',           # FirstName
+                item.get('lnho', ''),                       # ADBNo (numeric ID)
+                last_name,                                  # LastName
+                first_name,                                 # FirstName
                 sbli[2].upper() if len(sbli) > 2 else 'U',  # Gender
                 sbli[3] if len(sbli) > 3 else '',           # Day
                 sbli[4] if len(sbli) > 4 else '',           # Month
@@ -190,8 +248,12 @@ def parse_results_from_json(json_data):
                 sbli[6] if len(sbli) > 6 else '',           # Time
                 spli[0] if len(spli) > 0 else '',           # City
                 spli[1] if len(spli) > 1 else '',           # Country/State
-                spli[2].upper() if len(spli) > 2 else '',   # Longitude (e.g., 2E49)
-                spli[3].upper() if len(spli) > 3 else '',   # Latitude (e.g., 41N59)
+                spli[2].upper() if len(spli) > 2 else '',   # Longitude
+                spli[3].upper() if len(spli) > 3 else '',   # Latitude
+                rating,                                     # Rating
+                bio,                                        # Bio
+                categories_text,                            # Categories
+                link                                        # Link
             ])
         except IndexError as e:
             logging.warning(f"Skipping a record due to parsing error: {e} - Data: {item}")
@@ -199,9 +261,10 @@ def parse_results_from_json(json_data):
             
     return results, total_hits
 
-def fetch_all_data(session, output_path, initial_stat_data, category_ids):
+def fetch_all_data(session, output_path, initial_stat_data, category_ids, category_map):
     """Fetches all paginated data from the API, saving results incrementally."""
-    logging.info("Starting data extraction from API...")
+    print("")
+    logging.info(f"{Colors.YELLOW}Starting data extraction from API...{Colors.RESET}")
     pbar = None
     page_number = 1
     total_hits = 0
@@ -210,7 +273,7 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids):
     try:
         header = [
             "ARN", "ADBNo", "LastName", "FirstName", "Gender", "Day", "Month", "Year",
-            "Time", "City", "CountryState", "Longitude", "Latitude"
+            "Time", "City", "CountryState", "Longitude", "Latitude", "Rating", "Bio", "Categories", "Link"
         ]
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
             f.write("\t".join(header) + "\n")
@@ -236,7 +299,10 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids):
                         "dispositors-and-rulers": "combined",
                         "intercepted-signs-as-house-rulers": "no",
                         "north-node": "true", "out-of-sign-aspects": "respect",
-                        "pars-fortunae-formula": "day_night"
+                        "pars-fortunae-formula": "day_night",
+                        # Request additional fields based on UI checkboxes
+                        "with-bio": "on",
+                        "with-cat": "on"
                     }
                     
                     payload = {
@@ -266,7 +332,7 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids):
                 response.raise_for_status()
                 json_response = response.json()
                 
-                page_results, current_total = parse_results_from_json(json_response)
+                page_results, current_total = parse_results_from_json(json_response, category_map)
                 if pbar is None:
                     total_hits = current_total
                     if total_hits == 0: raise ValueError("Search successful but returned 0 results.")
@@ -297,12 +363,12 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids):
 
     if processed_count == 0: return
 
-    logging.info(f"{Colors.GREEN}Data fetching complete.{Colors.RESET}")
+    logging.info(f"{Colors.GREEN}Data fetching complete.\n{Colors.RESET}")
 
 def main():
     os.system('')
     parser = argparse.ArgumentParser(description="Fetch raw birth data from the Astro-Databank website.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("-o", "--output-file", default="data/sources/adb_raw_export_fetched.txt", help="Path for the output data file.")
+    parser.add_argument("-o", "--output-file", default="data/sources/adb_raw_export.txt", help="Path for the output data file.")
     parser.add_argument("--force", action="store_true", help="Force fetching and overwrite the output file if it exists.")
     args = parser.parse_args()
 
@@ -341,8 +407,8 @@ def main():
 
     with requests.Session() as session:
         login_to_adb(session, adb_username, adb_password)
-        initial_stat_data, category_ids = scrape_search_page_data(session)
-        fetch_all_data(session, output_path, initial_stat_data, category_ids)
+        initial_stat_data, category_ids, category_map = scrape_search_page_data(session)
+        fetch_all_data(session, output_path, initial_stat_data, category_ids, category_map)
 
 if __name__ == "__main__":
     main()

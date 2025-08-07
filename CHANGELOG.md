@@ -18,6 +18,7 @@
   - Simple `GET` requests with query parameters (`uid`, `pageNumber`) are sent for all subsequent pages.
   
   This change resolves the data corruption symptoms (the "27 unique codes" issue and the final page "overfetch"). It also includes new diagnostic scripts and documentation updates related to this debugging effort.
+
 ## 3.17.0 (2025-08-06)
 
 ### Bump
@@ -36,6 +37,7 @@
   - Overhauls the main `README.md` and creates a detailed `data/README_DATA.md`.
   - Documents the new CI workflow in `CONTRIBUTING.md` and `docs/DOCUMENTATION.md`.
   - Refactors data preparation scripts for clarity (e.g., `generate_database.py` -> `generate_personalities_db.py`) and updates all documentation to match.
+
 ## 3.16.0 (2025-08-05)
 
 ### Bump
@@ -56,6 +58,7 @@
   Key features include an interactive user prompt with an automatic backup system to prevent accidental data loss.
   
   This change also updates all relevant documentation and diagrams (workflow, data flow, and code architecture) to reflect the new, recommended data acquisition pipeline. The .gitignore has been updated to exclude the script's output file and any debugging artifacts.
+
 ## 3.15.0 (2025-08-05)
 
 ### Bump
@@ -71,6 +74,7 @@
   
   - Moves subject_db.csv to a new data/processed/ directory.
   - Updates all documentation and diagrams to reflect the new 4-step data pipeline.
+
 ## 3.14.0 (2025-08-05)
 
 ### Bump
@@ -84,6 +88,7 @@
   - Adds a confirmation prompt and a timestamped backup feature to prevent accidental overwrites of `personalities_db.txt`.
   - Fixes a critical bug where incorrect classification keys were being generated, resulting in empty descriptions in the output database.
   - Updates documentation and diagrams to reflect the new logic and data flow.
+
 ## 3.13.0 (2025-08-05)
 
 ### Bump
@@ -101,6 +106,7 @@
   - Refactors `generate_database.py` to use the new, simpler `subject_db.csv` as its input.
   - Adds user confirmation prompts and automated backups to all data preparation scripts for improved safety.
   - Consolidates the data directory structure for better organization, moving assets to `foundational_assets` and intermediate files to `intermediate`.
+  
 ## 3.12.0 (2025-08-04)
 
 ### Bump

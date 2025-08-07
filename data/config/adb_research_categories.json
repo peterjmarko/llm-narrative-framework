@@ -1,0 +1,77 @@
+{
+  "description": "Research categories in Astro-Databank that require 'Research:' URL prefix",
+  "last_updated": "2025-01-07",
+  "categories": {
+    "prefixes": [
+      "Accident:",
+      "AIDS ",
+      "Astrologer ",
+      "Birth Defect:",
+      "Birth Trauma ",
+      "Birth Unusual ",
+      "Business Executive",
+      "Cerebral Palsy ",
+      "Conjoined Twins ",
+      "Crime:",
+      "Death:",
+      "Depressed ",
+      "Disaster:",
+      "Disease:",
+      "Drug Abuse ",
+      "Eating Disorder ",
+      "Event:",
+      "Family Distress",
+      "Fire:",
+      "Homicide ",
+      "Homicide Child Victim ",
+      "Homicide Victim ",
+      "Homosexual ",
+      "Kidnapper ",
+      "Lesbian ",
+      "Medical:",
+      "Murder:",
+      "Physician ",
+      "Pilot ",
+      "Prostitute ",
+      "Rodden File ",
+      "S.I.D.S. ",
+      "Schizophrenic ",
+      "School:",
+      "Spina Bifida ",
+      "Suicide ",
+      "Suicidal ",
+      "Terrorism victim ",
+      "Transgender ",
+      "Twin:",
+      "Twins ",
+      "UFO:",
+      "Victim:",
+      "Widow"
+    ],
+    "patterns": [
+      "^[A-Za-z]+ \\d{3,}",
+      "^[A-Za-z]+: [A-Za-z]+ \\d{3,}",
+      "^Case \\d+",
+      "^Baby [A-Z]\\b",
+      "^Child [A-Z]\\b",
+      "^Infant [A-Z]\\b",
+      "^John Doe",
+      "^Jane Doe",
+      "^Unknown ",
+      "^Actress: Porno ",
+      "^Suicide or Murder"
+    ],
+    "exact_matches": [
+      "Astrologer",
+      "Business Executive",
+      "Widow"
+    ]
+  },
+  "definitely_not_research": {
+    "description": "Names that should NEVER be treated as Research entries",
+    "names": [
+      "Malcolm X",
+      "Soupy Sales"
+    ]
+  }
+}

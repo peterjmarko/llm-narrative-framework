@@ -1,64 +1,75 @@
 graph TD
     subgraph "Automated Pipeline"
-        F[src/filter_adb_candidates.py]
-        H[src/prepare_sf_import.py]
-        S[src/create_subject_db.py]
-        N[src/generate_personalities_db.py]
+        S_fetch[src/fetch_adb_data.py]
+        S_validate[src/validate_adb_data.py]
+        S_filter[src/filter_adb_candidates.py]
+        S_prepare[src/prepare_sf_import.py]
+        S_create[src/create_subject_db.py]
+        S_generate[src/generate_personalities_db.py]
     end
 
     subgraph "Manual & External Processes"
-        I[Use Solar Fire Software]
-        L[Use LLM to Neutralize Text]
+        P_sf[Use Solar Fire Software]
+        P_llm[Use LLM to Neutralize Text]
     end
     
-    subgraph "Inputs & Foundational Assets"
-        B_raw{adb_raw_export.txt}
-        Q_report{adb_validation_report.csv}
+    subgraph "Inputs & Data Artifacts"
         E_scores{eminence_scores.csv}
-        G_filtered{adb_filtered_5000.txt}
-        J_export{sf_chart_export.csv}
-        K_lib{sf_delineations_library.txt}
-        M_neut{neutralized_delineations/}
-        R_db{subject_db.csv}
+        A_raw{adb_raw_export.txt}
+        B_report{adb_validation_report.csv}
+        C_filtered{adb_filtered_5000.txt}
+        D_export{sf_chart_export.csv}
+        E_lib{sf_delineations_library.txt}
+        F_neut{neutralized_delineations/}
+        G_db{subject_db.csv}
     end
 
     subgraph "Final Output"
         O((personalities_db.txt))
     end
 
-    B_raw -- "(static input)" --> F
-    Q_report -- "(used by)" --> F
-    E_scores -- "(used by)" --> F
-    F --> G_filtered
-    G_filtered --> H
+    S_fetch --> A_raw
+    A_raw --> S_validate
+    S_validate --> B_report
     
-    H --> I
-    I --> J_export
-    I --> K_lib
+    A_raw -- "(input)" --> S_filter
+    B_report -- "(input)" --> S_filter
+    E_scores -- "(input)" --> S_filter
+    S_filter --> C_filtered
 
-    K_lib --> L
-    L --> M_neut
+    C_filtered --> S_prepare
+    S_prepare --> P_sf
     
-    J_export --> S
-    S --> R_db
-    
-    R_db --> N
-    M_neut --> N
-    N --> O
+    P_sf --> D_export
+    P_sf --> E_lib
 
-    style F fill:#d4edda,stroke:#155724
-    style H fill:#d4edda,stroke:#155724
-    style S fill:#d4edda,stroke:#155724
-    style N fill:#d4edda,stroke:#155724
-    style I fill:#fdebd0,stroke:#e59866
-    style L fill:#fdebd0,stroke:#e59866
-    style B_raw fill:#fef9e7,stroke:#b08d57
-    style Q_report fill:#fef9e7,stroke:#b08d57
-    style E_scores fill:#fef9e7,stroke:#b08d57
-    style G_filtered fill:#fef9e7,stroke:#b08d57
-    style J_export fill:#fef9e7,stroke:#b08d57
-    style K_lib fill:#fef9e7,stroke:#b08d57
-    style M_neut fill:#fef9e7,stroke:#b08d57
-    style R_db fill:#fef9e7,stroke:#b08d57
+    E_lib --> P_llm
+    P_llm --> F_neut
+    
+    D_export --> S_create
+    C_filtered --> S_create
+    E_scores --> S_create
+    S_create --> G_db
+    
+    G_db --> S_generate
+    F_neut --> S_generate
+    S_generate --> O
+
+    style S_fetch fill:#d4edda,stroke:#155724
+    style S_validate fill:#d4edda,stroke:#155724
+    style S_filter fill:#d4edda,stroke:#155724
+    style S_prepare fill:#d4edda,stroke:#155724
+    style S_create fill:#d4edda,stroke:#155724
+    style S_generate fill:#d4edda,stroke:#155724
+    style P_sf fill:#fdebd0,stroke:#e59866
+    style P_llm fill:#fdebd0,stroke:#e59866
+    style E_scores fill:#cde4ff,stroke:#6c93be
+    style A_raw fill:#fef9e7,stroke:#b08d57
+    style B_report fill:#fef9e7,stroke:#b08d57
+    style C_filtered fill:#fef9e7,stroke:#b08d57
+    style D_export fill:#fef9e7,stroke:#b08d57
+    style E_lib fill:#fef9e7,stroke:#b08d57
+    style F_neut fill:#fef9e7,stroke:#b08d57
+    style G_db fill:#fef9e7,stroke:#b08d57
     style O fill:#a3e4d7,stroke:#0e6251
     

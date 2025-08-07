@@ -1,0 +1,807 @@
+ID,CategoryName
+1,Constitution hardy
+2,Constitution sensitive
+3,Aerobic exercise
+4,Body builder
+5,Cosmetic surgery
+6,Diet unusual
+7,Hair
+8,Handedness
+9,Race
+10,Size
+11,Weight
+12,Other body
+13,Accident/Injury
+14,Aids
+15,Allergies
+16,Alzheimer's/Senility
+18,Arthritis
+19,Asthma
+20,Bladder
+21,Eyes
+22,Bone
+23,Brain
+24,Cancer
+25,Ears
+26,Diabetes/ Hypoglycemia
+28,Emphysema
+29,Epilepsy
+30,Heart
+32,Kidney
+34,Multiple Sclerosis
+35,Muscular Dystrophy
+36,Osteoporosis
+37,Paralysis
+38,Parkinson's
+39,Pneumonia
+40,Polio
+41,SIDS
+42,Skin
+43,STD/Sexually transmitted
+45,Stroke
+47,Surgery
+48,Tubal ligation/ Vasectomy
+49,Tuberculosis
+50,Gastrointestinal
+51,Circulatory problems
+52,Other Major diseases
+53,Child prodigy
+54,Exceptional mind
+55,Education extensive
+56,I.Q. high/ Mensa level
+57,Memory
+58,Education limited
+59,I.Q. low
+60,For Gross motor control
+61,Other Mind
+62,ADHD
+63,Abuse Alcohol
+65,Anti-social Personality
+66,Anxiety Disorder
+67,Bi-Polar Disorder
+68,Eating Disorder
+69,Depression
+70,Abuse Drugs
+71,Dyslexia
+72,Multiple Personality
+73,Sleep disorders
+74,Nervous Breakdown
+75,Phobias
+76,Personality robust
+77,Personality vulnerable
+78,For Fine motor control
+79,Psychotic Episode
+80,PTSD
+81,Schizophrenia
+82,"Stutter, Tics"
+83,Other Psychological
+84,Acquisitive
+85,Active
+86,Aggressive/ brash
+87,Changeable
+88,Charismatic
+89,Gracious/ sociable
+91,Creative
+93,Disciplined
+94,Emotional
+95,Articulate
+96,Fiery
+97,Juggles lots at once
+98,Shy
+100,Mystical
+101,Opportunist
+102,Optimist
+103,Passive/ Bland
+104,Perfectionist
+105,Persistent
+106,Pessimist
+108,Talkative
+109,Liar/ Fraud
+110,Other Personality
+111,For Creativity
+112,For Abstract thought
+113,For Diplomacy
+114,For Eye-hand coordination
+115,For Leadership
+116,For Motivating/Selling
+117,For Music
+118,For Numbers
+119,For Problem Solving
+120,For Public poise
+121,For Social skills
+122,For Verbal skills
+123,For Visual perception
+124,Other Extraordinary
+125,Cesarean
+126,"Defects, Handicaps"
+127,Difficult birth
+129,Infant mortality
+130,Late birth
+131,For Imagination
+132,Other Life Experiences
+133,"Twin, triplet, etc."
+134,Premature
+135,Labor short <3 hrs
+136,Conjoined twins
+137,Stillborn
+138,Test tube baby
+139,Unusual circumstances
+140,Other Birth
+143,Adopted
+144,Advantaged
+145,Self-employed
+146,Family close
+147,Disadvantaged
+148,Family distant
+149,Family noted
+151,Royal family
+152,Family traumatic event
+153,Family extraordinarily supportive
+155,Order of birth
+156,Family supportive
+157,Incest perpetrator
+158,Abuse - Incest
+159,Family large
+162,Abuse - Neglect
+163,Only child
+164,"Parent, Single or Step"
+165,Parents divorced
+166,Abuse - Physical/ Verbal
+167,Abuse-Sexual (outside of family)
+168,Sibling circumstances
+169,Other Childhood
+170,"Animals, pets"
+171,Family
+173,"Hobbies, games"
+174,Socialite
+175,Other Social Life
+176,Expatriate
+177,Many moves
+178,Neighborhood
+179,Same location lifetime
+180,Other Home
+181,Mate - Age difference >15 yrs
+182,Cohabitation >3 yrs
+183,Marriage - Compatible
+184,Number of Divorces
+185,Stress - Domestic violence
+186,Marriage - Very happy
+187,Mate - Interracial
+188,Number of Marriages
+189,Married late/never
+190,Mate - Noted
+191,Mate - Same sex
+192,Stress - Chronic misery
+193,Marriage >15 Yrs
+194,Marriage <3 Yrs
+195,Stress - Traumatic event
+196,Widowed
+197,Other relationship
+198,Kids >3
+199,Kids 1-3
+200,Abusive - Physical/Verbal
+201,Hardship - Little money
+202,Kids - Drug involved
+204,"Foster, Step, or Adopted Kids"
+205,Kids - Homosexual
+206,Birthing - Miscarriages
+207,Kids none
+208,Kids - Noted
+210,Kids -Traumatic event
+211,Other Parenting
+212,Atheist
+213,Clairvoyant/ Clairaudient
+214,Cult follower
+215,Eastern
+216,Metaphysical
+217,Mystical experience
+218,Near Death experience
+219,Out of Body experience
+220,Phenomena
+221,Psychic
+222,Spiritualist
+224,UFO Experience
+225,Western
+226,Bi-Sexual
+227,Celibacy/ Minimal
+228,Exhibitionism
+229,Extremes in quantity
+230,Fetishism
+231,Sex Organs
+232,Gay
+233,Lesbian
+234,Transsexual F-to-M
+235,Transsexual M-to-F
+236,Transvestite
+237,Other Sexual
+238,Other Rel/Spirituality
+239,Pedophile
+240,Rape/ Sex crime victim
+241,Rapist/ Sex crime
+242,Dominant/ Submissive
+243,Sexual offense victim
+244,Sexual abuser
+245,Sexual dysfunction
+246,Sexual perversions
+247,Sodomy
+248,Voyeur
+249,Extreme ups and downs
+250,Loss - Financial crisis
+251,Gambler
+253,Gain - Inheritance
+254,Invest/ Collectibles
+255,Invest/ Metals
+256,Invest/ Property
+257,"Invest/ Stocks, Bonds"
+258,Gain - Money Through Marriage
+259,Philanthropist
+260,Rags to riches
+262,Wealthy
+263,Gain - Winnings/ Lottery
+264,Other Financial
+265,Assault/ Battery
+266,Assault/ Battery victim
+267,Civil/ Political
+268,Concentration camp
+269,Thief/ Financial crime
+270,Financial crime victim
+271,Homicide by order
+272,Homicide involvement
+273,Homicide many at once
+274,Homicide serial
+275,Homicide single
+276,Homicide victim
+277,Kidnapper
+278,Kidnapping victim
+279,Lawsuit instigated
+280,Lawsuit sued
+281,Missing person
+282,Prison sentence
+283,Social crime victim
+284,Social crime/ delinquent
+285,Terrorist
+286,Other Criminal
+287,Accidental
+288,Executed
+289,New Age
+290,Illness/ Disease
+291,Long life  >80 yrs
+293,Suicide
+294,Suicide Attempt
+295,Unusual
+296,Other Death
+297,Who's Who
+298,Emmy
+299,Grammy
+300,Hall of Fame
+301,Historic figure
+302,Founder/ originator
+303,Knighted
+304,Medals
+305,Newsmaker
+306,Nobel prize
+307,Olympics
+308,Oscar
+309,Pulitzer prize
+310,Tony
+311,Other Famous
+312,Other Awards
+313,Hates job
+314,Hazardous work
+315,Same Job >10 yrs
+316,Middle Management
+317,Many job changes
+318,Skills - Multi-faceted
+319,Practical/ Realistic
+320,Loves job
+321,Skills - singular/specialist
+324,Work alone/ Singular role
+325,Work in team/ Tandem
+327,Other Work
+328,Stressful work
+329,Job-Related Injury
+330,Cartoonist
+331,Commercial artist
+332,Fine art artist
+334,Photography
+336,Stage/ Set design
+337,Other Art
+338,Sex-symbol
+339,Model
+340,Beauty Queen/ King
+341,Designer/ Fashion
+343,Personal care provider
+344,Other Beauty
+345,Architect/ Planner
+347,Construction work
+348,Electrician
+349,Interior design
+350,Plumber
+351,Other Building Trades
+352,Banker/ Financier
+353,Top executive
+354,Business owner
+355,Clerical/ Secretarial
+356,Clerk/ Typist
+357,CPA/ Auditor/ Accountant
+358,Data entry
+359,Economist
+360,Entrepreneur
+361,Office Worker
+362,Service Rep.
+363,Other Business
+364,Advertising
+366,Insurance fields
+368,Public relations
+369,Real estate
+370,Sales
+371,Stockbroker
+372,Other Business/Mkt
+373,Administrator
+374,Librarian
+376,Researcher
+377,Teacher
+378,Other Education
+379,Chemical
+380,Electrical
+381,Civil
+382,Mechanical
+383,Programmer
+385,Other Engineer
+386,Manager/ Agent
+387,Entertain Producer
+388,Production jobs
+389,Composer/ Arranger
+390,Conductor
+391,Country-Western
+392,Dancer/ Teacher
+393,Folk Music
+394,Group/ Duo
+395,Instrumentalist
+396,Music teacher
+398,Song writer
+399,Vocalist/Opera
+400,"Vocalist/ Pop, Rock, etc."
+401,Other Entertain/Music
+402,Actor/ Actress
+404,Child performer
+405,Circus/ Animal acts
+406,Comedy
+407,Unemployed >5 yrs
+408,Magic
+409,Mime
+410,News journalist/ Anchor
+411,Radio/ D.J./ Announcer
+412,TV series/ Soap star
+413,Live Stage
+414,TV host/ Personality
+416,Voice-Over
+417,Other Entertainment
+418,Baker/ Confections
+419,Bartender
+420,Butcher/ Meat
+421,Cater/ Supplier
+422,Chef/ Cook
+423,Alcohol business
+424,Farmer/ Rancher
+425,Fast-food service
+426,Host/ Maitre d'
+427,Marketing/ Producer
+428,Restaurateur
+429,Waiter/ Waitress
+430,Other Food and Beverage
+431,Alternative methods
+432,Counselor/ Therapist
+433,Therapist P.T. or O.T
+434,Psychiatrist
+435,Psychologist
+436,Religious healer
+437,Social worker
+438,Other Healing Fields
+439,Spy/ Counter agent
+440,CIA
+441,Court reporter
+442,FBI
+443,Private Investigator
+445,Attorney
+446,Jurist
+447,Police
+448,Legal system employee
+449,Fire department
+450,Other Law
+451,Cleaning service
+453,Factory work
+454,Handyman
+455,Homemaker/Care provider
+456,Mechanic
+457,Outdoor vocations
+458,Physical labor
+459,Repair service
+463,Chiropractor
+464,Dentist/ Dental Tech
+465,Mortician/ Death Affairs
+466,Nurse/ Nurse's Aids
+467,Nutritionist
+468,Pharmacist
+469,Physician
+470,Surgeon
+471,Technician
+472,Veterinarian
+473,Other Medical Vocations
+474,Extraordinarily nurturing
+475,Combat
+476,Honors
+477,Killed
+478,Military career
+479,Military service
+480,Pacifist/  Objector
+481,Wounded
+482,Other Military
+483,Astrologer
+484,Divination/ Prophecy
+485,Graphologist
+486,Numerologist
+487,Palmist
+488,Psychic/ Medium/ Spiritualist
+489,Tarot / I Ching
+491,Other Occult Fields
+492,Activist/ political
+493,Activist/ social
+494,Diplomat
+495,Government employee
+496,Heads of state
+497,Labor unions
+498,Nazi party
+499,Postal service
+500,Public office
+501,Activist/ feminist
+502,U.S. Presidents
+503,Other Politics
+504,Cult leader
+505,Ecclesiastics/ eastern
+506,Ecclesiastics/ western
+507,Metaphysical
+508,Popes
+509,Saint/ Stigmatist
+510,Spiritual Leader/ Guru
+511,Spiritualist
+512,Other Religion
+513,Anthropology
+514,Astronomy
+515,Biology
+516,Chemistry
+517,Geology
+518,Mathematics/ Statistics
+519,Physics
+520,Sociologist
+521,Other Science
+522,Porno Market
+523,Prostitute/ Pimp
+524,Surrogate
+525,Other Sex Bus
+526,Archery
+527,Baseball
+528,Basketball
+530,Bowling
+531,Boxing
+532,Bullfighting
+533,Equestrian
+534,Fencing
+535,Track and Field
+536,Football
+537,Games - Bridge/ Chess/ Other
+538,Golf
+539,Gymnastics
+540,Hockey
+541,Martial arts
+542,Race Bikes
+543,Race Cars
+544,Race Horses
+545,Rugby
+546,Skating
+547,Skiing
+548,Soccer (Eur.Football)
+549,Swimming
+550,Tennis
+551,Water sports
+552,Weightlifting
+553,Wrestling
+554,Other Sports
+555,Coach/ Manager/ Owner
+556,Promoter/ Agent
+557,Adventurer
+558,Astronaut
+559,Aviation field
+560,"Crew/ Ship, Train, Bus"
+561,Explorer
+562,Flight attendant
+563,Hotel/Motel/Resort
+564,Pilot/ commercial
+565,Pilot/ military
+566,Pilot/ private
+567,Travel agent
+568,Trucking business
+569,Other Travel
+570,Autobiographer
+571,Biographer
+572,Columnist/ journalist
+573,Critic
+574,Detective/ Mystery
+575,Fiction
+576,How To ....
+577,Humor
+578,Magazine/ newsletter
+579,Metaphysics/ Parapsychology
+582,Playwright/ script
+583,Poet
+584,Publisher/ Editor
+585,Sci-Fi/ Fantasy/ Horror
+586,Textbook/ Non-fiction
+587,Loss of job
+588,Other Writers
+589,Other Vocation Misc.
+590,Deranged Actions
+591,Natural Disasters
+592,Abusive - Neglectful
+593,Abusive - Sexual
+595,Other Disasters
+596,Achievements
+597,Animals
+598,Contests
+599,Discoveries
+600,Historic milestones
+601,Miracle/ Mystery
+602,Release dates
+603,Battles
+604,Conquest
+605,Terrorist attacks
+606,Treaties
+607,War declarations
+608,Other Maintenance/Misc..
+609,Child sex abuser
+611,Loss - Bankruptcy
+612,UFO sighting
+613,Director
+614,Spontaneous healing
+615,Other Political
+616,Other Entertain/Bus
+618,Changed name
+619,Top 5% of Profession
+620,"Humorous, Witty"
+621,Public speaker
+622,Astrology
+623,Religion/ Philosophy
+624,Liver/Pancreas/Spleen
+625,Handicapped
+626,Unusual categories
+627,Property damage
+628,Idealist
+629,Gain - Financial success in field
+630,Short Life <29 Yrs
+631,Profiles Of Women
+632,American Book
+633,Occult/ Misc. Collection
+634,Culture Collection
+635,Crime Collection
+895,Other Sports Business
+906,Sailing/ Boating
+907,Vocational award
+908,Criminal cases
+909,Erotic
+930,"Birthing - Twins, triplets, etc."
+934,Appearance gorgeous
+935,Travel for work
+936,Friends
+948,Home centered
+949,Aerospace
+950,POW/ MIA
+951,Birth of State or Country
+952,Elections/Crowning
+953,Invention
+955,Incorporation Date
+956,First Trade Date
+958,Other Mundane Financial
+959,Work at Home >10 yrs
+961,For Languages
+962,Obsessive/Compulsive Disorder
+963,Borderline Personality Disorder
+966,Eccentric
+972,Stress - Extramarital affairs
+973,Stress - Distant
+975,Sexual chemistry
+977,Contractor
+978,Sports
+979,Outdoors
+980,Groups
+981,Travel
+982,Missionary
+983,Meditation
+984,Fundamentalist/ Evangelical
+985,Drug business
+986,Divorce bitter
+987,Divorce friendly
+993,12 step group
+994,Temper
+995,Utilities/Phone/Cable/TV
+996,Energy field healer
+997,Security guard
+998,Tailor/Seamstress
+999,Trash collector
+1000,Yard care
+1021,Principled strongly
+1022,Memories Good
+1023,Memories Bad
+1028,Other Criminal Victim
+1029,Terrorism victim
+1032,Sports Championship
+1922,Solitary/ Introvert
+1923,Gregarious/Extrovert
+1927,Night Owl
+1928,Ambitious
+1929,Hard worker
+1932,Courageous
+1935,NYSE
+1936,NASDAQ
+1937,Large Cap
+1938,Mid Cap
+1939,Small Cap
+1940,Commodity
+1941,OTC
+1942,Financial Services
+1943,High Tech
+1944,Industrials
+1948,High Blood Pressure
+1949,"Headaches, severe"
+1950,Misfit
+2874,Voice/Speech
+2875,Wicca
+2876,Shamanism
+2878,Acupuncture
+2882,Private
+2883,Difficult/ mean spirited
+2884,Loved by all
+2885,Bigot
+2888,On the edge
+2890,Animal Breeder/Trainer
+2891,First in Field
+2892,Mentor/Tutor
+2893,Abuse - other addictions
+2894,ADD
+2897,Web site design
+2898,Hardware engineer
+2899,Systems Analyst
+2900,Other Computer
+2902,Referee
+2903,Primary care of elderly
+2905,Appearance unattractive
+2906,Vain/ Self-absorbed
+2907,Incompetent
+2908,Stubborn/ Steadfast
+2909,Unique
+2910,Institutionalized
+2911,Mental Illness
+2912,Married early <18
+2913,Parenting early <18
+2914,Parenting late >40
+2915,Start young <16
+2916,Retirement circumstances
+2917,Extravagant
+2918,Fundraiser
+2919,"Gain - Grant, Scholarship, etc."
+2920,Party animal
+2921,Collector
+2922,Homeless >2 mo.
+2923,Left home early <18
+2924,Left home late >30
+2925,Sadist/ Torturer
+2926,Philosopher/ Humanist
+2927,Conversion/ Born again
+2928,Rejection/ Leave church
+2930,Black Magic
+2931,Illegitimate birth
+2932,Abandoned
+2933,Traumatic birth
+2935,Notable extremes
+2936,Public Service
+2937,Guinness Book of Records
+2938,Torturer/ Sadist
+2939,Torture victim
+2940,Intern/ Apprentice
+2941,Labor long >36 hrs
+2943,Consultant
+2945,Product Marketing
+2946,Industrial
+2947,Stunt work
+2948,Jazz
+2949,Store clerk
+2950,Crafts
+2951,Mining
+2952,Parapsychology
+2953,Party Affiliation
+2954,Candidate and lost
+2955,Courtesan/ Escort
+2956,Exotic Dancers
+2957,Personal Trainer
+2958,Rowing/ Kayaking
+2959,Volleyball
+2960,Shooting
+2961,Translator
+2962,Children's literature
+2963,Art critic
+2966,Accidents
+2967,Epidemics
+2968,Company Founding
+2969,Stock Exchange
+2970,Financial index
+2971,Atomic
+2972,Agreements
+2973,Announcements
+2975,Military action
+2978,Aviation
+2979,Communication
+2980,Eureka
+2981,Technology
+2982,Other Medical/Science
+2983,Space
+2984,Police action
+2985,Legal matters
+2986,Contracts
+2987,Fetes
+2988,Foundings
+2989,Lottery
+2991,Sports business
+2992,Contests
+2993,Other Soc/Ent
+2994,Awards
+2995,Other Misc. Mundane
+2997,Sports contests
+2998,Other Mundane Sports
+2999,Heart disease/attack
+3002,Lou Gehrig's disease
+3003,Arms
+3004,Nose
+3005,Throat
+3006,Bowel
+3008,Lung
+3011,Other body problems
+3012,Legs
+3013,Autoimmune other
+3014,Attention seeking
+3015,Theosophy/Vedanta
+3016,Treatment/Therapy
+3018,Birth of City or Town
+3019,">500,000 population"
+3020,"400,000-500,000 population"
+3021,"300,000-400,000 population"
+3022,"200,000-300,000 population"
+3023,"100,000-200,000 population"
+3024," 70,000-100,000 population"
+3025,Extraordinary mundane events
+3026,Birthing - Abortions
+3027,Birthing - Fertility problems
+3028,Birthing - Unusual
+3029,Hardship-Little spousal support
+3030,Night Club/ Vaudeville
+3031,For Meritorious achievement
+3032,For Making Money
+3033,Early Bird
+3034,15 minutes of fame
+3035,Bad judgement
+3036,Parenting stressful
+3037," 50,000-70,000 population"
+3038," 30,000-50,000 population"
+3039," 20,000-30,000 population"
+3040," 10,000-20,000 population"
+3041,"  5,000-10,000 population"
+3042,"<5,000 population"
+4003,Economics
+4004,Ethnologist
+4005,Gender Studies
+4006,Geography
+4007,Historian
+4008,Linguist
+4009,Political Science
+4010,Philosopher
+4011,Vocalist/ Rapper
+4013,Fundamentalist/ Islam
+4014,Internet personality

@@ -1,26 +1,23 @@
 graph TD
     subgraph "Main Data Preparation Pipeline"
-        A[src/filter_adb_candidates.py]
-        B[src/prepare_sf_import.py]
-        D[src/create_subject_db.py]
-        C[src/generate_personalities_db.py]
+        A["src/fetch_adb_data.py"]
+        B["src/validate_adb_data.py"]
+        C["src/filter_adb_candidates.py"]
+        D["src/prepare_sf_import.py"]
+        E["src/create_subject_db.py"]
+        F["src/generate_personalities_db.py"]
     end
 
-    subgraph "Optional Pre-flight Scripts"
-        F_new[src/fetch_adb_data.py]
-        V[src/validate_adb_data.py]
-    end
-
-    F_new --> A
-    V -- "creates validation report for" --> A;
-    A --> B;
-    B --> D;
-    D --> C;
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
 
     style A fill:#d4edda,stroke:#155724
     style B fill:#d4edda,stroke:#155724
-    style D fill:#d4edda,stroke:#155724
     style C fill:#d4edda,stroke:#155724
-    style F_new fill:#fff3cd,stroke:#f1c40f
-    style V fill:#fff3cd,stroke:#f1c40f
+    style D fill:#d4edda,stroke:#155724
+    style E fill:#d4edda,stroke:#155724
+    style F fill:#d4edda,stroke:#155724
     

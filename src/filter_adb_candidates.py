@@ -197,36 +197,39 @@ def main():
     for line in lines:
         if '\t' not in line:
             continue
-        decoded_line = unquote(line)
-        parts = decoded_line.strip().split('\t')
-        if len(parts) < 5 or not parts[0].strip().isdigit():
+        
+        parts = line.strip().split('\t')
+        # New fetched format has 13 columns
+        if len(parts) < 13 or not parts[0].strip().isdigit():
             continue
 
-        raw_name = parts[1].strip()
-        date_str = parts[3].strip() if len(parts) > 3 else ""
-        unique_identifier = (normalize_name_for_deduplication(raw_name), date_str)
+        # Extract data fields from the new format
+        arn, last_name, first_name, year, birth_time = parts[0], parts[2], parts[3], parts[7], parts[8]
+
+        # Reconstruct name and date for deduplication and filtering
+        raw_name_for_dedup = f"{last_name}, {first_name}"
+        date_str = f"{parts[7]}-{parts[6]}-{parts[5]}" # YYYY-MM-DD
+        unique_identifier = (normalize_name_for_deduplication(raw_name_for_dedup), date_str)
 
         if unique_identifier in processed_identifiers:
-            arn = parts[0].strip()
-            name_for_log = re.sub(r'\(.*\)', '', raw_name).strip()
+            name_for_log = re.sub(r'\(.*\)', '', raw_name_for_dedup).strip()
             removed_duplicates_info.append(f"  - ARN {arn}: {name_for_log}")
             continue
         
-        arn = parts[0].strip()
         if arn not in valid_arns:
             continue
         
-        birth_time = parts[4].strip() if len(parts) > 4 else ""
         if not re.match(r"^\d{1,2}:\d{2}$", birth_time):
             continue
 
         try:
-            birth_year = int(date_str.split('-')[0])
+            birth_year = int(year)
             if not (1900 <= birth_year <= 1999):
                 continue
         except (ValueError, IndexError):
             continue
         
+        # Store the original parts from the new format
         stage1_candidates.append(parts)
         processed_identifiers.add(unique_identifier)
 
@@ -280,16 +283,22 @@ def main():
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as outfile:
             for i, (score, parts) in enumerate(final_candidates, start=1):
-                if len(parts) > 1:
-                    cleaned_name = parts[1].split('(')[0].strip()
-                    normalized_name = ' '.join(cleaned_name.split())
-                    parts[1] = normalized_name.replace("’", "'")
-
-                if len(parts) > 6:
-                    parts[-1] = parts[-1].split('(')[0].strip()
-
-                original_content_cleaned = "\t".join(parts[1:])
-                outfile.write(f"{i}\t{original_content_cleaned}\n")
+                # parts: [ARN, ADBNo, LName, FName, G, D, M, Y, T, City, Country, Lon, Lat]
+                name = f"{parts[2]}, {parts[3]}".replace("’", "'")
+                # Reconstruct a line with a clean, structured set of fields for
+                # downstream processing.
+                output_content = [
+                    name,
+                    parts[4],  # Gender
+                    f"{parts[7]}-{int(parts[6]):02d}-{int(parts[5]):02d}", # YYYY-MM-DD
+                    parts[8],  # Time
+                    "0",       # Placeholder for Timezone, not present in fetched data
+                    parts[9],  # City
+                    parts[10], # Country/State
+                    parts[12], # Latitude
+                    parts[11], # Longitude
+                ]
+                outfile.write(f"{i}\t" + "\t".join(output_content) + "\n")
     except IOError as e:
         logging.error(f"Failed to write to output file {args.output_file}: {e}")
         sys.exit(1)

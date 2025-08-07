@@ -4,11 +4,11 @@ This document outlines the planned development tasks for the project, categorize
 
 ## Code Development
 
-- [ ] **Automate Foundational Assets**
-  - [ ] Develop script to generate `eminence_scores.csv`.
 - [ ] **Integrate Automated Data Fetching**
-  - [ ] Update `validate_adb_data.py` to parse the new fetched format.
+  - [x] Update `validate_adb_data.py` to parse the new fetched format.
   - [ ] Update `filter_adb_candidates.py` to parse the new fetched format.
+- [ ] **Automate Foundational Assets**
+  - [ ] Develop script to generate `eminence_scores.csv` via LLM.
 - [ ] **Automate Delineation Neutralization**
   - [ ] Create `src/neutralize_delineations.py` to process the raw library via LLM.
 - [ ] **Create `new_study.ps1` Workflow**
@@ -36,6 +36,9 @@ This document outlines the planned development tasks for the project, categorize
 
 ## Paper Submission (PCI Psychology & Meta-Psychology)
 
+- [ ] **Solicit Pre-Submission Expert Feedback**
+  - [ ] Identify and contact key field experts (e.g., Currey, Godbout, Kosinski) for friendly pre-submission reviews.
+  - [ ] Incorporate feedback into the final manuscript draft.
 - [ ] **Manuscript Finalization**
   - [ ] Prepare the final version of the manuscript with numbered lines.
 - [ ] **Compliance & Disclosure**
