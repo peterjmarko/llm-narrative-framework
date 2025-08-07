@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.18.0 (2025-08-07)
+
+### Bump
+
+- **version 3.17.1 → 3.18.0**
+
+### Features
+
+- **automate data fetching and enhance validation pipeline**
+  This overhauls the entire data preparation pipeline, transitioning it to a fully automated, resilient, and intelligent workflow.
+  
+  -   **Automated Data Sourcing:** `fetch_adb_data.py` is now the primary entry point, generating an enriched 17-column raw data file with bios, categories, and correct ADB page links. It also automatically creates the `adb_category_map.csv` asset.
+  -   **Intelligent Validation:** `validate_adb_data.py` now distinguishes between 'Person' and 'Research' entries using a new config file. For Person entries, it uses a Wikipedia search API as a robust fallback for missing links.
+  -   **Enhanced Resilience:** The validation script is now protected against hanging with per-record timeouts and a throttling mechanism for Wikipedia searches to prevent rate-limiting.
+  -   **Improved Usability:** Adds `--retry-failed` and `--report-only` modes, a detailed real-time progress bar, and a comprehensive, well-formatted summary report.
+  -   **Documentation Sync:** All documentation and diagrams (`arch_prep_codebase`, `data_prep_flow`, `flow_prep_pipeline`) have been updated to reflect the new workflow.
+  -   **Preserved Legacy Flow:** The original scripts and data file are preserved as `_legacy` versions for historical reference and reproducibility.
 ## 3.17.1 (2025-08-06)
 
 ### Bump
