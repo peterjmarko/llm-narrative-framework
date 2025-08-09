@@ -69,6 +69,65 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 REQUEST_TIMEOUT = 30
 REQUEST_DELAY = 0.25
 
+def convert_hours_to_hhmm(decimal_hours: float) -> str:
+    """Converts decimal hours to a HH:MM string, handling the sign."""
+    sign = "" if decimal_hours >= 0 else "-"
+    decimal_hours = abs(decimal_hours)
+    
+    hours = int(decimal_hours)
+    minutes = round((decimal_hours * 60) % 60)
+    
+    return f"{sign}{hours:02d}:{minutes:02d}"
+
+def parse_tz_code(tz_code: str) -> tuple[str, str]:
+    """
+    Converts a Time Zone Code into Zone Abbreviation and Zone Time Offset.
+    For 'm' type, it uses the longitude embedded in the TZC itself.
+    Returns ('...', '00:00') on failure.
+    """
+    if not tz_code:
+        raise ValueError("Time Zone Code is empty.")
+
+    prefix = tz_code[0]
+    
+    if prefix == 'h': # Standard time zone, e.g., 'h5w'
+        zone_abbr = "..."
+        match = re.match(r"h(\d+)([we])(\d*)", tz_code.lower())
+        if not match:
+            raise ValueError(f"Invalid 'h' type TZC: {tz_code}")
+        
+        hours_str, direction, minutes_str = match.groups()
+        hours = int(hours_str)
+        minutes = int(minutes_str) if minutes_str else 0
+        
+        # Avoid creating a negative zero "-00:00" for UTC
+        if hours == 0 and minutes == 0:
+            sign = ""
+        else:
+            sign = "" if direction == 'w' else "-"
+        
+        zone_time = f"{sign}{hours:02d}:{minutes:02d}"
+        
+    elif prefix == 'm': # Local Mean Time
+        zone_abbr = "LMT"
+        match = re.match(r"m(\d+)([we])(\d*)", tz_code.lower())
+        if not match:
+            raise ValueError(f"Invalid 'm' type TZC: {tz_code}")
+
+        degrees, direction, minutes = match.groups()
+        decimal_degrees = float(degrees) + (float(minutes) / 60.0 if minutes else 0)
+        
+        if direction == 'e':
+            decimal_degrees *= -1
+            
+        decimal_hours = decimal_degrees / 15.0
+        zone_time = convert_hours_to_hhmm(decimal_hours)
+        
+    else:
+        raise ValueError(f"Unknown TZC prefix '{prefix}' in code: {tz_code}")
+        
+    return zone_abbr, zone_time
+
 def login_to_adb(session, username, password):
     """Logs into Astro-Databank to establish an authenticated session."""
     print("")
@@ -236,8 +295,15 @@ def parse_results_from_json(json_data, category_map):
             category_names = [category_map.get(cat_id, f"ID_{cat_id}") for cat_id in category_ids_str.split(',') if cat_id]
             categories_text = ', '.join(category_names)
 
+            # Extract and parse the timezone code
+            raw_tz_code = sbli[7] if len(sbli) > 7 else ''
+            try:
+                zone_abbr, zone_time_offset = parse_tz_code(raw_tz_code)
+            except ValueError:
+                zone_abbr, zone_time_offset = "...", "00:00"
+
             results.append([
-                str(item.get('recno', '')),                 # ARN
+                str(item.get('recno', '')),                 # Index
                 item.get('lnho', ''),                       # ADBNo (numeric ID)
                 last_name,                                  # LastName
                 first_name,                                 # FirstName
@@ -246,6 +312,8 @@ def parse_results_from_json(json_data, category_map):
                 sbli[4] if len(sbli) > 4 else '',           # Month
                 sbli[5] if len(sbli) > 5 else '',           # Year
                 sbli[6] if len(sbli) > 6 else '',           # Time
+                zone_abbr,                                  # ZoneAbbr
+                zone_time_offset,                           # ZoneTimeOffset
                 spli[0] if len(spli) > 0 else '',           # City
                 spli[1] if len(spli) > 1 else '',           # Country/State
                 spli[2].upper() if len(spli) > 2 else '',   # Longitude
@@ -272,8 +340,10 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
 
     try:
         header = [
-            "ARN", "ADBNo", "LastName", "FirstName", "Gender", "Day", "Month", "Year",
-            "Time", "City", "CountryState", "Longitude", "Latitude", "Rating", "Bio", "Categories", "Link"
+            "Index", "idADB", "LastName", "FirstName", "Gender", "Day", "Month",
+            "Year", "Time", "ZoneAbbr", "ZoneTimeOffset", "City",
+            "CountryState", "Longitude", "Latitude", "Rating", "Bio",
+            "Categories", "Link"
         ]
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
             f.write("\t".join(header) + "\n")

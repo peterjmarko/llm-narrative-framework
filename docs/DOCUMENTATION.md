@@ -11,9 +11,9 @@ To make changes, please edit the template file and then run 'pdm run build-docs'
 
 # A Framework for Testing Complex Narrative Systems
 
-This project provides a fully automated, resilient, and reproducible framework for conducting large-scale LLM experiments with complex narrative systems. It offers an end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
+This document is the **Framework Manual** for the project. It provides a comprehensive technical guide to the fully automated, resilient, and reproducible framework designed for conducting large-scale LLM experiments with complex narrative systems. It offers an end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
 
-While the framework is modular and adaptable, its primary application here is to test an LLM's ability to solve a complex "who's who" personality matching task. It is ideal for researchers investigating LLM capabilities and developers who need a robust system for managing and analyzing automated experiments.
+This manual is intended for developers, contributors, and researchers who wish to understand the system's architecture or use the framework for **conceptual replication and new research**.
 
 ## Research Question
 At its core, this project investigates whether a Large Language Model (LLM) can solve a complex matching task: given a set of sanitized, narrative personality descriptions (derived from birth data) and a corresponding set of general biographical profiles, can the LLM correctly pair them at a rate significantly greater than chance?
@@ -46,24 +46,46 @@ The data preparation pipeline is a fully automated workflow that transforms raw 
 
 The data preparation pipeline is a fully automated, multi-stage workflow. It begins with data extraction from the live Astro-Databank website and concludes with the generation of the final `personalities_db.txt` file used in the experiments.
 
-**For Replication:** To perfectly replicate the original study's findings, researchers must use the static legacy data file: `data/sources/adb_raw_export_legacy.txt`. For all new research, the automated workflow below is the standard process.
+**Replication Paths:** Researchers can approach this project in two ways:
+1.  **Direct Replication (Validating Findings):** To most directly replicate the original study, researchers should clone this repository and use the data files as provided. This ensures the experiment starts with the exact same input data used in the original analysis.
+2.  **Conceptual Replication (New Research):** To perform a new study or conceptual replication, researchers can run the automated scripts to generate a completely new dataset from live sources. This will test the methodology with different, up-to-date data.
 
 #### The Automated Workflow
 
 The pipeline is a sequence of Python scripts followed by manual processing steps.
 
-**Stage 1: Data Extraction and Validation (Automated)**
-1.  **Fetching (`fetch_adb_data.py`):** This is the primary entry point. The script logs into the ADB website, queries its internal API, and fetches a complete, structured dataset of over 10,000 subjects. It produces two key files:
-    -   `data/sources/adb_raw_export.txt`: The main raw data file.
-    -   `data/foundational_assets/adb_category_map.csv`: An automatically generated lookup table that translates numeric category IDs into human-readable text.
-2.  **Validation (`validate_adb_data.py`):** This script audits the raw data against live Wikipedia. It intelligently identifies non-person "Research" entries, uses a Wikipedia search API as a fallback for missing links, and provides robust retry logic for network stability. It produces:
-    -   `data/reports/adb_validation_report.csv`: A detailed, row-by-row audit.
-    -   `data/reports/adb_validation_summary.txt`: A high-level summary of the results.
-    -   **Advanced Usage:** The script includes powerful flags for efficient data maintenance, such as `--retry-failed` to re-process only previously failed records and `--report-only` to generate a fresh summary on demand.
+**Stage 1: Data Sourcing and Initial Processing (Automated)**
+1.  **Fetching (`fetch_adb_data.py`):** This is the primary entry point. The script logs into the ADB website, queries its internal API, and fetches a complete dataset of over 10,000 subjects. It performs two crucial transformations at the source:
+    *   **Identifier Standardization:** It replaces the unstable, temporary record number (`ARN`) with a file-specific sequential `Index`, and renames the permanent Astro-Databank ID (`ADBNo`) to `idADB`.
+    *   **Timezone Calculation:** It immediately processes the raw timezone code from the API into the final `ZoneAbbr` and `ZoneTimeOffset` values required by downstream software.
+    *   **Output:** `data/sources/adb_raw_export.txt`, a clean, complete source file.
 
-**Stage 2: Filtering and Formatting (Automated)**
-3.  **Filtering (`filter_adb_candidates.py`):** Takes the validated raw data export, the validation report, and an eminence score file as input. It filters candidates based on validation status, birth year, and birth time, then selects the top 5,000 subjects based on eminence rank.
-4.  **Formatting (`prepare_sf_import.py`):** Converts the final list of 5,000 subjects into the specific CQD format required for import into the Solar Fire software.
+**Stage 2: Validation and Filtering (Automated)**
+2.  **Validation (`validate_adb_data.py`):** This script audits the raw data against live Wikipedia. It intelligently identifies "Research" (non-person) entries and validates "Person" entries by checking for a Wikipedia page and a death date. A status of `OK` is reserved for fully validated `Person` entries.
+
+    > **A Note on Validation Logic**<br>
+    > The script uses a robust, multi-step process to validate each record:
+    >
+    > -   **Name Matching:** A "name mismatch" is flagged if the similarity score between the ADB name and the Wikipedia page title falls below **90%**. To ensure a fair comparison, both names are first normalized by removing disambiguation text (e.g., `(actor)`), standardizing name order, and ignoring case.
+    > -   **Death Date Verification:** A death date is confirmed by searching for multiple positive signals (e.g., a "Died" field in an infobox, year ranges like `(1910-1985)`) while also checking for negative signals like the "Living people" category.
+    > -   **English Wikipedia Requirement:** The validation requires a valid English Wikipedia page. This is a key methodological control to ensure a consistent and high-quality baseline for the LLM's biographical knowledge, as major LLMs are trained predominantly on English-language data.
+3.  **Filtering (`filter_adb_candidates.py`):** This script takes the raw data, the validation report, and an eminence score file as input. It filters candidates based on `Status='OK'`, birth year, and birth time, then selects the top 5,000 subjects based on eminence rank.
+
+**Stage 3: Final Formatting and Manual Processing**
+4.  **Formatting (`prepare_sf_import.py`):** This simplified script now performs one role: it converts the clean list of 5,000 subjects into the specific Comma Quote Delimited (CQD) format required for import into the Solar Fire software.
+5.  **Manual Processing (Solar Fire & LLM):** At this stage, the user manually imports the formatted file into Solar Fire, calculates the astrological charts, and exports two key files: `sf_chart_export.csv` (subject data) and `sf_delineations_library.txt` (raw description text). The delineations library is then manually neutralized using an LLM.
+
+#### Data Maintenance Workflow (`analyze_research_patterns.py`)
+Over time, as the Astro-Databank evolves, the `validate_adb_data.py` script may begin to fail on new types of "Research" entries (non-person records). A dedicated diagnostic script, `analyze_research_patterns.py`, is provided to help maintain the list of known research categories.
+
+**Workflow:**
+1.  Run `validate_adb_data.py` on the latest `adb_raw_export.txt`.
+2.  After the validation run is complete, run the analysis script:
+    ```bash
+    pdm run python src/analyze_research_patterns.py
+    ```
+3.  The script will analyze all "No Wikipedia Link Found" errors and identify any recurring, unrecognized category prefixes.
+4.  If it finds potential new prefixes, it will print a formatted snippet that can be copied directly into the `data/config/adb_research_categories.json` file to improve the accuracy of future validation runs.
 
 **Stage 3: Manual Processing (Solar Fire & LLM)**
 At this stage, the user manually imports the formatted file into Solar Fire, calculates the astrological charts, and exports two key files: `sf_chart_export.csv` (subject data) and `sf_delineations_library.txt` (raw description text). The delineations library is then manually neutralized using an LLM.
@@ -399,16 +421,7 @@ A follow-up study is planned to evaluate other powerful, medium-cost models as A
 
 ## Known Issues and Future Work
 
-This framework is under active development. The following is a list of known issues and planned improvements that will be addressed in future releases.
-
-*   **Outdated Test Suite**: The Pester test suite for the PowerShell wrapper scripts is out of date and does not reflect the current command-line arguments or script behaviors. A full update is planned to restore complete test coverage.
-*   **Inconsistent Log File Content**: The log file generated by `repair_experiment.ps1` is currently not as detailed as those from other scripts. The logging will be enhanced to capture the full, verbose output of the underlying Python processes for better diagnostics.
-*   **Missing Log File for Study Processing**: The `process_study.ps1` workflow, which performs the final data aggregation and analysis, does not currently generate a dedicated log file. This will be added to ensure all major workflows produce a persistent record of their execution.
-*   **Redundant API Calls in Forced Migration**: When forcing a migration on an already `VALIDATED` experiment, the workflow correctly reprocesses the data but also unnecessarily re-runs the LLM API calls. While this is a non-destructive action that is inefficient, it creates a record that is not reflective of the experiment's historical state.
-*   **Unclean Log Files for Migration**: The log files generated by the `migrate_experiment.ps1` and `migrate_study.ps1` scripts currently include the standard PowerShell transcript header and footer. A post-processing step will be implemented to clean these logs.
-*   **Planned - CLI-Driven and Manifest-Documented Experiments**: A major architectural improvement is planned to move experiment parameter definition from the global `config.ini` to command-line arguments for `new_experiment.ps1`. This will decouple experiment execution from the global configuration, allowing multiple, different experiments to be run concurrently without conflict. The script will then generate an experiment manifest file alongside the results to serve as a permanent, reproducible record of the parameters used. This manifest will also serve as the ground truth for all subsequent `audit`, `repair`, and `migrate` operations, making them significantly more robust and reliable.
-*   **Planned - Automated Study Generation (`new_study.ps1`)**: This new workflow will automate the creation of entire studies. It will read a matrix of factors to vary from `config.ini` (e.g., a list of models and mapping strategies) and then orchestrate the entire process by calling `new_experiment.ps1` with the correct command-line arguments for each required experiment.
-*   **Note on Project Scope**: While the framework includes parallel scripts for experiments and studies (e.g., `repair_experiment.ps1` vs. `repair_study.ps1`), a `process_studies.ps1` script is not planned. A "study" represents the highest level of aggregation and analysis within the project's defined scope, and there is no current use case for aggregating multiple studies into a higher-level meta-analysis.
+This framework is under active development. For a detailed and up-to-date list of planned improvements, known issues, and future development tasks, please see the [Project Roadmap](ROADMAP.md).
 
 ## Choosing the Right Workflow: Separation of Concerns
 

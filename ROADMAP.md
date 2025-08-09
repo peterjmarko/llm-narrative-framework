@@ -1,19 +1,34 @@
 # Project Roadmap
 
-This document outlines the planned development tasks for the project, categorized by work stream.
+This document outlines planned development tasks and tracks known issues for the project. The framework is designed to support two key research activities: the **direct replication** of the original study's findings by using the static data files included in the repository, and the **conceptual replication** of the methodology by generating new data from live sources. All development tasks are categorized by work stream below.
+
+## Known Issues
+
+-   **Outdated Test Suite**: The test suite for the PowerShell wrapper scripts is out of date and does not reflect the current command-line arguments or script behaviors.
+-   **Inconsistent Logging**:
+    -   The log file for `repair_experiment.ps1` is not as detailed as those from other scripts.
+    -   The `process_study.ps1` workflow does not currently generate a dedicated log file.
+    -   Log files from migration scripts contain unnecessary PowerShell transcript headers and footers.
+-   **Redundant API Calls**: Forcing a migration on an already `VALIDATED` experiment unnecessarily re-runs all LLM API calls.
 
 ## Code Development
 
-- [ ] **Integrate Automated Data Fetching**
-  - [x] Update `validate_adb_data.py` to parse the new fetched format.
-  - [ ] Update `filter_adb_candidates.py` to parse the new fetched format.
 - [ ] **Automate Foundational Assets**
-  - [ ] Develop script to generate `eminence_scores.csv` via LLM.
+  - [ ] Develop `generate_eminence_scores.py` script to create the eminence file via LLM.
+    - [ ] The script must read `adb_raw_export.txt` as its source.
+    - [ ] The output file (`eminence_scores.csv`) must contain the headers: `idADB`, `Name`, `EminenceScore`.
+  - [ ] Update `filter_adb_candidates.py` to use the new `eminence_scores.csv`.
+    - [ ] This will replace the temporary name-based matching with the permanent, robust `idADB`-based lookup.
+    - [ ] The script should include a secondary name-matching check to ensure data integrity between the source files.
 - [ ] **Automate Delineation Neutralization**
   - [ ] Create `src/neutralize_delineations.py` to process the raw library via LLM.
-- [ ] **Create `new_study.ps1` Workflow**
-  - [ ] Develop a new top-level script to automate the creation of an entire study by running a matrix of experiments.
-- [ ] **Update Test Suite**
+- [ ] **Improve Experiment Execution and Reproducibility**
+  - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.
+  - [ ] Generate an experiment manifest file with results to permanently record all parameters used.
+  - [ ] Update `audit`, `repair`, and `migrate` workflows to use the manifest as the ground truth.
+- [ ] **Automate Study Generation (`new_study.ps1`)**
+  - [ ] Develop the `new_study.ps1` workflow to orchestrate multiple `new_experiment.ps1` calls based on a factor matrix, creating entire studies automatically.
+- [ ] **Update and Restore Test Coverage**
   - [ ] Update all PowerShell and Python tests to reflect the current codebase.
   - [ ] Ensure the test suite is robust and provides thorough coverage.
 
@@ -55,12 +70,4 @@ This document outlines the planned development tasks for the project, categorize
   - [ ] IF REJECTED (PATH B): Revise Manuscript using the PCI feedback. Submit the improved manuscript for a fresh review at AMPPS
     - [ ] If needed, submit to Behavior Research Methods
     - [ ] If needed, submit to PLOS One
-  
-## Completed
 
-- [x] All tasksk to v3.16.0 (2025-08-05)
-- [x] Establish a complete and robust documentation suite.
-- [x] Implement a CI workflow with GitHub Actions.
-- [x] Correct and align all architectural diagrams across all project domains.
-- [x] Create a `ROADMAP.md` to track remaining work.
-- [x] Develop script to validate `country_codes.csv`.

@@ -1,6 +1,6 @@
 # A Resilient Framework for Large-Scale LLM Experimentation
 
-A comprehensive research framework for conducting Large Language Model (LLM) experiments with statistical analysis, hierarchical data aggregation, and resilient, self-healing workflow management.
+This document provides a high-level overview of the project. Its purpose is to introduce the framework's key features and guide users to the detailed documentation that best suits their needs.
 
 ## 🚀 Quick Start
 
@@ -35,16 +35,16 @@ Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
 -   PDM package manager
 -   PowerShell (Core) for Windows, Linux, or macOS
 
-## 📚 Documentation & Resources
+## 📚 Where to Go Next
 
-**[📖 Complete Documentation](docs/DOCUMENTATION.md)** - Detailed setup, usage, and architecture.
+This project is extensively documented to support different use cases. The resources are listed in the recommended reading order for new users.
 
-**[🤝 Contributing Guide](CONTRIBUTING.md)** - How to set up a development environment and contribute.
+-   **For Researchers (Replication):** The best place to start is the **[🔬 Replication Guide (article_supplementary_material.md)](article_supplementary_material.md)**. It provides a step-by-step walkthrough for reproducing the original study's findings.
 
-**[📋 Changelog](CHANGELOG.md)** - Version history and updates.
+-   **For a Deep Dive (Full Details):** To understand the system's architecture, run new experiments, or explore the complete methodology, see the **[📖 Framework Manual (DOCUMENTATION.md)](docs/DOCUMENTATION.md)**.
 
-**[⚖️ License](LICENSE.md)** - GPL v3.0 license terms.
+-   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/README.md)](data/README.md)**.
 
----
+-   **For Developers (Contributing):** To contribute to the project, please see the **[🤝 Developer's Guide (CONTRIBUTING.md)](CONTRIBUTING.md)** for development setup and contribution workflows.
 
-**For detailed setup instructions and comprehensive documentation, see [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)**
+-   **To see what's planned and track known issues**, view the **[🗺️ Project Roadmap (ROADMAP.md)](ROADMAP.md)**.

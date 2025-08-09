@@ -1,6 +1,6 @@
 # Contributing to the LLM Personality Matching Project
 
-We welcome contributions to this project! This document provides guidelines for setting up your development environment, adhering to project standards, and submitting your work.
+This document serves as the **Developer's Guide** for the project. Its purpose is to provide clear and comprehensive guidelines for anyone wishing to contribute, covering development environment setup, project standards, and the full contribution workflow.
 
 ## Getting Started: Development Environment Setup
 
@@ -333,9 +333,15 @@ pdm run build-docs --check
 
 If the CI build fails, please review the logs for the failed step on your pull request page, fix the issues locally, and push the new changes to your branch. This will automatically trigger a new CI run.
 
+## Project Scope
+
+To help guide contributions, please note the intended scope of the project. The framework's hierarchy culminates at the "study" level, which aggregates multiple experiments.
+
+While there are parallel scripts for experiments and studies (e.g., `repair_experiment.ps1` and `repair_study.ps1`), a workflow to process or aggregate multiple studies (e.g., a hypothetical `process_studies.ps1`) is considered out of scope. Contributions focusing on meta-analysis across different studies fall outside the project's current goals.
+
 ## Reporting Bugs and Suggesting Enhancements
 
 If you find a bug or have an idea for an improvement, please **open an issue** on GitHub.
 *   For bugs, include a clear title, steps to reproduce, expected behavior, and any relevant logs.
-*   For enhancements, describe the feature and why it would be valuable.
+*   For enhancements that align with the project scope, describe the feature and why it would be valuable.
 

@@ -81,6 +81,14 @@ from typing import Dict, List, Set
 import time
 from threading import Lock
 
+# --- ANSI Color Codes ---
+class Colors:
+    YELLOW = '\033[93m'
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+
 ADB_REQUEST_LOCK = Lock()
 ADB_LAST_REQUEST_TIME = 0
 ADB_MIN_DELAY = 0.2  # Minimum 200ms between ADB requests
@@ -391,7 +399,7 @@ def search_wikipedia(name: str, birth_year: str = None) -> list[tuple[str, str]]
         return []
 
 
-def find_best_wikipedia_match(name: str, birth_year: str, search_results: list[tuple[str, str]], pbar: tqdm) -> str | None:
+def find_best_wikipedia_match(name: str, birth_year: str, search_results: list[tuple[str, str]], pbar: tqdm, line_index: str) -> str | None:
     """
     Finds the best Wikipedia match from search results by checking page content.
     
@@ -400,6 +408,7 @@ def find_best_wikipedia_match(name: str, birth_year: str, search_results: list[t
         birth_year: Birth year to verify
         search_results: List of (title, url) tuples from search
         pbar: Progress bar for status updates
+        line_index: The index of the record being processed, for logging.
         
     Returns:
         URL of the best matching Wikipedia page, or None if no good match
@@ -443,11 +452,11 @@ def find_best_wikipedia_match(name: str, birth_year: str, search_results: list[t
                     # Try to find the right link on the disambiguation page
                     matching_url = find_matching_disambiguation_link(soup, birth_year)
                     if matching_url:
-                        pbar.write(f"INFO: Found match via disambiguation page: {matching_url}")
+                        pbar.write(f"Index {line_index}: Found match via disambiguation page: {matching_url}")
                         return matching_url
                     continue
                 
-                pbar.write(f"INFO: Found Wikipedia match via search: {url}")
+                pbar.write(f"Index {line_index}: Found Wikipedia match via search: {url}")
                 return url
                 
         except requests.exceptions.Timeout:
@@ -500,17 +509,43 @@ def debug_log(message: str):
         tqdm.write(f"[DEBUG] {message}")
 
 # --- Setup Logging ---
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+class TqdmLoggingHandler(logging.Handler):
+    """A logging handler that redirects all output to tqdm.write()."""
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            tqdm.write(msg)
+            self.flush()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            self.handleError(record)
+
+class CustomFormatter(logging.Formatter):
+    """Custom formatter to add colors to log levels."""
+    log_format = "%(levelname)s: %(message)s"
+    
+    FORMATS = {
+        logging.DEBUG: Colors.RESET + log_format + Colors.RESET,
+        logging.INFO: Colors.RESET + log_format + Colors.RESET,
+        logging.WARNING: Colors.YELLOW + log_format + Colors.RESET,
+        logging.ERROR: Colors.RED + log_format + Colors.RESET,
+        logging.CRITICAL: Colors.RED + log_format + Colors.RESET,
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+# Setup logger with custom formatter that uses the Tqdm handler
+handler = TqdmLoggingHandler()
+handler.setFormatter(CustomFormatter())
+# Use force=True to overwrite the basicConfig, ensuring our handler is used.
+logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
 
 # --- Global Shutdown Flag ---
 shutdown_event = threading.Event()
-
-# --- ANSI Color Codes ---
-class Colors:
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    RESET = '\033[0m'
 
 # --- Constants ---
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -535,31 +570,31 @@ SESSION.mount("http://", adapter)
 
 # --- Helper Functions ---
 
-def load_existing_records(filepath: Path) -> tuple[list, set, set]:
+def load_existing_records(filepath: Path) -> tuple[list, set, int]:
     """
     Reads an existing report, separating valid records from those that need retrying.
     Returns a tuple containing:
     - A list of valid record dicts.
-    - A set of all ARNs that have been processed.
+    - A set of all idADBs that have been processed.
     - An integer count of the valid records.
     """
     if not filepath.exists():
         return [], set(), 0
 
-    valid_records, processed_arns = [], set()
+    valid_records, processed_ids = [], set()
     ok_count = 0
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                arn = row.get('ARN')
-                if not arn: continue
+                id_adb = row.get('idADB')
+                if not id_adb: continue
                 
-                processed_arns.add(arn)
+                processed_ids.add(id_adb)
                 if row.get('Status') in ['OK', 'VALID']:
                     valid_records.append(row)
                     ok_count += 1
-        return valid_records, processed_arns, ok_count
+        return valid_records, processed_ids, ok_count
     except (IOError, csv.Error) as e:
         logging.warning(f"Could not read existing report at '{filepath}': {e}. Starting from scratch.")
         return [], set(), 0
@@ -612,32 +647,12 @@ def fetch_page_content(url: str) -> BeautifulSoup | None:
 
         return soup
     except requests.exceptions.RequestException as e:
-        # Use tqdm.write for thread-safe printing that doesn't mess up the progress bar.
-        tqdm.write(f"WARNING: Request failed for URL {url} after multiple retries: {e}")
+        # Use logging.warning. The Tqdm handler will ensure it's thread-safe.
+        logging.warning(f"Request failed for URL {url} after multiple retries: {e}")
         return None
 
-def fetch_adb_page_with_backoff(url: str, max_retries: int = 5) -> BeautifulSoup | None:
-    """
-    Fetches ADB page with exponential backoff on failures.
-    
-    Args:
-        url: The ADB URL to fetch
-        max_retries: Maximum number of retry attempts
-        
-    Returns:
-        BeautifulSoup object of the page, or None on error
-    """
-    for attempt in range(max_retries):
-        soup = fetch_page_content(url)
-        if soup:
-            return soup
-        
-        # Exponential backoff: 1s, 2s, 4s, 8s, 16s
-        wait_time = 2 ** attempt
-        debug_log(f"ADB request failed for {url}, waiting {wait_time}s before retry {attempt+1}/{max_retries}")
-        time.sleep(wait_time)
-    
-    return None
+# This function is now redundant, as the requests.Session handles retries.
+# It is being removed to prevent duplicate error logging.
 
 def fetch_adb_page_with_fallback(adb_url: str) -> tuple[str, BeautifulSoup]:
     """
@@ -758,11 +773,8 @@ def get_initial_wiki_url_from_adb(adb_url: str) -> str | None:
     Returns:
         The Wikipedia URL if found, None otherwise
     """
-    # Try to fetch with the original URL (with backoff for ADB)
-    if 'astro.com' in adb_url:
-        soup = fetch_adb_page_with_backoff(adb_url, max_retries=3)
-    else:
-        soup = fetch_page_content(adb_url)
+    # The requests.Session handles retries, so we call fetch_page_content directly.
+    soup = fetch_page_content(adb_url)
     
     # If failed, try alternative URL formats
     if not soup and '/astro-databank/' in adb_url:
@@ -790,10 +802,7 @@ def get_initial_wiki_url_from_adb(adb_url: str) -> str | None:
         # Try each variant
         for variant_url in variants:
             debug_log(f"Trying URL variant: {variant_url}")
-            if 'astro.com' in variant_url:
-                soup = fetch_adb_page_with_backoff(variant_url, max_retries=3)
-            else:
-                soup = fetch_page_content(variant_url)
+            soup = fetch_page_content(variant_url)
             if soup:
                 # Track successful Research patterns
                 if 'Research:' in variant_url and 'Research:' not in adb_url:
@@ -986,7 +995,7 @@ def find_matching_disambiguation_link(soup: BeautifulSoup, birth_year: str) -> s
     
     return None
 
-def process_wikipedia_page(url: str, adb_name: str, birth_year: str, pbar: tqdm, depth=0) -> dict:
+def process_wikipedia_page(url: str, adb_name: str, birth_year: str, pbar: tqdm, line_index: str, depth=0) -> dict:
     """
     Scrapes and validates a Wikipedia page with robust disambiguation handling.
     
@@ -1000,6 +1009,7 @@ def process_wikipedia_page(url: str, adb_name: str, birth_year: str, pbar: tqdm,
         adb_name: Name from Astro-Databank for comparison
         birth_year: Birth year for disambiguation resolution
         pbar: Progress bar for status updates
+        line_index: The index of the record being processed, for logging.
         depth: Current recursion depth for disambiguation handling
         
     Returns:
@@ -1018,12 +1028,12 @@ def process_wikipedia_page(url: str, adb_name: str, birth_year: str, pbar: tqdm,
 
     # Check for disambiguation
     if is_disambiguation_page(soup):
-        pbar.write(f"INFO: Disambiguation page found for {final_url}. Searching for birth year '{birth_year}'...")
+        pbar.write(f"Index {line_index}: Disambiguation page found for {final_url}. Searching for birth year '{birth_year}'...")
         
         matching_url = find_matching_disambiguation_link(soup, birth_year)
         if matching_url:
-            pbar.write(f"INFO:   -> Found matching link: {matching_url}")
-            return process_wikipedia_page(matching_url, adb_name, birth_year, pbar, depth + 1)
+            pbar.write(f"Index {line_index}:   -> Found matching link: {matching_url}")
+            return process_wikipedia_page(matching_url, adb_name, birth_year, pbar, line_index, depth + 1)
         
         return {'status': 'FAIL', 'notes': f"Disambiguation page, but no link with year {birth_year} found"}
 
@@ -1213,23 +1223,27 @@ def validate_death_date(soup: BeautifulSoup) -> bool:
     
     return False
 
-def sort_report_by_arn(filepath: Path, fieldnames: list):
-    """Reads the report CSV, sorts it by ARN, and writes it back."""
+def sort_and_reindex_report(filepath: Path, fieldnames: list):
+    """Reads the report CSV, sorts it by idADB, re-indexes it, and writes it back."""
     if not filepath.exists():
         return
 
     try:
         with open(filepath, 'r', encoding='utf-8', newline='') as f:
             reader = csv.DictReader(f)
-            # Read all rows and convert ARN to int for correct sorting
-            data = sorted(list(reader), key=lambda row: int(row['ARN']))
+            # Read all rows and convert idADB to int for correct sorting
+            data = sorted(list(reader), key=lambda row: int(row['idADB']))
         
+        # Re-index the sorted data
+        for i, row in enumerate(data, 1):
+            row['Index'] = i
+
         with open(filepath, 'w', encoding='utf-8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(data)
     except (IOError, csv.Error, KeyError, ValueError) as e:
-        logging.error(f"Could not sort the final report file: {e}")
+        logging.error(f"Could not sort and re-index the final report file: {e}")
 
 
 def generate_summary_report(report_path: Path):
@@ -1254,7 +1268,8 @@ def generate_summary_report(report_path: Path):
             logging.warning(f"Could not create backup for summary report: {e}")
             
     total_records, valid_records, failed_records = 0, 0, 0
-    no_wiki_link, fetch_fail, no_death, name_mismatch, other_errors = 0, 0, 0, 0, 0
+    no_wiki_link, fetch_fail, no_death, name_mismatch, disambiguation_fail = 0, 0, 0, 0, 0
+    timeout_error, non_english_error, other_errors = 0, 0, 0
     research_entries, person_entries = 0, 0
     research_valid, research_failed = 0, 0
 
@@ -1268,33 +1283,25 @@ def generate_summary_report(report_path: Path):
                 return
 
             for row in rows:
-                # Count entry types
-                entry_type = row.get('Entry_Type', 'Person')  # Default to Person for old reports
-                if entry_type == 'Research':
-                    research_entries += 1
-                    if row.get('Status') in ['OK', 'VALID']:
-                        research_valid += 1
-                    else:
-                        research_failed += 1
-                else:
-                    person_entries += 1
-                
-                # Count validation status
+                # ... (rest of loop)
                 if row.get('Status') in ['OK', 'VALID']:
                     valid_records += 1
                 else:
                     failed_records += 1
                     notes = row.get('Notes', '')
-                    if "No Wikipedia link found on ADB page" in notes: no_wiki_link += 1
-                    elif "Research entry - Wikipedia not expected" in notes: continue  # Don't count as error
+                    if "No Wikipedia link" in notes: no_wiki_link += 1
+                    elif "Research entry - Wikipedia not expected" in notes: continue
                     elif "Failed to fetch Wikipedia page" in notes: fetch_fail += 1
                     elif "Name mismatch" in notes: name_mismatch += 1
                     elif "Death date not found" in notes: no_death += 1
+                    elif "Disambiguation page" in notes: disambiguation_fail += 1
+                    elif "Processing timeout" in notes: timeout_error += 1
+                    elif "non-English WP link" in notes: non_english_error += 1
                     else: other_errors += 1
         
         # --- Build Formatted Report ---
         title = "Astro-Databank Validation Summary"
-        banner_width = 48
+        banner_width = 50
         banner = "=" * banner_width
         centered_title = title.center(banner_width)
 
@@ -1351,24 +1358,43 @@ def generate_summary_report(report_path: Path):
             failure_analysis.append(f"--- Failure Analysis ({failed_records:,} Records) ---")
             
             fail_data = [
-                ("1. No Wikipedia Link on ADB Page:", no_wiki_link),
+                # No WP link on ADB page, and Wikipedia search also found no matches.
+                ("1. No Wikipedia Link Found:", no_wiki_link),
+                # Network or HTTP error (e.g., 404) prevented fetching the Wikipedia page.
                 ("2. Could Not Fetch Wikipedia Page:", fetch_fail),
-                ("3. Death Date Not Found:", no_death),
+                # A disambiguation page was found, but no link matched the subject's birth year.
+                ("3. Disambiguation Failed:", disambiguation_fail),
+                # The name on the Wikipedia page was too different from the ADB name.
                 ("4. Name Mismatch:", name_mismatch),
-                ("5. Other Errors (e.g., Disambig.):", other_errors)
+                # A Wikipedia page was found, but a death date could not be confirmed.
+                ("5. Death Date Not Found:", no_death),
+                # The validation for a single record exceeded the 60-second timeout.
+                ("6. Processing Timeout:", timeout_error),
+                # A non-English WP link was found, but no English equivalent could be located.
+                ("7. Non-English Link (No Fallback):", non_english_error),
+                # Catch-all for other, less common errors (e.g., max redirects).
+                ("8. Other Errors:", other_errors)
             ]
             
-            # Use dynamic padding for perfect alignment
+            # Determine the width of the longest label for consistent padding.
+            max_label_width = max(len(label) for label, count in fail_data) if fail_data else 0
+            
             max_num_width = len(f"{max(d[1] for d in fail_data):,}") if fail_data else 1
             perc_width = 8 # e.g., " (10.0%)"
 
             for label, count in fail_data:
+                # Pad each label to the max width for left alignment.
+                padded_label = f"{label:<{max_label_width}}"
                 perc_str = f"({count/total_records:.1%})" if total_records > 0 else "(0.0%)"
-                # Create the right-aligned part of the string
+                
+                # Create the numeric part of the string.
                 right_part = f"{count:>{max_num_width},d} {perc_str:>{perc_width}}"
-                # Calculate padding needed to fill the rest of the banner width
-                padding = " " * (banner_width - len(label) - len(right_part))
-                line = f"{label}{padding}{right_part}"
+                
+                # Calculate the space between the padded label and the numbers.
+                # The "- 2" accounts for the requested right-shift.
+                padding = " " * (banner_width - len(padded_label) - len(right_part) - 2)
+
+                line = f"{padded_label}{padding}  {right_part}"
                 failure_analysis.append(line)
         
         # Note about Research entries
@@ -1459,13 +1485,13 @@ def worker_task_with_timeout(line: str, pbar: tqdm) -> dict:
         # Thread is still running, it's hung
         try:
             parts = line.strip().split('\t')
-            arn = parts[0] if parts else "unknown"
+            id_adb = parts[1] if len(parts) > 1 else "unknown"
             name = f"{parts[2]}, {parts[3]}" if len(parts) > 3 else "unknown"
         except:
-            arn, name = "unknown", "unknown"
+            id_adb, name = "unknown", "unknown"
         
-        tqdm.write(f"ERROR: Worker timeout for ARN {arn} ({name})")
-        return {'ARN': arn, 'ADB_Name': name, 'Status': 'ERROR', 'Notes': 'Processing timeout (30s)'}
+        tqdm.write(f"ERROR: Worker timeout for idADB {id_adb} ({name})")
+        return {'idADB': id_adb, 'ADB_Name': name, 'Status': 'ERROR', 'Notes': 'Processing timeout (30s)'}
     
     # Check for exceptions
     if not exception_queue.empty():
@@ -1498,28 +1524,31 @@ def worker_task(line: str, pbar: tqdm) -> dict:
 
     import traceback
     
-    # Extract ARN for debugging
+    # Extract Index and idADB for logging and processing
     try:
         parts = line.strip().split('\t')
-        arn = parts[0] if parts else "unknown"
-    except:
-        arn = "unknown"
+        line_index = parts[0] if parts else "unknown"
+        id_adb = parts[1] if len(parts) > 1 else "unknown"
+    except (IndexError, ValueError):
+        line_index, id_adb = "unknown", "unknown"
     
-    debug_log(f"[{arn}] Starting worker_task")
+    debug_log(f"Index {line_index}: Starting worker_task for idADB {id_adb}")
 
     if shutdown_event.is_set():
         return None # Exit early if shutdown is requested
 
     time.sleep(REQUEST_DELAY) # Add a small delay to be a polite scraper
     parts = line.strip().split('\t')
-    # The new input format has 17 columns, with the link at the end.
-    if len(parts) < 17: return None
+    # The new input format has 19 columns, with the link at index 18.
+    if len(parts) < 19:
+        return None
 
     # --- Extract data fields by their index from the new format ---
-    arn, last_name, first_name, birth_year = parts[0], parts[2], parts[3], parts[7]
+    # Indices: 1:idADB, 2:LastName, 3:FirstName, 7:Year, 18:Link
+    id_adb, last_name, first_name, birth_year = parts[1], parts[2], parts[3], parts[7]
     
-    # Unquote the URL immediately to handle all special characters (e.g., %C3%A9 for é).
-    adb_url = unquote(parts[16])
+    # Use the reliable Link from the input file and unquote it.
+    adb_url = unquote(parts[18])
 
     # Reconstruct name for validation and logging purposes.
     adb_name = f"{last_name}, {first_name}".strip(', ')
@@ -1527,87 +1556,73 @@ def worker_task(line: str, pbar: tqdm) -> dict:
     # Determine entry type
     full_name = adb_name if adb_name else f"{last_name} {first_name}".strip()
     entry_type = "Research" if is_research_entry(full_name, first_name) else "Person"
+
+    # For Research entries, the API-provided link often omits the "Research:"
+    # prefix, causing a 404. We must add it back in.
+    if entry_type == 'Research' and '/astro-databank/' in adb_url:
+        base, path = adb_url.split('/astro-databank/', 1)
+        if not path.lower().startswith('research:'):
+            adb_url = f"{base}/astro-databank/Research:{path}"
+            debug_log(f"Index {line_index}: Corrected Research URL to: {adb_url}")
+    
+    # Determine entry type
+    full_name = adb_name if adb_name else f"{last_name} {first_name}".strip()
+    entry_type = "Research" if is_research_entry(full_name, first_name) else "Person"
     
     # Initialize result with entry type
     result = {
-        'ARN': arn, 
+        'idADB': id_adb, 
         'ADB_Name': adb_name.strip(),
         'Entry_Type': entry_type
     }
     
-    if not adb_url:
-        return {**result, 'Status': 'ERROR', 'Notes': 'Missing ADB URL in source file'}
-    
-    # Build the appropriate URL based on entry type
-    full_name = adb_name if adb_name else f"{last_name} {first_name}".strip()
-    
-    # For entries that look like Research entries, try Research: prefix first
-    if is_research_entry(full_name, first_name) and '/astro-databank/' in adb_url:
-        base_url, path = adb_url.split('/astro-databank/', 1)
-        if not path.startswith('Research:'):
-            # Try Research URL first for known patterns
-            research_url = f"{base_url}/astro-databank/Research:{path}"
-            debug_log(f"ARN {arn}: Trying Research URL for '{full_name}': {research_url}")
-            
-            # Quick check if Research URL exists
-            test_response = SESSION.head(research_url, headers={'User-Agent': USER_AGENT}, 
-                                        timeout=5, allow_redirects=True)
-            if test_response.status_code == 200:
-                adb_url = research_url
-                debug_log(f"ARN {arn}: Research URL confirmed: {research_url}")
-            else:
-                debug_log(f"ARN {arn}: Research URL failed, using original: {adb_url}")
-    
     # Check if Wikipedia search is disabled
     skip_wiki_search = os.environ.get('NO_WIKI_SEARCH', '').lower() == 'true'
     
-    debug_log(f"[{arn}] Fetching ADB page: {adb_url}")
+    debug_log(f"[{id_adb}] Fetching ADB page: {adb_url}")
     
     # Get Wikipedia URL with optional search fallback
     try:
         initial_wiki_url = get_initial_wiki_url_from_adb(adb_url)
-        debug_log(f"[{arn}] ADB page fetched, wiki URL: {initial_wiki_url}")
+        debug_log(f"[{id_adb}] ADB page fetched, wiki URL: {initial_wiki_url}")
     except Exception as e:
-        debug_log(f"[{arn}] ERROR fetching ADB page: {e}")
+        debug_log(f"[{id_adb}] ERROR fetching ADB page: {e}")
         return {**result, 'Status': 'ERROR', 'Notes': f'Failed to fetch ADB page: {str(e)[:100]}'}
     
-    if not initial_wiki_url:
-        # Research entries often don't have Wikipedia pages
-        if entry_type == 'Research':
-            debug_log(f"ARN {arn}: Research entry - no Wikipedia link expected")
-            return {**result, 'Status': 'VALID', 'WP_URL': '', 
-                   'Notes': 'Research entry - Wikipedia not expected'}
-        else:
-            # For person entries, try Wikipedia search if enabled
-            if not skip_wiki_search:
-                debug_log(f"[{arn}] Starting Wikipedia search for: {adb_name}")
-                
-                try:
-                    search_results = search_wikipedia(adb_name, birth_year)
-                    debug_log(f"[{arn}] Search returned {len(search_results)} results")
-                    
-                    if search_results:
-                        debug_log(f"[{arn}] Checking search results for best match...")
-                        initial_wiki_url = find_best_wikipedia_match(adb_name, birth_year, search_results, pbar)
-                        debug_log(f"[{arn}] Best match result: {initial_wiki_url}")
-                except Exception as e:
-                    debug_log(f"[{arn}] Wikipedia search failed: {e}")
-                    initial_wiki_url = None
+    # If no URL was found on the ADB page, and it's a Person, try searching Wikipedia.
+    if not initial_wiki_url and entry_type == 'Person' and not skip_wiki_search:
+        try:
+            search_results = search_wikipedia(adb_name, birth_year)
+            debug_log(f"Index {line_index}: Search returned {len(search_results)} results")
             
-            # Check if we found anything
-            if not initial_wiki_url:
-                if skip_wiki_search:
-                    notes = 'No Wikipedia link found on ADB page'
-                else:
-                    notes = 'No Wikipedia link on ADB; Wikipedia search found no matches'
-                debug_log(f"ARN {arn}: {notes}")
-                return {**result, 'Status': 'ERROR', 'Notes': notes}
+            if search_results:
+                debug_log(f"Index {line_index}: Checking search results for best match...")
+                initial_wiki_url = find_best_wikipedia_match(adb_name, birth_year, search_results, pbar, line_index)
+                debug_log(f"Index {line_index}: Best match result: {initial_wiki_url}")
+        except Exception as e:
+            debug_log(f"Index {line_index}: Wikipedia search failed: {e}")
+            # initial_wiki_url remains None, which is handled next.
+
+    # After all attempts, if there is still no URL, handle the failure and exit.
+    if not initial_wiki_url:
+        if entry_type == 'Research':
+            notes = 'Research entry - Wikipedia not expected'
+            status = 'VALID'
+        elif skip_wiki_search:
+            notes = 'No Wikipedia link found on ADB page'
+            status = 'ERROR'
+        else:
+            notes = 'No Wikipedia link on ADB; Wikipedia search found no matches'
+            status = 'ERROR'
+        
+        debug_log(f"Index {line_index}: {notes}")
+        return {**result, 'Status': status, 'Notes': notes}
     
     english_wiki_url = get_english_wiki_url(initial_wiki_url)
     if not english_wiki_url:
         return {**result, 'Status': 'ERROR', 'Notes': 'Found non-English WP link, but no English equivalent'}
     
-    validation_data = process_wikipedia_page(english_wiki_url, adb_name, birth_year, pbar)
+    validation_data = process_wikipedia_page(english_wiki_url, adb_name, birth_year, pbar, line_index)
 
     if validation_data['status'] != 'OK':
         return {**result, 'Status': validation_data['status'], 'Notes': validation_data['notes']}
@@ -1619,6 +1634,12 @@ def worker_task(line: str, pbar: tqdm) -> dict:
     if not validation_data['death_date_found']:
         final_status = 'FAIL'
         notes.append("Death date not found")
+
+    # Final check: A record can only be 'OK' if it's a Person.
+    # Research entries are 'VALID' if they pass, but never 'OK'.
+    if final_status == 'OK' and entry_type != 'Person':
+        final_status = 'VALID'
+        notes.append("Entry is not a Person; status set to VALID instead of OK")
 
     return {
         **result, 'WP_URL': validation_data['final_url'], 'WP_Name': validation_data['wp_name'],
@@ -1663,56 +1684,51 @@ def main():
     if not input_path.exists():
         logging.error(f"Input file not found: {input_path}"); sys.exit(1)
 
-    fieldnames = ['ARN', 'ADB_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Status', 'Notes']
+    fieldnames = ['Index', 'idADB', 'ADB_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Status', 'Notes']
     
-    valid_records, processed_arns, initial_ok_count = load_existing_records(output_path)
+    valid_records, processed_ids, initial_ok_count = load_existing_records(output_path)
     
     with open(input_path, 'r', encoding='utf-8') as infile:
         all_lines = infile.readlines()[1:]
     
-    # Create a quick lookup map of ARN -> line for efficient filtering
-    arn_to_line_map = {line.split('\t')[0]: line for line in all_lines if line.strip()}
+    # Create a quick lookup map of idADB -> line for efficient filtering
+    id_to_line_map = {line.split('\t')[1]: line for line in all_lines if line.strip()}
 
     lines_to_process = []
     if args.retry_failed:
-        failed_arns = processed_arns - {rec['ARN'] for rec in valid_records}
-        if not failed_arns:
-            print(f"\n{Colors.GREEN}No failed records to retry. All {len(processed_arns)} processed records are valid.{Colors.RESET}")
+        failed_ids = processed_ids - {rec['idADB'] for rec in valid_records}
+        if not failed_ids:
+            print(f"\n{Colors.GREEN}No failed records to retry. All {len(processed_ids)} processed records are valid.{Colors.RESET}")
             generate_summary_report(output_path)
             sys.exit(0)
             
-        for arn in sorted(failed_arns, key=int):
-            if arn in arn_to_line_map:
-                lines_to_process.append(arn_to_line_map[arn])
+        for id_adb in sorted(failed_ids, key=int):
+            if id_adb in id_to_line_map:
+                lines_to_process.append(id_to_line_map[id_adb])
     else:
         for line in all_lines:
             try:
-                arn = line.split('\t')[0]
-                arn_val = int(arn)
-                if arn in processed_arns or arn_val < args.start_from or (args.stop_at > 0 and arn_val > args.stop_at):
+                parts = line.split('\t')
+                line_index = int(parts[0])
+                id_adb = parts[1]
+                if id_adb in processed_ids or line_index < args.start_from or (args.stop_at > 0 and line_index > args.stop_at):
                     continue
                 lines_to_process.append(line)
             except (IndexError, ValueError):
                 continue
 
-    all_records_processed = not lines_to_process
+    # --- Check if a forced re-validation is needed due to stale data ---
+    auto_force = False
+    if output_path.exists() and input_path.exists():
+        if os.path.getmtime(input_path) >= os.path.getmtime(output_path):
+            auto_force = True
+            print(f"\n{Colors.YELLOW}INFO: Source file '{input_path.name}' is newer than the report.")
+            print(f"      Will re-validate all records to ensure data is current.{Colors.RESET}")
 
-    # If all records are processed and --force is not used, ask interactively.
-    if all_records_processed and not args.force:
-        print("")
-        print(f"{Colors.GREEN}All records in the specified range have already been processed.{Colors.RESET}")
-        print(f"{Colors.YELLOW}You can force reprocessing, but this will overwrite the existing report.{Colors.RESET}")
-        response = input("Proceed with full reprocessing? (Y/N): ").lower()
-        if response == 'y':
-            args.force = True # Trigger the force logic below
-        else:
-            print("\nExiting without reprocessing.\n")
-            sort_report_by_arn(output_path, fieldnames)
-            generate_summary_report(output_path)
-            return
+    reprocessing_required = args.force or auto_force
 
-    # If --force is active (either from CLI or interactive prompt), handle file deletion and state reset.
-    if args.force:
+    # Handle the destructive file overwrite if reprocessing is required.
+    if reprocessing_required:
         if output_path.exists():
             print("")
             print(f"{Colors.YELLOW}WARNING: This will re-validate all records and overwrite the report at '{output_path}'.")
@@ -1743,7 +1759,7 @@ def main():
                 sys.exit(1)
         
         # Reset state to re-process everything within the specified range
-        processed_arns.clear()
+        processed_ids.clear()
         initial_ok_count = 0
         lines_to_process.clear()
         for line in all_lines:
@@ -1759,7 +1775,7 @@ def main():
     if not lines_to_process:
         print("")
         print(f"{Colors.GREEN}All records in the specified range have already been processed.{Colors.RESET}")
-        sort_report_by_arn(output_path, fieldnames)
+        sort_and_reindex_report(output_path, fieldnames)
         generate_summary_report(output_path)
         return
 
@@ -1773,11 +1789,11 @@ def main():
     if args.retry_failed:
         print(f"\n{Colors.YELLOW}--- Running in Retry-Failed Mode ---{Colors.RESET}")
         print(f"Found {len(valid_records):,} valid records to keep and {len(lines_to_process):,} failed records to re-process.")
-    elif not processed_arns:
-        print(f"{Colors.YELLOW}Starting enhanced validation for {len(all_lines):,} records using {args.workers} workers.{Colors.RESET}")
-        print(f"Output will be saved to '{output_path}'.")
+    elif not processed_ids:
+        print(f"{Colors.YELLOW}\nStarting enhanced validation for {len(all_lines):,} records using {args.workers} workers.{Colors.RESET}")
+        print(f"Output will be saved to '{output_path}'.\n")
     else:
-        print(f"{Colors.YELLOW}\nResuming validation: {len(processed_arns):,} records already processed ({initial_ok_count:,} valid).{Colors.RESET}")
+        print(f"{Colors.YELLOW}\nResuming validation: {len(processed_ids):,} records already processed ({initial_ok_count:,} valid).{Colors.RESET}")
         print(f"Now processing the remaining {len(lines_to_process):,} records using {args.workers} workers.")
 
     print("-" * 70)
@@ -1785,9 +1801,18 @@ def main():
     print(f"      and can take over an hour to complete.")
     print(f"      You can safely interrupt with 'Ctrl+C' and resume at any time.{Colors.RESET}")
     print("-" * 70)
+    print("")
     
     was_interrupted = False
-    pbar = tqdm(total=len(lines_to_process), desc="Validating records", ncols=120, smoothing=0.01)
+    # Use bar_format to apply color to the entire line, not just the bar.
+    # The double curly braces {{...}} are to escape them for the f-string.
+    pbar = tqdm(
+        total=len(lines_to_process), 
+        desc="Validating records", 
+        ncols=120, 
+        smoothing=0.01,
+        bar_format=f"{Colors.CYAN}{{l_bar}}{{bar}}|{{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}}, {{rate_fmt}}]{{postfix}}{Colors.RESET}"
+    )
     session_ok_count = 0
     session_research_count = 0  # Track Research entries
     newly_processed_results = []
@@ -1803,7 +1828,7 @@ def main():
         output_file = None
         writer = None
         if not args.retry_failed:
-            file_exists = output_path.exists() and len(processed_arns) > 0
+            file_exists = output_path.exists() and len(processed_ids) > 0
             output_file = open(output_path, 'a', encoding='utf-8', newline='')
             writer = csv.DictWriter(output_file, fieldnames=fieldnames)
             if not file_exists:
@@ -1816,7 +1841,7 @@ def main():
             # Track newly valid from this session
             newly_valid_count = 0
         else:
-            total_processed_before_session = len(processed_arns)
+            total_processed_before_session = len(processed_ids)
         
         for future in as_completed(futures):
             pbar.update(1)
@@ -1889,7 +1914,7 @@ def main():
                 logging.error(f"Failed to write the rebuilt report file: {e}")
         else:
             # In normal mode, we just sort the existing file.
-            sort_report_by_arn(output_path, fieldnames)
+            sort_and_reindex_report(output_path, fieldnames)
         
         # Generate the final summary report
         generate_summary_report(output_path)
@@ -1906,7 +1931,7 @@ def main():
                 )
             else:
                 total_ok_count = initial_ok_count + session_ok_count
-                total_processed_so_far = len(processed_arns) + processed_this_session
+                total_processed_so_far = len(processed_ids) + processed_this_session
                 final_msg = (
                     f"Process interrupted. {processed_this_session:,} records were processed this session.\n"
                     f"Total processed so far: {total_processed_so_far:,} records ({total_ok_count:,} valid).\n"

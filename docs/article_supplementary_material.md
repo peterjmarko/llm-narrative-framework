@@ -4,7 +4,7 @@ author: "Peter J. Marko"
 date: "[Date]"
 ---
 
-This document provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." It serves as a detailed, step-by-step guide for researchers seeking to replicate the data generation and preparation pipeline. The sections are arranged in workflow order as follows:
+This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers seeking to perform a **direct replication of the original study's findings**. The sections are arranged in workflow order as follows:
 
 *   **Obtaining Birth Data from Astro-Databank:** Describes the filtering of the ADB research database and the manual extraction process for obtaining birth data.
 *   **Data Preparation:** Describes the process of transforming the raw birth data in preparation for importing to the astrology software.
@@ -13,11 +13,15 @@ This document provides supplementary material to the main article, "A Framework 
 
 ## Obtaining Birth Data from Astro-Databank
 
-**A Note on Reproducibility:** The Astro-Databank (ADB) is a live research database that is continuously updated. Re-fetching the data today will not yield the exact dataset used in this study. While the data preparation pipeline is fully deterministic, this initial data extraction is the sole exception.
+This guide supports two distinct research paths.
 
-To ensure perfect, bit-for-bit replication of the original findings, researchers **must** use the static export file included in the project repository: `data/sources/adb_raw_export.txt`.
+**Path 1: Direct Replication (Validating Original Findings)**
+The Astro-Databank (ADB) is a live research database. To directly replicate and validate the original study's results, it is essential to use the static data files included in this repository. This approach ensures that you are working with the identical dataset used for the original analysis, providing the most stable baseline for comparison.
 
-The data fetching process described below has been fully automated. The instructions detail how to use the provided script to generate a new, up-to-date export. The original manual steps are retained at the end of this section for methodological transparency.
+**Path 2: Conceptual Replication (Creating a New Dataset)**
+For researchers wishing to perform a conceptual replication or conduct new research, the framework provides a fully automated pipeline to generate a fresh dataset. The instructions below describe how to use the provided scripts to create a new, up-to-date export from the live ADB. Note that this will yield a different dataset than the one used in the original study.
+
+The original manual data extraction steps are retained at the end of this section for methodological transparency.
 
 ### Automated Data Fetching (Recommended)
 
@@ -41,7 +45,7 @@ pdm run python src/fetch_adb_data.py
 # To bypass the interactive prompt and force an overwrite
 pdm run python src/fetch_adb_data.py --force
 ```
-The script produces a rich, tab-separated output file (`data/sources/adb_raw_export_fetched.txt`) with the following columns: `RecNo`, `ARN`, `LastName`, `FirstName`, `Gender`, `Day`, `Month`, `Year`, `Time`, `City`, `CountryState`, `Longitude`, and `Latitude`.
+The script produces a rich, tab-separated output file (`data/sources/adb_raw_export.txt`) with a file-specific `Index` and the stable `idADB`, and includes fully processed timezone information. The columns are: `Index`, `idADB`, `LastName`, `FirstName`, `Gender`, `Day`, `Month`, `Year`, `Time`, `ZoneAbbr`, `ZoneTimeOffset`, `City`, `CountryState`, `Longitude`, `Latitude`, `Rating`, `Bio`, `Categories`, and `Link`.
 
 **A Note on Downstream Compatibility:** This new, detailed format is superior for new research but is **not** directly compatible with the downstream processing scripts in this project (`filter_adb_candidates.py`, etc.), which were designed to parse the original, manually-exported `adb_raw_export.txt`. To use a newly fetched file with the existing pipeline, those scripts would need to be adapted.
 
@@ -57,27 +61,23 @@ The data obtained through this manual process required significant cleaning and 
 
 ## Data Preparation
 
-The raw export of over 10,000 candidates must be validated, filtered, and formatted. This is an automated, four-step process driven by Python scripts.
+The raw export of over 10,000 candidates must be validated, filtered, and formatted. This is an automated, three-step process driven by Python scripts.
 
-### Step 1: Data Validation (Audit)
+### Step 1: Data Validation (`validate_adb_data.py`)
 
-**A Note on Reproducibility and Dynamic Data:** The raw export (`adb_raw_export.txt`) was first audited by `src/validate_adb_data.py`. This script cross-references each entry against Wikipedia to verify the name and confirm a death date. Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. The study's pipeline therefore relies on the static report that resulted from this one-time audit, which is included as `data/reports/adb_validation_report.csv`. This ensures the filtering process is fully reproducible.
+**A Note on Reproducibility and Dynamic Data:** The raw export (`adb_raw_export.txt`) is audited by `src/validate_adb_data.py`. This script cross-references each entry against Wikipedia to verify it is a person with a recorded death date. Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. The study's pipeline therefore relies on the static report that resulted from this one-time audit, which is included as `data/reports/adb_validation_report.csv`. A status of `OK` is assigned only to validated `Person` entries. This static report ensures the subsequent filtering is fully deterministic.
+
+**A Note on Validation Logic:** The script uses a multi-step validation process. A "name mismatch" is flagged if the similarity score between the ADB name and the Wikipedia page title falls below 90% after normalization. A death date is confirmed by searching for multiple positive signals (e.g., a "Died" field in an infobox) while checking for negative signals (e.g., the "Living people" category). The validation also requires a valid English Wikipedia page; this is a methodological control to ensure a consistent and high-quality baseline for the LLM's biographical knowledge, as its training data is predominantly English.
 
 ### Step 2: Filtering and Selection (`filter_adb_candidates.py`)
 
-**A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are stored in the static file `data/foundational_assets/eminence_scores.csv`. The generation of these scores was a one-time process. By treating the scores as a static input, the filtering process remains fully deterministic.
+**A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are stored in the static file `data/foundational_assets/eminence_scores.csv`. By treating the scores as a static input, the filtering process remains fully deterministic.
 
-This step is automated by `src/filter_adb_candidates.py`. It takes the raw data, the validation report, and the eminence scores as input. It filters candidates based on their validation status, a valid birth time, and a birth year between 1900-1999. It then ranks the remaining candidates by eminence score (with ARN as a tie-breaker) and selects the top 5,000. The output is `data/intermediate/adb_filtered_5000.txt`.
+This step is automated by `src/filter_adb_candidates.py`. It takes the raw data, the validation report, and the eminence scores as input. It filters candidates based on a validation status of `OK`, a valid birth time, and a birth year between 1900-1999. It then ranks the remaining candidates by eminence score and selects the top 5,000. The output is `data/intermediate/adb_filtered_5000.txt`, a clean, sorted file ready for final formatting.
 
 ### Step 3: Formatting for Import (`prepare_sf_import.py`)
 
-This step, automated by `src/prepare_sf_import.py`, formats the 5,000 selected subjects for import into the Solar Fire astrology software. It parses the data from `adb_filtered_5000.txt`, extracts geographic and time zone information, and assembles a Comma Quote Delimited (CQD) record for each subject. The output is `data/intermediate/sf_data_import.txt`.
-
-### Step 4: Integration and Cleaning (`create_subject_db.py`)
-
-After the data is processed and exported from Solar Fire as `sf_chart_export.csv`, this crucial integration step is performed by `create_subject_db.py`. The script reads the multi-line chart export, flattens it into one row per subject, and enriches it by cross-referencing other source files (like the eminence scores). Most importantly, it **repairs character encoding issues** that originate from the Solar Fire export process.
-
-The final output is `data/processed/subject_db.csv`, a clean, UTF-8 encoded master file that serves as the primary input for the final database generation script.
+This final automated step, handled by `src/prepare_sf_import.py`, formats the 5,000 selected subjects for import into the Solar Fire astrology software. It reads the clean data from `adb_filtered_5000.txt`, transforms names and dates into the required format, and assembles a Comma Quote Delimited (CQD) record for each subject. The output is `data/intermediate/sf_data_import.txt`.
 
 ## Importing to and Exporting from Solar Fire
 

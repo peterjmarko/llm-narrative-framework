@@ -24,6 +24,7 @@ dependencies = [
     "python-docx", # Added for DOCX post-processing
     "thefuzz[speedup]>=0.22.1",
     "beautifulsoup4>=4.13.4",
+    "certifi>=2025.8.3",
 ]
 
 [project.optional-dependencies]

@@ -40,11 +40,12 @@ REPORT_FILENAME = PROJECT_ROOT / "project_scope_report.md"
 EXCLUDE_DIRS = {
     ".git", ".venv", "venv", "__pycache__", "node_modules", "output",
     "htmlcov", ".pytest_cache", "main_archive", "archive", "images",
-    "llm_personality_matching.egg-info", "dist", "build"
+    "llm_personality_matching.egg-info", "dist", "build",
+    "data/backup", "data/temp", "linter_backups"
 }
 
 # File extensions to exclude.
-EXCLUDE_EXTS = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp", ".lock", ".coverage", ".pdf"}
+EXCLUDE_EXTS = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp", ".lock", ".coverage", ".pdf", ".bak"}
 
 # Proxy for calculating document pages.
 WORDS_PER_PAGE = 250
@@ -77,10 +78,6 @@ def should_exclude(path: pathlib.Path) -> bool:
     """Checks if a file or directory should be excluded from the report."""
     if path.suffix.lower() in EXCLUDE_EXTS:
         return True
-    
-    # Check if any part of the path is an excluded directory name
-    if any(part in EXCLUDE_DIRS for part in path.parts):
-        return True
 
     # Exclude hidden files at the root, except for specific config files
     if path.parent == PROJECT_ROOT and path.name.startswith('.') and path.is_file():
@@ -88,6 +85,32 @@ def should_exclude(path: pathlib.Path) -> bool:
         if path.name not in allowed_hidden_files:
             return True
             
+    return False
+
+def should_exclude_dir(root_path: pathlib.Path, dir_name: str) -> bool:
+    """Checks if a directory should be excluded based on its path."""
+    # Get the full path of the directory
+    full_dir_path = root_path / dir_name
+    
+    # Get the relative path from project root
+    try:
+        rel_path = full_dir_path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        # If path is not relative to project root, don't exclude
+        return False
+    
+    # Check against all exclusion patterns
+    for excluded in EXCLUDE_DIRS:
+        # Check exact match of directory name
+        if dir_name == excluded:
+            return True
+        # Check exact match of relative path
+        if rel_path == excluded:
+            return True
+        # Check if the relative path starts with an excluded path (for nested exclusions)
+        if rel_path.startswith(excluded + '/'):
+            return True
+    
     return False
 
 def generate_table(headers: list, rows: list, totals: list) -> str:
@@ -116,12 +139,23 @@ def main():
     print("1. Scanning project and calculating metrics...")
     
     file_count = 0
+    excluded_dirs_count = 0
+    
     for root, dirs, files in os.walk(PROJECT_ROOT, topdown=True):
-        # Prune the directories in-place to prevent os.walk from descending into them.
-        dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-        
         root_path = pathlib.Path(root)
         
+        # --- Prune Directories In-Place ---
+        # Filter out directories that should be excluded
+        dirs_to_remove = []
+        for d in dirs:
+            if should_exclude_dir(root_path, d):
+                dirs_to_remove.append(d)
+                excluded_dirs_count += 1
+        
+        # Remove excluded directories from the walk
+        for d in dirs_to_remove:
+            dirs.remove(d)
+
         for filename in files:
             path = root_path / filename
             if should_exclude(path):
@@ -145,7 +179,7 @@ def main():
                 size_kb = get_file_size_kb(path)
                 data_files.append((f"`{rel_path}`", size_kb))
 
-    print(f"   ...found and processed {file_count} files.")
+    print(f"   ...found and processed {file_count} files (excluded {excluded_dirs_count} directories).")
 
     print("2. Assembling the report content...")
     # --- Generate Report Content ---
@@ -197,8 +231,7 @@ def main():
     ))
 
     # --- Write Report File ---
-    print(f"4. Writing final report to {REPORT_FILENAME.name}...")
-    # --- Write Report File ---
+    print(f"3. Writing final report to {REPORT_FILENAME.name}...")
     try:
         with open(REPORT_FILENAME, "w", encoding="utf-8") as f:
             f.write("\n".join(report_content))
