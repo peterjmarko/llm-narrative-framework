@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.2.0 (2025-08-09)
+
+### Bump
+
+- **version 4.1.0 → 4.2.0**
+
+### Features
+
+- **replace name-matching with robust idADB pass-through**
+  Replaces the fragile name-matching process with a deterministic Base58 encoding strategy to guarantee data integrity across the manual Solar Fire step.
+  - Adds id_encoder.py utility for Base58 encoding/decoding.
+  - prepare_sf_import.py now encodes the idADB and injects it into the ZoneAbbr field.
+  - create_subject_db.py now decodes the idADB for a perfect 1-to-1 merge, eliminating the need for fuzzy matching.
+  - Hardens create_subject_db.py with strict "perfect or nothing" validation, aborting and creating a diagnostic report on any failure.
+  - Overhauls the Solar Fire instructions in the supplementary material for clarity, accuracy, and ease of use.
 ## 4.1.0 (2025-08-09)
 
 ### Bump
