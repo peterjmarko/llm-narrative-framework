@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.1.0 (2025-08-09)
+
+### Bump
+
+- **version 4.0.0 → 4.1.0**
+
+### Features
+
+- **finalize data preparation pipeline**
+  Updates all data preparation scripts and related documentation to handle the new standardized data format using Index and idADB.
+  - Simplifies create_subject_db.py by removing external lookups.
+  - Updates prepare_sf_import.py, generate_personalities_db.py, and build_llm_queries.py for the new format.
+  - Aligns user-facing messages, backup logic, and error handling across all scripts.
+  - Corrects .gitignore to exclude generated data files and removes them from tracking.
+  - Updates all relevant documentation (DOCUMENTATION.template.md, data/README.md, CONTRIBUTING.md) and diagrams.
 ## 4.0.0 (2025-08-09)
 
 ### Bump
