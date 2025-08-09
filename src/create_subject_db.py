@@ -22,12 +22,15 @@
 """
 Creates a master subject database by flattening and enriching chart data.
 
-This script acts as a crucial data integration and validation step. It reads
-the multi-line chart data from Solar Fire (`sf_chart_export.csv`), flattens
-it into one row per subject, and enriches it by cross-referencing multiple
-source files to add Rank, ARN, and Eminence Score. The final output is a
-clean, sorted `subject_db.csv` file, which serves as the primary input for
-the final database generation script.
+This script acts as a crucial data integration step. It reads the multi-line
+chart data exported from Solar Fire (`sf_chart_export.csv`), flattens it into
+one row per subject, and merges it with the primary subject list from
+`adb_filtered_5000.txt`. It uses the name for matching and adds key identifiers
+(`Index`, `idADB`) and `EminenceScore` from the filtered list. The final output
+is a clean `subject_db.csv` file, which serves as the primary input for the
+final database generation script. The records in the output file are
+guaranteed to be in the same order as in the `adb_filtered_5000.txt` input
+file.
 """
 
 import argparse
@@ -44,6 +47,8 @@ from urllib.parse import unquote
 class BColors:
     """A helper class for terminal colors."""
     YELLOW = '\033[93m'
+    GREEN = '\033[92m'
+    RED = '\033[91m'
     ENDC = '\033[0m'
 
 # --- Setup Logging ---
@@ -148,8 +153,6 @@ def main():
     parser = argparse.ArgumentParser(description="Create a master subject database.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--chart-export", default="data/foundational_assets/sf_chart_export.csv")
     parser.add_argument("--filtered-5000", default="data/intermediate/adb_filtered_5000.txt")
-    parser.add_argument("--eminence-scores", default="data/foundational_assets/eminence_scores.csv")
-    parser.add_argument("--raw-export", default="data/sources/adb_raw_export.txt")
     parser.add_argument("--output-file", default="data/processed/subject_db.csv")
     args = parser.parse_args()
 
@@ -174,19 +177,7 @@ def main():
             logging.error(f"Failed to create backup file: {e}")
             sys.exit(1)
 
-    # --- Load all necessary lookup tables ---
-    logging.info("Loading lookup data...")
-
-    eminence_scores = load_lookup_data(Path(args.eminence_scores), 'ARN', 'EminenceScore')
-    
-    arn_map = {}
-    for line in Path(args.raw_export).read_text(encoding='utf-8').splitlines():
-        parts = line.split('\t')
-        if len(parts) > 1 and parts[0].isdigit():
-            # URL-decode the name field from the raw export first
-            decoded_name = unquote(parts[1])
-            name_no_slug = re.sub(r'\(.*\)', '', decoded_name).strip()
-            arn_map[normalize_name(name_no_slug)] = parts[0]
+    # No external lookups are needed; all required data is in the primary files.
 
     # --- Pre-process the chart export into a searchable map ---
     logging.info(f"Loading and parsing chart data from {args.chart_export}...")
@@ -195,65 +186,59 @@ def main():
     # --- Assemble final list using the filtered list as the source of truth ---
     logging.info(f"Assembling master database from primary list: {args.filtered_5000}")
     all_subjects = []
-    header = ["Rank", "ARN", "Name", "Date", "Time", "ZoneAbbrev", "ZoneTime", "Place", "Country", "Latitude", "Longitude", 
+    header = ["Index", "idADB", "Name", "Date", "Time", "ZoneAbbrev", "ZoneTime", "Place", "Country", "Latitude", "Longitude", 
               "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto", "Ascendant", "Midheaven", "EminenceScore"]
     
+    subjects_not_in_chart_export = 0
     try:
         with open(args.filtered_5000, 'r', encoding='utf-8') as f:
-            filtered_lines = f.readlines()
+            reader = csv.DictReader(f, delimiter='\t')
+            for row in reader:
+                # Construct full name from parts, handling single-name cases like 'Pelé'
+                full_name = " ".join(filter(None, [row['FirstName'], row['LastName']]))
+                norm_name_from_filter = normalize_name(full_name)
+                
+                # Find chart data using a truncated normalized name.
+                norm_name_truncated = norm_name_from_filter[:25]
+                chart_data = chart_data_map.get(norm_name_truncated)
+                
+                if not chart_data:
+                    subjects_not_in_chart_export += 1
+                    logging.warning(f"Index {row['Index']}: '{full_name}' could not be matched in the chart export file. Skipping.")
+                    continue
+
+                subject_data = {
+                    "Index": int(row['Index']),
+                    "idADB": int(row['idADB']),
+                    "EminenceScore": float(row['EminenceScore']),
+                    **chart_data
+                }
+                all_subjects.append(subject_data)
+
     except FileNotFoundError:
         logging.error(f"Filtered list not found: {args.filtered_5000}")
         sys.exit(1)
-
-    subjects_not_in_chart_export = 0
-    for line in filtered_lines:
-        parts = line.strip().split('\t')
-        rank, name_from_filter = parts[0], parts[1]
-        
-        norm_name_from_filter = normalize_name(name_from_filter)
-        
-        # First, try to find the ARN using the normalized name. This should work for most cases.
-        arn = arn_map.get(norm_name_from_filter)
-        if not arn:
-            logging.warning(f"Could not find ARN for '{name_from_filter}'. Skipping.")
-            continue
-
-        # Find chart data using a truncated normalized name.
-        norm_name_truncated = norm_name_from_filter[:25]
-        chart_data = chart_data_map.get(norm_name_truncated)
-        
-        if not chart_data:
-            subjects_not_in_chart_export += 1
-            logging.warning(f"Rank {rank}: '{name_from_filter}' could not be matched in the chart export file. Skipping.")
-            continue
-
-        subject_data = {
-            "Rank": int(rank),
-            "ARN": int(arn),
-            "EminenceScore": float(eminence_scores.get(arn, 0.0)),
-            **chart_data
-        }
-        all_subjects.append(subject_data)
+    except KeyError as e:
+        logging.error(f"Missing expected column {e} in {args.filtered_5000}. Please ensure it is correctly formatted.")
+        sys.exit(1)
 
     if subjects_not_in_chart_export > 0:
         logging.warning(f"A total of {subjects_not_in_chart_export} subjects from the filtered list were missing from the chart export.")
     
-    # --- Write final output (no sorting needed) ---
+    # --- Write final output ---
     logging.info(f"Writing {len(all_subjects)} records to {args.output_file}...")
     try:
-        # Before writing, remove the temporary 'OriginalName' key used for diagnostics
-        for subject in all_subjects:
-            subject.pop('OriginalName', None)
-
-        # Ensure the output directory exists before writing
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(args.output_file, 'w', encoding='utf-8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=header)
             writer.writeheader()
             writer.writerows(all_subjects)
-        logging.info("Master subject database created successfully. ✨\n")
+        
+        print("")
+        print(f"{BColors.GREEN}Master subject database created successfully. ✨{BColors.ENDC}")
+        print("")
     except IOError as e:
-        logging.error(f"Failed to write to output file: {e}")
+        print(f"\n{BColors.RED}Failed to write to output file: {e}{BColors.ENDC}\n")
         sys.exit(1)
 
 if __name__ == "__main__":

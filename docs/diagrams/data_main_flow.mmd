@@ -39,8 +39,7 @@ graph TD
     %% --- Data Flow Connections ---
     Input_PDB & Input_Query & Input_Config --> Script1
     Input_Config --> Art_archive
-    Script1 --> Art_query
-    Script1 --> Art_manifest
+    Script1 --> Art_query & Art_manifest
     Art_query --> Script2
     Script2 --> Art_response
     Art_response & Art_manifest --> Script3

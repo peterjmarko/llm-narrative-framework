@@ -1732,7 +1732,7 @@ def main():
         if output_path.exists():
             print("")
             print(f"{Colors.YELLOW}WARNING: This will re-validate all records and overwrite the report at '{output_path}'.")
-            print(f"This operation can take over an hour to complete.{Colors.RESET}")
+            print(f"This operation can take 45 minutes or more to complete.{Colors.RESET}")
             confirm = input("Are you sure you want to proceed? (Y/N): ").lower()
             if confirm != 'y':
                 print("\nOperation cancelled by user.\n")

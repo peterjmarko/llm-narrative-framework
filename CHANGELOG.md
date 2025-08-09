@@ -17,6 +17,7 @@
   - Updated all relevant documentation (READMEs, articles, framework manual) to reflect the new, robust pipeline and clarify key methodological details.
   
   BREAKING CHANGE: The file formats for `adb_raw_export.txt`, `adb_validation_report.csv`, and `adb_filtered_5000.txt` have changed. They now use `Index` and `idADB` as the primary key columns, and column order has been updated.
+  
 ## 3.18.0 (2025-08-07)
 
 ### Bump
@@ -34,6 +35,7 @@
   -   **Improved Usability:** Adds `--retry-failed` and `--report-only` modes, a detailed real-time progress bar, and a comprehensive, well-formatted summary report.
   -   **Documentation Sync:** All documentation and diagrams (`arch_prep_codebase`, `data_prep_flow`, `flow_prep_pipeline`) have been updated to reflect the new workflow.
   -   **Preserved Legacy Flow:** The original scripts and data file are preserved as `_legacy` versions for historical reference and reproducibility.
+
 ## 3.17.1 (2025-08-06)
 
 ### Bump

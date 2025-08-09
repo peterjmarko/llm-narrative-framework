@@ -20,13 +20,24 @@
 # Filename: src/generate_personalities_db.py
 
 """
-Generates the final personality database from a pre-processed master file.
+Generates the final personality database for the main experiments.
 
-This script is the final step in the data preparation pipeline. It reads the
-clean, flattened `subject_db.csv` and a library of neutralized delineations.
-For each person, it calculates scores for astrological factors, classifies them,
-and assembles a sanitized personality description. The final output is the
-`personalities_db.txt` file used in the main experiments.
+This script is the final step in the data preparation pipeline. It orchestrates
+the assembly of the final `personalities_db.txt` file.
+
+The process involves:
+1.  Loading the master subject list from `data/processed/subject_db.csv`.
+2.  Loading the core classification logic from `point_weights.csv` and
+    `balance_thresholds.csv`.
+3.  Loading the sanitized, non-esoteric description snippets from the
+    `neutralized_delineations/` directory.
+4.  For each subject, it calculates scores for various astrological factors
+    (elements, modes, etc.), classifies them as strong or weak based on
+    configurable thresholds, and looks up the corresponding text snippets.
+5.  It then assembles these snippets into a single, cohesive personality
+    description.
+6.  The final output is a tab-delimited text file with the columns:
+    `Index`, `idADB`, `Name`, `BirthYear`, `DescriptionText`.
 """
 
 import argparse
@@ -164,8 +175,7 @@ def main():
 
         # Create timestamped backup
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_filename = f"{output_path.stem}_backup_{timestamp}{output_path.suffix}"
-        backup_path = backup_dir / backup_filename
+        backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
         
         shutil.copy2(output_path, backup_path)
         print("")
@@ -184,7 +194,7 @@ def main():
     try:
         with open(args.output_file, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.writer(outfile, delimiter='\t')
-            writer.writerow(['Index', 'Name', 'BirthYear', 'DescriptionText'])
+            writer.writerow(['Index', 'idADB', 'Name', 'BirthYear', 'DescriptionText'])
             
             with open(args.subject_db, 'r', encoding='utf-8') as infile:
                 reader = csv.DictReader(infile)
@@ -193,18 +203,17 @@ def main():
                     classifications = calculate_classifications(placements, point_weights, thresholds)
                     desc_parts = [delineations.get(c, "") for c in classifications]
                     full_desc = " ".join(part for part in desc_parts if part).strip()
-                    writer.writerow([row['Rank'], row['Name'], row['Date'].split()[-1], full_desc])
+                    writer.writerow([row['Index'], row['idADB'], row['Name'], row['Date'].split()[-1], full_desc])
         
         print("")
-        print(f"{bcolors.OKGREEN}INFO: Database generation complete. Final file at: {args.output_file} ✨{bcolors.ENDC}")
+        print(f"{bcolors.OKGREEN}Database generation complete. Final file at: {args.output_file} ✨{bcolors.ENDC}")
         print("")
 
+    except KeyError as e:
+        print(f"\n{bcolors.FAIL}ERROR: Missing column {e} in '{args.subject_db}'. Please ensure the file is correctly formatted.{bcolors.ENDC}\n")
+        sys.exit(1)
     except Exception as e:
-        import traceback
-        print("")
-        print(f"{bcolors.FAIL}ERROR: An error occurred during database generation.{bcolors.ENDC}")
-        print(f"{bcolors.FAIL}{e}{bcolors.ENDC}\n")
-        traceback.print_exc()
+        print(f"\n{bcolors.FAIL}ERROR: An unexpected error occurred during database generation: {e}{bcolors.ENDC}\n")
         sys.exit(1)
 
 if __name__ == "__main__":

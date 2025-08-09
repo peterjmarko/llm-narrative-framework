@@ -28,10 +28,12 @@ into the Solar Fire astrology software.
 
 Its primary functions are:
 1.  Reads the structured, tab-delimited data from `adb_filtered_5000.txt`.
-2.  Formats the name from separate 'FirstName' and 'LastName' fields into
-    a single 'FirstName LastName' string.
+2.  Formats the name from 'FirstName' and 'LastName' fields into a single
+    'FirstName LastName' string, correctly handling cases like 'Pelé' where
+    one field may be empty.
 3.  Formats the date into the 'DD Month YYYY' format.
-4.  Pads coordinate strings to ensure they are in the DDvMM format.
+4.  Formats coordinate strings into the required 'DDDvMM' format (e.g.,
+    '122W25', '71W07'), truncating seconds if present.
 5.  Assembles the final 9-field CQD record required by Solar Fire.
 6.  Writes the formatted records to `sf_data_import.txt`.
 """
@@ -127,7 +129,8 @@ def main():
             reader = csv.DictReader(infile, delimiter='\t')
             for row in reader:
                 # 1. Assemble and clean the name
-                full_name = f"{row['FirstName']} {row['LastName']}"
+                # Handles cases where FirstName or LastName might be empty (e.g., 'Pelé')
+                full_name = " ".join(filter(None, [row['FirstName'], row['LastName']]))
                 full_name = full_name.replace('"', '')
 
                 # 2. Format the date

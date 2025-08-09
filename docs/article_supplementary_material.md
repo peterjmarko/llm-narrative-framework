@@ -152,13 +152,13 @@ Once chart options and preferences are adjusted, everything is set for a success
 
 Now we need to open all the charts so they can be exported. In the Chart Database dialog, click the arrow next to the 'File' button and select your charts file. If now shown on the list, select 'Other files...' and pick the file from the File Management dialog and click 'Select'. The total number of charts (5000) in the charts file and number of currently selected charts (1) within the file are shown on top. Do not change the sorting of the chart list.
 
-Click the 'All' button: all charts will be highlighted (selected) and '5000' will be shown in the 'Selected' field on top. Click the 'Open...' button: all 5000 charts will be opened one by one and shown on the list of Calculated Charts (note: this could take 15 minutes or more).
+Click the 'All' button: all charts will be highlighted (selected) and '5000' will be shown in the 'Selected' field on top. Click the 'Open...' button: all 5000 charts will be calculated and opened one by one and shown on the list of Calculated Charts (note: this could take 20 minutes or more).
 
 ### Exporting Astrological Data
 
 *   **Menu access:** *Chart > Export Charts as Text...*
 
-Once all 5000 charts are calculated and added to the list of Calculated Charts, scroll up to the top of the list and select the first chart. Scroll down to the bottom of the list again and Shift-select the last chart. All charts on the list will be highlighted (selected).
+Once all 5000 charts are calculated and added to the list of Calculated Charts, press the Home key to select the first chart. Shift-press the End key to scroll down to select all charts on the list.
 
 Open the 'Export Chart Data' dialog by invoking the 'Chart > Export Charts as Text...' menu item. Check the 'Chart Details' and 'Column Types' boxes, then click the 'Edit ASCII...' button to open the 'ASCII Formet Definitions' dialog. This window is identical to the one encountered during the import process with one important difference: the list of Definitions is specific to the export workflow. Just as for the import, go through the creation of a CQD format and ensure the exact same 9 fields are specified. Name the newly created definition to your preference (e.g., `CQD Export`) and click the 'Save' button to get back to the previous dialog. 
 

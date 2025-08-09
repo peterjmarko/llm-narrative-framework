@@ -37,7 +37,7 @@ Key Workflow:
 It is called by `orchestrate_replication.py`.
 """
 
-# === Start of src/build_queries.py ===
+# === Start of src/build_llm_queries.py ===
 
 import argparse
 import random
@@ -101,16 +101,17 @@ def load_all_personalities_df(filepath):
                  sys.exit(1)
 
         df = pd.read_csv(filepath, sep='\t', encoding='utf-8', dtype={'BirthYear': str}, header=0)
-        required_cols = ['Index', 'Name', 'BirthYear', 'DescriptionText']
+        required_cols = ['Index', 'idADB', 'Name', 'BirthYear', 'DescriptionText']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             logging.error(f"'{filepath}' is missing required header columns: {', '.join(missing_cols)}")
             sys.exit(1)
 
         df['Index'] = pd.to_numeric(df['Index'], errors='coerce')
+        df['idADB'] = pd.to_numeric(df['idADB'], errors='coerce')
         df['BirthYear_Clean'] = df['BirthYear'].astype(str).str.extract(r'(-?\d+)').iloc[:,0]
         df['BirthYear_Numeric'] = pd.to_numeric(df['BirthYear_Clean'], errors='coerce')
-        df.dropna(subset=['Index', 'Name', 'DescriptionText', 'BirthYear_Numeric'], inplace=True)
+        df.dropna(subset=['Index', 'idADB', 'Name', 'DescriptionText', 'BirthYear_Numeric'], inplace=True)
         df['Index'] = df['Index'].astype(int)
         df['BirthYear_Numeric'] = df['BirthYear_Numeric'].astype(int)
         df.rename(columns={'BirthYear_Numeric': 'BirthYearInt'}, inplace=True) # Keep original 'BirthYear' as string from dtype
@@ -348,7 +349,8 @@ def main():
             selected_subset_df = available_personalities_df.sample(n=args.k_per_query, random_state=current_selection_seed)
             current_iter_indices = selected_subset_df['Index'].tolist()
             
-            df_to_write = selected_subset_df[['Index', 'Name', 'BirthYearInt', 'DescriptionText']].copy()
+            # Select all required columns to pass to the worker script, matching the master header.
+            df_to_write = selected_subset_df[['Index', 'idADB', 'Name', 'BirthYearInt', 'DescriptionText']].copy()
             df_to_write.rename(columns={'BirthYearInt': 'BirthYear'}, inplace=True)
             
             with open(temp_subset_qgen_input_path, 'w', encoding='utf-8') as f_temp:

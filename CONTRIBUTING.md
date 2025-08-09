@@ -205,7 +205,7 @@ This approach is the required standard for maintaining test quality and coverage
 
 ### 4. Commit Your Changes
 
-This project uses a standardized workflow to ensure all code is clean, documented, and properly formatted before being committed. Follow these steps in order.
+This project uses a standardized workflow to ensure all code is clean, documented, and properly formatted before being committed. After ensuring all tests pass (see previous section), follow these steps in order.
 
 **Step 1: Lint File Headers**
 Run the header linter. This script will check all Python and PowerShell files for a compliant header/footer and prompt you to fix any issues automatically.

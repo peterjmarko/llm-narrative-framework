@@ -91,7 +91,7 @@ Over time, as the Astro-Databank evolves, the `validate_adb_data.py` script may 
 At this stage, the user manually imports the formatted file into Solar Fire, calculates the astrological charts, and exports two key files: `sf_chart_export.csv` (subject data) and `sf_delineations_library.txt` (raw description text). The delineations library is then manually neutralized using an LLM.
 
 **Stage 4: Final Database Generation (Automated)**
-5.  **Integration (`create_subject_db.py`):** This script integrates multiple data sources. It parses `sf_chart_export.csv`, cross-references it with the original filtered list and eminence scores, and repairs character encoding issues. The output is a clean, UTF-8 encoded master file: `data/processed/subject_db.csv`.
+5.  **Integration (`create_subject_db.py`):** This script merges the chart data from Solar Fire with the primary subject list. It reads `sf_chart_export.csv`, flattens it, and matches it by name against `adb_filtered_5000.txt`. This process enriches the chart data with the final `Index`, `idADB`, and `EminenceScore`, while also repairing character encoding issues. The output is a clean, UTF-8 encoded master file: `data/processed/subject_db.csv`.
 6.  **Generation (`generate_personalities_db.py`):** This final script assembles the experiment database. It loads configuration files (point weights, balance thresholds) and the neutralized description library. It then processes the master `subject_db.csv`, calculates personality classifications for each subject, and constructs the final `personalities_db.txt`.
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
