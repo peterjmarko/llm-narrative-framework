@@ -71,28 +71,15 @@ The pipeline is a sequence of Python scripts followed by manual processing steps
     > -   **English Wikipedia Requirement:** The validation requires a valid English Wikipedia page. This is a key methodological control to ensure a consistent and high-quality baseline for the LLM's biographical knowledge, as major LLMs are trained predominantly on English-language data.
 3.  **Filtering (`filter_adb_candidates.py`):** This script takes the raw data, the validation report, and an eminence score file as input. It filters candidates based on `Status='OK'`, birth year, and birth time, then selects the top 5,000 subjects based on eminence rank.
 
-**Stage 3: Final Formatting and Manual Processing**
-4.  **Formatting (`prepare_sf_import.py`):** This simplified script now performs one role: it converts the clean list of 5,000 subjects into the specific Comma Quote Delimited (CQD) format required for import into the Solar Fire software.
-5.  **Manual Processing (Solar Fire & LLM):** At this stage, the user manually imports the formatted file into Solar Fire, calculates the astrological charts, and exports two key files: `sf_chart_export.csv` (subject data) and `sf_delineations_library.txt` (raw description text). The delineations library is then manually neutralized using an LLM.
+**Stage 3: Bridging the Manual Gap with an Encoding Strategy**
+To ensure perfect data integrity across the manual software step, the pipeline uses a robust encoding/decoding strategy.
 
-#### Data Maintenance Workflow (`analyze_research_patterns.py`)
-Over time, as the Astro-Databank evolves, the `validate_adb_data.py` script may begin to fail on new types of "Research" entries (non-person records). A dedicated diagnostic script, `analyze_research_patterns.py`, is provided to help maintain the list of known research categories.
-
-**Workflow:**
-1.  Run `validate_adb_data.py` on the latest `adb_raw_export.txt`.
-2.  After the validation run is complete, run the analysis script:
-    ```bash
-    pdm run python src/analyze_research_patterns.py
-    ```
-3.  The script will analyze all "No Wikipedia Link Found" errors and identify any recurring, unrecognized category prefixes.
-4.  If it finds potential new prefixes, it will print a formatted snippet that can be copied directly into the `data/config/adb_research_categories.json` file to improve the accuracy of future validation runs.
-
-**Stage 3: Manual Processing (Solar Fire & LLM)**
-At this stage, the user manually imports the formatted file into Solar Fire, calculates the astrological charts, and exports two key files: `sf_chart_export.csv` (subject data) and `sf_delineations_library.txt` (raw description text). The delineations library is then manually neutralized using an LLM.
+4.  **Formatting & Encoding (`prepare_sf_import.py`):** This script prepares the data for Solar Fire. To pass a unique identifier through the software, it converts each subject's `idADB` into a compact, human-friendly `Base58` string (e.g., `102076` becomes `2b4L`). This encoding, notable for avoiding visually ambiguous characters (like `0` vs `O`), is injected into the `ZoneAbbr` field of the import file.
+5.  **Manual Processing (Solar Fire & LLM):** At this stage, the user manually imports the file into Solar Fire. The software uses the data to calculate astrological charts and exports two key files: `sf_chart_export.csv` (subject data with the encoded ID intact) and `sf_delineations_library.txt` (raw description text). The delineations library is then manually neutralized using an LLM.
 
 **Stage 4: Final Database Generation (Automated)**
-5.  **Integration (`create_subject_db.py`):** This script merges the chart data from Solar Fire with the primary subject list. It reads `sf_chart_export.csv`, flattens it, and matches it by name against `adb_filtered_5000.txt`. This process enriches the chart data with the final `Index`, `idADB`, and `EminenceScore`, while also repairing character encoding issues. The output is a clean, UTF-8 encoded master file: `data/processed/subject_db.csv`.
-6.  **Generation (`generate_personalities_db.py`):** This final script assembles the experiment database. It loads configuration files (point weights, balance thresholds) and the neutralized description library. It then processes the master `subject_db.csv`, calculates personality classifications for each subject, and constructs the final `personalities_db.txt`.
+6.  **Integration & Decoding (`create_subject_db.py`):** This script deterministically reverses the process. It reads `sf_chart_export.csv`, extracts the `Base58` string from the `ZoneAbbr` field, and decodes it back to the original `idADB`. This recovered ID allows for a perfect, 1-to-1 merge with the master subject list, eliminating any ambiguity. The output is a clean, UTF-8 encoded master file: `data/processed/subject_db.csv`.
+7.  **Generation (`generate_personalities_db.py`):** This final script assembles the experiment database. It loads configuration files (point weights, balance thresholds) and the neutralized description library. It then processes the master `subject_db.csv`, calculates personality classifications for each subject, and constructs the final `personalities_db.txt`.
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
 

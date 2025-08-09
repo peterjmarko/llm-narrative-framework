@@ -28,14 +28,12 @@ into the Solar Fire astrology software.
 
 Its primary functions are:
 1.  Reads the structured, tab-delimited data from `adb_filtered_5000.txt`.
-2.  Formats the name from 'FirstName' and 'LastName' fields into a single
-    'FirstName LastName' string, correctly handling cases like 'Pelé' where
-    one field may be empty.
-3.  Formats the date into the 'DD Month YYYY' format.
-4.  Formats coordinate strings into the required 'DDDvMM' format (e.g.,
-    '122W25', '71W07'), truncating seconds if present.
-5.  Assembles the final 9-field CQD record required by Solar Fire.
-6.  Writes the formatted records to `sf_data_import.txt`.
+2.  Encodes each subject's unique `idADB` into a compact, human-friendly
+    Base58 string (e.g., 102076 -> "2b4L").
+3.  Injects this encoded ID into the `ZoneAbbr` field of the import record.
+    This is the key step that allows a unique identifier to pass through the
+    manual Solar Fire processing step, ensuring robust data integrity.
+4.  Assembles and writes the final 9-field CQD records to `sf_data_import.txt`.
 """
 
 import argparse
@@ -47,6 +45,9 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
+
+# --- Local Imports ---
+from id_encoder import to_base58
 
 # --- ANSI Color Codes ---
 class BColors:
@@ -142,11 +143,14 @@ def main():
                     continue
 
                 # 3. Assemble the final 9-field CQD record
+                # Encode the idADB for safe transport in the ZoneAbbr field
+                encoded_id = to_base58(int(row['idADB']))
+
                 output_record = [
                     full_name,
                     sf_date_str,
                     row['Time'],
-                    row['ZoneAbbr'],
+                    encoded_id,
                     row['ZoneTimeOffset'],
                     row['City'],
                     row['Country'],

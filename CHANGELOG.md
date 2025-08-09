@@ -15,6 +15,7 @@
   - Aligns user-facing messages, backup logic, and error handling across all scripts.
   - Corrects .gitignore to exclude generated data files and removes them from tracking.
   - Updates all relevant documentation (DOCUMENTATION.template.md, data/README.md, CONTRIBUTING.md) and diagrams.
+  
 ## 4.0.0 (2025-08-09)
 
 ### Bump
@@ -32,7 +33,7 @@
   - Updated all relevant documentation (READMEs, articles, framework manual) to reflect the new, robust pipeline and clarify key methodological details.
   
   BREAKING CHANGE: The file formats for `adb_raw_export.txt`, `adb_validation_report.csv`, and `adb_filtered_5000.txt` have changed. They now use `Index` and `idADB` as the primary key columns, and column order has been updated.
-  
+
 ## 3.18.0 (2025-08-07)
 
 ### Bump

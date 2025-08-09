@@ -77,7 +77,9 @@ This step is automated by `src/filter_adb_candidates.py`. It takes the raw data,
 
 ### Step 3: Formatting for Import (`prepare_sf_import.py`)
 
-This final automated step, handled by `src/prepare_sf_import.py`, formats the 5,000 selected subjects for import into the Solar Fire astrology software. It reads the clean data from `adb_filtered_5000.txt`, transforms names and dates into the required format, and assembles a Comma Quote Delimited (CQD) record for each subject. The output is `data/intermediate/sf_data_import.txt`.
+This final automated step, handled by `src/prepare_sf_import.py`, formats the 5,000 selected subjects for import into the Solar Fire astrology software. To ensure perfect data integrity across the manual software step, the script uses a robust encoding strategy.
+
+It encodes each subject's unique `idADB` into a compact, human-friendly `Base58` string (e.g., `102076` becomes `2b4L`). This encoding, notable for avoiding visually ambiguous characters like `0` vs `O`, is injected into the `ZoneAbbr` field of the import record. This allows the unique identifier to be passed through the manual step without ambiguity or data loss. The final output is `data/intermediate/sf_data_import.txt`.
 
 ## Importing to and Exporting from Solar Fire
 
@@ -89,209 +91,154 @@ Once the data is prepared, we can start making the Solar Fire astrology software
 *   Its delineations library is fully exportable.
 *   It is relatively inexpensive ($360 USD currently).
 
-### Recommended Settings
+### One-Time Software Setup
 
-Prior to importing the birth data, we need to prepare the grounds within Solar Fire so that the data can be processed accurately. There are two separate screens to deal with: Chart Options and Preferences.
+The following configuration steps only need to be performed once. After the initial setup, you can proceed directly to the **Import/Export Workflow**.
 
-#### Chart Options
+#### 1. Configure Chart Points
 
-*   **Menu access:** *Chart Options > Displayed Points...*
+You must define which astrological points are included in the calculations.
 
-Define chart points:
+*   **Menu:** `Chart Options > Displayed Points...`
+*   **Action:**
+    1.  Create a new `.pts` file (e.g., `10_planets_2_angles.pts`).
+    2.  Edit this file to include exactly these 12 points: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, and Midheaven.
+    3.  Save the file and ensure it is selected as the active set.
 
-*   **Displayed Points:** 
+#### 2. Configure Preferences
 
-    *   Create a new *.pts file and save it with your preferred filename (e.g., `10_planets_2_angles.pts`).
-    *   Edit this file to have the following chart points: 10 Planets from Moon to Pluto, plus Ascendant and Midheaven (12 points).
-    *   Save and Select. The Current Settings table on top will display your filename with '(12 Points)' appended for 'Displayed Points'.
+Ensure the core calculation settings match the study's methodology.
 
-#### Preferences
+*   **Menu:** `Preferences > Edit Settings...`
+*   **Action:** Verify the following default settings are active:
+    *   **'Places' tab -> Atlas:** `ACS (Built-in)`
+    *   **'Calculations' tab -> MC in Polar Regions:** `Always above horizon`
+    *   **'Zodiac' tab -> Default Zodiac:** `Tropical`
+    *   **'AutoRun' tab -> Astrologer's Assistant:** Ensure this is cleared and no tasks run on startup.
 
-*Menu access: Preferences > Edit Settings...*
+#### 3. Define Data Formats
 
-Make sure these settings are in place:
+You must define the data structure for both importing and exporting. Solar Fire maintains **separate** format lists for each, so this process must be done twice.
 
-*   **Atlas ('Places' tab):** 'ACS (Built-in)' (default).
-*   **Astrologer's Assistant ('AutoRun' tab):** Click the 'Clear' button to remove the auto-running of any tasks. The 'Astrologer's Assistant task file to run on startup' field will be empty.
-*   **MC in Polar Regions ('Calculations' tab):** 'Always above horizon' (default).
-*   **Default Zodiac ('Zodiac' tab):** 'Tropical' (default).
+**a. Define Import Format**
+*   **Menu:** `Utilities > Chart Import/Export...`
+*   **Action:**
+    1.  Go to the **'Options' tab** and click **'Edit ASCII Formats...'**.
+    2.  Create a **new format definition**.
+    3.  Set **'Record Format'** to `Comma Quote Delimited`.
+    4.  Configure **'Fields in each record'** to contain exactly these 9 fields in this specific order: Name/Description, Date (String), Time (String), Zone Abbreviation, Zone Time (String), Place Name, Country/State Name, Latitude (String), Longitude (String).
+    5.  Save the format as `CQD Import`.
 
-### Importing Birth Data
+**b. Define Export Format**
+*   **Menu:** `Chart > Export Charts as Text...`
+*   **Action:**
+    1.  Click the **'Edit ASCII...'** button to open the format definitions dialog.
+    2.  **This list is separate from the import list.** You must create another **new format definition**.
+    3.  Repeat the exact same configuration as the import format, set it to `Comma Quote Delimited`, and add the same 9 fields in the same order.
+    4.  Save the format as `CQD Export`. This ensures both workflows use an identical data structure.
 
-*   **Menu access:** *Utilities > Chart Import/Export...*
+### Import/Export Workflow
 
-Once chart options and preferences are adjusted, everything is set for a successful operation. Import the birth data as follows:
+After completing the one-time setup, follow this workflow to process the data.
 
-*   **'Import From' tab**: Select 'ASCII files' for 'Chart Type to Import From'. Navigate to and select your previously saved TXT file (e.g., `sf_data_import.txt`).
-*   **'Save To' tab:**: Select 'Solar Charts' for 'Chart Type to Save Into'. Navigate to and select the folder Documents > Solar Fire > Charts. Type a filename for 'File Name to Save Into' (e.g., `famous_5000.cht`).
-*   **'Options' tab:** 
+#### Pre-flight Check: Clearing Existing Chart Data (For Re-runs)
+If you are re-running the import process, you must first clear the existing charts from your Solar Fire charts file to avoid duplicates.
 
-    *   **New Solar fire Chart Files:** Select the 'Create current format chart files (v6 or higher)' default.
-    *   **Default House System:** Select the 'Placidus' default (this setting is not used).
-    *   **Default Zodiac:** Select the 'Tropical' default.
-    *   **Default Coordinates:** Select the 'Geocentric' default.
-    *   **ASCII Format to Use:** Click the 'Edit ASCII Formats...' button to open the 'ASCII Formet Definitions' dialog. Click the 'Create New Definition' button and change the name of the newly created definition to your preference (e.g., `CQD Import`). For 'Fields in each record', use the 'Up', 'Dn, '>', and '<' buttons and items under 'Available fields' to make sure the following 9 fields are showing:
+*   **Menu:** `Chart > Open...`
+*   **Action:**
+    1.  In the 'Chart Database' dialog, select your charts file (e.g., `famous_5000.cht`).
+    2.  Click the **'All'** button to highlight every chart in the file.
+    3.  Click the **'Delete...'** button, then select **'Selected Charts...'**.
+    4.  A dialog will ask: "Do you wish to confirm the deletion of each chart individually?". Click **'No'** to delete all charts at once.
+    5.  Click **'Cancel'** to close the 'Chart Database' dialog. The file is now empty and ready for a fresh import.
 
-        *   Name/Description
-        *   Date (String)
-        *   Time (String)
-        *   Zone Abbreviation
-        *   Zone Time (String)
-        *   Place Name
-        *   Country/State Name
-        *   Latitude (String)
-        *   Longitude (String)
+#### Step 1: Import Birth Data
 
-        Select 'Comma Quote Delimited' for 'Record Format' and leave the defaults under Conversion Options and Flags' (boxes unchecked and 'W', 'N', and 'PM' for the flags). Click the 'Save' button to get back to the previous dialog. Make sure your new CQD format is selected for 'ASCII Format to Use'.
+*   **Menu:** `Utilities > Chart Import/Export...`
+*   **Action:**
+    1.  If a "Confirm" dialog appears immediately, click **'OK'**.
+    2.  On the **'Import From' tab**, select `ASCII files` and choose `data/intermediate/sf_data_import.txt`.
+    3.  On the **'Save To' tab**, ensure your `famous_5000.cht` file is selected.
+    4.  On the **'Options' tab**, select your `CQD Import` format.
+    5.  Click the **'Convert'** button.
+    6.  Once the import completes, click the **'Quit'** button to close the dialog.
 
-        Click the 'Convert' button once everything above is done. Solar Fire will import your data file into the specified charts file (e.g., `famous_5000.cht`).
+#### Step 2: Calculate All Charts
 
-### Opening Charts
+*   **Menu:** `Chart > Open...`
+*   **Action:**
+    1.  Select the charts file you just created (e.g., `famous_5000.cht`).
+    2.  Click the **'All'** button to select all 5,000 charts in the file.
+    3.  Click the **'Open...'** button. This will calculate all charts and add them to the "Calculated Charts" list. This step may take 15-20 minutes.
 
-*   **Menu access:** *Chart > Open...*
+> **A Note on Character Encoding:** In the "Calculated Charts" list, you may notice that some names with international characters appear corrupted (e.g., `CarnÃ©` instead of `Carné`). This is an expected display issue within Solar Fire. **Do not attempt to fix these names manually.** The automated scripts are designed to detect and repair these encoding errors in the next stage, ensuring the final database is clean.
 
-Now we need to open all the charts so they can be exported. In the Chart Database dialog, click the arrow next to the 'File' button and select your charts file. If now shown on the list, select 'Other files...' and pick the file from the File Management dialog and click 'Select'. The total number of charts (5000) in the charts file and number of currently selected charts (1) within the file are shown on top. Do not change the sorting of the chart list.
+#### Step 3: Export Chart Data
 
-Click the 'All' button: all charts will be highlighted (selected) and '5000' will be shown in the 'Selected' field on top. Click the 'Open...' button: all 5000 charts will be calculated and opened one by one and shown on the list of Calculated Charts (note: this could take 20 minutes or more).
-
-### Exporting Astrological Data
-
-*   **Menu access:** *Chart > Export Charts as Text...*
-
-Once all 5000 charts are calculated and added to the list of Calculated Charts, press the Home key to select the first chart. Shift-press the End key to scroll down to select all charts on the list.
-
-Open the 'Export Chart Data' dialog by invoking the 'Chart > Export Charts as Text...' menu item. Check the 'Chart Details' and 'Column Types' boxes, then click the 'Edit ASCII...' button to open the 'ASCII Formet Definitions' dialog. This window is identical to the one encountered during the import process with one important difference: the list of Definitions is specific to the export workflow. Just as for the import, go through the creation of a CQD format and ensure the exact same 9 fields are specified. Name the newly created definition to your preference (e.g., `CQD Export`) and click the 'Save' button to get back to the previous dialog. 
-
-Select 'Chart Points' (first item) under 'Select types of points:-' if not already selected. Make sure your new CQD format is selected under the 'Edit ASCII...' button. Select 'Comma Quote (CQD)' for 'Field Delimiters' and 'Export to File' for 'Destination'. Click the 'Browse' button, navigate to the `data/foundational_assets` folder, name the export file `sf_chart_export.csv`, and click the 'Save' button to get back to the main dialog. Click the 'Export' button to export the chart data to the file. Wait until the program exports all files, then dismiss the 'Export completed successfully' message and click the 'Quit' button in the main dialog.
+*   **Menu:** `Chart > Export Charts as Text...`
+*   **Action:**
+    1.  In the "Calculated Charts" window, select all 5,000 calculated charts.
+    2.  In the "Export Chart Data" dialog, check the **'Chart Details'** and **'Column Types'** boxes.
+    3.  Under 'Select types of points', ensure **'Chart Points'** is selected.
+    4.  For the ASCII format, select your custom `CQD Export` format.
+    5.  Set 'Field Delimiters' to `Comma Quote (CQD)` and 'Destination' to `Export to File`.
+    6.  Browse to the `data/foundational_assets/` directory and set the filename to `sf_chart_export.csv`.
+    7.  **Warning:** Solar Fire will overwrite this file without confirmation. Click **'Export'**.
+    8.  Once the export completes successfully, click the **'Quit'** button to close the dialog.
 
 The format of the exported file is as follows:
 
 ```
-"<First_name Last_name>","<D MMMM YYYY>","<H:MM>","<Zone_Abbreviation>","<±H:MM>","<Place>","<State>","<DDvMM>","<DDDhMM>"
+"<First_name Last_name>","<D MMMM YYYY>","<H:MM>","<Encoded_idADB>","<±H:MM>","<Place>","<State>","<DDvMM>","<DDDhMM>"
 "Body Name","Body Abbr","Longitude"
-"Moon","Mon",<Moon_Longitude>
-"Sun","Sun",<Sun_Longitude>
-"Mercury","Mer",<Mercury_Longitude>
-"Venus","Ven",<Venus_Longitude>
-"Mars","Mar",<Mars_Longitude>
-"Jupiter","Jup",<Jupiter_Longitude>
-"Saturn","Sat",<Saturn_Longitude>
-"Uranus","Ura",<Uranus_Longitude>
-"Neptune","Nep",<Neptune_Longitude>
-"Pluto","Plu",<Pluto_Longitude>
-"Ascendant","Asc",<Ascendant_Longitude>
-"Midheaven","MC",<Midheaven_Longitude>
-<14_lines_above_repeating_for_each_person>
+...
 ```
 
 Each 14-line block contains the following for one person:
 
-*   **Line 1:** Name, date of birth, time of birth, time zone abbreviation, time zone UTC offset, place, state, latitude with vertical (N/S) direction, longitude with horizontal (E/W) direction.
+*   **Line 1:** Name, date of birth, time of birth, the **Base58-encoded `idADB`** in the time zone field, time zone UTC offset, place, state, latitude with vertical (N/S) direction, longitude with horizontal (E/W) direction.
 *   **Line 2:** Header for the remaining lines.
 *   **Lines 3-14:** Chart point's name, point's abbreviation, point's zodiacal longitude (0.00-359.99 degrees)
 
-The entire file consists of 5000 * 14 = 7000 lines.
-
-### Exporting the Delineations Library
-
-*   **Menu access:** *Interps > Interpretation Files > Natal*
-
-Note: In Solar Fire, the cookbook-style delineation components are called "decompiled interpretations". Since the term 'interpretation' is typically considered a broader term that includes the synthesis of individual delineation components (such as the ones in this library) to arrive at a holistic view, we prefer the term "delineation" for the components we are dealing with here.
-
-In addition to astrological data for the database of 5000 famous people, we also need to export the delineations library so that these two pieces can be connected to form a complete personality description for every individual. To export the standard natal delineations library from Solar Fire, follow these steps:
-
-*   Open the File Management dialog for interpretations files by selecting the Interps > Interpretation Files > Natal menu item.
-*   Select 'Standard.int' on the list of natal interpretation files.
-*   Click the 'Edit' button.
-*   In the 'Interpretations Editor' dialog, select the File > Decompile... menu item, then click the 'Save' button. The file will be saved as `standard.def` in Documents > Solar Fire User Files > Interpretations.
-*   Close the 'Interpretations Editor' window to return to the main dialog.
-*   Click the 'Cancel' button to close the File Management dialog.
-*   Navigate to the definition file in File Explorer open it in a text editor.
-*   Save the file as a TXT file in the `data/foundational_assets` folder as `sf_delineations_library.txt`.
-
-The full library contains a header block followed by delineation components by category. The categories are listed at the start of the header block:
-
-```
-;
-; Decompiled Interpretations
-; <directory_path>\standard.int
-; Time: <YYYY-MM-DD HH:MM:SS>
-; SUMMARY OF ITEMS INCLUDED
-
-; Title Interpretations - Included below
-; Copyright Interpretations - Included below
-; Introduction Interpretations - Included below
-; Degree Interpretations - Included below
-; Decanate Interpretations - NOT INCLUDED IN THIS SET
-; Quadrant Interpretations - Included below
-; Hemisphere Interpretations - Included below
-; Element Interpretations - Included below
-; Mode Interpretations - Included below
-; Ray Interpretations - Included below
-; Aspect Interpretations - Included below
-; Lunar Phase Interpretations - Included below
-; House Interpretations - Included below
-; Sign Interpretations - Included below
-; Point Interpretations - Included below
-; Point in House Interpretations - Included below
-; Point in Sign Interpretations - Included below
-; Sign on House Cusp Interpretations - Included below
-; Point in Aspect to Point Interpretations - Included below
-; Midpoint Interpretations - NOT INCLUDED IN THIS SET
-; Point on Midpoint Interpretations - NOT INCLUDED IN THIS SET
-; Midpoint on Point Interpretations - NOT INCLUDED IN THIS SET
-
-*Title
-Standard Natal Interpretations
-
-```
-
-This is followed by a copyright block and an introductory block, after which the various delination blocks follow in the order above. For our purposes, only the following categories hold interest:
-
-*   **Sign Interpretations:** An example of a 'strong' sign is given below.
-    ```
-    *Aries Strong
-    Initiating, pioneering energy. Independent, bold, courageous, assertive, fiery, inspirational, direct, decisive. Can be egotistical, impulsive, impatient, aggressive, lacking subtlety.
-    ```
-*   **Element Interpretations:** An example of a 'weak' and 'strong' element is given below.
-    ```
-    *Element Fire Weak
-    You have difficulty getting yourself motivated to achieve your own goals. In fact at times you may lack the self-confidence to even set personal goals. You may experience a general lack of enthusiasm, feeling overwhelmed by change.
-
-    *Element Fire Strong
-    You are a highly-motivated person with many goals and aspirations for the future. You are vital and spontaneous, often enjoying the challenge of travelling down new and adventurous roads in your life. Your enthusiasm is irrepressible. Your weakness lies in your tendency to exaggerate and your inability to cope with the more mundane activities in life.
-    ```
-*   **Mode Interpretations:** An example of a 'weak' and 'strong' mode (quality) is given below.
-    ```
-    *Mode Cardinal Weak
-    You prefer to follow in other people's footsteps rather than initiate actions. You can be relied on to come up with the goods as long as someone else has the initial ideas. Your survival mechanisms are weak.
-
-    *Mode Cardinal Strong
-    You enjoy challenge and action, and become frustrated when you have no recourse for change. You expect others to also rise to a challenge.
-    ```
-*   **Quadrant Interpretations:** An example of a 'strong' quadrant is given below.
-    ```
-    *Quadrant 1 Strong
-    You see yourself as an independent individual, capable of organising your own life. You could be self-centred. The planets in this quadrant will highlight the areas of life in which you want to express yourself.
-    ```
-*   **Hemisphere Interpretations:** An example of a 'strong' hemisphere is given below.
-    ```
-    *Hemisphere Eastern Strong
-    You are a self-motivated and self-oriented individual. You like to map out your own life and follow your own path, experiencing difficulties only if anyone stands in your way. You value your independence and enjoy your own company. You enjoy the company of other people, but only if they give you plenty of freedom for your own pursuits. You need to watch out for egocentric and selfish behaviour.
-    ```
-*   **Point in Sign Interpretations:** An example of a 'chart point in sign' is given below.
-    ```
-    *Moon in Aries
-    You have an emotional need for action and independence. Under stress you will seek a challenge and time on your own, away from other people. You may have experienced your mother as independent and possibly impatient. As an adult you are a go-getter.
-    ```
-
-Note: Solar Fire uses the term "mode" for what is typically referred to as the "quality" of signs (i.e., cardinal, fixed, or mutable signs).
+The entire file consists of 5000 * 14 = 70,000 lines.
 
 ## Creating the Personalities Database
 
-The final stage of the pipeline assembles the `personalities_db.txt` file. The process involves three conceptual tasks, all of which are automated by the `generate_personalities_db.py` script using the clean `data/processed/subject_db.csv` as its main input.
+The final stage of the pipeline assembles the `personalities_db.txt` file. This process requires several foundational assets: the chart data from the previous step, configuration files for the classification algorithm, and a library of sanitized text descriptions. This section details how to acquire and use these assets.
 
-The following subsections describe the methodology that the script automates.
+### Step 1: Exporting and Neutralizing the Delineations Library
+
+The personality descriptions are assembled from a library of pre-written text components. This library is first exported from Solar Fire and then "neutralized" using an LLM to remove all esoteric jargon. This is a one-time setup task.
+
+#### a. Exporting from Solar Fire
+
+*   **Menu:** `Interps > Interpretation Files > Natal`
+*   **Action:**
+    1.  In the File Management dialog, select `Standard.int` and click **'Edit'**.
+    2.  In the 'Interpretations Editor', go to `File > Decompile...` and save the file. This creates `standard.def` in the `Documents/Solar Fire User Files/Interpretations` directory.
+    3.  Open this `.def` file in a text editor and save it as `data/foundational_assets/sf_delineations_library.txt`.
+
+The exported library contains text blocks for different astrological concepts, such as `*Aries Strong` or `*Element Fire Weak`.
+
+#### b. Neutralizing with an LLM
+
+Use an LLM to remove all astrological, gender, and chronological references from `sf_delineations_library.txt`. For example, one could use the following prompt:
+
+> "Revise the attached text but leave any line that starts with an asterisk (*) completely intact. For all other lines: remove references to astrology and astronomy; shift from second-person language to an impersonal, objective, neutral style without referring to specific people or time periods; and correct for grammar and spelling (US English). Preserve the original meaning as much as possible."
+
+Save the LLM's output into the six CSV files located in the `data/foundational_assets/neutralized_delineations/` directory (e.g., `balances_signs.csv`, `points_in_signs.csv`, etc.).
+
+### Step 2: Automated Database Generation
+
+Once all foundational assets are in place, the rest of the process is fully automated by two scripts.
+
+#### a. Integrating Chart Data (`create_subject_db.py`)
+First, the `create_subject_db.py` script bridges the manual software step. It reads the `sf_chart_export.csv` file, extracts the `Base58`-encoded string from the `ZoneAbbr` field, and decodes it back to the original `idADB`. This allows for a perfect 1-to-1 merge with the filtered subject list, producing the clean `data/processed/subject_db.csv` file.
+
+#### b. Assembling the Final Database (`generate_personalities_db.py`)
+The `generate_personalities_db.py` script performs the final assembly. It loads the clean `subject_db.csv`, the `point_weights.csv` and `balance_thresholds.csv` configuration files, and the neutralized delineation library. For each person, it calculates their divisional classifications and assembles the final description by looking up the corresponding text components.
+
+The following subsections describe the classification methodology that the script automates.
 
 ### Creating Divisional Classifications
 
