@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.0.0 (2025-08-09)
+
+### Bump
+
+- **version 3.18.0 → 4.0.0**
+
+### Features
+
+- **Overhaul and stabilize the data preparation pipeline**
+  - Standardized on stable identifiers (Index, idADB) across all data preparation scripts, fixing the critical eminence score sorting bug.
+  - Fixed multiple critical bugs in `validate_adb_data.py` including crashes (NameError, UnboundLocalError), incorrect URL construction for Research entries, and SSL/timeout errors.
+  - Improved diagnostics and UX with colored logging, a cyan progress bar, and Index-prefixed messages for better readability during long validation runs.
+  - Enhanced the validation summary report with a detailed breakdown of failure types and improved column alignment.
+  - Refactored the `analyze_research_patterns.py` diagnostic script for accuracy and clarity.
+  - Updated all relevant documentation (READMEs, articles, framework manual) to reflect the new, robust pipeline and clarify key methodological details.
+  
+  BREAKING CHANGE: The file formats for `adb_raw_export.txt`, `adb_validation_report.csv`, and `adb_filtered_5000.txt` have changed. They now use `Index` and `idADB` as the primary key columns, and column order has been updated.
 ## 3.18.0 (2025-08-07)
 
 ### Bump
