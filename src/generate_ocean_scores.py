@@ -868,3 +868,5 @@ def generate_missing_scores_report(
 
 if __name__ == "__main__":
     main()
+
+# === End of src/generate_ocean_scores.py ===

@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.4.0 (2025-08-10)
+
+### Bump
+
+- **version 4.3.0 → 4.4.0**
+
+### Features
+
+- **OCEAN scoring and dynamic cutoff to data pipeline**
+  Finalizes the data preparation pipeline by introducing a robust, data-driven method for determining the final subject pool size.
+  
+  - Introduces the `generate_ocean_scores.py` script, which uses a sophisticated "M of N" variance-based cutoff rule to automatically stop when personality diversity declines.
+  - The script is fully resumable, archives discarded data, includes a smart pre-flight check, and generates comprehensive summary and audit reports.
+  - Updates `filter_adb_candidates.py` to use the output of the OCEAN script as the definitive source for the final subject set, removing the previous hardcoded limit.
+  - All corresponding documentation, including the Framework Manual, supplementary materials, and all diagrams, has been updated to reflect the new, completed pipeline.
+  This completes the development of the data preparation work stream.
 ## 4.3.0 (2025-08-10)
 
 ### Bump
