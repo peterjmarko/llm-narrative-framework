@@ -6,6 +6,7 @@ graph TD
         D["src/prepare_sf_import.py"]
         E["src/create_subject_db.py"]
         F["src/generate_personalities_db.py"]
+        U["src/id_encoder.py"]
     end
 
     A --> B
@@ -13,6 +14,9 @@ graph TD
     C --> D
     D --> E
     E --> F
+    
+    U -.-> D
+    U -.-> E
 
     style A fill:#d4edda,stroke:#155724
     style B fill:#d4edda,stroke:#155724
@@ -20,4 +24,5 @@ graph TD
     style D fill:#d4edda,stroke:#155724
     style E fill:#d4edda,stroke:#155724
     style F fill:#d4edda,stroke:#155724
+    style U fill:#e9ecef,stroke:#adb5bd
     

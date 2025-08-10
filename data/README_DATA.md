@@ -61,7 +61,7 @@ These files are generated during the data validation and filtering stages.
 
 These files are static, pre-prepared assets that provide the rules and content for generating the final personality descriptions.
 
--   **`eminence_scores.csv`**: Contains the pre-computed eminence score for each candidate, used to rank and select the final 5,000 subjects. The key for this file is `idADB`.
+-   **`eminence_scores.csv`**: Contains the LLM-generated eminence score for every subject in the raw export. It is created by `generate_eminence_scores.py` and is used by `filter_adb_candidates.py` to rank and select the final 5,000 subjects. The file is sorted by `EminenceScore` and contains the headers: `Index`, `idADB`, `Name`, `EminenceScore`.
 -   **`country_codes.csv`**: A mapping file to resolve country/state abbreviations.
 -   **`sf_delineations_library.txt`**: The raw, complete library of interpretive text as exported from Solar Fire.
 -   **`neutralized_delineations/`**: A directory containing the sanitized, de-jargonized description components, ready for assembly.

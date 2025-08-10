@@ -15,6 +15,7 @@
   - create_subject_db.py now decodes the idADB for a perfect 1-to-1 merge, eliminating the need for fuzzy matching.
   - Hardens create_subject_db.py with strict "perfect or nothing" validation, aborting and creating a diagnostic report on any failure.
   - Overhauls the Solar Fire instructions in the supplementary material for clarity, accuracy, and ease of use.
+  
 ## 4.1.0 (2025-08-09)
 
 ### Bump
@@ -30,7 +31,7 @@
   - Aligns user-facing messages, backup logic, and error handling across all scripts.
   - Corrects .gitignore to exclude generated data files and removes them from tracking.
   - Updates all relevant documentation (DOCUMENTATION.template.md, data/README.md, CONTRIBUTING.md) and diagrams.
-  
+
 ## 4.0.0 (2025-08-09)
 
 ### Bump

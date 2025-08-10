@@ -1,0 +1,38 @@
+==================================================
+             Eminence Scores Summary              
+==================================================
+Total Scored:     10,583
+Total in Source:  10,583
+
+--- Descriptive Statistics ---
+  Mean:             50.72
+  Std Dev:          17.64
+  Min:               0.00
+  25% (Q1):         40.00
+  50% (Median):     50.00
+  75% (Q3):         60.00
+  Max:              98.00
+
+--- Score Distribution ---
+  0-20      :   415 (  3.92%)
+  20-40     : 1,290 ( 12.19%)
+  40-60     : 5,561 ( 52.55%)
+  60-70     : 1,623 ( 15.34%)
+  70-80     : 1,007 (  9.52%)
+  80-90     :   565 (  5.34%)
+  90-95     :   104 (  0.98%)
+  95-100    :    18 (  0.17%)
+
+--- Top 10 Most Eminent ---
+  98.00 - Martin Luther King
+  98.00 - Pope Francis"
+  97.00 - Bill Gates
+  96.00 - Enrico Fermi
+  96.00 - Jonas Salk
+  96.00 - Pope John Paul II
+  96.00 - Queen of the United Kingdom Elizabeth II
+  96.00 - Werner Heisenberg
+  95.00 - Anne Frank
+  95.00 - François Mitterrand
+==================================================
+[92mSUCCESS - Completion: 10583/10583 (100.00%)[0m

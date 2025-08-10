@@ -2,14 +2,14 @@
 
 This document outlines planned development tasks and tracks known issues for the project. The framework is designed to support two key research activities: the **direct replication** of the original study's findings by using the static data files included in the repository, and the **conceptual replication** of the methodology by generating new data from live sources. All development tasks are categorized by work stream below.
 
-## Tasks Prior to Release
+## Tasks Prior to Publication
 
 ### Code Development
 
-- [ ] **Automate Foundational Assets**
-  - [ ] Develop `generate_eminence_scores.py` script to create the eminence file via LLM.
-    - [ ] The script must read `adb_raw_export.txt` as its source.
-    - [ ] The output file (`eminence_scores.csv`) must contain the headers: `idADB`, `Name`, `EminenceScore`.
+- [x] **Automate Foundational Assets**
+  - [x] Develop `generate_eminence_scores.py` script to create the eminence file via LLM.
+    - [x] The script must read `adb_raw_export.txt` as its source.
+    - [x] The output file (`eminence_scores.csv`) now contains the headers: `Index`, `idADB`, `Name`, `EminenceScore`.
   - [ ] Update `filter_adb_candidates.py` to use the new `eminence_scores.csv`.
     - [ ] This will replace the temporary name-based matching with the permanent, robust `idADB`-based lookup.
     - [ ] The script should include a secondary name-matching check to ensure data integrity between the source files.
@@ -19,6 +19,9 @@ This document outlines planned development tasks and tracks known issues for the
     - [ ] The total number of entries at this cutoff point will be rounded down to the nearest 100 and will be used for filtering the ADB database.
 - [ ] **Automate Delineation Neutralization**
   - [ ] Create `src/neutralize_delineations.py` to process the raw library via LLM.
+- [ ] **Update and Restore Test Coverage**
+  - [ ] Update all PowerShell and Python tests to reflect the current codebase.
+  - [ ] Ensure the test suite is robust and provides thorough coverage.
 
 ### Resolution of Known Issues
 
@@ -27,7 +30,6 @@ This document outlines planned development tasks and tracks known issues for the
     -   The `process_study.ps1` workflow does not currently generate a dedicated log file.
     -   Log files from migration scripts contain unnecessary PowerShell transcript headers and footers.
 -   **Redundant API Calls**: Forcing a migration on an already `VALIDATED` experiment unnecessarily re-runs all LLM API calls.
--   **Outdated Test Suite**: The test suite for the PowerShell wrapper scripts is out of date and does not reflect the current command-line arguments or script behaviors.
 
 ### Documentation
 
@@ -68,7 +70,7 @@ This document outlines planned development tasks and tracks known issues for the
     - [ ] If needed, submit to Behavior Research Methods
     - [ ] If needed, submit to PLOS One
 
-## Tasks After Release
+## Future Work: Potential Enhancements After Publication
 
 ### Code Development
 
@@ -78,6 +80,11 @@ This document outlines planned development tasks and tracks known issues for the
   - [ ] Update `audit`, `repair`, and `migrate` workflows to use the manifest as the ground truth.
 - [ ] **Automate Study Generation (`new_study.ps1`)**
   - [ ] Develop the `new_study.ps1` workflow to orchestrate multiple `new_experiment.ps1` calls based on a factor matrix, creating entire studies automatically.
-- [ ] **Update and Restore Test Coverage**
-  - [ ] Update all PowerShell and Python tests to reflect the current codebase.
-  - [ ] Ensure the test suite is robust and provides thorough coverage.
+- [ ] **Concurrent LLM Averaging for Eminence Scores**
+  - [ ] Use a "wisdom of the crowd" approach by querying 4 different LLMs for the same batch and averaging their scores to get a more stable, less biased result.
+- [ ] **Pre-Run Estimate of Cost and Time**
+  - [ ] Before processing the first batch, the script would calculate and display:
+    - [ ] The total number of new subjects to be processed.
+    - [ ] The total number of API calls (batches) that will be made.
+    - [ ] An estimated total cost for the entire run, based on the chosen model's pricing.
+    - [ ] A very rough estimated time to completion.

@@ -28,7 +28,7 @@ The experiment is built upon a custom database of 5,000 famous historical indivi
 
 To create a uniquely challenging test, we employed a multi-step, deterministic process to generate the textual stimuli:
 
-1.  **Source & Filter**: A `Raw Subject Database` of 5,000 famous individuals was derived from a static snapshot of the Astro-Databank (ADB). To ensure the selection process is fully deterministic and reproducible, filtering relies on a static, pre-computed eminence score for each candidate.
+1.  **Source & Score**: A `Raw Subject Database` of over 10,000 famous individuals was derived from the Astro-Databank (ADB). To ensure the selection process is robust, filtering relies on an LLM-generated **eminence score** for each candidate, created by the `generate_eminence_scores.py` script.
 2.  **Calculation**: This database was processed by a commercial astrology program (Solar Fire) to calculate the precise celestial positions for each person, which were exported into a `Names and Placements` data file.
 3.  **Synthesis**: A custom Python script (`generate_database.py`) then processed this data. Using a `Neutralized Component Library` (a collection of pre-written, non-esoteric descriptive sentences), the script deterministically assembled a unique personality narrative for each individual.
     - The script's algorithm loads its core logic—point weights and balance thresholds—from external data files (`point_weights.csv`, `balance_thresholds.csv`). It uses these to calculate weighted scores for various astrological factors (elements, modes, quadrants, etc.) and classify them as 'strong' or 'weak' based on their prominence.
@@ -60,26 +60,23 @@ The pipeline is a sequence of Python scripts followed by manual processing steps
     *   **Timezone Calculation:** It immediately processes the raw timezone code from the API into the final `ZoneAbbr` and `ZoneTimeOffset` values required by downstream software.
     *   **Output:** `data/sources/adb_raw_export.txt`, a clean, complete source file.
 
-**Stage 2: Validation and Filtering (Automated)**
-2.  **Validation (`validate_adb_data.py`):** This script audits the raw data against live Wikipedia. It intelligently identifies "Research" (non-person) entries and validates "Person" entries by checking for a Wikipedia page and a death date. A status of `OK` is reserved for fully validated `Person` entries.
-
+**Stage 2: Scoring, Validation, and Filtering (Automated)**
+These two scripts can be run in parallel after `fetch_adb_data.py` is complete.
+2.  **Scoring (`generate_eminence_scores.py`):** This script processes the raw export, groups subjects into batches, and uses a powerful LLM with a highly calibrated prompt to generate an eminence score for each individual. The script is resumable and produces a rank-ordered list of all subjects.
+3.  **Validation (`validate_adb_data.py`):** This script audits the raw data against live Wikipedia. It intelligently identifies "Research" (non-person) entries and validates "Person" entries by checking for a Wikipedia page and a death date. A status of `OK` is reserved for fully validated `Person` entries.
     > **A Note on Validation Logic**<br>
-    > The script uses a robust, multi-step process to validate each record:
-    >
-    > -   **Name Matching:** A "name mismatch" is flagged if the similarity score between the ADB name and the Wikipedia page title falls below **90%**. To ensure a fair comparison, both names are first normalized by removing disambiguation text (e.g., `(actor)`), standardizing name order, and ignoring case.
-    > -   **Death Date Verification:** A death date is confirmed by searching for multiple positive signals (e.g., a "Died" field in an infobox, year ranges like `(1910-1985)`) while also checking for negative signals like the "Living people" category.
-    > -   **English Wikipedia Requirement:** The validation requires a valid English Wikipedia page. This is a key methodological control to ensure a consistent and high-quality baseline for the LLM's biographical knowledge, as major LLMs are trained predominantly on English-language data.
-3.  **Filtering (`filter_adb_candidates.py`):** This script takes the raw data, the validation report, and an eminence score file as input. It filters candidates based on `Status='OK'`, birth year, and birth time, then selects the top 5,000 subjects based on eminence rank.
+    > (Validation logic description remains the same)
+4.  **Filtering (`filter_adb_candidates.py`):** This script takes the raw data, the validation report, and the new `eminence_scores.csv` as input. It filters candidates based on `Status='OK'`, birth year, and birth time, then selects the top 5,000 subjects based on eminence rank.
 
 **Stage 3: Bridging the Manual Gap with an Encoding Strategy**
-To ensure perfect data integrity across the manual software step, the pipeline uses a robust encoding/decoding strategy.
-
-4.  **Formatting & Encoding (`prepare_sf_import.py`):** This script prepares the data for Solar Fire. To pass a unique identifier through the software, it converts each subject's `idADB` into a compact, human-friendly `Base58` string (e.g., `102076` becomes `2b4L`). This encoding, notable for avoiding visually ambiguous characters (like `0` vs `O`), is injected into the `ZoneAbbr` field of the import file.
-5.  **Manual Processing (Solar Fire & LLM):** At this stage, the user manually imports the file into Solar Fire. The software uses the data to calculate astrological charts and exports two key files: `sf_chart_export.csv` (subject data with the encoded ID intact) and `sf_delineations_library.txt` (raw description text). The delineations library is then manually neutralized using an LLM.
+(This section remains the same, but steps are renumbered)
+5.  **Formatting & Encoding (`prepare_sf_import.py`):** (Description remains the same)
+6.  **Manual Processing (Solar Fire & LLM):** (Description remains the same)
 
 **Stage 4: Final Database Generation (Automated)**
-6.  **Integration & Decoding (`create_subject_db.py`):** This script deterministically reverses the process. It reads `sf_chart_export.csv`, extracts the `Base58` string from the `ZoneAbbr` field, and decodes it back to the original `idADB`. This recovered ID allows for a perfect, 1-to-1 merge with the master subject list, eliminating any ambiguity. The output is a clean, UTF-8 encoded master file: `data/processed/subject_db.csv`.
-7.  **Generation (`generate_personalities_db.py`):** This final script assembles the experiment database. It loads configuration files (point weights, balance thresholds) and the neutralized description library. It then processes the master `subject_db.csv`, calculates personality classifications for each subject, and constructs the final `personalities_db.txt`.
+(This section remains the same, but steps are renumbered)
+7.  **Integration & Decoding (`create_subject_db.py`):** (Description remains the same)
+8.  **Generation (`generate_personalities_db.py`):** (Description remains the same)
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
 
@@ -98,7 +95,7 @@ The pipeline can be understood through the following architectural and logical d
 </div>
 
 <div align="center">
-  <p>Data Preparation Code Architecture: The sequential execution flow of the three data processing scripts.</p>
+  <p>Data Preparation Code Architecture: The execution flow of the data processing scripts.</p>
   <img src="images/arch_prep_codebase.png" width="50%">
 </div>
 

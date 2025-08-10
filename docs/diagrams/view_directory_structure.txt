@@ -20,21 +20,28 @@ personality_matching/
 └── repair_study.ps1            # ENTRY POINT: Repair all experiments in a study
 |
 ├── src/                        # All Python source code for the project
-│   ├── compile_study_results.py      # Aggregates experiments into a study summary
-│   ├── analyze_llm_performance.py  # Stage 4a: Calculates core metrics
-│   ├── build_llm_queries.py        # Stage 1: Generates all trial queries
-│   ├── compile_experiment_results.py # Compiles all replications for an experiment
-│   ├── compile_replication_results.py# Stage 6: Compiles results for one replication
-│   ├── experiment_manager.py       # Main controller for a single experiment
-│   ├── generate_replication_report.py# Stage 5: Creates the final text report
-│   ├── llm_prompter.py             # Worker: Handles a single API call
-│   ├── orchestrate_replication.py  # Orchestrates the 6 stages for one replication
-│   ├── process_llm_responses.py    # Stage 3: Parses LLM text responses
-│   ├── query_generator.py          # Worker: Generates a single query file
-│   ├── replication_log_manager.py  # Manages batch_run_log.csv
-│   ├── run_bias_analysis.py        # Stage 4b: Calculates bias metrics
-│   ├── run_llm_sessions.py         # Stage 2: Manages parallel LLM API calls
-│   └── study_analyzer.py           # Final: Performs statistical analysis for a study
+│   ├── analyze_llm_performance.py
+│   ├── build_llm_queries.py
+│   ├── compile_experiment_results.py
+│   ├── compile_replication_results.py
+│   ├── compile_study_results.py
+│   ├── create_subject_db.py
+│   ├── experiment_manager.py
+│   ├── fetch_adb_data.py
+│   ├── filter_adb_candidates.py
+│   ├── generate_personalities_db.py
+│   ├── generate_replication_report.py
+│   ├── id_encoder.py               # UTILITY: Base58 encoding for idADB
+│   ├── llm_prompter.py
+│   ├── orchestrate_replication.py
+│   ├── prepare_sf_import.py
+│   ├── process_llm_responses.py
+│   ├── query_generator.py
+│   ├── replication_log_manager.py
+│   ├── run_bias_analysis.py
+│   ├── run_llm_sessions.py
+│   ├── study_analyzer.py
+│   └── validate_adb_data.py
 |
 ├── data/                             # Source data, intermediate artifacts, and generated databases
 │   ├── foundational_assets/        # External, static data assets (e.g., eminence scores)

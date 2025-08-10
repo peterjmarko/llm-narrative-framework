@@ -22,29 +22,31 @@
 """
 Filter raw ADB data and select the top 5,000 candidates.
 
-This script performs a two-stage filtering of the raw data export from
-Astro-Databank (ADB) to produce a final, curated list of 5,000 subjects.
-It serves as the primary data reduction step before the data is formatted
-for Solar Fire import by the next script in the pipeline.
+This script performs a two-stage filtering process to produce a final, curated
+list of 5,000 subjects. It serves as the primary data reduction step before
+the data is formatted for Solar Fire import.
+
+Inputs:
+  - `adb_raw_export.txt`: The full list of subjects from `fetch_adb_data.py`.
+  - `adb_validation_report.csv`: The status report from `validate_adb_data.py`.
+  - `eminence_scores.csv`: The LLM-generated scores from `generate_eminence_scores.py`.
 
 Stage 1: Initial Filtering
-  - Reads the raw ADB export (~10,000 entries), validation report, and
-    eminence scores.
-  - Filters entries based on:
+  - Filters the ~10,000 raw entries based on:
     1. Validation status of 'OK'.
     2. Birth year between 1900-1999, inclusive.
     3. Presence of a validly formatted birth time.
     4. Uniqueness (deduplicated by name and birth date).
 
 Stage 2: Eminence-Based Selection
-  - Sorts the viable candidates by their eminence score (descending), with
-    ARN as a tie-breaker.
+  - Joins the filtered candidates with the eminence scores using `idADB`.
+  - Performs a secondary name-matching check for data integrity.
+  - Sorts the viable candidates by their eminence score (descending).
   - Selects the top 5,000 subjects.
 
 Output:
   - Creates `data/intermediate/adb_filtered_5000.txt`, a clean,
-    tab-delimited file with a header. This file contains all the necessary,
-    un-transformed data fields for the next pipeline step.
+    tab-delimited file ready for the next pipeline step.
 """
 
 import argparse
