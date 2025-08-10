@@ -10,7 +10,9 @@ graph TD
     end
 
     A --> B
-    B --> C
+    B --> G["src/generate_eminence_scores.py"]
+    G --> H["src/generate_ocean_scores.py"]
+    H --> C
     C --> D
     D --> E
     E --> F
@@ -24,5 +26,7 @@ graph TD
     style D fill:#d4edda,stroke:#155724
     style E fill:#d4edda,stroke:#155724
     style F fill:#d4edda,stroke:#155724
+    style G fill:#d4edda,stroke:#155724
+    style H fill:#d4edda,stroke:#155724
     style U fill:#e9ecef,stroke:#adb5bd
     

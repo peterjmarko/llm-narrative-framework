@@ -1,0 +1,41 @@
+graph TD
+    subgraph "Logic for generate_ocean_scores.py"
+        A[Start] --> B{Load eminence scores & existing OCEAN scores};
+        B --> C{Load cutoff state from previous run's summary};
+        C --> D{Perform Pre-flight Check};
+        D -- Cutoff Already Met --> E[Truncate & Exit];
+        D -- Continue --> F{Loop through remaining subjects in batches};
+
+        subgraph "Main Loop"
+            F --> G[Call LLM for OCEAN scores];
+            G --> H{Reconcile response, log any missed subjects};
+            H --> I[Append new scores to ocean_scores.csv];
+            I --> J{Did new scores cross a variance_analysis_window boundary?};
+            J -- No --> F;
+            J -- Yes --> K{"Establish Benchmark<br/>if not set"};
+            K --> L{"Is Cutoff Logic Active<br/>min subjects met"};
+            L -- No --> F;
+
+            subgraph "Cutoff Logic (M of N)"
+                L -- Yes --> M{"Window Variance<br/> < Threshold"};
+                M --> N[Update list of last N checks];
+                N --> O{"Trigger Count >= M"};
+                O -- No --> F;
+                O -- Yes --> Q[Break Loop];
+            end
+        end
+
+        F -- End of Subjects --> R[Finalize];
+        Q -- Stop --> R;
+        
+        subgraph "Finalization"
+            R --> S{Did run complete normally?};
+            S -- Yes --> T{Determine final subject count based on first trigger};
+            S -- No (Interrupted) --> U{Keep all processed subjects};
+            T --> V[Round down count to nearest 100];
+            V --> W[Truncate main file & archive discarded scores];
+            U --> W;
+            W --> X[Generate Summary & Missing Scores reports];
+            X --> Y[End];
+        end
+    end

@@ -20,16 +20,16 @@
 # Filename: src/filter_adb_candidates.py
 
 """
-Filter raw ADB data and select the top 5,000 candidates.
+Filter raw ADB data to match the OCEAN-scored subject set.
 
-This script performs a two-stage filtering process to produce a final, curated
-list of 5,000 subjects. It serves as the primary data reduction step before
-the data is formatted for Solar Fire import.
+This script performs an initial filtering of the raw ADB data and then selects
+only those candidates who are present in the final `ocean_scores.csv` file,
+which is the definitive source for the experiment's subject pool.
 
 Inputs:
   - `adb_raw_export.txt`: The full list of subjects from `fetch_adb_data.py`.
   - `adb_validation_report.csv`: The status report from `validate_adb_data.py`.
-  - `eminence_scores.csv`: The LLM-generated scores from `generate_eminence_scores.py`.
+  - `ocean_scores.csv`: The final subject list from `generate_ocean_scores.py`.
 
 Stage 1: Initial Filtering
   - Filters the ~10,000 raw entries based on:
@@ -38,15 +38,15 @@ Stage 1: Initial Filtering
     3. Presence of a validly formatted birth time.
     4. Uniqueness (deduplicated by name and birth date).
 
-Stage 2: Eminence-Based Selection
-  - Joins the filtered candidates with the eminence scores using `idADB`.
-  - Performs a secondary name-matching check for data integrity.
-  - Sorts the viable candidates by their eminence score (descending).
-  - Selects the top 5,000 subjects.
+Stage 2: OCEAN Set Selection
+  - Loads the set of `idADB`s from the `ocean_scores.csv` file.
+  - Joins this set with the Stage 1 candidates to produce the final list.
+  - Merges the final candidates with their eminence scores for the output file.
 
 Output:
-  - Creates `data/intermediate/adb_filtered_5000.txt`, a clean,
-    tab-delimited file ready for the next pipeline step.
+  - Creates `data/intermediate/adb_filtered_final.txt`, a clean,
+    tab-delimited file with a dynamic number of subjects, ready for the
+    next pipeline step.
 """
 
 import argparse
@@ -138,25 +138,30 @@ def load_country_codes(filepath: str) -> dict:
 
 def load_eminence_scores(filepath: str) -> dict:
     """
-    (Temporary) Loads eminence_scores.csv into a dictionary keyed by a
-    normalized version of the person's name.
+    Loads eminence_scores.csv into a dictionary keyed by idADB.
+    The value is a tuple containing the score and the name for verification.
     """
     eminence_data = {}
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # Use a normalized name as the key for matching
+                id_adb = row.get('idADB')
                 name = row.get('Name')
                 score_str = row.get('EminenceScore')
-                if not name or not score_str:
+
+                if not id_adb or not name or not score_str:
                     continue
                 try:
-                    normalized_name = normalize_name_for_matching(name)
-                    eminence_data[normalized_name] = float(score_str)
+                    # The value is a tuple: (score, normalized_name)
+                    # This allows for a secondary name-matching check later.
+                    eminence_data[id_adb] = (
+                        float(score_str),
+                        normalize_name_for_matching(name)
+                    )
                 except ValueError:
-                    logging.warning(f"Invalid eminence score for {name}: '{score_str}'. Skipping.")
-        logging.info(f"Loaded {len(eminence_data):,} eminence scores, keyed by normalized name.")
+                    logging.warning(f"Invalid eminence score for {name} (idADB: {id_adb}): '{score_str}'. Skipping.")
+        logging.info(f"Loaded {len(eminence_data):,} eminence scores, keyed by idADB.")
         return eminence_data
     except FileNotFoundError:
         logging.error(f"Eminence scores file not found: {filepath}")
@@ -172,7 +177,7 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("-i", "--input-file", default="data/sources/adb_raw_export.txt", help="Path to the raw, tab-delimited file exported from ADB.")
-    parser.add_argument("-o", "--output-file", default="data/intermediate/adb_filtered_5000.txt", help="Path for the final 5,000-entry output file.")
+    parser.add_argument("-o", "--output-file", default="data/intermediate/adb_filtered_final.txt", help="Path for the final filtered output file.")
     parser.add_argument("--validation-report-file", default="data/reports/adb_validation_report.csv", help="Path to the ADB validation report CSV file.")
     parser.add_argument("--eminence-file", default="data/foundational_assets/eminence_scores.csv", help="Path to the eminence scores CSV file.")
     parser.add_argument("--country-codes-file", default="data/foundational_assets/country_codes.csv", help="Path to the country code mapping CSV file.")
@@ -279,45 +284,40 @@ def main():
 
     logging.info(f"Stage 1 complete. Found {len(stage1_candidates):,} unique candidates.")
 
-    # --- Stage 2: Eminence-Based Selection ---
+    # --- Stage 2: OCEAN Set Selection ---
     print("")
-    print(f"{BColors.YELLOW}--- Stage 2: Eminence-Based Selection ---{BColors.ENDC}")
-    logging.info("Sorting candidates by eminence score...")
+    print(f"{BColors.YELLOW}--- Stage 2: OCEAN Set Selection ---{BColors.ENDC}")
     
+    # Load the definitive set of idADBs from the OCEAN scores file.
+    ocean_path = "data/foundational_assets/ocean_scores.csv"
+    try:
+        with open(ocean_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            ocean_ids = {row['idADB'] for row in reader if 'idADB' in row}
+        logging.info(f"Loaded {len(ocean_ids):,} definitive subject IDs from '{ocean_path}'.")
+    except FileNotFoundError:
+        logging.error(f"OCEAN scores file not found at: {ocean_path}")
+        sys.exit(1)
+
+    # Filter Stage 1 candidates to match the OCEAN set
+    stage2_candidates = [parts for parts in stage1_candidates if parts[1] in ocean_ids]
+    logging.info(f"Filtered Stage 1 candidates down to {len(stage2_candidates):,} to match the OCEAN set.")
+
+    # Join with eminence scores to get the score for the final report.
     candidates_with_scores = []
-    missing_score_names = []
-    for candidate_parts in stage1_candidates:
-        # Construct and normalize the name for the lookup
-        first_name = candidate_parts[3]
-        last_name = candidate_parts[2]
-        full_name = f"{first_name} {last_name}"
-        normalized_name = normalize_name_for_matching(full_name)
-        
-        score = eminence_scores.get(normalized_name)
-        if score is not None:
-            candidates_with_scores.append((score, candidate_parts))
+    for parts in stage2_candidates:
+        id_adb = parts[1]
+        eminence_entry = eminence_scores.get(id_adb)
+        if eminence_entry:
+            score, _ = eminence_entry
+            candidates_with_scores.append((score, parts))
         else:
-            missing_score_names.append(full_name.strip())
+            logging.warning(f"Could not find eminence score for idADB {id_adb}, who is in the OCEAN set. Skipping.")
 
-    if missing_score_names:
-        log_path = Path(args.missing_eminence_log)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        try:
-            with open(log_path, 'w', encoding='utf-8') as f:
-                for name in sorted(missing_score_names):
-                    f.write(f"{name}\n")
-            
-            logging.warning(f"{len(missing_score_names):,} candidates were excluded for lacking an eminence score.")
-            logging.warning(f"A list of their names has been saved to: {log_path}")
-        except IOError as e:
-            logging.error(f"Failed to write missing eminence scores log to {log_path}: {e}")
+    # Sort by eminence score (descending) for the final output file.
+    final_candidates = sorted(candidates_with_scores, key=lambda x: -x[0])
 
-    # Sort by Eminence (desc), then by LastName (asc), then FirstName (asc) for a stable tie-breaker.
-    candidates_with_scores.sort(key=lambda x: (-x[0], x[1][2], x[1][3]))
-    
-    final_candidates = candidates_with_scores[:5000]
-    logging.info(f"Stage 2 complete. Selected top {len(final_candidates):,} candidates from the remaining list of {len(candidates_with_scores):,} subjects.")
+    logging.info(f"Stage 2 complete. Final candidate count: {len(final_candidates):,}.")
 
     # --- Final Output Generation ---
     print("")
@@ -344,7 +344,7 @@ def main():
 
                 # Select the raw data fields needed for the next pipeline step.
                 output_row = [
-                    i,          # Index (1-5000)
+                    i,          # Final Index
                     parts[1],   # idADB
                     parts[2],   # LastName
                     parts[3],   # FirstName

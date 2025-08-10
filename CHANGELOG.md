@@ -17,6 +17,7 @@
   - Updated all project documentation (ROADMAP, main manual, data dictionary, and diagrams) to reflect the new automated data preparation workflow.
   - Fixed a critical bug in the save function that was overwriting previous results, ensuring correct data persistence.
   - Added a custom `changelog_template.md` and updated `pyproject.toml` to fix an issue where `commitizen` would not add a blank line between release notes.
+  
 ## 4.2.0 (2025-08-09)
 
 ### Bump
@@ -32,7 +33,7 @@
   - create_subject_db.py now decodes the idADB for a perfect 1-to-1 merge, eliminating the need for fuzzy matching.
   - Hardens create_subject_db.py with strict "perfect or nothing" validation, aborting and creating a diagnostic report on any failure.
   - Overhauls the Solar Fire instructions in the supplementary material for clarity, accuracy, and ease of use.
-  
+
 ## 4.1.0 (2025-08-09)
 
 ### Bump

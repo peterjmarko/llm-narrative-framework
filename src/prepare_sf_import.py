@@ -22,12 +22,12 @@
 """
 Format filtered ADB data for Solar Fire import.
 
-This script takes the clean, filtered list of 5,000 subjects and transforms
-it into the specific Comma Quote Delimited (CQD) format required for import
-into the Solar Fire astrology software.
+This script takes the clean, final list of subjects and transforms it into the
+specific Comma Quote Delimited (CQD) format required for import into the Solar
+Fire astrology software.
 
 Its primary functions are:
-1.  Reads the structured, tab-delimited data from `adb_filtered_5000.txt`.
+1.  Reads the structured, tab-delimited data from `adb_filtered_final.txt`.
 2.  Encodes each subject's unique `idADB` into a compact, human-friendly
     Base58 string (e.g., 102076 -> "2b4L").
 3.  Injects this encoded ID into the `ZoneAbbr` field of the import record.
@@ -84,7 +84,7 @@ def main():
     )
     parser.add_argument(
         "-i", "--input-file",
-        default="data/intermediate/adb_filtered_5000.txt",
+        default="data/intermediate/adb_filtered_final.txt",
         help="Path to the filtered, tab-delimited subject data file."
     )
     parser.add_argument(

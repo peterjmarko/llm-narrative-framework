@@ -68,7 +68,7 @@ class BColors:
 
 # --- Prompt Template ---
 EMINENCE_PROMPT_TEMPLATE = """
-Your task is to rate individuals on an absolute eminence scale of 0-100, considering **all people who have ever lived in human history**.
+Your task is to act as an expert historian and rate individuals on an absolute eminence scale of 0-100, considering **all people who have ever lived in human history**.
 
 **Global Historical Anchors:**
 To calibrate your ratings, use these historical figures as an absolute, fixed guide.
@@ -87,7 +87,7 @@ To calibrate your ratings, use these historical figures as an absolute, fixed gu
 Your primary task is to distinguish "lasting historical eminence" from "transient celebrity" or "pop culture fame."
 - **Eminence** implies a foundational, enduring impact on culture, science, politics, or art that will be remembered for centuries.
 - **Fame** can be immense but is often tied to entertainment and may fade faster over historical time.
-A figure like Michael Jackson is a global icon of fame, but his *historical* eminence is not the same as a figure like Isaac Newton, who redefined science. Please use this distinction in your ratings.
+Figures like Michael Jackson, Lionel Messi, or Oprah Winfrey are global icons of fame *currently*, but their *historical* eminence is not the same as a figure like Isaac Newton, who redefined science. Please use this distinction in your ratings.
 
 **Crucial Context for this Task:**
 The list you are about to rate contains **only famous people from the 20th century**. Given the historical anchors above, it is unlikely that anyone in this specific list will score above 98.0. You should expect most scores to fall between 40.0 and 95.0.
@@ -453,6 +453,10 @@ def main():
     max_consecutive_failures = 3
     was_interrupted = False
     run_completed_successfully = False
+
+    # Initialize the starting index for new entries. The final sort will re-index
+    # from 1, but this keeps the index column consistent during generation.
+    current_index = len(processed_ids) + 1
 
     try:
         for i in range(0, total_to_process, args.batch_size):

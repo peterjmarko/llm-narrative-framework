@@ -18,19 +18,22 @@ data/
 │   ├── adb_validation_report.csv
 │   ├── adb_validation_summary.txt
 │   ├── missing_eminence_scores.txt
-│   └── name_mismatches.csv
+│   ├── ocean_scores_summary.txt
+│   └── missing_ocean_scores.txt
 │
 ├── foundational_assets/
 │   ├── neutralized_delineations/   # Sanitized text snippets for database assembly.
 │   ├── sf_chart_export.csv         # Chart data exported from Solar Fire (manual step).
 │   ├── sf_delineations_library.txt # The original, raw delineations exported from Solar Fire.
 │   ├── country_codes.csv           # Mapping of ADB country/state codes to full names.
-│   ├── eminence_scores.csv         # Static scores used for final subject selection.
+│   ├── eminence_scores.csv         # Rank-ordered list of all subjects by eminence.
+│   ├── ocean_scores.csv            # The definitive subject set with OCEAN scores.
 │   ├── point_weights.csv           # Configurable weights for planets/points.
 │   └── balance_thresholds.csv      # Configurable thresholds for balance calculations.
 │
 ├── intermediate/
-│   ├── adb_filtered_5000.txt   # The 5,000 subjects after initial filtering.
+│   ├── adb_filtered_final.txt  # Subjects filtered to match the final OCEAN set.
+│   ├── ocean_scores_discarded.csv  # Archived OCEAN scores for subjects outside the final set.
 │   └── sf_data_import.txt      # Subjects formatted for Solar Fire import.
 │
 ├── processed/
@@ -54,14 +57,16 @@ These files are generated during the data validation and filtering stages.
 
 -   **`adb_validation_report.csv`**: The detailed, row-by-row output of `validate_adb_data.py`. It is used as a master filter by `filter_adb_candidates.py` to ensure reproducibility.
 -   **`adb_validation_summary.txt`**: A human-readable summary of the validation report.
--   **`missing_eminence_scores.txt`**: A log of subjects who were excluded because they lacked an eminence score.
--   **`name_mismatches.csv`**: A log of subjects excluded due to a name mismatch between `adb_raw_export.txt` and `eminence_scores.csv`, indicating a data integrity issue.
+-   **`missing_eminence_scores.txt`**: A log of subjects who lacked an eminence score.
+-   **`ocean_scores_summary.txt`**: The detailed summary report from `generate_ocean_scores.py`, including the cutoff analysis and descriptive statistics.
+-   **`missing_ocean_scores.txt`**: A complete audit from `generate_ocean_scores.py` listing all subjects who were not scored, either because they were missed by the LLM or were not attempted before the script stopped.
 
 ### 3. `foundational_assets/` - Static Assets for Generation
 
 These files are static, pre-prepared assets that provide the rules and content for generating the final personality descriptions.
 
--   **`eminence_scores.csv`**: Contains the LLM-generated eminence score for every subject in the raw export. It is created by `generate_eminence_scores.py` and is used by `filter_adb_candidates.py` to rank and select the final 5,000 subjects. The file is sorted by `EminenceScore` and contains the headers: `Index`, `idADB`, `Name`, `EminenceScore`.
+-   **`eminence_scores.csv`**: Contains the LLM-generated eminence score for every subject in the raw export. It is created by `generate_eminence_scores.py` and provides the rank-ordered input for `generate_ocean_scores.py`.
+-   **`ocean_scores.csv`**: This file is the **definitive source for the experiment's final subject pool**. It is created by `generate_ocean_scores.py`, which stops generating scores once personality diversity (variance) shows a sustained drop. The number of subjects in this file dictates the final dataset size.
 -   **`country_codes.csv`**: A mapping file to resolve country/state abbreviations.
 -   **`sf_delineations_library.txt`**: The raw, complete library of interpretive text as exported from Solar Fire.
 -   **`neutralized_delineations/`**: A directory containing the sanitized, de-jargonized description components, ready for assembly.
@@ -72,7 +77,8 @@ These files are static, pre-prepared assets that provide the rules and content f
 
 These files are the outputs of one pipeline script and the inputs to the next.
 
--   **`adb_filtered_5000.txt`**: The output of `filter_adb_candidates.py`. It contains the top 5,000 subjects, sorted by eminence. This file serves as a key input for two downstream processes: it provides the subject list for `prepare_sf_import.py` and is used for cross-referencing by `create_subject_db.py`.
+-   **`adb_filtered_final.txt`**: The output of `filter_adb_candidates.py`. It contains the final set of subjects after filtering the raw data to perfectly match the list defined in `ocean_scores.csv`.
+-   **`ocean_scores_discarded.csv`**: An archive of all OCEAN scores that were generated for subjects who fell outside the final, truncated dataset. This file is created by `generate_ocean_scores.py` to ensure no generated data is permanently lost.
 -   **`sf_data_import.txt`**: The output of `prepare_sf_import.py`. This file is formatted for direct import into the Solar Fire software.
 
 ### 5. `processed/` - Cleaned Master Database

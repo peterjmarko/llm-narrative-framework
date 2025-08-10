@@ -6,17 +6,6 @@ This document outlines planned development tasks and tracks known issues for the
 
 ### Code Development
 
-- [x] **Automate Foundational Assets**
-  - [x] Develop `generate_eminence_scores.py` script to create the eminence file via LLM.
-    - [x] The script must read `adb_raw_export.txt` as its source.
-    - [x] The output file (`eminence_scores.csv`) now contains the headers: `Index`, `idADB`, `Name`, `EminenceScore`.
-  - [ ] Update `filter_adb_candidates.py` to use the new `eminence_scores.csv`.
-    - [ ] This will replace the temporary name-based matching with the permanent, robust `idADB`-based lookup.
-    - [ ] The script should include a secondary name-matching check to ensure data integrity between the source files.
-  - [ ] Develop `generate_ocean_scores.py` script to create the OCEAN file via LLM.
-    - [ ] The script will proceed in the order of eminence scores established in `eminence_scores.csv`.
-    - [ ] It will continually evaluate the variance in OCEAN scores and stop at a pre-determined cutoff (when it falls below a certain threshold).
-    - [ ] The total number of entries at this cutoff point will be rounded down to the nearest 100 and will be used for filtering the ADB database.
 - [ ] **Automate Delineation Neutralization**
   - [ ] Create `src/neutralize_delineations.py` to process the raw library via LLM.
 - [ ] **Update and Restore Test Coverage**

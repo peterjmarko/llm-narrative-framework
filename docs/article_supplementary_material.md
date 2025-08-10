@@ -61,7 +61,7 @@ The data obtained through this manual process required significant cleaning and 
 
 ## Data Preparation
 
-The raw export of over 10,000 candidates must be validated, filtered, and formatted. This is an automated, three-step process driven by Python scripts.
+The raw export of over 10,000 candidates must be validated, scored, and filtered to produce the final, data-driven subject set. This is an automated, five-step process driven by a sequence of Python scripts.
 
 ### Step 1: Data Validation (`validate_adb_data.py`)
 
@@ -69,15 +69,25 @@ The raw export of over 10,000 candidates must be validated, filtered, and format
 
 **A Note on Validation Logic:** The script uses a multi-step validation process. A "name mismatch" is flagged if the similarity score between the ADB name and the Wikipedia page title falls below 90% after normalization. A death date is confirmed by searching for multiple positive signals (e.g., a "Died" field in an infobox) while checking for negative signals (e.g., the "Living people" category). The validation also requires a valid English Wikipedia page; this is a methodological control to ensure a consistent and high-quality baseline for the LLM's biographical knowledge, as its training data is predominantly English.
 
-### Step 2: Filtering and Selection (`filter_adb_candidates.py`)
+### Step 2: Eminence Scoring (`generate_eminence_scores.py`)
 
-**A Note on Eminence Scores and Reproducibility:** The eminence scores used for filtering are stored in the static file `data/foundational_assets/eminence_scores.csv`. By treating the scores as a static input, the filtering process remains fully deterministic.
+**A Note on Reproducibility:** The eminence scores are generated once by `src/generate_eminence_scores.py` and saved to `data/foundational_assets/eminence_scores.csv`. All downstream scripts use this static file as input, ensuring the process remains fully deterministic.
 
-This step is automated by `src/filter_adb_candidates.py`. It takes the raw data, the validation report, and the eminence scores as input. It filters candidates based on a validation status of `OK`, a valid birth time, and a birth year between 1900-1999. It then ranks the remaining candidates by eminence score and selects the top 5,000. The output is `data/intermediate/adb_filtered_5000.txt`, a clean, sorted file ready for final formatting.
+This script processes all subjects from the raw export and uses an LLM to assign a calibrated "eminence" score to each. This provides a robust, rank-ordered list that serves as the basis for the next selection step.
 
-### Step 3: Formatting for Import (`prepare_sf_import.py`)
+### Step 3: OCEAN Scoring and Dynamic Cutoff (`generate_ocean_scores.py`)
 
-This final automated step, handled by `src/prepare_sf_import.py`, formats the 5,000 selected subjects for import into the Solar Fire astrology software. To ensure perfect data integrity across the manual software step, the script uses a robust encoding strategy.
+This script is the final arbiter of the subject pool size. It processes subjects in descending order of their eminence score, querying an LLM to generate OCEAN (Big Five) personality scores. The script's core feature is a robust "M of N" stopping rule: it monitors the variance of scores in fixed-size windows (e.g., 100 subjects) and stops automatically when it detects a sustained drop in personality diversity (e.g., when 4 of the last 5 windows fall below a variance threshold).
+
+This data-driven approach determines the final number of subjects for the experiment. The output, `data/foundational_assets/ocean_scores.csv`, contains the definitive list of subjects.
+
+### Step 4: Final Filtering (`filter_adb_candidates.py`)
+
+This step is automated by `src/filter_adb_candidates.py`. It takes the raw data and the validation report, applies initial quality filters (e.g., valid birth time, birth year 1900-1999), and then selects only those subjects whose `idADB` is present in the `ocean_scores.csv` file. This ensures the final list perfectly matches the set determined by the dynamic cutoff. The output is `data/intermediate/adb_filtered_final.txt`.
+
+### Step 5: Formatting for Import (`prepare_sf_import.py`)
+
+This final automated step, handled by `src/prepare_sf_import.py`, formats the selected subjects for import into the Solar Fire astrology software. To ensure perfect data integrity across the manual software step, the script uses a robust encoding strategy.
 
 It encodes each subject's unique `idADB` into a compact, human-friendly `Base58` string (e.g., `102076` becomes `2b4L`). This encoding, notable for avoiding visually ambiguous characters like `0` vs `O`, is injected into the `ZoneAbbr` field of the import record. This allows the unique identifier to be passed through the manual step without ambiguity or data loss. The final output is `data/intermediate/sf_data_import.txt`.
 
@@ -146,7 +156,7 @@ If you are re-running the import process, you must first clear the existing char
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
-    1.  In the 'Chart Database' dialog, select your charts file (e.g., `famous_5000.cht`).
+    1.  In the 'Chart Database' dialog, select your charts file (e.g., `adb_famous.cht`).
     2.  Click the **'All'** button to highlight every chart in the file.
     3.  Click the **'Delete...'** button, then select **'Selected Charts...'**.
     4.  A dialog will ask: "Do you wish to confirm the deletion of each chart individually?". Click **'No'** to delete all charts at once.
@@ -158,7 +168,7 @@ If you are re-running the import process, you must first clear the existing char
 *   **Action:**
     1.  If a "Confirm" dialog appears immediately, click **'OK'**.
     2.  On the **'Import From' tab**, select `ASCII files` and choose `data/intermediate/sf_data_import.txt`.
-    3.  On the **'Save To' tab**, ensure your `famous_5000.cht` file is selected.
+    3.  On the **'Save To' tab**, ensure your `adb_famous.cht` file is selected.
     4.  On the **'Options' tab**, select your `CQD Import` format.
     5.  Click the **'Convert'** button.
     6.  Once the import completes, click the **'Quit'** button to close the dialog.
@@ -167,17 +177,17 @@ If you are re-running the import process, you must first clear the existing char
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
-    1.  Select the charts file you just created (e.g., `famous_5000.cht`).
-    2.  Click the **'All'** button to select all 5,000 charts in the file.
-    3.  Click the **'Open...'** button. This will calculate all charts and add them to the "Calculated Charts" list. This step may take 15-20 minutes.
+    1.  Select the charts file you just created (e.g., `adb_famous.cht`).
+    2.  Click the **'All'** button to select all charts in the file.
+    3.  Click the **'Open...'** button. This will calculate all charts and add them to the "Calculated Charts" list. The processing time will vary depending on the number of subjects (a few minutes for each set of 1,000 charts).
 
-> **A Note on Character Encoding:** In the "Calculated Charts" list, you may notice that some names with international characters appear corrupted (e.g., `CarnÃ©` instead of `Carné`). This is an expected display issue within Solar Fire. **Do not attempt to fix these names manually.** The automated scripts are designed to detect and repair these encoding errors in the next stage, ensuring the final database is clean.
+> **A Note on Character Encoding:** In the "Calculated Charts" list, you may notice that some names with international characters appear corrupted (e.g., `PelÃ©` instead of `Pelé`). This is an expected display issue within Solar Fire. **Do not attempt to fix these names manually.** The automated scripts are designed to detect and repair these encoding errors in the next stage, ensuring the final database is clean.
 
 #### Step 3: Export Chart Data
 
 *   **Menu:** `Chart > Export Charts as Text...`
 *   **Action:**
-    1.  In the "Calculated Charts" window, select all 5,000 calculated charts.
+    1.  In the "Calculated Charts" window, select all calculated charts.
     2.  In the "Export Chart Data" dialog, check the **'Chart Details'** and **'Column Types'** boxes.
     3.  Under 'Select types of points', ensure **'Chart Points'** is selected.
     4.  For the ASCII format, select your custom `CQD Export` format.
@@ -200,7 +210,7 @@ Each 14-line block contains the following for one person:
 *   **Line 2:** Header for the remaining lines.
 *   **Lines 3-14:** Chart point's name, point's abbreviation, point's zodiacal longitude (0.00-359.99 degrees)
 
-The entire file consists of 5000 * 14 = 70,000 lines.
+The entire file consists of `N * 14` lines, where `N` is the final number of subjects.
 
 ## Creating the Personalities Database
 

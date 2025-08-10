@@ -29,8 +29,9 @@ The experiment is built upon a custom database of 5,000 famous historical indivi
 To create a uniquely challenging test, we employed a multi-step, deterministic process to generate the textual stimuli:
 
 1.  **Source & Score**: A `Raw Subject Database` of over 10,000 famous individuals was derived from the Astro-Databank (ADB). To ensure the selection process is robust, filtering relies on an LLM-generated **eminence score** for each candidate, created by the `generate_eminence_scores.py` script.
-2.  **Calculation**: This database was processed by a commercial astrology program (Solar Fire) to calculate the precise celestial positions for each person, which were exported into a `Names and Placements` data file.
-3.  **Synthesis**: A custom Python script (`generate_database.py`) then processed this data. Using a `Neutralized Component Library` (a collection of pre-written, non-esoteric descriptive sentences), the script deterministically assembled a unique personality narrative for each individual.
+2.  **Determine Final Set**: A second script, `generate_ocean_scores.py`, processes subjects in order of eminence, generating OCEAN scores and stopping when personality diversity (measured by variance) shows a sustained drop. This data-driven cutoff determines the final number and list of subjects.
+3.  **Calculation**: This final subject database was processed by a commercial astrology program (Solar Fire) to calculate the precise celestial positions for each person, which were exported into a `Names and Placements` data file.
+4.  **Synthesis**: A custom Python script (`generate_database.py`) then processed this data. Using a `Neutralized Component Library` (a collection of pre-written, non-esoteric descriptive sentences), the script deterministically assembled a unique personality narrative for each individual.
     - The script's algorithm loads its core logic—point weights and balance thresholds—from external data files (`point_weights.csv`, `balance_thresholds.csv`). It uses these to calculate weighted scores for various astrological factors (elements, modes, quadrants, etc.) and classify them as 'strong' or 'weak' based on their prominence.
     - These classifications, along with simple placements, serve as keys to look up and combine the corresponding neutralized descriptions from the component library.
 
@@ -61,12 +62,13 @@ The pipeline is a sequence of Python scripts followed by manual processing steps
     *   **Output:** `data/sources/adb_raw_export.txt`, a clean, complete source file.
 
 **Stage 2: Scoring, Validation, and Filtering (Automated)**
-These two scripts can be run in parallel after `fetch_adb_data.py` is complete.
-2.  **Scoring (`generate_eminence_scores.py`):** This script processes the raw export, groups subjects into batches, and uses a powerful LLM with a highly calibrated prompt to generate an eminence score for each individual. The script is resumable and produces a rank-ordered list of all subjects.
-3.  **Validation (`validate_adb_data.py`):** This script audits the raw data against live Wikipedia. It intelligently identifies "Research" (non-person) entries and validates "Person" entries by checking for a Wikipedia page and a death date. A status of `OK` is reserved for fully validated `Person` entries.
+These scripts form a sequential pipeline that progressively refines the subject list.
+2.  **Validation (`validate_adb_data.py`):** This script audits the raw data against live Wikipedia. It intelligently identifies "Research" (non-person) entries and validates "Person" entries by checking for a Wikipedia page and a death date. A status of `OK` is reserved for fully validated `Person` entries.
     > **A Note on Validation Logic**<br>
     > (Validation logic description remains the same)
-4.  **Filtering (`filter_adb_candidates.py`):** This script takes the raw data, the validation report, and the new `eminence_scores.csv` as input. It filters candidates based on `Status='OK'`, birth year, and birth time, then selects the top 5,000 subjects based on eminence rank.
+3.  **Eminence Scoring (`generate_eminence_scores.py`):** This script processes the raw export, groups subjects into batches, and uses a powerful LLM with a highly calibrated prompt to generate an eminence score for each individual. The script is resumable and produces a rank-ordered list of all subjects.
+4.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** This is the key script for determining the final dataset size. It processes subjects in order of eminence, generates OCEAN scores, and uses a robust "M of N" rule to stop automatically when personality diversity (measured by variance) shows a sustained drop. The final count of subjects in its output file, `ocean_scores.csv`, is the definitive number for the experiment.
+5.  **Filtering (`filter_adb_candidates.py`):** This script takes the raw data and the validation report, performs an initial filtering for data quality, and then selects only those candidates who are present in the final `ocean_scores.csv` file.
 
 **Stage 3: Bridging the Manual Gap with an Encoding Strategy**
 (This section remains the same, but steps are renumbered)
@@ -92,7 +94,9 @@ The pipeline can be understood through the following architectural and logical d
 
 ### Data Preparation: Logic Flowcharts
 
-{{grouped_figure:docs/diagrams/logic_prep_filtering.mmd | scale=2.5 | width=65% | caption=Logic for Filtering (`filter_adb_candidates.py`): The algorithm for filtering the raw data export down to the final 5,000 subjects.}}
+{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=65% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size based on variance degradation.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_filtering.mmd | scale=2.5 | width=65% | caption=Logic for Filtering (`filter_adb_candidates.py`): The algorithm for filtering the raw data to match the definitive subject set from the OCEAN scoring process.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_generation.mmd | scale=2.5 | width=65% | caption=Logic for Database Generation (`generate_personalities_db.py`): The algorithm for loading configurations, calculating personality classifications, and assembling the final description text for each subject.}}
 

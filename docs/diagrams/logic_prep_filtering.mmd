@@ -1,18 +1,30 @@
 graph TD
-    A[Start] --> B[Load filter & eminence files into memory];
-    B --> C{Loop through each line in adb_raw_export.txt};
-    C -- "Next Line" --> D{"Valid Birth Time (H:MM)?"};
-    D -- No --> C;
-    D -- Yes --> E{"Birth Year 1900-1999?"};
-    E -- No --> C;
-    E -- Yes --> F{"Passes Master Filter? (Wiki, Death, IsDuplicate Flag)"};
-    F -- No --> C;
-    F -- Yes --> F2{"Is Duplicate? (Normalized Name + Date)"};
-    F2 -- "Yes (Skip)" --> C;
-    F2 -- "No (Keep)" --> G[Add to Stage 1 Candidates list];
-    G --> C;
-    C -- "End of File" --> H0[Filter out candidates lacking an eminence score & log excluded ARNs];
-    H0 --> H["Sort remaining candidates by Eminence (desc) then ARN (asc)"];
-    H --> I["Select Top 5,000 candidates"];
-    I --> J["Write to adb_filtered_5000.txt with new sequence numbers and cleaned Name/Links"];
-    J --> K[End];
+    subgraph "Logic for filter_adb_candidates.py"
+        A[Start] --> B{Load validation report and OCEAN subject IDs};
+        B --> C{Loop through each line in raw ADB export};
+
+        subgraph "Stage 1: Initial Filtering"
+            C --> D{"Is Duplicate by<br/>Norm Name and Date"};
+            D -- Yes (Skip) --> C;
+            D -- No --> E{"Is Status OK"};
+            E -- No --> C;
+            E -- Yes --> F{"Birth Year 1900-1999"};
+            F -- No --> C;
+            F -- Yes --> G{"Valid Birth Time"};
+            G -- No --> C;
+            G -- Yes --> H[Add to Stage 1 Candidates list];
+            H --> C;
+        end
+
+        C -- End of File --> I{Start Stage 2};
+
+        subgraph "Stage 2: OCEAN Set Selection"
+            I --> J{Filter Stage 1 list to keep only<br/>subjects present in the OCEAN ID set};
+            J --> K{Load eminence scores};
+            K --> L{Join candidates with their eminence scores};
+            L --> M{"Sort final list by<br/>eminence score descending"};
+            M --> N[Write final list to adb_filtered_final.txt];
+            N --> O[End];
+        end
+    end
+    
