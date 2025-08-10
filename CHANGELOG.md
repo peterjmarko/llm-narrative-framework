@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.3.0 (2025-08-10)
+
+### Bump
+
+- **version 4.2.0 → 4.3.0**
+
+### Features
+
+- **complete eminence score generation script**
+  This commit finalizes the development of `generate_eminence_scores.py`, a robust, resumable orchestrator for creating the eminence scores foundational asset.
+  
+  - Implemented the new script with key features including calibrated LLM prompting, safety checks (backup, force flag), and automated summary reporting.
+  - Added a new `[DataGeneration]` section to `config.ini` to manage settings for data asset creation scripts.
+  - Iteratively refined the LLM prompt with historical anchors and explicit instructions to solve calibration issues and improve score quality.
+  - Updated all project documentation (ROADMAP, main manual, data dictionary, and diagrams) to reflect the new automated data preparation workflow.
+  - Fixed a critical bug in the save function that was overwriting previous results, ensuring correct data persistence.
+  - Added a custom `changelog_template.md` and updated `pyproject.toml` to fix an issue where `commitizen` would not add a blank line between release notes.
 ## 4.2.0 (2025-08-09)
 
 ### Bump
