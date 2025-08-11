@@ -1,5 +1,33 @@
 # Changelog
 
+## 5.0.0 (2025-08-11)
+
+### Bump
+
+- **version 4.4.0 → 5.0.0**
+
+### Features
+
+- **Overhaul data prep pipeline for efficiency and automation**
+  This major overhaul re-engineers the entire data preparation pipeline to be more efficient, robust, and automated. All data quality checks are now performed *before* any expensive LLM scoring, and the previously manual delineation neutralization process is now a fully automated, resumable script.
+  
+  - **Efficiency Overhaul:**
+    - Introduces `select_eligible_candidates.py` to perform all data quality checks upfront.
+    - Updates `generate_eminence_scores.py` and `generate_ocean_scores.py` to use this pre-filtered list, significantly reducing API costs and runtime.
+    - Replaces `filter_adb_candidates.py` with `select_final_candidates.py` for a more logical final selection and transformation step.
+  
+  - **Automation:**
+    - Introduces `neutralize_delineations.py` to fully automate the rewriting of the esoteric delineation library using an LLM.
+  
+  - **Data Integrity:**
+    - Adds a `BirthYear` column to `eminence_scores.csv` and `ocean_scores.csv` for better disambiguation.
+    - Includes `patch_eminence_scores.py` to safely upgrade existing data.
+    - Updates `fetch_adb_data.py` to sanitize tab characters at the source.
+  
+  - **Documentation:**
+    - Updates all documentation (Framework Manual, Supplementary Material, Data Dictionary) and all associated diagrams to reflect the new, final pipeline.
+  
+  BREAKING CHANGE: The data preparation pipeline scripts have been renamed and their sequence altered. `filter_adb_candidates.py` has been removed and replaced by `select_eligible_candidates.py` and `select_final_candidates.py`. The schemas for `eminence_scores.csv` and `ocean_scores.csv` have been updated to include a `BirthYear` column. Any workflows or scripts relying on the old pipeline structure or data formats will need to be updated.
 ## 4.4.0 (2025-08-10)
 
 ### Bump
