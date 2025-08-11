@@ -16,6 +16,7 @@
   - Updates `filter_adb_candidates.py` to use the output of the OCEAN script as the definitive source for the final subject set, removing the previous hardcoded limit.
   - All corresponding documentation, including the Framework Manual, supplementary materials, and all diagrams, has been updated to reflect the new, completed pipeline.
   This completes the development of the data preparation work stream.
+  
 ## 4.3.0 (2025-08-10)
 
 ### Bump
@@ -33,7 +34,7 @@
   - Updated all project documentation (ROADMAP, main manual, data dictionary, and diagrams) to reflect the new automated data preparation workflow.
   - Fixed a critical bug in the save function that was overwriting previous results, ensuring correct data persistence.
   - Added a custom `changelog_template.md` and updated `pyproject.toml` to fix an issue where `commitizen` would not add a blank line between release notes.
-  
+
 ## 4.2.0 (2025-08-09)
 
 ### Bump

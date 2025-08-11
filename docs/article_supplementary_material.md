@@ -6,90 +6,86 @@ date: "[Date]"
 
 This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers seeking to perform a **direct replication of the original study's findings**. The sections are arranged in workflow order as follows:
 
-*   **Obtaining Birth Data from Astro-Databank:** Describes the filtering of the ADB research database and the manual extraction process for obtaining birth data.
-*   **Data Preparation:** Describes the process of transforming the raw birth data in preparation for importing to the astrology software.
-*   **Importing to and Exporting from Solar Fire:** Describes the process of importing of birth data to and exporting of astrological information from the Solar Fire astrology program.
-*   **Creating the Personalities Database:** Describes the process of compiling the personalities database using the information obtained in the previous three steps.
+*   **The Data Preparation Pipeline:** Describes the fully automated scripts that transform raw data into the final subject list.
+*   **The Manual Chart Calculation Step:** Details the one-time setup and repeatable workflow for using the Solar Fire astrology program.
+*   **Final Database Generation:** Describes the automated scripts that neutralize the esoteric texts and assemble the final `personalities_db.txt`.
 
-## Obtaining Birth Data from Astro-Databank
+## The Data Preparation Pipeline
 
 This guide supports two distinct research paths.
 
 **Path 1: Direct Replication (Validating Original Findings)**
-The Astro-Databank (ADB) is a live research database. To directly replicate and validate the original study's results, it is essential to use the static data files included in this repository. This approach ensures that you are working with the identical dataset used for the original analysis, providing the most stable baseline for comparison.
+The Astro-Databank (ADB) is a live research database. To directly replicate the original study, it is essential to use the static data files included in this repository (e.g., `adb_raw_export.txt`, `adb_validation_report.csv`). This ensures the pipeline starts with the identical data used for the original analysis, providing a stable baseline for comparison.
 
 **Path 2: Conceptual Replication (Creating a New Dataset)**
-For researchers wishing to perform a conceptual replication or conduct new research, the framework provides a fully automated pipeline to generate a fresh dataset. The instructions below describe how to use the provided scripts to create a new, up-to-date export from the live ADB. Note that this will yield a different dataset than the one used in the original study.
+For new research, the framework provides a fully automated pipeline to generate a fresh dataset from live sources. The instructions below describe how to use the provided scripts to create new data assets.
 
-The original manual data extraction steps are retained at the end of this section for methodological transparency.
+### Stage 1: Data Sourcing & Validation (Automated)
 
-### Automated Data Fetching (Recommended)
-
-The project includes a Python script, `src/fetch_adb_data.py`, to fully automate scraping the Astro-Databank website.
+#### a. Fetching Raw Data (`fetch_adb_data.py`)
+This script automates the scraping of the Astro-Databank website.
 
 **Prerequisites:**
-1.  You must have a registered account at `astro.com`.
-2.  Add your credentials to the `.env` file in the project's root directory:
-    ```
-    ADB_USERNAME=your-username-here
-    ADB_PASSWORD=your-password-here
-    ```
+1.  A registered account at `astro.com`.
+2.  Credentials in the `.env` file: `ADB_USERNAME` and `ADB_PASSWORD`.
 
 **Execution:**
-Run the script from your terminal. It will log in, perform the search with the required filters (Top 5% Famous, has a Death record, AA/A Rating, etc.), scrape all results, and save them to a new file. The script is resilient, saving data incrementally, and includes an interactive prompt to prevent accidental overwrites, automatically creating a timestamped backup of any existing file.
-
 ```bash
-# Run the script to fetch data
-pdm run python src/fetch_adb_data.py
-
-# To bypass the interactive prompt and force an overwrite
-pdm run python src/fetch_adb_data.py --force
+# Fetch a new dataset from the live ADB
+pdm run fetch-adb
 ```
-The script produces a rich, tab-separated output file (`data/sources/adb_raw_export.txt`) with a file-specific `Index` and the stable `idADB`, and includes fully processed timezone information. The columns are: `Index`, `idADB`, `LastName`, `FirstName`, `Gender`, `Day`, `Month`, `Year`, `Time`, `ZoneAbbr`, `ZoneTimeOffset`, `City`, `CountryState`, `Longitude`, `Latitude`, `Rating`, `Bio`, `Categories`, and `Link`.
+The script logs in, applies the required search filters, and saves the complete results to `data/sources/adb_raw_export.txt`.
 
-**A Note on Downstream Compatibility:** This new, detailed format is superior for new research but is **not** directly compatible with the downstream processing scripts in this project (`filter_adb_candidates.py`, etc.), which were designed to parse the original, manually-exported `adb_raw_export.txt`. To use a newly fetched file with the existing pipeline, those scripts would need to be adapted.
+#### b. Validating Data (`validate_adb_data.py`)
+This script audits the raw export against Wikipedia to verify each entry is a person with a recorded death date.
 
-### Manual Data Extraction (Obsolete)
+**A Note on Reproducibility:** Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. The study's pipeline therefore relies on the static report that resulted from this one-time audit, which is included as `data/reports/adb_validation_report.csv`. This static report ensures all subsequent filtering is fully deterministic.
 
-The following procedure describes the original manual process for obtaining the initial database, which resulted in the static `data/sources/adb_raw_export.txt` file. This method produced a different, less detailed format and is no longer recommended.
+**Execution:**
+```bash
+# Run the validation script on the raw export
+pdm run validate-adb
+```
 
-1.  Navigate to `https://www.astro.com/adb-search/adb-search/`.
-2.  Manually select the search criteria (Categories: Death, Top 5% of Profession; Options: AA/A Ratings, 500 results per page).
-3.  Execute the search and use a browser extension like 'Table Capture' to copy the results from all pages.
+### Stage 2: Pre-filtering & Scoring (Automated)
 
-The data obtained through this manual process required significant cleaning and resulted in a file with the columns: `ARN`, `Name`, `Born`, and `At`. The automated script is now the standard method.
+#### a. Selecting Eligible Candidates (`select_eligible_candidates.py`)
+This script performs all initial data quality checks (valid birth year, 'OK' status, uniqueness), ensuring that expensive LLM scoring is only performed on high-quality candidates.
+```bash
+# Create the list of eligible candidates
+pdm run select-eligible
+```
 
-## Data Preparation
+#### b. Eminence Scoring (`generate_eminence_scores.py`)
+This script processes the eligible candidates list and uses an LLM to assign a calibrated eminence score to each, creating the rank-ordered `eminence_scores.csv`.
+```bash
+# Generate eminence scores for all eligible candidates
+pdm run gen-eminence
+```
 
-The raw export of over 10,000 candidates must be validated, scored, and filtered to produce the final, data-driven subject set. This is an automated, five-step process driven by a sequence of Python scripts.
+#### c. OCEAN Scoring & Dynamic Cutoff (`generate_ocean_scores.py`)
+This script determines the final subject pool size by processing subjects in order of eminence, generating OCEAN scores, and stopping automatically when personality diversity declines. The output, `ocean_scores.csv`, is the definitive subject set.
+```bash
+# Generate OCEAN scores to determine the final cutoff
+pdm run gen-ocean
+```
 
-### Step 1: Data Validation (`validate_adb_data.py`)
+### Stage 3: Final Subject Selection (Automated)
 
-**A Note on Reproducibility and Dynamic Data:** The raw export (`adb_raw_export.txt`) is audited by `src/validate_adb_data.py`. This script cross-references each entry against Wikipedia to verify it is a person with a recorded death date. Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. The study's pipeline therefore relies on the static report that resulted from this one-time audit, which is included as `data/reports/adb_validation_report.csv`. A status of `OK` is assigned only to validated `Person` entries. This static report ensures the subsequent filtering is fully deterministic.
+#### a. Selecting Final Candidates (`select_final_candidates.py`)
+This script performs the final transformation. It filters the eligible list by the OCEAN set, resolves country codes, and sorts the result by eminence.
+```bash
+# Create the final, transformed list of subjects
+pdm run select-final
+```
 
-**A Note on Validation Logic:** The script uses a multi-step validation process. A "name mismatch" is flagged if the similarity score between the ADB name and the Wikipedia page title falls below 90% after normalization. A death date is confirmed by searching for multiple positive signals (e.g., a "Died" field in an infobox) while checking for negative signals (e.g., the "Living people" category). The validation also requires a valid English Wikipedia page; this is a methodological control to ensure a consistent and high-quality baseline for the LLM's biographical knowledge, as its training data is predominantly English.
-
-### Step 2: Eminence Scoring (`generate_eminence_scores.py`)
-
-**A Note on Reproducibility:** The eminence scores are generated once by `src/generate_eminence_scores.py` and saved to `data/foundational_assets/eminence_scores.csv`. All downstream scripts use this static file as input, ensuring the process remains fully deterministic.
-
-This script processes all subjects from the raw export and uses an LLM to assign a calibrated "eminence" score to each. This provides a robust, rank-ordered list that serves as the basis for the next selection step.
-
-### Step 3: OCEAN Scoring and Dynamic Cutoff (`generate_ocean_scores.py`)
-
-This script is the final arbiter of the subject pool size. It processes subjects in descending order of their eminence score, querying an LLM to generate OCEAN (Big Five) personality scores. The script's core feature is a robust "M of N" stopping rule: it monitors the variance of scores in fixed-size windows (e.g., 100 subjects) and stops automatically when it detects a sustained drop in personality diversity (e.g., when 4 of the last 5 windows fall below a variance threshold).
-
-This data-driven approach determines the final number of subjects for the experiment. The output, `data/foundational_assets/ocean_scores.csv`, contains the definitive list of subjects.
-
-### Step 4: Final Filtering (`filter_adb_candidates.py`)
-
-This step is automated by `src/filter_adb_candidates.py`. It takes the raw data and the validation report, applies initial quality filters (e.g., valid birth time, birth year 1900-1999), and then selects only those subjects whose `idADB` is present in the `ocean_scores.csv` file. This ensures the final list perfectly matches the set determined by the dynamic cutoff. The output is `data/intermediate/adb_filtered_final.txt`.
-
-### Step 5: Formatting for Import (`prepare_sf_import.py`)
-
-This final automated step, handled by `src/prepare_sf_import.py`, formats the selected subjects for import into the Solar Fire astrology software. To ensure perfect data integrity across the manual software step, the script uses a robust encoding strategy.
-
-It encodes each subject's unique `idADB` into a compact, human-friendly `Base58` string (e.g., `102076` becomes `2b4L`). This encoding, notable for avoiding visually ambiguous characters like `0` vs `O`, is injected into the `ZoneAbbr` field of the import record. This allows the unique identifier to be passed through the manual step without ambiguity or data loss. The final output is `data/intermediate/sf_data_import.txt`.
+#### b. Formatting for Import (`prepare_sf_import.py`)
+This script formats the final candidates list for import into Solar Fire, encoding the unique `idADB` of each subject into the `ZoneAbbr` field for data integrity.
+```bash
+# Prepare the final list for the manual import step
+pdm run prep-sf-import
+```
+This produces `data/intermediate/sf_data_import.txt`, the input for the next stage.
 
 ## Importing to and Exporting from Solar Fire
 
@@ -212,159 +208,49 @@ Each 14-line block contains the following for one person:
 
 The entire file consists of `N * 14` lines, where `N` is the final number of subjects.
 
-## Creating the Personalities Database
+## Final Database Generation
 
-The final stage of the pipeline assembles the `personalities_db.txt` file. This process requires several foundational assets: the chart data from the previous step, configuration files for the classification algorithm, and a library of sanitized text descriptions. This section details how to acquire and use these assets.
+The final stage of the pipeline assembles the `personalities_db.txt` file. This is a fully automated, three-step process.
 
-### Step 1: Exporting and Neutralizing the Delineations Library
+### Step 1: Exporting the Delineations Library (One-Time Task)
 
-The personality descriptions are assembled from a library of pre-written text components. This library is first exported from Solar Fire and then "neutralized" using an LLM to remove all esoteric jargon. This is a one-time setup task.
-
-#### a. Exporting from Solar Fire
+The personality descriptions are assembled from a library of pre-written text components. This library must first be exported from Solar Fire.
 
 *   **Menu:** `Interps > Interpretation Files > Natal`
 *   **Action:**
-    1.  In the File Management dialog, select `Standard.int` and click **'Edit'**.
+    1.  Select `Standard.int` and click **'Edit'**.
     2.  In the 'Interpretations Editor', go to `File > Decompile...` and save the file. This creates `standard.def` in the `Documents/Solar Fire User Files/Interpretations` directory.
-    3.  Open this `.def` file in a text editor and save it as `data/foundational_assets/sf_delineations_library.txt`.
+    3.  Copy this file to `data/foundational_assets/sf_delineations_library.txt`.
 
-The exported library contains text blocks for different astrological concepts, such as `*Aries Strong` or `*Element Fire Weak`.
+### Step 2: Automated Delineation Neutralization (`neutralize_delineations.py`)
 
-#### b. Neutralizing with an LLM
+This script automates the process of rewriting the esoteric library into neutral, psychological text. It parses the raw library, intelligently filters and groups related items, and uses an LLM with a calibrated prompt to neutralize the text.
+```bash
+# Neutralize the entire library
+pdm run neutralize
+```
+The script's output is the collection of `.csv` files in the `data/foundational_assets/neutralized_delineations/` directory.
 
-Use an LLM to remove all astrological, gender, and chronological references from `sf_delineations_library.txt`. For example, one could use the following prompt:
+### Step 3: Automated Database Generation (`create_subject_db.py`, `generate_personalities_db.py`)
 
-> "Revise the attached text but leave any line that starts with an asterisk (*) completely intact. For all other lines: remove references to astrology and astronomy; shift from second-person language to an impersonal, objective, neutral style without referring to specific people or time periods; and correct for grammar and spelling (US English). Preserve the original meaning as much as possible."
-
-Save the LLM's output into the six CSV files located in the `data/foundational_assets/neutralized_delineations/` directory (e.g., `balances_signs.csv`, `points_in_signs.csv`, etc.).
-
-### Step 2: Automated Database Generation
-
-Once all foundational assets are in place, the rest of the process is fully automated by two scripts.
+Once all foundational assets are in place, the final assembly is handled by two scripts.
 
 #### a. Integrating Chart Data (`create_subject_db.py`)
-First, the `create_subject_db.py` script bridges the manual software step. It reads the `sf_chart_export.csv` file, extracts the `Base58`-encoded string from the `ZoneAbbr` field, and decodes it back to the original `idADB`. This allows for a perfect 1-to-1 merge with the filtered subject list, producing the clean `data/processed/subject_db.csv` file.
+This script bridges the manual software step. It reads the `sf_chart_export.csv` file, decodes the `idADB` from the `ZoneAbbr` field, and merges the chart data with the final subject list to produce the clean `data/processed/subject_db.csv`.
+```bash
+# Integrate the manual chart data export
+pdm run create-subject-db
+```
 
 #### b. Assembling the Final Database (`generate_personalities_db.py`)
-The `generate_personalities_db.py` script performs the final assembly. It loads the clean `subject_db.csv`, the `point_weights.csv` and `balance_thresholds.csv` configuration files, and the neutralized delineation library. For each person, it calculates their divisional classifications and assembles the final description by looking up the corresponding text components.
-
-The following subsections describe the classification methodology that the script automates.
-
-### Creating Divisional Classifications
-
-#### Zodiac Categories and Divisions
-The zodiac categories and their constituent divisions are defined by longitude ranges as follows:
-
-*   **Signs** are 30-degree segments starting at 0 degrees tropical longitude: Aries, Taurus, Gemini, etc.
-*   **Elements** are sets of three 30-degree segments (tropical signs) distributed evenly along the zodiac. Starting at 0 degrees longitude, they follow in this order, repeating after each 120-degree segment: Fire, Earth, Air, Water.
-*   **Modes** are sets of four 30-degree segments (tropical signs) distributed evenly along the zodiac. Starting at 0 degrees longitude, they follow in this order, repeating after each 90-degree segment: Cardinal, Fixed, Mutable.
-*   **Quadrants** are 90-degree segments starting at 0 degrees tropical longitude and numbered from 1 to 4.
-*   **Hemispheres** are 180-degree segments starting at 0 degrees tropical longitude for vertical (North/South) divisions and at 90 degrees tropical longitude for horizontal (East/Wwest) divisions.
-*   **Points in Signs** are the 144 combinations of 12 chart points and 12 tropical signs.
-
-The process of classifying divisions in the first five categories above follows Solar Fire's algorithm for assembling the "Balances Report". 
-
-#### The Solar Fire "Balances Report"
-
-*   **Menu access for weights:** *Utilities > Edit Rulers/Weightings > Weighting Scores*
-*   **Menu access for weak and strong ratios:** *Interps > Interpretation Files > Natal... [select nterpretation file] > Edit > Edit > Scoring of Balances... [select Balance Type]*
-
-Note: All functionality and procedures described in this document, including the calculation of chart point balances (planetary dominance), form part of the Testing Framework. Modifying settings for the Balances Report in Solar Fire is optional but highly recommended since it may well serve as an external validation tool.
-
-We utilize the default weighting system for the calculation of Solar Fire's balances (planetary dominance) with one key modification. Based on exploratory trials, the weights for the generational planets (Uranus, Neptune, and Pluto) are set to zero to isolate more individualized factors. The specific "weight-points" assigned under 'Weighting Scores' are as follows:
-
-*   **3 points:** Sun, Moon, Ascendant, Midheaven
-*   **2 points:** Mercury, Venus, Mars
-*   **1 point:** Jupiter, Saturn
-*   **0 points:** Uranus, Neptune, Pluto
-
-Dominance within each astrological division (i.e., signs, elements, modes, quadrants, and hemispheres) is automatically determined by the program through a multi-step calculation:
-
-1.  A "total score" (`TS`) is calculated for each division (e.g., the element 'fire', the mode 'cardinal') by summing the "weight-points" of all chart points located within it.
-2.  An "average score" (`AS`) is then determined for the category by averaging the `TS` values across all its constituent divisions.
-3.  Two thresholds are established using this AS and predefined ratios: a "weak threshold" (`WT`) calculated with a "weak ratio" (`WR`), and a "strong threshold" (`ST`) calculated with a "strong ratio" (``SR`):
-    *   `WT = AS * WR`
-    *   `ST = AS * SR`
-4.  The default `WR` values are as follows: Quadrants 0, Hemispheres 0, Elements 0.5, Modes 0.5, Signs 0. The default `SR` values are as follows: Quadrants 1.5, Hemispheres 1.4, Elements 1.5, Modes 1.5, Signs 2.
-5.  A division is classified as 'weak' if its `TS` was below the `WT`, or 'strong' if its `TS` was greater than or equal to the `ST`. If `TS` is in-between the two thresholds, it is considered 'neutral' and the corresponding division is not mentioned in delineations.
-6. Other than being 'neutral', elements and modes can be classified either 'weak' or 'strong'. Signs, quadrants, and hemispheres on the other hand can only ever be 'strong' (i.e., they are 'neutral' when not 'strong'). This is because the default `WR`values are 0 (zero) for these latter categories, resulting in the same for `WT` values.
-
-Using the above settings, the resulting WT and ST values (rounded up to the nearest integer) are as follows:
-
-*   **Quadrants:** WT 0, ST 6.
-*   **Hemispheres:** WT 0, ST 10.
-*   **Elements:** WT 3, ST 8.
-*   **Modes:** WT 4, ST 10.
-*   **Signs:** WT 0, ST 4.
-
-The interpretive output of this process is the resulting list of 'strong' and 'weak' classifications for each division, which is then used by Solar Fire for report assembly. The `generate_personalities_db.py` script reimplements this entire classification logic.
-
-#### Divisional Classification Procedure
-
-The method for determining the divisional classifications is as follows:
-
-*   Determine which tropical sign each chart point falls into.
-*   Add up all the points for each sign.
-*   Classify each sign according to the criteria given for the "balances report" above.
-*   Add up all the points for each division in each category based on the fixed mapping between signs and categories.
-*   Classify each division in each category according to the criteria given for the "balances report" above.
-
-For example, John F. Kennedy had the following chart placements:
-
-*   Moon in Virgo, Sun in Gemini, Mercury in Taurus, Venus in Gemini, Mars in Taurus, Jupiter in Taurus, Saturn in Cancer, Uranus in Aquarius, Neptune in Leo, Pluto in Cancer, Ascendant in Libra, Midheaven in Cancer.
-*   This translates into the following points in the regular order of **signs** (Aries to Pisces): 0, 5, 5, 4, 0, 3, 3, 0, 0, 0, 0, 0 (Total 20).
-*   Distribution of **elements**: Fire 0, Earth 8, Air 8, Water 4 (Total 20).
-*   Distribution of **modes**: Cardinal 7, Fixed 5, Mutable 8 (Total 20).
-*   Distribution of **quadrants**: Ascendant and Midheaven are not counted, making Cancer 1 and Libra 0. Points: 0, 0, 10, 4 (Total 14).
-*   Distribution of **hemispheres**: Ascendant and Midheaven are not counted, making Cancer 1 and Libra 0. Points: Eastern 4, Western 10, Northern 0, Southern 14 (Total 28 due to overlap of hemispheres).
-
-The point disctributions result in the following classifications:
-
-*   **Signs:** 
-    *   Strong: Taurus, Gemini, Cancer.
-*   **Elements:** 
-    *   Weak: Fire.
-    *   Strong: Earth, Air.
-*   **Modes:** Balanced (no mode can be identified as 'weak' or 'strong').
-*   **Quadrants:** 
-    *   Strong: Quadrant 3.
-*   **Hemispheres:** 
-    *   Strong: Western, Southern.
-
-### Neutralizing the Library
-
-Use an LLM to remove all astrological, gender, and chronological references from the raw Solar Fire delineations library ("decompiled interpretations"). For example, one could use the following prompt:
-
-"Revise the attached text as follows: remove references to astrology and astronomy; shift from second-person langauge to an impersonal, objective, neutral style without referring to specific people, generations or time periods; and correct for grammar and spelling (US English). Preserve original meaning as much as possible while making these revisions."
-
-If this is done for several components at the same time, you will need to have the LLM preserve division identifiers that will facilitate the lookup functionality described in the next section. For example, if you are using the original Solar Fire format, you might lead with this wording:
-
-"Revise the attached text *with the exception of lines marked with an asterisk, which need to remain intact:*"
-
-Save the LLM's output in six separate files as follows:
-
-*   Sign Interpretations: `balances_signs.csv`
-*   Element Interpretations: `balances_elements.csv`
-*   Mode Interpretations: `balances_modes.csv`
-*   Quadrant Interpretations: `balances_quadrants.csv`
-*   Hemisphere Interpretations: `balances_hemispheres.csv`
-*   Point in Sign Interpretations: `points_in_signs.csv`
-
-### Compiling the Database
-
-Once the above information is available, compiling the final personalities database becomes a simple lookup and assembly procedure. For example, given the following delineation components for John F. Kennedy:
-
-*   **Taurus Strong:** "Stable and enduring, strong values, unyielding, earthy, acquisitive, strong desires. Can be stuck, stubborn, overly possessive, self-indulgent."
-*   **Gemini Strong:** "Agile, versatile, inquisitive, flowing, conversational, airy, many ideas. Can be volatile, superficial, changeable, restless and inconsistent."
-
-The beginning of the personality description becomes: "Stable and enduring, strong values, unyielding, earthy, acquisitive, strong desires. Can be stuck, stubborn, overly possessive, self-indulgent. Agile, versatile, inquisitive, flowing, conversational, airy, many ideas. Can be volatile, superficial, changeable, restless and inconsistent."
-
-This continues with the rest of the delineation components corresponding to weak and strong divisions for the person in question. This entire lookup and assembly process is performed automatically by the `generate_personalities_db.py` script.
-
-The final `personalities_db.txt` is a tab-delimited file containig the following fields: Index, Name, BirthYear, and DescriptionText. For example:
-
+This script performs the final assembly. It loads the clean `subject_db.csv`, the configuration files (`point_weights.csv`, `balance_thresholds.csv`), and the entire neutralized delineation library. For each person, it calculates their divisional classifications according to the deterministic algorithm and assembles the final description by looking up the corresponding text components.
+```bash
+# Generate the final personalities database
+pdm run gen-db
 ```
-1	John F. Kennedy	1917	Stable and enduring, defined by strong values and an unyielding, earthy nature with acquisitive tendencies and powerful desires. At times, may be perceived as rigid, stubborn, overly possessive, or self-indulgent. Agile, versatile, and inquisitive, characterized by a fluid and conversational style with many ideas. Can exhibit volatility, superficiality, inconsistency, and restlessness. Nurturing, protective, and tenacious, with pronounced emotional sensitivity and deeply rooted foundations. At times, may be overly protective, reluctant to let go, timid, or reclusive. Experiences difficulty becoming motivated to achieve personal goals. At times, self-confidence is insufficient even to set these goals, and a general lack of enthusiasm coupled with feeling overwhelmed by change is common. Exhibits a practical and efficient, hands-on approach with a dependable common-sense method applied to most matters. A down-to-earth demeanor proves advantageous for daily tasks, though a stubborn reluctance to embrace change can sometimes stifle both personal and others’ enthusiasm. Displays objectivity and philosophical insight, favoring an intellectual perspective in approaching life. The rational mind consistently outweighs emotional considerations, which are viewed as less reliable. Possesses a strong sense of fairness and logical thought, though there is a tendency to consider emotions in a disparaging light. Seeks relationships from an objective standpoint rather than a personal one and values public engagement alongside contributing to society. Interactions with others assume a paramount role, with significant value placed on both personal relationships and broader social connections. Possesses a natural aptitude for mediation, informed by an understanding of the nuances inherent in relationships. The greatest insights into personal identity are often gained through these relational contexts. Care should be taken to avoid becoming entangled in stifling relationships. Public life is regarded as the pinnacle of achievement, with personal satisfaction derived from notable accomplishments and ongoing contributions in the public arena. A high public profile may be attained through career success and social status, though it is essential that such accomplishments do not come at the expense of personal relationships. Reveals a strong connection between emotion and physical well-being coupled with a desire for perfection and order. Under stress, occasional health challenges may emerge. Exhibits curiosity, adaptability, and a versatile nature, maintaining high levels of engagement through lively communication and multiple interests. Often infuses situations with dynamic energy—even if this occasionally leads to disorganization. Values traditional knowledge and adopts a methodical, hands-on approach to learning. Prefers established ideas, approaching new information with caution. Values intellectual stimulation and engaging, flirtatious exchanges in relationships. Communication is essential, though a restless nature may drive frequent shifts in interest. Pursues personal desires with determination and methodical persistence. Follows a reliable course of action and can exhibit stubbornness when challenged. Pursues truth persistently while demonstrating loyalty and wisdom. Exhibits a robust desire for both material and experiential abundance. May tend toward emotional inhibition and shyness while still committing seriously to personal and familial responsibilities. Encourages brilliant, inventive breakthroughs that contribute unique insights to collective progress. Infuses creativity with spirituality, manifesting dramatic artistic expression and an appreciation for aesthetics. Represents the upheaval and reformation of familiar systems, prompting new social concepts and security structures. A courteous and thoughtful approach to life is combined with a strong focus on interpersonal relationships. Fairness, justice, and the cultivation of harmonious connections—whether personal or professional—play a central role in defining purpose. A career providing emotional security and opportunities to care for others is central, with strong feelings about public stature and a need for a nurturing work environment.
+The output is `personalities_db.txt`, a tab-delimited file with the fields: `Index`, `Name`, `BirthYear`, and `DescriptionText`.
+
+The rest of the Testing Framework is fully automated in Python, as documented in the main Framework Manual.nounced emotional sensitivity and deeply rooted foundations. At times, may be overly protective, reluctant to let go, timid, or reclusive. Experiences difficulty becoming motivated to achieve personal goals. At times, self-confidence is insufficient even to set these goals, and a general lack of enthusiasm coupled with feeling overwhelmed by change is common. Exhibits a practical and efficient, hands-on approach with a dependable common-sense method applied to most matters. A down-to-earth demeanor proves advantageous for daily tasks, though a stubborn reluctance to embrace change can sometimes stifle both personal and others’ enthusiasm. Displays objectivity and philosophical insight, favoring an intellectual perspective in approaching life. The rational mind consistently outweighs emotional considerations, which are viewed as less reliable. Possesses a strong sense of fairness and logical thought, though there is a tendency to consider emotions in a disparaging light. Seeks relationships from an objective standpoint rather than a personal one and values public engagement alongside contributing to society. Interactions with others assume a paramount role, with significant value placed on both personal relationships and broader social connections. Possesses a natural aptitude for mediation, informed by an understanding of the nuances inherent in relationships. The greatest insights into personal identity are often gained through these relational contexts. Care should be taken to avoid becoming entangled in stifling relationships. Public life is regarded as the pinnacle of achievement, with personal satisfaction derived from notable accomplishments and ongoing contributions in the public arena. A high public profile may be attained through career success and social status, though it is essential that such accomplishments do not come at the expense of personal relationships. Reveals a strong connection between emotion and physical well-being coupled with a desire for perfection and order. Under stress, occasional health challenges may emerge. Exhibits curiosity, adaptability, and a versatile nature, maintaining high levels of engagement through lively communication and multiple interests. Often infuses situations with dynamic energy—even if this occasionally leads to disorganization. Values traditional knowledge and adopts a methodical, hands-on approach to learning. Prefers established ideas, approaching new information with caution. Values intellectual stimulation and engaging, flirtatious exchanges in relationships. Communication is essential, though a restless nature may drive frequent shifts in interest. Pursues personal desires with determination and methodical persistence. Follows a reliable course of action and can exhibit stubbornness when challenged. Pursues truth persistently while demonstrating loyalty and wisdom. Exhibits a robust desire for both material and experiential abundance. May tend toward emotional inhibition and shyness while still committing seriously to personal and familial responsibilities. Encourages brilliant, inventive breakthroughs that contribute unique insights to collective progress. Infuses creativity with spirituality, manifesting dramatic artistic expression and an appreciation for aesthetics. Represents the upheaval and reformation of familiar systems, prompting new social concepts and security structures. A courteous and thoughtful approach to life is combined with a strong focus on interpersonal relationships. Fairness, justice, and the cultivation of harmonious connections—whether personal or professional—play a central role in defining purpose. A career providing emotional security and opportunities to care for others is central, with strong feelings about public stature and a need for a nurturing work environment.
 ```
 
 The rest of the Testing Framework is fully automated in Python, as documented herein.

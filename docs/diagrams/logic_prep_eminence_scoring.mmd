@@ -1,0 +1,32 @@
+graph TD
+    subgraph "Logic for generate_eminence_scores.py"
+        A[Start] --> B{Load eligible candidates};
+        B --> C{Load existing scores to find processed IDs};
+        C --> D[Create to-do list of unprocessed subjects];
+        D --> E{Any subjects to process?};
+        E -- No --> N[Finalize];
+        E -- Yes --> F{Loop through subjects in batches};
+
+        subgraph "Main Batch Processing Loop"
+            F -- Next Batch --> G[Construct prompt for batch];
+            G --> H[Call llm_prompter.py worker];
+            H --> I{Worker successful?};
+            I -- No --> J[Log error and continue];
+            J --> F;
+            I -- Yes --> K[Parse LLM response];
+            K --> L{Parsed count == Batch size?};
+            L -- No --> M[Log warning];
+            M --> O[Append parsed scores to CSV];
+            L -- Yes --> O;
+            O --> F;
+        end
+
+        F -- End of Batches / Interruption --> N;
+
+        subgraph "Finalization"
+            N[Finalize] --> P[Sort entire CSV by EminenceScore];
+            P --> Q[Re-index 'Index' column from 1 to N];
+            Q --> R[Generate summary report];
+            R --> S[End];
+        end
+    end

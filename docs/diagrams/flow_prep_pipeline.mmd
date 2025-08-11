@@ -1,87 +1,31 @@
 graph TD
-    subgraph "Automated Pipeline"
-        S_fetch[src/fetch_adb_data.py]
-        S_validate[src/validate_adb_data.py]
-        S_eminence[src/generate_eminence_scores.py]
-        S_ocean[src/generate_ocean_scores.py]
-        S_filter[src/filter_adb_candidates.py]
-        S_prepare[src/prepare_sf_import.py]
-        S_create[src/create_subject_db.py]
-        S_generate[src/generate_personalities_db.py]
+    subgraph "Stage 1: Sourcing & Validation"
+        A[Fetch Raw Data<br>src/fetch_adb_data.py] --> B[Validate Data<br>src/validate_adb_data.py];
     end
 
-    subgraph "Manual & External Processes"
-        P_sf[Use Solar Fire Software]
-        P_llm[Use LLM to Neutralize Text]
-    end
-    
-    subgraph "Inputs & Data Artifacts"
-        E_scores{eminence_scores.csv}
-        D_ocean{ocean_scores.csv}
-        A_raw{adb_raw_export.txt}
-        B_report{adb_validation_report.csv}
-        C_filtered{adb_filtered_final.txt}
-        D_export{sf_chart_export.csv}
-        E_lib{sf_delineations_library.txt}
-        F_neut{neutralized_delineations/}
-        G_db{subject_db.csv}
+    subgraph "Stage 2: Pre-filtering & Scoring"
+        B --> C[Select Eligible Candidates<br>src/select_eligible_candidates.py];
+        C --> D[Generate Eminence Scores<br>src/generate_eminence_scores.py];
+        D --> E[Generate OCEAN Scores<br>src/generate_ocean_scores.py];
     end
 
-    subgraph "Final Output"
-        O((personalities_db.txt))
+    subgraph "Stage 3: Final Selection"
+        E --> F[Select Final Candidates<br>src/select_final_candidates.py];
     end
 
-    S_fetch --> A_raw
-    A_raw --> S_validate
-    S_validate --> B_report
+    subgraph "Stage 4: Manual Chart Calculation"
+        F --> G[Prepare for SF Import<br>src/prepare_sf_import.py];
+        G --> H((Use Solar Fire Software));
+        style H fill:#f9f,stroke:#333,stroke-width:2px;
+    end
     
-    A_raw --> S_eminence
-    S_eminence --> E_scores
-    E_scores & A_raw --> S_ocean
-    S_ocean --> D_ocean
-    
-    A_raw -- "(input)" --> S_filter
-    B_report -- "(input)" --> S_filter
-    E_scores -- "(input)" --> S_filter
-    D_ocean -- "(input)" --> S_filter
-    S_filter --> C_filtered
+    subgraph "Stage 5: Automated Neutralization"
+        I[Neutralize Delineations<br>src/neutralize_delineations.py]
+    end
 
-    C_filtered --> S_prepare
-    S_prepare --> P_sf
-    
-    P_sf --> D_export
-    P_sf --> E_lib
-
-    E_lib --> P_llm
-    P_llm --> F_neut
-    
-    D_export --> S_create
-    C_filtered --> S_create
-    E_scores --> S_create
-    S_create --> G_db
-    
-    G_db --> S_generate
-    F_neut --> S_generate
-    S_generate --> O
-
-    style S_fetch fill:#d4edda,stroke:#155724
-    style S_validate fill:#d4edda,stroke:#155724
-    style S_eminence fill:#d4edda,stroke:#155724
-    style S_ocean fill:#d4edda,stroke:#155724
-    style S_filter fill:#d4edda,stroke:#155724
-    style S_prepare fill:#d4edda,stroke:#155724
-    style S_create fill:#d4edda,stroke:#155724
-    style S_generate fill:#d4edda,stroke:#155724
-    style P_sf fill:#fdebd0,stroke:#e59866
-    style P_llm fill:#fdebd0,stroke:#e59866
-    style E_scores fill:#fef9e7,stroke:#b08d57
-    style D_ocean fill:#fef9e7,stroke:#b08d57
-    style A_raw fill:#fef9e7,stroke:#b08d57
-    style B_report fill:#fef9e7,stroke:#b08d57
-    style C_filtered fill:#fef9e7,stroke:#b08d57
-    style D_export fill:#fef9e7,stroke:#b08d57
-    style E_lib fill:#fef9e7,stroke:#b08d57
-    style F_neut fill:#fef9e7,stroke:#b08d57
-    style G_db fill:#fef9e7,stroke:#b08d57
-    style O fill:#a3e4d7,stroke:#0e6251
+    subgraph "Stage 6: Final Database Generation"
+        H --> J[Create Subject DB<br>src/create_subject_db.py];
+        I --> K[Generate Personalities DB<br>src/generate_personalities_db.py];
+        J --> K
+    end
     

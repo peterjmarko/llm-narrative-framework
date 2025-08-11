@@ -1,0 +1,21 @@
+graph TD
+    subgraph Logic for select_eligible_candidates.py
+        A[Start] --> B{Load raw data and validation report};
+        B --> C{Loop through all raw records};
+
+        subgraph "Integrated Filtering"
+            C --> D{"Is Unique by<br/>Name and Date?"};
+            D -- No (Skip) --> C;
+            D -- Yes --> E{"Is Status 'OK'?"};
+            E -- No --> C;
+            E -- Yes --> F{"Birth Year 1900-1999?"};
+            F -- No --> C;
+            F -- Yes --> G{"Valid Birth Time Format?"};
+            G -- No --> C;
+            G -- Yes --> H[Add to Eligible Candidates list];
+            H --> C;
+        end
+
+        C -- End of File --> I[Write eligible list to adb_eligible_candidates.txt];
+        I --> J[End];
+    end

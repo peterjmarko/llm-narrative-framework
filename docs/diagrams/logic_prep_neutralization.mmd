@@ -1,0 +1,21 @@
+graph TD
+    subgraph Logic for neutralize_delineations.py
+        A[Start] --> B{Parse raw delineations library};
+        B --> C{Group delineations by category};
+        C --> D{Loop through each group};
+        D -- Next Group --> E{Is group 'points_in_signs'?};
+        E -- Yes --> F{Loop through each point};
+        F -- Next Point --> G[Assemble text block for point];
+        G --> H{Call LLM to neutralize block};
+        H --> I{Parse LLM response};
+        I --> J[Add neutralized text to collection];
+        J --> F;
+        F -- End Loop --> K[Save all neutralized points to CSV];
+        K --> D;
+        E -- No --> L[Assemble text block for group];
+        L --> M{Call LLM to neutralize block};
+        M --> N{Parse LLM response};
+        N --> O[Save neutralized text to CSV];
+        O --> D;
+        D -- End of Groups --> P[End];
+    end

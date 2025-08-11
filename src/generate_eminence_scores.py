@@ -20,11 +20,12 @@
 # Filename: src/generate_eminence_scores.py
 
 """
-Orchestrator to generate eminence scores for all subjects using an LLM.
+Orchestrator to generate eminence scores for all eligible subjects using an LLM.
 
-This script reads the raw Astro-Databank export, groups subjects into batches,
-and invokes the `llm_prompter.py` worker to query a Large Language Model (LLM)
-for a calibrated "eminence" score for each individual.
+This script reads the pre-filtered `adb_eligible_candidates.txt` file, which
+contains only high-quality subjects, groups them into batches, and invokes the
+`llm_prompter.py` worker to query a Large Language Model (LLM) for a
+calibrated "eminence" score for each individual.
 
 Key Features:
 -   **Resilient & Resumable**: Safely stops with Ctrl+C and resumes from the
@@ -41,7 +42,7 @@ Key Features:
 
 The final output is `eminence_scores.csv`, a foundational asset for all
 downstream filtering and analysis, containing the headers: `Index`, `idADB`,
-`Name`, and `EminenceScore`.
+`Name`, `BirthYear`, and `EminenceScore`.
 """
 
 import argparse
@@ -180,7 +181,7 @@ def load_processed_ids(filepath: Path) -> set:
     return processed_ids
 
 def load_subjects_to_process(input_path: Path, processed_ids: set) -> List[Dict]:
-    """Loads all subjects from the raw export and filters out processed ones."""
+    """Loads all subjects from the eligible candidates file and filters out processed ones."""
     subjects_to_process = []
     try:
         with open(input_path, 'r', encoding='utf-8') as f:
@@ -197,10 +198,10 @@ def load_subjects_to_process(input_path: Path, processed_ids: set) -> List[Dict]
         sys.exit(1)
     return subjects_to_process
 
-def parse_batch_response(response_text: str) -> List[Tuple[str, str, str]]:
+def parse_batch_response(response_text: str) -> List[Tuple[str, str, str, str]]:
     """
-    Parses the LLM response to extract idADB, name, and score.
-    Uses a robust right-split method to handle commas in names.
+    Parses the LLM response to extract idADB, name, birth year, and score.
+    Uses a robust right-split method and regex to handle complex names.
     """
     parsed_data = []
     lines = response_text.strip().split('\n')
@@ -211,31 +212,38 @@ def parse_batch_response(response_text: str) -> List[Tuple[str, str, str]]:
             continue
         
         try:
-            # Split from the right on ", ID" to isolate the name part,
-            # which might contain commas.
+            # Split from the right on ", ID" to isolate the name part.
             name_part, id_score_part = line.rsplit(', ID', 1)
             
-            # Now parse the ID and score from the second part
+            # Parse the ID and score from the second part.
             id_match = re.search(r'(\d+):\s*([\d.]+)', id_score_part)
             if not id_match:
                 continue
 
             id_adb = id_match.group(1)
             score = id_match.group(2)
-            # Clean quotes and whitespace from the name part first
-            cleaned_name_part = name_part.strip().strip('"')
-            # Now, remove the year from the end of the cleaned string, and do a final strip
-            name = re.sub(r'\s*\(\d{4}\)$', '', cleaned_name_part).strip().strip('"')
             
-            parsed_data.append((id_adb, name, score))
+            # Clean quotes and whitespace from the name part.
+            cleaned_name_part = name_part.strip().strip('"')
+            
+            # Check for a birth year in parentheses at the end of the name.
+            year_match = re.search(r'\s*\((\d{4})\)$', cleaned_name_part)
+            if year_match:
+                birth_year = year_match.group(1)
+                # Remove the year from the name for a clean name field.
+                name = re.sub(r'\s*\(\d{4}\)$', '', cleaned_name_part).strip()
+            else:
+                birth_year = ''
+                name = cleaned_name_part
+            
+            parsed_data.append((id_adb, name, birth_year, score))
         except ValueError:
-            # This handles cases where rsplit fails, or line format is unexpected.
             logging.warning(f"Could not parse line: '{line}'")
             continue
             
     return parsed_data
 
-def save_scores_to_csv(filepath: Path, scores: List[Tuple[str, str, str]], start_index: int):
+def save_scores_to_csv(filepath: Path, scores: List[Tuple[str, str, str, str]], start_index: int):
     """Appends a list of scores to the CSV file, adding a header only if the file is new."""
     try:
         file_is_new = not filepath.exists() or filepath.stat().st_size == 0
@@ -244,10 +252,10 @@ def save_scores_to_csv(filepath: Path, scores: List[Tuple[str, str, str]], start
             writer = csv.writer(f)
             
             if file_is_new:
-                writer.writerow(["Index", "idADB", "Name", "EminenceScore"])
+                writer.writerow(["Index", "idADB", "Name", "BirthYear", "EminenceScore"])
             
-            for i, (id_adb, name, score) in enumerate(scores):
-                writer.writerow([start_index + i, id_adb, name, score])
+            for i, (id_adb, name, birth_year, score) in enumerate(scores):
+                writer.writerow([start_index + i, id_adb, name, birth_year, score])
     except IOError as e:
         logging.error(f"Failed to write scores to {filepath}: {e}")
 
@@ -343,7 +351,7 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
 def main():
     """Main function to orchestrate the eminence score generation."""
     # --- Load Defaults from Config ---
-    default_input = get_config_value(APP_CONFIG, 'DataGeneration', 'raw_adb_export_input', 'data/sources/adb_raw_export.txt')
+    default_input = get_config_value(APP_CONFIG, 'DataGeneration', 'eligible_candidates_input', 'data/intermediate/adb_eligible_candidates.txt')
     default_output = get_config_value(APP_CONFIG, 'DataGeneration', 'eminence_scores_output', 'data/foundational_assets/eminence_scores.csv')
     default_model = get_config_value(APP_CONFIG, 'DataGeneration', 'eminence_model', 'openai/gpt-4o')
     default_batch_size = get_config_value(APP_CONFIG, 'DataGeneration', 'eminence_batch_size', 100, value_type=int)
@@ -352,7 +360,7 @@ def main():
         description="Generate eminence scores for ADB subjects using an LLM.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("-i", "--input-file", default=default_input, help="Path to the raw ADB export file. Default is from config.ini.")
+    parser.add_argument("-i", "--input-file", default=default_input, help="Path to the pre-filtered eligible candidates file. Default is from config.ini.")
     parser.add_argument("-o", "--output-file", default=default_output, help="Path for the output CSV file. Default is from config.ini.")
     parser.add_argument("--model", default=default_model, help="Name of the LLM to use for scoring. Default is from config.ini.")
     parser.add_argument("--batch-size", type=int, default=default_batch_size, help="Number of subjects per API call. Default is from config.ini.")
@@ -399,6 +407,7 @@ def main():
     # --- Handle Overwrite with Backup and Confirmation ---
     if args.force and output_path.exists():
         print(f"{BColors.YELLOW}WARNING: You are about to overwrite the existing file: {output_path}{BColors.ENDC}")
+        print(f"{BColors.YELLOW}This process incurs API costs and can take 30 minutes or more to complete.{BColors.ENDC}")
         confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower()
         if confirm != 'y':
             print("Operation cancelled by user.")
@@ -547,14 +556,21 @@ def main():
         generate_scores_summary(output_path, total_subjects_in_source)
         shutil.rmtree(temp_dir, ignore_errors=True)
         
+        final_scored_count = len(processed_ids) + processed_count
+        
         if run_completed_successfully:
-            print(f"\n{BColors.GREEN}Eminence score generation completed successfully. ✨{BColors.ENDC}\n")
+            if final_scored_count < total_subjects_in_source:
+                missing_count = total_subjects_in_source - final_scored_count
+                print(f"\n{BColors.YELLOW}Eminence score generation complete for this run.{BColors.ENDC}")
+                print(f"{BColors.YELLOW}Re-run the script to process the {missing_count} missing subjects. ✨{BColors.ENDC}\n")
+            else:
+                print(f"\n{BColors.GREEN}Eminence score generation completed successfully. All subjects processed. ✨{BColors.ENDC}\n")
         elif not was_interrupted:
             # If not interrupted, it must have been a critical error break
             print(f"\n{BColors.RED}Eminence score generation halted due to critical errors. ✨{BColors.ENDC}\n")
         else:
             # It was a user interruption
-            print(f"\nEminence score generation terminated by user. ✨\n")
+            print(f"\nEminence score generation terminated by user. Re-run to continue. ✨\n")
 
 if __name__ == "__main__":
     main()

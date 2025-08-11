@@ -81,7 +81,7 @@ class BColors:
     ENDC = '\033[0m'
 
 # --- Constants ---
-OCEAN_FIELDNAMES = ["Index", "idADB", "Name", "Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
+OCEAN_FIELDNAMES = ["Index", "idADB", "Name", "BirthYear", "Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
 
 # --- Prompt Template ---
 OCEAN_PROMPT_TEMPLATE = """
@@ -167,44 +167,28 @@ def load_processed_ids(filepath: Path) -> Set[str]:
     
     return processed_ids
 
-def load_subjects_to_process(eminence_path: Path, raw_export_path: Path, processed_ids: Set[str]) -> List[Dict]:
+def load_subjects_to_process(eminence_path: Path, processed_ids: Set[str]) -> List[Dict]:
     """
-    Loads subjects from eminence_scores.csv, merges with raw_export to get birth year,
-    sorts by eminence, and filters out processed ones.
+    Loads subjects from eminence_scores.csv, sorts by eminence, and filters
+    out those that have already been processed.
     """
     try:
-        # Load eminence scores and raw export data
         eminence_df = pd.read_csv(eminence_path)
-        raw_export_df = pd.read_csv(raw_export_path, delimiter='\t', usecols=['idADB', 'Year'])
 
-        # Ensure idADB is the same type for merging
-        eminence_df['idADB'] = eminence_df['idADB'].astype(str)
-        raw_export_df['idADB'] = raw_export_df['idADB'].astype(str)
+        # Sort by eminence score
+        sorted_df = eminence_df.sort_values(by="EminenceScore", ascending=False)
 
-        # Merge to add 'Year' to the eminence data
-        merged_df = pd.merge(eminence_df, raw_export_df, on='idADB', how='left')
+        # Filter out subjects that have already been processed
+        sorted_df["idADB"] = sorted_df["idADB"].astype(str)
+        unprocessed_df = sorted_df[~sorted_df["idADB"].isin(processed_ids)]
 
-        # Sort by eminence
-        sorted_df = merged_df.sort_values(by='EminenceScore', ascending=False)
-        
-        # Check for merge failures (missing Year)
-        missing_year_df = sorted_df[sorted_df['Year'].isna()]
-        if not missing_year_df.empty:
-            logging.warning(f"Found {len(missing_year_df)} subjects in eminence file with no match in raw export. They will be skipped.")
-            for _, row in missing_year_df.iterrows():
-                logging.warning(f"  - No birth year for: {row['Name']} (idADB: {row['idADB']})")
-        
-        # Filter out subjects with no year and those already processed
-        valid_df = sorted_df.dropna(subset=['Year'])
-        unprocessed_df = valid_df[~valid_df['idADB'].isin(processed_ids)]
+        return unprocessed_df.to_dict("records")
 
-        return unprocessed_df.to_dict('records')
-
-    except FileNotFoundError as e:
-        logging.error(f"Required data file not found: {e.filename}")
+    except FileNotFoundError:
+        logging.error(f"Required data file not found: {eminence_path}")
         sys.exit(1)
     except Exception as e:
-        logging.error(f"Error loading and merging subject data: {e}")
+        logging.error(f"Error loading subject data: {e}")
         sys.exit(1)
 
 def parse_batch_response(response_text: str) -> List[Dict]:
@@ -260,21 +244,6 @@ def calculate_average_variance(df: pd.DataFrame) -> float:
     
     variances = df[ocean_cols].var()
     return variances.mean()
-
-def backup_file(filepath: Path):
-    """Creates a timestamped backup of a file if it exists."""
-    if not filepath.exists():
-        return
-    try:
-        backup_dir = Path('data/backup')
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = backup_dir / f"{filepath.name}.{ts}.bak"
-        shutil.copy2(filepath, backup_path)
-        logging.info(f"Created backup of '{filepath.name}' at: {backup_path}")
-    except (IOError, OSError) as e:
-        logging.error(f"Failed to create backup for {filepath.name}: {e}")
-        sys.exit(1)
 
 
 def truncate_and_archive_scores(filepath: Path, num_records_to_keep: int):
@@ -587,29 +556,34 @@ def main():
 
     print(f"{BColors.YELLOW}\n--- Starting OCEAN Score Generation ---{BColors.ENDC}")
 
-    # --- Handle Overwrite ---
+    # --- Handle Overwrite with Backup and Confirmation ---
     if args.force and (output_path.exists() or summary_path.exists() or missing_report_path.exists()):
-        print(f"{BColors.YELLOW}WARNING: --force flag is active. The following files and their reports will be backed up and overwritten:{BColors.ENDC}")
-        print(f"  - {output_path}")
-        print(f"  - {summary_path}")
-        print(f"  - {missing_report_path}")
-        if input("Are you sure you want to continue? (Y/N): ").lower() != 'y':
-            print("Operation cancelled."); sys.exit(0)
+        print(f"{BColors.YELLOW}WARNING: You are about to overwrite existing OCEAN score files.{BColors.ENDC}")
+        print(f"{BColors.YELLOW}This process incurs API costs and can take several hours to complete.{BColors.ENDC}")
+        confirm = input("Backups will be created. Are you sure you want to continue? (Y/N): ").lower()
+        if confirm != 'y':
+            print("Operation cancelled by user.")
+            sys.exit(0)
         
-        backup_file(output_path)
-        backup_file(summary_path)
-        backup_file(missing_report_path)
+        backup_dir = Path('data/backup')
+        backup_dir.mkdir(parents=True, exist_ok=True)
 
         for p in [output_path, summary_path, missing_report_path]:
             if p.exists():
-                p.unlink()
-
-        print(f"\n{BColors.YELLOW}WARNING: Backups created. Overwriting existing files...{BColors.ENDC}")
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_path = backup_dir / f"{p.stem}.{timestamp}{p.suffix}.bak"
+                    shutil.copy2(p, backup_path)
+                    p.unlink()
+                except (IOError, OSError) as e:
+                    logging.error(f"Failed to back up or remove {p.name}: {e}")
+                    sys.exit(1)
+        
+        print(f"\n{BColors.YELLOW}Backups created. Overwriting existing files...{BColors.ENDC}")
 
     # --- Load Data ---
-    raw_export_input_path = get_config_value(APP_CONFIG, 'DataGeneration', 'raw_adb_export_input', 'data/sources/adb_raw_export.txt')
     processed_ids = load_processed_ids(output_path)
-    subjects_to_process = load_subjects_to_process(input_path, Path(raw_export_input_path), processed_ids)
+    subjects_to_process = load_subjects_to_process(input_path, processed_ids)
     
     total_to_process = len(subjects_to_process)
     total_possible_subjects = len(processed_ids) + total_to_process
@@ -665,7 +639,7 @@ def main():
             print(f"\n{BColors.CYAN}--- Processing Session Batch {session_batch_num} of {total_session_batches} (max) ---{BColors.ENDC}")
 
             # 1. Construct prompt
-            subject_list_str = "\n".join([f'{s["Name"]} ({s["Year"]:.0f}), ID {s["idADB"]}' for s in batch])
+            subject_list_str = "\n".join([f'{s["Name"]} ({s["BirthYear"]}), ID {s["idADB"]}' for s in batch])
             prompt_text = OCEAN_PROMPT_TEMPLATE.format(subject_list=subject_list_str)
             temp_query_file.write_text(prompt_text, encoding='utf-8')
 
@@ -703,9 +677,14 @@ def main():
                 logging.error(f"Failed to parse any scores from response for batch {batch_num}.")
                 continue
             
+            # Create a lookup map to add BirthYear back to the results
+            id_to_birth_year = {str(s["idADB"]): s["BirthYear"] for s in batch}
+            
             start_index = len(all_scores_df) + 1
             for idx, score_dict in enumerate(parsed_scores):
-                score_dict['Index'] = start_index + idx
+                score_dict["Index"] = start_index + idx
+                # Add the BirthYear from our lookup map
+                score_dict["BirthYear"] = id_to_birth_year.get(str(score_dict["idADB"]), "")
 
             save_scores_to_csv(output_path, parsed_scores)
             

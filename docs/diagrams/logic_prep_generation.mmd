@@ -1,10 +1,10 @@
 graph TD
-    A[Start] --> B["Load delineation library, point weights, and balance thresholds from data files"];
+    A[Start] --> B["Load neutralized delineations library, point weights, and balance thresholds"];
     B --> C{Loop through each person in subject_db.csv};
     C -- Next Person --> D[Parse Placements from subject row];
     D --> E["Calculate Scores for Signs, Elements, and Modes"];
     E --> F["Calculate Scores for Quadrants and Hemispheres"];
-    F --> G[Apply Thresholds to get Weak/Strong classifications for balances];
+    F --> G[Apply Thresholds to get Weak/Strong classifications];
     G --> H[Get 'Point in Sign' classifications];
     H --> I[Look up Delineation Text for all classifications];
     I --> J[Assemble Full Description Text];

@@ -84,8 +84,8 @@ def main():
     )
     parser.add_argument(
         "-i", "--input-file",
-        default="data/intermediate/adb_filtered_final.txt",
-        help="Path to the filtered, tab-delimited subject data file."
+        default="data/intermediate/adb_final_candidates.txt",
+        help="Path to the final, tab-delimited subject data file."
     )
     parser.add_argument(
         "-o", "--output-file",

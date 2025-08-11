@@ -13,13 +13,13 @@ graph TD
             I --> J{Did new scores cross a variance_analysis_window boundary?};
             J -- No --> F;
             J -- Yes --> K{"Establish Benchmark<br/>if not set"};
-            K --> L{"Is Cutoff Logic Active<br/>min subjects met"};
+            K --> L{"Is Cutoff Logic Active<br/>min subjects met?"};
             L -- No --> F;
 
             subgraph "Cutoff Logic (M of N)"
-                L -- Yes --> M{"Window Variance<br/> < Threshold"};
+                L -- Yes --> M{"Window Variance<br/> < Threshold?"};
                 M --> N[Update list of last N checks];
-                N --> O{"Trigger Count >= M"};
+                N --> O{"Trigger Count >= M?"};
                 O -- No --> F;
                 O -- Yes --> Q[Break Loop];
             end

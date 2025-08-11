@@ -32,7 +32,8 @@ data/
 │   └── balance_thresholds.csv      # Configurable thresholds for balance calculations.
 │
 ├── intermediate/
-│   ├── adb_filtered_final.txt  # Subjects filtered to match the final OCEAN set.
+│   ├── adb_eligible_candidates.txt # All subjects passing initial data quality checks.
+│   ├── adb_final_candidates.txt    # The final subject set, transformed and ready for SF.
 │   ├── ocean_scores_discarded.csv  # Archived OCEAN scores for subjects outside the final set.
 │   └── sf_data_import.txt      # Subjects formatted for Solar Fire import.
 │
@@ -69,15 +70,16 @@ These files are static, pre-prepared assets that provide the rules and content f
 -   **`ocean_scores.csv`**: This file is the **definitive source for the experiment's final subject pool**. It is created by `generate_ocean_scores.py`, which stops generating scores once personality diversity (variance) shows a sustained drop. The number of subjects in this file dictates the final dataset size.
 -   **`country_codes.csv`**: A mapping file to resolve country/state abbreviations.
 -   **`sf_delineations_library.txt`**: The raw, complete library of interpretive text as exported from Solar Fire.
--   **`neutralized_delineations/`**: A directory containing the sanitized, de-jargonized description components, ready for assembly.
--   **`sf_chart_export.csv`**: The raw data exported from Solar Fire after it has processed the subjects. This is the output of a manual step in the pipeline.
+-   **`neutralized_delineations/`**: A directory of `.csv` files containing the sanitized, de-jargonized description components. This library is generated automatically by `neutralize_delineations.py`.
+-   **`sf_chart_export.csv`**: The raw data exported from Solar Fire after it has processed the subjects. This is the output of the single manual step in the pipeline.
 -   **`point_weights.csv` & `balance_thresholds.csv`**: Configuration files that define the core logic for the personality classification algorithm in `generate_personalities_db.py`.
 
 ### 4. `intermediate/` - Pipeline Artifacts
 
 These files are the outputs of one pipeline script and the inputs to the next.
 
--   **`adb_filtered_final.txt`**: The output of `filter_adb_candidates.py`. It contains the final set of subjects after filtering the raw data to perfectly match the list defined in `ocean_scores.csv`.
+-   **`adb_eligible_candidates.txt`**: The output of `select_eligible_candidates.py`. Contains all subjects from the raw export that pass initial data quality checks, creating a clean pool for LLM scoring.
+-   **`adb_final_candidates.txt`**: The output of `select_final_candidates.py`. This is the definitive, final set of subjects for the experiment. It is created by filtering the eligible list against the OCEAN set, resolving country codes, and sorting by eminence.
 -   **`ocean_scores_discarded.csv`**: An archive of all OCEAN scores that were generated for subjects who fell outside the final, truncated dataset. This file is created by `generate_ocean_scores.py` to ensure no generated data is permanently lost.
 -   **`sf_data_import.txt`**: The output of `prepare_sf_import.py`. This file is formatted for direct import into the Solar Fire software.
 

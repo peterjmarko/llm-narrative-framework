@@ -62,23 +62,25 @@ The pipeline is a sequence of Python scripts followed by manual processing steps
     *   **Output:** `data/sources/adb_raw_export.txt`, a clean, complete source file.
 
 **Stage 2: Scoring, Validation, and Filtering (Automated)**
-These scripts form a sequential pipeline that progressively refines the subject list.
-2.  **Validation (`validate_adb_data.py`):** This script audits the raw data against live Wikipedia. It intelligently identifies "Research" (non-person) entries and validates "Person" entries by checking for a Wikipedia page and a death date. A status of `OK` is reserved for fully validated `Person` entries.
-    > **A Note on Validation Logic**<br>
-    > (Validation logic description remains the same)
-3.  **Eminence Scoring (`generate_eminence_scores.py`):** This script processes the raw export, groups subjects into batches, and uses a powerful LLM with a highly calibrated prompt to generate an eminence score for each individual. The script is resumable and produces a rank-ordered list of all subjects.
-4.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** This is the key script for determining the final dataset size. It processes subjects in order of eminence, generates OCEAN scores, and uses a robust "M of N" rule to stop automatically when personality diversity (measured by variance) shows a sustained drop. The final count of subjects in its output file, `ocean_scores.csv`, is the definitive number for the experiment.
-5.  **Filtering (`filter_adb_candidates.py`):** This script takes the raw data and the validation report, performs an initial filtering for data quality, and then selects only those candidates who are present in the final `ocean_scores.csv` file.
+This stage ensures expensive LLM processing is only performed on high-quality candidates.
+2.  **Validation (`validate_adb_data.py`):** Audits the raw data against live Wikipedia, assigning a validation `Status` to each record.
+3.  **Eligibility Selection (`select_eligible_candidates.py`):** Performs all initial data quality checks (e.g., valid birth year, 'OK' status, uniqueness), producing a clean list of all subjects potentially viable for the study.
+4.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
+5.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** Determines the final dataset size by processing subjects in order of eminence and stopping automatically when personality diversity (variance) shows a sustained drop. The output also includes `BirthYear`.
 
-**Stage 3: Bridging the Manual Gap with an Encoding Strategy**
-(This section remains the same, but steps are renumbered)
-5.  **Formatting & Encoding (`prepare_sf_import.py`):** (Description remains the same)
-6.  **Manual Processing (Solar Fire & LLM):** (Description remains the same)
+**Stage 3: Final Subject Selection (Automated)**
+6.  **Final Selection (`select_final_candidates.py`):** Performs the final filtering. It takes the eligible candidates list, selects only those present in the definitive `ocean_scores.csv` set, resolves country codes, and sorts the final list by eminence.
 
-**Stage 4: Final Database Generation (Automated)**
-(This section remains the same, but steps are renumbered)
-7.  **Integration & Decoding (`create_subject_db.py`):** (Description remains the same)
-8.  **Generation (`generate_personalities_db.py`):** (Description remains the same)
+**Stage 4: Chart Calculation (Manual)**
+7.  **Formatting (`prepare_sf_import.py`):** Formats the final subject list for import into the Solar Fire software, encoding each subject's unique ID for data integrity.
+8.  **Manual Processing (Solar Fire):** The formatted file is imported into Solar Fire, which calculates the required celestial data and exports it as `sf_chart_export.csv`.
+
+**Stage 5: Delineation Neutralization (Automated)**
+9.  **Neutralization (`neutralize_delineations.py`):** This script automates the rewriting of the esoteric source texts. It parses the raw `sf_delineations_library.txt`, intelligently filters and groups related items, and uses an LLM with a highly calibrated prompt to transform them into a library of neutral, psychological descriptions, saved as a series of `.csv` files in the `neutralized_delineations/` directory.
+
+**Stage 6: Final Database Generation (Automated)**
+10. **Integration (`create_subject_db.py`):** Integrates the manually generated chart data with the final subject list, decodes the unique IDs, and produces a clean master database.
+11. **Generation (`generate_personalities_db.py`):** Assembles the final `personalities_db.txt` by combining the subject data with the neutralized delineation library according to a deterministic algorithm.
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
 
@@ -87,7 +89,7 @@ The pipeline can be understood through the following architectural and logical d
 ### Data Preparation: Visual Architecture
 
 <div align="center">
-  <p>Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated database, showing both manual and automated steps.</p>
+  <p>Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated databases, showing both manual and automated steps.</p>
   <img src="images/flow_prep_pipeline.png" width="75%">
 </div>
 
@@ -104,17 +106,32 @@ The pipeline can be understood through the following architectural and logical d
 ### Data Preparation: Logic Flowcharts
 
 <div align="center">
+  <p>Logic for Eligibility Selection (`select_eligible_candidates.py`): The algorithm for performing initial data quality checks to create a pool of eligible candidates.</p>
+  <img src="images/logic_prep_eligibility.png" width="65%">
+</div>
+
+<div align="center">
+  <p>Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.</p>
+  <img src="images/logic_prep_eminence_scoring.png" width="65%">
+</div>
+
+<div align="center">
   <p>Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size based on variance degradation.</p>
   <img src="images/logic_prep_ocean_scoring.png" width="65%">
 </div>
 
 <div align="center">
-  <p>Logic for Filtering (`filter_adb_candidates.py`): The algorithm for filtering the raw data to match the definitive subject set from the OCEAN scoring process.</p>
-  <img src="images/logic_prep_filtering.png" width="65%">
+  <p>Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.</p>
+  <img src="images/logic_prep_final_selection.png" width="65%">
 </div>
 
 <div align="center">
-  <p>Logic for Database Generation (`generate_personalities_db.py`): The algorithm for loading configurations, calculating personality classifications, and assembling the final description text for each subject.</p>
+  <p>Logic for Delineation Neutralization (`neutralize_delineations.py`): The algorithm for parsing, filtering, grouping, and rewriting esoteric texts into a neutral library.</p>
+  <img src="images/logic_prep_neutralization.png" width="65%">
+</div>
+
+<div align="center">
+  <p>Logic for Database Generation (`generate_personalities_db.py`): The algorithm for assembling the final description text for each subject.</p>
   <img src="images/logic_prep_generation.png" width="65%">
 </div>
 

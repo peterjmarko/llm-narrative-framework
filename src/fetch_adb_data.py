@@ -271,9 +271,11 @@ def parse_results_from_json(json_data, category_map):
             sbli = item.get('sbli', '').split(',')
             spli = item.get('spli', '').split(',')
             
-            # --- Extract data using confirmed keys and validated logic ---
-            last_name = sbli[0] if len(sbli) > 0 else ''
-            first_name = sbli[1] if len(sbli) > 1 else ''
+            # --- Extract and clean data: replace tabs with spaces to ensure valid TSV output ---
+            last_name = (sbli[0] if len(sbli) > 0 else '').replace('\t', ' ')
+            first_name = (sbli[1] if len(sbli) > 1 else '').replace('\t', ' ')
+            city = (spli[0] if len(spli) > 0 else '').replace('\t', ' ')
+            country_state = (spli[1] if len(spli) > 1 else '').replace('\t', ' ')
             
             # Construct URL slug based on the validated rules from visual evidence.
             if first_name.strip():
@@ -288,12 +290,12 @@ def parse_results_from_json(json_data, category_map):
             link = f"https://www.astro.com/astro-databank/{url_slug}" if url_slug else ''
 
             rating = item.get('srra', '')
-            bio = item.get('sbio', '')
+            bio = item.get('sbio', '').replace('\t', ' ')
             
-            # Translate category IDs to text names.
+            # Translate category IDs to text names and clean the final string.
             category_ids_str = item.get('ctgs', '')
             category_names = [category_map.get(cat_id, f"ID_{cat_id}") for cat_id in category_ids_str.split(',') if cat_id]
-            categories_text = ', '.join(category_names)
+            categories_text = ', '.join(category_names).replace('\t', ' ')
 
             # Extract and parse the timezone code
             raw_tz_code = sbli[7] if len(sbli) > 7 else ''
@@ -314,8 +316,8 @@ def parse_results_from_json(json_data, category_map):
                 sbli[6] if len(sbli) > 6 else '',           # Time
                 zone_abbr,                                  # ZoneAbbr
                 zone_time_offset,                           # ZoneTimeOffset
-                spli[0] if len(spli) > 0 else '',           # City
-                spli[1] if len(spli) > 1 else '',           # Country/State
+                city,                                       # City
+                country_state,                              # Country/State
                 spli[2].upper() if len(spli) > 2 else '',   # Longitude
                 spli[3].upper() if len(spli) > 3 else '',   # Latitude
                 rating,                                     # Rating

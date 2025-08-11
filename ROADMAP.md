@@ -6,6 +6,10 @@ This document outlines planned development tasks and tracks known issues for the
 
 ### Code Development
 
+- [ ] **Re-engineer Data Prep Pipeline for Efficiency**
+  - [ ] Create `select_eligible_candidates.py` to perform all data quality checks *before* LLM scoring, producing a list of all candidates eligible for the study.
+  - [ ] Rename `filter_adb_candidates.py` to `select_final_candidates.py` and simplify its logic to be the final filter that matches the eligible list against the OCEAN set.
+  - [ ] Update `generate_eminence_scores.py` to use the output of `select_eligible_candidates.py` as its input, ensuring no resources are wasted on scoring invalid subjects.
 - [ ] **Automate Delineation Neutralization**
   - [ ] Create `src/neutralize_delineations.py` to process the raw library via LLM.
 - [ ] **Update and Restore Test Coverage**

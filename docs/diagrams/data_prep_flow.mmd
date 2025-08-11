@@ -1,101 +1,73 @@
-graph LR
-    subgraph "Data Sources"
-        D_country[country_codes.csv]
+graph TD
+    subgraph "Inputs & Data Artifacts"
+        direction LR
+        subgraph "Automated Pipeline"
+            adb_raw(adb_raw_export.txt)
+            validation_report(adb_validation_report.csv)
+            eligible_candidates(adb_eligible_candidates.txt)
+            eminence_scores(eminence_scores.csv)
+            ocean_scores(ocean_scores.csv)
+            final_candidates(adb_final_candidates.txt)
+            neutralized(neutralized_delineations/)
+            subject_db(subject_db.csv)
+            final_product(personalities_db.txt)
+        end
+        subgraph "Manual & External Processes"
+            sf_import(sf_data_import.txt)
+            sf_export(sf_chart_export.csv)
+            sf_lib(sf_delineations_library.txt)
+        end
     end
 
     subgraph "Pipeline Scripts"
-        S_fetch[src/fetch_adb_data.py]
-        S_validate[src/validate_adb_data.py]
-        S_eminence[src/generate_eminence_scores.py]
-        S_ocean[src/generate_ocean_scores.py]
-        S_filter[src/filter_adb_candidates.py]
-        S_prepare[src/prepare_sf_import.py]
-        S_create[src/create_subject_db.py]
-        S_generate[src/generate_personalities_db.py]
+        direction LR
+        fetch[src/fetch_adb_data.py]
+        validate[src/validate_adb_data.py]
+        select_eligible[src/select_eligible_candidates.py]
+        gen_eminence[src/generate_eminence_scores.py]
+        gen_ocean[src/generate_ocean_scores.py]
+        select_final[src/select_final_candidates.py]
+        prepare_sf[src/prepare_sf_import.py]
+        neutralize_dels[src/neutralize_delineations.py]
+        create_subject[src/create_subject_db.py]
+        gen_personalities[src/generate_personalities_db.py]
     end
 
-    subgraph "Manual / External Processes"
-        P_sf["Solar Fire Software"]
-        P_llm["LLM Neutralization"]
+    fetch --> adb_raw
+    adb_raw --> validate
+    validate --> validation_report
+
+    adb_raw --> select_eligible
+    validation_report --> select_eligible
+    select_eligible --> eligible_candidates
+
+    eligible_candidates --> gen_eminence
+    gen_eminence --> eminence_scores
+
+    eminence_scores --> gen_ocean
+    gen_ocean --> ocean_scores
+
+    eligible_candidates --> select_final
+    ocean_scores --> select_final
+    eminence_scores --> select_final
+    select_final --> final_candidates
+
+    final_candidates --> prepare_sf
+    prepare_sf --> sf_import
+
+    subgraph "Manual Steps"
+        manual_sf(Use Solar Fire Software)
     end
+    sf_import --> manual_sf
+    manual_sf --> sf_export
 
-    subgraph "Data Artifacts"
-        A_raw{adb_raw_export.txt}
-        B_cat_map{adb_category_map.csv}
-        C_report{adb_validation_report.csv}
-        D_summary{adb_validation_summary.txt}
-        C_eminence{eminence_scores.csv}
-        D_ocean{ocean_scores.csv}
-        E_filtered{adb_filtered_final.txt}
-        F_import{sf_data_import.txt}
-        G_export_chart{sf_chart_export.csv}
-        H_export_delineations{sf_delineations_library.txt}
-        I_neutralized{neutralized_delineations/}
-        J_subject{subject_db.csv}
-    end
+    sf_lib --> neutralize_dels
+    neutralize_dels --> neutralized
 
-    subgraph "Final Product"
-        K_final((personalities_db.txt))
-    end
+    sf_export --> create_subject
+    final_candidates --> create_subject
+    create_subject --> subject_db
 
-    S_fetch --> A_raw
-    S_fetch --> B_cat_map
-    
-    A_raw --> S_validate
-    S_validate --> C_report
-    S_validate --> D_summary
-    
-    A_raw --> S_eminence
-    S_eminence --> C_eminence
-    
-    A_raw & C_eminence --> S_ocean
-    S_ocean --> D_ocean
-
-    A_raw & C_report & D_ocean & C_eminence & D_country --> S_filter
-    S_filter --> E_filtered
-
-    E_filtered --> S_prepare
-    S_prepare --> F_import
-
-    F_import --> P_sf
-    P_sf --> G_export_chart
-    P_sf --> H_export_delineations
-    
-    H_export_delineations --> P_llm
-    P_llm --> I_neutralized
-
-    G_export_chart & E_filtered --> S_create
-    S_create --> J_subject
-    
-    J_subject & I_neutralized --> S_generate
-    S_generate --> K_final
-
-    style D_country fill:#cde4ff,stroke:#6c93be
-    
-    style S_fetch fill:#d4edda,stroke:#155724
-    style S_validate fill:#d4edda,stroke:#155724
-    style S_eminence fill:#d4edda,stroke:#155724
-    style S_ocean fill:#d4edda,stroke:#155724
-    style S_filter fill:#d4edda,stroke:#155724
-    style S_prepare fill:#d4edda,stroke:#155724
-    style S_create fill:#d4edda,stroke:#155724
-    style S_generate fill:#d4edda,stroke:#155724
-
-    style P_sf fill:#fdebd0,stroke:#e59866
-    style P_llm fill:#fdebd0,stroke:#e59866
-
-    style A_raw fill:#fef9e7,stroke:#b08d57
-    style B_cat_map fill:#fef9e7,stroke:#b08d57
-    style C_report fill:#fef9e7,stroke:#b08d57
-    style D_summary fill:#fef9e7,stroke:#b08d57
-    style C_eminence fill:#fef9e7,stroke:#b08d57
-    style D_ocean fill:#fef9e7,stroke:#b08d57
-    style E_filtered fill:#fef9e7,stroke:#b08d57
-    style F_import fill:#fef9e7,stroke:#b08d57
-    style G_export_chart fill:#fef9e7,stroke:#b08d57
-    style H_export_delineations fill:#fef9e7,stroke:#b08d57
-    style I_neutralized fill:#fef9e7,stroke:#b08d57
-    style J_subject fill:#fef9e7,stroke:#b08d57
-
-    style K_final fill:#a3e4d7,stroke:#0e6251
-    
+    subject_db --> gen_personalities
+    neutralized --> gen_personalities
+    gen_personalities --> final_product
