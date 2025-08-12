@@ -1,47 +1,26 @@
-graph TD
+graph LR
     subgraph "Logic for generate_ocean_scores.py"
-        A[Start] --> B{Load eminence scores & ALL existing OCEAN scores};
-        
-        subgraph "Pre-flight Check & Resumption"
-            B --> C{"Enough data for<br/>pre-flight check?"};
-            C -- No --> F{Loop through remaining subjects in batches};
-            C -- Yes --> D[Re-calculate benchmark variance & ALL variance checks from existing data];
-            D --> E{"Is Cutoff condition met?"};
-            E -- Yes --> G[Finalize data truncate/report & Exit];
-            E -- No --> H[Load re-calculated state for resumption];
-            H --> F;
+        A[Start] --> B{"Load eligible candidates,<br>OCEAN scores & eminence scores"}
+
+        subgraph "Pre-flight Check / Startup"
+            B --> C{"if --force,<br>skip preflight check"}
+            C -- Yes --> D["Calculate benchmark variance"] --> G(Start Main Loop)
+            C -- No --> E{"Perform pre-flight check"}
+            E -- Continue --> G
+            E -- Exit --> Z[End]
         end
 
         subgraph "Main Loop"
-            F --> G[Call LLM for OCEAN scores];
-            G --> H{Reconcile response, log any missed subjects};
-            H --> I[Append new scores to ocean_scores.csv];
-            I --> J{Did new scores cross a variance_analysis_window boundary?};
-            J -- No --> F;
-            J -- Yes --> K{"Establish Benchmark<br/>if not set"};
-            K --> L{"Is Cutoff Logic Active<br/>min subjects met?"};
-            L -- No --> F;
-
-            subgraph "Cutoff Logic (M of N)"
-                L -- Yes --> M{"Window Variance<br/> < Threshold?"};
-                M --> N[Update list of last N checks];
-                N --> O{"Trigger Count >= M?"};
-                O -- No --> F;
-                O -- Yes --> Q[Break Loop];
-            end
-        end
-
-        F -- End of Subjects --> R[Finalize];
-        Q -- Stop --> R;
-        
-        subgraph "Finalization"
-            R --> S{Did run complete normally?};
-            S -- Yes --> T{Determine final subject count based on last trigger};
-            S -- No (Interrupted) --> U{Keep all processed subjects};
-            T --> V[Round down count to nearest 100];
-            V --> W[Truncate main file & archive discarded scores];
-            U --> W;
-            W --> X[Generate Summary & Missing Scores reports];
-            X --> Y[End];
+            G --> H{"Loop through remaining subjects<br>in batches"}
+            H -- Next Batch --> I[Construct prompt for batch]
+            I --> J[Call LLM worker]
+            J --> K[Parse response]
+            K --> L[Append scores to CSV]
+            L --> M{"Crosses a variance<br>check boundary?"}
+            M -- No --> H
+            M -- Yes --> N{"Perform Cutoff Check"}
+            N -- Yes (Cutoff Met) --> O["Truncate/Archive & Exit"] --> Z
+            N -- No --> H
+            H -- End of Batches --> P["Finalize normally"] --> Z
         end
     end

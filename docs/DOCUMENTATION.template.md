@@ -92,19 +92,23 @@ The pipeline can be understood through the following architectural and logical d
 
 {{grouped_figure:docs/diagrams/flow_prep_pipeline.mmd | scale=2.5 | width=75% | caption=Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated databases, showing both manual and automated steps.}}
 
-{{grouped_figure:docs/diagrams/data_prep_flow.mmd | scale=2.5 | width=70% | caption=Data Preparation Data Flow: The creation and transformation of data files by the preparation scripts and manual processes.}}
+{{grouped_figure:docs/diagrams/data_prep_flow_1_sourcing.mmd | scale=2.5 | width=70% | caption=Data Prep Flow 1: Sourcing raw data and creating a validated list of eligible candidates.}}
+
+{{grouped_figure:docs/diagrams/data_prep_flow_2_scoring.mmd | scale=2.5 | width=70% | caption=Data Prep Flow 2: Scoring eligible candidates to determine the final, rank-ordered subject set.}}
+
+{{grouped_figure:docs/diagrams/data_prep_flow_3_generation.mmd | scale=2.5 | width=90% | caption=Data Prep Flow 3: Generating the final personalities database from the subject set and neutralized text library.}}
 
 {{grouped_figure:docs/diagrams/arch_prep_codebase.mmd | scale=2.5 | width=50% | caption=Data Preparation Code Architecture: The execution flow of the data processing scripts.}}
 
 ### Data Preparation: Logic Flowcharts
 
-{{grouped_figure:docs/diagrams/logic_prep_eligibility.mmd | scale=2.5 | width=65% | caption=Logic for Eligibility Selection (`select_eligible_candidates.py`): The algorithm for performing initial data quality checks to create a pool of eligible candidates.}}
+{{grouped_figure:docs/diagrams/logic_prep_eligible_candidates.mmd | scale=2.5 | width=65% | caption=Logic for Eligibility Selection (`select_eligible_candidates.py`): The algorithm for performing initial data quality checks to create a pool of eligible candidates.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_eminence_scoring.mmd | scale=2.5 | width=65% | caption=Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=65% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size. A robust pre-flight check re-analyzes all existing data to ensure correct resumption or finalization after interruptions.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_final_selection.mmd | scale=2.5 | width=65% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.}}
+{{grouped_figure:docs/diagrams/logic_prep_final_candidates.mmd | scale=2.5 | width=65% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_neutralization.mmd | scale=2.5 | width=65% | caption=Logic for Delineation Neutralization (`neutralize_delineations.py`): The hybrid algorithm for rewriting texts. Fast mode bundles tasks for speed, while the robust default mode processes each item individually to guarantee completion.}}
 

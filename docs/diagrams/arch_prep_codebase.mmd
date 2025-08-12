@@ -4,8 +4,8 @@ graph TD
     subgraph Main Data Preparation Pipeline
         A[src/fetch_adb_data.py] --> B[src/validate_adb_data.py]
         B --> C[src/select_eligible_candidates.py]
-        C --> D[src/generate_eminence_scores.py]
-        D --> E[src/generate_ocean_scores.py]
+        C --> D["src/generate_eminence_scores.py<br/>(Uses LLM)"]
+        D --> E["src/generate_ocean_scores.py<br/>(Uses LLM)"]
         E --> F[src/select_final_candidates.py]
         F --> G[src/prepare_sf_import.py]
         G --> H[src/create_subject_db.py]
@@ -13,10 +13,11 @@ graph TD
     end
     
     subgraph Delineation Processing
-        J[src/neutralize_delineations.py]
+        J["src/neutralize_delineations.py<br/>(Uses LLM)"]
     end
 
     J --> I
+    J --> H
 
     subgraph Shared Utilities
         K(src/id_encoder.py)

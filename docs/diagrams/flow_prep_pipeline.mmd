@@ -1,13 +1,21 @@
 graph TD
     classDef manualStyle fill:#f8cecc,stroke:#b85450,stroke-width:2px
+    classDef sourceStyle fill:#cce5ff,stroke:#333,stroke-width:2px
+    classDef finalProductStyle fill:#d5e8d4,stroke:#82b366,stroke-width:2px,font-weight:bold
+
+    subgraph "Start"
+        StartDB(("Live Astro-Databank<br/>Website"))
+    end
+
     subgraph "Stage 1: Sourcing & Validation"
-        A[Fetch Raw Data<br>src/fetch_adb_data.py] --> B[Validate Data<br>src/validate_adb_data.py];
+        StartDB --> A[Fetch Raw Data<br>src/fetch_adb_data.py]
+        A --> B[Validate Data<br>src/validate_adb_data.py];
     end
 
     subgraph "Stage 2: Pre-filtering & Scoring"
         B --> C[Select Eligible Candidates<br>src/select_eligible_candidates.py];
-        C --> D[Generate Eminence Scores<br>src/generate_eminence_scores.py];
-        D --> E[Generate OCEAN Scores<br>src/generate_ocean_scores.py];
+        C --> D["Generate Eminence Scores<br>src/generate_eminence_scores.py<br/>(Uses LLM)"];
+        D --> E["Generate OCEAN Scores<br>src/generate_ocean_scores.py<br/>(Uses LLM)"];
     end
 
     subgraph "Stage 3: Final Selection"
@@ -19,16 +27,22 @@ graph TD
         G --> H((Use Solar Fire Software));
     end
     
-    class H manualStyle;
-    
     subgraph "Stage 5: Automated Neutralization"
-        I[Neutralize Delineations<br>src/neutralize_delineations.py]
+        I["Neutralize Delineations<br>src/neutralize_delineations.py<br/>(Uses LLM)"]
     end
 
     subgraph "Stage 6: Final Database Generation"
         H --> J[Create Subject DB<br>src/create_subject_db.py];
         I --> J
-        I --> K[Generate Personalities DB<br>src/generate_personalities_db.py];
-        J --> K
+        J --> K[Generate Personalities DB<br>src/generate_personalities_db.py];
+        I --> K
     end
+    
+    subgraph "End"
+        K --> FinalDB(("personalities_db.txt"))
+    end
+
+    class H manualStyle;
+    class StartDB sourceStyle;
+    class FinalDB finalProductStyle;
     

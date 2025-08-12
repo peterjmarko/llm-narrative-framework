@@ -96,8 +96,18 @@ The pipeline can be understood through the following architectural and logical d
 </div>
 
 <div align="center">
-  <p>Data Preparation Data Flow: The creation and transformation of data files by the preparation scripts and manual processes.</p>
-  <img src="images/data_prep_flow.png" width="70%">
+  <p>Data Prep Flow 1: Sourcing raw data and creating a validated list of eligible candidates.</p>
+  <img src="images/data_prep_flow_1_sourcing.png" width="70%">
+</div>
+
+<div align="center">
+  <p>Data Prep Flow 2: Scoring eligible candidates to determine the final, rank-ordered subject set.</p>
+  <img src="images/data_prep_flow_2_scoring.png" width="70%">
+</div>
+
+<div align="center">
+  <p>Data Prep Flow 3: Generating the final personalities database from the subject set and neutralized text library.</p>
+  <img src="images/data_prep_flow_3_generation.png" width="90%">
 </div>
 
 <div align="center">
@@ -109,7 +119,7 @@ The pipeline can be understood through the following architectural and logical d
 
 <div align="center">
   <p>Logic for Eligibility Selection (`select_eligible_candidates.py`): The algorithm for performing initial data quality checks to create a pool of eligible candidates.</p>
-  <img src="images/logic_prep_eligibility.png" width="65%">
+  <img src="images/logic_prep_eligible_candidates.png" width="65%">
 </div>
 
 <div align="center">
@@ -124,7 +134,7 @@ The pipeline can be understood through the following architectural and logical d
 
 <div align="center">
   <p>Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.</p>
-  <img src="images/logic_prep_final_selection.png" width="65%">
+  <img src="images/logic_prep_final_candidates.png" width="65%">
 </div>
 
 <div align="center">

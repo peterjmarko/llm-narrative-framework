@@ -1,4 +1,4 @@
-graph TD
+graph LR
     subgraph "Logic for generate_eminence_scores.py"
         A[Start] --> B{Load eligible candidates};
         B --> C{Load existing scores to find processed IDs};
@@ -30,3 +30,9 @@ graph TD
             R --> S[End];
         end
     end
+    classDef decisionStyle fill:#ccf,stroke:#333,stroke-width:2px
+    classDef processStyle fill:#fff2cc,stroke:#d6b656,stroke-width:2px
+    
+    %% Apply Styles
+    class E,I,L decisionStyle
+    class A,B,C,D,F,G,H,J,K,M,O,P,Q,R scriptStyle

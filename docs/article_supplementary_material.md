@@ -152,7 +152,7 @@ If you are re-running the import process, you must first clear the existing char
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
-    1.  In the 'Chart Database' dialog, select your charts file (e.g., `adb_famous.cht`).
+    1.  In the 'Chart Database' dialog, select your charts file (e.g., `adb_famous.sfcht`).
     2.  Click the **'All'** button to highlight every chart in the file.
     3.  Click the **'Delete...'** button, then select **'Selected Charts...'**.
     4.  A dialog will ask: "Do you wish to confirm the deletion of each chart individually?". Click **'No'** to delete all charts at once.
@@ -164,7 +164,7 @@ If you are re-running the import process, you must first clear the existing char
 *   **Action:**
     1.  If a "Confirm" dialog appears immediately, click **'OK'**.
     2.  On the **'Import From' tab**, select `ASCII files` and choose `data/intermediate/sf_data_import.txt`.
-    3.  On the **'Save To' tab**, ensure your `adb_famous.cht` file is selected.
+    3.  On the **'Save To' tab**, ensure your `adb_famous.sfcht` file is selected.
     4.  On the **'Options' tab**, select your `CQD Import` format.
     5.  Click the **'Convert'** button.
     6.  Once the import completes, click the **'Quit'** button to close the dialog.
@@ -173,9 +173,9 @@ If you are re-running the import process, you must first clear the existing char
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
-    1.  Select the charts file you just created (e.g., `adb_famous.cht`).
+    1.  Select the charts file you just created (e.g., `adb_famous.sfcht`).
     2.  Click the **'All'** button to select all charts in the file.
-    3.  Click the **'Open...'** button. This will calculate all charts and add them to the "Calculated Charts" list. The processing time will vary depending on the number of subjects (a few minutes for each set of 1,000 charts).
+    3.  Click the **'Open...'** button. This will calculate all charts and add them to the "Calculated Charts" list. The processing time will vary depending on the number of subjects (typically a few minutes for each set of 1,000 charts).
 
 > **A Note on Character Encoding:** In the "Calculated Charts" list, you may notice that some names with international characters appear corrupted (e.g., `PelÃ©` instead of `Pelé`). This is an expected display issue within Solar Fire. **Do not attempt to fix these names manually.** The automated scripts are designed to detect and repair these encoding errors in the next stage, ensuring the final database is clean.
 

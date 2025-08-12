@@ -1,0 +1,19 @@
+graph LR
+    subgraph "Setup"
+        A[Start] --> B{"Load all required data:<br/>- Eligible Candidates<br/>- OCEAN Scores<br/>- Eminence Scores<br/>- Country Codes"};
+    end
+
+    subgraph "Filtering & Transformation"
+        C{"Create set of final subject IDs<br/>from OCEAN scores file"} --> D{"Filter eligible candidates list<br/>by final ID set"};
+        D --> E{"Resolve 'CountryState' code<br/>to full 'Country' name"};
+        E --> F{"Join with eminence scores"};
+    end
+
+    subgraph "Finalization"
+        G{"Sort final list by<br/>eminence score descending"} --> H["Write final list to<br/>adb_final_candidates.txt"];
+        H --> I[End];
+    end
+
+    %% Connect the stages
+    B --> C;
+    F --> G;

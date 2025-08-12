@@ -83,7 +83,7 @@ def main():
     if output_path.exists() and not args.force:
         print()
         print(f"{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-        response = input("Are you sure you want to continue? (Y/N): ").lower()
+        response = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower()
         if response != "y":
             print("\nOperation cancelled by user.")
             sys.exit(0)
@@ -103,16 +103,16 @@ def main():
     print(f"\n{Fore.YELLOW}--- Loading Files ---")
     try:
         eligible_df = pd.read_csv(eligible_path, sep="\t")
-        ocean_df = pd.read_csv(ocean_path)
         eminence_df = pd.read_csv(eminence_path)
+        ocean_df = pd.read_csv(ocean_path)
         country_codes_df = pd.read_csv(country_codes_path)
     except FileNotFoundError as e:
         logging.error(f"{Fore.RED}FATAL: Input file not found: {e.filename}")
         sys.exit(1)
 
     logging.info(f"Loaded {len(eligible_df):,} records from {eligible_path.name}.")
-    logging.info(f"Loaded {len(ocean_df):,} records from {ocean_path.name} (defines final set).")
     logging.info(f"Loaded {len(eminence_df):,} records from {eminence_path.name}.")
+    logging.info(f"Loaded {len(ocean_df):,} records from {ocean_path.name} (defines final set).")
     logging.info(f"Loaded {len(country_codes_df):,} mappings from {country_codes_path.name}.")
 
     print(f"\n{Fore.YELLOW}--- Selecting and Transforming Final Candidates ---")
@@ -139,9 +139,18 @@ def main():
     logging.info("Sorted final candidates by eminence score.")
 
     # Step 4: Finalize columns for output
-    # The downstream script expects the original columns, plus the new 'Country' column.
-    # We drop the temporary 'EminenceScore' column.
-    final_df.drop(columns=["EminenceScore"], inplace=True)
+    # Re-index the 'Index' column to be sequential from 1 to N
+    final_df.reset_index(drop=True, inplace=True)
+    final_df['Index'] = final_df.index + 1
+    logging.info("Re-indexed the final list to be sequential.")
+
+    # Define the exact final column order, replacing 'CountryState' with 'Country'
+    final_column_order = [
+        'Index', 'idADB', 'LastName', 'FirstName', 'Gender', 'Day', 'Month', 'Year',
+        'Time', 'ZoneAbbr', 'ZoneTimeOffset', 'City', 'Country', 'Longitude',
+        'Latitude', 'Rating', 'Bio', 'Categories', 'Link'
+    ]
+    final_df = final_df[final_column_order]
 
     # --- Save the final list ---
     final_df.to_csv(args.output_file, sep="\t", index=False, encoding="utf-8")

@@ -1,0 +1,38 @@
+graph TD
+    %% Define Styles
+    classDef scriptStyle fill:#fff2cc,stroke:#d6b656,stroke-width:2px
+    classDef artifactFileStyle fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef artifactDBStyle fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef inputStyle fill:#d5e8d4,stroke:#82b366,stroke-width:2px
+
+    subgraph "Input from Previous Stage"
+        eligible_candidates_in[adb_eligible_candidates.txt]
+    end
+
+    subgraph "Pipeline Scripts"
+        gen_eminence["src/generate_eminence_scores.py<br/>(Uses LLM)"]
+        gen_ocean["src/generate_ocean_scores.py<br/>(Uses LLM)"]
+        select_final[src/select_final_candidates.py]
+    end
+
+    subgraph "Data Artifacts"
+        eminence_scores[(eminence_scores.csv)]
+        ocean_scores[(ocean_scores.csv)]
+        final_candidates[adb_final_candidates.txt]
+    end
+
+    %% Connections
+    eligible_candidates_in --> gen_eminence
+    gen_eminence --> eminence_scores
+    eminence_scores --> gen_ocean
+    gen_ocean --> ocean_scores
+    eligible_candidates --> select_final
+    eminence_scores --> select_final
+    ocean_scores --> select_final
+    select_final --> final_candidates
+
+    %% Apply Styles
+    class eligible_candidates_in artifactFileStyle
+    class gen_eminence,gen_ocean,select_final scriptStyle
+    class final_candidates artifactFileStyle
+    class eminence_scores,ocean_scores artifactDBStyle

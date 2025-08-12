@@ -104,7 +104,7 @@ def main():
     if output_path.exists():
         print("")
         print(f"{BColors.YELLOW}WARNING: The output file '{output_path}' already exists and will be overwritten.{BColors.ENDC}")
-        confirm = input("Are you sure you want to continue? (Y/N): ").lower()
+        confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower()
         if confirm != 'y':
             print("\nOperation cancelled by user.\n")
             sys.exit(0)

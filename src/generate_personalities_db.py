@@ -56,12 +56,13 @@ MODES_MAP = {"Cardinal": SIGNS[0::3], "Fixed": SIGNS[1::3], "Mutable": SIGNS[2::
 QUADRANTS_MAP = {"1": SIGNS[0:3], "2": SIGNS[3:6], "3": SIGNS[6:9], "4": SIGNS[9:12]}
 HEMISPHERES_MAP = {"Eastern": SIGNS[9:12] + SIGNS[0:3], "Western": SIGNS[3:9], "Northern": SIGNS[0:6], "Southern": SIGNS[6:12]}
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-class bcolors:
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
+class BColors:
+    """A helper class for terminal colors."""
+    YELLOW = '\033[93m'
+    GREEN = '\033[92m'
+    RED = '\033[91m'
     ENDC = '\033[0m'
 
 def load_point_weights(file_path: Path) -> dict:
@@ -163,11 +164,10 @@ def main():
     # Check if output file exists and prompt user to overwrite
     if output_path.exists():
         print("")
-        print(f"{bcolors.WARNING}WARNING: The output file '{output_path}' already exists and will be overwritten.{bcolors.ENDC}")
-        confirm = input("Do you want to continue? (Y/N): ").lower().strip()
+        print(f"{BColors.YELLOW}WARNING: The output file '{output_path}' already exists and will be overwritten.{BColors.ENDC}")
+        confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
         if confirm != 'y':
-            print("")
-            logging.info("Operation cancelled by user.\n")
+            print("\nOperation cancelled by user.\n")
             sys.exit(0)
 
         # Create backup directory if it doesn't exist
@@ -179,18 +179,18 @@ def main():
         
         shutil.copy2(output_path, backup_path)
         print("")
-        logging.info(f"Backup of existing file created at: {backup_path}")
+        print(f"Backup of existing file created at: {backup_path}")
 
     data_dir = Path(args.output_file).parent
     point_weights_path = data_dir / "foundational_assets" / "point_weights.csv"
     thresholds_path = data_dir / "foundational_assets" / "balance_thresholds.csv"
 
-    logging.info("Loading configuration and delineation files...")
+    print("\nLoading configuration and delineation files...")
     point_weights = load_point_weights(point_weights_path)
     thresholds = load_thresholds(thresholds_path)
     delineations = load_delineations(Path(args.delineations_dir))
 
-    logging.info(f"Processing subjects from {args.subject_db}...")
+    print(f"Processing subjects from {args.subject_db}...")
     try:
         with open(args.output_file, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.writer(outfile, delimiter='\t')
@@ -205,15 +205,17 @@ def main():
                     full_desc = " ".join(part for part in desc_parts if part).strip()
                     writer.writerow([row['Index'], row['idADB'], row['Name'], row['Date'].split()[-1], full_desc])
         
-        print("")
-        print(f"{bcolors.OKGREEN}Database generation complete. Final file at: {args.output_file} ✨{bcolors.ENDC}")
-        print("")
+        # Count the number of records processed
+        with open(args.subject_db, 'r', encoding='utf-8') as infile:
+            num_records = sum(1 for line in infile) - 1 # Subtract header
+        
+        print(f"\n{BColors.GREEN}SUCCESS: Personalities database with {num_records} records created successfully. ✨{BColors.ENDC}\n")
 
     except KeyError as e:
-        print(f"\n{bcolors.FAIL}ERROR: Missing column {e} in '{args.subject_db}'. Please ensure the file is correctly formatted.{bcolors.ENDC}\n")
+        print(f"\n{BColors.RED}ERROR: Missing column {e} in '{args.subject_db}'. Please ensure the file is correctly formatted.{BColors.ENDC}\n")
         sys.exit(1)
     except Exception as e:
-        print(f"\n{bcolors.FAIL}ERROR: An unexpected error occurred during database generation: {e}{bcolors.ENDC}\n")
+        print(f"\n{BColors.RED}ERROR: An unexpected error occurred during database generation: {e}{BColors.ENDC}\n")
         sys.exit(1)
 
 if __name__ == "__main__":

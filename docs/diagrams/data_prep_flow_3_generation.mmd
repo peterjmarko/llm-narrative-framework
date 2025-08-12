@@ -1,0 +1,59 @@
+graph TD
+    %% Define Styles
+    classDef scriptStyle fill:#fff2cc,stroke:#d6b656,stroke-width:2px
+    classDef artifactFileStyle fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef artifactDBStyle fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef manualStyle fill:#f8cecc,stroke:#b85450,stroke-width:2px
+    classDef inputStyle fill:#d5e8d4,stroke:#82b366,stroke-width:2px
+
+    subgraph "Input from Previous Stage"
+        final_candidates_in[adb_final_candidates.txt]
+    end
+
+    subgraph "Pipeline Scripts"
+        prepare_sf[src/prepare_sf_import.py]
+        neutralize_dels["src/neutralize_delineations.py<br/>(Uses LLM)"]
+        create_subject[src/create_subject_db.py]
+        gen_personalities[src/generate_personalities_db.py]
+    end
+
+    subgraph "Manual & External Processes"
+        sf_import[sf_data_import.txt]
+        manual_sf(Use Solar Fire Software)
+        sf_export[(sf_chart_export.csv)]
+        sf_lib[sf_delineations_library.txt]
+    end
+
+    subgraph "Data Artifacts"
+        neutralized[neutralized_delineations/]
+        subject_db[(subject_db.csv)]
+        final_product[personalities_db.txt]
+    end
+
+    %% Connections
+    final_candidates_in --> prepare_sf
+    prepare_sf --> sf_import
+    sf_import --> manual_sf
+    manual_sf --> sf_export
+    manual_sf --> sf_lib
+    
+    sf_lib --> neutralize_dels
+    neutralize_dels --> neutralized
+
+    sf_export --> create_subject
+    final_candidates --> create_subject
+    create_subject --> subject_db
+
+    subject_db --> gen_personalities
+    neutralized --> gen_personalities
+    gen_personalities --> final_product
+
+    %% Apply Styles
+    classDef finalProductStyle fill:#d5e8d4,stroke:#82b366,stroke-width:2px,font-weight:bold
+
+    class final_candidates_in artifactFileStyle
+    class final_product finalProductStyle
+    class prepare_sf,neutralize_dels,create_subject,gen_personalities scriptStyle
+    class sf_import,sf_lib,neutralized,final_product artifactFileStyle
+    class sf_export,subject_db artifactDBStyle
+    class manual_sf manualStyle

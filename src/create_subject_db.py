@@ -56,7 +56,7 @@ class BColors:
     ENDC = '\033[0m'
 
 # --- Setup Logging ---
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 # --- Helper Functions ---
 
@@ -140,7 +140,7 @@ def load_chart_data_map(filepath: Path) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="Create a master subject database.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--chart-export", default="data/foundational_assets/sf_chart_export.csv")
-    parser.add_argument("--filtered-5000", default="data/intermediate/adb_filtered_5000.txt")
+    parser.add_argument("--final-candidates", default="data/intermediate/adb_final_candidates.txt")
     parser.add_argument("--output-file", default="data/processed/subject_db.csv")
     args = parser.parse_args()
 
@@ -148,7 +148,7 @@ def main():
     output_path = Path(args.output_file)
     if output_path.exists():
         print(f"{BColors.YELLOW}WARNING: The output file '{output_path}' already exists and will be overwritten.{BColors.ENDC}")
-        confirm = input("Are you sure you want to continue? (Y/N): ").lower()
+        confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower()
         if confirm != 'y':
             print("\nOperation cancelled by user.\n")
             sys.exit(0)
@@ -160,24 +160,24 @@ def main():
             backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
             shutil.copy2(output_path, backup_path)
             print("")
-            logging.info(f"Created backup of existing file at: {backup_path}")
+            print(f"Created backup of existing file at: {backup_path}")
         except (IOError, OSError) as e:
-            logging.error(f"Failed to create backup file: {e}")
+            print(f"{BColors.RED}Failed to create backup file: {e}{BColors.ENDC}\n")
             sys.exit(1)
 
     # --- Pre-process the chart export into a searchable map ---
-    logging.info(f"Loading and parsing chart data from {args.chart_export}...")
+    print(f"Loading and parsing chart data from {args.chart_export}...")
     chart_data_map = load_chart_data_map(Path(args.chart_export))
 
     # --- Assemble final list by merging the filtered list and chart export ---
-    logging.info(f"Assembling master database from primary list: {args.filtered_5000}")
+    print(f"Assembling master database from primary list: {args.final_candidates}")
     all_subjects = []
     missing_subjects_log = []  # Initialize list before the try block
     header = ["Index", "idADB", "Name", "Date", "Time", "ZoneAbbrev", "ZoneTime", "Place", "Country", "Latitude", "Longitude", 
-              "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto", "Ascendant", "Midheaven", "EminenceScore"]
+              "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto", "Ascendant", "Midheaven"]
     
     try:
-        with open(args.filtered_5000, 'r', encoding='utf-8') as f:
+        with open(args.final_candidates, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f, delimiter='\t')
             for row in reader:
                 full_name = " ".join(filter(None, [row['FirstName'], row['LastName']]))
@@ -192,14 +192,14 @@ def main():
                     missing_subjects_log.append({ 'Index': row['Index'], 'idADB': id_adb_key, 'Name': full_name, 'Reason': 'Not found in chart export' })
                     continue
                 
-                subject_data = { "Index": int(row['Index']), "idADB": id_adb_key, "EminenceScore": float(row['EminenceScore']), **chart_data }
+                subject_data = { "Index": int(row['Index']), "idADB": id_adb_key, **chart_data }
                 all_subjects.append(subject_data)
 
     except FileNotFoundError:
-        logging.error(f"Filtered list not found: {args.filtered_5000}")
+        logging.error(f"Filtered list not found: {args.final_candidates}")
         sys.exit(1)
     except KeyError as e:
-        logging.error(f"Missing expected column {e} in {args.filtered_5000}. Please ensure it is correctly formatted.")
+        logging.error(f"Missing expected column {e} in {args.final_candidates}. Please ensure it is correctly formatted.")
         sys.exit(1)
 
     # --- Final Validation and Output ---
@@ -227,8 +227,7 @@ def main():
             writer.writeheader()
             writer.writerows(all_subjects)
         
-        print(f"\n{BColors.GREEN}Successfully processed all {len(all_subjects)} records.{BColors.ENDC}")
-        print(f"{BColors.GREEN}Master subject database created successfully. ✨{BColors.ENDC}\n")
+        print(f"\n{BColors.GREEN}SUCCESS: Master subject database with {len(all_subjects)} records created successfully. ✨{BColors.ENDC}\n")
     except IOError as e:
         print(f"\n{BColors.RED}Failed to write to output file: {e}{BColors.ENDC}\n")
         sys.exit(1)
