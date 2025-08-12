@@ -164,6 +164,52 @@ def save_group_to_csv(filepath: Path, data: Dict[str, str]):
             writer.writerow([key, text])
 
 
+def append_to_csv(filepath: Path, data: Dict[str, str]):
+    """Appends key-value delineations to a CSV file with all fields quoted."""
+    with open(filepath, "a", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        for key, text in data.items():
+            writer.writerow([key, text])
+
+
+def resort_csv_by_key_order(filepath: Path, key_order: List[str]):
+    """Sorts a 2-column CSV file based on a provided list of keys."""
+    if not filepath.exists():
+        return
+    
+    # Create a map for efficient lookups: {key: index}
+    sort_map = {key: i for i, key in enumerate(key_order)}
+    
+    with open(filepath, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        # Read all rows into memory for sorting
+        rows = list(reader)
+
+    # Sort the rows based on the key's index in the sort_map
+    # Use a large number for keys not found to push them to the end.
+    rows.sort(key=lambda row: sort_map.get(row[0], float('inf')))
+
+    with open(filepath, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerows(rows)
+
+
+def get_processed_keys_from_csv(filepath: Path) -> set:
+    """Reads a delineation CSV and returns a set of keys already processed."""
+    if not filepath.exists():
+        return set()
+    processed_keys = set()
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if row:
+                    processed_keys.add(row[0])
+    except (IOError, csv.Error):
+        return set()
+    return processed_keys
+
+
 def main():
     """Main function to orchestrate the neutralization process."""
     # --- Config and Arguments ---
@@ -178,6 +224,7 @@ def main():
     parser.add_argument("--model", default=default_model)
     parser.add_argument("--force", action="store_true", help="Force re-processing of all groups.")
     parser.add_argument("--debug-first-prompt", action="store_true", help="Process only the first item, print prompt/response, and exit.")
+    parser.add_argument("--debug-task", type=str, default=None, help="Debug a specific task (e.g., 'Sun', 'Quadrants'). Prints prompt/response and exits.")
     args = parser.parse_args()
     
     # --- File Handling and Backup ---
@@ -188,7 +235,8 @@ def main():
 
     if args.force and output_dir.exists():
         print(f"\n{Fore.YELLOW}WARNING: You are about to overwrite all neutralized delineation files.{Fore.RESET}")
-        confirm = input("A backup will be created. Are you sure? (Y/N): ").lower()
+        print(f"{Fore.YELLOW}This process incurs API costs and can take 10 minutes or more to complete.{Fore.RESET}")
+        confirm = input("Backups will be created. Are you sure? (Y/N): ").lower()
         if confirm != "y":
             print("Operation cancelled by user."); sys.exit(0)
         try:
@@ -217,96 +265,171 @@ def main():
     print(f"\n{Fore.YELLOW}--- Starting Delineation Neutralization ---")
     all_delineations = parse_llm_response(input_path)
     grouped_delineations = group_delineations(all_delineations, points_list)
-    
+    # Get the master sort order for points_in_signs from the original file
+    points_in_signs_master_order = list(get_points_in_signs_delineations(all_delineations, points_list).keys())
+
+    # Calculate total tasks for the weighted progress bar
+    num_balance_tasks = len(grouped_delineations) - 1
+    num_points_tasks = len(points_list)
+    total_bar_points = (num_balance_tasks * 1) + (num_points_tasks * 2) + 1
+
     processed_count, skipped_count, failed_count = 0, 0, 0
     pbar = None
     is_first_item_for_debug = True
+
+def main():
+    """Main function to orchestrate the neutralization process."""
+    # --- Config and Arguments ---
+    default_model = get_config_value(APP_CONFIG, "DataGeneration", "neutralization_model", "anthropic/claude-3.5-sonnet")
+    default_points_str = "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, Midheaven"
+    points_to_process = get_config_value(APP_CONFIG, "DataGeneration", "points_for_neutralization", default_points_str)
+    points_list = [p.strip() for p in points_to_process.split(',')]
     
-    # --- Main Processing Loop ---
+    parser = argparse.ArgumentParser(description="Neutralize raw astrological delineations using an LLM.")
+    parser.add_argument("-i", "--input-file", default="data/foundational_assets/sf_delineations_library.txt")
+    parser.add_argument("-o", "--output-dir", default="data/foundational_assets/neutralized_delineations")
+    parser.add_argument("--model", default=default_model)
+    parser.add_argument("--force", action="store_true", help="Force re-processing of all groups.")
+    parser.add_argument("--fast", action="store_true", help="Use bundled API calls for faster initial processing.")
+    parser.add_argument("--debug-task", type=str, default=None, help="Debug a specific task (e.g., 'Sun in Aries', 'Quadrants'). Prints prompt/response and exits.")
+    args = parser.parse_args()
+    
+    # --- File Handling and Backup ---
+    input_path, output_dir = Path(args.input_file), Path(args.output_dir)
+    if not input_path.exists(): logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}"); sys.exit(1)
+
+    if args.force and output_dir.exists():
+        print(f"\n{Fore.YELLOW}WARNING: You are about to overwrite all neutralized delineation files.{Fore.RESET}")
+        confirm = input("A backup will be created. Are you sure? (Y/N): ").lower()
+        if confirm != "y": print("Operation cancelled by user."); sys.exit(0)
+        try:
+            backup_dir = Path("data/backup"); backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_name = f"{output_dir.name}_{timestamp}.zip"
+            shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
+            logging.info(f"Successfully created backup at: {backup_dir / backup_name}")
+            shutil.rmtree(output_dir)
+        except Exception as e: logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # --- Worker Setup ---
+    script_dir, temp_dir = Path(__file__).parent, Path(__file__).parent / "temp_neutralize_worker"
+    temp_dir.mkdir(exist_ok=True)
+    temp_config = configparser.ConfigParser()
+    if APP_CONFIG.has_section('LLM'): temp_config['LLM'] = APP_CONFIG['LLM']
+    if APP_CONFIG.has_section('API'): temp_config['API'] = APP_CONFIG['API']
+    if not temp_config.has_section('LLM'): temp_config.add_section('LLM')
+    temp_config.set('LLM', 'model_name', args.model)
+    with open(temp_dir / "temp_config.ini", 'w') as f: temp_config.write(f)
+
+    print(f"\n{Fore.YELLOW}--- Starting Delineation Neutralization ---")
+    all_delineations = parse_llm_response(input_path)
+    grouped_delineations = group_delineations(all_delineations, points_list)
+    points_in_signs_master_order = list(get_points_in_signs_delineations(all_delineations, points_list).keys())
+
+    # --- Dynamically build the list of tasks to run ---
+    tasks_to_run = []
+    points_output_path = output_dir / "points_in_signs.csv"
+
+    if args.fast:
+        tqdm.write("Running in --fast mode: tasks are bundled for speed.")
+        all_balances_data = {}
+        for filename, data in grouped_delineations.items():
+            if filename != "points_in_signs.csv":
+                all_balances_data.update(data)
+        if all_balances_data:
+            tasks_to_run.append({'type': 'balance_bundle', 'name': 'All Balances', 'data': all_balances_data})
+        
+        for point in points_list:
+            point_dels = {k: v for k, v in grouped_delineations["points_in_signs.csv"].items() if k.startswith(point)}
+            if point_dels:
+                tasks_to_run.append({'type': 'point_bundle', 'name': f"{point} in Signs", 'data': point_dels})
+        if points_output_path.exists(): points_output_path.unlink()
+
+    else:
+        for filename, data in grouped_delineations.items():
+            if filename != "points_in_signs.csv":
+                if args.force or not (output_dir / filename).exists():
+                    tasks_to_run.append({'type': 'balance', 'name': filename.replace('.csv','').replace('balances_',''), 'filename': filename, 'data': data})
+        
+        processed_keys = set() if args.force else get_processed_keys_from_csv(points_output_path)
+        if args.force and points_output_path.exists(): points_output_path.unlink()
+        for key, text in grouped_delineations["points_in_signs.csv"].items():
+            if key not in processed_keys:
+                tasks_to_run.append({'type': 'point_in_sign', 'name': key, 'data': {key: text}})
+
+    processed_count, failed_count = 0, 0
+    resorting_needed = False
+    
     try:
-        with tqdm(total=len(grouped_delineations), desc="Processing Groups", ncols=100) as pbar:
-            for filename, group_data in grouped_delineations.items():
-                pbar.set_postfix_str(filename)
-                group_name = filename.replace('.csv', '').replace('balances_', '')
-                output_path = output_dir / filename
+        with tqdm(total=len(tasks_to_run), desc="Processing Tasks", ncols=100) as pbar:
+            for task in tasks_to_run:
+                task_msg = f"Neutralizing {task['name']}..."
+                tqdm.write(task_msg)
+                
+                block = "\n".join([f"*{k}\n{v}" for k, v in task['data'].items()])
+                prompt = NEUTRALIZE_PROMPT_TEMPLATE.format(delineation_block=block)
+                
+                if args.debug_task and args.debug_task.lower() == task['name'].lower():
+                    debug_and_exit(prompt, run_llm_worker(script_dir, temp_dir, "debug_task", prompt), pbar, temp_dir)
 
-                if output_path.exists() and not args.force:
-                    tqdm.write(f"Skipping {group_name} (already exists)...")
-                    skipped_count += 1
-                    pbar.update(1)
-                    continue
+                response, error = run_llm_worker(script_dir, temp_dir, task['name'], prompt)
+                
+                success = False
+                if response:
+                    parsed = parse_llm_response(response)
+                    if len(parsed) == len(task['data']):
+                        success = True
+                        if task['type'] == 'balance':
+                            save_group_to_csv(output_dir / task['filename'], parsed)
+                        elif task['type'] in ['point_in_sign', 'point_bundle']:
+                            append_to_csv(points_output_path, parsed)
+                            resorting_needed = True
+                        elif task['type'] == 'balance_bundle':
+                            for fname, grp_data in grouped_delineations.items():
+                                if fname != "points_in_signs.csv":
+                                    subset_data = {k: parsed[k] for k in grp_data.keys() if k in parsed}
+                                    if subset_data:
+                                        save_group_to_csv(output_dir / fname, subset_data)
 
-                if filename == "points_in_signs.csv":
-                    tqdm.write("Processing Points in Signs...")
-                    neutralized_group_data = {}
-                    point_failures = 0
-                    for point in points_list:
-                        tqdm.write(f"  - Neutralizing {point} in Signs...")
-                        point_dels = {k: v for k, v in group_data.items() if k.startswith(point)}
-                        if not point_dels: continue
-                        
-                        block = "\n".join([f"*{k}\n{v}" for k, v in point_dels.items()])
-                        prompt = NEUTRALIZE_PROMPT_TEMPLATE.format(delineation_block=block)
-                        
-                        if args.debug_first_prompt and is_first_item_for_debug:
-                            debug_and_exit(prompt, run_llm_worker(script_dir, temp_dir, "debug_task", prompt), pbar, temp_dir)
-
-                        response, error = run_llm_worker(script_dir, temp_dir, f"neutralize_{point}", prompt)
-                        if response:
-                            parsed_response = parse_llm_response(response)
-                            if len(parsed_response) == len(point_dels):
-                                neutralized_group_data.update(parsed_response)
-                            else:
-                                point_failures += 1
-                        else:
-                            point_failures += 1
-                        is_first_item_for_debug = False
-                            
-                    if point_failures == 0:
-                        save_group_to_csv(output_path, neutralized_group_data)
-                        tqdm.write(f" -> {Fore.GREEN}Points in Signs completed.{Fore.RESET}")
-                        processed_count += 1
-                    else:
-                        tqdm.write(f" -> {Fore.RED}Points in Signs failed ({point_failures} sub-tasks failed).{Fore.RESET}")
-                        failed_count += 1
-                else: # Standard groups
-                    block = "\n".join([f"*{k}\n{v}" for k, v in group_data.items()])
-                    prompt = NEUTRALIZE_PROMPT_TEMPLATE.format(delineation_block=block)
-                    
-                    if args.debug_first_prompt and is_first_item_for_debug:
-                        debug_and_exit(prompt, run_llm_worker(script_dir, temp_dir, "debug_task", prompt), pbar, temp_dir)
-                    is_first_item_for_debug = False
-
-                    response, error = run_llm_worker(script_dir, temp_dir, f"neutralize_{group_name}", prompt)
-                    
-                    if response:
-                        neutralized_data = parse_llm_response(response)
-                        if len(neutralized_data) == len(group_data):
-                            save_group_to_csv(output_path, neutralized_data)
-                            tqdm.write(f"{Fore.GREEN}{group_name.capitalize()} balances completed.{Fore.RESET}")
-                            processed_count += 1
-                        else:
-                            tqdm.write(f"{Fore.RED}{group_name.capitalize()} balances failed (incomplete response).{Fore.RESET}")
-                            failed_count += 1
-                    else:
-                        tqdm.write(f"{Fore.RED}{group_name.capitalize()} balances failed (no response).{Fore.RESET}")
-                        failed_count += 1
+                if success:
+                    tqdm.write(f"  -> {Fore.GREEN}Completed.{Fore.RESET}")
+                    processed_count += 1
+                else:
+                    tqdm.write(f"  -> {Fore.RED}Failed.{Fore.RESET}")
+                    failed_count += 1
+                    if error:
+                        error_text = error.read_text(encoding='utf-8').strip()
+                        tqdm.write(f"{Fore.RED}      Reason: {error_text}{Fore.RESET}")
+                
                 pbar.update(1)
                 time.sleep(0.1)
-
+                
     except KeyboardInterrupt:
         print(f"\n\n{Fore.YELLOW}Process interrupted by user.{Fore.RESET}")
     finally:
-        if 'pbar' in locals() and pbar is not None and not pbar.disable:
-            pbar.close()
+        if resorting_needed and failed_count == 0:
+            print("\nRe-sorting to match original file order...")
+            resort_csv_by_key_order(points_output_path, points_in_signs_master_order)
+        
         shutil.rmtree(temp_dir, ignore_errors=True)
+        
+        if args.fast:
+            total_possible_tasks = 1 + len(points_list)
+        else:
+            total_possible_tasks = (len(grouped_delineations) - 1) + len(points_in_signs_master_order)
+        
+        skipped_count = total_possible_tasks - len(tasks_to_run)
+
         print(f"\n{Fore.YELLOW}--- Summary ---{Fore.RESET}")
-        print(f"Processed: {processed_count} groups")
-        print(f"Skipped:   {skipped_count} groups (already exist)")
-        print(f"Failed:    {failed_count} groups")
+        print(f"Processed: {processed_count} tasks")
+        print(f"Skipped:   {skipped_count} tasks (already exist)")
+        print(f"Failed:    {failed_count} tasks")
         
         if failed_count > 0:
-            print(f"\n{Fore.RED}Neutralization process finished with {failed_count} failure(s). ✨{Fore.RESET}\n")
+            print(f"\n{Fore.RED}Neutralization process finished with {failed_count} failure(s).{Fore.RESET}")
+            print(f"{Fore.YELLOW}Re-run the script to automatically process the failed tasks.{Fore.RESET}\n")
         else:
             print(f"\n{Fore.GREEN}Neutralization process finished successfully. ✨{Fore.RESET}\n")
 
@@ -315,30 +438,6 @@ def debug_and_exit(prompt, worker_result, pbar, temp_dir):
     response_path, error_path = worker_result
     if pbar:
         pbar.close()
-        sys.stdout.write('\x1b[2K\r') 
-        
-    print(f"\n\n{Fore.CYAN}--- DEBUG MODE: FIRST PROMPT AND RESPONSE ---{Fore.RESET}")
-    print(f"\n{Fore.YELLOW}--- PROMPT SENT TO LLM ---{Fore.RESET}")
-    print(prompt)
-    if error_path:
-        print(f"\n{Fore.RED}--- ERROR RECEIVED ---{Fore.RESET}")
-        print(error_path.read_text(encoding='utf-8'))
-    elif response_path:
-        print(f"\n{Fore.GREEN}--- RESPONSE RECEIVED ---{Fore.RESET}")
-        print(response_path.read_text(encoding='utf-8'))
-    else:
-        print(f"\n{Fore.RED}--- NO RESPONSE OR ERROR FILE GENERATED ---{Fore.RESET}")
-    print(f"\n{Fore.CYAN}--- HALTING EXECUTION ---{Fore.RESET}")
-    
-    if temp_dir.exists():
-        shutil.rmtree(temp_dir)
-    sys.exit(0)
-
-def debug_and_exit(prompt, response_path, error_path, pbar, temp_dir):
-    """Prints debug info and halts the script."""
-    if pbar:
-        pbar.close()
-        # Clear the line where the progress bar was to prevent display artifacts
         sys.stdout.write('\x1b[2K\r') 
         
     print(f"\n\n{Fore.CYAN}--- DEBUG MODE: FIRST PROMPT AND RESPONSE ---{Fore.RESET}")
@@ -379,7 +478,17 @@ def run_llm_worker(script_dir, temp_dir, task_name, prompt):
         "--config_path", str(config_file),
         "--quiet",
     ]
-    subprocess.run(worker_cmd, check=False, capture_output=True)
+    result = subprocess.run(worker_cmd, check=False, capture_output=True, text=True, encoding='utf-8')
+
+    # If the worker crashed without writing its own error file, capture its output.
+    error_file_exists = error_file.exists() and error_file.stat().st_size > 0
+    if result.returncode != 0 and not error_file_exists:
+        crash_log = f"LLM worker crashed with exit code {result.returncode}.\n"
+        if result.stdout:
+            crash_log += f"\n--- STDOUT ---\n{result.stdout}\n"
+        if result.stderr:
+            crash_log += f"\n--- STDERR ---\n{result.stderr}\n"
+        error_file.write_text(crash_log, encoding='utf-8')
 
     error = error_file if error_file.exists() and error_file.stat().st_size > 0 else None
     response = response_file if response_file.exists() else None

@@ -66,7 +66,7 @@ This stage ensures expensive LLM processing is only performed on high-quality ca
 2.  **Validation (`validate_adb_data.py`):** Audits the raw data against live Wikipedia, assigning a validation `Status` to each record.
 3.  **Eligibility Selection (`select_eligible_candidates.py`):** Performs all initial data quality checks (e.g., valid birth year, 'OK' status, uniqueness), producing a clean list of all subjects potentially viable for the study.
 4.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
-5.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** Determines the final dataset size by processing subjects in order of eminence and stopping automatically when personality diversity (variance) shows a sustained drop. The output also includes `BirthYear`.
+5.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** A fully automated, resilient script that determines the final dataset size. It processes subjects by eminence and stops when diversity (variance) shows a sustained drop. Its robust pre-flight check re-analyzes existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention. The output also includes `BirthYear`.
 
 **Stage 3: Final Subject Selection (Automated)**
 6.  **Final Selection (`select_final_candidates.py`):** Performs the final filtering. It takes the eligible candidates list, selects only those present in the definitive `ocean_scores.csv` set, resolves country codes, and sorts the final list by eminence.
@@ -76,7 +76,9 @@ This stage ensures expensive LLM processing is only performed on high-quality ca
 8.  **Manual Processing (Solar Fire):** The formatted file is imported into Solar Fire, which calculates the required celestial data and exports it as `sf_chart_export.csv`.
 
 **Stage 5: Delineation Neutralization (Automated)**
-9.  **Neutralization (`neutralize_delineations.py`):** This script automates the rewriting of the esoteric source texts. It parses the raw `sf_delineations_library.txt`, intelligently filters and groups related items, and uses an LLM with a highly calibrated prompt to transform them into a library of neutral, psychological descriptions, saved as a series of `.csv` files in the `neutralized_delineations/` directory.
+9.  **Neutralization (`neutralize_delineations.py`):** This script uses a powerful hybrid strategy to rewrite the esoteric source texts.
+    *   **Fast Mode (`--fast`):** For initial runs, this mode bundles tasks into large, high-speed API calls (e.g., all 12 "Sun in Signs" delineations at once). This is highly efficient but may fail on some large tasks.
+    *   **Robust/Resume Mode (default):** For resuming or fixing failed runs, this mode processes each of the 149 delineations as a separate, atomic task. This granular approach is slower but guarantees completion by solving potential response truncation issues from the LLM.
 
 **Stage 6: Final Database Generation (Automated)**
 10. **Integration (`create_subject_db.py`):** Integrates the manually generated chart data with the final subject list, decodes the unique IDs, and produces a clean master database.
@@ -100,11 +102,11 @@ The pipeline can be understood through the following architectural and logical d
 
 {{grouped_figure:docs/diagrams/logic_prep_eminence_scoring.mmd | scale=2.5 | width=65% | caption=Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=65% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size based on variance degradation.}}
+{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=65% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size. A robust pre-flight check re-analyzes all existing data to ensure correct resumption or finalization after interruptions.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_final_selection.mmd | scale=2.5 | width=65% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_neutralization.mmd | scale=2.5 | width=65% | caption=Logic for Delineation Neutralization (`neutralize_delineations.py`): The algorithm for parsing, filtering, grouping, and rewriting esoteric texts into a neutral library.}}
+{{grouped_figure:docs/diagrams/logic_prep_neutralization.mmd | scale=2.5 | width=65% | caption=Logic for Delineation Neutralization (`neutralize_delineations.py`): The hybrid algorithm for rewriting texts. Fast mode bundles tasks for speed, while the robust default mode processes each item individually to guarantee completion.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_generation.mmd | scale=2.5 | width=65% | caption=Logic for Database Generation (`generate_personalities_db.py`): The algorithm for assembling the final description text for each subject.}}
 

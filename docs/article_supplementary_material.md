@@ -64,7 +64,7 @@ pdm run gen-eminence
 ```
 
 #### c. OCEAN Scoring & Dynamic Cutoff (`generate_ocean_scores.py`)
-This script determines the final subject pool size by processing subjects in order of eminence, generating OCEAN scores, and stopping automatically when personality diversity declines. The output, `ocean_scores.csv`, is the definitive subject set.
+This script is a fully automated, resilient process that determines the final subject pool size. It processes subjects by eminence and stops when diversity (variance) shows a sustained drop. Its robust pre-flight check re-analyzes all existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention.
 ```bash
 # Generate OCEAN scores to determine the final cutoff
 pdm run gen-ocean
@@ -224,10 +224,20 @@ The personality descriptions are assembled from a library of pre-written text co
 
 ### Step 2: Automated Delineation Neutralization (`neutralize_delineations.py`)
 
-This script automates the process of rewriting the esoteric library into neutral, psychological text. It parses the raw library, intelligently filters and groups related items, and uses an LLM with a calibrated prompt to neutralize the text.
-```bash
-# Neutralize the entire library
-pdm run neutralize
+This script uses a powerful hybrid strategy to rewrite the esoteric library into neutral, psychological text. The recommended workflow is a two-step process:
+
+1.  **Initial Fast Pass:** Run the script with the `--fast` flag. This mode bundles tasks into large, high-speed API calls (e.g., all 12 "Sun in Signs" delineations at once). This is highly efficient but may fail on some large tasks.
+    ```bash
+    # Perform the initial, high-speed neutralization
+    pdm run neutralize --fast
+    ```
+
+2.  **Robust Resume/Fix:** After the fast run, re-run the script without any flags. In its default mode, the script processes each of the 149 delineations as a separate, atomic task. It will automatically detect any tasks that failed during the fast pass and re-run only those, guaranteeing completion.
+    ```bash
+    # Automatically fix any failed tasks from the fast run
+    pdm run neutralize
+    ```
+The script's output is the collection of `.csv` files in the `data/foundational_assets/neutralized_delineations/` directory.
 ```
 The script's output is the collection of `.csv` files in the `data/foundational_assets/neutralized_delineations/` directory.
 
@@ -250,10 +260,7 @@ pdm run gen-db
 ```
 The output is `personalities_db.txt`, a tab-delimited file with the fields: `Index`, `Name`, `BirthYear`, and `DescriptionText`.
 
-The rest of the Testing Framework is fully automated in Python, as documented in the main Framework Manual.nounced emotional sensitivity and deeply rooted foundations. At times, may be overly protective, reluctant to let go, timid, or reclusive. Experiences difficulty becoming motivated to achieve personal goals. At times, self-confidence is insufficient even to set these goals, and a general lack of enthusiasm coupled with feeling overwhelmed by change is common. Exhibits a practical and efficient, hands-on approach with a dependable common-sense method applied to most matters. A down-to-earth demeanor proves advantageous for daily tasks, though a stubborn reluctance to embrace change can sometimes stifle both personal and others’ enthusiasm. Displays objectivity and philosophical insight, favoring an intellectual perspective in approaching life. The rational mind consistently outweighs emotional considerations, which are viewed as less reliable. Possesses a strong sense of fairness and logical thought, though there is a tendency to consider emotions in a disparaging light. Seeks relationships from an objective standpoint rather than a personal one and values public engagement alongside contributing to society. Interactions with others assume a paramount role, with significant value placed on both personal relationships and broader social connections. Possesses a natural aptitude for mediation, informed by an understanding of the nuances inherent in relationships. The greatest insights into personal identity are often gained through these relational contexts. Care should be taken to avoid becoming entangled in stifling relationships. Public life is regarded as the pinnacle of achievement, with personal satisfaction derived from notable accomplishments and ongoing contributions in the public arena. A high public profile may be attained through career success and social status, though it is essential that such accomplishments do not come at the expense of personal relationships. Reveals a strong connection between emotion and physical well-being coupled with a desire for perfection and order. Under stress, occasional health challenges may emerge. Exhibits curiosity, adaptability, and a versatile nature, maintaining high levels of engagement through lively communication and multiple interests. Often infuses situations with dynamic energy—even if this occasionally leads to disorganization. Values traditional knowledge and adopts a methodical, hands-on approach to learning. Prefers established ideas, approaching new information with caution. Values intellectual stimulation and engaging, flirtatious exchanges in relationships. Communication is essential, though a restless nature may drive frequent shifts in interest. Pursues personal desires with determination and methodical persistence. Follows a reliable course of action and can exhibit stubbornness when challenged. Pursues truth persistently while demonstrating loyalty and wisdom. Exhibits a robust desire for both material and experiential abundance. May tend toward emotional inhibition and shyness while still committing seriously to personal and familial responsibilities. Encourages brilliant, inventive breakthroughs that contribute unique insights to collective progress. Infuses creativity with spirituality, manifesting dramatic artistic expression and an appreciation for aesthetics. Represents the upheaval and reformation of familiar systems, prompting new social concepts and security structures. A courteous and thoughtful approach to life is combined with a strong focus on interpersonal relationships. Fairness, justice, and the cultivation of harmonious connections—whether personal or professional—play a central role in defining purpose. A career providing emotional security and opportunities to care for others is central, with strong feelings about public stature and a need for a nurturing work environment.
-```
-
-The rest of the Testing Framework is fully automated in Python, as documented herein.
+The rest of the Testing Framework is fully automated in Python, as documented in the main Framework Manual.
 
 ## Related Files
 

@@ -30,15 +30,15 @@ subjects to be used in the experiment.
 
 Key Features:
 -   **Data-Driven Cutoff**: The script stops processing when it detects a
-    sustained drop in the variance of OCEAN scores. It uses a robust "M of N"
-    rule (e.g., stop if 4 of the last 5 windows are below a threshold) to
-    avoid premature cutoffs caused by temporary fluctuations.
+    sustained drop in the variance of OCEAN scores. The cutoff point is set
+    at the beginning of the last window that triggered the stop condition.
 -   **Fixed Benchmark**: The variance of new subject windows is compared against a
     stable benchmark calculated from a fixed number of the most eminent
     subjects, ensuring a consistent standard.
--   **Resilient & Resumable**: Safely stops and resumes, with a smart pre-flight
-    check that can auto-truncate data if a run was interrupted after a valid
-    cutoff was passed.
+-   **Robust & Resumable**: The script's pre-flight check re-analyzes all
+    existing data on startup. This ensures that if a previous run was
+    interrupted after the cutoff condition was met, the script will
+    automatically finalize the data without processing more subjects.
 -   **Data Integrity**: Tracks subjects the LLM fails to score and generates a
     `missing_ocean_scores.txt` report. Discarded data is archived in
     `ocean_scores_discarded.csv` instead of being deleted.
@@ -301,18 +301,19 @@ def generate_summary_report(
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         df = pd.read_csv(filepath)
-        # Ensure all OCEAN columns are included
-        ocean_cols = [field for field in OCEAN_FIELDNAMES if field not in ["Index", "idADB", "Name"]]
-        stats_raw = df[ocean_cols].describe()
+        # Define columns for the main stats table and for the 'Overall' calculation
+        report_cols = [field for field in OCEAN_FIELDNAMES if field not in ["Index", "idADB", "Name"]]
+        personality_cols = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
+        stats_raw = df[report_cols].describe()
 
-        # Calculate the 'Overall' aggregate column for the main table
-        stats_raw['Overall'] = stats_raw.mean(axis=1)
+        # Calculate the 'Overall' aggregate column for the main table, using only personality scores
+        stats_raw['Overall'] = stats_raw[personality_cols].mean(axis=1)
         stats_raw.loc['count', 'Overall'] = stats_raw.loc['count', 'Openness']
-        stats_raw.loc['min', 'Overall'] = stats_raw.loc['min'].min()
-        stats_raw.loc['max', 'Overall'] = stats_raw.loc['max'].max()
+        stats_raw.loc['min', 'Overall'] = stats_raw.loc['min', personality_cols].min()
+        stats_raw.loc['max', 'Overall'] = stats_raw.loc['max', personality_cols].max()
 
         # Reorder columns
-        all_cols_with_overall = ['Overall'] + ocean_cols
+        all_cols_with_overall = ['Overall'] + report_cols
         stats_raw = stats_raw[all_cols_with_overall]
 
         def format_with_custom_precision(raw_stats_df):
@@ -396,10 +397,10 @@ def generate_summary_report(
                     continue
 
                 # Get stats for the quintile
-                q_stats_raw = quintile_df[ocean_cols].describe().loc[['count', 'mean', 'std']]
+                q_stats_raw = quintile_df[report_cols].describe().loc[['count', 'mean', 'std']]
                 
-                # Calculate the 'Overall' aggregate column for the quintile
-                q_stats_raw['Overall'] = q_stats_raw.mean(axis=1)
+                # Calculate the 'Overall' aggregate column for the quintile, using only personality scores
+                q_stats_raw['Overall'] = q_stats_raw[personality_cols].mean(axis=1)
                 q_stats_raw.loc['count', 'Overall'] = q_stats_raw.loc['count', 'Openness']
                 
                 # Reorder and format using the custom precision formatter
@@ -462,41 +463,49 @@ def load_cutoff_state(summary_path: Path, maxlen: int) -> (float, deque):
 
     return benchmark_variance, last_checks
 
-def perform_pre_flight_check(args, all_scores_df, benchmark_variance, last_variance_checks):
+def perform_pre_flight_check(args, all_scores_df, benchmark_variance, initial_checks):
     """
-    Analyzes the loaded state to decide if the run should continue,
-    truncate and exit, or just exit.
+    Analyzes the current data to decide if the run should continue or stop.
+    It returns the authoritative, up-to-date variance check state for resumption.
     """
-    if benchmark_variance == 0:
-        return "CONTINUE" # Not enough data yet to do a check.
+    if len(all_scores_df) < args.cutoff_start_point or benchmark_variance == 0:
+        return "CONTINUE", initial_checks
 
-    met_count = sum(1 for check in last_variance_checks if check[2])
+    # Recalculate the true state of variance checks from all existing data.
+    recalculated_checks = deque(maxlen=args.variance_check_window)
+    start = args.cutoff_start_point
+    end = len(all_scores_df)
+
+    for check_point in range(start, end + 1, args.variance_analysis_window):
+        window_df = all_scores_df.iloc[check_point - args.variance_analysis_window : check_point]
+        if len(window_df) < args.variance_analysis_window:
+            continue
+        
+        v_avg = calculate_average_variance(window_df)
+        is_met = v_avg < (args.variance_cutoff_percentage * benchmark_variance)
+        percentage = (v_avg / benchmark_variance) * 100 if benchmark_variance > 0 else 0.0
+        recalculated_checks.append((check_point, v_avg, bool(is_met), percentage))
+
+    met_count = sum(1 for check in recalculated_checks if check[2])
     if met_count < args.variance_trigger_count:
         print(f"{BColors.GREEN}Pre-flight check: Cutoff condition not met ({met_count}/{args.variance_trigger_count}). Resuming run...{BColors.ENDC}")
-        return "CONTINUE"
+        return "CONTINUE", recalculated_checks
 
-    # --- Cutoff condition IS met ---
-    successful_checks = [c for c in last_variance_checks if c[2]]
-    first_trigger_checkpoint = min(c[0] for c in successful_checks)
-    cutoff_start_point = first_trigger_checkpoint - args.variance_analysis_window
-    final_rounded_count = (cutoff_start_point // 100) * 100
-
-    if len(all_scores_df) == final_rounded_count:
-        print(f"{BColors.GREEN}Pre-flight check: Cutoff condition met and file is already correctly truncated to {final_rounded_count} records. Nothing to do.{BColors.ENDC}")
-        return "EXIT"
+    # --- Cutoff condition IS met based on existing data ---
+    print(f"{BColors.YELLOW}Pre-flight check: Cutoff condition is met based on existing data ({met_count}/{args.variance_trigger_count}).{BColors.ENDC}")
+    print("No new subjects will be processed. Finalizing with current data.")
     
-    if len(all_scores_df) > final_rounded_count:
-        print(f"{BColors.YELLOW}Pre-flight check: Cutoff met. File has {len(all_scores_df)} records but should have {final_rounded_count}.{BColors.ENDC}")
-        print("Truncating file to correct size...")
-        truncate_and_archive_scores(Path(args.output_file), final_rounded_count)
-        generate_summary_report(
-            Path(args.output_file), "Finalized by pre-flight check.", len(all_scores_df), final_rounded_count,
-            benchmark_variance, last_variance_checks, args.variance_analysis_window,
-            args.benchmark_population_size, args.variance_check_window, args.variance_trigger_count
-        )
-        return "EXIT"
-        
-    return "CONTINUE" # Should not be reached, but safe default.
+    last_check_checkpoint = recalculated_checks[-1][0]
+    cutoff_start_point = last_check_checkpoint - args.variance_analysis_window
+    final_rounded_count = (cutoff_start_point // args.variance_analysis_window) * args.variance_analysis_window
+
+    truncate_and_archive_scores(Path(args.output_file), final_rounded_count)
+    generate_summary_report(
+        Path(args.output_file), "Finalized by pre-flight check (cutoff met).", len(all_scores_df), final_rounded_count,
+        benchmark_variance, recalculated_checks, args.variance_analysis_window,
+        args.benchmark_population_size, args.variance_check_window, args.variance_trigger_count
+    )
+    return "EXIT", None
 
 def main():
     """Main function to orchestrate the OCEAN score generation."""
@@ -603,10 +612,10 @@ def main():
         all_scores_df = pd.read_csv(output_path)
 
     # --- Pre-flight Check ---
-    summary_path = output_path.parent / f"{output_path.stem}_summary.txt"
-    benchmark_variance, last_variance_checks = load_cutoff_state(summary_path, args.variance_check_window)
+    summary_path = output_path.parent.parent / "reports" / f"{output_path.stem}_summary.txt"
+    benchmark_variance, initial_checks = load_cutoff_state(summary_path, args.variance_check_window)
     
-    status = perform_pre_flight_check(args, all_scores_df, benchmark_variance, last_variance_checks)
+    status, last_variance_checks = perform_pre_flight_check(args, all_scores_df, benchmark_variance, initial_checks)
     if status == "EXIT":
         sys.exit(0)
     
@@ -655,7 +664,7 @@ def main():
             # 3. Process response
             if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
                 error_msg = temp_error_file.read_text().strip()
-                logging.error(f"Worker failed for batch {batch_num}. Error: {error_msg}")
+                logging.error(f"Worker failed for batch {session_batch_num}. Error: {error_msg}")
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
                     logging.critical(f"Halting after {max_consecutive_failures} consecutive batch failures.")
@@ -667,14 +676,14 @@ def main():
             consecutive_failures = 0
             
             if not temp_response_file.exists():
-                logging.error(f"Worker did not produce response file for batch {batch_num}.")
+                logging.error(f"Worker did not produce response file for batch {session_batch_num}.")
                 continue
             
             response_text = temp_response_file.read_text(encoding='utf-8')
             parsed_scores = parse_batch_response(response_text)
 
             if not parsed_scores:
-                logging.error(f"Failed to parse any scores from response for batch {batch_num}.")
+                logging.error(f"Failed to parse any scores from response for batch {session_batch_num}.")
                 continue
             
             # Create a lookup map to add BirthYear back to the results
@@ -739,10 +748,8 @@ def main():
                         if met_count >= args.variance_trigger_count:
                             stop_reason = f"Cutoff met ({met_count} of last {len(last_variance_checks)} windows below threshold)."
                             
-                            # Find the earliest window that contributed to the stop condition
-                            successful_checks = [c for c in last_variance_checks if c[2]]
-                            first_trigger_checkpoint = min(c[0] for c in successful_checks)
-                            cutoff_start_subject_count = first_trigger_checkpoint - args.variance_analysis_window
+                            # Set cutoff to the beginning of the window that triggered this final check.
+                            cutoff_start_subject_count = check_point - args.variance_analysis_window
                             
                             print(f"{BColors.RED}STOPPING: {stop_reason}{BColors.ENDC}")
                             break # Exit main loop
@@ -767,7 +774,7 @@ def main():
             if stop_reason.startswith("Cutoff met"):
                 final_raw_count = cutoff_start_subject_count
             
-            final_count = (final_raw_count // 100) * 100
+            final_count = (final_raw_count // args.variance_analysis_window) * args.variance_analysis_window
             truncate_and_archive_scores(output_path, final_count)
 
         # Always generate reports. They will reflect the final state of the CSV file.

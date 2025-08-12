@@ -1,23 +1,9 @@
 graph TD
-    subgraph "Inputs & Data Artifacts"
-        direction LR
-        subgraph "Automated Pipeline"
-            adb_raw(adb_raw_export.txt)
-            validation_report(adb_validation_report.csv)
-            eligible_candidates(adb_eligible_candidates.txt)
-            eminence_scores(eminence_scores.csv)
-            ocean_scores(ocean_scores.csv)
-            final_candidates(adb_final_candidates.txt)
-            neutralized(neutralized_delineations/)
-            subject_db(subject_db.csv)
-            final_product(personalities_db.txt)
-        end
-        subgraph "Manual & External Processes"
-            sf_import(sf_data_import.txt)
-            sf_export(sf_chart_export.csv)
-            sf_lib(sf_delineations_library.txt)
-        end
-    end
+    %% Define Styles
+    classDef scriptStyle fill:#fff2cc,stroke:#d6b656,stroke-width:2px
+    classDef artifactFileStyle fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef artifactDBStyle fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef manualStyle fill:#f8cecc,stroke:#b85450,stroke-width:2px
 
     subgraph "Pipeline Scripts"
         direction LR
@@ -33,6 +19,28 @@ graph TD
         gen_personalities[src/generate_personalities_db.py]
     end
 
+    subgraph "Inputs & Data Artifacts"
+        direction LR
+        subgraph "Automated Pipeline"
+            adb_raw[adb_raw_export.txt]
+            validation_report[(adb_validation_report.csv)]
+            eligible_candidates[adb_eligible_candidates.txt]
+            eminence_scores[(eminence_scores.csv)]
+            ocean_scores[(ocean_scores.csv)]
+            final_candidates[adb_final_candidates.txt]
+            neutralized[neutralized_delineations/]
+            subject_db[(subject_db.csv)]
+            final_product[personalities_db.txt]
+        end
+        subgraph "Manual & External Processes"
+            sf_import[sf_data_import.txt]
+            sf_export[(sf_chart_export.csv)]
+            sf_lib[sf_delineations_library.txt]
+            manual_sf(Use Solar Fire Software)
+        end
+    end
+
+    %% Connections
     fetch --> adb_raw
     adb_raw --> validate
     validate --> validation_report
@@ -55,11 +63,9 @@ graph TD
     final_candidates --> prepare_sf
     prepare_sf --> sf_import
 
-    subgraph "Manual Steps"
-        manual_sf(Use Solar Fire Software)
-    end
     sf_import --> manual_sf
     manual_sf --> sf_export
+    manual_sf --> sf_lib
 
     sf_lib --> neutralize_dels
     neutralize_dels --> neutralized
@@ -71,3 +77,9 @@ graph TD
     subject_db --> gen_personalities
     neutralized --> gen_personalities
     gen_personalities --> final_product
+
+    %% Apply Styles
+    class fetch,validate,select_eligible,gen_eminence,gen_ocean,select_final,prepare_sf,neutralize_dels,create_subject,gen_personalities scriptStyle
+    class adb_raw,eligible_candidates,final_candidates,sf_import,sf_lib,neutralized,final_product artifactFileStyle
+    class validation_report,eminence_scores,ocean_scores,sf_export,subject_db artifactDBStyle
+    class manual_sf manualStyle

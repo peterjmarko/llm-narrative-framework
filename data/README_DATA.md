@@ -70,7 +70,7 @@ These files are static, pre-prepared assets that provide the rules and content f
 -   **`ocean_scores.csv`**: This file is the **definitive source for the experiment's final subject pool**. It is created by `generate_ocean_scores.py`, which stops generating scores once personality diversity (variance) shows a sustained drop. The number of subjects in this file dictates the final dataset size.
 -   **`country_codes.csv`**: A mapping file to resolve country/state abbreviations.
 -   **`sf_delineations_library.txt`**: The raw, complete library of interpretive text as exported from Solar Fire.
--   **`neutralized_delineations/`**: A directory of `.csv` files containing the sanitized, de-jargonized description components. This library is generated automatically by `neutralize_delineations.py`.
+-   **`neutralized_delineations/`**: A directory of `.csv` files containing the sanitized, de-jargonized description components. This library is generated automatically by `neutralize_delineations.py`, which uses a hybrid strategy: a fast, bundled initial run (`--fast`) followed by a granular, robust resume run to guarantee completion.
 -   **`sf_chart_export.csv`**: The raw data exported from Solar Fire after it has processed the subjects. This is the output of the single manual step in the pipeline.
 -   **`point_weights.csv` & `balance_thresholds.csv`**: Configuration files that define the core logic for the personality classification algorithm in `generate_personalities_db.py`.
 

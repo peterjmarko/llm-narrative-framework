@@ -1,10 +1,16 @@
 graph TD
     subgraph "Logic for generate_ocean_scores.py"
-        A[Start] --> B{Load eminence scores & existing OCEAN scores};
-        B --> C{Load cutoff state from previous run's summary};
-        C --> D{Perform Pre-flight Check};
-        D -- Cutoff Already Met --> E[Truncate & Exit];
-        D -- Continue --> F{Loop through remaining subjects in batches};
+        A[Start] --> B{Load eminence scores & ALL existing OCEAN scores};
+        
+        subgraph "Pre-flight Check & Resumption"
+            B --> C{"Enough data for<br/>pre-flight check?"};
+            C -- No --> F{Loop through remaining subjects in batches};
+            C -- Yes --> D[Re-calculate benchmark variance & ALL variance checks from existing data];
+            D --> E{"Is Cutoff condition met?"};
+            E -- Yes --> G[Finalize data truncate/report & Exit];
+            E -- No --> H[Load re-calculated state for resumption];
+            H --> F;
+        end
 
         subgraph "Main Loop"
             F --> G[Call LLM for OCEAN scores];
@@ -30,7 +36,7 @@ graph TD
         
         subgraph "Finalization"
             R --> S{Did run complete normally?};
-            S -- Yes --> T{Determine final subject count based on first trigger};
+            S -- Yes --> T{Determine final subject count based on last trigger};
             S -- No (Interrupted) --> U{Keep all processed subjects};
             T --> V[Round down count to nearest 100];
             V --> W[Truncate main file & archive discarded scores];

@@ -1,11 +1,12 @@
 graph TD
+    classDef scriptStyle fill:#fff2cc,stroke:#d6b656,stroke-width:2px
+    classDef utilStyle fill:#e6e6fa,stroke:#333,stroke-width:2px
     subgraph Main Data Preparation Pipeline
         A[src/fetch_adb_data.py] --> B[src/validate_adb_data.py]
         B --> C[src/select_eligible_candidates.py]
         C --> D[src/generate_eminence_scores.py]
         D --> E[src/generate_ocean_scores.py]
         E --> F[src/select_final_candidates.py]
-        C --> F
         F --> G[src/prepare_sf_import.py]
         G --> H[src/create_subject_db.py]
         H --> I[src/generate_personalities_db.py]
@@ -15,10 +16,15 @@ graph TD
         J[src/neutralize_delineations.py]
     end
 
+    J --> I
+
     subgraph Shared Utilities
         K(src/id_encoder.py)
-        style K fill:#e6e6fa
     end
 
     G -.-> K
     H -.-> K
+
+    %% Apply Styles
+    class A,B,C,D,E,F,G,H,I,J scriptStyle
+    class K utilStyle

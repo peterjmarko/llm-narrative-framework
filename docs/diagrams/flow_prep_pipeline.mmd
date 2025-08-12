@@ -1,4 +1,5 @@
 graph TD
+    classDef manualStyle fill:#f8cecc,stroke:#b85450,stroke-width:2px
     subgraph "Stage 1: Sourcing & Validation"
         A[Fetch Raw Data<br>src/fetch_adb_data.py] --> B[Validate Data<br>src/validate_adb_data.py];
     end
@@ -16,8 +17,9 @@ graph TD
     subgraph "Stage 4: Manual Chart Calculation"
         F --> G[Prepare for SF Import<br>src/prepare_sf_import.py];
         G --> H((Use Solar Fire Software));
-        style H fill:#f9f,stroke:#333,stroke-width:2px;
     end
+    
+    class H manualStyle;
     
     subgraph "Stage 5: Automated Neutralization"
         I[Neutralize Delineations<br>src/neutralize_delineations.py]
@@ -25,6 +27,7 @@ graph TD
 
     subgraph "Stage 6: Final Database Generation"
         H --> J[Create Subject DB<br>src/create_subject_db.py];
+        I --> J
         I --> K[Generate Personalities DB<br>src/generate_personalities_db.py];
         J --> K
     end

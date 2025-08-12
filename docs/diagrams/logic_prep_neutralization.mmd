@@ -1,21 +1,37 @@
 graph TD
-    subgraph Logic for neutralize_delineations.py
-        A[Start] --> B{Parse raw delineations library};
-        B --> C{Group delineations by category};
-        C --> D{Loop through each group};
-        D -- Next Group --> E{Is group 'points_in_signs'?};
-        E -- Yes --> F{Loop through each point};
-        F -- Next Point --> G[Assemble text block for point];
-        G --> H{Call LLM to neutralize block};
-        H --> I{Parse LLM response};
-        I --> J[Add neutralized text to collection];
-        J --> F;
-        F -- End Loop --> K[Save all neutralized points to CSV];
-        K --> D;
-        E -- No --> L[Assemble text block for group];
-        L --> M{Call LLM to neutralize block};
-        M --> N{Parse LLM response};
-        N --> O[Save neutralized text to CSV];
-        O --> D;
-        D -- End of Groups --> P[End];
+    subgraph "Logic for neutralize_delineations.py"
+        subgraph "Task Building"
+            A[Start] --> B{Parse raw delineations library};
+            B --> C{"--fast mode enabled?"};
+            C -- Yes --> D[Build bundled tasks:<br/>- 1 for all Balances<br/>- 1 for each Point / 12 signs];
+            C -- No --> E[Build granular tasks:<br/>- Check each balance file, create task if missing<br/>- Check points_in_signs.csv, create task for each missing key];
+            D --> F(Start Task Loop);
+            E --> F;
+        end
+
+        subgraph "Task Processing Loop"
+            F --> G{Loop through each task in the list};
+            G -- Next Task --> H[Assemble prompt from task data];
+            H --> I{Call LLM to neutralize text};
+            I --> J{Parse LLM response};
+            J --> K{"Is response complete?"};
+            K -- Yes --> L(Handle Success);
+            K -- No --> M[Log failure and raw response];
+            M --> G;
+        end
+        
+        subgraph "Success Handling"
+            L --> N{"Task type 'balance_bundle'?"};
+            N -- Yes --> O[Split response and save all individual balance files];
+            N -- No --> P[Save/Append to correct CSV file];
+            O --> G;
+            P --> G;
+        end
+        
+        subgraph "Finalization"
+            G -- End of Tasks --> Q{"Was points_in_signs.csv modified?"};
+            Q -- Yes --> R[Re-sort points_in_signs.csv to match original order];
+            Q -- No --> S[End];
+            R --> S;
+        end
     end
