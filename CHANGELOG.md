@@ -1,5 +1,31 @@
 # Changelog
 
+## 5.0.3 (2025-08-12)
+
+### Bump
+
+- **version 5.0.2 → 5.0.3**
+
+### Refactor
+
+- **harden error handling and standardize user experience**
+  Refactors the entire data preparation and main experiment pipelines to improve robustness, consistency, and the developer/user experience.
+  
+  Data Preparation Pipeline:
+  - Standardizes all ten scripts to a consistent UX model.
+  - Implements a universal `--force` flag for non-interactive overwriting.
+  - Ensures automatic, timestamped backups are created for all overwritten files.
+  - Replaces custom color codes with the `colorama` library for cross-platform consistency.
+  
+  Main Experiment Pipeline:
+  - Fixes a chain of silent failures in the `new_experiment.ps1` workflow by hardening error handling in all child scripts (`build_llm_queries`, `orchestrate_replication`, etc.).
+  - Corrects the verbosity logic to align with the design principle: high-level logs are now shown by default, and `--verbose` enables debug-level output.
+  - Restores real-time, non-buffered logging for stage progress.
+  
+  Documentation:
+  - Adds a "Design Principles" section to CONTRIBUTING.md.
+  - Updates the project ROADMAP.md.
+  - Corrects a workflow diagram to reflect the current codebase.
 ## 5.0.2 (2025-08-12)
 
 ### Bump
