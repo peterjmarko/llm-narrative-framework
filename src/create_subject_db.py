@@ -45,15 +45,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from colorama import Fore, init
+
 # --- Local Imports ---
 from id_encoder import from_base58
 
-class BColors:
-    """A helper class for terminal colors."""
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
+# Initialize colorama
+init(autoreset=True)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -142,31 +140,35 @@ def main():
     parser.add_argument("--chart-export", default="data/foundational_assets/sf_chart_export.csv")
     parser.add_argument("--final-candidates", default="data/intermediate/adb_final_candidates.txt")
     parser.add_argument("--output-file", default="data/processed/subject_db.csv")
+    parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
-    print("")
     output_path = Path(args.output_file)
+    proceed = True
+
     if output_path.exists():
-        print(f"{BColors.YELLOW}WARNING: The output file '{output_path}' already exists and will be overwritten.{BColors.ENDC}")
-        confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower()
-        if confirm != 'y':
+        if not args.force:
+            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
+            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            if confirm != 'y':
+                proceed = False
+        
+        if proceed:
+            try:
+                backup_dir = Path('data/backup')
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+                shutil.copy2(output_path, backup_path)
+                logging.info(f"Created backup of existing file at: {backup_path}")
+            except (IOError, OSError) as e:
+                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+                sys.exit(1)
+        else:
             print("\nOperation cancelled by user.\n")
             sys.exit(0)
-        
-        try:
-            backup_dir = Path('data/backup')
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-            shutil.copy2(output_path, backup_path)
-            print("")
-            print(f"Created backup of existing file at: {backup_path}")
-        except (IOError, OSError) as e:
-            print(f"{BColors.RED}Failed to create backup file: {e}{BColors.ENDC}\n")
-            sys.exit(1)
 
-    # --- Pre-process the chart export into a searchable map ---
-    print(f"Loading and parsing chart data from {args.chart_export}...")
+    print(f"\nLoading and parsing chart data from {args.chart_export}...")
     chart_data_map = load_chart_data_map(Path(args.chart_export))
 
     # --- Assemble final list by merging the filtered list and chart export ---
@@ -212,10 +214,10 @@ def main():
             writer = csv.DictWriter(f, fieldnames=['Index', 'idADB', 'Name', 'Reason'])
             writer.writeheader()
             writer.writerows(missing_subjects_log)
-            
-        print(f"\n{BColors.RED}ERROR: Found {len(missing_subjects_log)} missing subjects during processing.{BColors.ENDC}")
-        print(f"{BColors.YELLOW}A diagnostic report has been created at: {report_path}{BColors.ENDC}")
-        print(f"{BColors.YELLOW}The master subject DB has NOT been created. Please resolve the discrepancies and run again.{BColors.ENDC}\n")
+
+        logging.error(f"Found {len(missing_subjects_log)} missing subjects during processing.")
+        logging.warning(f"A diagnostic report has been created at: {report_path}")
+        logging.warning("The master subject DB has NOT been created. Please resolve the discrepancies and run again.\n")
         sys.exit(1)
 
     # --- Write final output if validation passes ---
@@ -226,10 +228,10 @@ def main():
             writer = csv.DictWriter(f, fieldnames=header)
             writer.writeheader()
             writer.writerows(all_subjects)
-        
-        print(f"\n{BColors.GREEN}SUCCESS: Master subject database with {len(all_subjects)} records created successfully. ✨{BColors.ENDC}\n")
+
+        print(f"\n{Fore.GREEN}SUCCESS: Master subject database with {len(all_subjects)} records created successfully. ✨\n")
     except IOError as e:
-        print(f"\n{BColors.RED}Failed to write to output file: {e}{BColors.ENDC}\n")
+        logging.error(f"Failed to write to output file: {e}\n")
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -81,14 +81,13 @@ from typing import Dict, List, Set
 import time
 from threading import Lock
 
-# --- ANSI Color Codes ---
-class Colors:
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
+from colorama import Fore, init
 
+# Initialize colorama
+init(autoreset=True)
+
+
+# --- ANSI Color Codes ---
 ADB_REQUEST_LOCK = Lock()
 ADB_LAST_REQUEST_TIME = 0
 ADB_MIN_DELAY = 0.2  # Minimum 200ms between ADB requests
@@ -523,18 +522,18 @@ class TqdmLoggingHandler(logging.Handler):
 
 class CustomFormatter(logging.Formatter):
     """Custom formatter to add colors to log levels."""
-    log_format = "%(levelname)s: %(message)s"
+    log_format = f"%(levelname)s: %(message)s"
     
     FORMATS = {
-        logging.DEBUG: Colors.RESET + log_format + Colors.RESET,
-        logging.INFO: Colors.RESET + log_format + Colors.RESET,
-        logging.WARNING: Colors.YELLOW + log_format + Colors.RESET,
-        logging.ERROR: Colors.RED + log_format + Colors.RESET,
-        logging.CRITICAL: Colors.RED + log_format + Colors.RESET,
+        logging.DEBUG: Fore.CYAN + log_format,
+        logging.INFO: log_format,
+        logging.WARNING: Fore.YELLOW + log_format,
+        logging.ERROR: Fore.RED + log_format,
+        logging.CRITICAL: Fore.RED + log_format,
     }
 
     def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
+        log_fmt = self.FORMATS.get(record.levelno, self.log_format)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
@@ -1719,43 +1718,41 @@ def main():
 
     # --- Check if a forced re-validation is needed due to stale data ---
     auto_force = False
-    if output_path.exists() and input_path.exists():
+    if not args.retry_failed and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) >= os.path.getmtime(output_path):
             auto_force = True
-            print(f"\n{Colors.YELLOW}INFO: Source file '{input_path.name}' is newer than the report.")
-            print(f"      Will re-validate all records to ensure data is current.{Colors.RESET}")
+            logging.warning(f"Source file '{input_path.name}' is newer than the report.")
+            logging.warning("A full re-validation will be performed to ensure data is current.")
 
     reprocessing_required = args.force or auto_force
 
     # Handle the destructive file overwrite if reprocessing is required.
     if reprocessing_required:
+        proceed = True
         if output_path.exists():
-            print("")
-            print(f"{Colors.YELLOW}WARNING: This will re-validate all records and overwrite the report at '{output_path}'.")
-            print(f"This operation can take 45 minutes or more to complete.{Colors.RESET}")
-            confirm = input("Are you sure you want to proceed? (Y/N): ").lower()
-            if confirm != 'y':
+            if not args.force: # Only prompt if not forced
+                print(f"\n{Fore.YELLOW}WARNING: This will re-validate all records and overwrite the report at '{output_path}'.")
+                print(f"This operation can take 45 minutes or more to complete.{Fore.RESET}")
+                confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+                if confirm != 'y':
+                    proceed = False
+            
+            if not proceed:
                 print("\nOperation cancelled by user.\n")
-                return
+                sys.exit(0)
 
-            # Create a timestamped backup before deleting the original
+            # If we proceed (either by confirmation or force), do the backup and delete
             try:
                 backup_dir = Path('data/backup')
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
                 shutil.copy2(output_path, backup_path)
-                print("")
                 logging.info(f"Created backup of existing report at: {backup_path}")
-            except (IOError, OSError) as e:
-                logging.error(f"{Colors.RED}Failed to create backup file: {e}{Colors.RESET}")
-                sys.exit(1)
-
-            try:
                 output_path.unlink()
-                logging.info(f"Deleted existing report: {output_path}")
-            except OSError as e:
-                logging.error(f"{Colors.RED}Could not delete existing report file: {e}{Colors.RESET}")
+                logging.warning(f"Removed existing report to start fresh: {output_path.name}")
+            except (IOError, OSError) as e:
+                logging.error(f"{Fore.RED}Failed to create backup or remove file: {e}")
                 sys.exit(1)
         
         # Reset state to re-process everything within the specified range
@@ -1787,31 +1784,26 @@ def main():
     
     # --- Print startup banner ---
     if args.retry_failed:
-        print(f"\n{Colors.YELLOW}--- Running in Retry-Failed Mode ---{Colors.RESET}")
-        print(f"Found {len(valid_records):,} valid records to keep and {len(lines_to_process):,} failed records to re-process.")
-    elif not processed_ids:
-        print(f"{Colors.YELLOW}\nStarting enhanced validation for {len(all_lines):,} records using {args.workers} workers.{Colors.RESET}")
-        print(f"Output will be saved to '{output_path}'.\n")
+        print(f"\n{Fore.YELLOW}--- Running in Retry-Failed Mode ---")
+        logging.info(f"Found {len(valid_records):,} valid records to keep and {len(lines_to_process):,} failed records to re-process.")
+    elif reprocessing_required or not processed_ids:
+        print(f"\n{Fore.YELLOW}--- Starting Full Validation ---")
+        logging.info(f"Processing {len(lines_to_process):,} records using {args.workers} workers.")
     else:
-        print(f"{Colors.YELLOW}\nResuming validation: {len(processed_ids):,} records already processed ({initial_ok_count:,} valid).{Colors.RESET}")
-        print(f"Now processing the remaining {len(lines_to_process):,} records using {args.workers} workers.")
+        print(f"\n{Fore.YELLOW}--- Resuming Validation ---")
+        logging.info(f"Found {len(processed_ids):,} existing records ({initial_ok_count:,} valid).")
+        logging.info(f"Now processing {len(lines_to_process):,} new records using {args.workers} workers.")
 
-    print("-" * 70)
-    print(f"{Colors.YELLOW}NOTE: This script performs live web scraping for thousands of records")
-    print(f"      and can take over an hour to complete.")
-    print(f"      You can safely interrupt with 'Ctrl+C' and resume at any time.{Colors.RESET}")
-    print("-" * 70)
-    print("")
-    
+    print(f"\n{Fore.YELLOW}NOTE: This script performs live web scraping and can take over an hour.")
+    print(f"      You can safely interrupt with 'Ctrl+C' and resume at any time.{Fore.RESET}\n")
+
     was_interrupted = False
-    # Use bar_format to apply color to the entire line, not just the bar.
-    # The double curly braces {{...}} are to escape them for the f-string.
     pbar = tqdm(
-        total=len(lines_to_process), 
-        desc="Validating records", 
-        ncols=120, 
+        total=len(lines_to_process),
+        desc="Validating records",
+        ncols=120,
         smoothing=0.01,
-        bar_format=f"{Colors.CYAN}{{l_bar}}{{bar}}|{{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}}, {{rate_fmt}}]{{postfix}}{Colors.RESET}"
+        bar_format=f"{Fore.CYAN}{{l_bar}}{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}}, {{rate_fmt}}]{{postfix}}"
     )
     session_ok_count = 0
     session_research_count = 0  # Track Research entries
@@ -1921,40 +1913,19 @@ def main():
 
         processed_this_session = pbar.n if pbar else 0
         
-        print("") # Add a newline for clean summary output
         if was_interrupted:
-            if args.retry_failed:
-                # In retry mode, show how many failed records were retried
-                final_msg = (
-                    f"Process interrupted. {processed_this_session:,} failed records were retried this session.\n"
-                    f"Run the script again with --retry-failed to continue retrying.\n"
-                )
-            else:
-                total_ok_count = initial_ok_count + session_ok_count
-                total_processed_so_far = len(processed_ids) + processed_this_session
-                final_msg = (
-                    f"Process interrupted. {processed_this_session:,} records were processed this session.\n"
-                    f"Total processed so far: {total_processed_so_far:,} records ({total_ok_count:,} valid).\n"
-                    f"Run the script again to resume.\n"
-                )
-            print(f"{Colors.YELLOW}INFO: {final_msg}{Colors.RESET}")
+            total_processed_so_far = len(processed_ids) + processed_this_session
+            final_msg = f"Process interrupted. {processed_this_session:,} records processed this session. Total is now {total_processed_so_far:,}."
+            logging.warning(f"{final_msg} Re-run to continue. ✨\n")
         else:
-            if args.retry_failed:
-                # Count final results from the combined data
-                final_valid_count = len([r for r in (valid_records + newly_processed_results) if r.get('Status') in ['OK', 'VALID']])
-                total_records = len(valid_records) + len(newly_processed_results)
-                final_msg = (
-                    f"Retry complete. {processed_this_session:,} failed records were reprocessed.\n"
-                    f"Final result: {final_valid_count:,} valid out of {total_records:,} total records.\n"
-                    f"Full report saved at: {output_path}."
-                )
-            else:
-                total_ok_count = initial_ok_count + session_ok_count
-                final_msg = (
-                    f"Finished processing all {len(all_lines):,} records ({total_ok_count:,} valid).\n"
-                    f"Full report saved at: {output_path}."
-                )
-            print(f"{Colors.GREEN}INFO: {final_msg}{Colors.RESET}")
+            with open(output_path, 'r', encoding='utf-8') as f_in:
+                reader = csv.DictReader(f_in)
+                all_final_records = list(reader)
+                total_valid = sum(1 for row in all_final_records if row.get('Status') in ['OK', 'VALID'])
+                total_records = len(all_final_records)
+
+            final_msg = f"Validation complete. Final valid count: {total_valid:,} / {total_records:,}."
+            print(f"\n{Fore.GREEN}SUCCESS: {final_msg} ✨\n")
 
 if __name__ == "__main__":
     main()

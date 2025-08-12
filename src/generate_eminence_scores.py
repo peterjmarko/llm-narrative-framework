@@ -59,13 +59,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Tuple
 
-class BColors:
-    """A helper class for terminal colors."""
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    CYAN = '\033[96m'
-    ENDC = '\033[0m'
+from colorama import Fore, init
+
+# Initialize colorama
+init(autoreset=True)
 
 # --- Prompt Template ---
 EMINENCE_PROMPT_TEMPLATE = """
@@ -117,24 +114,8 @@ except ImportError:
         print(f"FATAL: Could not import from config_loader.py. Error: {e}")
         sys.exit(1)
 
-class CustomFormatter(logging.Formatter):
-    """Custom formatter that adds colors to log levels."""
-    log_format = "%(levelname)s: %(message)s"
-    
-    FORMATS = {
-        logging.DEBUG:   BColors.CYAN + log_format + BColors.ENDC,
-        logging.INFO:    BColors.GREEN + log_format + BColors.ENDC,
-        logging.WARNING: BColors.YELLOW + log_format + BColors.ENDC,
-        logging.ERROR:   BColors.RED + log_format + BColors.ENDC,
-        logging.CRITICAL:BColors.RED + log_format + BColors.ENDC,
-    }
-
-    def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno, self.log_format)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
-
-# Logging is now configured in main()
+# Configure logging
+logging.basicConfig(level=logging.INFO, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
 
 def load_processed_ids(filepath: Path) -> set:
     """
@@ -155,17 +136,17 @@ def load_processed_ids(filepath: Path) -> set:
             if 'idADB' not in header:
                 if 'ARN' in header:
                     # Legacy format detected. Halt with instructions.
-                    print(f"{BColors.RED}FATAL ERROR: Incompatible legacy file format detected.{BColors.ENDC}")
-                    print(f"The existing file '{filepath}' uses the old 'ARN' column.")
-                    print("The new script requires an 'idADB' column to function correctly.")
+                    logging.critical("Incompatible legacy file format detected.")
+                    logging.error(f"The existing file '{filepath}' uses the old 'ARN' column.")
+                    logging.error("The new script requires an 'idADB' column to function correctly.")
                     print("\nTo fix this, you have two options:")
                     print(f"  1. Manually rename or delete the old file: '{filepath}'")
-                    print(f"  2. Re-run the script with the {BColors.CYAN}--force{BColors.ENDC} flag to automatically back up and overwrite it.")
+                    print(f"  2. Re-run the script with the {Fore.CYAN}--force{Fore.RESET} flag to automatically back up and overwrite it.")
                     sys.exit(1)
                 else:
                     # Header is malformed.
-                    print(f"{BColors.RED}FATAL ERROR: Malformed CSV header.{BColors.ENDC}")
-                    print(f"Could not find required 'idADB' column in '{filepath}'.")
+                    logging.critical("Malformed CSV header.")
+                    logging.error(f"Could not find required 'idADB' column in '{filepath}'.")
                     sys.exit(1)
 
             # If header is valid, proceed to read the rest of the file.
@@ -332,11 +313,11 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         completion_pct = (total_scored / total_subjects_overall) * 100 if total_subjects_overall > 0 else 0
         status_line = f"Completion: {total_scored}/{total_subjects_overall} ({completion_pct:.2f}%)"
         if completion_pct > 99.5:
-            report.append(f"{BColors.GREEN}SUCCESS - {status_line}{BColors.ENDC}")
+            report.append(f"\n{Fore.GREEN}SUCCESS - {status_line}")
         elif completion_pct >= 95.0:
-            report.append(f"{BColors.YELLOW}WARNING - {status_line}{BColors.ENDC}")
+            report.append(f"\n{Fore.YELLOW}WARNING - {status_line}")
         else:
-            report.append(f"{BColors.RED}ERROR - {status_line} - Significantly incomplete.{BColors.ENDC}")
+            report.append(f"\n{Fore.RED}ERROR - {status_line} - Significantly incomplete.")
 
         summary_content = "\n".join(report)
         summary_path.write_text(summary_content, encoding='utf-8')
@@ -365,28 +346,7 @@ def main():
     parser.add_argument("--model", default=default_model, help="Name of the LLM to use for scoring. Default is from config.ini.")
     parser.add_argument("--batch-size", type=int, default=default_batch_size, help="Number of subjects per API call. Default is from config.ini.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
-    parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity (-v for INFO, -vv for DEBUG).")
     args = parser.parse_args()
-
-    # --- Setup Logging ---
-    if args.verbose >= 2:
-        log_level = logging.DEBUG
-    elif args.verbose == 1:
-        log_level = logging.INFO
-    else:
-        log_level = logging.WARNING
-    
-    root_logger = logging.getLogger()
-    root_logger.setLevel(log_level)
-    
-    # Remove any existing handlers to prevent duplicate output
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
-        
-    # Add our new custom handler
-    handler = logging.StreamHandler()
-    handler.setFormatter(CustomFormatter())
-    root_logger.addHandler(handler)
 
     # --- Setup Paths ---
     script_dir = Path(__file__).parent
@@ -402,43 +362,45 @@ def main():
     temp_error_file = temp_dir / "error.txt"
     temp_config_file = temp_dir / "temp_config.ini"
 
-    print(f"{BColors.YELLOW}\n--- Starting Eminence Score Generation ---{BColors.ENDC}")
+    print(f"\n{Fore.YELLOW}--- Starting Eminence Score Generation ---{Fore.RESET}")
 
     # --- Handle Overwrite with Backup and Confirmation ---
-    if args.force and output_path.exists():
-        print(f"{BColors.YELLOW}WARNING: You are about to overwrite the existing file: {output_path}{BColors.ENDC}")
-        print(f"{BColors.YELLOW}This process incurs API costs and can take 30 minutes or more to complete.{BColors.ENDC}")
-        confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower()
-        if confirm != 'y':
-            print("Operation cancelled by user.")
-            sys.exit(0)
-
-        try:
-            backup_dir = Path('data/backup')
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"{output_path.name}.{timestamp}.bak"
-            shutil.copy2(output_path, backup_path)
-            logging.info(f"Created backup of existing file at: {backup_path}")
-        except (IOError, OSError) as e:
-            logging.error(f"Failed to create backup file: {e}")
-            sys.exit(1)
+    proceed = True
+    if output_path.exists():
+        if not args.force:
+            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
+            print(f"This process incurs API costs and can take over 30 minutes to complete.{Fore.RESET}")
+            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            if confirm != 'y':
+                proceed = False
         
-        # Proceed with deleting the original file
-        output_path.unlink()
-        print("")
-        logging.warning(f"Removed existing file: {output_path}")
+        if proceed:
+            try:
+                backup_dir = Path('data/backup')
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = backup_dir / f"{output_path.name}.{timestamp}.bak"
+                shutil.copy2(output_path, backup_path)
+                logging.info(f"Created backup of existing file at: {backup_path}")
+                output_path.unlink()
+                logging.warning(f"Removed existing file to start fresh: {output_path.name}")
+            except (IOError, OSError) as e:
+                logging.error(f"{Fore.RED}Failed to create backup or remove file: {e}")
+                sys.exit(1)
+        else:
+            print("\nOperation cancelled by user.\n")
+            sys.exit(0)
 
     # --- Load Data and Create To-Do List ---
     processed_ids = load_processed_ids(output_path)
     all_subjects = load_subjects_to_process(input_path, processed_ids)
-    
-    if not all_subjects:
-        print(f"{BColors.GREEN}All subjects have already been processed. Nothing to do. ✨{BColors.ENDC}")
 
     total_to_process = len(all_subjects)
     total_subjects_in_source = len(processed_ids) + total_to_process
-    print(f"Found {BColors.CYAN}{len(processed_ids):,}{BColors.ENDC} existing scores. Processing {BColors.CYAN}{total_to_process:,}{BColors.ENDC} new subjects out of {BColors.CYAN}{total_subjects_in_source:,}{BColors.ENDC} total.")
+    logging.info(f"Found {len(processed_ids):,} existing scores. Processing {total_to_process:,} new subjects out of {total_subjects_in_source:,} total.")
+
+    if not all_subjects:
+        print(f"\n{Fore.GREEN}All subjects have already been processed. Nothing to do. ✨\n")
 
     # --- Create Temporary Config for Model Override ---
     # Create a new config parser and copy all relevant sections from the global config.
@@ -473,7 +435,7 @@ def main():
             batch_num = (i // args.batch_size) + 1
             total_batches = (total_to_process + args.batch_size - 1) // args.batch_size
 
-            print(f"\n{BColors.CYAN}--- Processing Batch {batch_num} of {total_batches} ---{BColors.ENDC}")
+            print(f"\n{Fore.CYAN}--- Processing Batch {batch_num} of {total_batches} ---{Fore.RESET}")
 
             # 1. Construct prompt
             subject_list_str = "\n".join([f'"{b["FirstName"]} {b["LastName"]}" ({b["Year"]}), ID {b["idADB"]}' for b in batch])
@@ -487,11 +449,9 @@ def main():
                 "--input_query_file", str(temp_query_file),
                 "--output_response_file", str(temp_response_file),
                 "--output_error_file", str(temp_error_file),
-                "--config_path", str(temp_config_file)
+                "--config_path", str(temp_config_file),
+                "--quiet"
             ]
-            # Keep worker quiet unless orchestrator is in debug mode
-            if log_level > logging.DEBUG:
-                worker_cmd.append("--quiet")
 
             subprocess.run(worker_cmd, check=False)
 
@@ -503,10 +463,10 @@ def main():
                 
                 # Fast-fail for critical errors
                 if "401" in error_msg or "403" in error_msg or "Unauthorized" in error_msg or "Forbidden" in error_msg:
-                    print(f"{BColors.RED}CRITICAL: Halting due to a fatal API authentication/authorization error.{BColors.ENDC}")
+                    logging.critical("Halting due to a fatal API authentication/authorization error.")
                     break
                 if consecutive_failures >= max_consecutive_failures:
-                    print(f"{BColors.RED}CRITICAL: Halting after {max_consecutive_failures} consecutive batch failures.{BColors.ENDC}")
+                    logging.critical(f"Halting after {max_consecutive_failures} consecutive batch failures.")
                     break
                 
                 temp_error_file.unlink() # Clean up error file before next iteration
@@ -548,29 +508,30 @@ def main():
 
     except KeyboardInterrupt:
         was_interrupted = True
-        print(f"\n\n{BColors.YELLOW}Process interrupted by user. Exiting gracefully.{BColors.ENDC}")
+        print(f"\n\n{Fore.YELLOW}Process interrupted by user. Exiting gracefully.{Fore.RESET}")
     finally:
         # --- Final Processing and Cleanup ---
         print("\n--- Finalizing ---")
         sort_and_reindex_scores(output_path)
         generate_scores_summary(output_path, total_subjects_in_source)
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
         
         final_scored_count = len(processed_ids) + processed_count
         
         if run_completed_successfully:
             if final_scored_count < total_subjects_in_source:
                 missing_count = total_subjects_in_source - final_scored_count
-                print(f"\n{BColors.YELLOW}Eminence score generation complete for this run.{BColors.ENDC}")
-                print(f"{BColors.YELLOW}Re-run the script to process the {missing_count} missing subjects. ✨{BColors.ENDC}\n")
+                logging.warning("Eminence score generation complete for this run.")
+                logging.warning(f"Re-run the script to process the {missing_count} missing subjects. ✨\n")
             else:
-                print(f"\n{BColors.GREEN}Eminence score generation completed successfully. All subjects processed. ✨{BColors.ENDC}\n")
+                print(f"\n{Fore.GREEN}Eminence score generation completed successfully. All subjects processed. ✨\n")
         elif not was_interrupted:
             # If not interrupted, it must have been a critical error break
-            print(f"\n{BColors.RED}Eminence score generation halted due to critical errors. ✨{BColors.ENDC}\n")
+            logging.critical("Eminence score generation halted due to critical errors. ✨\n")
         else:
             # It was a user interruption
-            print(f"\nEminence score generation terminated by user. Re-run to continue. ✨\n")
+            logging.warning("Eminence score generation terminated by user. Re-run to continue. ✨\n")
 
 if __name__ == "__main__":
     main()

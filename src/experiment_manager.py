@@ -824,43 +824,61 @@ def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, qui
     except Exception as e:
         return rep_num, False, f"An unexpected error occurred in replication worker {rep_num}: {e}"
 
-def _run_new_mode(target_dir, start_rep, end_rep, notes, quiet, orchestrator_script, colors):
-    """Executes 'NEW' mode by calling orchestrator, which is now parallelized."""
-    C_CYAN = colors['cyan']
-    C_YELLOW = colors['yellow']
-    C_RESET = colors['reset']
+def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_script, colors):
+    """Executes 'NEW' mode by calling the orchestrator for each replication."""
+    C_CYAN, C_YELLOW, C_RESET = colors['cyan'], colors['yellow'], colors['reset']
 
+    run_dirs = glob.glob(os.path.join(target_dir, 'run_*_rep-*'))
     completed_reps = {int(re.search(r'_rep-(\d+)_', os.path.basename(d)).group(1))
-                      for d in glob.glob(os.path.join(target_dir, 'run_*_rep-*'))
-                      if re.search(r'_rep-(\d+)_', os.path.basename(d))}
+                      for d in run_dirs if re.search(r'_rep-(\d+)_', os.path.basename(d))}
                       
     reps_to_run = [r for r in range(start_rep, end_rep + 1) if r not in completed_reps]
     if not reps_to_run:
-        print("All replications exist. Nothing to do in NEW mode.")
+        print("All required replications already exist. Nothing to do in NEW mode.")
         return True
 
-    print(f"Will create {len(reps_to_run)} new replication(s).")
+    print(f"Will create {len(reps_to_run)} new replication(s), from {min(reps_to_run)} to {max(reps_to_run)}.")
     batch_start_time = time.time()
     
     for i, rep_num in enumerate(reps_to_run):
-        header_text = f" RUNNING REPLICATION {rep_num} of {end_rep} "
+        header_text = f" RUNNING REPLICATION {rep_num} ({i + 1} of {len(reps_to_run)} in this batch) "
         print(f"\n{C_CYAN}{'='*80}{C_RESET}")
         print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
         print(f"{C_CYAN}{'='*80}{C_RESET}")
         
-        # The orchestrator is now responsible for the entire replication lifecycle, including parallel sessions.
         cmd_orch = [sys.executable, orchestrator_script, "--replication_num", str(rep_num), "--base_output_dir", target_dir]
         if notes: cmd_orch.extend(["--notes", notes])
-        if quiet: cmd_orch.append("--quiet")
+        if verbose: cmd_orch.append("--verbose")
         
         try:
-            subprocess.run(cmd_orch, check=True)
-            # Bias analysis is now handled inside the orchestrator after Stage 4.
+            # Use Popen to stream stdout in real-time while capturing stderr.
+            proc = subprocess.Popen(cmd_orch, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, encoding='utf-8', errors='replace')
+            
+            # Stream and print stdout line by line as it comes in.
+            for line in proc.stdout:
+                print(line, end='', flush=True)
+
+            # Wait for the process to complete and get the final return code and any stderr output.
+            proc.wait()
+            stderr_output = proc.stderr.read()
+
+            if proc.returncode != 0:
+                # If the process failed, manually raise a CalledProcessError with the captured stderr.
+                raise subprocess.CalledProcessError(proc.returncode, proc.args, stderr=stderr_output)
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
-            logging.error(f"Replication {rep_num} failed or was interrupted.")
-            if isinstance(e, KeyboardInterrupt): sys.exit(1)
-            return False # Indicate failure
+            logging.error(f"Orchestrator for replication {rep_num} failed or was interrupted.")
+            if isinstance(e, subprocess.CalledProcessError):
+                # Print the captured stderr from the failed orchestrator process.
+                # This will contain the full traceback from the underlying script.
+                if e.stderr:
+                    print(e.stderr, file=sys.stderr)
+            if isinstance(e, KeyboardInterrupt):
+                # If interrupted, exit the manager immediately.
+                sys.exit(1)
+            # For any failure, immediately stop the batch.
+            return False
 
         elapsed = time.time() - batch_start_time
         avg_time = elapsed / (i + 1)
@@ -1399,7 +1417,7 @@ def main():
             success = True
 
             if state_overall_status == "NEW_NEEDED":
-                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, not args.verbose, script_paths['orchestrator'], colors)
+                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, args.verbose, script_paths['orchestrator'], colors)
                 action_taken = True
             else:
                 run_flags = {

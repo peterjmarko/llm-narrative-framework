@@ -48,17 +48,14 @@ from urllib.parse import urljoin, quote
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from colorama import Fore, init
 from tqdm import tqdm
+
+# Initialize colorama
+init(autoreset=True)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-
-# --- ANSI Color Codes ---
-class Colors:
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    RESET = '\033[0m'
 
 # --- Constants ---
 BASE_URL = "https://www.astro.com"
@@ -131,7 +128,7 @@ def parse_tz_code(tz_code: str) -> tuple[str, str]:
 def login_to_adb(session, username, password):
     """Logs into Astro-Databank to establish an authenticated session."""
     print("")
-    logging.info(f"{Colors.YELLOW}Attempting to log into Astro-Databank...{Colors.RESET}")
+    logging.info(f"{Fore.YELLOW}Attempting to log into Astro-Databank...")
     try:
         session.get(BASE_URL, headers={'User-Agent': USER_AGENT}, timeout=REQUEST_TIMEOUT)
         time.sleep(REQUEST_DELAY)
@@ -148,10 +145,10 @@ def login_to_adb(session, username, password):
         if "act=disconnect" not in verify_response.text or "not logged in" in verify_response.text:
             raise ValueError("Login failed. Please check credentials in .env file.")
         
-        logging.info(f"{Colors.GREEN}Login successful.{Colors.RESET}")
+        logging.info(f"{Fore.GREEN}Login successful.")
         return True
     except (requests.exceptions.RequestException, ValueError) as e:
-        logging.error(f"{Colors.RED}An error occurred during login: {e}{Colors.RESET}")
+        logging.error(f"{Fore.RED}An error occurred during login: {e}")
         sys.exit(1)
 
 def scrape_search_page_data(session):
@@ -334,7 +331,7 @@ def parse_results_from_json(json_data, category_map):
 def fetch_all_data(session, output_path, initial_stat_data, category_ids, category_map):
     """Fetches all paginated data from the API, saving results incrementally."""
     print("")
-    logging.info(f"{Colors.YELLOW}Starting data extraction from API...{Colors.RESET}")
+    logging.info(f"{Fore.YELLOW}Starting data extraction from API...")
     pbar = None
     page_number = 1
     total_hits = 0
@@ -425,56 +422,57 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
                 time.sleep(REQUEST_DELAY)
 
     except (requests.exceptions.RequestException, ValueError, KeyError) as e:
-        logging.error(f"\n{Colors.RED}An error occurred during fetch: {e}{Colors.RESET}")
+        logging.error(f"\n{Fore.RED}An error occurred during fetch: {e}")
         import traceback
         traceback.print_exc()
     except KeyboardInterrupt:
-        logging.info(f"\n{Colors.YELLOW}\nProcess interrupted by user. {processed_count:,} records were saved.{Colors.RESET}")
+        logging.warning(f"\nProcess interrupted by user. {processed_count:,} records were saved.")
     finally:
         if pbar: pbar.close()
 
     if processed_count == 0: return
 
-    logging.info(f"{Colors.GREEN}Data fetching complete.\n{Colors.RESET}")
+    print(f"\n{Fore.GREEN}Data fetching complete. ✨")
 
 def main():
     os.system('')
     parser = argparse.ArgumentParser(description="Fetch raw birth data from the Astro-Databank website.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-o", "--output-file", default="data/sources/adb_raw_export.txt", help="Path for the output data file.")
-    parser.add_argument("--force", action="store_true", help="Force fetching and overwrite the output file if it exists.")
+    parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
     output_path = Path(args.output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    proceed = True
 
     if output_path.exists():
         if not args.force:
-            print("")
-            logging.warning(f"{Colors.YELLOW}The output file '{output_path}' already exists.{Colors.RESET}")
-            response = input("Do you want to overwrite it? (Y/N): ").lower()
-            if response != 'y':
-                print("")
-                logging.info("Operation cancelled by user.\n")
-                sys.exit(0)
+            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
+            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            if confirm != 'y':
+                proceed = False
 
-        # Create a backup before proceeding
-        try:
-            backup_dir = Path('data/backup')
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-            shutil.copy2(output_path, backup_path)
-            logging.info(f"Created backup of existing file at: {backup_path}")
-        except (IOError, OSError) as e:
-            logging.error(f"{Colors.RED}Failed to create backup file: {e}{Colors.RESET}")
-            sys.exit(1)
+        if proceed:
+            try:
+                backup_dir = Path('data/backup')
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+                shutil.copy2(output_path, backup_path)
+                logging.info(f"Created backup of existing file at: {backup_path}")
+            except (IOError, OSError) as e:
+                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+                sys.exit(1)
+        else:
+            print("\nOperation cancelled by user.\n")
+            sys.exit(0)
 
     load_dotenv()
     adb_username = os.getenv("ADB_USERNAME")
     adb_password = os.getenv("ADB_PASSWORD")
 
     if not adb_username or not adb_password:
-        logging.error(f"{Colors.RED}ADB_USERNAME and ADB_PASSWORD must be set in the .env file.{Colors.RESET}")
+        logging.error(f"{Fore.RED}ADB_USERNAME and ADB_PASSWORD must be set in the .env file.")
         sys.exit(1)
 
     with requests.Session() as session:

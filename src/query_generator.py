@@ -46,6 +46,7 @@ import os
 import sys
 import logging
 import unicodedata
+import csv
 
 from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 
@@ -105,35 +106,20 @@ def load_base_query(filepath):
 def load_personalities(filepath, required_k_value):
     personalities = []
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            header = f.readline().strip()
-            if not header:
-                logging.error(f"Personalities file '{filepath}' appears to be empty or has no header line.")
-                sys.exit(1)
-            
-            for line_num, line_content in enumerate(f, 2): 
-                line = line_content.strip()
-                if not line:
-                    continue 
-
-                parts = line.split('\t')
-                if len(parts) != 4:
-                    logging.warning(f"Line {line_num} in '{filepath}' has {len(parts)} fields, expected 4. Skipping: '{line[:100]}...'")
-                    continue
-                
+        with open(filepath, 'r', encoding='utf-8', newline='') as f:
+            # Use DictReader to handle columns by name, which is robust to column count/order.
+            reader = csv.DictReader(f, delimiter='\t')
+            for line_num, row in enumerate(reader, 2): # Start line count from 2 for logging
                 try:
-                    original_idx = int(parts[0])
-                    name = parts[1]
-                    year = int(parts[2]) 
-                    description = parts[3]
+                    # The worker only needs these specific keys. It will ignore 'idADB'.
                     personalities.append({
-                        'original_index_from_file': original_idx,
-                        'name': name,
-                        'year': year,
-                        'description': description
+                        'original_index_from_file': int(row['Index']),
+                        'name': row['Name'],
+                        'year': int(row['BirthYear']),
+                        'description': row['DescriptionText']
                     })
-                except ValueError:
-                    logging.warning(f"Line {line_num} in '{filepath}' has invalid data type (e.g., index or year not an int). Skipping: '{line[:100]}...'")
+                except (ValueError, KeyError) as e:
+                    logging.warning(f"Line {line_num} in '{filepath}' has invalid data type or missing key ({e}). Skipping: '{row}'")
                     continue
         
         if len(personalities) < required_k_value:

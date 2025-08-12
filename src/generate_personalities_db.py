@@ -49,6 +49,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from colorama import Fore, init
+
+# Initialize colorama
+init(autoreset=True)
+
 # --- Constants based on the supplementary material ---
 SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 ELEMENTS_MAP = {"Fire": SIGNS[0::4], "Earth": SIGNS[1::4], "Air": SIGNS[2::4], "Water": SIGNS[3::4]}
@@ -57,13 +62,6 @@ QUADRANTS_MAP = {"1": SIGNS[0:3], "2": SIGNS[3:6], "3": SIGNS[6:9], "4": SIGNS[9
 HEMISPHERES_MAP = {"Eastern": SIGNS[9:12] + SIGNS[0:3], "Western": SIGNS[3:9], "Northern": SIGNS[0:6], "Southern": SIGNS[6:12]}
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
-
-class BColors:
-    """A helper class for terminal colors."""
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
 
 def load_point_weights(file_path: Path) -> dict:
     """Loads point weights from a CSV file."""
@@ -156,30 +154,33 @@ def main():
     parser.add_argument("--subject-db", default="data/processed/subject_db.csv", help="Path to the master subject database CSV.")
     parser.add_argument("--delineations-dir", default="data/foundational_assets/neutralized_delineations", help="Directory with neutralized delineation CSVs.")
     parser.add_argument("--output-file", default="data/personalities_db.txt", help="Path for the final output database.")
+    parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
     output_path = Path(args.output_file)
-    backup_dir = output_path.parent / 'backup'
+    proceed = True
 
-    # Check if output file exists and prompt user to overwrite
     if output_path.exists():
-        print("")
-        print(f"{BColors.YELLOW}WARNING: The output file '{output_path}' already exists and will be overwritten.{BColors.ENDC}")
-        confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-        if confirm != 'y':
+        if not args.force:
+            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
+            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            if confirm != 'y':
+                proceed = False
+        
+        if proceed:
+            try:
+                backup_dir = Path('data/backup')
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+                shutil.copy2(output_path, backup_path)
+                logging.info(f"Created backup of existing file at: {backup_path}")
+            except (IOError, OSError) as e:
+                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+                sys.exit(1)
+        else:
             print("\nOperation cancelled by user.\n")
             sys.exit(0)
-
-        # Create backup directory if it doesn't exist
-        backup_dir.mkdir(exist_ok=True)
-
-        # Create timestamped backup
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-        
-        shutil.copy2(output_path, backup_path)
-        print("")
-        print(f"Backup of existing file created at: {backup_path}")
 
     data_dir = Path(args.output_file).parent
     point_weights_path = data_dir / "foundational_assets" / "point_weights.csv"
@@ -209,13 +210,13 @@ def main():
         with open(args.subject_db, 'r', encoding='utf-8') as infile:
             num_records = sum(1 for line in infile) - 1 # Subtract header
         
-        print(f"\n{BColors.GREEN}SUCCESS: Personalities database with {num_records} records created successfully. ✨{BColors.ENDC}\n")
+        print(f"\n{Fore.GREEN}SUCCESS: Personalities database with {num_records} records created successfully. ✨\n")
 
     except KeyError as e:
-        print(f"\n{BColors.RED}ERROR: Missing column {e} in '{args.subject_db}'. Please ensure the file is correctly formatted.{BColors.ENDC}\n")
+        logging.error(f"Missing column {e} in '{args.subject_db}'. Please ensure the file is correctly formatted.\n")
         sys.exit(1)
     except Exception as e:
-        print(f"\n{BColors.RED}ERROR: An unexpected error occurred during database generation: {e}{BColors.ENDC}\n")
+        logging.error(f"An unexpected error occurred during database generation: {e}\n")
         sys.exit(1)
 
 if __name__ == "__main__":

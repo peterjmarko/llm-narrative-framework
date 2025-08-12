@@ -19,6 +19,7 @@
   - All data preparation diagrams now use a consistent color scheme and have been updated to reflect the latest script logic, including labels for LLM-assisted steps.
   - Logic flowcharts for several scripts have been rearranged into a more compact, horizontal layout to improve readability in the final documents.
   - Console logging for all final pipeline scripts has been cleaned up and standardized for a better user experience.
+  
 ## 5.0.1 (2025-08-11)
 
 ### Bump
@@ -36,7 +37,7 @@
   - Hardens `generate_ocean_scores.py` with a robust pre-flight check that re-analyzes all existing data on startup, ensuring correct finalization of interrupted runs.
   - Overhauls console logging in `neutralize_delineations.py` for clarity, providing clean, task-by-task status updates.
   - Updates all related documentation, docstrings, and diagrams to reflect the new, more sophisticated workflows.
-  
+
 ## 5.0.0 (2025-08-11)
 
 ### Bump

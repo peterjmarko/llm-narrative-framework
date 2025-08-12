@@ -81,26 +81,14 @@ DEFAULT_TEMP_SUBSET_FN = get_config_value(APP_CONFIG, 'Filenames', 'temp_subset_
 DEFAULT_USED_INDICES_FN = get_config_value(APP_CONFIG, 'Filenames', 'used_indices_log', fallback="used_personality_indices.txt")
 DEFAULT_AGGREGATE_MAPPINGS_FN = get_config_value(APP_CONFIG, 'Filenames', 'aggregated_mappings_in_queries_dir', fallback="mappings.txt")
 
-# --- Setup Logging ---
-DEFAULT_LOG_LEVEL_BUILD = get_config_value(APP_CONFIG, 'General', 'default_log_level', fallback='INFO')
-numeric_log_level_build = getattr(logging, DEFAULT_LOG_LEVEL_BUILD.upper(), logging.INFO)
-logging.basicConfig(level=numeric_log_level_build,
-                    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
-
 # --- Helper Functions ---
 # ... (load_all_personalities_df, load_used_indices, append_used_indices, 
 #      get_next_start_index, clear_output_files_for_fresh_run functions remain the same) ...
 def load_all_personalities_df(filepath):
-    original_header_line = None
     try:
-        with open(filepath, 'r', encoding='utf-8') as f_header:
-            original_header_line = f_header.readline().strip() 
-            if not original_header_line:
-                 logging.error(f"Master personalities file '{filepath}' seems to be missing a header.")
-                 sys.exit(1)
-
-        df = pd.read_csv(filepath, sep='\t', encoding='utf-8', dtype={'BirthYear': str}, header=0)
+        df = pd.read_csv(filepath, sep='\t', encoding='utf-8', dtype={'BirthYear': str})
+        # Reconstruct the original header line directly from the dataframe columns
+        original_header_line = "\t".join(df.columns)
         required_cols = ['Index', 'idADB', 'Name', 'BirthYear', 'DescriptionText']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
@@ -228,20 +216,21 @@ def main():
 
     args = parser.parse_args()
     
-    # --- Adjust Log Level ---
-    log_level_final_build = DEFAULT_LOG_LEVEL_BUILD
-    if args.verbose == 1: log_level_final_build = "INFO"
-    elif args.verbose >= 2: log_level_final_build = "DEBUG"
-    numeric_final_log_level = getattr(logging, log_level_final_build.upper(), logging.INFO)
-    root_logger = logging.getLogger(); root_logger.setLevel(numeric_final_log_level)
-    if not root_logger.hasHandlers() or not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
-        for handler_old in root_logger.handlers[:]: root_logger.removeHandler(handler_old)
-        stream_handler = logging.StreamHandler(sys.stdout)
-        stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
-        root_logger.addHandler(stream_handler)
-    else:
-        for handler_curr in root_logger.handlers: handler_curr.setLevel(numeric_final_log_level)
-    logging.info(f"Build Queries log level set to: {log_level_final_build}")
+    # --- Setup Logging ---
+    log_level = logging.WARNING
+    if args.quiet:
+        log_level = logging.ERROR
+    elif args.verbose >= 2:
+        log_level = logging.DEBUG
+    elif args.verbose == 1:
+        log_level = logging.INFO
+        
+    # Configure logger to write to stderr, which is captured by the orchestrator.
+    # The 'force=True' flag ensures any pre-existing handlers are replaced.
+    logging.basicConfig(level=log_level,
+                        format='%(levelname)s (build_queries): %(message)s',
+                        stream=sys.stderr,
+                        force=True)
 
     # --- Validate k and iterations ---
     if args.num_iterations <= 0: logging.error("Number of iterations must be positive."); sys.exit(1)
@@ -301,7 +290,10 @@ def main():
 
         master_personalities_src_path = os.path.join(PROJECT_ROOT, "data", args.master_personalities_file)
         logging.info(f"Loading master personalities from: {master_personalities_src_path}")
-        master_personalities_df, original_master_header = load_all_personalities_df(master_personalities_src_path)
+        master_personalities_df, _ = load_all_personalities_df(master_personalities_src_path)
+        
+        # Define the exact header the query_generator.py worker expects.
+        worker_input_header = "Index\tidADB\tName\tBirthYear\tDescriptionText"
         
         globally_used_indices = load_used_indices(used_indices_filepath)
         logging.info(f"Loaded {len(globally_used_indices)} previously used personality indices.")
@@ -354,7 +346,7 @@ def main():
             df_to_write.rename(columns={'BirthYearInt': 'BirthYear'}, inplace=True)
             
             with open(temp_subset_qgen_input_path, 'w', encoding='utf-8') as f_temp:
-                f_temp.write(original_master_header + "\n") 
+                f_temp.write(worker_input_header + "\n") 
                 df_to_write.to_csv(f_temp, sep='\t', index=False, header=False, encoding='utf-8')
             
             qgen_base_query_filename = get_config_value(APP_CONFIG, 'Filenames', 'base_query_src', fallback="base_query.txt")
@@ -417,8 +409,11 @@ def main():
 
     except KeyboardInterrupt:
         logging.info("\nBatch generation interrupted by user (Ctrl+C).")
-    except Exception as e_global: 
-        logging.exception(f"\nAn unexpected error occurred during batch processing: {e_global}")
+        sys.exit(1)
+    except Exception:
+        # logging.exception automatically captures and prints the full traceback to stderr.
+        logging.exception("An unexpected error occurred during batch processing.")
+        sys.exit(1)
     finally: 
         if newly_used_indices_this_batch:
             append_used_indices(used_indices_filepath, newly_used_indices_this_batch)

@@ -47,15 +47,13 @@ from datetime import datetime
 from pathlib import Path
 
 # --- Local Imports ---
+from colorama import Fore, init
+
+# --- Local Imports ---
 from id_encoder import to_base58
 
-# --- ANSI Color Codes ---
-class BColors:
-    """A helper class for terminal colors."""
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
+# Initialize colorama
+init(autoreset=True)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -92,6 +90,7 @@ def main():
         default="data/intermediate/sf_data_import.txt",
         help="Path to write the final CQD-formatted output file."
     )
+    parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
     input_path = Path(args.input_file)
@@ -101,24 +100,28 @@ def main():
         logging.error(f"Input file not found: {input_path}")
         sys.exit(1)
 
+    proceed = True
     if output_path.exists():
-        print("")
-        print(f"{BColors.YELLOW}WARNING: The output file '{output_path}' already exists and will be overwritten.{BColors.ENDC}")
-        confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower()
-        if confirm != 'y':
+        if not args.force:
+            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
+            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            if confirm != 'y':
+                proceed = False
+        
+        if proceed:
+            try:
+                backup_dir = Path('data/backup')
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+                shutil.copy2(output_path, backup_path)
+                logging.info(f"Created backup of existing file at: {backup_path}")
+            except (IOError, OSError) as e:
+                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+                sys.exit(1)
+        else:
             print("\nOperation cancelled by user.\n")
             sys.exit(0)
-        
-        try:
-            backup_dir = Path('data/backup')
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-            shutil.copy2(output_path, backup_path)
-            logging.info(f"Created backup of existing file at: {backup_path}")
-        except (IOError, OSError) as e:
-            logging.error(f"Failed to create backup file: {e}")
-            sys.exit(1)
 
     print("")
     logging.info(f"Reading filtered data from: {input_path}")
@@ -164,7 +167,7 @@ def main():
         sys.exit(1)
 
     if not processed_records:
-        print(f"{BColors.RED}No valid records were processed. Output file will not be created.{BColors.ENDC}")
+        logging.error("No valid records were processed. Output file will not be created.")
         sys.exit(1)
 
     try:
@@ -175,10 +178,9 @@ def main():
                 formatted_line = ",".join([f'"{field}"' for field in record])
                 outfile.write(formatted_line + "\n")
         
-        print(f"{BColors.GREEN}\nSuccessfully wrote {len(processed_records)} records to {output_path}.{BColors.ENDC}")
-        print("")
+        print(f"\n{Fore.GREEN}SUCCESS: Successfully wrote {len(processed_records)} records to {output_path}. ✨\n")
     except IOError as e:
-        print(f"{BColors.RED}Failed to write to output file {output_path}: {e}{BColors.ENDC}")
+        logging.error(f"Failed to write to output file {output_path}: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

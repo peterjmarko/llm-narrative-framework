@@ -96,6 +96,20 @@ The `scripts/` directory contains helper utilities for development, maintenance,
 *   `lint_file_headers.py`: Scans the codebase to enforce file header and footer standards.
 *   `list_project_files.py`: Lists project files, typically for debugging or reporting.
 
+## Design Principles
+
+To maintain the quality and consistency of the codebase, all contributions should adhere to the following core design principles.
+
+*   **Separation of Concerns (Create -> Check -> Fix)**: The framework is built around a clear "Create, Check, Fix" model. Each script should have a single, well-defined responsibility. For example, `audit_experiment.ps1` only *checks* the state, while `repair_experiment.ps1` *fixes* it. This separation makes the system predictable and easier to debug.
+
+*   **Fail Loudly and Early**: Scripts must not hide errors. If a script encounters a fatal error, it must exit with a non-zero status code and provide a clear, informative error message to `stderr`. Silent failures that allow the pipeline to continue in a broken state are considered critical bugs.
+
+*   **Clarity and Control in Logging**: Scripts should be informative but not noisy by default. Standard runs should log high-level progress (e.g., stage completion). Detailed, line-by-line logs or internal state information should only be displayed when a `--verbose` flag is used.
+
+*   **Predictable and Safe User Interaction**: All scripts that modify or delete data must follow a standard interaction model. By default, they should prompt for confirmation before overwriting existing files. A `--force` flag should be available to bypass this prompt for automated workflows. In either case, a backup of the overwritten data should be created automatically.
+
+*   **Guaranteed Reproducibility**: Experimental results must be verifiably linked to the parameters that created them. The pipeline ensures this by automatically archiving the `config.ini` file within each run's output directory, creating an immutable record.
+
 ## Contribution Workflow
 
 ### 1. Create a Branch

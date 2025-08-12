@@ -59,10 +59,19 @@ import glob
 import time
 import configparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from colorama import Fore, init
+
 try:
     from tqdm import tqdm
 except ImportError:
     def tqdm(iterable, *args, **kwargs): return iterable
+
+# Initialize colorama
+init(autoreset=True)
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s (orchestrator): %(message)s', stream=sys.stderr)
 
 # --- Setup ---
 try:
@@ -73,77 +82,35 @@ except ImportError:
         sys.path.insert(0, current_script_dir)
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 
-def run_script(command, title, quiet=False):
+def run_script(command, title, verbose=False):
     """
-    Helper to run a script as a subprocess and capture its output.
-    Returns a tuple: (full_output_string, return_code, error_object_if_any)
-    The error_object_if_any will be a CalledProcessError if the subprocess
-    returned a non-zero exit code.
+    Helper to run a script as a subprocess.
+    Raises CalledProcessError on failure, which includes stdout/stderr.
+    Returns the process's stdout on success.
     """
-    print(f"--- Running Stage: {title} ---")
-    header = (
-        f"\n\n{'='*80}\n"
-        f"### STAGE: {title} ###\n"
-        f"COMMAND: {' '.join(command)}\n"
-        f"{'='*80}\n\n"
+    # Use a different printer for sub-stages to avoid confusion.
+    if re.match(r"\d+[a-z]", title):
+        # This is a sub-stage like "4a.". The calling code prints the message.
+        pass
+    else:
+        # This is a main stage like "1. Build LLM Queries"
+        print(f"--- Running Stage: {title} ---")
+    
+    # Run the subprocess, capturing output. check=True raises an error on failure.
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        check=True,
+        text=True,
+        encoding='utf-8',
+        errors='replace'
     )
     
-    result = None
-    captured_stdout = ""
-    captured_stderr = ""
-    
-    try:
-        # Always run with check=False to capture all output regardless of exit code
-        if title == "2. Run LLM Sessions":
-            result = subprocess.run(
-                command, stdout=subprocess.PIPE, stderr=None, check=False,
-                text=True, encoding='utf-8', errors='replace'
-            )
-            captured_stdout = result.stdout
-        else:
-            result = subprocess.run(
-                command, capture_output=True, check=False,
-                text=True, encoding='utf-8', errors='replace'
-            )
-            captured_stdout = result.stdout
-            captured_stderr = result.stderr
-
-    except FileNotFoundError as e:
-        error_message = (
-            f"\n\n--- FAILED STAGE: {title} ---\n"
-            f"Error: {e}\n"
-            f"Details: Script not found or executable: {' '.join(command)}\n"
-        )
-        # For FileNotFoundError, there's no subprocess result, so we return a synthetic error
-        return header + error_message, 1, e # Return code 1 for FileNotFoundError
-    
-    # Combine stdout and stderr for general processing and display
-    full_captured_output = captured_stdout + captured_stderr
-
-    lines = full_captured_output.splitlines()
-    filtered_lines = [line for line in lines if "RuntimeWarning" not in line and "UserWarning" not in line]
-    filtered_output = "\n".join(filtered_lines)
-
-    # The orchestrator should only print the subprocess's output if it's NOT in quiet mode
-    # and the subprocess itself is not handling its own output (e.g., Stage 2).
-    # For quiet mode, the orchestrator should capture but not print.
-    if not quiet:
-        # For Stage 2, output is already streamed, so we don't print the captured stdout again.
-        # For other stages, print the captured and filtered output.
-        if title != "2. Run LLM Sessions":
-            print(filtered_output)
-
-    # The returned output should contain the header and the filtered output
-    final_output_string = header + filtered_output
-    
-    # Return the full output, the return code, and the CalledProcessError if applicable
-    if result.returncode != 0:
-        # Manually create a CalledProcessError to attach the full captured output
-        err = subprocess.CalledProcessError(result.returncode, command, output=captured_stdout, stderr=captured_stderr)
-        err.full_log = final_output_string # Attach the complete output for inspection
-        return final_output_string, result.returncode, err
-    else:
-        return final_output_string, 0, None # Success, no error object
+    # Only print the child's stdout if the orchestrator is in verbose mode.
+    if verbose and result.stdout:
+        print(result.stdout)
+        
+    return result.stdout
 
 def generate_run_dir_name(model_name, temperature, num_iterations, k_per_query, personalities_db, replication_num, num_replications, mapping_strategy):
     """Generates a descriptive, sanitized directory name."""
@@ -170,17 +137,16 @@ def main():
     parser.add_argument("--replication_num", type=int, default=1, help="Replication number for new runs.")
     parser.add_argument("--base_seed", type=int, default=None, help="Base random seed for personality selection.")
     parser.add_argument("--qgen_base_seed", type=int, default=None, help="Base random seed for shuffling.")
-    parser.add_argument("--quiet", action="store_true", help="Run all stages in quiet mode.")
     parser.add_argument("--reprocess", action="store_true", help="Re-process existing responses.")
     parser.add_argument("--run_output_dir", type=str, default=None, help="Path to a specific run output directory for reprocessing.")
     parser.add_argument("--base_output_dir", type=str, default=None, help="The base directory where the new run folder should be created.")
     parser.add_argument("--indices", type=int, nargs='+', help="A specific list of trial indices to run. If provided, only these trials will be executed.")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose (DEBUG level) output from child scripts.")
     
     args = parser.parse_args()
     
-    all_stage_outputs = []
     pipeline_status = "FAILED" # Default to FAILED, changed to COMPLETED only on full success
-    output3, output4 = "", ""
+    output3 = ""
 
     if args.reprocess:
         if not args.run_output_dir or not os.path.isdir(args.run_output_dir):
@@ -234,12 +200,10 @@ def main():
         # Stage 1: Build Queries (only for new runs)
         if not args.reprocess:
             cmd1 = [sys.executable, build_script, "--run_output_dir", run_specific_dir_path]
-            if args.quiet: cmd1.append("--quiet")
+            if args.verbose: cmd1.append("-v")
             if args.base_seed: cmd1.extend(["--base_seed", str(args.base_seed)])
             if args.qgen_base_seed: cmd1.extend(["--qgen_base_seed", str(args.qgen_base_seed)])
-            output1, rc1, err1 = run_script(cmd1, "1. Build LLM Queries", quiet=args.quiet)
-            all_stage_outputs.append(output1)
-            if rc1 != 0: raise err1
+            run_script(cmd1, "1. Build LLM Queries", verbose=args.verbose)
 
         # Stage 2: Run LLM Sessions (Parallel by default)
         stage_title_2 = "2. Run LLM Sessions"
@@ -289,7 +253,7 @@ def main():
                               "--output_error_file", final_error_filepath,
                               "--output_json_file", final_json_filepath,
                               "--config_path", config_path]
-                if args.quiet: worker_cmd.append("--quiet")
+                if args.verbose: worker_cmd.append("-v")
                 
                 start_time = time.time()
                 try:
@@ -326,77 +290,63 @@ def main():
                     with open(api_times_log_path, "a", encoding='utf-8') as f:
                         f.write(f"Query_{index:03d}\t{duration:.2f}\t{total_elapsed_time:.2f}\t{eta:.2f}\n")
             
-            all_stage_outputs.append("\n".join(all_logs))
             if failed_sessions > 0:
+                # Log the specific failures before raising the general exception.
+                for log_entry in all_logs:
+                    if log_entry.strip() and "STAGE:" not in log_entry: # Avoid re-printing the header
+                        logging.error(log_entry)
                 raise Exception(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed. See logs for details.")
 
         # Stage 3: Process LLM Responses
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]
-        if args.quiet: cmd3.append("--quiet")
-        output3, rc3, err3 = run_script(cmd3, "3. Process LLM Responses", quiet=args.quiet)
-        all_stage_outputs.append(output3)
-        if rc3 != 0: raise err3
+        if args.verbose: cmd3.append("-v")
+        output3 = run_script(cmd3, "3. Process LLM Responses", verbose=args.verbose)
         
         n_valid_str = (re.search(r"<<<PARSER_SUMMARY:(\d+):", output3) or ['0','0'])[1]
         
         # Stage 4: Analyze LLM Performance
         stage_title_4 = "4. Analyze LLM Performance"
         print(f"--- Running Stage: {stage_title_4} ---")
-        header_4 = (f"\n\n{'='*80}\n### STAGE: {stage_title_4} ###\n{'='*80}\n\n")
-        all_stage_outputs.append(header_4)
         
         # Sub-stage 4a: Core performance metrics
         print("   - Calculating core performance metrics...")
         cmd_analyze = [sys.executable, analyze_script, "--run_output_dir", run_specific_dir_path, "--num_valid_responses", n_valid_str]
-        if args.quiet: cmd_analyze.append("--quiet")
-        # Run subprocess directly to manage console output
-        result4 = subprocess.run(cmd_analyze, capture_output=True, check=False, text=True, encoding='utf-8', errors='replace')
-        output4 = result4.stdout # Keep stdout for report generation
-        all_stage_outputs.append("\n--- Sub-stage: Core Performance Metrics ---\n" + output4 + result4.stderr)
-        if result4.returncode != 0:
-            raise subprocess.CalledProcessError(result4.returncode, cmd_analyze, output=result4.stdout, stderr=result4.stderr)
+        if args.verbose: cmd_analyze.append("--verbose")
+        run_script(cmd_analyze, "4a. Core Performance Metrics", verbose=args.verbose)
 
         # Sub-stage 4b: Positional bias metrics
         print("   - Calculating positional bias metrics...")
         k_val = int(get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int, fallback=10))
         cmd_bias = [sys.executable, bias_script, run_specific_dir_path, "--k_value", str(k_val)]
-        if not args.quiet: cmd_bias.append("--verbose")
-        result5 = subprocess.run(cmd_bias, capture_output=True, check=False, text=True, encoding='utf-8', errors='replace')
-        all_stage_outputs.append("\n--- Sub-stage: Positional Bias Metrics ---\n" + result5.stdout + result5.stderr)
-        if result5.returncode != 0:
-            raise subprocess.CalledProcessError(result5.returncode, cmd_bias, output=result5.stdout, stderr=result5.stderr)
+        if args.verbose: cmd_bias.append("--verbose")
+        run_script(cmd_bias, "4b. Positional Bias Metrics", verbose=args.verbose)
 
         # Stage 5: Generate Final Report
         cmd5 = [sys.executable, generate_report_script, "--run_output_dir", run_specific_dir_path, "--replication_num", str(args.replication_num), "--notes", args.notes]
-        output5, rc5, err5 = run_script(cmd5, "5. Generate Replication Report", quiet=args.quiet)
-        all_stage_outputs.append(output5)
-        if rc5 != 0: raise err5
+        run_script(cmd5, "5. Generate Replication Report", verbose=args.verbose)
 
         # Stage 6: Create Replication Summary
         cmd6 = [sys.executable, summarize_script, run_specific_dir_path]
-        output6, rc6, err6 = run_script(cmd6, "6. Compile Replication Results", quiet=args.quiet)
-        all_stage_outputs.append(output6)
-        if rc6 != 0: raise err6
+        run_script(cmd6, "6. Compile Replication Results", verbose=args.verbose)
 
         pipeline_status = "COMPLETED"
 
     except (KeyboardInterrupt, subprocess.CalledProcessError, Exception) as e:
+        pipeline_status = "FAILED"
         if isinstance(e, KeyboardInterrupt):
             pipeline_status = "INTERRUPTED BY USER"
-        else:
-            pipeline_status = "FAILED"
         
-        # Minimalist error logging
-        logging.error(f"\n\n--- PIPELINE {pipeline_status} ---")
-        if isinstance(e, subprocess.CalledProcessError) and hasattr(e, 'full_log'):
-            all_stage_outputs.append(e.full_log)
+        logging.error(f"\n\n{Fore.RED}--- PIPELINE {pipeline_status} ---{Fore.RESET}")
+
+        # If the error is from a subprocess, log its stderr to show the root cause.
+        if isinstance(e, subprocess.CalledProcessError):
+            logging.error(e.stderr)
         else:
-            import traceback
-            all_stage_outputs.append(f"\n--- ERROR DETAILS ---\n{traceback.format_exc()}")
-        
-        # The orchestrator still needs to generate a final report, even on failure.
-        # The logic for this is now consolidated with the success path.
-        pass
+            # For other exceptions, log the exception info.
+            logging.exception("An unexpected error occurred in the orchestrator.")
+
+        # CRITICAL: Exit with a non-zero code to signal failure to the manager.
+        sys.exit(1)
 
     # --- Finalization: Update Report Status ---
     # The report is now clean. The only remaining task is to set its final status.
@@ -415,11 +365,6 @@ def main():
                 f.truncate()
         except IOError as e:
             logging.error(f"Could not update final report {report_path}: {e}")
-    else:
-        # If no report exists (major failure), create a simple failure log with all captured output.
-        fail_log_path = os.path.join(run_specific_dir_path, 'orchestration_FAILURE.log')
-        with open(fail_log_path, 'w', encoding='utf-8') as f:
-             f.write(f"PIPELINE {pipeline_status}\n\n" + "".join(all_stage_outputs))
 
     logging.info(f"Replication run finished. Final status: {pipeline_status}")
 

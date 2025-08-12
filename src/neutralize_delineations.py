@@ -298,18 +298,27 @@ def main():
     input_path, output_dir = Path(args.input_file), Path(args.output_dir)
     if not input_path.exists(): logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}"); sys.exit(1)
 
-    if args.force and output_dir.exists():
-        print(f"\n{Fore.YELLOW}WARNING: You are about to overwrite all neutralized delineation files.{Fore.RESET}")
-        confirm = input("A backup will be created. Are you sure? (Y/N): ").lower()
-        if confirm != "y": print("Operation cancelled by user."); sys.exit(0)
-        try:
-            backup_dir = Path("data/backup"); backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_name = f"{output_dir.name}_{timestamp}.zip"
-            shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
-            logging.info(f"Successfully created backup at: {backup_dir / backup_name}")
-            shutil.rmtree(output_dir)
-        except Exception as e: logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)
+    proceed = True
+    if output_dir.exists():
+        if not args.force:
+            print(f"\n{Fore.YELLOW}WARNING: The output directory '{output_dir}' already exists.")
+            print(f"This process incurs API costs and can take over 10 minutes to complete.{Fore.RESET}")
+            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            if confirm != "y":
+                proceed = False
+
+        if proceed:
+            try:
+                backup_dir = Path("data/backup"); backup_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_name = f"{output_dir.name}_{timestamp}.zip"
+                shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
+                logging.info(f"Successfully created backup at: {backup_dir / backup_name}")
+                shutil.rmtree(output_dir)
+            except Exception as e:
+                logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)
+        else:
+            print("\nOperation cancelled by user.\n"); sys.exit(0)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -423,15 +432,15 @@ def main():
         skipped_count = total_possible_tasks - len(tasks_to_run)
 
         print(f"\n{Fore.YELLOW}--- Summary ---{Fore.RESET}")
-        print(f"Processed: {processed_count} tasks")
-        print(f"Skipped:   {skipped_count} tasks (already exist)")
-        print(f"Failed:    {failed_count} tasks")
+        print(f"  - Processed: {processed_count} tasks")
+        print(f"  - Skipped:   {skipped_count} tasks (already exist)")
+        print(f"  - Failed:    {failed_count} tasks")
         
         if failed_count > 0:
-            print(f"\n{Fore.RED}Neutralization process finished with {failed_count} failure(s).{Fore.RESET}")
-            print(f"{Fore.YELLOW}Re-run the script to automatically process the failed tasks.{Fore.RESET}\n")
+            logging.warning(f"Neutralization process finished with {failed_count} failure(s).")
+            logging.warning("Re-run the script to automatically process the failed tasks.\n")
         else:
-            print(f"\n{Fore.GREEN}Neutralization process finished successfully. ✨{Fore.RESET}\n")
+            print(f"\n{Fore.GREEN}Neutralization process finished successfully. ✨\n")
 
 def debug_and_exit(prompt, worker_result, pbar, temp_dir):
     """Prints debug info and halts the script."""

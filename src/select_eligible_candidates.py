@@ -79,25 +79,29 @@ def main():
     args = parser.parse_args()
 
     output_path = Path(args.output_file)
-    if output_path.exists() and not args.force:
-        print()
-        print(f"{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-        response = input("Are you sure you want to continue? (Y/N): ").lower()
-        if response != "y":
-            print("\nOperation cancelled by user.")
-            sys.exit(0)
+    proceed = True
 
     if output_path.exists():
-        try:
-            backup_dir = Path("data/backup")
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = (backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak")
-            shutil.copy2(output_path, backup_path)
-            logging.info(f"Created backup of existing file at: {backup_path}")
-        except (IOError, OSError) as e:
-            logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-            sys.exit(1)
+        if not args.force:
+            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
+            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            if confirm != 'y':
+                proceed = False
+        
+        if proceed:
+            try:
+                backup_dir = Path('data/backup')
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+                shutil.copy2(output_path, backup_path)
+                logging.info(f"Created backup of existing file at: {backup_path}")
+            except (IOError, OSError) as e:
+                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+                sys.exit(1)
+        else:
+            print("\nOperation cancelled by user.\n")
+            sys.exit(0)
 
     print(f"\n{Fore.YELLOW}--- Loading Files ---")
     try:
@@ -168,9 +172,7 @@ def main():
         for parts in final_candidates:
             f.write("\t".join(parts) + "\n")
     
-    print()
-    print(f"{Fore.GREEN}Successfully saved {len(final_candidates)} eligible candidates to {args.output_file}")
-    print()
+    print(f"\n{Fore.GREEN}SUCCESS: Successfully saved {len(final_candidates)} eligible candidates to {args.output_file}. ✨\n")
 
 
 if __name__ == "__main__":

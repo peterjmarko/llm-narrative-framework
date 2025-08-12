@@ -72,13 +72,10 @@ except ImportError:
     print("Please install it by running: pdm install pandas")
     sys.exit(1)
 
-class BColors:
-    """A helper class for terminal colors."""
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    CYAN = '\033[96m'
-    ENDC = '\033[0m'
+from colorama import Fore, init
+
+# Initialize colorama
+init(autoreset=True)
 
 # --- Constants ---
 OCEAN_FIELDNAMES = ["Index", "idADB", "Name", "BirthYear", "Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
@@ -133,21 +130,8 @@ except ImportError:
         print(f"FATAL: Could not import from config_loader.py. Error: {e}")
         sys.exit(1)
 
-class CustomFormatter(logging.Formatter):
-    """Custom formatter that adds colors to log levels."""
-    log_format = "%(levelname)s: %(message)s"
-    FORMATS = {
-        logging.DEBUG: BColors.CYAN + log_format + BColors.ENDC,
-        logging.INFO: BColors.GREEN + log_format + BColors.ENDC,
-        logging.WARNING: BColors.YELLOW + log_format + BColors.ENDC,
-        logging.ERROR: BColors.RED + log_format + BColors.ENDC,
-        logging.CRITICAL: BColors.RED + log_format + BColors.ENDC,
-    }
-
-    def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno, self.log_format)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
+# Configure logging
+logging.basicConfig(level=logging.INFO, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
 
 def load_processed_ids(filepath: Path) -> Set[str]:
     """Reads an existing output file to find which idADBs have been processed."""
@@ -488,12 +472,12 @@ def perform_pre_flight_check(args, all_scores_df, benchmark_variance, initial_ch
 
     met_count = sum(1 for check in recalculated_checks if check[2])
     if met_count < args.variance_trigger_count:
-        print(f"{BColors.GREEN}Pre-flight check: Cutoff condition not met ({met_count}/{args.variance_trigger_count}). Resuming run...{BColors.ENDC}")
+        logging.info(f"{Fore.GREEN}Pre-flight check: Cutoff condition not met ({met_count}/{args.variance_trigger_count}). Resuming run...")
         return "CONTINUE", recalculated_checks
 
     # --- Cutoff condition IS met based on existing data ---
-    print(f"{BColors.YELLOW}Pre-flight check: Cutoff condition is met based on existing data ({met_count}/{args.variance_trigger_count}).{BColors.ENDC}")
-    print("No new subjects will be processed. Finalizing with current data.")
+    logging.warning(f"Pre-flight check: Cutoff condition is met based on existing data ({met_count}/{args.variance_trigger_count}).")
+    logging.warning("No new subjects will be processed. Finalizing with current data.")
     
     last_check_checkpoint = recalculated_checks[-1][0]
     cutoff_start_point = last_check_checkpoint - args.variance_analysis_window
@@ -536,17 +520,7 @@ def main():
     parser.add_argument("--benchmark-population-size", type=int, default=default_benchmark_pop, help="Number of top subjects to use for benchmark variance.")
     parser.add_argument("--cutoff-start-point", type=int, default=default_cutoff_start, help="Minimum subjects to process before cutoff logic is active.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
-    parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity (-v for INFO, -vv for DEBUG).")
     args = parser.parse_args()
-
-    # --- Setup Logging ---
-    log_level = logging.WARNING - (args.verbose * 10)
-    root_logger = logging.getLogger()
-    root_logger.setLevel(log_level)
-    for handler in root_logger.handlers[:]: root_logger.removeHandler(handler)
-    handler = logging.StreamHandler()
-    handler.setFormatter(CustomFormatter())
-    root_logger.addHandler(handler)
 
     # --- Setup Paths & Worker ---
     script_dir = Path(__file__).parent
@@ -563,32 +537,36 @@ def main():
     temp_error_file = temp_dir / "error.txt"
     temp_config_file = temp_dir / "temp_config.ini"
 
-    print(f"{BColors.YELLOW}\n--- Starting OCEAN Score Generation ---{BColors.ENDC}")
+    print(f"\n{Fore.YELLOW}--- Starting OCEAN Score Generation ---{Fore.RESET}")
 
     # --- Handle Overwrite with Backup and Confirmation ---
-    if args.force and (output_path.exists() or summary_path.exists() or missing_report_path.exists()):
-        print(f"{BColors.YELLOW}WARNING: You are about to overwrite existing OCEAN score files.{BColors.ENDC}")
-        print(f"{BColors.YELLOW}This process incurs API costs and can take several hours to complete.{BColors.ENDC}")
-        confirm = input("Backups will be created. Are you sure you want to continue? (Y/N): ").lower()
-        if confirm != 'y':
-            print("Operation cancelled by user.")
+    files_to_check = [output_path, summary_path, missing_report_path]
+    proceed = True
+    if any(p.exists() for p in files_to_check):
+        if not args.force:
+            print(f"\n{Fore.YELLOW}WARNING: One or more OCEAN score files already exist.")
+            print(f"This process incurs API costs and can take several hours to complete.{Fore.RESET}")
+            confirm = input("Backups will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            if confirm != 'y':
+                proceed = False
+        
+        if proceed:
+            backup_dir = Path('data/backup')
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            for p in files_to_check:
+                if p.exists():
+                    try:
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        backup_path = backup_dir / f"{p.stem}.{timestamp}{p.suffix}.bak"
+                        shutil.copy2(p, backup_path)
+                        logging.info(f"Created backup for {p.name} at: {backup_path}")
+                        p.unlink()
+                    except (IOError, OSError) as e:
+                        logging.error(f"{Fore.RED}Failed to back up or remove {p.name}: {e}")
+                        sys.exit(1)
+        else:
+            print("\nOperation cancelled by user.\n")
             sys.exit(0)
-        
-        backup_dir = Path('data/backup')
-        backup_dir.mkdir(parents=True, exist_ok=True)
-
-        for p in [output_path, summary_path, missing_report_path]:
-            if p.exists():
-                try:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_path = backup_dir / f"{p.stem}.{timestamp}{p.suffix}.bak"
-                    shutil.copy2(p, backup_path)
-                    p.unlink()
-                except (IOError, OSError) as e:
-                    logging.error(f"Failed to back up or remove {p.name}: {e}")
-                    sys.exit(1)
-        
-        print(f"\n{BColors.YELLOW}Backups created. Overwriting existing files...{BColors.ENDC}")
 
     # --- Load Data ---
     processed_ids = load_processed_ids(output_path)
@@ -596,7 +574,7 @@ def main():
     
     total_to_process = len(subjects_to_process)
     total_possible_subjects = len(processed_ids) + total_to_process
-    print(f"Found {BColors.CYAN}{len(processed_ids):,}{BColors.ENDC} existing scores. Processing {BColors.CYAN}{total_to_process:,}{BColors.ENDC} new subjects out of {total_possible_subjects:,} total.")
+    logging.info(f"Found {len(processed_ids):,} existing scores. Processing {total_to_process:,} new subjects out of {total_possible_subjects:,} total.")
 
     # --- Create Temporary Config for Worker ---
     temp_config = configparser.ConfigParser()
@@ -621,7 +599,7 @@ def main():
     
     # If resuming, check if there's anything to do
     if not subjects_to_process:
-        print(f"{BColors.GREEN}All subjects have already been processed. Nothing to do. ✨{BColors.ENDC}")
+        print(f"\n{Fore.GREEN}All subjects have already been processed. Nothing to do. ✨\n")
         # Finalize with the current state just in case config changed
         final_count = len(all_scores_df)
         generate_summary_report(
@@ -645,7 +623,7 @@ def main():
             session_batch_num = (i // args.batch_size) + 1
             total_session_batches = (total_to_process + args.batch_size - 1) // args.batch_size
             
-            print(f"\n{BColors.CYAN}--- Processing Session Batch {session_batch_num} of {total_session_batches} (max) ---{BColors.ENDC}")
+            print(f"\n{Fore.CYAN}--- Processing Session Batch {session_batch_num} of {total_session_batches} (max) ---{Fore.RESET}")
 
             # 1. Construct prompt
             subject_list_str = "\n".join([f'{s["Name"]} ({s["BirthYear"]}), ID {s["idADB"]}' for s in batch])
@@ -722,20 +700,20 @@ def main():
                 if benchmark_variance == 0 and new_total >= args.benchmark_population_size:
                     benchmark_df = all_scores_df.iloc[:args.benchmark_population_size]
                     benchmark_variance = calculate_average_variance(benchmark_df)
-                    print(f"{BColors.GREEN}Benchmark variance established from top {args.benchmark_population_size} subjects: {benchmark_variance:.4f}{BColors.ENDC}")
+                    logging.info(f"{Fore.GREEN}Benchmark variance established from top {args.benchmark_population_size} subjects: {benchmark_variance:.4f}")
 
                 # If benchmark is set, perform the cutoff check
                 if benchmark_variance > 0:
                     check_point = (new_total // args.variance_analysis_window) * args.variance_analysis_window
                     
                     if check_point < args.cutoff_start_point:
-                        print(f"{BColors.CYAN}Cutoff checks will begin after {args.cutoff_start_point} subjects are processed.{BColors.ENDC}")
+                        logging.info(f"{Fore.CYAN}Cutoff checks will begin after {args.cutoff_start_point} subjects are processed.")
                     else:
                         latest_window_df = all_scores_df.iloc[check_point - args.variance_analysis_window : check_point]
                         V_avg_latest_window = calculate_average_variance(latest_window_df)
                         
                         percentage = (V_avg_latest_window / benchmark_variance) * 100 if benchmark_variance > 0 else 0.0
-                        print(f"Variance Check: Benchmark Avg={benchmark_variance:.4f}, Latest {len(latest_window_df)} entries Avg={V_avg_latest_window:.4f} ({percentage:.2f}%)")
+                        logging.info(f"Variance Check: Benchmark Avg={benchmark_variance:.4f}, Latest {len(latest_window_df)} entries Avg={V_avg_latest_window:.4f} ({percentage:.2f}%)")
 
                         is_met = V_avg_latest_window < (args.variance_cutoff_percentage * benchmark_variance)
                         # Convert numpy.bool_ to standard Python bool for JSON serialization
@@ -743,7 +721,7 @@ def main():
                         
                         met_count = sum(1 for check in last_variance_checks if check[2])
                         # Report against the configured check window size for clarity
-                        print(f"{BColors.YELLOW}Cutoff Status: {met_count}/{args.variance_trigger_count} of last {args.variance_check_window} windows have met the threshold ({len(last_variance_checks)} currently tracked).{BColors.ENDC}")
+                        logging.warning(f"Cutoff Status: {met_count}/{args.variance_trigger_count} of last {args.variance_check_window} windows have met the threshold ({len(last_variance_checks)} currently tracked).")
 
                         if met_count >= args.variance_trigger_count:
                             stop_reason = f"Cutoff met ({met_count} of last {len(last_variance_checks)} windows below threshold)."
@@ -751,7 +729,7 @@ def main():
                             # Set cutoff to the beginning of the window that triggered this final check.
                             cutoff_start_subject_count = check_point - args.variance_analysis_window
                             
-                            print(f"{BColors.RED}STOPPING: {stop_reason}{BColors.ENDC}")
+                            logging.warning(f"{Fore.RED}STOPPING: {stop_reason}")
                             break # Exit main loop
             
             time.sleep(1)
@@ -759,11 +737,12 @@ def main():
     except KeyboardInterrupt:
         was_interrupted = True
         stop_reason = "Process interrupted by user."
-        print(f"\n\n{BColors.YELLOW}{stop_reason} Exiting gracefully.{BColors.ENDC}")
+        print(f"\n\n{Fore.YELLOW}{stop_reason} Exiting gracefully.{Fore.RESET}")
     finally:
         # --- Finalization ---
         print("\n--- Finalizing ---")
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
 
         total_processed_count = len(all_scores_df)
         final_count = total_processed_count  # Default to preserving all data
@@ -789,27 +768,13 @@ def main():
 
         # Print final status message based on the exit condition
         if was_interrupted:
-            print(f"\n{BColors.YELLOW}OCEAN score generation terminated by user. ✨{BColors.ENDC}\n")
+            logging.warning("OCEAN score generation terminated by user. ✨\n")
         elif stop_reason.startswith("Halted"):
-            print(f"\n{BColors.RED}OCEAN score generation halted due to critical errors. ✨{BColors.ENDC}\n")
+            logging.critical("OCEAN score generation halted due to critical errors. ✨\n")
         else:
-            # Normal completion status (either finished all subjects or stopped by variance cutoff)
             final_df = pd.read_csv(output_path) if output_path.exists() and output_path.stat().st_size > 0 else pd.DataFrame()
-            final_subject_count = len(final_df)
-            
-            # Judge completion based on what was *intended* for this run.
-            # If stopped by variance, it's a 100% successful completion of the intended task.
-            intended_to_process = cutoff_start_subject_count if stop_reason.startswith("Cutoff met") else total_possible_subjects
-            
-            completion_pct = (final_subject_count / intended_to_process) * 100 if intended_to_process > 0 else 100
-            
-            status_line = f"Final Count: {final_subject_count:,} subjects."
-            
-            if completion_pct >= 99.5:
-                print(f"\n{BColors.GREEN}SUCCESS - {status_line} OCEAN score generation completed as designed. ✨{BColors.ENDC}\n")
-            else:
-                # This case should rarely be hit, e.g. if the script stops between rounding boundaries.
-                print(f"\n{BColors.YELLOW}WARNING - {status_line} OCEAN score generation completed with partial data. ✨{BColors.ENDC}\n")
+            status_line = f"Final Count: {len(final_df):,} subjects."
+            print(f"\n{Fore.GREEN}SUCCESS: {status_line} OCEAN score generation completed as designed. ✨\n")
 
 def generate_missing_scores_report(
     filepath: Path,

@@ -61,6 +61,8 @@ This document outlines planned development tasks and tracks known issues for the
 
 ### Code Development
 
+- [ ] **Refactor `experiment_manager.py`**
+  - [ ] Split the script into two distinct modules: `experiment_auditor.py` (for verification logic) and `experiment_manager.py` (for state-machine control) to improve maintainability and testability.
 - [ ] **Improve Experiment Execution and Reproducibility**
   - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.
   - [ ] Generate an experiment manifest file with results to permanently record all parameters used (this will replace config.ini as the source of parameters).
