@@ -1,5 +1,24 @@
 # Changelog
 
+## 5.0.2 (2025-08-12)
+
+### Bump
+
+- **version 5.0.1 → 5.0.2**
+
+### Fixes
+
+- **Finalize pipeline scripts and documentation**
+  Script Fixes:
+  - `select_final_candidates.py`: Corrected a bug preventing the script from re-indexing its output and properly replacing the `CountryState` column with the resolved `Country` name.
+  - `create_subject_db.py`: Fixed a crash caused by referencing an obsolete input file and a non-existent `EminenceScore` column.
+  - `generate_personalities_db.py`: Standardized console logging for consistency.
+  
+  Documentation Overhaul:
+  - The monolithic data prep flow diagram has been split into three clearer, stage-specific diagrams (Sourcing, Scoring, Generation).
+  - All data preparation diagrams now use a consistent color scheme and have been updated to reflect the latest script logic, including labels for LLM-assisted steps.
+  - Logic flowcharts for several scripts have been rearranged into a more compact, horizontal layout to improve readability in the final documents.
+  - Console logging for all final pipeline scripts has been cleaned up and standardized for a better user experience.
 ## 5.0.1 (2025-08-11)
 
 ### Bump
