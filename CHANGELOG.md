@@ -1,5 +1,22 @@
 # Changelog
 
+## 5.0.1 (2025-08-11)
+
+### Bump
+
+- **version 5.0.0 → 5.0.1**
+
+### Refactor
+
+- **Overhaul and harden data generation scripts**
+  This commit introduces a major refactoring of the data preparation pipeline to improve performance, resilience, and user experience.
+  
+  Key Improvements:
+  - Introduces a hybrid `--fast` mode to `neutralize_delineations.py` for rapid initial runs, followed by a robust, granular default mode for resuming and fixing any failed tasks.
+  - Refactors `neutralize_delineations.py` to use atomic, single-item tasks in its default mode, permanently solving LLM response truncation issues.
+  - Hardens `generate_ocean_scores.py` with a robust pre-flight check that re-analyzes all existing data on startup, ensuring correct finalization of interrupted runs.
+  - Overhauls console logging in `neutralize_delineations.py` for clarity, providing clean, task-by-task status updates.
+  - Updates all related documentation, docstrings, and diagrams to reflect the new, more sophisticated workflows.
 ## 5.0.0 (2025-08-11)
 
 ### Bump
