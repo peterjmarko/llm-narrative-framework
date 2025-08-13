@@ -132,6 +132,7 @@ def generate_run_dir_name(model_name, temperature, num_iterations, k_per_query, 
     return "_".join(sanitized_parts)
 
 def main():
+    all_stage_outputs = []
     parser = argparse.ArgumentParser(description="Runs or re-processes a single replication.")
     parser.add_argument("--notes", type=str, default="N/A", help="Optional notes for the report.")
     parser.add_argument("--replication_num", type=int, default=1, help="Replication number for new runs.")
@@ -153,7 +154,7 @@ def main():
             logging.error("FATAL: --run_output_dir must be a valid directory in --reprocess mode.")
             sys.exit(1)
         run_specific_dir_path = args.run_output_dir
-        logging.info(f"--- REPROCESS MODE for: {os.path.basename(run_specific_dir_path)} ---")
+        print(f"{Fore.YELLOW}--- REPROCESS MODE for: {os.path.basename(run_specific_dir_path)} ---{Fore.RESET}")
         
         config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
         if not os.path.exists(config_path):
@@ -366,7 +367,12 @@ def main():
         except IOError as e:
             logging.error(f"Could not update final report {report_path}: {e}")
 
-    logging.info(f"Replication run finished. Final status: {pipeline_status}")
+    if args.reprocess:
+        final_status_msg = "REPAIRED"
+    else:
+        final_status_msg = pipeline_status
+
+    print(f"{Fore.GREEN}Replication run finished. Final status: {final_status_msg}{Fore.RESET}")
 
 
 if __name__ == "__main__":

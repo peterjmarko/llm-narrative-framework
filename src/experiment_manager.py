@@ -899,7 +899,7 @@ def _run_finalization(final_output_dir, script_paths, colors):
         logging.error(f"An unexpected error occurred during finalization: {e}")
         sys.exit(1)
 
-def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, compile_script, target_dir, log_manager_script, colors):
+def _run_reprocess_mode(runs_to_reprocess, notes, verbose, orchestrator_script, compile_script, target_dir, log_manager_script, colors):
     """Executes 'REPROCESS' mode to fix corrupted analysis files."""
     C_CYAN = colors['cyan']
     C_YELLOW = colors['yellow']
@@ -914,7 +914,7 @@ def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, co
         print(f"{C_CYAN}{'='*80}{C_RESET}")
 
         cmd_orch = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", run_dir]
-        if quiet: cmd_orch.append("--quiet")
+        if verbose: cmd_orch.append("--verbose")
         if notes: cmd_orch.extend(["--notes", notes])
 
         try:
@@ -927,7 +927,7 @@ def _run_reprocess_mode(runs_to_reprocess, notes, quiet, orchestrator_script, co
             return False
 
     # The main loop will handle the final aggregation.
-    print(f"\n{C_CYAN}--- All replications reprocessed successfully. ---{C_RESET}")
+    print(f"\n{C_GREEN}--- All replications reprocessed successfully. ---{C_RESET}")
     return True
 
 def _setup_environment_and_paths():
@@ -1096,7 +1096,7 @@ def main():
                     all_run_dirs = sorted([p for p in Path(final_output_dir).glob("run_*") if p.is_dir()])
                     payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
                 
-                success = _run_reprocess_mode(payload_details, args.notes, not args.verbose, script_paths['orchestrator'], script_paths['compile_experiment'], final_output_dir, script_paths['log_manager'], colors)
+                success = _run_reprocess_mode(payload_details, args.notes, args.verbose, script_paths['orchestrator'], script_paths['compile_experiment'], final_output_dir, script_paths['log_manager'], colors)
                 action_taken = True
                 force_reprocess_once = False # Reset flag after use
 

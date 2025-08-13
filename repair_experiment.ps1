@@ -95,7 +95,24 @@ param(
     [switch]$ForceAggregate
 )
 
+function Write-Header($message, $color, $C_RESET) {
+    $line = '#' * 80
+    $bookend = "###"
+    $contentWidth = $line.Length - ($bookend.Length * 2)
+    $paddingNeeded = $contentWidth - $message.Length
+    $leftPad = [Math]::Floor($paddingNeeded / 2)
+    $rightPad = [Math]::Ceiling($paddingNeeded / 2)
+    $centeredMsg = "$bookend$(' ' * $leftPad)$message$(' ' * $rightPad)$bookend"
+    
+    Write-Host ""
+    Write-Host "$color$line"
+    Write-Host "$color$centeredMsg"
+    Write-Host "$color$line$C_RESET"
+    Write-Host ""
+}
+
 function Invoke-RepairExperiment {
+    $C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"; $C_RESET = "`e[0m"
     # --- Auto-detect execution environment ---
     $executable = "python"
     $prefixArgs = @()
@@ -160,7 +177,7 @@ function Invoke-RepairExperiment {
             # A final verification is not needed here, as the calling script (`repair_study.ps1`) will do it.
             return
         }
-        Write-Host "`n--- Auditing experiment to determine required action... ---" -ForegroundColor Cyan
+        Write-Header "STEP 1: DIAGNOSING EXPERIMENT STATE" $C_CYAN $C_RESET
         # In an automatic flow, the audit result determines the action.
         # If the audit is valid (exit code 0), it becomes an interactive flow.
         $isInteractive = $false
@@ -216,12 +233,12 @@ Enter your choice (1, 2, 3, or N)
                         if ($confirm.Trim() -ceq 'YES') {
                             Write-Host ""; Write-Host "Deleting LLM responses..." -ForegroundColor Yellow
                             Get-ChildItem -Path $TargetDirectory -Filter "llm_response_*.txt" -Recurse | Remove-Item -Force
-                            Write-Host "`n--- Starting experiment repair/resumption... ---" -ForegroundColor Cyan
+                            Write-Header "STEP 2: APPLYING REPAIRS / UPDATES" $C_CYAN $C_RESET
                             $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
                         } else { Write-Host "`nAction aborted by user.`n" -ForegroundColor Yellow; return }
                     }
                     '2' { # Force Full Update
-                        Write-Host "`n--- Starting experiment reprocessing... ---" -ForegroundColor Cyan
+                        Write-Header "STEP 2: APPLYING REPAIRS / UPDATES" $C_CYAN $C_RESET
                         $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
                     }
                     '3' { # Force Aggregation
@@ -234,11 +251,11 @@ Enter your choice (1, 2, 3, or N)
                 }
             }
             1 { # AUDIT_NEEDS_REPROCESS
-                Write-Host "`n--- Starting experiment reprocessing... ---" -ForegroundColor Cyan
+                Write-Header "STEP 2: APPLYING REPAIRS / UPDATES" $C_CYAN $C_RESET
                 $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
             }
             2 { # AUDIT_NEEDS_REPAIR
-                Write-Host "`n--- Starting experiment repair/resumption... ---" -ForegroundColor Cyan
+                Write-Header "STEP 2: APPLYING REPAIRS / UPDATES" $C_CYAN $C_RESET
                 $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
             }
             3 { # AUDIT_NEEDS_MIGRATION
