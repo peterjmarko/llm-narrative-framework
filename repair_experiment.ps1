@@ -259,7 +259,10 @@ Enter your choice (1, 2, 3, or N)
                 $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
             }
             3 { # AUDIT_NEEDS_MIGRATION
-                Write-Error "This experiment is a legacy version and requires migration. Please run 'migrate_experiment.ps1' on this directory."; exit 1
+                Write-Header "REPAIR HALTED" $C_RED $C_RESET
+                $message = "This experiment is corrupted and requires migration. Please run '.\migrate_experiment.ps1' instead."
+                Write-Host "$($C_YELLOW)$message`n$($C_RESET)"
+                exit 1
             }
             4 { # AUDIT_NEEDS_AGGREGATION
                 Write-Host "`n--- Starting experiment finalization... ---" -ForegroundColor Cyan
@@ -283,13 +286,28 @@ Enter your choice (1, 2, 3, or N)
 
         # If any action was successfully taken, run a final verification to confirm the new state.
         if ($actionTaken) {
-            Write-Host "`n--- Verifying final experiment state... ---" -ForegroundColor Cyan
-            $finalAuditArgs = @("src/experiment_auditor.py", $TargetDirectory, "--force-color")
+            Write-Header "STEP 3: FINAL VERIFICATION" $C_CYAN $C_RESET
+            
+            # Run the audit in non-interactive mode to suppress its default banner.
+            $finalAuditArgs = @("src/experiment_auditor.py", $TargetDirectory, "--force-color", "--non-interactive")
             & $executable $prefixArgs $finalAuditArgs
+            $finalAuditCode = $LASTEXITCODE
+
+            if ($finalAuditCode -eq 0) { # 0 is AUDIT_ALL_VALID
+                Write-Header "REPAIR SUCCESSFUL: Experiment is now valid." $C_GREEN $C_RESET
+            } else {
+                throw "Final verification failed. The experiment is still not valid."
+            }
         }
 
     } catch {
-        Write-Error "An error occurred during the repair/update process: $($_.Exception.Message)"
+        # Use the existing Write-Header function for a standardized failure banner.
+        Write-Header "REPAIR FAILED" $C_RED $C_RESET
+        
+        # Print the specific error message from the 'throw' statement.
+        Write-Host "$($C_RED)$($_.Exception.Message)$($C_RESET)`n"
+        
+        # Exit with a non-zero status code to signal failure to calling scripts.
         exit 1
     } finally {
         # Stop the transcript silently to suppress the default message

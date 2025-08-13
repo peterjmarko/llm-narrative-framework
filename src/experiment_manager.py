@@ -900,11 +900,11 @@ def _run_finalization(final_output_dir, script_paths, colors):
         sys.exit(1)
 
 def _run_reprocess_mode(runs_to_reprocess, notes, verbose, orchestrator_script, compile_script, target_dir, log_manager_script, colors):
-    """Executes 'REPROCESS' mode to fix corrupted analysis files."""
+    """Executes 'REPROCESS' mode to update analysis artifacts for specified runs."""
     C_CYAN = colors['cyan']
     C_YELLOW = colors['yellow']
     C_RESET = colors['reset']
-    print(f"{C_YELLOW}--- Entering REPROCESS Mode: Fixing {len(runs_to_reprocess)} run(s) with corrupt analysis ---{C_RESET}")
+    print(f"{C_YELLOW}--- Entering REPROCESS Mode: Updating analysis for {len(runs_to_reprocess)} replication(s) ---{C_RESET}")
 
     for i, run_info in enumerate(runs_to_reprocess):
         run_dir = run_info["dir"]

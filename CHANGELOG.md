@@ -21,6 +21,7 @@
   Additionally, improves the user experience by standardizing and colorizing
   console log banners across `repair_experiment.ps1`, `experiment_manager.py`,
   and `orchestrate_replication.py` for better clarity and consistency.
+  
 ## 5.1.0 (2025-08-13)
 
 ### Bump
@@ -40,7 +41,7 @@
   Improves audit accuracy and user experience by:
   - Refining failure classification logic.
   - Standardizing UI banners for color, terminology, and error handling.
-  
+
 ## 5.0.4 (2025-08-12)
 
 ### Bump
