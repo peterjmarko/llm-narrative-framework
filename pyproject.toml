@@ -97,7 +97,7 @@ test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "5.1.2"
+version = "5.1.3"
 version_files = [
     "pyproject.toml:version"
 ]

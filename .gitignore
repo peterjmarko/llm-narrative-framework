@@ -35,6 +35,9 @@ docs/**/*.pdf
 ~$README.*
 ~$CONTRIBUTING.*
 
+# Temporary files for PowerShell streaming
+temp_*.log
+
 # Temporary file for crafting conventional commit messages (see CONTRIBUTING.md)
 commit.txt
 

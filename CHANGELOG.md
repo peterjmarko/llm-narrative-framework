@@ -1,5 +1,29 @@
 # Changelog
 
+## 5.1.3 (2025-08-13)
+
+### Bump
+
+- **version 5.1.2 → 5.1.3**
+
+### Fixes
+
+- **Fix and harden experiment migration workflow**
+  Resolves several critical bugs that caused the `migrate_experiment.ps1`
+  workflow to fail during testing. The migration process is now robust
+  and handles corrupted, valid, and repairable experiments correctly.
+  
+  Key fixes include:
+  - Making the `--migrate` mode in `experiment_manager.py` smarter by
+    conditionally running the legacy patcher, preventing crashes on
+    modern-but-broken experiments.
+  - Correcting logic in `orchestrate_replication.py` to ensure both .txt
+    and .json response files are checked for during repairs.
+  - Implementing robust, real-time output streaming in the PowerShell
+    wrapper to fix buffering and file-locking issues.
+  
+  Additionally, enhances the console UI by improving the clarity, color,
+  and formatting of user prompts and status messages.
 ## 5.1.2 (2025-08-13)
 
 ### Bump
