@@ -140,7 +140,7 @@ function Invoke-NewExperiment {
         
         if ($null -ne $latestExperiment) {
             Write-Header -Lines "Verifying Final Experiment State" -Color Cyan
-            $finalAuditArgs = @("src/experiment_manager.py", "--verify-only", $latestExperiment.FullName, "--force-color", "--non-interactive")
+            $finalAuditArgs = @("src/experiment_auditor.py", $latestExperiment.FullName, "--force-color", "--non-interactive")
             & $executable $prefixArgs $finalAuditArgs
         }
     } catch {

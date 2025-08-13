@@ -1,7 +1,7 @@
 graph TD
     subgraph "Control & Output"
         A[audit_experiment.ps1<br>User Entry Point]:::entry_ps
-        B[experiment_manager.py --verify-only]:::layer_orange
+        B[experiment_auditor.py]:::layer_orange
         
         A -- "1. Calls" --> B
         B -- "3. Returns Colored Report" --> A

@@ -13,6 +13,7 @@ graph TD
 
     subgraph "2. Top-Level Orchestration"
         exp_manager["experiment_manager.py"]
+        exp_auditor["experiment_auditor.py"]
         compile_study_results_py["compile_study_results.py"]
         study_analysis["study_analyzer.py"]
     end
@@ -41,7 +42,21 @@ graph TD
     end
 
     %% --- Connections ---
-    new_experiment_ps1 & audit_experiment_ps1 & repair_experiment_ps1 & migrate_experiment_ps1 & audit_study_ps1 & repair_study_ps1 & migrate_study_ps1 --> exp_manager
+    new_experiment_ps1 --> exp_manager
+    
+    audit_experiment_ps1 --> exp_auditor
+    audit_study_ps1 --> exp_auditor
+    
+    repair_experiment_ps1 --> exp_auditor
+    repair_experiment_ps1 --> exp_manager
+    repair_study_ps1 --> exp_auditor
+    repair_study_ps1 --> exp_manager
+    
+    migrate_experiment_ps1 --> exp_auditor
+    migrate_experiment_ps1 --> exp_manager
+    migrate_study_ps1 --> exp_auditor
+    migrate_study_ps1 --> exp_manager
+
     process_study_ps1 --> compile_study_results_py
     compile_study_results_py --> study_analysis
 
@@ -63,7 +78,7 @@ graph TD
     stage1 -.-> query_generator
 
     %% Import Connections (dotted)
-    exp_manager & orchestrator & stage1 & stage2 & stage3 & stage4 & stage4b & stage5 & stage6 & query_generator & log_manager & compile_experiment & compile_study_results_py & study_analysis & patch_old -.-> config_loader
+    exp_manager & exp_auditor & orchestrator & stage1 & stage2 & stage3 & stage4 & stage4b & stage5 & stage6 & query_generator & log_manager & compile_experiment & compile_study_results_py & study_analysis & patch_old -.-> config_loader
 
     %% --- Inline Styling ---
     style new_experiment_ps1 fill:#cde4ff,stroke:#6c93be
@@ -76,6 +91,7 @@ graph TD
     style process_study_ps1 fill:#cde4ff,stroke:#6c93be
 
     style exp_manager fill:#fff3cd,stroke:#f1c40f
+    style exp_auditor fill:#fff3cd,stroke:#f1c40f
     style compile_study_results_py fill:#fff3cd,stroke:#f1c40f
     style study_analysis fill:#fff3cd,stroke:#f1c40f
     

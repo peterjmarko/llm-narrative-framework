@@ -223,7 +223,7 @@ The `orchestrate_replication.py` script executes the full pipeline for a single 
 
 #### Workflow 2: Audit an Experiment
 
-This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls `experiment_manager.py` with the `--verify-only` flag. The full audit report, including subprocess outputs, is also saved to `audit_log.txt` within the audited directory.
+This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls the dedicated `experiment_auditor.py` script. The full audit report, including subprocess outputs, is also saved to `experiment_audit_log.txt` within the audited directory.
 
 <div align="center">
   <p>Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.</p>
@@ -252,7 +252,7 @@ In addition to the per-replication table, the audit provides an `Overall Summary
 
 #### Workflow 3: Repair or Update an Experiment
 
-This workflow is the main "fix-it" tool for any existing experiment. The `repair_experiment.ps1` script is an intelligent wrapper around `experiment_manager.py`. It first performs a full audit to diagnose the experiment's state.
+This workflow is the main "fix-it" tool for any existing experiment. The `repair_experiment.ps1` script is an intelligent wrapper. It first performs a full audit by calling `experiment_auditor.py` to diagnose the experiment's state. Based on the audit result, it then calls `experiment_manager.py` to apply the correct repairs.
 
 -   If the audit finds missing data or outdated analysis files, the script proceeds to automatically apply the correct repair.
 -   If the audit finds the experiment is already complete and valid, it becomes interactive, presenting a menu that allows the user to force a full data repair, an analysis update, or a simple re-aggregation of results.
@@ -266,7 +266,7 @@ This workflow is the main "fix-it" tool for any existing experiment. The `repair
 
 This utility workflow provides a safe, non-destructive process to upgrade older experimental data into the current pipeline's format, leaving the original data untouched. The `migrate_experiment.ps1` script orchestrates a clear, four-step process:
 
-1.  **Audit Target**: A read-only audit is performed on the target directory to assess its state.
+1.  **Audit Target**: A read-only audit is performed on the target directory by `experiment_auditor.py` to assess its state.
 2.  **Copy Data**: After user confirmation, the script creates a clean, timestamped copy of the target experiment in the `output/migrated_experiments/` directory.
 3.  **Upgrade Copy**: The script calls `experiment_manager.py --migrate` on the new copy. This manager automates the entire upgrade, which consists of a *preprocessing* phase (cleaning old artifacts, patching configs, reprocessing all runs) and a *finalizing* phase (generating all modern summary files).
 4.  **Final Validation**: The wrapper script runs a final read-only audit on the newly upgraded experiment, providing explicit confirmation that the process was successful.

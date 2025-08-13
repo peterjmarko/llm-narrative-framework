@@ -238,8 +238,6 @@ This script uses a powerful hybrid strategy to rewrite the esoteric library into
     pdm run neutralize
     ```
 The script's output is the collection of `.csv` files in the `data/foundational_assets/neutralized_delineations/` directory.
-```
-The script's output is the collection of `.csv` files in the `data/foundational_assets/neutralized_delineations/` directory.
 
 ### Step 3: Automated Database Generation (`create_subject_db.py`, `generate_personalities_db.py`)
 
@@ -269,6 +267,9 @@ The rest of the Testing Framework is fully automated in Python, as documented in
     This file contains the final prompt template used for the LLM matching task. It is the product of a systematic, multi-stage piloting process. Various prompt structures and phrasing were tested to find the version that yielded the most reliable and consistently parsable structured output from the target LLM.
 
 *   `country_codes.csv`
+
+    This file provides a mapping from the two- or three-letter country/state abbreviations used in the Astro-Databank to their full, standardized names.
+
     ```
     "Abbreviation","Country"
     "AB (CAN)","Canada"

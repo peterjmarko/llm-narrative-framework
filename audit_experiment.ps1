@@ -25,9 +25,10 @@
 
 .DESCRIPTION
     This script is the primary diagnostic tool for CHECKING the status of any
-    experiment. It performs a comprehensive, read-only audit and prints a
-    detailed report, including a final recommendation for the next appropriate
-    action (e.g., 'repair_experiment.ps1' or 'migrate_experiment.ps1').
+    experiment. It calls the `experiment_auditor.py` backend to perform a
+    comprehensive, read-only audit and prints a detailed report, including a
+    final recommendation for the next appropriate action (e.g., 'repair_experiment.ps1'
+    or 'migrate_experiment.ps1').
 
     It never makes any changes to the data. The full, detailed output is also
     saved to an 'experiment_audit_log.txt' file inside the target directory.
@@ -72,9 +73,9 @@ try {
     }
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
 
-    $scriptName = "src/experiment_manager.py"
+    $scriptName = "src/experiment_auditor.py"
     # Build the argument list for the python script itself.
-    $pythonScriptArgs = @($ResolvedPath, "--verify-only")
+    $pythonScriptArgs = @($ResolvedPath)
     if ($PSBoundParameters['Verbose']) {
         $pythonScriptArgs += "--verbose"
     }

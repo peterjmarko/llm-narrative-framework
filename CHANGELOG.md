@@ -26,6 +26,7 @@
   - Adds a "Design Principles" section to CONTRIBUTING.md.
   - Updates the project ROADMAP.md.
   - Corrects a workflow diagram to reflect the current codebase.
+  
 ## 5.0.2 (2025-08-12)
 
 ### Bump
@@ -45,7 +46,7 @@
   - All data preparation diagrams now use a consistent color scheme and have been updated to reflect the latest script logic, including labels for LLM-assisted steps.
   - Logic flowcharts for several scripts have been rearranged into a more compact, horizontal layout to improve readability in the final documents.
   - Console logging for all final pipeline scripts has been cleaned up and standardized for a better user experience.
-  
+
 ## 5.0.1 (2025-08-11)
 
 ### Bump

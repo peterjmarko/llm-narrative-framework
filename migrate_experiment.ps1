@@ -130,10 +130,11 @@ try {
     Start-Transcript -Path $logFilePath -Force | Out-Null
 
     # 3. Run the audit, capturing its output to be logged by the transcript
-    $scriptName = "src/experiment_manager.py"
-    $auditArgs = $TargetPath, "--verify-only", "--force-color"
+    $auditorScriptName = "src/experiment_auditor.py"
+    $managerScriptName = "src/experiment_manager.py"
+    $auditArgs = $TargetPath, "--force-color"
     Write-Host "Auditing..." -ForegroundColor DarkGray
-    $auditOutput = & $executable $prefixArgs $scriptName $auditArgs 2>&1
+    $auditOutput = & $executable $prefixArgs $auditorScriptName $auditArgs 2>&1
     $auditOutput | Out-Host
     $pythonExitCode = $LASTEXITCODE
 
@@ -174,13 +175,13 @@ try {
 
     Write-Header -Lines "Step 2/2: Upgrading New Experiment Copy" -Color Cyan
     $migrateArgs = $DestinationPath, "--migrate"
-    $migrationOutput = & $executable $prefixArgs $scriptName $migrateArgs 2>&1
+    $migrationOutput = & $executable $prefixArgs $managerScriptName $migrateArgs 2>&1
     $migrationOutput | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "ERROR: Migration process failed with exit code ${LASTEXITCODE}." }
 
     # 6. Final validation audit
-    $finalAuditArgs = $DestinationPath, "--verify-only", "--force-color"
-    $finalAuditOutput = & $executable $prefixArgs $scriptName $finalAuditArgs 2>&1
+    $finalAuditArgs = $DestinationPath, "--force-color"
+    $finalAuditOutput = & $executable $prefixArgs $auditorScriptName $finalAuditArgs 2>&1
     $finalAuditOutput | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "VALIDATION FAILED! The final result is not valid." }
 

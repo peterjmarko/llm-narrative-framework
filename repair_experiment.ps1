@@ -164,11 +164,11 @@ function Invoke-RepairExperiment {
         # In an automatic flow, the audit result determines the action.
         # If the audit is valid (exit code 0), it becomes an interactive flow.
         $isInteractive = $false
-        $auditArgs = @("src/experiment_manager.py", "--verify-only", $TargetDirectory, "--force-color")
+        $auditArgs = @("src/experiment_auditor.py", $TargetDirectory, "--force-color")
         
         # We need to peek at the exit code first to decide if we should suppress the recommendation
         # on the *first* audit display.
-        $peekResult = & $executable $prefixArgs $auditArgs | Out-Null
+        & $executable $prefixArgs $auditArgs *>&1 | Out-Null
         $auditExitCode = $LASTEXITCODE
 
         if ($auditExitCode -ne 0) {
@@ -180,7 +180,8 @@ function Invoke-RepairExperiment {
         }
         
         # Now display the correctly formatted audit report.
-        & $executable $prefixArgs $auditArgs
+        & $executable $prefixArgs $auditArgs *>&1 | Tee-Object -Variable auditOutput
+        $auditExitCode = $LASTEXITCODE
 
         $actionTaken = $false
         $procArgs = $null
@@ -266,7 +267,7 @@ Enter your choice (1, 2, 3, or N)
         # If any action was successfully taken, run a final verification to confirm the new state.
         if ($actionTaken) {
             Write-Host "`n--- Verifying final experiment state... ---" -ForegroundColor Cyan
-            $finalAuditArgs = @("src/experiment_manager.py", "--verify-only", $TargetDirectory, "--force-color")
+            $finalAuditArgs = @("src/experiment_auditor.py", $TargetDirectory, "--force-color")
             & $executable $prefixArgs $finalAuditArgs
         }
 
