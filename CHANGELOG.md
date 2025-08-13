@@ -1,5 +1,26 @@
 # Changelog
 
+## 5.1.1 (2025-08-13)
+
+### Bump
+
+- **version 5.1.0 → 5.1.1**
+
+### Fixes
+
+- **Fix repair workflow and enhance console logging**
+  Corrects several critical bugs that caused the `repair_experiment.ps1`
+  workflow to fail during testing.
+  
+  - Fixes an `unrecognized argument: --quiet` error by removing an invalid
+    flag pass from `experiment_manager.py` to `orchestrate_replication.py`.
+  - Resolves a `NameError` in `orchestrate_replication.py` by ensuring
+    the `all_stage_outputs` list is always initialized.
+  - Corrects a PowerShell `ParserError` in `repair_experiment.ps1`.
+  
+  Additionally, improves the user experience by standardizing and colorizing
+  console log banners across `repair_experiment.ps1`, `experiment_manager.py`,
+  and `orchestrate_replication.py` for better clarity and consistency.
 ## 5.1.0 (2025-08-13)
 
 ### Bump
