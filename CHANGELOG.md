@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.1.4 (2025-08-13)
+
+### Bump
+
+- **version 5.1.3 → 5.1.4**
+
+### Refactor
+
+- **Rename 'repair' scripts to 'fix' for clarity**
+  This commit renames the main "fix-it" scripts from `repair_*` to `fix_*` to better reflect their dual functionality of performing both critical data repairs and simple analysis updates.
+  
+  Key changes:
+  - Renamed `repair_experiment.ps1` to `fix_experiment.ps1`.
+  - Renamed `repair_study.ps1` to `fix_study.ps1`.
+  
+  Consequential updates:
+  - Updated the output of `fix_experiment.ps1` to explicitly state whether it is performing a "repair" or an "update".
+  - Updated all documentation (`DOCUMENTATION.template.md`, `article_supplementary_material.md`), diagrams, and calling scripts (`audit_study.ps1`) to use the new `fix_*` naming convention.
+  
+  Note: The modification to `project_scope_report.md` is not covered by this summary and should be reviewed separately.
 ## 5.1.3 (2025-08-13)
 
 ### Bump
