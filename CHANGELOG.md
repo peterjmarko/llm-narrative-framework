@@ -21,6 +21,7 @@
   
   Improves the console UI by standardizing all step and result banners
   for a more consistent and professional user experience.
+  
 ## 5.1.1 (2025-08-13)
 
 ### Bump
@@ -42,7 +43,7 @@
   Additionally, improves the user experience by standardizing and colorizing
   console log banners across `repair_experiment.ps1`, `experiment_manager.py`,
   and `orchestrate_replication.py` for better clarity and consistency.
-  
+
 ## 5.1.0 (2025-08-13)
 
 ### Bump

@@ -79,6 +79,42 @@ function Write-Header {
     Write-Host "" # Add a blank line after the header
 }
 
+function Run-Manager ($managerArgs, $executable, $prefixArgs, $C_RED, $C_RESET) {
+    $managerScript = "src/experiment_manager.py"
+    $fullArgs = $prefixArgs + $managerScript + $managerArgs
+    
+    # Use absolute paths in the system temp directory for robust streaming
+    $tempStdout = Join-Path $env:TEMP "mig_stdout_$(Get-Random).log"
+    $tempStderr = Join-Path $env:TEMP "mig_stderr_$(Get-Random).log"
+
+    $proc = Start-Process -FilePath $executable -ArgumentList $fullArgs -NoNewWindow -PassThru -RedirectStandardOutput $tempStdout -RedirectStandardError $tempStderr
+    
+    Start-Sleep -Milliseconds 200 # Wait for process to start and lock file
+    
+    # Monitor using a FileStream with ReadWrite sharing to avoid locks.
+    $fileStream = New-Object System.IO.FileStream($tempStdout, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+    $reader = New-Object System.IO.StreamReader($fileStream)
+    while (-not $proc.HasExited) {
+        while ($line = $reader.ReadLine()) { Write-Host $line }
+        Start-Sleep -Milliseconds 100
+    }
+    while ($line = $reader.ReadLine()) { Write-Host $line }
+    $reader.Close(); $fileStream.Close(); $reader.Dispose(); $fileStream.Dispose()
+
+    $managerExitCode = $proc.ExitCode
+    $stderrContent = Get-Content $tempStderr -Raw
+    
+    Remove-Item $tempStdout, $tempStderr -ErrorAction SilentlyContinue
+
+    if ($managerExitCode -ne 0) {
+        Write-Host "`n$($C_RED)Experiment Manager failed with exit code $managerExitCode.$($C_RESET)"
+        if ($stderrContent) {
+            Write-Host "$($C_RED)Error Details:`n$stderrContent$($C_RESET)"
+        }
+    }
+    return $managerExitCode
+}
+
 # --- Auto-detect execution environment ---
 Write-Host "" # Add blank line for spacing
 $executable = "python"
@@ -91,6 +127,9 @@ if (Get-Command pdm -ErrorAction SilentlyContinue) {
 else {
     Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
 }
+
+# --- Shared Variables ---
+$C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"; $C_RESET = "`e[0m"
 
 # --- Define Audit Exit Codes from experiment_manager.py ---
 # These are mapped from the Python script for clarity and robustness.
@@ -159,8 +198,9 @@ try {
                 if (-not (Confirm-Proceed -Message "`nDo you wish to proceed?")) { Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; return }
             }
             default {
-                Write-Host "`nThis experiment needs repair/update. We recommend running 'repair_experiment.ps1' instead.`nMigration will create an upgraded copy, leaving the original data untouched."
-                if (-not (Confirm-Proceed -Message "`nDo you still want to proceed with migration?")) { Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; return }
+                Write-Host "`nThis experiment does not need to be migrated. Rather, choose 'N' at the following prompt and run 'repair_experiment.ps1' instead." -ForegroundColor Yellow
+                Write-Host "If you still decide to go ahead with migration, it will create an upgraded copy, leaving the original data untouched.`n"
+                if (-not (Confirm-Proceed -Message "Do you still want to proceed with migration?")) { Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; return }
             }
         }
     }
@@ -174,10 +214,9 @@ try {
     Write-Host "`nCopy complete."
 
     Write-Header -Lines "Step 2/2: Upgrading New Experiment Copy" -Color Cyan
-    $migrateArgs = $DestinationPath, "--migrate"
-    $migrationOutput = & $executable $prefixArgs $managerScriptName $migrateArgs 2>&1
-    $migrationOutput | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "ERROR: Migration process failed with exit code ${LASTEXITCODE}." }
+    $migrateArgs = @($DestinationPath, "--migrate", "--force-color")
+    $managerExitCode = Run-Manager -managerArgs $migrateArgs -executable $executable -prefixArgs $prefixArgs -C_RED $C_RED -C_RESET $C_RESET
+    if ($managerExitCode -ne 0) { throw "ERROR: Migration process failed with exit code ${managerExitCode}." }
 
     # 6. Final validation audit
     $finalAuditArgs = $DestinationPath, "--force-color"

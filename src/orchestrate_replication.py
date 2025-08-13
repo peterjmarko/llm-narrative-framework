@@ -154,7 +154,7 @@ def main():
             logging.error("FATAL: --run_output_dir must be a valid directory in --reprocess mode.")
             sys.exit(1)
         run_specific_dir_path = args.run_output_dir
-        print(f"{Fore.YELLOW}--- REPROCESS MODE for: {os.path.basename(run_specific_dir_path)} ---{Fore.RESET}")
+        print(f"\n{Fore.YELLOW}--- REPROCESS MODE for: ---\n{os.path.basename(run_specific_dir_path)}{Fore.RESET}")
         
         config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
         if not os.path.exists(config_path):
@@ -221,7 +221,9 @@ def main():
             indices_to_run = []
             responses_dir = os.path.join(run_specific_dir_path, "session_responses")
             for i in all_indices:
-                if not os.path.exists(os.path.join(responses_dir, f"llm_response_{i:03d}.txt")):
+                txt_path = os.path.join(responses_dir, f"llm_response_{i:03d}.txt")
+                json_path = os.path.join(responses_dir, f"llm_response_{i:03d}_full.json")
+                if not os.path.exists(txt_path) or not os.path.exists(json_path):
                     indices_to_run.append(i)
 
         if not indices_to_run:
@@ -371,8 +373,12 @@ def main():
         final_status_msg = "REPAIRED"
     else:
         final_status_msg = pipeline_status
+    
+    status_color = Fore.GREEN
+    if final_status_msg not in ["COMPLETED", "REPAIRED"]:
+        status_color = Fore.RED
 
-    print(f"{Fore.GREEN}Replication run finished. Final status: {final_status_msg}{Fore.RESET}")
+    print(f"\n{status_color}Replication run finished. Final status: {final_status_msg}{Fore.RESET}")
 
 
 if __name__ == "__main__":

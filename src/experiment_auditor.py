@@ -395,7 +395,7 @@ def main():
             print(f"\n{C_CYAN}{'#'*80}{C_RESET}")
             print(f"{C_CYAN}{_format_header('Running Experiment Audit')}{C_RESET}")
             print(f"{C_CYAN}{'#'*80}{C_RESET}")
-        print(f"\n--- Verifying Data Completeness in: ---\n{relative_path}")
+        print(f"\n{C_YELLOW}--- Verifying Data Completeness in: ---{C_RESET}\n{relative_path}")
 
     run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
     audit_result_code = AUDIT_ALL_VALID

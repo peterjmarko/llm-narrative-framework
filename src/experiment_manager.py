@@ -675,7 +675,7 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
 
 # This '_session_worker' function is no longer needed here and has been moved into orchestrate_replication.py's logic.
 
-def _run_repair_mode(runs_to_repair, orchestrator_script_path, quiet, colors):
+def _run_repair_mode(runs_to_repair, orchestrator_script_path, verbose, colors):
     """Delegates repair work to the orchestrator for each failed run."""
     C_YELLOW = colors['yellow']
     C_RESET = colors['reset']
@@ -698,8 +698,8 @@ def _run_repair_mode(runs_to_repair, orchestrator_script_path, quiet, colors):
             "--indices"
         ] + [str(i) for i in failed_indices]
         
-        if quiet:
-            cmd.append("--quiet")
+        if verbose:
+            cmd.append("--verbose")
 
         try:
             # The orchestrator will now handle its own progress display.
@@ -801,6 +801,13 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet, col
             return False # Indicate failure
     return True
 
+def _is_patching_needed(run_dirs):
+    """Checks if any run is missing an archived config, indicating a legacy experiment."""
+    for run_dir in run_dirs:
+        if not (run_dir / "config.ini.archived").exists():
+            return True
+    return False
+
 def _run_migrate_mode(target_dir, patch_script, orchestrator_script, colors, verbose=False):
     """
     Executes a one-time migration process for a legacy experiment directory.
@@ -825,8 +832,7 @@ def _run_migrate_mode(target_dir, patch_script, orchestrator_script, colors, ver
                 file_path.unlink()
 
         for run_dir in run_dirs:
-            for corrupted_file in run_dir.glob("*.txt.corrupted"):
-                corrupted_file.unlink()
+            # Clean analysis_inputs to force full regeneration
             analysis_inputs_path = run_dir / "analysis_inputs"
             if analysis_inputs_path.is_dir():
                 shutil.rmtree(analysis_inputs_path)
@@ -835,32 +841,37 @@ def _run_migrate_mode(target_dir, patch_script, orchestrator_script, colors, ver
         logging.error(f"Failed to clean artifacts: {e}")
         return False
 
-    # Sub-step 2: Patch Configs
-    print("\n- Patching legacy configuration files...")
-    try:
-        subprocess.run([sys.executable, patch_script, str(target_dir)], check=True, capture_output=True, text=True)
-        print("  - Patching complete.")
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to patch configs. Stderr:\n{e.stderr}")
-        return False
+    # Sub-step 2: Conditionally Patch Configs
+    if _is_patching_needed(run_dirs):
+        print("\n- Legacy experiment detected. Patching configuration files...")
+        try:
+            subprocess.run([sys.executable, patch_script, str(target_dir)], check=True, capture_output=True, text=True)
+            print("  - Patching complete.")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to patch configs. Stderr:\n{e.stderr}")
+            return False
+    else:
+        print("\n- Modern experiment format detected. Skipping config patching.")
+
 
     # Sub-step 3: Reprocess Each Replication
     print(f"\n- Reprocessing {len(run_dirs)} individual runs to generate modern reports...")
-    try:
-        for run_dir in tqdm(run_dirs, desc="Reprocessing Runs", ncols=80):
-            cmd = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", str(run_dir)]
-            if not verbose: cmd.append("--quiet")
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
-            if result.returncode != 0:
-                logging.error(f"Failed to reprocess {run_dir.name}. Stderr:\n{result.stderr}")
-                return False
-        print("  - Reprocessing complete.")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred during reprocessing: {e}")
-        return False
+    all_reprocessed_successfully = True
+    for run_dir in tqdm(run_dirs, desc="Reprocessing Runs", ncols=80):
+        cmd = [sys.executable, orchestrator_script, "--reprocess", "--run_output_dir", str(run_dir)]
+        if verbose: cmd.append("--verbose")
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        if result.returncode != 0:
+            logging.error(f"Failed to reprocess {run_dir.name}. Stderr:\n{result.stderr}")
+            all_reprocessed_successfully = False
+            break # Exit the loop immediately on first failure
 
-    print(f"\n{C_GREEN}--- Migration pre-processing complete. ---{C_RESET}")
-    print("The manager will now proceed with final checks to finalize the migration.")
+    if not all_reprocessed_successfully:
+        return False # Signal failure to the main manager loop
+    
+    print("  - Reprocessing complete.")
+
+    print(f"\n{C_GREEN}--- Migration pre-processing complete. Proceeding to finalization. ---{C_RESET}")
     return True
 
 def _run_finalization(final_output_dir, script_paths, colors):
@@ -1011,10 +1022,10 @@ def main():
     parser.add_argument('--quiet', action='store_true', help="Suppress all non-essential output from the audit. Used for scripting.")
     args = parser.parse_args()
 
-    # Define color constants based on TTY status or the --force-color flag
+    # Define color constants, defaulting to empty strings
+    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = ('', '', '', '', '')
     use_color = sys.stdout.isatty() or args.force_color
     if use_color:
-        global C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET
         C_CYAN = '\033[96m'
         C_GREEN = '\033[92m'
         C_YELLOW = '\033[93m'
@@ -1088,7 +1099,7 @@ def main():
                 if success and full_rep_repairs:
                     success = _run_full_replication_repair(full_rep_repairs, script_paths['orchestrator'], not args.verbose, colors)
                 if success and session_repairs:
-                    success = _run_repair_mode(session_repairs, script_paths['orchestrator'], not args.verbose, colors)
+                    success = _run_repair_mode(session_repairs, script_paths['orchestrator'], args.verbose, colors)
                 action_taken = True
 
             elif state_overall_status == "REPROCESS_NEEDED" or force_reprocess_once:
@@ -1101,7 +1112,8 @@ def main():
                 force_reprocess_once = False # Reset flag after use
 
             elif state_overall_status == "COMPLETE":
-                print(f"{C_GREEN}--- Experiment is COMPLETE. Proceeding to finalization. ---{C_RESET}")
+                if not is_migration_run:
+                    print(f"{C_GREEN}--- Experiment is COMPLETE. Proceeding to finalization. ---{C_RESET}")
                 break # Exit loop to finalize
 
             if not success:
