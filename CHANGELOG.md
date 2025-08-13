@@ -1,5 +1,24 @@
 # Changelog
 
+## 5.1.0 (2025-08-13)
+
+### Bump
+
+- **version 5.0.4 → 5.1.0**
+
+### Features
+
+- **Enhance experiment audit workflow and UI**
+  Isolates experiment auditing logic into a new, dedicated script,
+  `src/experiment_auditor.py`, improving separation of concerns.
+  
+  The `audit_experiment.ps1` script now automatically saves a clean,
+  uncolored copy of its full report to `experiment_audit_log.txt` inside
+  the audited directory.
+  
+  Improves audit accuracy and user experience by:
+  - Refining failure classification logic.
+  - Standardizing UI banners for color, terminology, and error handling.
 ## 5.0.4 (2025-08-12)
 
 ### Bump
