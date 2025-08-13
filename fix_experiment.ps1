@@ -21,24 +21,25 @@
 
 <#
 .SYNOPSIS
-    Repairs or updates an existing experiment. Runs automatically on broken
-    experiments or interactively on valid ones.
+    Fixes or updates an existing experiment. It intelligently applies the safest,
+    cheapest fix required.
 
 .DESCRIPTION
-    This is the main "fix-it" tool for any experiment with a single, repairable
-    issue. It first runs a comprehensive audit to diagnose the state.
+    This is the main "fix-it" tool for any experiment. It automatically diagnoses
+    the experiment's state and applies the most appropriate action.
 
-    - If a single, fixable error is found (e.g., missing responses, outdated analysis),
-      it automatically applies the correct repair.
+    - If it finds critical data issues (e.g., missing LLM responses), it will
+      perform a data-level REPAIR.
+    - If it finds only outdated analysis files, it will perform a safe, local
+      analysis-only UPDATE.
     - If the experiment is already valid, it becomes interactive, allowing the user
-      to force a data repair, analysis update, or re-aggregation.
+      to force a specific action.
 
-    After any action, it concludes with a final verification audit. For legacy or
-    severely corrupted experiments (those with multiple errors), use 'migrate_experiment.ps1'.
+    For legacy or severely corrupted experiments, use 'migrate_experiment.ps1'.
 
 .PARAMETER TargetDirectory
     (Required) The path to the existing experiment directory that needs to be
-    repaired or updated.
+    fixed or updated.
 
 .PARAMETER Notes
     A string of notes to embed in the reports and logs of any newly generated
@@ -251,11 +252,15 @@ Enter your choice (1, 2, 3, or N)
                 }
             }
             1 { # AUDIT_NEEDS_REPROCESS
-                Write-Header "STEP 2: APPLYING REPAIRS / UPDATES" $C_CYAN $C_RESET
+                Write-Header "STEP 2: APPLYING ANALYSIS-ONLY UPDATE" $C_YELLOW $C_RESET
+                Write-Host "Diagnosis: Analysis or report files are outdated." -ForegroundColor Yellow
+                Write-Host "Action:    Applying a safe, local analysis update (no API calls needed)." -ForegroundColor Yellow
                 $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
             }
             2 { # AUDIT_NEEDS_REPAIR
-                Write-Header "STEP 2: APPLYING REPAIRS / UPDATES" $C_CYAN $C_RESET
+                Write-Header "STEP 2: APPLYING DATA-LEVEL REPAIR" $C_RED $C_RESET
+                Write-Host "Diagnosis: Critical data (queries/responses) is missing or incomplete." -ForegroundColor Red
+                Write-Host "Action:    Applying a data-level repair. This may re-run API calls." -ForegroundColor Red
                 $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
             }
             3 { # AUDIT_NEEDS_MIGRATION

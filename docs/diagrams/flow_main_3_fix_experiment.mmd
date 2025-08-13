@@ -1,13 +1,13 @@
 graph TD
-    EntryPointPS["<b>repair_experiment.ps1</b><br/>(User Entry Point)"]:::entry_ps --> PreAudit["1. Audit Experiment<br/><small>calls experiment_manager.py --verify-only</small>"]:::script;
+    EntryPointPS["<b>fix_experiment.ps1</b><br/>(User Entry Point)"]:::entry_ps --> PreAudit["1. Audit Experiment<br/><small>calls experiment_auditor.py</small>"]:::script;
     
     PreAudit --> Decision{Audit Result?}:::decision;
     
     Decision -- "VALIDATED" --> Prompt["Prompt User<br/>'Force Action?'<br/><small>(Repair / Update / Aggregate)</small>"]:::user_interaction;
-    Decision -- "NEEDS_REPAIR / NEEDS_UPDATE" --> AutoRepair["2. Run Automatic Repair/Update<br/><small>calls experiment_manager.py --non-interactive</small>"]:::layer_green;
+    Decision -- "NEEDS REPAIR / NEEDS UPDATE" --> AutoRepair["2. Run Automatic Fix<br/><small>calls experiment_manager.py</small>"]:::layer_green;
     Decision -- "INVALID" --> Stop((Exit)):::stop_node;
     
-    Prompt -- "Force Repair" --> ForceRepair["Force Full Repair<br/><small>Deletes responses, then calls<br/>experiment_manager.py --non-interactive</small>"]:::layer_orange;
+    Prompt -- "Force Repair" --> ForceRepair["Force Full Repair<br/><small>Deletes responses, then calls<br/>experiment_manager.py</small>"]:::layer_orange;
     Prompt -- "Force Update" --> ForceUpdate["Force Full Update<br/><small>calls experiment_manager.py --reprocess</small>"]:::layer_orange;
     Prompt -- "No" --> Stop;
     

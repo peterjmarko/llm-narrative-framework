@@ -16,8 +16,8 @@ personality_matching/
 ├── migrate_study.ps1           # ENTRY POINT: Upgrade all legacy experiments in a study
 ├── new_experiment.ps1          # ENTRY POINT: Create a new experiment
 ├── process_study.ps1           # ENTRY POINT: Compile and analyze a full study
-├── repair_experiment.ps1       # ENTRY POINT: Repair/update a single experiment
-└── repair_study.ps1            # ENTRY POINT: Repair all experiments in a study
+├── fix_experiment.ps1          # ENTRY POINT: Fix/update a single experiment
+└── fix_study.ps1               # ENTRY POINT: Fix all experiments in a study
 |
 ├── src/                        # All Python source code for the project
 │   ├── analyze_llm_performance.py

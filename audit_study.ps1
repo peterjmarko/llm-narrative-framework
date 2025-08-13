@@ -117,7 +117,7 @@ if (-not $NoLog.IsPresent) {
 try {
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
 
-    $scriptName = "src/experiment_manager.py"
+    $scriptName = "src/experiment_auditor.py"
     $auditResults = @()
     $overallStatus = $AUDIT_ALL_VALID
     $headerLine = "#" * 80
@@ -147,7 +147,7 @@ try {
     $i = 0
     foreach ($dir in $experimentDirs) {
         $i++
-        $arguments = @("--verify-only", $dir.FullName, "--force-color")
+        $arguments = @($dir.FullName, "--quiet", "--force-color")
         $output = @()
         
         if ($PSBoundParameters['Verbose']) {
@@ -179,7 +179,12 @@ try {
             default                  { "ERROR", "Red"; break }
         }
         if (-not $PSBoundParameters['Verbose']) {
-            $progressText = if ($progressColor -eq "Green") { "[ OK ]" } else { "[ FAIL ]" }
+            $progressText = switch ($progressColor) {
+                "Green"  { "[ OK ]"; break }
+                "Yellow" { "[ WARN ]"; break }
+                "Red"    { "[ FAIL ]"; break }
+                default  { "[ ?? ]"; break }
+            }
             Write-Host $progressText -ForegroundColor $progressColor
         }
 
@@ -211,10 +216,10 @@ try {
     foreach ($result in $auditResults) {
         $statusText, $details, $colorCode = switch ($result.TrueStatus) {
             "VALIDATED"          { "VALIDATED", "Ready for processing.", $c_green; break }
-            "NEEDS UPDATE"       { "NEEDS UPDATE", "Run 'repair_experiment.ps1' to update.", $c_yellow; break }
-            "NEEDS REPAIR"       { "NEEDS REPAIR", "Run 'repair_experiment.ps1' to fix.", $c_red; break }
+            "NEEDS UPDATE"       { "NEEDS UPDATE", "Run 'fix_experiment.ps1' to update.", $c_yellow; break }
+            "NEEDS REPAIR"       { "NEEDS REPAIR", "Run 'fix_experiment.ps1' to fix.", $c_red; break }
             "NEEDS MIGRATION"    { "NEEDS MIGRATION", "Run 'migrate_experiment.ps1' to upgrade.", $c_red; break }
-            "NEEDS FINALIZATION" { "NEEDS FINALIZATION", "Run 'repair_experiment.ps1' to finalize.", $c_yellow; break }
+            "NEEDS FINALIZATION" { "NEEDS FINALIZATION", "Run 'fix_experiment.ps1' to finalize.", $c_yellow; break }
             default              { "UNKNOWN", "Manual investigation required.", $c_red; break }
         }
         
@@ -258,8 +263,8 @@ try {
         Write-Output $completenessUnderline
 
         foreach ($check in $completenessChecks) {
-            $statusText = if ($check.Found) { "[  OK  ]" } else { "[ FAIL ]" }
-            $statusColor = if ($check.Found) { $c_green } else { $c_red }
+            $statusText = if ($check.Found) { "[  OK  ]" } else { "[ MISSING ]" }
+            $statusColor = if ($check.Found) { $c_green } else { $c_yellow }
             $statusPart = "$statusColor{0,-$statusWidth}$c_reset" -f $statusText
             $line = ("{0,-$artifactNameWidth}" -f $check.Name) + $gap + $statusPart
             Write-Output $line

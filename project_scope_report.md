@@ -1,48 +1,48 @@
 # Project Scope & Extent Report
 
-**Generated on:** 2025-08-12
+**Generated on:** 2025-08-13
 
 ---
 
 ## 📄 Documents
 
 -   **Total Files:** 13
--   **Total Estimated Pages:** ~161.7 (based on 40,433 words)
+-   **Total Estimated Pages:** ~166.6 (based on 41,657 words)
 
 | File | Word Count | Estimated Pages |
 |:---:|:---:|:---:|
-| `CHANGELOG.md` | 9864 | ~39.5 |
-| `CONTRIBUTING.md` | 2316 | ~9.3 |
+| `CHANGELOG.md` | 10666 | ~42.7 |
+| `CONTRIBUTING.md` | 2568 | ~10.3 |
 | `LICENSE.md` | 5761 | ~23.0 |
 | `README.md` | 375 | ~1.5 |
-| `ROADMAP.md` | 751 | ~3.0 |
+| `ROADMAP.md` | 780 | ~3.1 |
 | `config/changelog_template.md` | 34 | ~0.1 |
 | `data/README_DATA.md` | 972 | ~3.9 |
-| `docs/DOCUMENTATION.md` | 6041 | ~24.2 |
-| `docs/DOCUMENTATION.template.md` | 6031 | ~24.1 |
+| `docs/DOCUMENTATION.md` | 6057 | ~24.2 |
+| `docs/DOCUMENTATION.template.md` | 6047 | ~24.2 |
 | `docs/article_cover_letter.md` | 308 | ~1.2 |
 | `docs/article_main_text.md` | 4648 | ~18.6 |
-| `docs/article_supplementary_material.md` | 2521 | ~10.1 |
-| `project_scope_report.md` | 811 | ~3.2 |
-| **Total** | **40,433** | **~161.7** |
+| `docs/article_supplementary_material.md` | 2528 | ~10.1 |
+| `project_scope_report.md` | 913 | ~3.7 |
+| **Total** | **41,657** | **~166.6** |
 
 
 ---
 
 ## 💻 Scripts
 
--   **Total Files:** 83
--   **Total Lines of Code:** 22,630
+-   **Total Files:** 84
+-   **Total Lines of Code:** 22,710
 
 | File | Lines of Code |
 |:---:|:---:|
-| `audit_experiment.ps1` | 115 |
+| `audit_experiment.ps1` | 129 |
 | `audit_study.ps1` | 286 |
-| `migrate_experiment.ps1` | 195 |
+| `migrate_experiment.ps1` | 226 |
 | `migrate_study.ps1` | 209 |
 | `new_experiment.ps1` | 132 |
 | `process_study.ps1` | 237 |
-| `repair_experiment.ps1` | 249 |
+| `repair_experiment.ps1` | 279 |
 | `repair_study.ps1` | 222 |
 | `scripts/build_docs.py` | 507 |
 | `scripts/changelog_hook.py` | 46 |
@@ -58,35 +58,36 @@
 | `src/__init__.py` | 0 |
 | `src/analyze_llm_performance.py` | 787 |
 | `src/analyze_research_patterns.py` | 93 |
-| `src/build_llm_queries.py` | 365 |
+| `src/build_llm_queries.py` | 360 |
 | `src/compile_experiment_results.py` | 97 |
 | `src/compile_replication_results.py` | 136 |
 | `src/compile_study_results.py` | 100 |
 | `src/config_loader.py` | 246 |
-| `src/create_subject_db.py` | 203 |
-| `src/experiment_manager.py` | 1226 |
-| `src/fetch_adb_data.py` | 413 |
+| `src/create_subject_db.py` | 202 |
+| `src/experiment_auditor.py` | 407 |
+| `src/experiment_manager.py` | 966 |
+| `src/fetch_adb_data.py` | 411 |
 | `src/filter_adb_candidates.py` | 326 |
-| `src/generate_eminence_scores.py` | 479 |
-| `src/generate_ocean_scores.py` | 714 |
-| `src/generate_personalities_db.py` | 191 |
+| `src/generate_eminence_scores.py` | 447 |
+| `src/generate_ocean_scores.py` | 686 |
+| `src/generate_personalities_db.py` | 194 |
 | `src/generate_replication_report.py` | 138 |
 | `src/id_encoder.py` | 48 |
 | `src/llm_prompter.py` | 423 |
-| `src/neutralize_delineations.py` | 415 |
-| `src/orchestrate_replication.py` | 371 |
+| `src/neutralize_delineations.py` | 423 |
+| `src/orchestrate_replication.py` | 326 |
 | `src/patch_eminence_scores.py` | 105 |
 | `src/patch_old_experiment.py` | 86 |
-| `src/prepare_sf_import.py` | 161 |
+| `src/prepare_sf_import.py` | 162 |
 | `src/process_llm_responses.py` | 645 |
-| `src/query_generator.py` | 438 |
+| `src/query_generator.py` | 427 |
 | `src/replication_log_manager.py` | 210 |
 | `src/restore_config.py` | 125 |
 | `src/run_bias_analysis.py` | 155 |
-| `src/select_eligible_candidates.py` | 151 |
-| `src/select_final_candidates.py` | 140 |
+| `src/select_eligible_candidates.py` | 152 |
+| `src/select_final_candidates.py` | 141 |
 | `src/study_analyzer.py` | 483 |
-| `src/validate_adb_data.py` | 1639 |
+| `src/validate_adb_data.py` | 1607 |
 | `src/validate_country_codes.py` | 131 |
 | `tests/Test-Harness.ps1` | 75 |
 | `tests/__init__.py` | 0 |
@@ -119,7 +120,7 @@
 | `tests/test_smoke.py` | 198 |
 | `tests/test_study_analyzer.py` | 287 |
 | `tests/update_experiment.Tests.ps1` | 93 |
-| **Total** | **22,630** |
+| **Total** | **22,710** |
 
 
 ---
@@ -127,11 +128,11 @@
 ## 📊 Diagrams
 
 -   **Total Files:** 27
--   **Total Complexity Score (Lines):** 838
+-   **Total Complexity Score (Lines):** 850
 
 | File | Complexity (Lines) |
 |:---:|:---:|
-| `docs/diagrams/arch_main_codebase.mmd` | 82 |
+| `docs/diagrams/arch_main_codebase.mmd` | 94 |
 | `docs/diagrams/arch_prep_codebase.mmd` | 26 |
 | `docs/diagrams/data_main_flow.mmd` | 82 |
 | `docs/diagrams/data_prep_flow_1_sourcing.mmd` | 32 |
@@ -158,7 +159,7 @@
 | `docs/diagrams/logic_prep_ocean_scoring.mmd` | 24 |
 | `docs/diagrams/logic_workflow_chooser.mmd` | 40 |
 | `docs/diagrams/logic_workflow_chooser_study.mmd` | 39 |
-| **Total** | **838** |
+| **Total** | **850** |
 
 
 ---
@@ -166,7 +167,7 @@
 ## 💾 Data Files
 
 -   **Total Files:** 30
--   **Total Size:** 23,874.1 KB
+-   **Total Size:** 23,138.3 KB
 
 | File | Size (KB) |
 |:---:|:---:|
@@ -191,8 +192,8 @@
 | `data/intermediate/adb_final_candidates.txt` | 1899.5 |
 | `data/intermediate/ocean_scores_discarded.csv` | 56.1 |
 | `data/intermediate/sf_data_import.txt` | 524.7 |
-| `data/personalities_db.txt` | 8303.9 |
-| `data/processed/subject_db.csv` | 1448.2 |
+| `data/personalities_db.txt` | 7452.8 |
+| `data/processed/subject_db.csv` | 1563.5 |
 | `data/reports/adb_validation_report.csv` | 1169.7 |
 | `data/reports/adb_validation_summary.txt` | 0.8 |
 | `data/reports/missing_eminence_scores.txt` | 0.0 |
@@ -200,4 +201,4 @@
 | `data/reports/missing_sf_subjects.csv` | 256.0 |
 | `data/reports/ocean_scores_summary.txt` | 6.4 |
 | `data/sources/adb_raw_export.txt` | 3316.1 |
-| **Total** | **23,874.1** |
+| **Total** | **23,138.3** |

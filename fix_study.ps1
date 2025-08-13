@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: repair_study.ps1
+# Filename: fix_study.ps1
 
 <#
 .SYNOPSIS
-    Repairs, updates, or resumes all incomplete or outdated experiments within a study directory.
+    Fixes, updates, or resumes all incomplete or outdated experiments within a study directory.
 
 .DESCRIPTION
     This script provides a high-level workflow for bringing an entire study into a valid and
@@ -33,17 +33,17 @@
     an error, recommending that 'migrate_study.ps1' be run first.
 
     If fixable issues are found, it will list the affected experiments, ask for a single user
-    confirmation, and then sequentially call 'repair_experiment.ps1' non-interactively on each one.
+    confirmation, and then sequentially call 'fix_experiment.ps1' non-interactively on each one.
 
 .PARAMETER TargetDirectory
     The path to the study directory containing multiple experiment folders.
 
 .PARAMETER Verbose
-    If specified, displays the full, detailed output from each individual 'repair_experiment.ps1' call.
+    If specified, displays the full, detailed output from each individual 'fix_experiment.ps1' call.
 
 .EXAMPLE
-    # Run a repair on a study, which will first audit and then prompt for confirmation.
-    .\repair_study.ps1 -TargetDirectory "output/studies/My_First_Study"
+    # Run a fix on a study, which will first audit and then prompt for confirmation.
+    .\fix_study.ps1 -TargetDirectory "output/studies/My_First_Study"
 #>
 
 [CmdletBinding()]
@@ -77,7 +77,7 @@ function Format-Banner {
 }
 
 # --- Logging Setup ---
-$logFileName = "study_repair_log.txt"
+$logFileName = "study_fix_log.txt"
 if (-not (Test-Path -Path $TargetDirectory -PathType Container)) {
     throw "Study directory not found: $TargetDirectory"
 }
@@ -94,11 +94,11 @@ if (Get-Command pdm -ErrorAction SilentlyContinue) {
 $ScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
 try {
-    # Use -Force to overwrite the repair log, even if it's read-only.
+    # Use -Force to overwrite the fix log, even if it's read-only.
     Start-Transcript -Path $logFilePath -Force | Out-Null
     
     Write-Host "" # Blank line before message
-    Write-Host "The repair log will be saved to:" -ForegroundColor Gray
+    Write-Host "The fix log will be saved to:" -ForegroundColor Gray
     $relativePath = Resolve-Path -Path $logFilePath -Relative
     Write-Host $relativePath -ForegroundColor Gray
 
@@ -117,7 +117,7 @@ try {
     $AUDIT_NEEDS_MIGRATION = 3
     $AUDIT_NEEDS_AGGREGATION = 4
 
-    Write-Host "`n--- Performing pre-repair audit of the entire study... ---" -ForegroundColor Cyan
+    Write-Host "`n--- Performing pre-fix audit of the entire study... ---" -ForegroundColor Cyan
     $experimentDirs = Get-ChildItem -Path $TargetDirectory -Directory | Where-Object { $_.Name -ne 'anova' }
     if ($experimentDirs.Count -eq 0) {
         Write-Host "No experiment directories found in '$TargetDirectory'." -ForegroundColor Yellow
@@ -149,7 +149,7 @@ try {
     # --- Main Logic branches based on the reliable audit results ---
 
     if ($experimentsToMigrate.Count -gt 0) {
-        throw "Audit found experiments that require migration. Please run 'migrate_study.ps1' to handle these experiments before proceeding with a repair."
+        throw "Audit found experiments that require migration. Please run 'migrate_study.ps1' to handle these experiments before proceeding with a fix."
     }
 
     if ($allExperimentsValid) {
@@ -166,13 +166,13 @@ Do you still want to proceed with updating or aggregating all experiments?
 
 Note: For safety reasons, a study-wide LLM-level repair is not available. 
       To force a repair on a single experiment, please run 
-      'repair_experiment.ps1' directly on its directory.
+      'fix_experiment.ps1' directly on its directory.
 
 Enter your choice (1, 2, or N)
 "@
         $choice = Read-Host -Prompt $prompt
         $actionTaken = $false
-        $repairScriptPath = Join-Path $ScriptRoot "repair_experiment.ps1"
+        $fixScriptPath = Join-Path $ScriptRoot "fix_experiment.ps1"
 
         switch ($choice.Trim().ToLower()) {
             '1' {
@@ -180,7 +180,7 @@ Enter your choice (1, 2, or N)
                 foreach ($experimentDir in $experimentDirs) {
                     $i++
                     Write-Host "`n--- Forcing Update on experiment $i of $($experimentDirs.Count): $($experimentDir.Name) ---" -ForegroundColor Cyan
-                    & $repairScriptPath -TargetDirectory $experimentDir.FullName -ForceUpdate
+                    & $fixScriptPath -TargetDirectory $experimentDir.FullName -ForceUpdate
                     if ($LASTEXITCODE -ne 0) { throw "Forced update failed for experiment: $($experimentDir.Name)." }
                 }
                 $actionTaken = $true
@@ -190,7 +190,7 @@ Enter your choice (1, 2, or N)
                 foreach ($experimentDir in $experimentDirs) {
                     $i++
                     Write-Host "`n--- Forcing Aggregation on experiment $i of $($experimentDirs.Count): $($experimentDir.Name) ---" -ForegroundColor Cyan
-                    & $repairScriptPath -TargetDirectory $experimentDir.FullName -ForceAggregate
+                    & $fixScriptPath -TargetDirectory $experimentDir.FullName -ForceAggregate
                     if ($LASTEXITCODE -ne 0) { throw "Forced aggregation failed for experiment: $($experimentDir.Name)." }
                 }
                 $actionTaken = $true
@@ -210,44 +210,44 @@ Enter your choice (1, 2, or N)
         return
     }
 
-    # Correct path for a study that needs repair
-    Write-Host "`nThe following $($experimentsToFix.Count) experiment(s) will be repaired/updated:" -ForegroundColor Yellow
+    # Correct path for a study that needs fixing
+    Write-Host "`nThe following $($experimentsToFix.Count) experiment(s) will be fixed/updated:" -ForegroundColor Yellow
     $experimentsToFix | ForEach-Object { Write-Host " - $_" }
 
-    $choice = Read-Host "`nDo you wish to proceed with the repair? (Y/N)"
+    $choice = Read-Host "`nDo you wish to proceed with the fix? (Y/N)"
     if ($choice.Trim().ToLower() -ne 'y') {
-        Write-Host "`nRepair aborted by user." -ForegroundColor Yellow
+        Write-Host "`nFix aborted by user." -ForegroundColor Yellow
         return
     }
 
-    $repairScriptPath = Join-Path $ScriptRoot "repair_experiment.ps1"
+    $fixScriptPath = Join-Path $ScriptRoot "fix_experiment.ps1"
     $i = 0
     foreach ($experimentName in $experimentsToFix) {
         $i++
         $experimentPath = Join-Path $TargetDirectory $experimentName
-        Write-Host "`n--- Repairing experiment $i of $($experimentsToFix.Count): $experimentName ---" -ForegroundColor Cyan
+        Write-Host "`n--- Fixing experiment $i of $($experimentsToFix.Count): $experimentName ---" -ForegroundColor Cyan
         
-        $repairArgs = @{ TargetDirectory = $experimentPath; NonInteractive = $true }
-        if ($PSBoundParameters['Verbose']) { $repairArgs['Verbose'] = $true }
-        & $repairScriptPath @repairArgs
+        $fixArgs = @{ TargetDirectory = $experimentPath; NonInteractive = $true }
+        if ($PSBoundParameters['Verbose']) { $fixArgs['Verbose'] = $true }
+        & $fixScriptPath @fixArgs
         
         if ($LASTEXITCODE -ne 0) {
-            throw "Repair failed for experiment: $experimentName. Halting study repair."
+            throw "Fix failed for experiment: $experimentName. Halting study fix."
         }
     }
 
-    Write-Host "`n--- Running post-repair audit to verify all changes... ---" -ForegroundColor Cyan
+    Write-Host "`n--- Running post-fix audit to verify all changes... ---" -ForegroundColor Cyan
     & $auditScriptPath -TargetDirectory $TargetDirectory -NoLog
     
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Green
-    Write-Host (Format-Banner "Study Repair Completed Successfully") -ForegroundColor Green
+    Write-Host (Format-Banner "Study Fix Completed Successfully") -ForegroundColor Green
     Write-Host "$headerLine" -ForegroundColor Green
 
 } catch {
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Red
-    Write-Host (Format-Banner "STUDY REPAIR FAILED") -ForegroundColor Red
+    Write-Host (Format-Banner "STUDY FIX FAILED") -ForegroundColor Red
     Write-Host "$headerLine" -ForegroundColor Red
     Write-Host "ERROR: $($_.Exception.Message)`n" -ForegroundColor Red
     exit 1
@@ -255,9 +255,9 @@ Enter your choice (1, 2, or N)
     # Stop the transcript silently to suppress the default message
     Stop-Transcript | Out-Null
     
-    # Only print the custom message if a repair log was actually created.
+    # Only print the custom message if a fix log was actually created.
     if (Test-Path -LiteralPath $logFilePath) {
-        Write-Host "`nThe repair log has been saved to:" -ForegroundColor Gray
+        Write-Host "`nThe fix log has been saved to:" -ForegroundColor Gray
         $relativePath = Resolve-Path -Path $logFilePath -Relative
         Write-Host $relativePath -ForegroundColor Gray
         Write-Host "" # Add a blank line for spacing

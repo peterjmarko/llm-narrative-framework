@@ -4,11 +4,9 @@ author: "Peter J. Marko"
 date: "[Date]"
 ---
 
-This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers seeking to perform a **direct replication of the original study's findings**. The sections are arranged in workflow order as follows:
+This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers seeking to perform a **direct replication of the original study's findings**.
 
-*   **The Data Preparation Pipeline:** Describes the fully automated scripts that transform raw data into the final subject list.
-*   **The Manual Chart Calculation Step:** Details the one-time setup and repeatable workflow for using the Solar Fire astrology program.
-*   **Final Database Generation:** Describes the automated scripts that neutralize the esoteric texts and assemble the final `personalities_db.txt`.
+This guide covers the complete end-to-end workflow, from initial setup and data preparation to running the main experiments and producing the final statistical analysis.
 
 ## The Data Preparation Pipeline
 
@@ -258,7 +256,98 @@ pdm run gen-db
 ```
 The output is `personalities_db.txt`, a tab-delimited file with the fields: `Index`, `Name`, `BirthYear`, and `DescriptionText`.
 
-The rest of the Testing Framework is fully automated in Python, as documented in the main Framework Manual.
+With the `personalities_db.txt` file generated, the data preparation phase is complete. The following sections describe how to run the main experimental pipeline.
+
+## Setup and Installation
+
+This project uses **PDM** for dependency and environment management.
+
+1.  **Install PDM (One-Time Setup)**:
+    If you don't have PDM, install it once with pip.
+    ```bash
+    pip install --user pdm
+    ```
+
+2.  **Install Project Environment & Dependencies**:
+    From the project's root directory, run the main PDM installation command.
+    ```bash
+    pdm install -G dev
+    ```
+
+3.  **Configure API Key**:
+    *   Create a file named `.env` in the project root.
+    *   Add your API key from your chosen provider (e.g., OpenRouter):
+        `OPENROUTER_API_KEY=your-actual-api-key`
+
+To run any project command, prefix it with `pdm run`.
+
+## Configuration (`config.ini`)
+
+All experimental parameters are defined in the `config.ini` file. For a direct replication, the key settings to verify are:
+
+*   **`[Study]`**:
+    *   `num_replications = 30`
+    *   `mapping_strategy`: Should be set to `correct` or `random` depending on the experiment you wish to replicate.
+*   **`[LLM]`**:
+    *   `model_name`: The API identifier for the LLM to be tested (e.g., `google/gemini-flash-1.5`).
+    *   `temperature`: `0.2` was used in the original study for deterministic output.
+
+The framework automatically archives this file with the results for guaranteed reproducibility.
+
+## The Main Experiment & Analysis Pipeline
+
+The experimental pipeline is controlled by a set of user-friendly PowerShell scripts.
+
+### Step 1: Running a New Experiment
+
+The `new_experiment.ps1` script runs a full experiment based on the settings in `config.ini`. It creates a timestamped directory in `output/new_experiments/` and executes the configured number of replications.
+
+**Execution:**
+```powershell
+# Create and run a new experiment from scratch
+.\new_experiment.ps1
+```
+
+### Step 2: Auditing and Fixing an Experiment
+
+If a run is interrupted (e.g., due to a network error), you can use the framework's "fix-it" tools.
+
+**a. Audit the Experiment (`audit_experiment.ps1`)**
+This read-only script provides a detailed status report and recommends the correct next step.
+```powershell
+# Get a status report for a specific experiment
+.\audit_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_..."
+```
+
+**b. Fix the Experiment (`fix_experiment.ps1`)**
+This intelligent script automatically applies the safest, most efficient fix. If it detects missing LLM responses, it will re-run only the failed API calls. If it detects only outdated analysis, it will perform a fast, local update without making any API calls.
+```powershell
+# Automatically diagnose and fix the experiment
+.\fix_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_..."
+```
+
+### Step 3: Analyzing a Full Study
+
+After running several experiments (e.g., one for `mapping_strategy = correct` and another for `random`), you can analyze them together as a single study.
+
+**a. Organize the Study**
+Manually create a directory in `output/studies/` (e.g., `output/studies/My_Replication_Study/`) and move your completed experiment folders into it.
+
+**b. Process the Study (`process_study.ps1`)**
+This script orchestrates the final analysis. It audits all experiments in the study directory, compiles the results into a master `STUDY_results.csv` file, and runs the final statistical analysis (Two-Way ANOVA).
+
+**Execution:**
+```powershell
+# Compile and analyze all experiments in the study directory
+.\process_study.ps1 -StudyDirectory "output/studies/My_Replication_Study"
+```
+
+**Final Artifacts:**
+The script generates two key outputs in your study directory:
+1.  A master `STUDY_results.csv` file containing the aggregated data.
+2.  A new `anova/` subdirectory containing:
+    *   `STUDY_analysis_log.txt`: A comprehensive text report of the statistical findings.
+    *   `boxplots/`: Publication-quality plots visualizing the results.
 
 ## Related Files
 

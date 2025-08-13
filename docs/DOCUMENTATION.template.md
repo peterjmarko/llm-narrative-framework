@@ -215,7 +215,7 @@ This workflow is the main "fix-it" tool for any existing experiment. The `repair
 -   If the audit finds missing data or outdated analysis files, the script proceeds to automatically apply the correct repair.
 -   If the audit finds the experiment is already complete and valid, it becomes interactive, presenting a menu that allows the user to force a full data repair, an analysis update, or a simple re-aggregation of results.
 
-{{grouped_figure:docs/diagrams/flow_main_3_repair_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Repair or Update an Experiment, showing both automatic and interactive repair paths.}}
+{{grouped_figure:docs/diagrams/flow_main_3_fix_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Fix or Update an Experiment, showing both automatic and interactive repair paths.}}
 
 #### Workflow 4: Migrate Old Experiment Data
 
@@ -254,7 +254,7 @@ Based on the combined results from both audits, it presents a consolidated summa
 
 This is the main "fix-it" tool for an entire study. It first runs a comprehensive audit to identify all experiments that need to be resumed, repaired, or updated. It will halt if any experiments require migration. Otherwise, it prompts for confirmation and then automatically calls `repair_experiment.ps1` on each experiment that needs attention.
 
-{{grouped_figure:docs/diagrams/flow_main_8_repair_study.mmd | scale=2.5 | width=80% | caption=Workflow 8: Repair a Study. A batch operation to fix all repairable experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_main_8_fix_study.mmd | scale=2.5 | width=80% | caption=Workflow 8: Repair a Study. A batch operation to fix all repairable experiments in a study.}}
 
 #### Workflow 9: Migrate a Study
 
@@ -383,7 +383,7 @@ The framework is designed around a clear "Create -> Check -> Fix" model, with de
 
 -   **`audit_experiment.ps1` (Check)**: Use this read-only tool to get a detailed status report on any existing experiment. It is your primary diagnostic tool and will recommend the correct next step.
 
--   **`repair_experiment.ps1` (Fix & Update)**: Use this for any experiment with a **single, fixable error**. It is the main "fix-it" tool for common issues like resuming an interrupted run or applying analysis updates. It concludes with a final verification audit.
+-   **`fix_experiment.ps1` (Fix & Update)**: Use this for any experiment with a **single, fixable error**. It is the main "fix-it" tool for common issues like resuming an interrupted run or applying analysis updates. It concludes with a final verification audit.
 
 -   **`migrate_experiment.ps1` (Upgrade)**: Use this powerful safety utility for any **legacy or severely corrupted experiment** (i.e., one with multiple errors per run). It performs a non-destructive upgrade by creating a clean copy of the experiment and running the full repair and validation process on it, leaving the original data untouched.
 

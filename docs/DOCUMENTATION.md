@@ -258,8 +258,8 @@ This workflow is the main "fix-it" tool for any existing experiment. The `repair
 -   If the audit finds the experiment is already complete and valid, it becomes interactive, presenting a menu that allows the user to force a full data repair, an analysis update, or a simple re-aggregation of results.
 
 <div align="center">
-  <p>Workflow 3: Repair or Update an Experiment, showing both automatic and interactive repair paths.</p>
-  <img src="images/flow_main_3_repair_experiment.png" width="100%">
+  <p>Workflow 3: Fix or Update an Experiment, showing both automatic and interactive repair paths.</p>
+  <img src="images/flow_main_3_fix_experiment.png" width="100%">
 </div>
 
 #### Workflow 4: Migrate Old Experiment Data
@@ -312,7 +312,7 @@ This is the main "fix-it" tool for an entire study. It first runs a comprehensiv
 
 <div align="center">
   <p>Workflow 8: Repair a Study. A batch operation to fix all repairable experiments in a study.</p>
-  <img src="images/flow_main_8_repair_study.png" width="80%">
+  <img src="images/flow_main_8_fix_study.png" width="80%">
 </div>
 
 #### Workflow 9: Migrate a Study
@@ -465,7 +465,7 @@ The framework is designed around a clear "Create -> Check -> Fix" model, with de
 
 -   **`audit_experiment.ps1` (Check)**: Use this read-only tool to get a detailed status report on any existing experiment. It is your primary diagnostic tool and will recommend the correct next step.
 
--   **`repair_experiment.ps1` (Fix & Update)**: Use this for any experiment with a **single, fixable error**. It is the main "fix-it" tool for common issues like resuming an interrupted run or applying analysis updates. It concludes with a final verification audit.
+-   **`fix_experiment.ps1` (Fix & Update)**: Use this for any experiment with a **single, fixable error**. It is the main "fix-it" tool for common issues like resuming an interrupted run or applying analysis updates. It concludes with a final verification audit.
 
 -   **`migrate_experiment.ps1` (Upgrade)**: Use this powerful safety utility for any **legacy or severely corrupted experiment** (i.e., one with multiple errors per run). It performs a non-destructive upgrade by creating a clean copy of the experiment and running the full repair and validation process on it, leaving the original data untouched.
 
