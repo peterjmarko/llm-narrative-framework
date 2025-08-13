@@ -1,5 +1,26 @@
 # Changelog
 
+## 5.1.2 (2025-08-13)
+
+### Bump
+
+- **version 5.1.1 → 5.1.2**
+
+### Fixes
+
+- **Fix repair workflow and improve console UI**
+  Fixes several critical bugs that caused the `repair_experiment.ps1`
+  workflow to fail during testing. The script now correctly handles
+  all three core scenarios: automatic repair, graceful halting for
+  non-repairable experiments, and interactive updates for valid ones.
+  
+  Key fixes include:
+  - Resolving a `NameError` in `orchestrate_replication.py`.
+  - Correcting an `unrecognized argument` error in `experiment_manager.py`.
+  - Fixing a PowerShell `ParserError` in `repair_experiment.ps1`.
+  
+  Improves the console UI by standardizing all step and result banners
+  for a more consistent and professional user experience.
 ## 5.1.1 (2025-08-13)
 
 ### Bump
