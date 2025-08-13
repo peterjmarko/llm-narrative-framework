@@ -14,6 +14,7 @@
   This change introduces experiment_auditor.py, a new script dedicated solely to performing comprehensive, read-only verification of an experiment's state. The experiment_manager.py script is now a streamlined state-machine controller that orchestrates actions based on the auditor's findings.
   
   All relevant PowerShell wrappers, documentation, and diagrams have been updated to reflect this new, more robust architecture.
+  
 ## 5.0.3 (2025-08-12)
 
 ### Bump
@@ -40,7 +41,7 @@
   - Adds a "Design Principles" section to CONTRIBUTING.md.
   - Updates the project ROADMAP.md.
   - Corrects a workflow diagram to reflect the current codebase.
-  
+
 ## 5.0.2 (2025-08-12)
 
 ### Bump

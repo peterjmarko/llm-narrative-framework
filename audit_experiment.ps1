@@ -69,7 +69,7 @@ try {
     # Clean and validate the input path to prevent errors from hidden characters or typos.
     $TargetDirectory = $TargetDirectory.Trim()
     if (-not (Test-Path $TargetDirectory -PathType Container)) {
-        throw "The specified TargetDirectory '$TargetDirectory' does not exist as a directory relative to the current location: '$(Get-Location)'"
+        throw "The specified directory '$TargetDirectory' does not exist."
     }
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
 
@@ -103,10 +103,27 @@ try {
     $scriptExitCode = $pythonExitCode
 }
 catch {
-    Write-Host "`n######################################################" -ForegroundColor Red
-    Write-Host "### AUDIT FAILED ###" -ForegroundColor Red
-    Write-Host "######################################################`n" -ForegroundColor Red
-    Write-Error $_.Exception.Message
+    $line = '#' * 80
+    
+    # Dynamically center the message to ensure it is always aligned correctly.
+    $messageText = " AUDIT FAILED "
+    $bookend = "###"
+    $contentWidth = $line.Length - ($bookend.Length * 2)
+    $paddingNeeded = $contentWidth - $messageText.Length
+    $leftPadCount = [Math]::Floor($paddingNeeded / 2)
+    $rightPadCount = [Math]::Ceiling($paddingNeeded / 2)
+    $centeredMessage = "$bookend$(' ' * $leftPadCount)$messageText$(' ' * $rightPadCount)$bookend"
+
+    Write-Host ""
+    Write-Host $line -ForegroundColor Red
+    Write-Host $centeredMessage -ForegroundColor Red
+    Write-Host $line -ForegroundColor Red
+    Write-Host ""
+    
+    # Display a clean, user-friendly error message.
+    Write-Host "$($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Please provide a valid path to an existing experiment directory.`n" -ForegroundColor Yellow
+    
     $scriptExitCode = 1
 }
 finally {

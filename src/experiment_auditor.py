@@ -322,17 +322,37 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
     failures = [d for d in status_details if not d.endswith(" OK")]
     if not failures:
         return "VALIDATED", status_details
-    if len(failures) >= 2:
+
+    # Classify failures into distinct categories to identify complex corruption
+    failure_categories = set()
+    for f in failures:
+        if "INVALID_NAME" in f:
+            failure_categories.add("INVALID_NAME")
+        elif "CONFIG" in f:
+            failure_categories.add("CONFIG")
+        elif any(err in f for err in ["SESSION_QUERIES", "MAPPINGS_MISSING", "MANIFESTS_INCOMPLETE"]):
+            failure_categories.add("QUERY")
+        elif any(err in f for err in ["SESSION_RESPONSES", "QUERY_RESPONSE_INDEX_MISMATCH"]):
+            failure_categories.add("RESPONSE")
+        else:  # Defaults to an analysis-related issue
+            failure_categories.add("ANALYSIS")
+
+    # A run is corrupted if it has failures from two or more distinct categories
+    if len(failure_categories) >= 2:
         return "RUN_CORRUPTED", status_details
 
-    failure = failures[0]
-    if "INVALID_NAME" in failure: return "INVALID_NAME", status_details
-    if "CONFIG" in failure: return "CONFIG_ISSUE", status_details
-    if any(err in failure for err in ["SESSION_QUERIES", "MAPPINGS_MISSING", "MANIFESTS_INCOMPLETE"]):
+    # If only one category of failure exists, determine the specific status
+    category = failure_categories.pop()
+    if category == "INVALID_NAME":
+        return "INVALID_NAME", status_details
+    if category == "CONFIG":
+        return "CONFIG_ISSUE", status_details
+    if category == "QUERY":
         return "QUERY_ISSUE", status_details
-    if any(err in failure for err in ["SESSION_RESPONSES", "QUERY_RESPONSE_INDEX_MISMATCH"]):
+    if category == "RESPONSE":
         return "RESPONSE_ISSUE", status_details
     
+    # Otherwise, it's a simple analysis issue
     return "ANALYSIS_ISSUE", status_details
 
 def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
@@ -419,12 +439,18 @@ def main():
 
         messages = {
             AUDIT_NEEDS_MIGRATION: ("Experiment needs MIGRATION.", "Run `migrate_experiment.ps1` to create an upgraded copy."),
-            AUDIT_NEEDS_REPAIR: ("Experiment needs REPAIR.", "Run `repair_experiment.ps1` to fix the experiment."),
-            AUDIT_NEEDS_REPROCESS: ("Experiment needs UPDATE.", "Run `repair_experiment.ps1` to update the experiment."),
-            AUDIT_NEEDS_AGGREGATION: ("Experiment needs FINALIZATION.", "Run `repair_experiment.ps1` to finalize it."),
+            AUDIT_NEEDS_REPAIR: ("Experiment needs REPAIR (Critical Data Issue).", "Run `repair_experiment.ps1` to fix the experiment."),
+            AUDIT_NEEDS_REPROCESS: ("Experiment needs REPAIR (Outdated Analysis).", "Run `repair_experiment.ps1` to update the experiment."),
+            AUDIT_NEEDS_AGGREGATION: ("Experiment needs REPAIR (Finalization Required).", "Run `repair_experiment.ps1` to finalize it."),
             AUDIT_ALL_VALID: ("PASSED. Experiment is complete and valid.", "No further action is required.")
         }
-        color_map = {0: C_GREEN, 1: C_RED, 2: C_RED, 3: C_RED, 4: C_YELLOW}
+        color_map = {
+            AUDIT_ALL_VALID: C_GREEN,          # 0: PASSED -> Green
+            AUDIT_NEEDS_REPROCESS: C_YELLOW,   # 1: UPDATE -> Yellow
+            AUDIT_NEEDS_REPAIR: C_YELLOW,      # 2: REPAIR -> Yellow
+            AUDIT_NEEDS_MIGRATION: C_RED,      # 3: MIGRATE -> Red
+            AUDIT_NEEDS_AGGREGATION: C_YELLOW, # 4: FINALIZE -> Yellow
+        }
         
         audit_message, audit_recommendation = messages[audit_result_code]
         audit_color = color_map[audit_result_code]
