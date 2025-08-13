@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.0.4 (2025-08-12)
+
+### Bump
+
+- **version 5.0.3 → 5.0.4**
+
+### Refactor
+
+- **separate audit logic into dedicated script**
+  The experiment_manager.py script was refactored to improve maintainability and separation of concerns. Its dual role of read-only auditing and state management made it complex and difficult to test effectively.
+  
+  This change introduces experiment_auditor.py, a new script dedicated solely to performing comprehensive, read-only verification of an experiment's state. The experiment_manager.py script is now a streamlined state-machine controller that orchestrates actions based on the auditor's findings.
+  
+  All relevant PowerShell wrappers, documentation, and diagrams have been updated to reflect this new, more robust architecture.
 ## 5.0.3 (2025-08-12)
 
 ### Bump
