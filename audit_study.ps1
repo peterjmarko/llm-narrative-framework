@@ -29,7 +29,7 @@
     consolidated summary report. This helps determine if the entire study is ready for
     final analysis via 'process_study.ps1'.
 
-.PARAMETER StudyDirectory
+.PARAMETER TargetDirectory
     The path to the study directory containing multiple experiment folders.
 
 .PARAMETER Verbose
@@ -38,11 +38,11 @@
 
 .EXAMPLE
     # Run a summary audit on a study.
-    .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
+    .\audit_study.ps1 -TargetDirectory "output/studies/My_First_Study"
 
 .EXAMPLE
     # Run a detailed audit, showing the full report for each experiment.
-    .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study" -Verbose
+    .\audit_study.ps1 -TargetDirectory "output/studies/My_First_Study" -Verbose
 #>
 [CmdletBinding()]
 param (
@@ -51,9 +51,6 @@ param (
 
     [Parameter(Mandatory=$false)]
     [switch]$NoLog,
-
-    [Parameter(Mandatory=$false, HelpMessage="Suppresses the real-time progress table, showing only the final summary report.")]
-    [switch]$NoProgress,
 
     [Parameter(Mandatory=$false, HelpMessage="Suppresses the initial PDM detection message.")]
     [switch]$NoHeader
@@ -147,20 +144,10 @@ try {
         return
     }
 
-    # --- Print Real-time Audit Table Header ---
-    if (-not $NoProgress.IsPresent) {
-        Write-Host ""
-        $progressWidth = 10
-        $experimentNameCap = 40 # Set a reasonable maximum width for names
-        Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} {2}" -f "Progress", "Experiment", "Result")
-        Write-Host ("-" * $progressWidth + " " + "-" * $experimentNameCap + " " + "-" * 8)
-    }
-
     $i = 0
     foreach ($dir in $experimentDirs) {
         $i++
         $arguments = @($dir.FullName, "--quiet", "--force-color")
-        $output = @()
         
         if ($PSBoundParameters['Verbose']) {
             Write-Host "`n--- Auditing Experiment $($i)/$($experimentDirs.Count) (Verbose): $($dir.Name) ---" -ForegroundColor Yellow
@@ -170,36 +157,19 @@ try {
             Write-Host "--- End of Audit for: $($dir.Name) ---" -ForegroundColor Yellow
         }
         else {
-            if (-not $NoProgress.IsPresent) {
-                $progress = "$i/$($experimentDirs.Count)"
-                $displayName = $dir.Name
-                if ($displayName.Length -gt $experimentNameCap) {
-                    $displayName = $displayName.Substring(0, $experimentNameCap - 3) + "..."
-                }
-                Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
-            }
             $finalArgs = $prefixArgs + $scriptName + $arguments
             & $executable @finalArgs 2>&1 | Out-Null # Suppress Python output in non-verbose
             $exitCode = $LASTEXITCODE
         }
 
         # --- Status Logic based on the now-reliable exit code ---
-        $trueStatus, $progressColor = switch ($exitCode) {
-            $AUDIT_ALL_VALID         { "VALIDATED", "Green"; break }
-            $AUDIT_NEEDS_REPROCESS   { "NEEDS UPDATE", "Yellow"; break }
-            $AUDIT_NEEDS_REPAIR      { "NEEDS REPAIR", "Red"; break }
-            $AUDIT_NEEDS_MIGRATION   { "NEEDS MIGRATION", "Red"; break }
-            $AUDIT_NEEDS_AGGREGATION { "NEEDS FINALIZATION", "Yellow"; break }
-            default                  { "ERROR", "Red"; break }
-        }
-        if (-not $PSBoundParameters['Verbose'] -and -not $NoProgress.IsPresent) {
-            $progressText = switch ($progressColor) {
-                "Green"  { "[ OK ]"; break }
-                "Yellow" { "[ WARN ]"; break }
-                "Red"    { "[ FAIL ]"; break }
-                default  { "[ ?? ]"; break }
-            }
-            Write-Host $progressText -ForegroundColor $progressColor
+        $trueStatus = switch ($exitCode) {
+            $AUDIT_ALL_VALID         { "VALIDATED"; break }
+            $AUDIT_NEEDS_REPROCESS   { "NEEDS UPDATE"; break }
+            $AUDIT_NEEDS_REPAIR      { "NEEDS REPAIR"; break }
+            $AUDIT_NEEDS_MIGRATION   { "NEEDS MIGRATION"; break }
+            $AUDIT_NEEDS_AGGREGATION { "NEEDS FINALIZATION"; break }
+            default                  { "ERROR"; break }
         }
 
         $auditResults += [PSCustomObject]@{ Name = $dir.Name; ExitCode = $exitCode; TrueStatus = $trueStatus }
@@ -301,11 +271,13 @@ try {
         Write-Output "$c_green$headerLine`n$c_reset"
     }
     else {
-        # Case 3: One or more experiments are not ready (need repair, migration, etc.).
-        Write-Output "$c_red`n$headerLine$c_reset"
-        Write-Output "$c_red$(Format-HeaderLine "AUDIT FINISHED: STUDY IS NOT READY")$c_reset"
-        Write-Output "$c_red$(Format-HeaderLine "Recommendation: Address issues listed above.")$c_reset"
-        Write-Output "$c_red$headerLine`n$c_reset"
+        # Case 3: One or more experiments are not ready. Use a yellow warning banner.
+        $finalBannerColor = $c_yellow
+
+        Write-Output "$finalBannerColor`n$headerLine$c_reset"
+        Write-Output "$finalBannerColor$(Format-HeaderLine "AUDIT FINISHED: STUDY IS NOT READY")$c_reset"
+        Write-Output "$finalBannerColor$(Format-HeaderLine "Recommendation: Address issues listed above.")$c_reset"
+        Write-Output "$finalBannerColor$headerLine`n$c_reset"
     }
     
     # Set the exit code for the script based on the audit result.

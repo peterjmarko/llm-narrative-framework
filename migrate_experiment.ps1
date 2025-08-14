@@ -51,7 +51,10 @@ param (
     [string]$DestinationParent,
 
     [Parameter(Mandatory = $false, HelpMessage = "Run in non-interactive mode, suppressing user prompts for confirmation.")]
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+
+    [Parameter(Mandatory=$false, HelpMessage="Suppresses the initial PDM detection message.")]
+    [switch]$NoHeader
 )
 
 # --- Helper function to create standardized headers ---
@@ -131,12 +134,12 @@ $prefixArgs = @()
 $usingPdm = $false
 if (Get-Command pdm -ErrorAction SilentlyContinue) {
     $usingPdm = $true
-    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    if (-not $NoHeader.IsPresent) { Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan }
     $executable = "pdm"
     $prefixArgs = "run", "python"
 }
 else {
-    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+    if (-not $NoHeader.IsPresent) { Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow }
 }
 
 # --- Shared Variables ---

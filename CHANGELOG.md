@@ -13,6 +13,7 @@
   - Fix multiple bugs in the migration workflow, including an incorrect file path for patch scripts and an infinite loop after reprocessing.
   - Add intelligent up-to-date checks to the build script to skip unnecessary `.docx` and `.md` file regeneration, improving efficiency.
   - Improve the console output and user prompts for the `fix_experiment` and `migrate_experiment` scripts to be clearer and more informative.
+  
 ## 5.2.1 (2025-08-14)
 
 ### Bump
@@ -29,7 +30,7 @@
   - Delete the obsolete `filter_adb_candidates.py` script.
   - Fix a bug in `generate_replication_report.py` that incorrectly duplicated Top-1 accuracy metrics.
   - Perform a comprehensive update of all documentation (docstrings, architecture diagrams, data format diagrams, and main text) to reflect the new, cleaner architecture.
-  
+
 ## 5.2.0 (2025-08-13)
 
 ### Bump

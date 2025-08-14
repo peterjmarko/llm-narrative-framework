@@ -92,6 +92,19 @@ if (Get-Command pdm -ErrorAction SilentlyContinue) {
 }
 
 $ScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+$StudyAuditScriptPath = Join-Path $ScriptRoot "audit_study.ps1"
+
+# --- Auto-detect execution environment (once, at the top) ---
+$executable = "python"
+$prefixArgs = @()
+if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    $executable = "pdm"
+    $prefixArgs = "run", "python"
+}
+else {
+    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+}
 
 try {
     # Use -Force to overwrite the fix log, even if it's read-only.
@@ -102,64 +115,26 @@ try {
     $relativePath = Resolve-Path -Path $logFilePath -Relative
     Write-Host $relativePath -ForegroundColor Gray
 
-    # --- Auto-detect execution environment ---
-    $executable = "python"
-    $prefixArgs = @()
-    if (Get-Command pdm -ErrorAction SilentlyContinue) {
-        $executable = "pdm"
-        $prefixArgs = "run", "python"
-    }
-
     # --- Define Audit Exit Codes from experiment_auditor.py ---
     $AUDIT_ALL_VALID       = 0
-    $AUDIT_NEEDS_REPROCESS = 1
-    $AUDIT_NEEDS_REPAIR    = 2
     $AUDIT_NEEDS_MIGRATION = 3
-    $AUDIT_NEEDS_AGGREGATION = 4
 
-    # --- Perform a single, visible audit to gather state and inform user ---
-    $headerLine = "#" * 80
-    $C_CYAN = "`e[96m"
-    Write-Host "`n$($C_CYAN)$headerLine"
-    Write-Host "$($C_CYAN)$(Format-Banner "RUNNING PRE-FIX AUDIT")"
-    Write-Host "$($C_CYAN)$headerLine`n"
-
+    # --- Phase 1: Quietly audit to determine the true state ---
+    Write-Host "`n--- Performing pre-fix audit of the entire study... ---" -ForegroundColor Cyan
     $experimentDirs = Get-ChildItem -Path $TargetDirectory -Directory | Where-Object { $_.Name -ne 'anova' }
     if ($experimentDirs.Count -eq 0) {
         Write-Host "No experiment directories found in '$TargetDirectory'." -ForegroundColor Yellow
         return
     }
 
-    # Print Real-time Audit Table Header
-    $progressWidth = 10
-    $experimentNameCap = 40
-    Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} {2}" -f "Progress", "Experiment", "Result")
-    Write-Host ("-" * $progressWidth + " " + "-" * $experimentNameCap + " " + "-" * 8)
-
     $experimentsToFix = [System.Collections.Generic.List[string]]::new()
     $experimentsToMigrate = [System.Collections.Generic.List[string]]::new()
     $allExperimentsValid = $true
     $auditorScriptPath = "src/experiment_auditor.py"
-    $i = 0
 
     foreach ($dir in $experimentDirs) {
-        $i++
-        $progress = "$i/$($experimentDirs.Count)"
-        $displayName = if ($dir.Name.Length -gt $experimentNameCap) { ($dir.Name.Substring(0, $experimentNameCap - 3) + "...") } else { $dir.Name }
-        Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
-
         & $executable $prefixArgs $auditorScriptPath $dir.FullName --quiet --force-color
         $exitCode = $LASTEXITCODE
-
-        $statusText, $color = switch ($exitCode) {
-            $AUDIT_ALL_VALID         { "[ OK ]", "Green"; break }
-            $AUDIT_NEEDS_REPROCESS   { "[ WARN ]", "Yellow"; break }
-            $AUDIT_NEEDS_REPAIR      { "[ FAIL ]", "Red"; break }
-            $AUDIT_NEEDS_MIGRATION   { "[ FAIL ]", "Red"; break }
-            $AUDIT_NEEDS_AGGREGATION { "[ WARN ]", "Yellow"; break }
-            default                  { "[ ?? ]", "Red"; break }
-        }
-        Write-Host $statusText -ForegroundColor $color
 
         if ($exitCode -eq $AUDIT_NEEDS_MIGRATION) {
             $experimentsToMigrate.Add($dir.Name)
@@ -169,12 +144,24 @@ try {
             $allExperimentsValid = $false
         }
     }
-    Write-Host "" # Newline after progress table
+    
+    # --- Phase 2: Show the user the official audit report ---
+    # We call the main audit script to give a consistent, rich report.
+    & $StudyAuditScriptPath -TargetDirectory $TargetDirectory -NoLog -NoHeader
 
     # --- Main Logic branches based on the reliable audit results ---
 
     if ($experimentsToMigrate.Count -gt 0) {
-        throw "Audit found experiments that require migration. Please run 'migrate_study.ps1' to handle these experiments before proceeding with a fix."
+        $headerLine = "#" * 80
+        $c_yellow = "`e[93m"
+        Write-Host "`n$headerLine" -ForegroundColor Yellow
+        Write-Host (Format-Banner "STUDY FIX HALTED") -ForegroundColor Yellow
+        Write-Host "$headerLine" -ForegroundColor Yellow
+        Write-Host "" # Blank line
+        $message = "One or more experiments are not fixable in their current state. Please see the audit result and recommendation above."
+        Write-Host $message -ForegroundColor Yellow
+        Write-Host "" # Blank line
+        exit 1
     }
 
     if ($allExperimentsValid) {
@@ -226,7 +213,7 @@ Enter your choice (1, 2, or N)
 
         if ($actionTaken) {
             Write-Host "`n--- Running post-action audit to verify all changes... ---" -ForegroundColor Cyan
-            & $auditScriptPath -TargetDirectory $TargetDirectory -NoLog
+            & $StudyAuditScriptPath -TargetDirectory $TargetDirectory -NoLog -NoHeader
             $headerLine = "#" * 80
             Write-Host "`n$headerLine" -ForegroundColor Green
             Write-Host (Format-Banner "Study Action Completed Successfully") -ForegroundColor Green
@@ -247,12 +234,22 @@ Enter your choice (1, 2, or N)
 
     $fixScriptPath = Join-Path $ScriptRoot "fix_experiment.ps1"
     $i = 0
+    $headerLine = "#" * 80
+    $C_CYAN = "`e[96m"
+
     foreach ($experimentName in $experimentsToFix) {
         $i++
         $experimentPath = Join-Path $TargetDirectory $experimentName
-        Write-Host "`n--- Fixing experiment $i of $($experimentsToFix.Count): $experimentName ---" -ForegroundColor Cyan
+        $bannerMessage = "Fixing Experiment $i of $($experimentsToFix.Count): $experimentName"
+        Write-Host "`n$($C_CYAN)$headerLine"
+        Write-Host "$($C_CYAN)$(Format-Banner $bannerMessage)"
+        Write-Host "$($C_CYAN)$headerLine`n"
         
-        $fixArgs = @{ TargetDirectory = $experimentPath; NonInteractive = $true }
+        $fixArgs = @{
+            TargetDirectory = $experimentPath
+            NonInteractive  = $true
+            NoHeader        = $true
+        }
         if ($PSBoundParameters['Verbose']) { $fixArgs['Verbose'] = $true }
         & $fixScriptPath @fixArgs
         
@@ -262,7 +259,7 @@ Enter your choice (1, 2, or N)
     }
 
     Write-Host "`n--- Running post-fix audit to verify all changes... ---" -ForegroundColor Cyan
-    & $auditScriptPath -TargetDirectory $TargetDirectory -NoLog
+    & $StudyAuditScriptPath -TargetDirectory $TargetDirectory -NoLog -NoHeader
     
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Green

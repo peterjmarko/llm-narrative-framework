@@ -94,7 +94,10 @@ param(
     [switch]$ForceUpdate,
     
     [Parameter(Mandatory=$false, HelpMessage="Non-interactively forces re-aggregation on a valid experiment.")]
-    [switch]$ForceAggregate
+    [switch]$ForceAggregate,
+
+    [Parameter(Mandatory=$false, HelpMessage="Suppresses the initial PDM detection message.")]
+    [switch]$NoHeader
 )
 
 function Write-Header($message, $color, $C_RESET) {
@@ -117,12 +120,12 @@ function Write-Header($message, $color, $C_RESET) {
 $executable = "python"
 $prefixArgs = @()
 if (Get-Command pdm -ErrorAction SilentlyContinue) {
-    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    if (-not $NoHeader.IsPresent) { Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan }
     $executable = "pdm"
     $prefixArgs = "run", "python"
 }
 else {
-    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+    if (-not $NoHeader.IsPresent) { Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow }
 }
 
 function Invoke-FixExperiment {

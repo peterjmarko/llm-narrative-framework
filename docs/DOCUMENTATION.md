@@ -199,7 +199,7 @@ The project's functionality is organized into six primary workflows, each initia
 
 7.  **Audit a Study**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
 
-8.  **Repair a Study**: The primary "fix-it" tool for a study. It audits all experiments and automatically calls `repair_experiment.ps1` on any that need to be resumed, repaired, or updated.
+8.  **Fix a Study**: The primary "fix-it" tool for a study. It audits all experiments and automatically calls `fix_experiment.ps1` on any that need to be resumed, repaired, or updated.
 
 9.  **Migrate a Study**: A batch utility for safely upgrading legacy or corrupted experiments. It audits the study and calls `migrate_experiment.ps1` on any experiments that require it.
 
@@ -241,7 +241,7 @@ If a replication run has **exactly one** identifiable problem, it is considered 
 *   **`RESPONSE_ISSUE`**: One or more LLM response files are missing.
 *   **`ANALYSIS_ISSUE`**: All core data is present, but derivative analysis files or reports are missing/outdated.
 
-Any of these single-error states will result in an overall audit recommendation to run **`repair_experiment.ps1`**.
+Any of these single-error states will result in an overall audit recommendation to run **`fix_experiment.ps1`**.
 
 **Corrupted Runs (Multiple Errors)**
 If a replication run has **two or more** distinct problems (e.g., a missing config file *and* missing responses), it is flagged with the status `RUN_CORRUPTED`. The presence of even one corrupted run suggests a systemic issue that is safer to handle with a non-destructive copy-and-upgrade workflow. The overall audit will recommend running **`migrate_experiment.ps1`** to create a clean, repaired copy of the experiment.
@@ -250,15 +250,15 @@ The `Details` string provides a semicolon-separated list of all detected issues 
 
 In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Aggregation Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`), confirming whether the last aggregation step for the experiment was successfully completed.
 
-#### Workflow 3: Repair or Update an Experiment
+#### Workflow 3: Fixing or Updating an Experiment
 
-This workflow is the main "fix-it" tool for any existing experiment. The `repair_experiment.ps1` script is an intelligent wrapper. It first performs a full audit by calling `experiment_auditor.py` to diagnose the experiment's state. Based on the audit result, it then calls `experiment_manager.py` to apply the correct repairs.
+This workflow is the main "fix-it" tool for any existing experiment. The `fix_experiment.ps1` script is an intelligent wrapper. It first performs a full audit by calling `experiment_auditor.py` to diagnose the experiment's state. Based on the audit result, it then calls `experiment_manager.py` to apply the correct repairs.
 
 -   If the audit finds missing data or outdated analysis files, the script proceeds to automatically apply the correct repair.
 -   If the audit finds the experiment is already complete and valid, it becomes interactive, presenting a menu that allows the user to force a full data repair, an analysis update, or a simple re-aggregation of results.
 
 <div align="center">
-  <p>Workflow 3: Fix or Update an Experiment, showing both automatic and interactive repair paths.</p>
+  <p>Workflow 3: Fixing or Updating an Experiment, showing both automatic and interactive repair paths.</p>
   <img src="images/flow_main_3_fix_experiment.png" width="100%">
 </div>
 
@@ -306,12 +306,12 @@ Based on the combined results from both audits, it presents a consolidated summa
   <img src="images/flow_main_7_audit_study.png" width="100%">
 </div>
 
-#### Workflow 8: Repair a Study
+#### Workflow 8: Fix a Study
 
-This is the main "fix-it" tool for an entire study. It first runs a comprehensive audit to identify all experiments that need to be resumed, repaired, or updated. It will halt if any experiments require migration. Otherwise, it prompts for confirmation and then automatically calls `repair_experiment.ps1` on each experiment that needs attention.
+This is the main "fix-it" tool for an entire study. It first runs a comprehensive audit to identify all experiments that need to be resumed, repaired, or updated. It will halt if any experiments require migration. Otherwise, it prompts for confirmation and then automatically calls `fix_experiment.ps1` on each experiment that needs attention.
 
 <div align="center">
-  <p>Workflow 8: Repair a Study. A batch operation to fix all repairable experiments in a study.</p>
+  <p>Workflow 8: Fix a Study. A batch operation to fix all repairable experiments in a study.</p>
   <img src="images/flow_main_8_fix_study.png" width="80%">
 </div>
 
@@ -491,15 +491,15 @@ This is the primary diagnostic tool. It performs a read-only check and provides 
 .\audit_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
 ```
 
-### Repairing or Updating an Experiment (`repair_experiment.ps1`)
+### Fixing or Updating an Experiment (`fix_experiment.ps1`)
 
 This is the main "fix-it" tool for any existing experiment. It automatically diagnoses and fixes issues.
 
 **To automatically fix a broken or incomplete experiment:**
 The script will run an audit, identify the problem (e.g., missing responses, outdated analysis), and automatically apply the correct fix.
 ```powershell
-# Automatically repair a broken experiment
-.\repair_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
+# Automatically fix a broken experiment
+.\fix_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
 ```
 
 **To interactively force an action on a valid experiment:**
@@ -510,7 +510,7 @@ If you run the script on a complete and valid experiment, it will present an int
 
 ```powershell
 # Run on a valid experiment to bring up the interactive force menu
-.\repair_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
+.\fix_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
 ```
 
 ### Migrating Old Experiment Data (`migrate_experiment.ps1`)
@@ -547,13 +547,13 @@ This is the main diagnostic tool for a study. It performs a comprehensive, two-p
 .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
 ```
 
-### Repairing a Study (`repair_study.ps1`)
+### Fixing a Study (`fix_study.ps1`)
 
-This is the main "fix-it" tool for a study. It audits the study and automatically calls `repair_experiment.ps1` on any experiment that needs to be resumed, repaired, or updated. It will halt with an error if any experiments require migration, ensuring it only operates on repairable issues.
+This is the main "fix-it" tool for a study. It audits the study and automatically calls `fix_experiment.ps1` on any experiment that needs to be resumed, repaired, or updated. It will halt with an error if any experiments require migration, ensuring it only operates on repairable issues.
 
 ```powershell
 # Automatically fix all repairable experiments in a study
-.\repair_study.ps1 -StudyDirectory "output/studies/My_Broken_Study"
+.\fix_study.ps1 -StudyDirectory "output/studies/My_Broken_Study"
 ```
 
 ### Migrating a Study (`migrate_study.ps1`)

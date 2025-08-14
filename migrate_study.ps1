@@ -87,7 +87,7 @@ if (-not (Test-Path -Path $TargetDirectory -PathType Container)) {
 }
 $logFilePath = Join-Path $TargetDirectory $logFileName
 
-# --- Auto-detect execution environment ---
+# --- Auto-detect execution environment (once, at the top) ---
 $executable = "python"
 $prefixArgs = @()
 if (Get-Command pdm -ErrorAction SilentlyContinue) {
@@ -141,7 +141,15 @@ try {
 
     # --- Main Logic branches based on the reliable audit results ---
     if ($needsRepair) {
-        throw "Audit found experiments that require repair or update. Please run 'repair_study.ps1' first to ensure the study is in a stable state before migrating."
+        $headerLine = "#" * 80
+        Write-Host "`n$headerLine" -ForegroundColor Yellow
+        Write-Host (Format-Banner "STUDY MIGRATION HALTED") -ForegroundColor Yellow
+        Write-Host "$headerLine" -ForegroundColor Yellow
+        Write-Host "" # Blank line
+        $message = "The study contains issues that must be resolved first. Please see the audit result and recommendation above."
+        Write-Host $message -ForegroundColor Yellow
+        Write-Host "" # Blank line
+        exit 1
     }
 
     if ($experimentsToMigrate.Count -eq 0) {
@@ -173,15 +181,22 @@ Enter your choice (1 or N)
 
             $migrateScriptPath = Join-Path $ScriptRoot "migrate_experiment.ps1"
             $i = 0
+            $headerLine = "#" * 80
+            $C_CYAN = "`e[96m"
+
             foreach ($experimentDir in $experimentDirs) {
                 $i++
-                Write-Host "`n--- Forcing Migration on experiment $i of $($experimentDirs.Count): $($experimentDir.Name) ---" -ForegroundColor Cyan
+                $bannerMessage = "Forcing Migration on Experiment $i of $($experimentDirs.Count): $($experimentDir.Name)"
+                Write-Host "`n$($C_CYAN)$headerLine"
+                Write-Host "$($C_CYAN)$(Format-Banner $bannerMessage)"
+                Write-Host "$($C_CYAN)$headerLine`n"
                 
                 # Pass the new study directory as the destination for the worker script.
                 $migrateArgs = @{
                     TargetDirectory   = $experimentDir.FullName
                     DestinationParent = $migratedStudyPath
                     NonInteractive    = $true
+                    NoHeader          = $true
                 }
                 if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
                 & $migrateScriptPath @migrateArgs
@@ -209,16 +224,23 @@ Enter your choice (1 or N)
 
     $migrateScriptPath = Join-Path $ScriptRoot "migrate_experiment.ps1"
     $i = 0
+    $headerLine = "#" * 80
+    $C_CYAN = "`e[96m"
+
     foreach ($experimentName in $experimentsToMigrate) {
         $i++
         $experimentPath = Join-Path $TargetDirectory $experimentName
-        Write-Host "`n--- Migrating experiment $i of $($experimentsToMigrate.Count): $experimentName ---" -ForegroundColor Cyan
+        $bannerMessage = "Migrating Experiment $i of $($experimentsToMigrate.Count): $experimentName"
+        Write-Host "`n$($C_CYAN)$headerLine"
+        Write-Host "$($C_CYAN)$(Format-Banner $bannerMessage)"
+        Write-Host "$($C_CYAN)$headerLine`n"
         
         # Add NonInteractive = $true to suppress the redundant confirmation prompt
         # in the worker script.
         $migrateArgs = @{
             TargetDirectory = $experimentPath
             NonInteractive  = $true
+            NoHeader        = $true
         }
         if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
         & $migrateScriptPath @migrateArgs
