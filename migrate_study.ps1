@@ -108,7 +108,7 @@ try {
     $relativePath = Resolve-Path -Path $logFilePath -Relative
     Write-Host $relativePath -ForegroundColor Gray
 
-    # --- Define Audit Exit Codes from experiment_manager.py ---
+    # --- Define Audit Exit Codes from experiment_auditor.py ---
     $AUDIT_ALL_VALID       = 0
     $AUDIT_NEEDS_MIGRATION = 3
 
@@ -121,10 +121,11 @@ try {
 
     $experimentsToMigrate = [System.Collections.Generic.List[string]]::new()
     $needsRepair = $false
+    $auditorScriptPath = "src/experiment_auditor.py"
 
-    # This new loop performs a reliable, quiet audit on each experiment.
+    # This loop performs a reliable, quiet audit on each experiment.
     foreach ($dir in $experimentDirs) {
-        & $executable $prefixArgs src/experiment_manager.py --verify-only --quiet $dir.FullName
+        & $executable $prefixArgs $auditorScriptPath $dir.FullName --quiet
         $exitCode = $LASTEXITCODE
 
         if ($exitCode -eq $AUDIT_NEEDS_MIGRATION) {
@@ -136,7 +137,7 @@ try {
 
     # Now, run the full, visible audit so the user sees the report.
     $auditScriptPath = Join-Path $ScriptRoot "audit_study.ps1"
-    & $auditScriptPath -TargetDirectory $TargetDirectory -NoLog
+    & $auditScriptPath -TargetDirectory $TargetDirectory -NoLog -NoHeader
 
     # --- Main Logic branches based on the reliable audit results ---
     if ($needsRepair) {

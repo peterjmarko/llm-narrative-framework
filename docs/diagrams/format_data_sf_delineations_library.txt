@@ -1,0 +1,24 @@
+# The raw, esoteric text library exported from Solar Fire using its 'decompile' feature.
+# Format: A plain text file with a custom structure.
+
+# Lines beginning with ';' are comments and are ignored by the parser.
+; SUMMARY OF ITEMS INCLUDED
+; ...
+
+# A section begins with a line starting with an asterisk '*' followed by the section title.
+*Title
+Standard Natal Interpretations
+
+# Each entry within a section is also marked with an asterisk, followed by the specific key.
+*Quadrant 1 Strong
+You see yourself as an independent individual...
+
+# The text for each entry follows on the subsequent lines.
+# Multi-line text is common.
+*Sun in Gemini
+Your Sun is in the zodiac sign of Gemini indicating that you're curious, lively...
+|writing, study, numerous telephone calls or even travelling to...
+|
+
+# A vertical bar '|' at the beginning of a line indicates a continuation of the previous line's text.
+# The parser script (`neutralize_delineations.py`) handles joining these lines.

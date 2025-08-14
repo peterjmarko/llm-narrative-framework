@@ -94,7 +94,9 @@ def main():
     header_lines = [
         "="*80, " REPLICATION RUN REPORT", "="*80,
         f"{'Date:':<24}{run_date_display}",
-        f"Final Status:                  PENDING",  # Orchestrator will replace this entire line.
+        f"Final Status:                  PENDING",
+        f"{'Parsing Status:':<24}PENDING",
+        f"{'Validation Status:':<24}PENDING",
         f"{'Replication Number:':<24}{args.replication_num}",
         f"{'Run Directory:':<24}{os.path.basename(run_specific_dir_path)}",
         f"{'Report File:':<24}{os.path.basename(report_path)}",
@@ -116,9 +118,10 @@ def main():
     header_lines.append("-------------------------------")
 
     # 2. Human-Readable Summary Body
-    top_k_acc_key = next((k for k in metrics if k.startswith('mean_top_') and k.endswith('_acc')), 'mean_top_3_acc')
-    top_k_p_key = top_k_acc_key.replace('_acc', '_p')
-    k_num = int(re.search(r'\d+', top_k_acc_key).group()) if re.search(r'\d+', top_k_acc_key) else 3
+    # Correctly identify the Top-3 accuracy keys to avoid duplicating Top-1
+    top_k_acc_key = 'mean_top_3_acc'
+    top_k_p_key = 'top_3_acc_p'
+    k_num = 3
 
     summary_lines = [
         "="*80, "### OVERALL META-ANALYSIS RESULTS ###", "="*80,

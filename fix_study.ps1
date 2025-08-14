@@ -110,28 +110,56 @@ try {
         $prefixArgs = "run", "python"
     }
 
-    # --- Define Audit Exit Codes from experiment_manager.py ---
+    # --- Define Audit Exit Codes from experiment_auditor.py ---
     $AUDIT_ALL_VALID       = 0
     $AUDIT_NEEDS_REPROCESS = 1
     $AUDIT_NEEDS_REPAIR    = 2
     $AUDIT_NEEDS_MIGRATION = 3
     $AUDIT_NEEDS_AGGREGATION = 4
 
-    Write-Host "`n--- Performing pre-fix audit of the entire study... ---" -ForegroundColor Cyan
+    # --- Perform a single, visible audit to gather state and inform user ---
+    $headerLine = "#" * 80
+    $C_CYAN = "`e[96m"
+    Write-Host "`n$($C_CYAN)$headerLine"
+    Write-Host "$($C_CYAN)$(Format-Banner "RUNNING PRE-FIX AUDIT")"
+    Write-Host "$($C_CYAN)$headerLine`n"
+
     $experimentDirs = Get-ChildItem -Path $TargetDirectory -Directory | Where-Object { $_.Name -ne 'anova' }
     if ($experimentDirs.Count -eq 0) {
         Write-Host "No experiment directories found in '$TargetDirectory'." -ForegroundColor Yellow
         return
     }
 
+    # Print Real-time Audit Table Header
+    $progressWidth = 10
+    $experimentNameCap = 40
+    Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} {2}" -f "Progress", "Experiment", "Result")
+    Write-Host ("-" * $progressWidth + " " + "-" * $experimentNameCap + " " + "-" * 8)
+
     $experimentsToFix = [System.Collections.Generic.List[string]]::new()
     $experimentsToMigrate = [System.Collections.Generic.List[string]]::new()
     $allExperimentsValid = $true
+    $auditorScriptPath = "src/experiment_auditor.py"
+    $i = 0
 
-    # This new loop performs a reliable, quiet audit on each experiment.
     foreach ($dir in $experimentDirs) {
-        & $executable $prefixArgs src/experiment_manager.py --verify-only --quiet $dir.FullName
+        $i++
+        $progress = "$i/$($experimentDirs.Count)"
+        $displayName = if ($dir.Name.Length -gt $experimentNameCap) { ($dir.Name.Substring(0, $experimentNameCap - 3) + "...") } else { $dir.Name }
+        Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
+
+        & $executable $prefixArgs $auditorScriptPath $dir.FullName --quiet --force-color
         $exitCode = $LASTEXITCODE
+
+        $statusText, $color = switch ($exitCode) {
+            $AUDIT_ALL_VALID         { "[ OK ]", "Green"; break }
+            $AUDIT_NEEDS_REPROCESS   { "[ WARN ]", "Yellow"; break }
+            $AUDIT_NEEDS_REPAIR      { "[ FAIL ]", "Red"; break }
+            $AUDIT_NEEDS_MIGRATION   { "[ FAIL ]", "Red"; break }
+            $AUDIT_NEEDS_AGGREGATION { "[ WARN ]", "Yellow"; break }
+            default                  { "[ ?? ]", "Red"; break }
+        }
+        Write-Host $statusText -ForegroundColor $color
 
         if ($exitCode -eq $AUDIT_NEEDS_MIGRATION) {
             $experimentsToMigrate.Add($dir.Name)
@@ -141,10 +169,7 @@ try {
             $allExperimentsValid = $false
         }
     }
-
-    # Now, run the full, visible audit so the user sees the report.
-    $auditScriptPath = Join-Path $ScriptRoot "audit_study.ps1"
-    & $auditScriptPath -TargetDirectory $TargetDirectory -NoLog
+    Write-Host "" # Newline after progress table
 
     # --- Main Logic branches based on the reliable audit results ---
 
@@ -264,4 +289,4 @@ Enter your choice (1, 2, or N)
     }
 }
 
-# === End of repair_study.ps1 ===
+# === End of fix_study.ps1 ===

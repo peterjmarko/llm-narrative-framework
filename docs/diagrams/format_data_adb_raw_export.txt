@@ -1,0 +1,6 @@
+# The primary raw data source, fetched by `fetch_adb_data.py`.
+# Format: Tab-Separated Values (TSV) with header.
+
+Index<tab>idADB<tab>LastName<tab>FirstName<tab>Gender<tab>Day<tab>Month<tab>Year<tab>Time<tab>ZoneAbbr<tab>ZoneTimeOffset<tab>City<tab>CountryState<tab>Longitude<tab>Latitude<tab>Rating<tab>Bio<tab>Categories<tab>Link
+<int><tab><int><tab><str><tab><str><tab><char><tab><int><tab><int><tab><int><tab><time><tab><str><tab><time><tab><str><tab><str><tab><geo><tab><geo><tab><str><tab><str><tab><str><tab><url>
+...

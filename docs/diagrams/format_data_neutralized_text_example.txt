@@ -1,0 +1,10 @@
+# This format represents all neutralized text library files, including those for point placements (e.g., points_in_signs.csv)
+# and divisional balances (e.g., balance_elements.csv).
+#
+# All files share a simple two-column CSV structure mapping a classification key to a descriptive sentence.
+
+Key,Text
+"Sun_in_Aries","<neutral_description_text>"
+"strong_fire","<neutral_description_text>"
+"weak_water","<neutral_description_text>"
+...

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: repair_experiment.ps1
+# Filename: fix_experiment.ps1
 
 <#
 .SYNOPSIS
@@ -339,4 +339,4 @@ if ($MyInvocation.InvocationName -ne '.') {
     Invoke-FixExperiment
 }
 
-# === End of repair_experiment.ps1 ===
+# === End of fix_experiment.ps1 ===

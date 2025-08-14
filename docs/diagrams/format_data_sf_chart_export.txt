@@ -1,0 +1,24 @@
+# The complex, multi-line output from the manual Solar Fire step.
+# Format: A repeating 14-line block for each person, comma-quote delimited.
+
+# Line 1: Biographical data. The 4th field (ZoneAbbr) contains the Base58-encoded idADB.
+"<Name>","<Date>","<Time>","<Encoded_idADB>","<ZoneOffset>","<Place>","<Country>","<Lat>","<Lon>"
+
+# Line 2: Header for the celestial point data.
+"Body Name","Body Abbr","Longitude"
+
+# Lines 3-14: The name, abbreviation, and zodiacal longitude (0-359.99) for each of the 12 points.
+"Moon","Mon",<float>
+"Sun","Sun",<float>
+"Mercury","Mer",<float>
+"Venus","Ven",<float>
+"Mars","Mar",<float>
+"Jupiter","Jup",<float>
+"Saturn","Sat",<float>
+"Uranus","Ura",<float>
+"Neptune","Nep",<float>
+"Pluto","Plu",<float>
+"Ascendant","Asc",<float>
+"Midheaven","MC",<float>
+
+# ... this 14-line block repeats for every subject ...

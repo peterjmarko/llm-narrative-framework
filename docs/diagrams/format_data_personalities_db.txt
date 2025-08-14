@@ -1,0 +1,6 @@
+# The final, clean database used as input for experiments, created by `generate_personalities_db.py`.
+# Format: Tab-Separated Values (TSV) with header.
+
+Index<tab>idADB<tab>Name<tab>BirthYear<tab>DescriptionText
+<int><tab><int><tab><str><tab><int><tab><long_str>
+...

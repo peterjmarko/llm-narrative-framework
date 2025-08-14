@@ -78,6 +78,7 @@ graph TD
     stage1 -.-> query_generator
 
     %% Import Connections (dotted)
+    exp_manager -.-> exp_auditor
     exp_manager & exp_auditor & orchestrator & stage1 & stage2 & stage3 & stage4 & stage4b & stage5 & stage6 & query_generator & log_manager & compile_experiment & compile_study_results_py & study_analysis & patch_old -.-> config_loader
 
     %% --- Inline Styling ---

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/validate_country_codes.py
+# Filename: src/utils/validate_country_codes.py
 
 """
 Validates and diagnoses the country_codes.csv lookup file and its source data.
@@ -155,4 +155,4 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 
-# === End of src/validate_country_codes.py ===
+# === End of src/utils/validate_country_codes.py ===

@@ -1,0 +1,6 @@
+# The master database integrating biographical and chart data, created by `create_subject_db.py`.
+# Format: Comma-Separated Values (CSV) with header.
+
+Index,idADB,Name,Date,Time,ZoneAbbrev,ZoneTime,Place,Country,Latitude,Longitude,Sun,Moon,Mercury,Venus,Mars,Jupiter,Saturn,Uranus,Neptune,Pluto,Ascendant,Midheaven
+<int>,<int>,<str>,<date>,<time>,<str>,<time>,<str>,<str>,<geo>,<geo>,<float>,<float>,<float>,<float>,<float>,<float>,<float>,<float>,<float>,<float>,<float>,<float>
+...

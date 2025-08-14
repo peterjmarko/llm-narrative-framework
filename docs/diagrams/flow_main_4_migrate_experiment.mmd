@@ -1,5 +1,5 @@
 graph TD
-    A[<b>migrate_experiment.ps1</b><br>User Entry Point]:::script --> B[<b>Audit Target Directory</b><br><small>calls experiment_manager.py --verify-only</small>]:::entry_py_alt
+    A[<b>migrate_experiment.ps1</b><br>User Entry Point]:::script --> B[<b>Audit Target Directory</b><br><small>calls experiment_auditor.py</small>]:::entry_py_alt
 
     B --> C{Audit Result?}:::decision_alt
 

@@ -20,18 +20,19 @@
 # Filename: src/experiment_auditor.py
 
 """
-Read-Only Auditor for a Single Experiment.
+Read-Only Auditor and State Provider for a Single Experiment.
 
-This script performs a comprehensive, read-only audit of a single experiment
-directory. It is designed to be the single source of truth for determining the
-status of an experiment for user-facing reports.
+This script is the single source of truth for determining the status of an
+experiment. It serves a dual role:
 
-It checks all expected files, validates data integrity, and compares results
-against manifests. Based on its findings, it prints a detailed, colored report
-to the console and exits with a specific status code that can be interpreted by
-wrapper scripts.
+1.  **CLI Tool**: When run directly, it produces a detailed, human-readable
+    audit report and exits with a specific status code for wrapper scripts.
+2.  **Importable Library**: Its core function, `get_experiment_state`, can be
+    imported by other modules (`experiment_manager.py`) to programmatically
+    and consistently determine the state of an experiment.
 
-It is invoked by `audit_experiment.ps1` and `repair_experiment.ps1`.
+It is invoked by `audit_experiment.ps1`, `fix_experiment.ps1`, and is imported by
+`experiment_manager.py`.
 """
 
 import sys
@@ -375,6 +376,58 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
             details.append("batch_run_log.csv UNREADABLE")
     return is_complete, details
 
+def get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -> tuple[str, list, dict]:
+    """
+    High-level state machine driver with correct state priority.
+    This is the single source of truth for an experiment's status.
+    """
+    run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
+    
+    if not run_dirs:
+        return "NEW_NEEDED", [], {}
+
+    run_paths_by_name = {p.name: p for p in run_dirs}
+    granular = {p.name: _verify_single_run_completeness(p) for p in run_dirs}
+    fails = {n: (s, d) for n, (s, d) in granular.items() if s != "VALIDATED"}
+
+    if any(s == "RUN_CORRUPTED" for s, d in fails.values()):
+        return "MIGRATION_NEEDED", [info for info in fails.items() if info[1][0] == "RUN_CORRUPTED"], granular
+
+    runs_needing_session_repair = []
+    runs_needing_full_replication_repair = []
+    for run_name, (status, details_list) in fails.items():
+        if status == "RESPONSE_ISSUE":
+            run_path = run_paths_by_name[run_name]
+            query_indices = _get_file_indices(run_path, FILE_MANIFEST["query_files"])
+            response_txt_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
+            failed_indices = sorted(list(query_indices - response_txt_indices))
+            if failed_indices:
+                runs_needing_session_repair.append({"dir": str(run_path), "failed_indices": failed_indices, "repair_type": "session_repair"})
+        elif status == "CONFIG_ISSUE":
+            runs_needing_session_repair.append({"dir": str(run_paths_by_name[run_name]), "repair_type": "config_repair"})
+        elif status in {"QUERY_ISSUE", "INVALID_NAME"}:
+            runs_needing_full_replication_repair.append({"dir": str(run_paths_by_name[run_name]), "repair_type": "full_replication_repair"})
+
+    if runs_needing_full_replication_repair:
+        return "REPAIR_NEEDED", runs_needing_full_replication_repair, granular
+    if runs_needing_session_repair:
+        return "REPAIR_NEEDED", runs_needing_session_repair, granular
+
+    if any(status == "ANALYSIS_ISSUE" for status, _ in fails.values()):
+        analysis_fails = [{"dir": str(run_paths_by_name[name])} for name, (status, _) in fails.items() if status == "ANALYSIS_ISSUE"]
+        return "REPROCESS_NEEDED", analysis_fails, granular
+
+    if not fails and len(run_dirs) < expected_reps:
+        return "NEW_NEEDED", [], granular
+
+    if not fails and len(run_dirs) >= expected_reps:
+        is_complete, _ = _verify_experiment_level_files(target_dir)
+        if not is_complete:
+            return "AGGREGATION_NEEDED", [], granular
+        return "COMPLETE", [], granular
+        
+    return "UNKNOWN", [], granular
+
 def main():
     parser = argparse.ArgumentParser(description="Read-only auditor for experiments.")
     parser.add_argument('target_dir', help="The target directory for the experiment.")
@@ -385,81 +438,59 @@ def main():
 
     use_color = sys.stdout.isatty() or args.force_color
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = ('','','','','')
-    if use_color:
-        C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = '\033[96m', '\033[92m', '\033[93m', '\033[91m', '\033[0m'
+    if use_color: C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = '\033[96m', '\033[92m', '\033[93m', '\033[91m', '\033[0m'
 
     target_dir = Path(args.target_dir)
+    num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+    
+    # Use the definitive state-checking function
+    state_name, _, granular_details = get_experiment_state(target_dir, num_reps)
+
+    # Map the internal state name to an exit code for PowerShell
+    state_to_exit_code = {
+        "COMPLETE": AUDIT_ALL_VALID, "REPROCESS_NEEDED": AUDIT_NEEDS_REPROCESS,
+        "REPAIR_NEEDED": AUDIT_NEEDS_REPAIR, "NEW_NEEDED": AUDIT_NEEDS_REPAIR,
+        "MIGRATION_NEEDED": AUDIT_NEEDS_MIGRATION, "AGGREGATION_NEEDED": AUDIT_NEEDS_AGGREGATION,
+        "UNKNOWN": AUDIT_NEEDS_MIGRATION
+    }
+    audit_result_code = state_to_exit_code.get(state_name, AUDIT_NEEDS_MIGRATION)
+
     if not args.quiet:
         relative_path = os.path.relpath(target_dir, PROJECT_ROOT)
-        if not args.non_interactive:
-            print(f"\n{C_CYAN}{'#'*80}{C_RESET}")
-            print(f"{C_CYAN}{_format_header('Running Experiment Audit')}{C_RESET}")
-            print(f"{C_CYAN}{'#'*80}{C_RESET}")
         print(f"\n{C_YELLOW}--- Verifying Data Completeness in: ---{C_RESET}\n{relative_path}")
 
-    run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
-    audit_result_code = AUDIT_ALL_VALID
-
-    if not run_dirs:
-        if not args.quiet:
-            print(f"\n{C_YELLOW}Diagnosis: No 'run_*' directories found.{C_RESET}")
-        sys.exit(AUDIT_NEEDS_MIGRATION)
-
-    all_runs_data = [
-        {"name": run.name, "status": status, "details": "; ".join(details)}
-        for run in run_dirs
-        for status, details in [_verify_single_run_completeness(run)]
-    ]
-    
-    unique_statuses = {run['status'] for run in all_runs_data}
-    
-    critical_errors = {"INVALID_NAME", "CONFIG_ISSUE", "QUERY_ISSUE", "RESPONSE_ISSUE"}
-    found_critical_types = unique_statuses.intersection(critical_errors)
-
-    if "RUN_CORRUPTED" in unique_statuses or len(found_critical_types) > 1:
-        audit_result_code = AUDIT_NEEDS_MIGRATION
-    elif len(found_critical_types) == 1:
-        audit_result_code = AUDIT_NEEDS_REPAIR
-    elif "ANALYSIS_ISSUE" in unique_statuses:
-        audit_result_code = AUDIT_NEEDS_REPROCESS
-    
-    exp_complete, _ = _verify_experiment_level_files(target_dir)
-    if audit_result_code == AUDIT_ALL_VALID and not exp_complete:
-        audit_result_code = AUDIT_NEEDS_AGGREGATION
-
-    if not args.quiet:
-        MAX_NAME_WIDTH = 40
-        max_name_len = min(max((len(run['name']) for run in all_runs_data), default=20), MAX_NAME_WIDTH)
-        print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
-        print(f"{'-'*max_name_len} {'-'*20} {'-'*45}")
-        for run in all_runs_data:
-            display_name = run['name'] if len(run['name']) <= max_name_len else run['name'][:max_name_len-3] + "..."
-            status_color = C_GREEN if run['status'] == "VALIDATED" else C_RED
-            print(f"{display_name:<{max_name_len}} {status_color}{run['status']:<20}{C_RESET} {run['details']}")
+        if not granular_details:
+             print(f"\n{C_YELLOW}Diagnosis: No 'run_*' directories found.{C_RESET}")
+        else:
+            max_name_len = min(max((len(run_name) for run_name in granular_details), default=20), 40)
+            print(f"\n{'Run Directory':<{max_name_len}} {'Status':<20} {'Details'}")
+            print(f"{'-'*max_name_len} {'-'*20} {'-'*45}")
+            for name, (status, details) in granular_details.items():
+                display_name = name if len(name) <= max_name_len else name[:max_name_len-3] + "..."
+                status_color = C_GREEN if status == "VALIDATED" else C_RED
+                print(f"{display_name:<{max_name_len}} {status_color}{status:<20}{C_RESET} {'; '.join(details)}")
 
         messages = {
             AUDIT_NEEDS_MIGRATION: ("Experiment needs MIGRATION.", "Run `migrate_experiment.ps1` to create an upgraded copy."),
-            AUDIT_NEEDS_REPAIR: ("Experiment needs REPAIR (Critical Data Issue).", "Run `repair_experiment.ps1` to fix the experiment."),
-            AUDIT_NEEDS_REPROCESS: ("Experiment needs REPAIR (Outdated Analysis).", "Run `repair_experiment.ps1` to update the experiment."),
-            AUDIT_NEEDS_AGGREGATION: ("Experiment needs REPAIR (Finalization Required).", "Run `repair_experiment.ps1` to finalize it."),
-            AUDIT_ALL_VALID: ("PASSED. Experiment is complete and valid.", "No further action is required.")
+            AUDIT_NEEDS_REPAIR: ("Experiment needs REPAIR.", "Run `fix_experiment.ps1` to fix critical data issues."),
+            AUDIT_NEEDS_REPROCESS: ("Experiment needs an UPDATE.", "Run `fix_experiment.ps1` to update analysis files."),
+            AUDIT_NEEDS_AGGREGATION: ("Experiment needs FINALIZATION.", "Run `fix_experiment.ps1` to create summary files."),
+            AUDIT_ALL_VALID: ("PASSED. Experiment is complete and valid.", "No action is required.")
         }
         color_map = {
-            AUDIT_ALL_VALID: C_GREEN,          # 0: PASSED -> Green
-            AUDIT_NEEDS_REPROCESS: C_YELLOW,   # 1: UPDATE -> Yellow
-            AUDIT_NEEDS_REPAIR: C_YELLOW,      # 2: REPAIR -> Yellow
-            AUDIT_NEEDS_MIGRATION: C_RED,      # 3: MIGRATE -> Red
-            AUDIT_NEEDS_AGGREGATION: C_YELLOW, # 4: FINALIZE -> Yellow
+            AUDIT_ALL_VALID: C_GREEN,
+            AUDIT_NEEDS_REPROCESS: C_YELLOW,
+            AUDIT_NEEDS_REPAIR: C_YELLOW,
+            AUDIT_NEEDS_MIGRATION: C_YELLOW,
+            AUDIT_NEEDS_AGGREGATION: C_YELLOW,
         }
         
-        audit_message, audit_recommendation = messages[audit_result_code]
-        audit_color = color_map[audit_result_code]
+        audit_message, audit_recommendation = messages.get(audit_result_code, ("UNKNOWN STATE", "Manual investigation required."))
+        audit_color = color_map.get(audit_result_code, C_RED)
 
         line = audit_color + ("#" * 80) + C_RESET
-        print(f"\n{line}")
-        print(f"{audit_color}{_format_header(f'Audit Result: {audit_message}')}{C_RESET}")
-        if not args.non_interactive:
-            print(f"{audit_color}{_format_header(f'Recommendation: {audit_recommendation}')}{C_RESET}")
+        print(f"\n{line}\n{audit_color}{_format_header(f'Audit Result: {audit_message}')}{C_RESET}")
+        if not args.non_interactive: print(f"{audit_color}{_format_header(f'Recommendation: {audit_recommendation}')}{C_RESET}")
         print(f"{line}\n")
 
     sys.exit(audit_result_code)

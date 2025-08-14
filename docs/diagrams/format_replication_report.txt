@@ -1,28 +1,26 @@
-
 ================================================================================
- {<Report Title>}
+ REPLICATION RUN REPORT
 ================================================================================
-Date:            <Run Date>
-Final Status:    <pipeline_status>
-Run Directory:   <run_directory_name>
-Parsing Status:  <parsing_status>
-Validation Status: <validation_status>
-Report File:     <report_filename>
+Date:                   <Run Date>
+Final Status:           <Pipeline Status>
+Parsing Status:         <Parsing Status>
+Validation Status:      <Validation Status>
+Replication Number:     <Replication #>
+Run Directory:          <Run Directory Name>
+Report File:            <Report Filename>
 
 --- Run Parameters ---
-Num Iterations (m): <num_iterations>
-Items per Query (k): <items_per_query>
-Mapping Strategy: <mapping_strategy>
-Personalities Source: <db_filename>
-LLM Model:       <model_name>
-Run Notes:       <run_notes>
+Number of Trials (m):   <m_iterations>
+Group Size (k):         <k_per_query>
+Mapping Strategy:       <mapping_strategy>
+Personalities Source:   <db_filename>
+LLM Model:              <model_name>
+Run Notes:              <run_notes>
 ================================================================================
 
-
 --- Base Query Prompt Used ---
-{<base_query_prompt_content>}
+{...base_query_prompt_content...}
 -------------------------------
-
 
 ================================================================================
 ### OVERALL META-ANALYSIS RESULTS ###
@@ -51,27 +49,34 @@ Run Notes:       <run_notes>
 
 <<<METRICS_JSON_START>>>
 {
-    "mwu_stouffer_z": <value>, 
-    "mwu_stouffer_p": <value>, 
-    "mwu_fisher_chi2": <value>, 
-    "mwu_fisher_p": <value>, 
-    "mean_effect_size_r": <value>, 
-    "effect_size_r_p": <value>, 
-    "mean_mrr": <value>, 
-    "mrr_p": <value>, 
-    "mean_top_1_acc": <value>, 
-    "top_1_acc_p": <value>, 
-    "mean_top_3_acc": <value>, 
-    "top_3_acc_p": <value>, 
-    "mean_rank_of_correct_id": <value>, 
-    "rank_of_correct_id_p": <value>, 
-    "top1_pred_bias_std": <value>, 
-    "true_false_score_diff": <value>, 
-    "bias_slope": <value>, 
-    "bias_intercept": <value>, 
-    "bias_r_value": <value>, 
+    "mwu_stouffer_z": <value>,
+    "mwu_stouffer_p": <value>,
+    "mwu_fisher_chi2": <value>,
+    "mwu_fisher_p": <value>,
+    "mean_effect_size_r": <value>,
+    "effect_size_r_p": <value>,
+    "mean_mrr": <value>,
+    "mrr_p": <value>,
+    "mean_top_1_acc": <value>,
+    "top_1_acc_p": <value>,
+    "mean_top_3_acc": <value>,
+    "top_3_acc_p": <value>,
+    "mean_mrr_lift": <value>,
+    "mean_top_1_acc_lift": <value>,
+    "mean_top_3_acc_lift": <value>,
+    "mean_rank_of_correct_id": <value>,
+    "rank_of_correct_id_p": <value>,
+    "top1_pred_bias_std": <value>,
+    "true_false_score_diff": <value>,
+    "bias_slope": <value>,
+    "bias_intercept": <value>,
+    "bias_r_value": <value>,
     "bias_p_value": <value>,
     "bias_std_err": <value>,
-    "n_valid_responses": <value>
+    "n_valid_responses": <value>,
+    "positional_bias_metrics": {
+        "top1_pred_bias_std": <value>,
+        "true_false_score_diff": <value>
+    }
 }
 <<<METRICS_JSON_END>>>

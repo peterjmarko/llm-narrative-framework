@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/analyze_research_patterns.py
+# Filename: src/utils/analyze_research_patterns.py
 
 """
 A diagnostic tool to help maintain the list of Astro-Databank 'Research' categories.
@@ -109,4 +109,4 @@ def analyze_failures(report_path: Path = Path("data/reports/adb_validation_repor
 if __name__ == "__main__":
     analyze_failures()
 
-# === End of src/analyze_research_patterns.py ===
+# === End of src/utils/analyze_research_patterns.py ===

@@ -22,27 +22,18 @@
 """
 Backend State-Machine Controller for a Single Experiment.
 
-This script is the high-level, intelligent backend controller for managing the
-entire lifecycle of a single experiment. It is invoked by user-facing
-PowerShell wrappers (e.g., `new_experiment.ps1`, `repair_experiment.ps1`).
+This script is the high-level, action-oriented backend controller for managing
+the lifecycle of a single experiment. It is invoked by user-facing PowerShell
+wrappers (e.g., `new_experiment.ps1`, `repair_experiment.ps1`).
 
-It operates as a state machine: when pointed at an experiment directory, it
-verifies the experiment's status and automatically takes the correct action to
-bring it to completion. If invoked without a target directory, it creates a
-new one and runs the experiment from scratch.
+It operates as a state machine: it determines an experiment's status by
+importing and calling the `get_experiment_state` function from the
+`experiment_auditor` module, and then automatically takes the correct action
+(e.g., creating, repairing, or reprocessing runs) to bring the experiment to
+completion.
 
-Its core function is to orchestrate `orchestrate_replication.py` to create or
-repair individual replication runs. Once all replications are valid, it performs
-a finalization step by calling `compile_experiment_results.py` to generate the
-top-level summary CSV for the experiment.
-
-It supports several modes:
-- **Default (State Machine)**: Intelligently ensures an experiment reaches completion.
-- **`--reprocess`**: Forces a full re-processing of all analysis artifacts.
-- **`--migrate`**: Transforms a legacy experiment into the modern format.
-
-For read-only auditing, see `experiment_auditor.py`. User-facing usage examples
-are provided in the main project `DOCUMENTATION.md`.
+Its core function is to orchestrate `orchestrate_replication.py` to execute
+the required changes for individual replication runs.
 """
 
 import sys
@@ -114,437 +105,15 @@ except ImportError as e:
     print(f"FATAL: Could not import config_loader.py. Error: {e}", file=sys.stderr)
     sys.exit(1)
 
-# Audit exit codes for --verify-only mode and internal signals
-AUDIT_ALL_VALID = 0
-AUDIT_NEEDS_REPROCESS = 1 # Replications have analysis issues
-AUDIT_NEEDS_REPAIR = 2      # Replications have data issues (query/response)
-AUDIT_NEEDS_MIGRATION = 3   # Experiment is legacy format
-AUDIT_NEEDS_AGGREGATION = 4 # Replications are valid, but experiment summary is not
-AUDIT_ABORTED_BY_USER = 99  # Specific exit code when user aborts via prompt
+try:
+    from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
+    from experiment_auditor import get_experiment_state, _get_file_indices, FILE_MANIFEST
+except ImportError as e:
+    print(f"FATAL: Could not import a required module. Error: {e}", file=sys.stderr)
+    sys.exit(1)
 
-#==============================================================================
-#   CENTRAL FILE MANIFEST & REPORT CRITERIA
-#==============================================================================
-FILE_MANIFEST = {
-    "config": {
-        "path": "config.ini.archived",
-        "type": "config_file",
-        "required_keys": {
-            # canonical_name: [(section, key), (fallback_section, fallback_key), ...]
-            "model_name": [("LLM", "model_name"), ("LLM", "model")],
-            "temperature": [("LLM", "temperature")],
-            "mapping_strategy": [("Study", "mapping_strategy")],
-            "num_subjects": [("Study", "group_size"), ("Study", "k_per_query")],
-            "num_trials": [("Study", "num_trials"), ("Study", "num_iterations")],
-            "personalities_db_path": [("Filenames", "personalities_src")],
-        },
-    },
-    "queries_dir":   {"path": "session_queries"},
-    "query_files":   {"path": "session_queries/llm_query_*.txt", "pattern": r"llm_query_(\d+)\.txt"},
-    "trial_manifests": {"path": "session_queries/llm_query_*_manifest.txt", "pattern": r"llm_query_(\d+)_manifest\.txt"},
-    "aggregated_mappings_file": {"path": "session_queries/mappings.txt"},
-    "responses_dir": {"path": "session_responses"},
-    "response_files":{"path": "session_responses/llm_response_*.txt", "pattern": r"llm_response_(\d+)\.txt"},
-    "response_json_files": {"path": "session_responses/llm_response_*_full.json", "pattern": r"llm_response_(\d+)_full\.json"},
-    "analysis_dir":  {"path": "analysis_inputs"},
-    "scores_file":   {"path": "analysis_inputs/all_scores.txt"},
-    "mappings_file": {"path": "analysis_inputs/all_mappings.txt"},
-    "replication_report": {"pattern": r"replication_report_\d{4}-\d{2}-\d{2}.*\.txt"},
-}
-
-REPORT_REQUIRED_METRICS = {
-    "n_valid_responses", "mwu_stouffer_z", "mwu_stouffer_p", "mwu_fisher_chi2",
-    "mwu_fisher_p", "mean_effect_size_r", "effect_size_r_p", "mean_mrr",
-    "mrr_p", "mean_top_1_acc", "top_1_acc_p", "mean_top_3_acc",
-    "top_3_acc_p", "mean_rank_of_correct_id", "rank_of_correct_id_p",
-    "bias_slope", "bias_intercept", "bias_r_value", "bias_p_value", "bias_std_err",
-    "mean_mrr_lift", "mean_top_1_acc_lift", "mean_top_3_acc_lift"
-}
-
-# Define required nested dictionaries and the keys they must contain
-REPORT_REQUIRED_NESTED_KEYS = {
-    "positional_bias_metrics": {"top1_pred_bias_std", "true_false_score_diff"}
-}
-
-# --- Verification Helper Functions ---
-
-def _get_file_indices(run_path: Path, spec: dict) -> set[int]:
-    """Extracts the numerical indices from a set of files using regex."""
-    indices = set()
-    regex = re.compile(spec["pattern"])
-    files = run_path.glob(spec["path"])
-    for f in files:
-        match = regex.match(os.path.basename(f))
-        if match:
-            indices.add(int(match.group(1)))
-    return indices
-
-def _count_lines_in_file(filepath: str, skip_header: bool = True) -> int:
-    """Counts data lines in a file, optionally skipping a header."""
-    if not os.path.exists(filepath):
-        return 0
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        start_index = 1 if skip_header and lines else 0
-        return len([line for line in lines[start_index:] if line.strip()])
-    except Exception:
-        return 0
-
-def _count_matrices_in_file(filepath: str, k: int) -> int:
-    """Counts how many k x k matrices are in a file."""
-    if not os.path.exists(filepath) or k <= 0:
-        return 0
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            lines = [line for line in f.read().splitlines() if line.strip()]
-        return len(lines) // k
-    except Exception:
-        return 0
-
-# ------------------------------------------------------------------ helpers
-def _check_config_manifest(run_path: Path, k_expected: int, m_expected: int):
-    cfg_path = run_path / FILE_MANIFEST["config"]["path"]
-    required_keys_map = FILE_MANIFEST["config"]["required_keys"]
-
-    try:
-        cfg = ConfigParser()
-        # Use a `with open` block to ensure the file handle is always closed, preventing file locks.
-        with open(cfg_path, 'r', encoding='utf-8') as f:
-            cfg.read_file(f)
-        if not cfg.sections():
-            return "CONFIG_MALFORMED"
-    except Exception:
-        return "CONFIG_MALFORMED"
-
-    # Generic function to find a key's value using the fallback map
-    def _get_value(canonical_name, value_type=str):
-        for section, key in required_keys_map[canonical_name]:
-            if cfg.has_option(section, key):
-                try:
-                    if value_type is int:
-                        return cfg.getint(section, key)
-                    if value_type is float:
-                        return cfg.getfloat(section, key)
-                    return cfg.get(section, key)
-                except (configparser.Error, ValueError):
-                    continue  # Try next fallback
-        return None
-
-    # Check for presence of all required keys
-    missing_keys = [name for name in required_keys_map if _get_value(name) is None]
-    if missing_keys:
-        return f"CONFIG_MISSING_KEYS: {', '.join(missing_keys)}"
-
-    # Validate k and m values against directory name
-    k_cfg = _get_value("num_subjects", value_type=int)
-    m_cfg = _get_value("num_trials", value_type=int)
-
-    mismatched = []
-    if k_cfg != k_expected:
-        mismatched.append(f"k (expected {k_expected}, found {k_cfg})")
-    if m_cfg != m_expected:
-        mismatched.append(f"m (expected {m_expected}, found {m_cfg})")
-
-    if mismatched:
-        return f"CONFIG_MISMATCH: {', '.join(mismatched)}"
-
-    return "VALID"
-
-def _check_file_set(run_path: Path, spec: dict, expected_count: int):
-    glob_pattern = spec["path"]
-    regex_pattern = spec.get("pattern")
-
-    all_files_in_dir = list(run_path.glob(glob_pattern))
-
-    # If a specific regex pattern is provided, filter the glob results for a more precise count.
-    if regex_pattern:
-        regex = re.compile(regex_pattern)
-        actual = [f for f in all_files_in_dir if regex.match(os.path.basename(f))]
-    else:
-        # If no regex is provided, use the glob results directly.
-        actual = all_files_in_dir
-
-    label = glob_pattern.split("/", 1)[0]  # e.g. session_queries
-    if not actual:
-        return f"{label.upper()}_MISSING"
-
-    count = len(actual)
-    if count < expected_count:
-        return f"{label.upper()}_INCOMPLETE"
-    if count > expected_count:
-        return f"{label.upper()}_TOO_MANY"
-    return "VALID"
-
-
-def _check_analysis_files(run_path: Path, expected_entries: int, k_value: int):
-    scores_p = run_path / FILE_MANIFEST["scores_file"]["path"]
-    mappings_p = run_path / FILE_MANIFEST["mappings_file"]["path"]
-    for p in (scores_p, mappings_p):
-        if not p.exists():
-            return "ANALYSIS_FILES_MISSING"
-    try:
-        # Mappings are simple line-delimited files; we assume a potential header.
-        n_mappings = _count_lines_in_file(mappings_p, skip_header=True)
-        # The number of score matrices depends on 'k' (group size).
-        n_scores = _count_matrices_in_file(scores_p, k_value)
-    except Exception:
-        return "ANALYSIS_DATA_MALFORMED"
-    if n_scores != expected_entries or n_mappings != expected_entries:
-        return "ANALYSIS_DATA_INCOMPLETE"
-    return "VALID"
-
-
-def _check_report(run_path: Path):
-    reports = sorted(run_path.glob("replication_report_*.txt"))
-    if not reports:
-        return "REPORT_MISSING"
-    latest = reports[-1]
-    try:
-        text = latest.read_text(encoding="utf-8")
-    except Exception:
-        return "REPORT_MALFORMED"
-    if "<<<METRICS_JSON_START>>>" not in text or "<<<METRICS_JSON_END>>>" not in text:
-        return "REPORT_MALFORMED"
-    try:
-        start = text.index("<<<METRICS_JSON_START>>>")
-        end = text.index("<<<METRICS_JSON_END>>>")
-        j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
-    except Exception:
-        return "REPORT_MALFORMED"
-
-    # Check for required top-level metric keys
-    missing_metrics = REPORT_REQUIRED_METRICS - j.keys()
-    if missing_metrics:
-        return f"REPORT_INCOMPLETE_METRICS: {', '.join(sorted(missing_metrics))}"
-
-    # Check for required nested dictionaries and their internal keys
-    for nested_key, required_sub_keys in REPORT_REQUIRED_NESTED_KEYS.items():
-        nested_dict = j.get(nested_key)
-        if not isinstance(nested_dict, dict):
-            return f"REPORT_MISSING_NESTED_DICT: {nested_key}"
-
-        missing_sub_keys = required_sub_keys - nested_dict.keys()
-        if missing_sub_keys:
-            return f"REPORT_INCOMPLETE_NESTED_KEYS ({nested_key}): {', '.join(sorted(missing_sub_keys))}"
-
-    return "VALID"
-
-def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
-    status_details = []
-
-    # 1. name validity
-    # This regex now correctly handles the new format without a trailing '$' to allow for the new parts.
-    name_match = re.search(r"sbj-(\d+)_trl-(\d+)", run_path.name)
-    if not run_path.name.startswith("run_") or not name_match:
-        status_details = [f"{run_path.name} does not match required run_*_sbj-NN_trl-NNN* pattern"]
-        return "INVALID_NAME", status_details
-    k_expected, m_expected = int(name_match.group(1)), int(name_match.group(2))
-
-    # 2. config
-    stat_cfg = _check_config_manifest(run_path, k_expected, m_expected)
-    if stat_cfg != "VALID":
-        status_details.append(stat_cfg)
-    else:
-        status_details.append("config OK")
-
-    # 3. queries
-    stat_q = _check_file_set(run_path, FILE_MANIFEST["query_files"], m_expected)
-    if stat_q != "VALID":
-        status_details.append(stat_q)
-    else:
-        status_details.append("queries OK")
-
-    # 4. Check for mappings file and optional trial manifests
-    aggregated_mappings_path = run_path / FILE_MANIFEST["aggregated_mappings_file"]["path"]
-    if not aggregated_mappings_path.exists():
-        status_details.append("AGGREGATED_MAPPINGS_MISSING")
-
-    # Conditionally check for trial manifests, as they may not exist in legacy runs.
-    # First, do a quick check to see if ANY manifest files are present.
-    manifest_spec = FILE_MANIFEST["trial_manifests"]
-    if list(run_path.glob(manifest_spec["path"])):
-        # If manifests are found, then perform the full, strict check for completeness.
-        stat_q_manifests = _check_file_set(run_path, manifest_spec, m_expected)
-        if stat_q_manifests != "VALID":
-            status_details.append("MANIFESTS_INCOMPLETE")
-
-    # 5. Check response files
-    expected_responses = m_expected
-    response_details = []
-
-    # Check file counts first
-    stat_r_txt = _check_file_set(run_path, FILE_MANIFEST["response_files"], expected_responses)
-    stat_r_json = _check_file_set(run_path, FILE_MANIFEST["response_json_files"], expected_responses)
-
-    if stat_r_txt != "VALID":
-        response_details.append(f"TXT: {stat_r_txt}")
-    if stat_r_json != "VALID":
-        response_details.append(f"JSON: {stat_r_json}")
-
-    # If counts seem okay, perform a deeper check for index consistency
-    if not response_details:
-        query_indices = _get_file_indices(run_path, FILE_MANIFEST["query_files"])
-        response_txt_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
-        response_json_indices = _get_file_indices(run_path, FILE_MANIFEST["response_json_files"])
-        
-        mismatches = []
-        if query_indices != response_txt_indices:
-            mismatches.append("txt")
-        if query_indices != response_json_indices:
-            mismatches.append("json")
-        
-        if mismatches:
-            response_details.append(f"QUERY_RESPONSE_INDEX_MISMATCH ({','.join(mismatches)})")
-
-    if response_details:
-        # Consolidate all response issues into a single failure string
-        status_details.append(f"SESSION_RESPONSES_ISSUE: {'; '.join(response_details)}")
-    else:
-        status_details.append("responses OK")
-
-    # 6. Consolidated Analysis, Report, and Summary Check
-    # Any failure in these downstream artifacts is considered a single, non-critical ANALYSIS_ISSUE.
-    analysis_ok = True
-    
-    # First, check the final replication summary. If it's missing, it's an analysis issue.
-    if not (run_path / "REPLICATION_results.csv").exists():
-        status_details.append("REPLICATION_RESULTS_MISSING")
-        analysis_ok = False
-    
-    # Second, check the report. A missing or malformed report is also an analysis issue.
-    stat_rep = _check_report(run_path)
-    if stat_rep != "VALID":
-        status_details.append(stat_rep)
-        analysis_ok = False
-
-    # Third, check the intermediate analysis files, but only if the other checks haven't failed.
-    # This prevents error-masking and double-counting.
-    if analysis_ok:
-        try:
-            latest_report = sorted(run_path.glob("replication_report_*.txt"))[-1]
-            text = latest_report.read_text(encoding="utf-8")
-            start = text.index("<<<METRICS_JSON_START>>>")
-            end = text.index("<<<METRICS_JSON_END>>>")
-            j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
-            expected_entries = j.get("n_valid_responses")
-
-            if expected_entries is not None and expected_entries >= 0:
-                stat_a = _check_analysis_files(run_path, expected_entries, k_expected)
-                if stat_a != "VALID":
-                    status_details.append(stat_a)
-                    analysis_ok = False
-            else:
-                status_details.append("ANALYSIS_SKIPPED_BAD_REPORT")
-                analysis_ok = False
-        except (IndexError, ValueError, KeyError):
-            status_details.append("ANALYSIS_SKIPPED_BAD_REPORT")
-            analysis_ok = False
-
-    if analysis_ok:
-        status_details.append("analysis OK")
-
-    # --- Roll-up Logic: Classify based on the number of issues found ---
-    failures = [d for d in status_details if not d.endswith(" OK")]
-    num_failures = len(failures)
-
-    if num_failures == 0:
-        return "VALIDATED", status_details
-    
-    # If there are 2 or more distinct failures, the run is considered corrupted.
-    if num_failures >= 2:
-        return "RUN_CORRUPTED", status_details
-
-    # --- If there is exactly one failure, classify it for targeted repair ---
-    failure = failures[0]
-    if "INVALID_NAME" in failure:
-        return "INVALID_NAME", status_details
-    if "CONFIG" in failure:
-        return "CONFIG_ISSUE", status_details
-    if any(err in failure for err in ["SESSION_QUERIES", "MAPPINGS_MISSING", "MANIFESTS_INCOMPLETE"]):
-        return "QUERY_ISSUE", status_details
-    if any(err in failure for err in ["SESSION_RESPONSES", "QUERY_RESPONSE_INDEX_MISMATCH"]):
-        return "RESPONSE_ISSUE", status_details
-    
-    # Any other single, non-fatal issue is a less severe ANALYSIS_ISSUE.
-    return "ANALYSIS_ISSUE", status_details
-
-def _get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -> tuple[str, list, dict]:
-    """
-    High-level state machine driver with correct state priority.
-
-    Returns:
-        A tuple containing:
-        - str: The high-level state of the experiment (e.g., "REPAIR_NEEDED").
-        - list: The detailed payload for the action (e.g., list of failed runs).
-        - dict: A granular map of {run_name: (status, details)} for every run.
-    """
-    run_dirs = sorted([p for p in target_dir.glob("run_*") if p.is_dir()])
-    
-    # Handle the brand-new experiment case first.
-    if not run_dirs:
-        return "NEW_NEEDED", [], {}
-
-    run_paths_by_name = {p.name: p for p in run_dirs}
-    granular = {p.name: _verify_single_run_completeness(p) for p in run_dirs}
-    fails = {n: (s, d) for n, (s, d) in granular.items() if s != "VALIDATED"}
-
-    # --- State Priority 1: REPAIR_NEEDED ---
-    # Check for critical issues that require re-running parts of the pipeline.
-    runs_needing_session_repair = []
-    runs_needing_full_replication_repair = []
-    for run_name, (status, details_list) in fails.items():
-        if status == "RESPONSE_ISSUE":
-            run_path = run_paths_by_name[run_name]
-            query_indices = _get_file_indices(run_path, FILE_MANIFEST["query_files"])
-            
-            # Check for missing indices from both .txt and .json response files
-            response_txt_indices = _get_file_indices(run_path, FILE_MANIFEST["response_files"])
-            response_json_indices = _get_file_indices(run_path, FILE_MANIFEST["response_json_files"])
-
-            # A failed index is any query index that is missing either its .txt or .json response
-            failed_txt_indices = query_indices - response_txt_indices
-            failed_json_indices = query_indices - response_json_indices
-            
-            # Combine them into a single set of unique failed indices
-            failed_indices = sorted(list(failed_txt_indices.union(failed_json_indices)))
-
-            if failed_indices:
-                runs_needing_session_repair.append({"dir": str(run_path), "failed_indices": failed_indices, "repair_type": "session_repair"})
-        elif status == "CONFIG_ISSUE":
-            # This is now a distinct, less destructive repair type.
-            run_path = run_paths_by_name[run_name] # Correctly get the path using the run's name
-            runs_needing_session_repair.append({"dir": str(run_path), "repair_type": "config_repair"})
-        elif status in {"QUERY_ISSUE", "INVALID_NAME"}:
-            runs_needing_full_replication_repair.append({"dir": str(run_paths_by_name[run_name]), "repair_type": "full_replication_repair"})
-
-    if runs_needing_full_replication_repair:
-        return "REPAIR_NEEDED", runs_needing_full_replication_repair, granular
-    if runs_needing_session_repair:
-        return "REPAIR_NEEDED", runs_needing_session_repair, granular
-
-    # --- State Priority 2: REPROCESS_NEEDED ---
-    # If no critical repairs are needed, check for analysis issues.
-    if any(status == "ANALYSIS_ISSUE" for status, _ in fails.values()):
-        analysis_fails = [
-            {"dir": str(run_paths_by_name[name])}
-            for name, (status, _) in fails.items()
-            if status == "ANALYSIS_ISSUE"
-        ]
-        return "REPROCESS_NEEDED", analysis_fails, granular
-
-    # --- State Priority 3: NEW_NEEDED ---
-    # If all existing runs are valid but there are not enough of them.
-    if not fails and len(run_dirs) < expected_reps:
-        return "NEW_NEEDED", [], granular
-
-    # --- State Priority 4: COMPLETE ---
-    # If all existing runs are valid and the count is correct.
-    if not fails and len(run_dirs) >= expected_reps:
-        return "COMPLETE", [], granular
-        
-    # Fallback for any unhandled state.
-    return "UNKNOWN", [], granular
+# This constant is specific to the manager's internal flow when a user aborts.
+AUDIT_ABORTED_BY_USER = 99
 
 # --- Mode Execution Functions ---
 
@@ -1083,13 +652,13 @@ def main():
             action_taken = False
             success = True
 
-            state_overall_status, payload_details, _ = _get_experiment_state(Path(final_output_dir), end_rep, verbose=False)
+            state_name, payload_details, _ = get_experiment_state(Path(final_output_dir), end_rep)
 
-            if state_overall_status == "NEW_NEEDED":
+            if state_name == "NEW_NEEDED":
                 success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, args.verbose, script_paths['orchestrator'], colors)
                 action_taken = True
 
-            elif state_overall_status == "REPAIR_NEEDED":
+            elif state_name == "REPAIR_NEEDED":
                 config_repairs = [d for d in payload_details if d.get("repair_type") == "config_repair"]
                 full_rep_repairs = [d for d in payload_details if d.get("repair_type") == "full_replication_repair"]
                 session_repairs = [d for d in payload_details if d.get("repair_type") == "session_repair"]
@@ -1102,7 +671,7 @@ def main():
                     success = _run_repair_mode(session_repairs, script_paths['orchestrator'], args.verbose, colors)
                 action_taken = True
 
-            elif state_overall_status == "REPROCESS_NEEDED" or force_reprocess_once:
+            elif state_name == "REPROCESS_NEEDED" or force_reprocess_once:
                 if force_reprocess_once and not payload_details:
                     all_run_dirs = sorted([p for p in Path(final_output_dir).glob("run_*") if p.is_dir()])
                     payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
@@ -1111,7 +680,7 @@ def main():
                 action_taken = True
                 force_reprocess_once = False # Reset flag after use
 
-            elif state_overall_status == "COMPLETE":
+            elif state_name == "COMPLETE":
                 if not is_migration_run:
                     print(f"{C_GREEN}--- Experiment is COMPLETE. Proceeding to finalization. ---{C_RESET}")
                 break # Exit loop to finalize

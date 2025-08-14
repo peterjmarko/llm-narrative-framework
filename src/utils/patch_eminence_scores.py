@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/patch_eminence_scores.py
+# Filename: src/utils/patch_eminence_scores.py
 
 """
 One-time patch script to clean and enrich the eminence_scores.csv file.
@@ -129,4 +129,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/patch_eminence_scores.py ===
+# === End of src/utils/patch_eminence_scores.py ===

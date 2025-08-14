@@ -79,7 +79,7 @@ $c_yellow = "$c[93m"
 $c_red = "$c[91m"
 $c_cyan = "$c[96m"
 
-# --- Define Audit Exit Codes from experiment_manager.py ---
+# --- Define Audit Exit Codes from experiment_auditor.py ---
 $AUDIT_ALL_VALID       = 0 # Experiment is complete and valid.
 $AUDIT_NEEDS_REPROCESS = 1 # Experiment needs reprocessing (e.g., analysis issues).
 $AUDIT_NEEDS_REPAIR    = 2 # Experiment needs repair (e.g., missing responses, critical files).

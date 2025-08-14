@@ -4,7 +4,7 @@ graph TD
 
         subgraph "Stage 1: Readiness Audit"
             direction LR
-            B["Calls experiment_manager.py --verify-only<br>on each experiment directory"]:::script
+            B["Calls experiment_auditor.py<br>on each experiment directory"]:::script
         end
         
         C{"Are All Experiments<br>VALIDATED?"}:::decision

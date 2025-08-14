@@ -27,7 +27,7 @@
     This script is the primary diagnostic tool for CHECKING the status of any
     experiment. It calls the `experiment_auditor.py` backend to perform a
     comprehensive, read-only audit and prints a detailed report, including a
-    final recommendation for the next appropriate action (e.g., 'repair_experiment.ps1'
+    final recommendation for the next appropriate action (e.g., 'fix_experiment.ps1'
     or 'migrate_experiment.ps1').
 
     It never makes any changes to the data. The full, detailed output is also

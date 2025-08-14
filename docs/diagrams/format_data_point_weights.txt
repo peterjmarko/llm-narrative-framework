@@ -1,0 +1,7 @@
+# A core configuration file for the generation algorithm, defining the weight of each celestial point.
+# Format: Comma-Separated Values (CSV) with header.
+
+Point,Weight
+"Sun",<int>
+"Moon",<int>
+...

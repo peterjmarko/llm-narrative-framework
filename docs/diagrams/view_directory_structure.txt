@@ -25,22 +25,34 @@ personality_matching/
 │   ├── compile_experiment_results.py
 │   ├── compile_replication_results.py
 │   ├── compile_study_results.py
+│   ├── config_loader.py
 │   ├── create_subject_db.py
+│   ├── experiment_auditor.py
 │   ├── experiment_manager.py
 │   ├── fetch_adb_data.py
 │   ├── filter_adb_candidates.py
+│   ├── generate_eminence_scores.py
+│   ├── generate_ocean_scores.py
 │   ├── generate_personalities_db.py
 │   ├── generate_replication_report.py
-│   ├── id_encoder.py               # UTILITY: Base58 encoding for idADB
+│   ├── id_encoder.py
 │   ├── llm_prompter.py
+│   ├── neutralize_delineations.py
 │   ├── orchestrate_replication.py
 │   ├── prepare_sf_import.py
 │   ├── process_llm_responses.py
 │   ├── query_generator.py
 │   ├── replication_log_manager.py
 │   ├── run_bias_analysis.py
-│   ├── run_llm_sessions.py
+│   ├── select_eligible_candidates.py
+│   ├── select_final_candidates.py
 │   ├── study_analyzer.py
+│   ├── utils/                  # Standalone utilities and maintenance scripts
+│   │   ├── analyze_research_patterns.py
+│   │   ├── patch_eminence_scores.py
+│   │   ├── patch_old_experiment.py
+│   │   ├── restore_config.py
+│   │   └── validate_country_codes.py
 │   └── validate_adb_data.py
 |
 ├── data/                             # Source data, intermediate artifacts, and generated databases
