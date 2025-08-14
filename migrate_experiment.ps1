@@ -116,11 +116,10 @@ function Run-Manager ($managerArgs, $executable, $prefixArgs, $C_RED, $C_RESET) 
 }
 
 # --- Auto-detect execution environment ---
-Write-Host "" # Add blank line for spacing
 $executable = "python"
 $prefixArgs = @()
 if (Get-Command pdm -ErrorAction SilentlyContinue) {
-    Write-Host "PDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
     $executable = "pdm"
     $prefixArgs = "run", "python"
 }

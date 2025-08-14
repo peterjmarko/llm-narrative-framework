@@ -50,15 +50,25 @@ param (
     [string]$TargetDirectory,
 
     [Parameter(Mandatory=$false)]
-    [switch]$NoLog
+    [switch]$NoLog,
+
+    [Parameter(Mandatory=$false, HelpMessage="Suppresses the real-time progress table, showing only the final summary report.")]
+    [switch]$NoProgress,
+
+    [Parameter(Mandatory=$false, HelpMessage="Suppresses the initial PDM detection message.")]
+    [switch]$NoHeader
 )
 
 # --- Auto-detect execution environment ---
 $executable = "python"
 $prefixArgs = @()
 if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    if (-not $NoHeader.IsPresent) { Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan }
     $executable = "pdm"
     $prefixArgs = "run", "python"
+}
+else {
+    if (-not $NoHeader.IsPresent) { Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow }
 }
 
 # --- Define ANSI Color Codes for Rich Text Output ---
@@ -138,11 +148,13 @@ try {
     }
 
     # --- Print Real-time Audit Table Header ---
-    Write-Host ""
-    $progressWidth = 10
-    $experimentNameCap = 40 # Set a reasonable maximum width for names
-    Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} {2}" -f "Progress", "Experiment", "Result")
-    Write-Host ("-" * $progressWidth + " " + "-" * $experimentNameCap + " " + "-" * 8)
+    if (-not $NoProgress.IsPresent) {
+        Write-Host ""
+        $progressWidth = 10
+        $experimentNameCap = 40 # Set a reasonable maximum width for names
+        Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} {2}" -f "Progress", "Experiment", "Result")
+        Write-Host ("-" * $progressWidth + " " + "-" * $experimentNameCap + " " + "-" * 8)
+    }
 
     $i = 0
     foreach ($dir in $experimentDirs) {
@@ -158,12 +170,14 @@ try {
             Write-Host "--- End of Audit for: $($dir.Name) ---" -ForegroundColor Yellow
         }
         else {
-            $progress = "$i/$($experimentDirs.Count)"
-            $displayName = $dir.Name
-            if ($displayName.Length -gt $experimentNameCap) {
-                $displayName = $displayName.Substring(0, $experimentNameCap - 3) + "..."
+            if (-not $NoProgress.IsPresent) {
+                $progress = "$i/$($experimentDirs.Count)"
+                $displayName = $dir.Name
+                if ($displayName.Length -gt $experimentNameCap) {
+                    $displayName = $displayName.Substring(0, $experimentNameCap - 3) + "..."
+                }
+                Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
             }
-            Write-Host ("{0,-$progressWidth} {1,-$experimentNameCap} " -f $progress, $displayName) -NoNewline
             $finalArgs = $prefixArgs + $scriptName + $arguments
             & $executable @finalArgs 2>&1 | Out-Null # Suppress Python output in non-verbose
             $exitCode = $LASTEXITCODE
@@ -178,7 +192,7 @@ try {
             $AUDIT_NEEDS_AGGREGATION { "NEEDS FINALIZATION", "Yellow"; break }
             default                  { "ERROR", "Red"; break }
         }
-        if (-not $PSBoundParameters['Verbose']) {
+        if (-not $PSBoundParameters['Verbose'] -and -not $NoProgress.IsPresent) {
             $progressText = switch ($progressColor) {
                 "Green"  { "[ OK ]"; break }
                 "Yellow" { "[ WARN ]"; break }

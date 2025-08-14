@@ -20,6 +20,7 @@
   - Updated all documentation (`DOCUMENTATION.template.md`, `article_supplementary_material.md`), diagrams, and calling scripts (`audit_study.ps1`) to use the new `fix_*` naming convention.
   
   Note: The modification to `project_scope_report.md` is not covered by this summary and should be reviewed separately.
+  
 ## 5.1.3 (2025-08-13)
 
 ### Bump

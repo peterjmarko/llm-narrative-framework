@@ -55,6 +55,19 @@ param(
 )
 
 # This is the main execution function.
+# --- Auto-detect execution environment ---
+$executable = "python"
+$prefixArgs = @()
+if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    $executable = "pdm"
+    $prefixArgs = "run", "python"
+}
+else {
+    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+}
+
+# This is the main execution function.
 function Invoke-NewExperiment {
 
     # --- Helper function to create standardized headers ---
@@ -79,18 +92,6 @@ function Invoke-NewExperiment {
         }
         Write-Host $separator -ForegroundColor $Color
         Write-Host ""
-    }
-
-    # --- Auto-detect execution environment ---
-    $executable = "python"
-    $prefixArgs = @()
-    if (Get-Command pdm -ErrorAction SilentlyContinue) {
-        Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
-        $executable = "pdm"
-        $prefixArgs = "run", "python"
-    }
-    else {
-        Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
     }
 
     Write-Host # Add blank line for spacing

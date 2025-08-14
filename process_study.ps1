@@ -78,7 +78,7 @@ function Format-Banner {
 $executable = "python"
 $prefixArgs = @()
 if (Get-Command pdm -ErrorAction SilentlyContinue) {
-    Write-Host "PDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
     $executable = "pdm"
     $prefixArgs = "run", "python"
 }
@@ -215,9 +215,10 @@ try {
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
     
     $headerLine = "#" * 80
+    $relativePath = Resolve-Path -Path $TargetDirectory -Relative
     Write-Host "`n$headerLine" -ForegroundColor Green
-    Write-Host "### Starting Study Processing for:" -ForegroundColor Green
-    Write-Host "### '$($ResolvedPath)'" -ForegroundColor Green
+    Write-Host (Format-Banner "Starting Study Processing for:") -ForegroundColor Green
+    Write-Host (Format-Banner "'$($relativePath)'") -ForegroundColor Green
     Write-Host "$headerLine`n" -ForegroundColor Green
 
     # --- Step 1: Run Pre-Analysis Audit ---
@@ -229,23 +230,28 @@ try {
 
     # Run the audit and capture its output to check the final status.
     # The audit script prints its own report, so we don't need to explicitly write the output here.
-    $auditOutput = & $auditScriptPath -TargetDirectory $TargetDirectory -ErrorAction Stop
-    
-    if ($LASTEXITCODE -ne 0) {
-        # The audit script already prints a clear banner with the error and recommendation.
-        # We just need to halt the processing.
-        throw "Study audit failed. Please address the issues reported above before proceeding."
+    $auditOutput = & $auditScriptPath -TargetDirectory $TargetDirectory -NoProgress -NoHeader -ErrorAction Stop
+    $auditExitCode = $LASTEXITCODE
+
+    if ($auditExitCode -ne 0) {
+        # The audit script has already printed its detailed report and recommendation.
+        # We add context here about what this means for the processing workflow.
+        Write-Host "`n[2/3: Compile Study Results] SKIPPED" -ForegroundColor Yellow
+        Write-Host "[3/3: Run Final Analysis (ANOVA)] SKIPPED" -ForegroundColor Yellow
+        throw "Pre-analysis audit failed. Processing cannot continue."
     }
 
     # If the audit passed (exit code 0), check if the study is already fully processed.
-    if (($auditOutput | Out-String) -match "Overall Study Status: COMPLETE") {
+    if (($auditOutput | Out-String) -match "AUDIT FINISHED: STUDY IS COMPLETE") {
         Write-Host "`nWarning: This study is already marked as COMPLETE." -ForegroundColor Yellow
         $choice = Read-Host "Re-running will overwrite existing analysis files. Do you wish to proceed? (Y/N)"
         if ($choice.Trim().ToLower() -ne 'y') {
-            # Throwing an error here is a clean way to exit through the catch block.
-            throw "Processing aborted by user."
+            Write-Host "`nProcessing aborted by user.`n" -ForegroundColor Yellow
+            Write-Host "[2/3: Compile Study Results] SKIPPED" -ForegroundColor Yellow
+            Write-Host "[3/3: Run Final Analysis (ANOVA)] SKIPPED`n" -ForegroundColor Yellow
+            return # Use 'return' for a clean exit from the 'try' block.
         }
-        Write-Host "Proceeding with re-analysis..." -ForegroundColor Yellow
+        Write-Host "`nProceeding with re-analysis..." -ForegroundColor Yellow
     }
     
     Write-Host "Step '1/3: Pre-Analysis Audit' completed successfully." -ForegroundColor Green
@@ -268,7 +274,7 @@ catch {
     Write-Host "`n$headerLine" -ForegroundColor Red
     Write-Host (Format-Banner "STUDY PROCESSING FAILED") -ForegroundColor Red
     Write-Host "$headerLine" -ForegroundColor Red
-    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red # Print the captured exception message cleanly
+    Write-Host "`nERROR: $($_.Exception.Message)`n" -ForegroundColor Red # Print the captured exception message cleanly
     # Exit with a non-zero status code to indicate failure to other automation tools
     exit 1
 }

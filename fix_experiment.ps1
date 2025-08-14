@@ -112,16 +112,21 @@ function Write-Header($message, $color, $C_RESET) {
     Write-Host ""
 }
 
-function Invoke-RepairExperiment {
-    $C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"; $C_RESET = "`e[0m"
-    # --- Auto-detect execution environment ---
-    $executable = "python"
-    $prefixArgs = @()
-    if (Get-Command pdm -ErrorAction SilentlyContinue) {
-        $executable = "pdm"
-        $prefixArgs = "run", "python"
-    }
+# --- Auto-detect execution environment ---
+$executable = "python"
+$prefixArgs = @()
+if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    $executable = "pdm"
+    $prefixArgs = "run", "python"
+}
+else {
+    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+}
 
+function Invoke-FixExperiment {
+    $C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"; $C_RESET = "`e[0m"
+    
     function Invoke-FinalizeExperiment-Local {
         # This nested function handles the three-step finalization process.
         # It uses variables from the parent scope ($TargetDirectory, $executable, $prefixArgs).
@@ -331,7 +336,7 @@ Enter your choice (1, 2, 3, or N)
 # This invocation guard ensures the main execution logic is only triggered
 # when the script is run directly (not dot-sourced).
 if ($MyInvocation.InvocationName -ne '.') {
-    Invoke-RepairExperiment
+    Invoke-FixExperiment
 }
 
 # === End of repair_experiment.ps1 ===

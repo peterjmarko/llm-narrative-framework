@@ -87,6 +87,18 @@ if (-not (Test-Path -Path $TargetDirectory -PathType Container)) {
 }
 $logFilePath = Join-Path $TargetDirectory $logFileName
 
+# --- Auto-detect execution environment ---
+$executable = "python"
+$prefixArgs = @()
+if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
+    $executable = "pdm"
+    $prefixArgs = "run", "python"
+}
+else {
+    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+}
+
 try {
     # Use -Force to overwrite the log file, even if it's read-only.
     Start-Transcript -Path $logFilePath -Force | Out-Null
@@ -95,14 +107,6 @@ try {
     Write-Host "The migration log will be saved to:" -ForegroundColor Gray
     $relativePath = Resolve-Path -Path $logFilePath -Relative
     Write-Host $relativePath -ForegroundColor Gray
-    
-    # --- Auto-detect execution environment ---
-    $executable = "python"
-    $prefixArgs = @()
-    if (Get-Command pdm -ErrorAction SilentlyContinue) {
-        $executable = "pdm"
-        $prefixArgs = "run", "python"
-    }
 
     # --- Define Audit Exit Codes from experiment_manager.py ---
     $AUDIT_ALL_VALID       = 0
