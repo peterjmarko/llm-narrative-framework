@@ -1,5 +1,21 @@
 # Changelog
 
+## 5.2.1 (2025-08-14)
+
+### Bump
+
+- **version 5.2.0 → 5.2.1**
+
+### Refactor
+
+- **centralize audit logic into single source of truth**
+  Enforce separation of concerns by making `experiment_auditor.py` the single source of truth for all audit-related logic.
+  
+  - Remove duplicated audit logic from `experiment_manager.py` and replace it with an import from the auditor.
+  - Create a new `src/utils/` directory for standalone maintenance and analysis scripts, moving five files to clean up the main source directory.
+  - Delete the obsolete `filter_adb_candidates.py` script.
+  - Fix a bug in `generate_replication_report.py` that incorrectly duplicated Top-1 accuracy metrics.
+  - Perform a comprehensive update of all documentation (docstrings, architecture diagrams, data format diagrams, and main text) to reflect the new, cleaner architecture.
 ## 5.2.0 (2025-08-13)
 
 ### Bump
