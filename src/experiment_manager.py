@@ -247,16 +247,20 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
 def _run_repair_mode(runs_to_repair, orchestrator_script_path, verbose, colors):
     """Delegates repair work to the orchestrator for each failed run."""
     C_YELLOW = colors['yellow']
+    C_CYAN = colors['cyan']
     C_RESET = colors['reset']
     print(f"{C_YELLOW}--- Entering REPAIR Mode: Fixing {len(runs_to_repair)} run(s) with missing responses ---{C_RESET}")
 
-    for run_info in runs_to_repair:
+    for i, run_info in enumerate(runs_to_repair):
         run_dir = run_info["dir"]
         failed_indices = run_info.get("failed_indices", [])
         if not failed_indices:
             continue
 
-        print(f"\n--- Repairing {len(failed_indices)} session(s) in: {os.path.basename(run_dir)} ---")
+        header_text = f" REPAIRING REPLICATION {os.path.basename(run_dir)} ({i+1}/{len(runs_to_repair)}) "
+        print(f"\n{C_CYAN}{'='*80}{C_RESET}")
+        print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
+        print(f"{C_CYAN}{'='*80}{C_RESET}")
         
         # Call the orchestrator in --reprocess mode and pass the specific indices to fix.
         # The orchestrator is now responsible for the parallel execution.
@@ -484,6 +488,7 @@ def _run_reprocess_mode(runs_to_reprocess, notes, verbose, orchestrator_script, 
     C_CYAN = colors['cyan']
     C_YELLOW = colors['yellow']
     C_RESET = colors['reset']
+    C_GREEN = colors['green']
     print(f"{C_YELLOW}--- Entering REPROCESS Mode: Updating analysis for {len(runs_to_reprocess)} replication(s) ---{C_RESET}")
 
     for i, run_info in enumerate(runs_to_reprocess):
@@ -638,67 +643,69 @@ def main():
         config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
         end_rep = args.end_rep if args.end_rep is not None else config_num_reps
 
+        # --- Workflow Branching: Handle --migrate as a special one-shot process ---
         if args.migrate:
+            # The migrate workflow is a single pass: preprocess, then finalize.
             if not _run_migrate_mode(Path(final_output_dir), script_paths['patch'], script_paths['orchestrator'], colors, args.verbose):
                 print(f"{C_RED}--- Migration pre-processing failed. Please review logs. ---{C_RESET}")
                 sys.exit(1)
+            # After migration, the only remaining step is finalization.
+            _run_finalization(final_output_dir, script_paths, colors)
 
-        is_migration_run = args.migrate
-        force_reprocess_once = args.reprocess
+        else:
+            # --- For all other modes, use the iterative state-machine loop ---
+            force_reprocess_once = args.reprocess
+            loop_count = 0
+            while loop_count < args.max_loops:
+                loop_count += 1
+                action_taken = False
+                success = True
 
-        loop_count = 0
-        while loop_count < args.max_loops:
-            loop_count += 1
-            action_taken = False
-            success = True
+                state_name, payload_details, _ = get_experiment_state(Path(final_output_dir), end_rep)
 
-            state_name, payload_details, _ = get_experiment_state(Path(final_output_dir), end_rep)
+                if state_name == "NEW_NEEDED":
+                    success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, args.verbose, script_paths['orchestrator'], colors)
+                    action_taken = True
 
-            if state_name == "NEW_NEEDED":
-                success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, args.verbose, script_paths['orchestrator'], colors)
-                action_taken = True
+                elif state_name == "REPAIR_NEEDED":
+                    config_repairs = [d for d in payload_details if d.get("repair_type") == "config_repair"]
+                    full_rep_repairs = [d for d in payload_details if d.get("repair_type") == "full_replication_repair"]
+                    session_repairs = [d for d in payload_details if d.get("repair_type") == "session_repair"]
+                    
+                    if config_repairs:
+                        success = _run_config_repair(config_repairs, script_paths['restore_config'], colors)
+                    if success and full_rep_repairs:
+                        success = _run_full_replication_repair(full_rep_repairs, script_paths['orchestrator'], not args.verbose, colors)
+                    if success and session_repairs:
+                        success = _run_repair_mode(session_repairs, script_paths['orchestrator'], args.verbose, colors)
+                    action_taken = True
 
-            elif state_name == "REPAIR_NEEDED":
-                config_repairs = [d for d in payload_details if d.get("repair_type") == "config_repair"]
-                full_rep_repairs = [d for d in payload_details if d.get("repair_type") == "full_replication_repair"]
-                session_repairs = [d for d in payload_details if d.get("repair_type") == "session_repair"]
+                elif state_name == "REPROCESS_NEEDED" or force_reprocess_once:
+                    if force_reprocess_once and not payload_details:
+                        all_run_dirs = sorted([p for p in Path(final_output_dir).glob("run_*") if p.is_dir()])
+                        payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
+                    
+                    success = _run_reprocess_mode(payload_details, args.notes, args.verbose, script_paths['orchestrator'], script_paths['compile_experiment'], final_output_dir, script_paths['log_manager'], colors)
+                    action_taken = True
+                    force_reprocess_once = False
+
+                elif state_name == "COMPLETE" or state_name == "AGGREGATION_NEEDED":
+                    print(f"{C_GREEN}--- Experiment is VALIDATED. Proceeding to finalization. ---{C_RESET}")
+                    break
+
+                if not success:
+                    print(f"{C_RED}--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
+                    sys.exit(1)
                 
-                if config_repairs:
-                    success = _run_config_repair(config_repairs, script_paths['restore_config'], colors)
-                if success and full_rep_repairs:
-                    success = _run_full_replication_repair(full_rep_repairs, script_paths['orchestrator'], not args.verbose, colors)
-                if success and session_repairs:
-                    success = _run_repair_mode(session_repairs, script_paths['orchestrator'], args.verbose, colors)
-                action_taken = True
+                # The premature break was a bug. The loop should continue until state is COMPLETE.
+                # if action_taken and success:
+                #     break
 
-            elif state_name == "REPROCESS_NEEDED" or force_reprocess_once:
-                if force_reprocess_once and not payload_details:
-                    all_run_dirs = sorted([p for p in Path(final_output_dir).glob("run_*") if p.is_dir()])
-                    payload_details = [{"dir": str(run_dir)} for run_dir in all_run_dirs]
-                
-                success = _run_reprocess_mode(payload_details, args.notes, args.verbose, script_paths['orchestrator'], script_paths['compile_experiment'], final_output_dir, script_paths['log_manager'], colors)
-                action_taken = True
-                force_reprocess_once = False # Reset flag after use
-
-            elif state_name == "COMPLETE":
-                if not is_migration_run:
-                    print(f"{C_GREEN}--- Experiment is COMPLETE. Proceeding to finalization. ---{C_RESET}")
-                break # Exit loop to finalize
-
-            if not success:
-                print(f"{C_RED}--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
+            if loop_count >= args.max_loops:
+                print(f"{C_RED}--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
                 sys.exit(1)
             
-            if action_taken and success:
-                # After an action, assume state is valid and proceed to finalization
-                break
-
-
-        if loop_count >= args.max_loops:
-            print(f"{C_RED}--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
-            sys.exit(1)
-
-        _run_finalization(final_output_dir, script_paths, colors)
+            _run_finalization(final_output_dir, script_paths, colors)
 
         relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
         print(f"\n{C_GREEN}Experiment run finished successfully for:{C_RESET}")

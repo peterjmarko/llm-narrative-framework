@@ -16,6 +16,7 @@
   - Delete the obsolete `filter_adb_candidates.py` script.
   - Fix a bug in `generate_replication_report.py` that incorrectly duplicated Top-1 accuracy metrics.
   - Perform a comprehensive update of all documentation (docstrings, architecture diagrams, data format diagrams, and main text) to reflect the new, cleaner architecture.
+  
 ## 5.2.0 (2025-08-13)
 
 ### Bump

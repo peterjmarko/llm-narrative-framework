@@ -1,6 +1,6 @@
 [project]
 name = "llm-personality-matching"
-version = "4.2.0"
+version = "5.2.1"
 description = "A reproducible pipeline for LLM personality matching experiments."
 authors = [
     {name = "Peter Marko", email = "peter.j.marko@gmail.com"},
@@ -81,18 +81,24 @@ release = {cmd = "python scripts/finalize_release.py", help = "Finalize a new re
 # Main workflow shortcuts
 new-exp = "powershell -ExecutionPolicy Bypass -File ./new_experiment.ps1"
 aud-exp = "powershell -ExecutionPolicy Bypass -File ./audit_experiment.ps1"
-rep-exp = "powershell -ExecutionPolicy Bypass -File ./repair_experiment.ps1"
+fix-exp = "powershell -ExecutionPolicy Bypass -File ./fix_experiment.ps1"
 mig-exp = "powershell -ExecutionPolicy Bypass -File ./migrate_experiment.ps1"
-aud-stu = "powershell -ExecutionPolicy Bypass -File ./audit_study.ps1"
-rep-stu = "powershell -ExecutionPolicy Bypass -File ./repair_study.ps1"
 pro-stu = "powershell -ExecutionPolicy Bypass -File ./process_study.ps1"
+new-stu = "powershell -ExecutionPolicy Bypass -File ./new_study.ps1"
+aud-stu = "powershell -ExecutionPolicy Bypass -File ./audit_study.ps1"
+fix-stu = "powershell -ExecutionPolicy Bypass -File ./fix_study.ps1"
+mig-stu = "powershell -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 
-# Testing shortcuts (Jul 31, 2025: test scripts are out of date)
-test-ps-exp = "pwsh ./tests/run_experiment.Tests.ps1"
-test-ps-aud = "pwsh tests/audit_experiment.Tests.ps1"
-test-ps-upd = "pwsh ./tests/update_experiment.Tests.ps1"
-test-ps-mig = "pwsh tests/migrate_experiment.Tests.ps1"
-test-ps-stu = "pwsh ./tests/analyze_study.Tests.ps1"
+# Testing shortcuts
+test-ps-exp = "pwsh ./tests/new_experiment.Tests.ps1"
+test-ps-aud = "pwsh ./tests/audit_experiment.Tests.ps1"
+test-ps-fix = "pwsh ./tests/fix_experiment.Tests.ps1"
+test-ps-mig = "pwsh ./tests/migrate_experiment.Tests.ps1"
+test-ps-pro = "pwsh ./tests/process_study.Tests.ps1"
+test-ps-stu = "pwsh ./tests/new_study.Tests.ps1"
+test-ps-ast = "pwsh ./tests/audit_study.Tests.ps1"
+test-ps-fst = "pwsh ./tests/fix_study.Tests.ps1"
+test-ps-mst = "pwsh ./tests/migrate_study.Tests.ps1"
 test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
 
 [tool.commitizen]

@@ -24,12 +24,14 @@
     Upgrades a legacy or severely corrupted experiment via a safe, non-destructive copy.
 
 .DESCRIPTION
-    This is a powerful safety utility for handling legacy data or any experiment
-    diagnosed with multiple, complex errors. It performs a non-destructive
-    migration by first creating a clean, timestamped copy of the target experiment,
-    then running the full upgrade and validation process on that copy.
+    This is a powerful safety utility for handling legacy or corrupted experiments.
+    It performs a non-destructive migration by creating a clean, timestamped copy
+    of the target experiment and running the full upgrade and validation process
+    on that new copy.
 
-    The original data is always left untouched.
+    The original data is always left untouched. The script provides a clear,
+    context-aware prompt that explains the safety of the process and accurately
+    describes when API calls might be necessary to repair missing data.
 
 .PARAMETER TargetDirectory
     The path to the experiment directory that will be targeted for migration.
@@ -81,13 +83,21 @@ function Write-Header {
 
 function Run-Manager ($managerArgs, $executable, $prefixArgs, $C_RED, $C_RESET) {
     $managerScript = "src/experiment_manager.py"
-    $fullArgs = $prefixArgs + $managerScript + $managerArgs
+    
+    # Construct the arguments for the final command
+    $command_executable = $executable
+    $command_args = $prefixArgs + $managerScript + $managerArgs
+
+    # If using PDM, the executable is 'pdm' and the arguments start with 'run python'
+    if ($usingPdm) {
+        $command_executable = "pdm"
+    }
     
     # Use absolute paths in the system temp directory for robust streaming
     $tempStdout = Join-Path $env:TEMP "mig_stdout_$(Get-Random).log"
     $tempStderr = Join-Path $env:TEMP "mig_stderr_$(Get-Random).log"
 
-    $proc = Start-Process -FilePath $executable -ArgumentList $fullArgs -NoNewWindow -PassThru -RedirectStandardOutput $tempStdout -RedirectStandardError $tempStderr
+    $proc = Start-Process -FilePath $command_executable -ArgumentList $command_args -NoNewWindow -PassThru -RedirectStandardOutput $tempStdout -RedirectStandardError $tempStderr
     
     Start-Sleep -Milliseconds 200 # Wait for process to start and lock file
     
@@ -118,7 +128,9 @@ function Run-Manager ($managerArgs, $executable, $prefixArgs, $C_RED, $C_RESET) 
 # --- Auto-detect execution environment ---
 $executable = "python"
 $prefixArgs = @()
+$usingPdm = $false
 if (Get-Command pdm -ErrorAction SilentlyContinue) {
+    $usingPdm = $true
     Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
     $executable = "pdm"
     $prefixArgs = "run", "python"
@@ -178,6 +190,7 @@ try {
 
     # 4. Prompt for confirmation if needed
     if (-not $NonInteractive.IsPresent) {
+        # Standard confirmation function
         function Confirm-Proceed {
             param([string]$Message)
             $promptText = "$Message (Y/N)"
@@ -187,20 +200,41 @@ try {
                 if ($choice.Trim().ToLower() -eq 'n') { return $false }
             }
         }
+        
+        # Present the correct prompt based on the audit result
+        $proceed = $false
         switch ($pythonExitCode) {
-            $AUDIT_ALL_VALID {
-                Write-Host "`nExperiment is already complete and valid." -ForegroundColor Yellow; Write-Host ""
-                if (-not (Confirm-Proceed -Message "Do you still want to proceed with migration?")) { Write-Host "`nNo action taken.`n" -ForegroundColor Yellow; return }
-            }
             $AUDIT_NEEDS_MIGRATION {
-                Write-Host "`nMigration Required. This script will copy your original data and perform a full upgrade." -ForegroundColor Yellow
-                if (-not (Confirm-Proceed -Message "`nDo you wish to proceed?")) { Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; return }
+                $promptMessage = @"
+
+This experiment is in a legacy format and requires migration to align it with current data formats.
+This is a safe, non-destructive process:
+  - Your original data at '$((Resolve-Path $TargetPath -Relative).TrimStart(".\"))' will NOT be modified.
+  - A clean, upgraded copy of the experiment will be created.
+  - API calls will ONLY be made to repair any missing LLM responses found in the original data.
+
+Do you wish to proceed?
+"@
+                $proceed = Confirm-Proceed -Message $promptMessage
             }
-            default {
-                Write-Host "`nThis experiment does not need to be migrated. Rather, choose 'N' at the following prompt and run 'repair_experiment.ps1' instead." -ForegroundColor Yellow
-                Write-Host "If you still decide to go ahead with migration, it will create an upgraded copy, leaving the original data untouched.`n"
-                if (-not (Confirm-Proceed -Message "Do you still want to proceed with migration?")) { Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow; return }
+            default { # Handles VALIDATED, NEEDS_REPAIR, etc.
+                $promptMessage = @"
+
+This experiment does not require migration.
+Regardless, you may choose to go ahead with it. This is a safe, non-destructive process:
+  - Your original data at '$((Resolve-Path $TargetPath -Relative).TrimStart(".\"))' will NOT be modified.
+  - A clean, upgraded copy of the experiment will be created.
+  - API calls will ONLY be made to repair any missing LLM responses found in the original data.
+
+Do you wish to proceed with this full copy-and-upgrade?
+"@
+                $proceed = Confirm-Proceed -Message $promptMessage
             }
+        }
+
+        if (-not $proceed) {
+            Write-Host "`nMigration aborted by user.`n" -ForegroundColor Yellow
+            return
         }
     }
 

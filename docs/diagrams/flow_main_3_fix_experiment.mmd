@@ -5,7 +5,7 @@ graph TD
     
     Decision -- "VALIDATED" --> Prompt["Prompt User<br/>'Force Action?'<br/><small>(Repair / Update / Aggregate)</small>"]:::user_interaction;
     Decision -- "NEEDS REPAIR / NEEDS UPDATE" --> AutoRepair["2. Run Automatic Fix<br/><small>calls experiment_manager.py</small>"]:::layer_green;
-    Decision -- "INVALID" --> Stop((Exit)):::stop_node;
+    Decision -- "NEEDS MIGRATION" --> Halted["<b>Repair Halted</b><br/><small>Script exits with a message<br/>recommending migration.</small>"]:::stop_node;
     
     Prompt -- "Force Repair" --> ForceRepair["Force Full Repair<br/><small>Deletes responses, then calls<br/>experiment_manager.py</small>"]:::layer_orange;
     Prompt -- "Force Update" --> ForceUpdate["Force Full Update<br/><small>calls experiment_manager.py --reprocess</small>"]:::layer_orange;

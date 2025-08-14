@@ -233,10 +233,26 @@ def main():
             max_workers = get_config_value(APP_CONFIG, 'LLM', 'max_parallel_sessions', value_type=int, fallback=10)
             llm_prompter_script = os.path.join(src_dir, 'llm_prompter.py')
 
+            # Get the responses subdirectory name ONCE from the config for consistency.
+            responses_subdir_name = get_config_value(APP_CONFIG, 'General', 'responses_subdir', fallback='session_responses')
+            responses_dir = os.path.join(run_specific_dir_path, responses_subdir_name)
+            
             # Ensure the response directory exists before starting workers.
-            responses_dir = os.path.join(run_specific_dir_path, get_config_value(APP_CONFIG, 'General', 'responses_subdir', fallback='session_responses'))
             os.makedirs(responses_dir, exist_ok=True)
             
+            # If in a repair context, clean up old artifacts for the target indices first.
+            if args.reprocess or args.indices:
+                logging.info(f"Repair mode: Cleaning previous artifacts for {len(indices_to_run)} trial(s)...")
+                for index in indices_to_run:
+                    base_path = os.path.join(responses_dir, f"llm_response_{index:03d}")
+                    for ext in [".txt", "_full.json", ".error.txt"]:
+                        file_to_delete = f"{base_path}{ext}"
+                        if os.path.exists(file_to_delete):
+                            try:
+                                os.remove(file_to_delete)
+                            except OSError as e:
+                                logging.warning(f"Could not remove old artifact {os.path.basename(file_to_delete)}: {e}")
+
             api_times_log_path = os.path.join(run_specific_dir_path, get_config_value(APP_CONFIG, 'Filenames', 'api_times_log', fallback="api_times.log"))
             if not os.path.exists(api_times_log_path):
                 with open(api_times_log_path, "w", encoding='utf-8') as f:
@@ -244,8 +260,9 @@ def main():
 
             def session_worker(index):
                 query_filepath = os.path.join(run_specific_dir_path, "session_queries", f"llm_query_{index:03d}.txt")
-                final_response_filepath = os.path.join(run_specific_dir_path, "session_responses", f"llm_response_{index:03d}.txt")
-                final_error_filepath = os.path.join(run_specific_dir_path, "session_responses", f"llm_response_{index:03d}.error.txt")
+                # Use the consistent 'responses_dir' variable to construct paths.
+                final_response_filepath = os.path.join(responses_dir, f"llm_response_{index:03d}.txt")
+                final_error_filepath = os.path.join(responses_dir, f"llm_response_{index:03d}.error.txt")
                 final_json_filepath = os.path.splitext(final_response_filepath)[0] + "_full.json"
                 config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
 
@@ -294,11 +311,18 @@ def main():
                         f.write(f"Query_{index:03d}\t{duration:.2f}\t{total_elapsed_time:.2f}\t{eta:.2f}\n")
             
             if failed_sessions > 0:
-                # Log the specific failures before raising the general exception.
+                # Log the specific failures.
                 for log_entry in all_logs:
                     if log_entry.strip() and "STAGE:" not in log_entry: # Avoid re-printing the header
                         logging.error(log_entry)
-                raise Exception(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed. See logs for details.")
+                
+                # For NEW runs, a session failure is fatal to the entire replication.
+                # For REPAIR/REPROCESS runs, we log the failure but continue gracefully.
+                # The run will remain incomplete and can be re-repaired later.
+                if not args.reprocess:
+                    raise Exception(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed. See logs for details.")
+                else:
+                    logging.warning(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed to repair. The script will continue, but the run remains incomplete.")
 
         # Stage 3: Process LLM Responses
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]

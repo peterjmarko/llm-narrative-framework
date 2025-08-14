@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/utils/restore_config.py
+# Filename: src/restore_config.py
 
 """
 Reverse-engineers a `config.ini.archived` file from a `replication_report.txt`.
@@ -146,4 +146,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/utils/restore_config.py ===
+# === End of src/restore_config.py ===

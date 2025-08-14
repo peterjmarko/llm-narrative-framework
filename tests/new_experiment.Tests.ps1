@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/run_experiment.Tests.ps1
+# Filename: tests/new_experiment.Tests.ps1
 
 . (Join-Path $PSScriptRoot "Test-Harness.ps1")
 
@@ -110,4 +110,4 @@ Run-Test "should handle a combination of all parameters correctly" {
 # --- Finalize the run ---
 Finalize-Test-Run
 
-# === End of tests/run_experiment.Tests.ps1 ===
+# === End of tests/new_experiment.Tests.ps1 ===

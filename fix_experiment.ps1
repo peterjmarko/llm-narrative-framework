@@ -25,17 +25,18 @@
     cheapest fix required.
 
 .DESCRIPTION
-    This is the main "fix-it" tool for any experiment. It automatically diagnoses
-    the experiment's state and applies the most appropriate action.
+    This is the main "fix-it" tool for any experiment. It automatically performs
+    a full audit to diagnose the experiment's state and then applies the most
+    appropriate action.
 
-    - If it finds critical data issues (e.g., missing LLM responses), it will
-      perform a data-level REPAIR.
-    - If it finds only outdated analysis files, it will perform a safe, local
+    - If it finds critical data issues (e.g., missing LLM responses), it performs
+      a data-level REPAIR.
+    - If it finds only outdated analysis files, it performs a safe, local
       analysis-only UPDATE.
     - If the experiment is already valid, it becomes interactive, allowing the user
-      to force a specific action.
-
-    For legacy or severely corrupted experiments, use 'migrate_experiment.ps1'.
+      to force a specific action (e.g., a full data repair or analysis update).
+    - If the experiment is found to be unfixable (i.e., requires migration), the
+      script will halt with a clear message and recommendation.
 
 .PARAMETER TargetDirectory
     (Required) The path to the existing experiment directory that needs to be
@@ -184,26 +185,11 @@ function Invoke-FixExperiment {
             return
         }
         Write-Header "STEP 1: DIAGNOSING EXPERIMENT STATE" $C_CYAN $C_RESET
-        # In an automatic flow, the audit result determines the action.
-        # If the audit is valid (exit code 0), it becomes an interactive flow.
-        $isInteractive = $false
-        $auditArgs = @("src/experiment_auditor.py", $TargetDirectory, "--force-color")
-        
-        # We need to peek at the exit code first to decide if we should suppress the recommendation
-        # on the *first* audit display.
-        & $executable $prefixArgs $auditArgs *>&1 | Out-Null
-        $auditExitCode = $LASTEXITCODE
 
-        if ($auditExitCode -ne 0) {
-            # This is an automatic repair flow. Re-run the audit with the recommendation suppressed.
-            $auditArgs += "--non-interactive"
-        } else {
-            # This is an interactive flow.
-            $isInteractive = $true
-        }
-        
-        # Now display the correctly formatted audit report.
-        & $executable $prefixArgs $auditArgs *>&1 | Tee-Object -Variable auditOutput
+        # Perform a single, direct audit. The script will display the full report,
+        # and we will capture the exit code to determine the next action.
+        $auditArgs = @("src/experiment_auditor.py", $TargetDirectory, "--force-color")
+        & $executable $prefixArgs $auditArgs
         $auditExitCode = $LASTEXITCODE
 
         $actionTaken = $false
@@ -257,20 +243,20 @@ Enter your choice (1, 2, 3, or N)
                 }
             }
             1 { # AUDIT_NEEDS_REPROCESS
-                Write-Header "STEP 2: APPLYING ANALYSIS-ONLY UPDATE" $C_YELLOW $C_RESET
-                Write-Host "Diagnosis: Analysis or report files are outdated." -ForegroundColor Yellow
-                Write-Host "Action:    Applying a safe, local analysis update (no API calls needed)." -ForegroundColor Yellow
+                Write-Header "STEP 2: APPLYING ANALYSIS-ONLY UPDATE" $C_CYAN $C_RESET
+                Write-Host "Diagnosis: Analysis or report files are outdated." -ForegroundColor Gray
+                Write-Host "Action:    Applying a safe, local analysis update (no API calls needed)." -ForegroundColor Gray
                 $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
             }
             2 { # AUDIT_NEEDS_REPAIR
-                Write-Header "STEP 2: APPLYING DATA-LEVEL REPAIR" $C_RED $C_RESET
-                Write-Host "Diagnosis: Critical data (queries/responses) is missing or incomplete." -ForegroundColor Red
-                Write-Host "Action:    Applying a data-level repair. This may re-run API calls." -ForegroundColor Red
+                Write-Header "STEP 2: APPLYING DATA-LEVEL REPAIR" $C_CYAN $C_RESET
+                Write-Host "Diagnosis: Critical data (queries/responses) is missing or incomplete."
+                Write-Host "Action:    Applying a data-level repair. This may re-run API calls."
                 $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
             }
             3 { # AUDIT_NEEDS_MIGRATION
-                Write-Header "REPAIR HALTED" $C_RED $C_RESET
-                $message = "This experiment is corrupted and requires migration. Please run '.\migrate_experiment.ps1' instead."
+                Write-Header "REPAIR HALTED" $C_CYAN $C_RESET
+                $message = "This experiment is not fixable in its current state. Please see the audit result and recommendation above."
                 Write-Host "$($C_YELLOW)$message`n$($C_RESET)"
                 exit 1
             }

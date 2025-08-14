@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/analyze_study.Tests.ps1
+# Filename: tests/process_study.Tests.ps1
 
 . (Join-Path $PSScriptRoot "Test-Harness.ps1")
 
@@ -81,4 +81,4 @@ Run-Test "config.ini valid but empty display name map should warn" {
 # --- Finalize the run ---
 Finalize-Test-Run
 
-# === End of tests/analyze_study.Tests.ps1 ===
+# === End of tests/process_study.Tests.ps1 ===

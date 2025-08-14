@@ -34,7 +34,8 @@ from datetime import datetime
 # --- Configuration ---
 # The root of the project, determined by going up one level from this script's location.
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
-REPORT_FILENAME = PROJECT_ROOT / "project_scope_report.md"
+REPORT_OUTPUT_DIR = PROJECT_ROOT / "output" / "project_reports"
+REPORT_FILENAME = REPORT_OUTPUT_DIR / "project_scope_report.md"
 
 # Directories to completely exclude from the scan.
 EXCLUDE_DIRS = {
@@ -49,6 +50,13 @@ EXCLUDE_EXTS = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp", ".lock", ".cover
 
 # Proxy for calculating document pages.
 WORDS_PER_PAGE = 250
+
+# ANSI color codes for better terminal output
+class Colors:
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RESET = '\033[0m'
 
 # --- Helper Functions ---
 
@@ -129,7 +137,7 @@ def generate_table(headers: list, rows: list, totals: list) -> str:
 
 def main():
     """Main function to generate the project scope report."""
-    print("--- Starting Project Scope Analysis ---")
+    print(f"{Colors.YELLOW}\n--- Starting Project Scope Analysis ---{Colors.RESET}")
 
     documents = []
     scripts = []
@@ -185,9 +193,25 @@ def main():
     # --- Generate Report Content ---
     report_content = [f"# Project Scope & Extent Report\n\n**Generated on:** {datetime.now().strftime('%Y-%m-%d')}\n\n---\n"]
 
-    # Documents Section
+    # --- Pre-calculate all totals for summary ---
     total_words = sum(row[1] for row in documents)
     total_pages = round(total_words / WORDS_PER_PAGE, 1)
+    total_lines_scripts = sum(row[1] for row in scripts)
+    total_lines_diagrams = sum(row[1] for row in diagrams)
+    total_size_data = round(sum(row[1] for row in data_files), 1)
+
+    # Overall Summary Section
+    report_content.append("## 📊 Project at a Glance\n")
+    summary_lines = [
+        f"-   **Documents:** {len(documents)} files (~{total_pages} pages)",
+        f"-   **Scripts:** {len(scripts)} files ({total_lines_scripts:,} LoC)",
+        f"-   **Diagrams:** {len(diagrams)} files ({total_lines_diagrams:,} lines)",
+        f"-   **Data Files:** {len(data_files)} files ({total_size_data:,} KB)"
+    ]
+    report_content.append("\n".join(summary_lines))
+    report_content.append("\n\n---\n")
+
+    # Documents Section
     report_content.append("## 📄 Documents\n")
     report_content.append(f"-   **Total Files:** {len(documents)}")
     report_content.append(f"-   **Total Estimated Pages:** ~{total_pages} (based on {total_words:,} words)\n")
@@ -231,14 +255,16 @@ def main():
     ))
 
     # --- Write Report File ---
-    print(f"3. Writing final report to {REPORT_FILENAME.name}...")
+    print(f"3. Writing final report to {REPORT_FILENAME.relative_to(PROJECT_ROOT)}...")
     try:
+        # Ensure the output directory exists before writing the file.
+        REPORT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         with open(REPORT_FILENAME, "w", encoding="utf-8") as f:
             f.write("\n".join(report_content))
-        print(f"\n--- Analysis Complete ---")
-        print(f"Successfully generated report: {REPORT_FILENAME}")
+        print(f"\n{Colors.YELLOW}--- Analysis Complete ---{Colors.RESET}")
+        print(f"{Colors.GREEN}Successfully generated report: {REPORT_FILENAME.relative_to(PROJECT_ROOT)}{Colors.RESET}\n")
     except IOError as e:
-        print(f"\nError: Could not write report to {REPORT_FILENAME}. Details: {e}")
+        print(f"\n{Colors.RED}Error: Could not write report to {REPORT_FILENAME}. Details: {e}{Colors.RESET}")
 
 if __name__ == "__main__":
     main()
