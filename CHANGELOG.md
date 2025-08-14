@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.2.3 (2025-08-14)
+
+### Bump
+
+- **version 5.2.2 → 5.2.3**
+
+### Fixes
+
+- **Refine study-level workflow UX and logging**
+  Refactors the study-level workflow scripts (audit, fix, migrate) based on manual testing feedback.
+  
+  - Improves logging by adding prominent banners for sub-processes and centralizing PDM detection messages to reduce noise.
+  - Enhances user experience by replacing harsh red "FAILED" banners for controlled halts with clearer, yellow "HALTED" banners that provide specific, actionable advice.
+  - Updates documentation and diagrams to reflect the script rename from `repair_study.ps1` to `fix_study.ps1`, ensuring consistency.
 ## 5.2.2 (2025-08-14)
 
 ### Bump
