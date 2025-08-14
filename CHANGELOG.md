@@ -1,5 +1,33 @@
 # Changelog
 
+## 5.2.0 (2025-08-13)
+
+### Bump
+
+- **version 5.1.4 → 5.2.0**
+
+### Features
+
+- **Improve study processing and audit UX**
+  This commit introduces a series of significant improvements to the study-level workflow scripts (`process_study.ps1`, `audit_study.ps1`) based on manual testing, focusing on bug fixes, clarity, and user experience.
+  
+  ### Key Changes:
+  
+  1.  **Improved `process_study.ps1` Logic:**
+      *   The script now correctly handles studies that are already complete, prompting the user for confirmation before re-running and exiting gracefully if the user aborts.
+      *   When the pre-flight audit fails, it now prints a clear summary of which steps were skipped, providing better context than a generic error.
+      *   Standardized the initial startup banner to be consistent with other scripts.
+  
+  2.  **Enhanced `audit_study.ps1`:**
+      *   Added a `-NoHeader` switch to suppress the PDM detection message, allowing it to be called cleanly from other scripts.
+      *   The real-time progress table is now more informative, using a yellow `[ WARN ]` for non-critical issues (like needing an update) instead of a red `[ FAIL ]`.
+      *   The completeness check now uses a yellow `[ MISSING ]` status for un-generated artifacts, which is more accurate than `[ FAIL ]`.
+  
+  3.  **Bug Fixes:**
+      *   Fixed a critical bug in `audit_study.ps1` where it would incorrectly validate an experiment that had zero replication runs. It now correctly checks against the `num_replications` value from `config.ini`.
+  
+  4.  **Standardized PDM Detection:**
+      *   Standardized the "PDM detected" message snippet across all PowerShell scripts (`fix_experiment.ps1`, `fix_study.ps1`, `new_experiment.ps1`, etc.) for a consistent startup experience.
 ## 5.1.4 (2025-08-13)
 
 ### Bump
