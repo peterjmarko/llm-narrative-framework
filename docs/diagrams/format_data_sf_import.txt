@@ -1,0 +1,5 @@
+# The formatted data for manual import into Solar Fire, created by `prepare_sf_import.py`.
+# Format: Comma Quote Delimited (CQD).
+"Name/Description","Date","Time","ZoneAbbr","ZoneTime","Place","Country","Latitude","Longitude"
+"<str>","<str>","<str>","<str>","<str>","<str>","<str>","<str>","<str>"
+...

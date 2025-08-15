@@ -61,22 +61,23 @@ The pipeline is a sequence of Python scripts followed by manual processing steps
     *   **Timezone Calculation:** It immediately processes the raw timezone code from the API into the final `ZoneAbbr` and `ZoneTimeOffset` values required by downstream software.
     *   **Output:** `data/sources/adb_raw_export.txt`, a clean, complete source file.
 
-**Stage 2: Scoring, Validation, and Filtering (Automated)**
-This stage ensures expensive LLM processing is only performed on high-quality candidates.
-2.  **Validation (`validate_adb_data.py`):** Audits the raw data against live Wikipedia, assigning a validation `Status` to each record.
-3.  **Eligibility Selection (`select_eligible_candidates.py`):** Performs all initial data quality checks (e.g., valid birth year, 'OK' status, uniqueness), producing a clean list of all subjects potentially viable for the study.
-4.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
-5.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** A fully automated, resilient script that determines the final dataset size. It processes subjects by eminence and stops when diversity (variance) shows a sustained drop. Its robust pre-flight check re-analyzes existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention. The output also includes `BirthYear`.
+**Stage 2: Link Finding, Validation, and Scoring (Automated)**
+This stage identifies the correct Wikipedia page for each subject, validates its content, and scores the candidates to ensure only high-quality subjects proceed.
+2.  **Link Finding (`find_wikipedia_links.py`):** This script takes the raw ADB export and finds the best-guess English Wikipedia URL for each subject. It scrapes the ADB page and uses a Wikipedia search as a fallback. The output is an intermediate file, `adb_wiki_links.csv`.
+3.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name, and confirms their death date. The final output is the detailed `adb_validation_report.csv`.
+4.  **Eligibility Selection (`select_eligible_candidates.py`):** Performs all initial data quality checks (e.g., valid birth year, 'OK' status, uniqueness), producing a clean list of all subjects potentially viable for the study.
+5.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
+6.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** A fully automated, resilient script that determines the final dataset size. It processes subjects by eminence and stops when diversity (variance) shows a sustained drop. Its robust pre-flight check re-analyzes existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention. The output also includes `BirthYear`.
 
 **Stage 3: Final Subject Selection (Automated)**
-6.  **Final Selection (`select_final_candidates.py`):** Performs the final filtering. It takes the eligible candidates list, selects only those present in the definitive `ocean_scores.csv` set, resolves country codes, and sorts the final list by eminence.
+7.  **Final Selection (`select_final_candidates.py`):** Performs the final filtering. It takes the eligible candidates list, selects only those present in the definitive `ocean_scores.csv` set, resolves country codes, and sorts the final list by eminence.
 
 **Stage 4: Chart Calculation (Manual)**
-7.  **Formatting (`prepare_sf_import.py`):** Formats the final subject list for import into the Solar Fire software, encoding each subject's unique ID for data integrity.
-8.  **Manual Processing (Solar Fire):** The formatted file is imported into Solar Fire, which calculates the required celestial data and exports it as `sf_chart_export.csv`.
+8.  **Formatting (`prepare_sf_import.py`):** Formats the final subject list for import into the Solar Fire software, encoding each subject's unique ID for data integrity.
+9.  **Manual Processing (Solar Fire):** The formatted file is imported into Solar Fire, which calculates the required celestial data and exports it as `sf_chart_export.csv`.
 
 **Stage 5: Delineation Neutralization (Automated)**
-9.  **Neutralization (`neutralize_delineations.py`):** This script uses a powerful hybrid strategy to rewrite the esoteric source texts.
+10. **Neutralization (`neutralize_delineations.py`):** This script uses a powerful hybrid strategy to rewrite the esoteric source texts.
     *   **Fast Mode (`--fast`):** For initial runs, this mode bundles tasks into large, high-speed API calls (e.g., all 12 "Sun in Signs" delineations at once). This is highly efficient but may fail on some large tasks.
     *   **Robust/Resume Mode (default):** For resuming or fixing failed runs, this mode processes each of the 149 delineations as a separate, atomic task. This granular approach is slower but guarantees completion by solving potential response truncation issues from the LLM.
 
@@ -116,6 +117,16 @@ The pipeline can be understood through the following architectural and logical d
 </div>
 
 ### Data Preparation: Logic Flowcharts
+
+<div align="center">
+  <p>Logic for Link Finding (`find_wikipedia_links.py`): The algorithm for finding Wikipedia URLs by scraping ADB and using a Wikipedia search fallback.</p>
+  <img src="images/logic_prep_find_links.png" width="65%">
+</div>
+
+<div align="center">
+  <p>Logic for Page Validation (`validate_wikipedia_pages.py`): The algorithm for validating Wikipedia page content, including redirect and disambiguation handling.</p>
+  <img src="images/logic_prep_validate_pages.png" width="65%">
+</div>
 
 <div align="center">
   <p>Logic for Eligibility Selection (`select_eligible_candidates.py`): The algorithm for performing initial data quality checks to create a pool of eligible candidates.</p>
@@ -660,6 +671,36 @@ This section provides a reference for the structure of the most important data f
 
 <div align="center">
   <img src="images/format_data_sf_delineations_library.png" caption="Format for the Source Delineation Library (`sf_delineations_library.txt`)">
+</div>
+
+### Intermediate Data Artifacts
+
+<div align="center">
+  <img src="images/format_data_adb_wiki_links.png" caption="Format for `adb_wiki_links.csv`">
+</div>
+
+<div align="center">
+  <img src="images/format_data_adb_validation_report.png" caption="Format for `adb_validation_report.csv`">
+</div>
+
+<div align="center">
+  <img src="images/format_data_adb_eligible_candidates.png" caption="Format for `adb_eligible_candidates.txt`">
+</div>
+
+<div align="center">
+  <img src="images/format_data_eminence_scores.png" caption="Format for `eminence_scores.csv`">
+</div>
+
+<div align="center">
+  <img src="images/format_data_ocean_scores.png" caption="Format for `ocean_scores.csv`">
+</div>
+
+<div align="center">
+  <img src="images/format_data_adb_final_candidates.png" caption="Format for `adb_final_candidates.txt`">
+</div>
+
+<div align="center">
+  <img src="images/format_data_sf_import.png" caption="Format for `sf_data_import.txt`">
 </div>
 
 ---

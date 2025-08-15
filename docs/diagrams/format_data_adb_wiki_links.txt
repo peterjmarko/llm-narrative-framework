@@ -1,0 +1,5 @@
+# The intermediate output from `find_wikipedia_links.py`, mapping subjects to URLs.
+# Format: Comma-Separated Values (CSV) with header.
+Index,idADB,ADB_Name,BirthYear,Entry_Type,Wikipedia_URL,Notes
+<int>,<int>,<str>,<int>,<str>,<url>,<str>
+...

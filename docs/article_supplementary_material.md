@@ -1,5 +1,6 @@
 ---
-title: "Supplementary Material: A Replication Guide"
+title: "Replication Guide"
+subtitle: "Supplementary Material for 'A Framework for the Computationally Reproducible Testing of Complex Narrative Systems'"
 author: "Peter J. Marko"
 date: "[Date]"
 ---
@@ -18,7 +19,7 @@ The Astro-Databank (ADB) is a live research database. To directly replicate the 
 **Path 2: Conceptual Replication (Creating a New Dataset)**
 For new research, the framework provides a fully automated pipeline to generate a fresh dataset from live sources. The instructions below describe how to use the provided scripts to create new data assets.
 
-### Stage 1: Data Sourcing & Validation (Automated)
+### Stage 1: Data Sourcing, Link Finding & Validation (Automated)
 
 #### a. Fetching Raw Data (`fetch_adb_data.py`)
 This script automates the scraping of the Astro-Databank website.
@@ -32,17 +33,22 @@ This script automates the scraping of the Astro-Databank website.
 # Fetch a new dataset from the live ADB
 pdm run fetch-adb
 ```
-The script logs in, applies the required search filters, and saves the complete results to `data/sources/adb_raw_export.txt`.
+This produces `data/sources/adb_raw_export.txt`.
 
-#### b. Validating Data (`validate_adb_data.py`)
-This script audits the raw export against Wikipedia to verify each entry is a person with a recorded death date.
-
-**A Note on Reproducibility:** Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. The study's pipeline therefore relies on the static report that resulted from this one-time audit, which is included as `data/reports/adb_validation_report.csv`. This static report ensures all subsequent filtering is fully deterministic.
-
-**Execution:**
+#### b. Finding Wikipedia Links (`find_wikipedia_links.py`)
+This script takes the raw export and finds the best-guess Wikipedia URL for each subject, creating the intermediate `data/processed/adb_wiki_links.csv` file.
 ```bash
-# Run the validation script on the raw export
-pdm run validate-adb
+# Find Wikipedia links for all raw records
+pdm run find-links
+```
+
+#### c. Validating Wikipedia Pages (`validate_wikipedia_pages.py`)
+This script takes the list of found links, validates the content of each page, and produces the final `data/reports/adb_validation_report.csv` and a human-readable summary.
+
+**A Note on Reproducibility:** Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. For direct replication, the study's pipeline relies on the static report (`adb_validation_report.csv`) included in the repository.
+```bash
+# Validate the content of each found Wikipedia page
+pdm run validate-pages
 ```
 
 ### Stage 2: Pre-filtering & Scoring (Automated)

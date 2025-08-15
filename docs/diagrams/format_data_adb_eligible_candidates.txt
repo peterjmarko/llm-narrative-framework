@@ -1,0 +1,6 @@
+# A filtered subset of the raw export, created by `select_eligible_candidates.py`.
+# Contains only subjects who passed initial validation and quality checks.
+# Format: Tab-Separated Values (TSV) with header.
+Index<tab>idADB<tab>LastName<tab>FirstName<tab>...<tab>Link
+<int><tab><int><tab><str><tab><str><tab>...<tab><url>
+...

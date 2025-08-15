@@ -1,0 +1,45 @@
+graph TD
+    subgraph Legend
+        direction LR
+        start_end("Start / End"):::blue
+        process("Process"):::lightBlue
+        decision("Decision Point"):::orange
+        io("File I/O"):::green
+    end
+
+    style start_end fill:#e3f2fd,stroke:#333,stroke-width:2px
+    style process fill:#e0f7fa,stroke:#333,stroke-width:1px
+    style decision fill:#ffe0b2,stroke:#333,stroke-width:2px
+    style io fill:#e8f5e9,stroke:#333,stroke-width:1px
+    
+    A(Start) --> B{File Exists?}
+    B -- Yes --> C[Load Processed IDs]
+    B -- No --> D[Initialize Empty Set]
+    C --> E[Filter Raw Data]
+    D --> E
+    E --> F{Any Records to Process?}
+    F -- No --> G[Print 'Up to Date' & Exit]
+    F -- Yes --> H[Process Records in Parallel]
+    
+    subgraph "Worker Task"
+        H1[Get Link from ADB Page]
+        H2{Link Found?}
+        H3[Search Wikipedia API]
+        H4{Match Found?}
+        H5[Resolve to English URL]
+        H6[Write Result to File]
+        
+        H1 --> H2
+        H2 -- No --> H3
+        H2 -- Yes --> H5
+        H3 --> H4
+        H4 -- No --> H6
+        H4 -- Yes --> H5
+        H5 --> H6
+    end
+    
+    H --> H1
+    H6 --> I{All Done?}
+    I -- No --> H
+    I -- Yes --> J[Sort Final File]
+    J --> K(End)

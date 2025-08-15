@@ -55,7 +55,7 @@ from tqdm import tqdm
 init(autoreset=True)
 
 # --- Setup Logging ---
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 # --- Constants ---
 BASE_URL = "https://www.astro.com"
@@ -332,22 +332,14 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
     """Fetches all paginated data from the API, saving results incrementally."""
     print("")
     logging.info(f"{Fore.YELLOW}Starting data extraction from API...")
-    pbar = None
+    
     page_number = 1
     total_hits = 0
-    processed_count = 0
+    all_results = []
+    pbar = None
 
     try:
-        header = [
-            "Index", "idADB", "LastName", "FirstName", "Gender", "Day", "Month",
-            "Year", "Time", "ZoneAbbr", "ZoneTimeOffset", "City",
-            "CountryState", "Longitude", "Latitude", "Rating", "Bio",
-            "Categories", "Link"
-        ]
-        with open(output_path, 'w', encoding='utf-8', newline='') as f:
-            f.write("\t".join(header) + "\n")
-
-            while True:
+        while True:
                 # Common headers for all requests
                 headers = {
                     'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -405,67 +397,94 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
                 if pbar is None:
                     total_hits = current_total
                     if total_hits == 0: raise ValueError("Search successful but returned 0 results.")
-                    pbar = tqdm(total=total_hits, desc="Scraping records", ncols=80)
+                    print("") # Add blank line before progress bar
+                    pbar = tqdm(total=total_hits, desc="Scraping records", ncols=120)
                 
                 if not page_results: break
-
-                for row in page_results:
-                    f.write("\t".join(map(str, row)) + "\n")
                 
-                processed_count += len(page_results)
+                all_results.extend(page_results)
                 pbar.update(len(page_results))
-                if processed_count > pbar.total:
-                    pbar.total = processed_count
                 
                 page_number += 1
-                if processed_count >= total_hits and total_hits > 0: break
+                if pbar.n >= total_hits and total_hits > 0: break
                 time.sleep(REQUEST_DELAY)
 
     except (requests.exceptions.RequestException, ValueError, KeyError) as e:
         logging.error(f"\n{Fore.RED}An error occurred during fetch: {e}")
-        import traceback
-        traceback.print_exc()
     except KeyboardInterrupt:
-        logging.warning(f"\nProcess interrupted by user. {processed_count:,} records were saved.")
+        logging.warning(f"\nProcess interrupted by user. Saving partial results...")
     finally:
         if pbar: pbar.close()
 
-    if processed_count == 0: return
+    if not all_results: return
 
+    # Sort and write the final file
+    header = [
+        "Index", "idADB", "LastName", "FirstName", "Gender", "Day", "Month",
+        "Year", "Time", "ZoneAbbr", "ZoneTimeOffset", "City",
+        "CountryState", "Longitude", "Latitude", "Rating", "Bio",
+        "Categories", "Link"
+    ]
+    
+    # Sort by the original record number (Index) to ensure consistent order
+    sorted_results = sorted(all_results, key=lambda x: int(x[0]))
+
+    with open(output_path, 'w', encoding='utf-8', newline='') as f:
+        f.write("\t".join(header) + "\n")
+        for row in sorted_results:
+            f.write("\t".join(map(str, row)) + "\n")
+
+    # Final summary message
+    processed_count = len(sorted_results)
+    percentage = (processed_count / total_hits) * 100 if total_hits > 0 else 0
     print(f"\n{Fore.GREEN}Data fetching complete. ✨")
+    print(f"Successfully fetched {processed_count:,} out of {total_hits:,} total records ({percentage:.0f}%).")
+    print(f"Output saved to: {output_path}\n")
 
 def main():
     os.system('')
     parser = argparse.ArgumentParser(description="Fetch raw birth data from the Astro-Databank website.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-o", "--output-file", default="data/sources/adb_raw_export.txt", help="Path for the output data file.")
-    parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
+    parser.add_argument("--force", action="store_true", help="Force overwrite of the output file without a prompt.")
     args = parser.parse_args()
 
     output_path = Path(args.output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    proceed = True
+    
+    def backup_and_overwrite(file_path: Path):
+        """Creates a backup of the file before overwriting."""
+        try:
+            backup_dir = Path('data/backup')
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
+            shutil.copy2(file_path, backup_path)
+            logging.info(f"Created backup of existing file at: {backup_path}")
+        except (IOError, OSError) as e:
+            logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+            sys.exit(1)
 
     if output_path.exists():
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-            if confirm != 'y':
-                proceed = False
-
-        if proceed:
-            try:
-                backup_dir = Path('data/backup')
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-                shutil.copy2(output_path, backup_path)
-                logging.info(f"Created backup of existing file at: {backup_path}")
-            except (IOError, OSError) as e:
-                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-                sys.exit(1)
+        if args.force:
+            print(f"\n{Fore.YELLOW}--force flag detected. Overwriting existing output file...")
+            backup_and_overwrite(output_path)
         else:
-            print("\nOperation cancelled by user.\n")
-            sys.exit(0)
+            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
+            confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. Do you wish to proceed? (Y/N): ").lower().strip()
+            if confirm == 'y':
+                backup_and_overwrite(output_path)
+            else:
+                print("\nOperation cancelled by user. No files were changed.")
+                # Summarize the existing file before exiting
+                if output_path.exists():
+                    try:
+                        with open(output_path, 'r', encoding='utf-8') as f:
+                            # Read lines and subtract 1 for the header
+                            record_count = max(0, len(f.readlines()) - 1)
+                        print(f"The existing file contains {record_count:,} records.\n")
+                    except IOError:
+                        print("\n") # Just add a blank line if file can't be read
+                sys.exit(0)
 
     load_dotenv()
     adb_username = os.getenv("ADB_USERNAME")

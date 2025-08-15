@@ -1,0 +1,5 @@
+# The rank-ordered list with LLM-generated eminence scores, created by `generate_eminence_scores.py`.
+# Format: Comma-Separated Values (CSV) with header.
+idADB,Name,BirthYear,EminenceScore
+<int>,<str>,<int>,<float>
+...

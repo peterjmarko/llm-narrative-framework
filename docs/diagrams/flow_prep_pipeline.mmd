@@ -7,13 +7,14 @@ graph TD
         StartDB(("Live Astro-Databank<br/>Website"))
     end
 
-    subgraph "Stage 1: Sourcing & Validation"
+    subgraph "Stage 1: Sourcing, Link Finding & Validation"
         StartDB --> A[Fetch Raw Data<br>src/fetch_adb_data.py]
-        A --> B[Validate Data<br>src/validate_adb_data.py];
+        A --> B[Find Wikipedia Links<br>src/find_wikipedia_links.py]
+        B --> B2[Validate Wikipedia Pages<br>src/validate_wikipedia_pages.py];
     end
 
     subgraph "Stage 2: Pre-filtering & Scoring"
-        B --> C[Select Eligible Candidates<br>src/select_eligible_candidates.py];
+        B2 --> C[Select Eligible Candidates<br>src/select_eligible_candidates.py];
         C --> D["Generate Eminence Scores<br>src/generate_eminence_scores.py<br/>(Uses LLM)"];
         D --> E["Generate OCEAN Scores<br>src/generate_ocean_scores.py<br/>(Uses LLM)"];
     end

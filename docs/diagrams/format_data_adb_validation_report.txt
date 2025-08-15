@@ -1,0 +1,5 @@
+# The final output from `validate_wikipedia_pages.py`, with detailed validation status.
+# Format: Comma-Separated Values (CSV) with header.
+Index,idADB,ADB_Name,Entry_Type,WP_URL,WP_Name,Name_Match_Score,Death_Date_Found,Status,Notes
+<int>,<int>,<str>,<str>,<url>,<str>,<int>,<bool>,<str>,<str>
+...

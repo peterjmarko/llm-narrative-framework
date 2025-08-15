@@ -1,0 +1,44 @@
+graph TD
+    subgraph Legend
+        direction LR
+        start_end("Start / End"):::blue
+        process("Process"):::lightBlue
+        decision("Decision Point"):::orange
+        io("File I/O"):::green
+    end
+
+    style start_end fill:#e3f2fd,stroke:#333,stroke-width:2px
+    style process fill:#e0f7fa,stroke:#333,stroke-width:1px
+    style decision fill:#ffe0b2,stroke:#333,stroke-width:2px
+    style io fill:#e8f5e9,stroke:#333,stroke-width:1px
+    
+    A(Start) --> B[Load Link File]
+    B --> C[Load Existing Report]
+    C --> D[Filter for Unprocessed Records]
+    D --> E{Any Records to Process?}
+    E -- No --> F[Finalize & Report]
+    F --> G(End)
+    E -- Yes --> H[Process Records in Parallel]
+
+    subgraph "Worker Task"
+        H1{URL Exists?}
+        H2[Follow Redirects]
+        H3{Disambiguation Page?}
+        H4[Find Link by Birth Year]
+        H5[Validate Name & Death Date]
+        H6[Write Result to Report]
+
+        H1 -- Yes --> H2
+        H1 -- No --> H6
+        H2 --> H3
+        H3 -- Yes --> H4
+        H3 -- No --> H5
+        H4 --> H5
+        H5 --> H6
+    end
+    
+    H --> H1
+    H6 --> I{All Done?}
+    I -- No --> H
+    I -- Yes --> J[Finalize & Report]
+    J --> G

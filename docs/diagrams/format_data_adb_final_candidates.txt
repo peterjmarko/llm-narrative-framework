@@ -1,0 +1,6 @@
+# The final, sorted list of subjects, created by `select_final_candidates.py`.
+# Country codes have been resolved to full names.
+# Format: Tab-Separated Values (TSV) with header.
+Index<tab>idADB<tab>LastName<tab>FirstName<tab>...<tab>Country<tab>...<tab>Link
+<int><tab><int><tab><str><tab><str><tab>...<tab><str><tab>...<tab><url>
+...

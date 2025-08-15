@@ -43,7 +43,7 @@ commit.txt
 
 # Intermediate and generated files from the data preparation pipeline
 /data/intermediate/
-/data/processed/subject_db.csv
+/data/processed/
 /data/foundational_assets/sf_chart_export.csv
 /data/foundational_assets/eminence_scores.csv
 /data/foundational_assets/ocean_scores.csv

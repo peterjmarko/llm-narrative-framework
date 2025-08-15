@@ -7,16 +7,14 @@ graph TD
 
     subgraph "Pipeline Scripts"
         fetch[src/fetch_adb_data.py]
-        validate[src/validate_adb_data.py]
+        find_links[src/find_wikipedia_links.py]
+        validate_pages[src/validate_wikipedia_pages.py]
         select_eligible[src/select_eligible_candidates.py]
-    end
-
-    subgraph "Data Source"
-        adb_source(("Live Astro-Databank<br/>Website"))
     end
 
     subgraph "Data Artifacts"
         adb_raw[adb_raw_export.txt]
+        wiki_links[adb_wiki_links.csv]
         validation_report[(adb_validation_report.csv)]
         eligible_candidates[adb_eligible_candidates.txt]
     end
@@ -24,14 +22,16 @@ graph TD
     %% Connections
     adb_source --> fetch
     fetch --> adb_raw
-    adb_raw --> validate
-    validate --> validation_report
+    adb_raw --> find_links
+    find_links --> wiki_links
+    wiki_links --> validate_pages
+    validate_pages --> validation_report
     adb_raw --> select_eligible
     validation_report --> select_eligible
     select_eligible --> eligible_candidates
 
     %% Apply Styles
-    class fetch,validate,select_eligible scriptStyle
-    class adb_raw,eligible_candidates artifactFileStyle
+    class fetch,find_links,validate_pages,select_eligible scriptStyle
+    class adb_raw,wiki_links,eligible_candidates artifactFileStyle
     class validation_report artifactDBStyle
     class adb_source sourceStyle

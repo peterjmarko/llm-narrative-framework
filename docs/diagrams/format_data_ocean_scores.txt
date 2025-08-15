@@ -1,0 +1,5 @@
+# The final subject set with LLM-generated OCEAN scores, created by `generate_ocean_scores.py`.
+# Format: Comma-Separated Values (CSV) with header.
+idADB,Name,BirthYear,O,C,E,A,N
+<int>,<str>,<int>,<float>,<float>,<float>,<float>,<float>
+...

@@ -14,6 +14,7 @@
   - Improves logging by adding prominent banners for sub-processes and centralizing PDM detection messages to reduce noise.
   - Enhances user experience by replacing harsh red "FAILED" banners for controlled halts with clearer, yellow "HALTED" banners that provide specific, actionable advice.
   - Updates documentation and diagrams to reflect the script rename from `repair_study.ps1` to `fix_study.ps1`, ensuring consistency.
+  
 ## 5.2.2 (2025-08-14)
 
 ### Bump
@@ -27,7 +28,7 @@
   - Fix multiple bugs in the migration workflow, including an incorrect file path for patch scripts and an infinite loop after reprocessing.
   - Add intelligent up-to-date checks to the build script to skip unnecessary `.docx` and `.md` file regeneration, improving efficiency.
   - Improve the console output and user prompts for the `fix_experiment` and `migrate_experiment` scripts to be clearer and more informative.
-  
+
 ## 5.2.1 (2025-08-14)
 
 ### Bump

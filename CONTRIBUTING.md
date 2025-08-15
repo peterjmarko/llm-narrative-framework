@@ -96,11 +96,27 @@ The `scripts/` directory contains helper utilities for development, maintenance,
 *   `lint_file_headers.py`: Scans the codebase to enforce file header and footer standards.
 *   `list_project_files.py`: Lists project files, typically for debugging or reporting.
 
-## Design Principles
+## Code Quality and Style
+
+All contributions must adhere to standard software engineering best practices to ensure the codebase remains clean, readable, and maintainable.
+
+*   **DRY (Don't Repeat Yourself)**: Avoid duplicating code. If you find yourself writing the same logic in multiple places, refactor it into a reusable function or a shared utility module. For example, the colored banner formatting in the PowerShell scripts is handled by a single, shared `Format-Banner` function.
+
+*   **KISS (Keep It Simple, Stupid)**: Write the simplest possible code that solves the problem. Avoid premature optimization or overly complex solutions for simple tasks. Code should be straightforward and easy for other developers to understand.
+
+*   **YAGNI (You Ain't Gonna Need It)**: Do not add functionality that is not required by the current set of tasks. Focus on solving the immediate problem, and avoid adding features just because they *might* be useful in the future.
+
+*   **Readability Over Conciseness**: Clear, readable code is always preferred over clever, one-line solutions that are difficult to understand. Use descriptive variable names, add comments where the logic is complex, and break down long functions into smaller, more manageable pieces.
+
+## Project-Specific Design Principles
 
 To maintain the quality and consistency of the codebase, all contributions should adhere to the following core design principles.
 
-*   **Separation of Concerns (Create -> Check -> Fix)**: The framework is built around a clear "Create, Check, Fix" model. Each script should have a single, well-defined responsibility. For example, `audit_experiment.ps1` only *checks* the state, while `repair_experiment.ps1` *fixes* it. This separation makes the system predictable and easier to debug.
+*   **Separation of Concerns**: Each script must have a single, well-defined responsibility. This principle applies in two key ways:
+    1.  **By Workflow Pattern (Create -> Check -> Fix)**: For managing experiments, the framework uses distinct scripts for creating, auditing, and repairing data. For example, `audit_experiment.ps1` only *checks* the state, while `fix_experiment.ps1` *fixes* it.
+    2.  **By Data Pipeline Stage**: For complex data processing, workflows are broken into a clear, sequential pipeline of single-purpose scripts. For example, the original monolithic `validate_adb_data.py` was refactored into two more focused scripts: `find_wikipedia_links.py` is responsible only for finding subject URLs, while `validate_wikipedia_pages.py` handles the intensive work of validating the page content and generating the final reports.
+
+    This separation makes the system predictable, easier to debug, and more maintainable.
 
 *   **Fail Loudly and Early**: Scripts must not hide errors. If a script encounters a fatal error, it must exit with a non-zero status code and provide a clear, informative error message to `stderr`. Silent failures that allow the pipeline to continue in a broken state are considered critical bugs.
 
