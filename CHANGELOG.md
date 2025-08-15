@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.3.0 (2025-08-15)
+
+### Bump
+
+- **version 5.2.3 → 5.3.0**
+
+### Features
+
+- **Refactor validation pipeline into modular scripts**
+  Replaces the monolithic `validate_adb_data.py` with a more robust, modular, and user-friendly two-step pipeline (`find_wikipedia_links.py` and `validate_wikipedia_pages.py`).
+  
+  - Implements intelligent retries for timed-out records and adds stale-data detection to ensure data integrity.
+  - Adds safe overwrite logic with interactive prompts and automatic backups to all data generation scripts.
+  - Fixes critical bugs related to script hanging, inconsistent logging, and incorrect summary reporting.
+  - Updates all relevant documentation, diagrams, and developer guides to reflect the new, more modular workflow.
 ## 5.2.3 (2025-08-14)
 
 ### Bump
