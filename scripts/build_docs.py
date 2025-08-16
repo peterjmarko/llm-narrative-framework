@@ -608,15 +608,22 @@ def main():
         
         # --- 1. Convert the main documentation (from in-memory content) ---
         readme_docx_path = os.path.join(project_root, 'docs/DOCUMENTATION.docx')
-        # The true source for the DOCX is the MD file we just built.
-        if not do_force_documents and os.path.exists(readme_docx_path) and os.path.getmtime(readme_docx_path) >= os.path.getmtime(readme_path):
-             print(f"    - Skipping DOCX conversion for {Colors.CYAN}DOCUMENTATION.docx{Colors.RESET} (up-to-date).")
-        else:
+        
+        should_build_main_doc = False
+        if do_force_documents or not os.path.exists(readme_docx_path):
+            should_build_main_doc = True
+        elif os.path.getmtime(readme_docx_path) < os.path.getmtime(readme_path):
+            should_build_main_doc = True
+
+        if should_build_main_doc:
             if not convert_to_docx(pypandoc, readme_docx_path, project_root, source_md_content=pandoc_content):
                 sys.exit(1)
+        else:
+            print(f"    - Skipping DOCX conversion for {Colors.CYAN}DOCUMENTATION.docx{Colors.RESET} (up-to-date).")
 
         # --- 2. Convert other markdown files, processing placeholders where needed ---
         files_to_convert = {
+            "TESTING.md": False,
             "CONTRIBUTING.md": False,
             "CHANGELOG.md": False,
             "LICENSE.md": False,
@@ -631,22 +638,32 @@ def main():
             output_filename = os.path.splitext(os.path.basename(rel_path))[0] + ".docx"
             output_path = os.path.join(project_root, 'docs', output_filename)
 
-            if not do_force_documents and os.path.exists(output_path) and os.path.exists(source_path) and os.path.getmtime(output_path) >= os.path.getmtime(source_path):
+            should_build = False
+            if do_force_documents or not os.path.exists(output_path):
+                should_build = True
+            elif os.path.exists(source_path) and os.path.getmtime(output_path) < os.path.getmtime(source_path):
+                should_build = True
+
+            if not should_build:
                 print(f"    - Skipping DOCX conversion for {Colors.CYAN}{output_filename}{Colors.RESET} (up-to-date).")
                 continue
 
-            if os.path.exists(source_path):
-                content_to_convert = None
-                path_to_convert = source_path
-                if process_placeholders:
-                    with open(source_path, 'r', encoding='utf-8') as f:
-                        content_to_convert = process_markdown_content(f.read(), project_root, flavor='pandoc')
-                    path_to_convert = None
-                
-                if not convert_to_docx(pypandoc, output_path, project_root, 
-                                       source_md_path=path_to_convert, 
-                                       source_md_content=content_to_convert):
-                    sys.exit(1)
+            if not os.path.exists(source_path):
+                print(f"    - {Colors.YELLOW}[DIAGNOSTIC] Source file not found at path: '{source_path}'. Skipping.{Colors.RESET}")
+                continue
+
+            # This code is now correctly placed *after* the existence check.
+            content_to_convert = None
+            path_to_convert = source_path
+            if process_placeholders:
+                with open(source_path, 'r', encoding='utf-8') as f:
+                    content_to_convert = process_markdown_content(f.read(), project_root, flavor='pandoc')
+                path_to_convert = None
+            
+            if not convert_to_docx(pypandoc, output_path, project_root, 
+                                   source_md_path=path_to_convert, 
+                                   source_md_content=content_to_convert):
+                sys.exit(1)
         
         print(f"\n{Colors.GREEN}{Colors.BOLD}All documents built successfully.{Colors.RESET}")
 

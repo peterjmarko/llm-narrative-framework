@@ -376,7 +376,7 @@ def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int
     else:
         # The success message and summary have already been printed by generate_summary_report
         # We just need to confirm the file locations.
-        print(f"{Fore.GREEN}SUCCESS: Validation complete.")
+        print(f"{Fore.GREEN}\nSUCCESS: Validation complete.")
         print(f"{Fore.CYAN}  - Detailed Report: {output_path}")
         print(f"{Fore.CYAN}  - Summary Report:  {summary_path} ✨\n")
 

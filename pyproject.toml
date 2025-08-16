@@ -1,3 +1,7 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
 [project]
 name = "llm-personality-matching"
 version = "5.4.0"
@@ -5,7 +9,7 @@ description = "A reproducible pipeline for LLM personality matching experiments.
 authors = [
     {name = "Peter Marko", email = "peter.j.marko@gmail.com"},
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 readme = "README.md"
 license = {text = "MIT"}
 
@@ -27,22 +31,24 @@ dependencies = [
     "certifi>=2025.8.3",
 ]
 
-[project.optional-dependencies]
+[tool.pdm.dev-dependencies]
 dev = [
     "pytest",
     "pre-commit",
     "pypandoc>=1.15",
     "pillow>=10.4.0",
     "pytest-cov>=5.0.0",
-    "pdm>=2.20.1",
     "pytest-mock>=3.14.1",
     "commitizen>=3.31.0",
-    "python-docx>=0.8.11", # Added for DOCX post-processing
+    "python-docx>=0.8.11",
 ]
 
 [tool.pdm]
 # This tells PDM to use a virtual environment located in the project's .venv folder.
 venv.in-project = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
 
 [tool.pdm.scripts]
 # Development and testing shortcuts. {args} allows passing specific files.
@@ -59,12 +65,11 @@ test = {cmd = "python tests/run_all_tests.py {args}", help = "Run all tests (Pyt
 # 5. `coverage report` or `coverage html` shows the final, correct results.
 
 # --- THE DEFINITIVE COVERAGE SCRIPTS ---
-# We disable the pytest-cov plugin with `-p no:cov` because we are manually
-# invoking 'coverage run' within our test's subprocesses.
-# This prevents the plugin from interfering with our manual setup.
-cov = {cmd = "coverage erase && pytest -p no:cov && coverage combine && coverage report -m", help="Run all tests with coverage analysis."}
-cov-file = {cmd = "coverage erase && pytest -p no:cov {args} && coverage combine && coverage report -m", help="Run a specific test file with coverage."}
-cov-html = {cmd = "coverage erase && pytest -p no:cov && coverage combine && coverage html", help="Run all tests and generate an HTML coverage report."}
+# We disable the pytest-cov plugin with `-p no:cov` to prevent it from
+# interfering with our manual `coverage run` invocation.
+cov = {cmd = "coverage erase && coverage run -m pytest -p no:cov && coverage report", help="Run all tests with coverage analysis."}
+cov-file = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/test_{args}.py && coverage report src/{args}.py", help="Run coverage for a specific file by its base name (e.g., find_wikipedia_links)."}
+cov-html = {cmd = "coverage erase && coverage run -m pytest -p no:cov && coverage html", help="Run all tests and generate an HTML coverage report."}
 cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
 # ------------------------------------
 

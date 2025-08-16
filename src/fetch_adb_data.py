@@ -71,8 +71,12 @@ def convert_hours_to_hhmm(decimal_hours: float) -> str:
     sign = "" if decimal_hours >= 0 else "-"
     decimal_hours = abs(decimal_hours)
     
-    hours = int(decimal_hours)
-    minutes = round((decimal_hours * 60) % 60)
+    # Convert to total minutes and round to handle precision issues robustly.
+    total_minutes = round(decimal_hours * 60)
+    
+    # Recalculate hours and minutes from the rounded total.
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
     
     return f"{sign}{hours:02d}:{minutes:02d}"
 

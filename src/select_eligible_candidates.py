@@ -29,16 +29,17 @@ ensures that subsequent, expensive LLM-based scoring is only performed on
 high-quality, valid data.
 
 Inputs:
-  - `data/sources/adb_raw_export.txt`: Raw data from `fetch_adb_data.py`.
-  - `data/reports/adb_validation_report.csv`: Status report from `validate_adb_data.py`.
+  - Raw data from `fetch_adb_data.py`.
+  - Status report from `validate_wikipedia_pages.py`.
 
 Output:
-  - `data/intermediate/adb_eligible_candidates.txt`: A clean, tab-delimited
-    file containing all subjects who pass the initial quality checks.
+  - A clean, tab-delimited file containing all subjects who pass the initial
+    quality checks.
 """
 
 import argparse
 import logging
+import os
 import re
 import sys
 import shutil
@@ -55,18 +56,51 @@ init(autoreset=True)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-def normalize_name_for_deduplication(raw_name: str) -> tuple:
+def backup_and_overwrite(file_path: Path):
+    """Creates a backup of the file before overwriting."""
+    try:
+        backup_dir = Path('data/backup')
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
+        shutil.copy2(file_path, backup_path)
+        print(f"\n{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
+    except (IOError, OSError) as e:
+        logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+        sys.exit(1)
+
+def finalize_and_report(output_path: Path, new_count: int, was_interrupted: bool = False):
+    """Generates the final summary and prints the status message."""
+    try:
+        total_eligible = len(pd.read_csv(output_path, sep='\t'))
+        summary_msg = f"Found {new_count:,} new eligible candidates. Total now saved: {total_eligible:,}."
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        summary_msg = f"Saved {new_count:,} eligible candidates to new file."
+
+    if was_interrupted:
+        print(f"\n{Fore.YELLOW}WARNING: Processing interrupted by user.")
+        print(summary_msg)
+        print(f"{Fore.CYAN}Partial results saved to: {output_path} ✨{Fore.RESET}\n")
+        os._exit(1)
+    else:
+        print(f"\n{Fore.GREEN}SUCCESS: Selection complete.")
+        print(summary_msg)
+        print(f"{Fore.CYAN}Output saved to: {output_path} ✨{Fore.RESET}\n")
+
+
+def normalize_name_for_deduplication(series: pd.Series) -> pd.Series:
     """
-    Normalizes a name for robust duplicate detection.
+    Normalizes a name series for robust duplicate detection.
     It strips parenthetical content and sorts name parts alphabetically.
     """
-    # Remove anything in parentheses (including the URL)
-    name = re.sub(r"\(.*\)", "", raw_name).strip()
-    # Split into parts, handling both comma and space delimiters
-    parts = re.split(r"[,\s-]+", name)
-    # Filter out empty strings, convert to lowercase, and sort
-    normalized_parts = sorted([part.lower() for part in parts if part])
-    return tuple(normalized_parts)
+    def process_name(raw_name):
+        if not isinstance(raw_name, str):
+            return tuple()
+        name = re.sub(r"\(.*\)", "", raw_name).strip()
+        parts = re.split(r"[,\s-]+", name)
+        return tuple(sorted([part.lower() for part in parts if part]))
+
+    return series.apply(process_name)
 
 def main():
     """Main function to orchestrate the filtering process."""
@@ -74,105 +108,90 @@ def main():
         description="Filter raw ADB data to generate a list of eligible candidates.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+    parser.add_argument("--input-file", default="data/sources/adb_raw_export.txt", help="Path to the raw ADB export file.")
+    parser.add_argument("--validation-report", default="data/reports/adb_validation_report.csv", help="Path to the validation report CSV.")
     parser.add_argument("-o", "--output-file", default="data/intermediate/adb_eligible_candidates.txt", help="Path for the eligible candidates output file.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
+    input_path = Path(args.input_file)
+    validation_path = Path(args.validation_report)
     output_path = Path(args.output_file)
-    proceed = True
 
-    if output_path.exists():
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-            if confirm != 'y':
-                proceed = False
-        
-        if proceed:
-            try:
-                backup_dir = Path('data/backup')
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-                shutil.copy2(output_path, backup_path)
-                logging.info(f"Created backup of existing file at: {backup_path}")
-            except (IOError, OSError) as e:
-                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-                sys.exit(1)
-        else:
-            print("\nOperation cancelled by user.\n")
-            sys.exit(0)
+    if not args.force and output_path.exists():
+        output_mtime = os.path.getmtime(output_path)
+        input_stale = os.path.exists(input_path) and os.path.getmtime(input_path) > output_mtime
+        validation_stale = os.path.exists(validation_path) and os.path.getmtime(validation_path) > output_mtime
+        if input_stale or validation_stale:
+            print(f"{Fore.YELLOW}\nInput file(s) are newer than the existing output. Stale data detected.")
+            print("Automatically re-running full selection process...")
+            backup_and_overwrite(output_path)
+            args.force = True
 
-    print(f"\n{Fore.YELLOW}--- Loading Files ---")
     try:
-        validation_df = pd.read_csv("data/reports/adb_validation_report.csv")
-        with open("data/sources/adb_raw_export.txt", "r", encoding="utf-8") as f:
-            header = f.readline().strip()
-            raw_lines = f.readlines()
+        raw_df = pd.read_csv(input_path, sep='\t', dtype={'idADB': str})
+        validation_df = pd.read_csv(validation_path, usecols=['idADB', 'Status'], dtype={'idADB': str})
     except FileNotFoundError as e:
         logging.error(f"{Fore.RED}FATAL: Input file not found: {e.filename}")
         sys.exit(1)
-    
-    logging.info(f"Loaded {len(raw_lines):,} records from data/sources/adb_raw_export.txt.")
-    logging.info(f"Loaded {len(validation_df):,} records from data/reports/adb_validation_report.csv.")
 
-    print(f"\n{Fore.YELLOW}--- Selecting Eligible Candidates ---")
+    # --- Step 1: Find ALL theoretically eligible candidates from source ---
+    print(f"\n{Fore.YELLOW}--- Analyzing Full Dataset ---")
+    df = pd.merge(raw_df, validation_df, on="idADB", how="left")
+    df = df[df['Status'].isin(['OK', 'VALID'])]
+    logging.info(f"Initial filtering complete. {len(df)} records passed status check.")
     
-    # Pre-process raw lines into a list of lists (parts)
-    parsed_lines = [line.strip().split("\t") for line in raw_lines]
-    
-    # Filter 1: 'OK' Status
-    valid_ids = set(validation_df[validation_df["Status"] == "OK"]["idADB"].astype(str))
-    stage1_candidates = [parts for parts in parsed_lines if parts[1] in valid_ids]
-    logging.info(f"{len(stage1_candidates)} candidates remaining after filtering for 'OK' status from the validation report.")
+    # --- Step 2: Apply all deterministic filters ---
+    df['Year'] = pd.to_numeric(df['Year'], errors='coerce')
+    df.dropna(subset=['Year'], inplace=True)
+    df['Year'] = df['Year'].astype(int)
+    df = df[df['Year'].between(1900, 1999)]
+    df = df[df['Time'].astype(str).str.match(r"^\d{1,2}:\d{2}$", na=False)]
+    df['FullName'] = df['LastName'].fillna('') + ", " + df['FirstName'].fillna('')
+    df['NormalizedName'] = normalize_name_for_deduplication(df['FullName'])
+    df['BirthDate'] = df['Year'].astype(str) + '-' + df['Month'].astype(str) + '-' + df['Day'].astype(str)
+    df.drop_duplicates(subset=['NormalizedName', 'BirthDate'], keep='first', inplace=True)
+    all_eligible_df = df[raw_df.columns].copy()
+    logging.info(f"Found {len(all_eligible_df):,} total potential candidates in source files.")
 
-    # Filter 2: Birth Year
-    stage2_candidates = []
-    for parts in stage1_candidates:
+    # --- Step 3: Determine which candidates are new ---
+    processed_ids = set()
+    if not args.force and output_path.exists():
         try:
-            if 1900 <= int(parts[7]) <= 1999:
-                stage2_candidates.append(parts)
-        except (ValueError, IndexError):
-            continue
-    logging.info(f"{len(stage2_candidates)} candidates remaining after filtering for birth year (1900-1999).")
-
-    # Filter 3: Valid Time Format
-    stage3_candidates = [parts for parts in stage2_candidates if re.match(r"^\d{1,2}:\d{2}$", parts[8])]
-    logging.info(f"{len(stage3_candidates)} candidates remaining after filtering for valid birth time (HH:MM format).")
+            processed_df = pd.read_csv(output_path, sep='\t', usecols=['idADB'], dtype={'idADB': str})
+            processed_ids = set(processed_df['idADB'])
+        except (pd.errors.EmptyDataError, FileNotFoundError, KeyError):
+            pass
     
-    # Filter 4: Uniqueness (LAST)
-    final_candidates = []
-    processed_identifiers = set()
-    removed_duplicates_info = []
-    for parts in stage3_candidates:
-        if len(parts) < 9: continue
-        id_adb, last_name, first_name, day, month, year = parts[1], parts[2], parts[3], parts[5], parts[6], parts[7]
-        raw_name = f"{last_name}, {first_name}"
-        unique_identifier = (normalize_name_for_deduplication(raw_name), f"{year}-{month}-{day}")
-        
-        if unique_identifier not in processed_identifiers:
-            final_candidates.append(parts)
-            processed_identifiers.add(unique_identifier)
+    final_candidates_to_save = all_eligible_df[~all_eligible_df['idADB'].isin(processed_ids)]
+
+    # --- Step 4: Decide whether to run ---
+    if final_candidates_to_save.empty and not args.force:
+        print(f"\n{Fore.GREEN}All records have already been processed. Output is up to date. ✨")
+        confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. \nDo you wish to proceed? (Y/N): ").lower().strip()
+        if confirm == 'y':
+            backup_and_overwrite(output_path)
+            args.force = True
         else:
-            name_for_log = re.sub(r"\(.*\)", "", raw_name).strip()
-            removed_duplicates_info.append(f"  - idADB {id_adb}: {name_for_log}")
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.\n")
+            sys.exit(0)
 
-    if removed_duplicates_info:
-        logging.info(f"Dropped {len(removed_duplicates_info)} duplicate entries:")
-        for info in removed_duplicates_info:
-            logging.info(info)
-        logging.info(f"{len(final_candidates)} candidates remaining.")
+    # --- Step 5: Execute ---
+    if args.force:
+        # If forcing, the "new" candidates are ALL eligible candidates
+        final_candidates_to_save = all_eligible_df
+        print(f"\n{Fore.YELLOW}--- Reprocessing Full Dataset ---{Fore.RESET}")
+        logging.info(f"Processing all {len(final_candidates_to_save)} eligible candidates.")
     else:
-        duplicates_removed = len(stage3_candidates) - len(final_candidates)
-        logging.info(f"Removed {duplicates_removed} duplicates. {len(final_candidates)} candidates remaining.")
-        
-    # --- Save the final list ---
-    with open(args.output_file, "w", encoding="utf-8") as f:
-        f.write(header + "\n")
-        for parts in final_candidates:
-            f.write("\t".join(parts) + "\n")
+        logging.info(f"Resuming: Processing {len(final_candidates_to_save)} new eligible candidates.")
     
-    print(f"\n{Fore.GREEN}SUCCESS: Successfully saved {len(final_candidates)} eligible candidates to {args.output_file}. ✨\n")
+    # --- Step 6: Save ---
+    is_new_file = not output_path.exists() or args.force
+    final_candidates_to_save.to_csv(
+        output_path, sep='\t', index=False, mode='w' if is_new_file else 'a', header=is_new_file
+    )
+    
+    finalize_and_report(output_path, len(final_candidates_to_save))
 
 
 if __name__ == "__main__":

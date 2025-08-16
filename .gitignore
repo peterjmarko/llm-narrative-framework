@@ -54,6 +54,9 @@ commit.txt
 /data/temp/
 /linter_backups/
 
+# Temporary files for manual testing
+data/temp_manual_test/
+
 # Generated reports, backup and temporary files
 /data/backup/
 /data/reports/
