@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.4.0 (2025-08-16)
+
+### Bump
+
+- **version 5.3.0 → 5.4.0**
+
+### Features
+
+- **Refactor validation pipeline and add master orchestrator**
+  Introduces `prepare_data.ps1`, a master orchestrator script that runs the entire data preparation pipeline with a single command.
+  
+  - Replaces the monolithic `validate_adb_data.py` with a more robust, two-step pipeline (`find_wikipedia_links.py`, `validate_wikipedia_pages.py`).
+  - Hardens all data scripts with intelligent retries for timeouts, stale-data detection, safe overwrite logic, and robust interrupt handling.
+  - Fixes critical regressions in death date validation and Wikipedia search logic, restoring original accuracy.
+  - Updates all relevant documentation and diagrams to reflect the new workflow.
 ## 5.3.0 (2025-08-15)
 
 ### Bump
