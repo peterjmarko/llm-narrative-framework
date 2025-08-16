@@ -237,7 +237,8 @@ def main():
     if results['NON_COMPLIANT']:
         # ... (prompting logic remains the same)
         try:
-            if input("Do you want to fix the non-compliant files? (Y/N): ").strip().lower() != 'y':
+            print("Non-compliant files found. If you decide to go ahead with fixing them, backups of the existing files will be created first.")
+            if input("Do you wish to proceed? (Y/N): ").strip().lower() != 'y':
                 raise KeyboardInterrupt
         except (KeyboardInterrupt, EOFError):
             print(f"\n{Colors.YELLOW}Operation cancelled by user.{Colors.ENDC}\n")
@@ -252,18 +253,10 @@ def main():
         for rel_path in results['NON_COMPLIANT']:
             shutil.copy2(os.path.join(project_root, rel_path), os.path.join(backup_dir, os.path.basename(rel_path)))
         relative_backup_dir = os.path.relpath(backup_dir, project_root).replace(os.sep, '/')
-        print(f"{Colors.GREEN}All {len(results['NON_COMPLIANT'])} original files backed up to: {relative_backup_dir}{Colors.ENDC}\n")
+        print(f"{Colors.CYAN}All {len(results['NON_COMPLIANT'])} original files backed up to: {relative_backup_dir}{Colors.ENDC}")
 
-        # Final Confirmation
-        try:
-            if input("Proceed with overwriting original files? (Y/N): ").strip().lower() != 'y':
-                raise KeyboardInterrupt
-        except (KeyboardInterrupt, EOFError):
-            print(f"\n{Colors.YELLOW}Operation cancelled. No files were changed.{Colors.ENDC}\n")
-            sys.exit(1)
-
-        # Fixing Stage
-        print(f"\n{Colors.YELLOW}--- Validating Fixes ---{Colors.ENDC}")
+        # Fixing Stage (No second confirmation needed)
+        print(f"\n{Colors.YELLOW}--- Validating and Applying Fixes ---{Colors.ENDC}")
         fixed_count, integrity_failures, validation_failures = 0, [], []
         for rel_path in results['NON_COMPLIANT']:
             print(f"Validating fix for: {rel_path}")
@@ -289,7 +282,7 @@ def main():
             try:
                 with open(os.path.join(project_root, rel_path), 'w', encoding='utf-8', newline='\n') as f:
                     f.write(analysis['correct_content'])
-                print(f"🟢 FIXED: {rel_path}\n")
+                print(f"🟢 FIXED: {rel_path}")
                 fixed_count += 1
             except Exception as e:
                 print(f"❌ FAILED TO WRITE: {rel_path} ({e})\n")
@@ -301,6 +294,7 @@ def main():
         if validation_failures:
             print(f"\n{Colors.RED}ERROR: {len(validation_failures)} files failed post-fix validation and were NOT modified:{Colors.ENDC}")
             for f in validation_failures: print(f"   - {f}")
+        
         print(f"\n{Colors.GREEN}Successfully fixed {fixed_count} of {len(results['NON_COMPLIANT'])} non-compliant files.{Colors.ENDC}")
     else:
         print(f"\n{Colors.GREEN}All files are compliant.{Colors.ENDC}")

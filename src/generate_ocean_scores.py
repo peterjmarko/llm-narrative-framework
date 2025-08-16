@@ -55,6 +55,7 @@ import csv
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -132,6 +133,29 @@ except ImportError:
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
+
+
+def backup_and_overwrite_related_files(output_path: Path):
+    """Backs up the main output file and its related summary/report files."""
+    summary_path = output_path.parent.parent / "reports" / f"{output_path.stem}_summary.txt"
+    missing_report_path = output_path.parent.parent / "reports" / "missing_ocean_scores.txt"
+    files_to_back_up = [output_path, summary_path, missing_report_path]
+
+    backup_dir = Path('data/backup')
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    
+    print() # Add a blank line for better spacing
+    for p in files_to_back_up:
+        if p.exists():
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = backup_dir / f"{p.stem}.{timestamp}{p.suffix}.bak"
+                shutil.copy2(p, backup_path)
+                print(f"{Fore.CYAN}Created backup for {p.name} at: {backup_path}{Fore.RESET}")
+                p.unlink()
+            except (IOError, OSError) as e:
+                logging.error(f"{Fore.RED}Failed to back up or remove {p.name}: {e}")
+                sys.exit(1)
 
 def load_processed_ids(filepath: Path) -> Set[str]:
     """Reads an existing output file to find which idADBs have been processed."""
@@ -525,6 +549,12 @@ def main():
     # --- Setup Paths & Worker ---
     script_dir = Path(__file__).parent
     input_path = Path(args.input_file)
+    
+    # --- Configure Logging ---
+    log_level = logging.INFO
+    if os.environ.get('DEBUG_OCEAN', '').lower() == 'true':
+        log_level = logging.DEBUG
+    logging.basicConfig(level=log_level, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
     output_path = Path(args.output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path = output_path.parent.parent / "reports" / f"{output_path.stem}_summary.txt"
@@ -539,43 +569,21 @@ def main():
 
     print(f"\n{Fore.YELLOW}--- Starting OCEAN Score Generation ---{Fore.RESET}")
 
-    # --- Handle Overwrite with Backup and Confirmation ---
-    files_to_check = [output_path, summary_path, missing_report_path]
-    proceed = True
-    if any(p.exists() for p in files_to_check):
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: One or more OCEAN score files already exist.")
-            print(f"This process incurs API costs and can take several hours to complete.{Fore.RESET}")
-            confirm = input("Backups will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-            if confirm != 'y':
-                proceed = False
-        
-        if proceed:
-            backup_dir = Path('data/backup')
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            for p in files_to_check:
-                if p.exists():
-                    try:
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        backup_path = backup_dir / f"{p.stem}.{timestamp}{p.suffix}.bak"
-                        shutil.copy2(p, backup_path)
-                        logging.info(f"Created backup for {p.name} at: {backup_path}")
-                        p.unlink()
-                    except (IOError, OSError) as e:
-                        logging.error(f"{Fore.RED}Failed to back up or remove {p.name}: {e}")
-                        sys.exit(1)
-        else:
-            print("\nOperation cancelled by user.\n")
-            sys.exit(0)
+    # --- Intelligent Startup Logic (Stale Check) ---
+    if not args.force and output_path.exists() and input_path.exists():
+        if os.path.getmtime(input_path) > os.path.getmtime(output_path):
+            print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
+            print("Automatically re-running full scoring process...")
+            backup_and_overwrite_related_files(output_path)
+            args.force = True
 
-    # --- Load Data ---
+    if args.force and any(p.exists() for p in [output_path, summary_path, missing_report_path]):
+        backup_and_overwrite_related_files(output_path)
+
+    # --- Load Data and Determine Scope ---
     processed_ids = load_processed_ids(output_path)
     subjects_to_process = load_subjects_to_process(input_path, processed_ids)
     
-    total_to_process = len(subjects_to_process)
-    total_possible_subjects = len(processed_ids) + total_to_process
-    logging.info(f"Found {len(processed_ids):,} existing scores. Processing {total_to_process:,} new subjects out of {total_possible_subjects:,} total.")
-
     # --- Create Temporary Config for Worker ---
     temp_config = configparser.ConfigParser()
     if APP_CONFIG.has_section('LLM'): temp_config['LLM'] = APP_CONFIG['LLM']
@@ -593,21 +601,37 @@ def main():
     summary_path = output_path.parent.parent / "reports" / f"{output_path.stem}_summary.txt"
     benchmark_variance, initial_checks = load_cutoff_state(summary_path, args.variance_check_window)
     
-    status, last_variance_checks = perform_pre_flight_check(args, all_scores_df, benchmark_variance, initial_checks)
-    if status == "EXIT":
-        sys.exit(0)
+    if not args.force:
+        status, last_variance_checks = perform_pre_flight_check(args, all_scores_df, benchmark_variance, initial_checks)
+        if status == "EXIT":
+            sys.exit(0)
+    else:
+        # If forcing, we don't need the pre-flight check's result, just an initialized deque
+        last_variance_checks = initial_checks
     
     # If resuming, check if there's anything to do
     if not subjects_to_process:
-        print(f"\n{Fore.GREEN}All subjects have already been processed. Nothing to do. ✨\n")
-        # Finalize with the current state just in case config changed
-        final_count = len(all_scores_df)
-        generate_summary_report(
-            output_path, "Completed all available subjects.", len(all_scores_df), final_count,
-            benchmark_variance, last_variance_checks, args.variance_analysis_window,
-            args.benchmark_population_size, args.variance_check_window, args.variance_trigger_count
-        )
-        sys.exit(0)
+        print(f"\n{Fore.GREEN}All subjects have already been processed. Output is up to date. ✨")
+        print("If you decide to go ahead with recreating OCEAN scores, a backup of the existing file will be created first.")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
+        if confirm == 'y':
+            backup_and_overwrite_related_files(output_path)
+            args.force = True
+            # Re-load after backup to ensure we process everything
+            processed_ids = load_processed_ids(output_path)
+            subjects_to_process = load_subjects_to_process(input_path, processed_ids)
+            # CRITICAL FIX: Reset the in-memory DataFrame after deleting the file
+            all_scores_df = pd.DataFrame()
+        else:
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.\n")
+            sys.exit(0)
+
+    # Correctly calculate the total to process *after* the interactive prompt has run
+    total_to_process = len(subjects_to_process)
+    total_possible_subjects = len(processed_ids) + total_to_process
+    print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
+    print(f"Found {len(processed_ids):,} existing scores.")
+    print(f"Processing {total_to_process:,} new subjects (out of {total_possible_subjects:,} total).")
 
     llm_missed_subjects = []
     consecutive_failures = 0
@@ -747,12 +771,11 @@ def main():
         total_processed_count = len(all_scores_df)
         final_count = total_processed_count  # Default to preserving all data
 
-        # On normal completion, calculate the final rounded count and truncate the file
-        if not was_interrupted and not stop_reason.startswith("Halted"):
-            final_raw_count = total_processed_count
-            if stop_reason.startswith("Cutoff met"):
-                final_raw_count = cutoff_start_subject_count
-            
+        # Only truncate the file if the specific "Cutoff met" reason was given
+        if stop_reason.startswith("Cutoff met"):
+            # The cutoff point is the start of the window that triggered the final check
+            final_raw_count = cutoff_start_subject_count
+            # Round down to the nearest full window size for a clean dataset
             final_count = (final_raw_count // args.variance_analysis_window) * args.variance_analysis_window
             truncate_and_archive_scores(output_path, final_count)
 

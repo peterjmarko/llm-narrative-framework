@@ -51,8 +51,10 @@ Module                              Cov. (%)        Status & Justification
                                                     including LLM response parsing, resumability, and a mocked
                                                     orchestrator loop. Live LLM calls are validated via integration.
 
-`src/generate_ocean_scores.py`      `N/A`           **PENDING.** Primary function is live LLM interaction. To be
-                                                    validated by successful pipeline execution.
+`src/generate_ocean_scores.py`      `~17%`          **COMPLETE.** Unit tests cover the critical offline logic,
+                                                    including LLM response parsing, variance calculation, and the
+                                                    data-driven cutoff logic. Live LLM calls are validated via
+                                                    integration testing.
 
 `src/select_final_candidates.py`    `N/A`           **PENDING.** Simple data filter. Validated by the pipeline's
                                                     output artifacts.
