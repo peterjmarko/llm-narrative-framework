@@ -53,7 +53,21 @@ The data preparation pipeline is a fully automated, multi-stage workflow. It beg
 
 #### The Automated Workflow
 
-The pipeline is a sequence of Python scripts followed by manual processing steps.
+The automated data preparation pipeline is orchestrated by a single, intelligent PowerShell script: `prepare_data.ps1`. This is the recommended method for both initial runs and for resuming interrupted processes.
+
+**Execution:**
+```powershell
+# Run the entire data preparation pipeline interactively
+.\prepare_data.ps1
+
+# Get a read-only status report of the pipeline's progress
+.\prepare_data.ps1 -ReportOnly
+```
+The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.
+
+#### Individual Script Details
+
+The `prepare_data.ps1` script orchestrates a sequence of individual Python scripts followed by a manual processing step. The following is a detailed breakdown of this underlying workflow.
 
 **Stage 1: Data Sourcing and Initial Processing (Automated)**
 1.  **Fetching (`fetch_adb_data.py`):** This is the primary entry point. The script logs into the ADB website, queries its internal API, and fetches a complete dataset of over 10,000 subjects. It performs two crucial transformations at the source:

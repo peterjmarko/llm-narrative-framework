@@ -1,17 +1,35 @@
 graph TD
     classDef scriptStyle fill:#fff2cc,stroke:#d6b656,stroke-width:2px
     classDef utilStyle fill:#e6e6fa,stroke:#333,stroke-width:2px
-    subgraph Main Data Preparation Pipeline
-        A[src/fetch_adb_data.py] --> B[src/find_wikipedia_links.py]
-        B --> B2[src/validate_wikipedia_pages.py]
-        B2 --> C[src/select_eligible_candidates.py]
-        C --> D["src/generate_eminence_scores.py<br/>(Uses LLM)"]
-        D --> E["src/generate_ocean_scores.py<br/>(Uses LLM)"]
-        E --> F[src/select_final_candidates.py]
-        F --> G[src/prepare_sf_import.py]
-        G --> H[src/create_subject_db.py]
-        H --> I[src/generate_personalities_db.py]
+    classDef orchestratorStyle fill:#cce5ff,stroke:#333,stroke-width:2px
+
+    subgraph "Orchestration Scripts"
+        P[prepare_data.ps1]
     end
+
+    subgraph "Main Data Preparation Pipeline"
+        A[src/fetch_adb_data.py]
+        B[src/find_wikipedia_links.py]
+        B2[src/validate_wikipedia_pages.py]
+        C[src/select_eligible_candidates.py]
+        D["src/generate_eminence_scores.py<br/>(Uses LLM)"]
+        E["src/generate_ocean_scores.py<br/>(Uses LLM)"]
+        F[src/select_final_candidates.py]
+        G[src/prepare_sf_import.py]
+        H[src/create_subject_db.py]
+        I[src/generate_personalities_db.py]
+    end
+    
+    P --> A
+    P --> B
+    P --> B2
+    P --> C
+    P --> D
+    P --> E
+    P --> F
+    P --> G
+    P --> H
+    P --> I
     
     subgraph Delineation Processing
         J["src/neutralize_delineations.py<br/>(Uses LLM)"]
@@ -28,5 +46,6 @@ graph TD
     H -.-> K
 
     %% Apply Styles
+    class P orchestratorStyle
     class A,B,B2,C,D,E,F,G,H,I,J scriptStyle
     class K utilStyle

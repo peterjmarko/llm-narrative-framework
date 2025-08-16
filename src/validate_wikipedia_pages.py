@@ -165,19 +165,84 @@ def validate_name(adb_name: str, soup: BeautifulSoup) -> tuple[str, int]:
     return wp_name, fuzz.ratio(adb_base_name.lower(), wp_base_name.lower())
 
 def validate_death_date(soup: BeautifulSoup) -> bool:
-    """Checks for evidence of a death date on the Wikipedia page."""
-    if soup.find('div', id='mw-normal-catlinks', string=re.compile(r'\bLiving people\b')):
-        return False
-    if soup.find('div', id='mw-normal-catlinks', string=re.compile(r'\d{4} deaths')):
-        return True
+    """Exhaustive death date detection using multiple strategies and locations."""
+    # Strategy 1: Check categories first (most reliable for Wikipedia)
+    categories_div = soup.find('div', id='mw-normal-catlinks')
+    if categories_div:
+        cat_text = categories_div.get_text()
+        if re.search(r'\bLiving people\b', cat_text):
+            return False
+        death_category_patterns = [
+            r'\d{4} deaths', r'Deaths in \d{4}', r'\d{4} births', r'People who died',
+            r'Murdered', r'Executed', r'Suicides', r'Assassination', r'victims'
+        ]
+        for pattern in death_category_patterns:
+            if re.search(pattern, cat_text, re.I):
+                return True
     
+    # Strategy 2: Infobox check (multiple field names)
     infobox = soup.find('table', class_='infobox')
-    if infobox and infobox.find(lambda tag: tag.name == 'th' and re.search(r'\bDied\b', tag.get_text())):
+    if infobox:
+        death_headers = [
+            r'\bDied\b', r'\bDeath\b', r'\bDeceased\b', r'\bResting place\b',
+            r'\bBuried\b', r'\bDeath date\b', r'\bDate of death\b', r'\bDisappeared\b'
+        ]
+        for header_pattern in death_headers:
+            header = infobox.find(lambda tag: tag.name in ['th', 'td', 'caption'] and re.search(header_pattern, tag.get_text(strip=True), re.I))
+            if header:
+                if re.search(r'\d{4}', header.get_text(strip=True)): return True
+                next_cell = header.find_next_sibling()
+                if next_cell and re.search(r'\d{4}', next_cell.get_text()): return True
+                if header.name == 'th':
+                    parent_row = header.find_parent('tr')
+                    if parent_row and parent_row.find('td') and re.search(r'\d{4}', parent_row.find('td').get_text()):
+                        return True
+    
+    # Strategy 3: First paragraph analysis
+    paragraphs = [p for p in soup.find_all('p') if len(p.get_text(strip=True)) > 20 and not p.get_text(strip=True).startswith('Coordinates:')]
+    for p in paragraphs[:10]:
+        text = p.get_text()
+        if re.search(r'\([^)]*\b\d{3,4}\b[^)]*[–—\-][^)]*\b\d{3,4}\b[^)]*\)', text):
+            return True
+        if re.search(r'\bwas\s+(?:a|an)\s+\w+', text, re.I) and not re.search(r'was\s+(?:a|an)\s+\w+\s+(?:from|between|during|in\s+\d{4})', text, re.I):
+            if re.search(r'\b(?:1[0-9]{3}|20[0-2][0-9])\b', text):
+                return True
+        death_patterns = [
+            r'\b(?:died|d\.)\s+(?:on\s+)?[\w\s,]*\b\d{4}\b', r'†\s*[\w\s,]*\b\d{4}\b',
+            r'\b(?:deceased|death)\b.*\b\d{4}\b', r'\b(?:passed away|passing)\b.*\b\d{4}\b',
+            r'\b(?:killed|murdered|executed)\b.*\b\d{4}\b', r'\b(?:perished|drowned|crashed)\b.*\b\d{4}\b',
+            r'\b(?:suicide|hanged)\b.*\b\d{4}\b', r'\blast seen\b.*\b\d{4}\b',
+            r'\b(?:found dead|body found)\b',
+            r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\s*[)–—\-]'
+        ]
+        for pattern in death_patterns:
+            if re.search(pattern, text, re.I):
+                return True
+    
+    # Strategy 4: Check other infobox table formats
+    for table in soup.find_all('table', class_=re.compile(r'infobox|biography|vcard', re.I)):
+        text = table.get_text()
+        if re.search(r'\bDied\b.*\d{4}', text, re.I): return True
+        if re.search(r'[–—\-]\s*\d{1,2}\s+\w+\s+\d{4}', text): return True
+    
+    # Strategy 5: Check hatnotes
+    for hatnote in soup.find_all('div', class_=re.compile(r'hatnote')):
+        if re.search(r'\b(?:died|deceased)\b.*\d{4}', hatnote.get_text(), re.I):
+            return True
+    
+    # Strategy 6: Check "Death" section headers
+    if soup.find_all(['h2', 'h3'], string=re.compile(r'\bDeath\b|\bFinal\b|\bLast\s+years\b|\bPassing\b', re.I)):
         return True
     
-    first_p = soup.find('p')
-    if first_p and re.search(r'\([^)]*\b\d{3,4}\b[^)]*–[^)]*\b\d{3,4}\b[^)]*\)', first_p.get_text()):
+    # Strategy 7: Special Wikipedia templates
+    if soup.find_all(attrs={'class': re.compile(r'death-date|deathdate|dday', re.I)}):
         return True
+    
+    # Strategy 8: Check image captions
+    for caption in soup.find_all(['div', 'p'], class_=re.compile(r'caption|thumb', re.I)):
+        if re.search(r'\b\d{4}\s*[–—\-]\s*\d{4}\b', caption.get_text()):
+            return True
+    
     return False
 
 def process_wikipedia_page(url: str, adb_name: str, birth_year: str, pbar: tqdm, depth=0) -> dict:
@@ -211,15 +276,19 @@ def worker_task(row: dict, pbar: tqdm, index: int) -> dict:
     # Base result includes all input data
     result = {'Index': index, **row}
 
-    # If a URL is present and there are no pre-existing notes, proceed with validation.
-    # Otherwise, pass the record through with its original notes.
-    if row.get('Wikipedia_URL') and not row.get('Notes'):
-        validation = process_wikipedia_page(row['Wikipedia_URL'], row['ADB_Name'], row['BirthYear'], pbar)
-    else:
+    # If the record already has notes from the link-finder, it's a pre-existing failure.
+    # Pass it through without modification to preserve the original error reason.
+    if row.get('Notes'):
         status = 'VALID' if row['Entry_Type'] == 'Research' else 'FAIL'
-        notes = row.get('Notes') or ('Research entry - Wikipedia not expected' if row['Entry_Type'] == 'Research' else 'No Wikipedia URL found')
+        return {**result, 'Status': status, 'Notes': row['Notes']}
+
+    # If there's no URL and no notes, it's a simple "No Link" failure.
+    if not row.get('Wikipedia_URL'):
+        status = 'VALID' if row['Entry_Type'] == 'Research' else 'FAIL'
+        notes = 'Research entry - Wikipedia not expected' if row['Entry_Type'] == 'Research' else 'No Wikipedia URL found'
         return {**result, 'Status': status, 'Notes': notes}
 
+    # Only proceed with validation if a URL is present and there were no prior errors.
     validation = process_wikipedia_page(row['Wikipedia_URL'], row['ADB_Name'], row['BirthYear'], pbar)
     
     if validation['status'] != 'OK':
@@ -247,7 +316,7 @@ def worker_task(row: dict, pbar: tqdm, index: int) -> dict:
 def load_and_filter_input(input_path: Path, report_path: Path, force: bool) -> tuple[list, set, int, int, int, int]:
     """Loads input data, filters out processed records, and returns current validation state."""
     if not input_path.exists():
-        logging.error(f"Input file not found: {input_path}"); sys.exit(1)
+        logging.error(f"\nInput file not found: {input_path}"); sys.exit(1)
 
     with open(input_path, 'r', encoding='utf-8') as f:
         all_records = list(csv.DictReader(f))
@@ -290,30 +359,26 @@ def sort_output_file(filepath: Path, fieldnames: list):
     except (IOError, csv.Error, KeyError, ValueError) as e:
         logging.error(f"Could not sort the output file: {e}")
 
-def print_final_summary(output_path: Path, total_subjects: int):
-    """Reads the final report file and prints a comprehensive summary."""
-    try:
-        with open(output_path, 'r', encoding='utf-8') as f:
-            final_results = list(csv.DictReader(f))
-        
-        total_processed = len(final_results)
-        total_valid = sum(1 for r in final_results if r.get('Status') in ['OK', 'VALID'])
+def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int, was_interrupted: bool = False):
+    """Sorts the final CSV, generates the summary, and prints the final status message."""
+    sort_output_file(output_path, fieldnames)
+    generate_summary_report(output_path) # This already prints the full summary to console
+    
+    summary_path = output_path.with_name("adb_validation_summary.txt")
 
-        percentage_str = "(0%)"
-        if total_processed > 0:
-            percentage = (total_valid / total_processed) * 100
-            percentage_str = f"({percentage:.0f}%)"
-        
-        summary_msg = f"Validated {total_valid:,} out of {total_subjects:,} total subjects {percentage_str}."
-        if total_processed < total_subjects:
-            summary_msg = f"Validated {total_valid:,} records across {total_processed:,} processed subjects (out of {total_subjects:,} total) {percentage_str}."
-
-        print(f"\n{Fore.GREEN}SUCCESS: Validation complete.")
-        print(summary_msg)
-        print(f"Final report is sorted and saved to: {output_path} ✨\n")
-
-    except (IOError, csv.Error) as e:
-        logging.error(f"Failed to generate final summary: {e}")
+    if was_interrupted:
+        print(f"\n{Fore.YELLOW}WARNING: Validation incomplete.")
+        print(f"Partial results have been sorted and saved.")
+        print(f"{Fore.CYAN}  - Detailed Report: {output_path}")
+        print(f"{Fore.CYAN}  - Summary Report:  {summary_path} ✨")
+        print(f"{Fore.YELLOW}\nPlease re-run the script to resume validation.\n")
+        os._exit(1)
+    else:
+        # The success message and summary have already been printed by generate_summary_report
+        # We just need to confirm the file locations.
+        print(f"{Fore.GREEN}SUCCESS: Validation complete.")
+        print(f"{Fore.CYAN}  - Detailed Report: {output_path}")
+        print(f"{Fore.CYAN}  - Summary Report:  {summary_path} ✨\n")
 
 def generate_summary_report(report_path: Path):
     """Reads the detailed CSV report and generates a summary text file."""
@@ -351,47 +416,28 @@ def generate_summary_report(report_path: Path):
 
         # Aggregate data
         for row in rows:
-            if row.get('Entry_Type') == 'Research':
-                research_entries += 1
-            else:
-                person_entries += 1
+            if row.get('Entry_Type') == 'Research': research_entries += 1
+            else: person_entries += 1
             
             if row.get('Status') in ['OK', 'VALID']:
                 valid_records += 1
             else:
                 failed_records += 1
                 notes = row.get('Notes', '')
-                url_notes = row.get('Wikipedia_URL', '')
-                
-                # Use a prioritized elif chain to categorize each failure once
-                if "TIMEOUT" in url_notes:
-                    timeout_error += 1
-                elif "NON-ENGLISH" in url_notes:
-                    non_english_error += 1
-                elif "No Wikipedia URL found" in notes:
-                    no_wiki_link += 1
-                elif "Failed to fetch" in notes:
-                    fetch_fail += 1
-                elif "Disambiguation" in notes:
-                    disambiguation_fail += 1
-                elif "Name mismatch" in notes:
-                    name_mismatch += 1
-                elif "Death date not found" in notes:
-                    no_death += 1
-                elif notes.strip():
-                    other_errors += 1
+                if 'Processing timeout' in notes: timeout_error += 1
+                elif 'Non-English URL' in notes: non_english_error += 1
+                elif 'No Wikipedia URL' in notes: no_wiki_link += 1
+                elif 'Failed to fetch' in notes: fetch_fail += 1
+                elif 'Disambiguation' in notes: disambiguation_fail += 1
+                elif 'Name mismatch' in notes: name_mismatch += 1
+                elif 'Death date not found' in notes: no_death += 1
+                else: other_errors += 1
         
         # --- Build Formatted Report ---
         title = "Astro-Databank Validation Summary"
-        banner_width = 60
-        banner = "=" * banner_width
-        
-        # --- Define Column Widths ---
-        label_col = 35
-        count_col = 12
-        perc_col = 10
+        banner_width = 60; banner = "=" * banner_width
+        label_col, count_col, perc_col = 35, 12, 10
 
-        # Overall Statistics
         s2_perc = f"({valid_records/total_records:.1%})" if total_records > 0 else ""
         s3_perc = f"({failed_records/total_records:.1%})" if total_records > 0 else ""
 
@@ -421,27 +467,21 @@ def generate_summary_report(report_path: Path):
                 ("7. Processing Timeout:", timeout_error),
                 ("8. Other Errors:", other_errors)
             ]
-            
             for label, count in fail_data:
-                if count > 0:
-                    perc_str = f"({count/total_records:.1%})"
-                    line = f"{label:<{label_col}}{count:>{count_col},}{perc_str:>{perc_col}}"
-                    failure_analysis.append(line)
+                perc_str = f"({count/total_records:.1%})"
+                line = f"{label:<{label_col}}{count:>{count_col},}{perc_str:>{perc_col}}"
+                failure_analysis.append(line)
         
         report_lines = [
             f"{Fore.CYAN}{banner}", f"{title.center(banner_width)}", f"{banner}{Fore.RESET}",
             f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
             *overall_stats, *entry_type_stats, *failure_analysis,
-            f"\n{Fore.CYAN}{banner}{Fore.RESET}"
+            f"{Fore.CYAN}{banner}{Fore.RESET}"
         ]
         
         summary_content = "\n".join(report_lines)
-        
-        with open(summary_path, 'w', encoding='utf-8') as f:
-            f.write(summary_content)
-
-        print("\n" + summary_content + "\n")
-        print(f"{Fore.GREEN}SUCCESS: Summary report saved to '{summary_path}' ✨\n")
+        with open(summary_path, 'w', encoding='utf-8') as f: f.write(summary_content)
+        print("\n" + summary_content)
 
     except (IOError, csv.Error) as e:
         print(f"{Fore.RED}ERROR: Failed to generate summary report: {e}")
@@ -518,13 +558,13 @@ def main():
             
     # Handle --force flag first for non-interactive overwrite
     if args.force and output_path.exists():
-        print(f"{Fore.YELLOW}Forcing overwrite of existing report...")
+        print(f"{Fore.YELLOW}\nForcing overwrite of existing report...")
         backup_and_overwrite(output_path)
     
     # Automatically re-run if the input link file is newer than the report
     elif not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
-            print(f"{Fore.YELLOW}Input file '{input_path.name}' is newer than the existing report.")
+            print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing report.")
             print("Stale data detected. Automatically re-running validation...")
             backup_and_overwrite(output_path)
             # Set force=True for the loader to ensure a full re-run
@@ -551,24 +591,35 @@ def main():
         records_to_process, _, max_index_before, valid_before, processed_before, _ = load_and_filter_input(input_path, output_path, False)
 
     if not records_to_process:
-        # If there are still no records to process after handling timeouts, then we're truly done.
-        print(f"\n{Fore.GREEN}All records have already been validated. Output is up to date. ✨")
-        
-        confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. Do you wish to proceed? (Y/N): ").lower().strip()
+        # If there are no new records to process, check for pending retries.
+        if timed_out_ids:
+            print(f"\n{Fore.GREEN}All records have been processed, but {len(timed_out_ids)} previously timed out.")
+            confirm = input(f"Do you want to retry these {len(timed_out_ids)} records? (Y/n): ").lower().strip()
+            if confirm != 'n':
+                print(f"{Fore.YELLOW}Preparing to retry {len(timed_out_ids)} timed-out records...")
+                # The existing retry logic below will handle the rest.
+            else:
+                print("Operation cancelled by user.")
+                finalize_and_report(output_path, fieldnames, total_subjects, False)
+                sys.exit(0)
+        else:
+            print(f"\n{Fore.GREEN}All records have already been validated. Output is up to date. ✨")
+            confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. \nDo you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
             print(f"{Fore.YELLOW}Forcing overwrite of existing report...")
             backup_and_overwrite(output_path)
             # Re-initialize state for a full run
             records_to_process, timed_out_ids, max_index_before, valid_before, processed_before, total_subjects = load_and_filter_input(input_path, output_path, True)
         else:
-            # Just print the summary of the existing file without modifying it
-            print_final_summary(output_path, total_subjects)
+            # Just generate the summary text file and print it without modifying the main report
+            generate_summary_report(output_path)
             sys.exit(0)
         
     print(f"\n{Fore.YELLOW}--- Validating Wikipedia Pages ---")
     print(f"Found {processed_before:,} already processed records ({valid_before:,} valid).")
     print(f"Now processing {len(records_to_process):,} new records using {args.workers} workers.")
-    print(f"{Fore.CYAN}NOTE: Each set of 1,000 records can take a minute or more to process. You can safely interrupt with Ctrl+C at any time to resume later.\n")
+    print(f"{Fore.CYAN}NOTE: Each set of 1,000 records can take 1.5 minutes or more to process.")
+    print(f"{Fore.CYAN}You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     was_interrupted = False
     valid_this_session = 0
@@ -620,15 +671,7 @@ def main():
             output_file.close()
 
     # Always finalize and report on exit.
-    if was_interrupted:
-        print(f"\n{Fore.YELLOW}Finalizing report...")
-        sort_output_file(output_path, fieldnames)
-        generate_summary_report(output_path)
-        os._exit(1) # Still need a hard exit for hangs
-    else:
-        sort_output_file(output_path, fieldnames)
-        generate_summary_report(output_path)
-        print_final_summary(output_path, total_subjects)
+    finalize_and_report(output_path, fieldnames, total_subjects, was_interrupted)
 
 if __name__ == "__main__":
     main()

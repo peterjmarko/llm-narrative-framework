@@ -230,16 +230,53 @@ def search_wikipedia(name: str) -> list[tuple[str, str]]:
         debug_log(f"Wikipedia search failed for '{name}': {e}")
         return []
 
-def find_best_wikipedia_match(name: str, search_results: list[tuple[str, str]]) -> str | None:
-    """Finds the best Wikipedia match from search results by name similarity."""
+def find_best_wikipedia_match(name: str, birth_year: str, search_results: list[tuple[str, str]], pbar: tqdm) -> str | None:
+    """Finds the best Wikipedia match from search results by checking page content for the birth year."""
     base_name = re.sub(r'\s*\(\d{4}\)$', '', name).strip()
     if ',' in base_name:
         base_name = ' '.join(reversed(base_name.split(',', 1))).strip()
 
-    for title, url in search_results:
-        title_clean = re.sub(r'\s*\(.*?\)$', '', title).strip()
-        if fuzz.ratio(base_name.lower(), title_clean.lower()) > 80:
-            return url
+    for title, url in search_results[:3]: # Check top 3 results
+        try:
+            # First, do a quick check on title similarity to weed out obvious mismatches
+            title_clean = re.sub(r'\s*\(.*?\)$', '', title).strip()
+            if fuzz.ratio(base_name.lower(), title_clean.lower()) < 60:
+                continue
+
+            # If the title is plausible, fetch the page to check for the birth year
+            soup = fetch_page_content(url)
+            if soup and birth_year in soup.get_text()[:10000]: # Check first 10KB for performance
+                # Check if this is a disambiguation page that we can resolve
+                if is_disambiguation_page(soup):
+                    matching_url = find_matching_disambiguation_link_from_search(soup, birth_year)
+                    if matching_url:
+                        logging.info(f"  -> Found match for {name} via disambiguation page")
+                        return matching_url
+                    continue # Disambiguation page but no match
+                
+                logging.info(f"  -> Confirmed match for {name} via birth year check")
+                return url
+        except Exception as e:
+            logging.warning(f"Error while checking search result {url}: {e}")
+            continue
+            
+    return None
+
+def is_disambiguation_page(soup: BeautifulSoup) -> bool:
+    """Detects if a Wikipedia page is a disambiguation page."""
+    return any([
+        soup.find('div', id='disambiguation'),
+        soup.find(class_=re.compile(r'\bdisambiguation\b', re.I)),
+        soup.find(string=re.compile(r"may refer to:", re.I))
+    ])
+
+def find_matching_disambiguation_link_from_search(soup: BeautifulSoup, birth_year: str) -> str | None:
+    """Finds the correct link on a disambiguation page using birth year."""
+    for item in soup.find_all('li'):
+        if birth_year in item.get_text():
+            link = item.find('a', href=re.compile(r"/wiki/"))
+            if link:
+                return urljoin("https://en.wikipedia.org", link['href'])
     return None
 
 def worker_task(line: str, pbar: tqdm, index: int) -> dict | None:
@@ -265,8 +302,7 @@ def worker_task(line: str, pbar: tqdm, index: int) -> dict | None:
         logging.info(f"No link on ADB for {adb_name}. Searching Wikipedia...")
         search_results = search_wikipedia(adb_name)
         if search_results:
-            wiki_url = find_best_wikipedia_match(adb_name, search_results)
-            if wiki_url: logging.info(f"  -> Found match via search for {adb_name}: {unquote(wiki_url).split('/')[-1]}")
+            wiki_url = find_best_wikipedia_match(adb_name, birth_year, search_results, pbar)
 
     if wiki_url:
         english_url = get_english_wiki_url(wiki_url)
@@ -375,37 +411,53 @@ def worker_task_with_timeout(line: str, pbar: tqdm, index: int) -> dict:
     
     return result
 
-def finalize_and_report(output_path: Path, fieldnames: list, all_lines: list):
-    """Sorts the final output file and prints a comprehensive summary."""
+def finalize_and_report(output_path: Path, fieldnames: list, all_lines: list, was_interrupted: bool):
+    """Sorts the file, generates the summary, and prints the final status message for all exit conditions."""
+    # Step 1: Always sort the file to ensure a consistent state.
     sort_output_file(output_path, fieldnames)
     
+    # Step 2: Always generate the detailed summary report.
+    # We will capture the final counts from this process for the final console message.
     try:
         with open(output_path, 'r', encoding='utf-8') as f:
             final_results = list(csv.DictReader(f))
         
-        found_links = sum(1 for r in final_results if r.get('Wikipedia_URL') and r['Wikipedia_URL'] != 'ERROR: TIMEOUT')
+        found_links = sum(1 for r in final_results if r.get('Wikipedia_URL'))
         processed_count = len(final_results)
         total_subjects = len(all_lines)
-        timeouts = sum(1 for r in final_results if r.get('Wikipedia_URL') == 'ERROR: TIMEOUT')
+        timeouts = sum(1 for r in final_results if r.get('Notes') == 'Processing timeout')
 
-        percentage_str = "(0%)"
-        if processed_count > 0:
-            percentage = (found_links / processed_count) * 100
-            percentage_str = f"({percentage:.0f}%)"
-
+        percentage_str = f"({found_links / processed_count * 100:.0f}%)" if processed_count > 0 else "(0%)"
+        
         summary_msg = f"Found {found_links:,} Wikipedia links out of {total_subjects:,} total subjects {percentage_str}."
         if processed_count < total_subjects:
             summary_msg = f"Found {found_links:,} links across {processed_count:,} processed records (out of {total_subjects:,} total) {percentage_str}."
 
-        print(f"\n{Fore.GREEN}SUCCESS: Link finding complete.")
-        print(summary_msg)
-        print(f"Output saved to: {output_path} ✨\n")
-        
-        if timeouts > 0:
-            print(f"{Fore.YELLOW}NOTE: {timeouts:,} records timed out. You can re-run the script to retry them.\n")
-
     except (IOError, csv.Error) as e:
-        logging.error(f"Failed to generate final summary: {e}")
+        logging.error(f"Failed to read final report for summary: {e}")
+        # If we can't read the report, we can't give a detailed summary. Exit gracefully.
+        if was_interrupted:
+            os._exit(1)
+        return
+
+    # Step 3: Print the final status message based on whether the run was interrupted.
+    if was_interrupted:
+        print(f"\n{Fore.YELLOW}WARNING: Processing interrupted by user.")
+        print(summary_msg)
+        print(f"Partial results sorted and saved to: {output_path} ✨\n")
+        if timeouts > 0:
+            print(f"{Fore.YELLOW}NOTE: {timeouts:,} records timed out. Re-run the script to retry them.\n")
+        os._exit(1)
+    else:
+        if timeouts > 0:
+            print(f"\n{Fore.YELLOW}WARNING: Link finding incomplete.")
+            print(summary_msg)
+            print(f"Output saved to: {output_path} ✨")
+            print(f"{Fore.YELLOW}NOTE: {timeouts:,} records timed out. Please re-run the script to retry them.\n")
+        else:
+            print(f"\n{Fore.GREEN}SUCCESS: Link finding complete.")
+            print(summary_msg)
+            print(f"Output saved to: {output_path} ✨\n")
 
 def main():
     parser = argparse.ArgumentParser(description="Find Wikipedia links for subjects in the raw ADB export.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -477,8 +529,10 @@ def main():
         
         shutil.move(temp_path, output_path)
 
-        # Reload the state from the cleaned file to get an accurate starting point
-        processed_ids, _, links_found_before, max_index_before, _ = load_processed_ids(output_path)
+        # Reload the state from the cleaned file to get an accurate starting point.
+        # Crucially, the timeout count is now correctly reset to 0 for the retry run.
+        processed_ids, timed_out_ids, links_found_before, max_index_before = load_processed_ids(output_path)
+        timeouts_before = 0
 
     lines_to_process = [
         line for line in all_lines 
@@ -490,7 +544,7 @@ def main():
     if not lines_to_process:
         print(f"\n{Fore.GREEN}All records have already been processed. Output is up to date. ✨")
         
-        confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. Do you wish to proceed? (Y/N): ").lower().strip()
+        confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. \nDo you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
             print(f"{Fore.YELLOW}Forcing overwrite of existing output file...")
             backup_and_overwrite(output_path)
@@ -509,7 +563,8 @@ def main():
         print(f"\n{Fore.YELLOW}--- Finding Wikipedia Links ---")
         print(f"Processing {len(lines_to_process):,} records using {args.workers} workers.")
 
-    print(f"{Fore.CYAN}NOTE: Each set of 1,000 records can take 3 minutes or more to process. You can safely interrupt with Ctrl+C at any time to resume later.\n")
+    print(f"{Fore.CYAN}NOTE: Each set of 1,000 records can take 3 minutes or more to process.")
+    print(f"{Fore.CYAN}You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     links_found_this_session, timeouts_this_session = 0, 0
     links_found_lock, timeouts_lock = Lock(), Lock()
@@ -526,85 +581,62 @@ def main():
         if is_new_file:
             writer.writeheader()
 
-        print("") # Add blank line for readability before the progress bar
         with tqdm(total=len(lines_to_process), desc="Finding links", ncols=120, smoothing=0.01) as pbar:
             tasks = [(max_index_before + i + 1, line) for i, line in enumerate(lines_to_process)]
             futures = {executor.submit(worker_task_with_timeout, line, pbar, index) for index, line in tasks}
-            try:
-                # Use a while loop with a timeout to keep the main thread responsive
-                while futures:
-                    try:
-                        # Process futures that complete within a 1-second timeout
-                        for future in as_completed(futures, timeout=1):
-                            res = future.result()
-                            if res:
-                                url = res.get('Wikipedia_URL', '')
-                                if url and url != 'ERROR: TIMEOUT':
-                                    with links_found_lock:
-                                        links_found_this_session += 1
-                                elif url == 'ERROR: TIMEOUT':
-                                    with timeouts_lock:
-                                        timeouts_this_session += 1
-                                try:
-                                    writer.writerow(res)
-                                except (IOError, csv.Error) as e:
-                                    logging.error(f"Error writing row for idADB {res.get('idADB')}: {e}")
-                            
-                            pbar.update(1)
-                            futures.remove(future)
-                            
-                            # Update progress bar with total counts
-                            total_links = links_found_before + links_found_this_session
-                            total_processed = len(processed_ids) + pbar.n
-                            percentage = (total_links / total_processed) * 100 if total_processed > 0 else 0
-                            pbar.set_postfix_str(f"Links found: {total_links:,}/{total_processed:,} ({percentage:.0f}%)")
+            
+            while futures:
+                try:
+                    for future in as_completed(futures, timeout=1):
+                        res = future.result()
+                        if res:
+                            notes = res.get('Notes', '')
+                            if res.get('Wikipedia_URL') and 'timeout' not in notes:
+                                with links_found_lock:
+                                    links_found_this_session += 1
+                            elif 'timeout' in notes:
+                                with timeouts_lock:
+                                    timeouts_this_session += 1
+                            try:
+                                writer.writerow(res)
+                            except (IOError, csv.Error) as e:
+                                logging.error(f"Error writing row for idADB {res.get('idADB')}: {e}")
+                        
+                        pbar.update(1)
+                        futures.remove(future)
+                        
+                        # Update progress bar with total counts
+                        total_links = links_found_before + links_found_this_session
+                        total_processed = len(processed_ids) + pbar.n
+                        total_timeouts = timeouts_before + timeouts_this_session
+                        percentage = (total_links / total_processed) * 100 if total_processed > 0 else 0
+                        
+                        postfix_str = f"Links found: {total_links:,}/{total_processed:,} ({percentage:.0f}%)"
+                        if total_timeouts > 0:
+                            postfix_str += f", Timeouts: {total_timeouts:,}"
+                        pbar.set_postfix_str(postfix_str)
+                except TimeoutError:
+                    pass
 
-                    except TimeoutError:
-                        # This is expected if workers are busy. It allows the loop to
-                        # remain responsive to KeyboardInterrupt.
-                        pass
-
-            except KeyboardInterrupt:
-                print(f"\n{Fore.YELLOW}Processing interrupted by user. Saving and sorting partial results...")
-                
-                # Manually close the file to ensure all data is flushed to disk
-                if output_file and not output_file.closed:
-                    output_file.close()
-                
-                # Sort the partial results before exiting
-                sort_output_file(output_path, fieldnames)
-                
-                print(f"Partial results sorted and saved to: {output_path} ✨\n")
-                
-                # Use os._exit to terminate immediately, bypassing hanging threads.
-                os._exit(1)
+    except KeyboardInterrupt:
+        was_interrupted = True
+        # We must finalize here because the finally block might hang and os._exit will prevent
+        # the code below from running.
+        if output_file and not output_file.closed:
+            output_file.close()
+        finalize_and_report(output_path, fieldnames, all_lines, was_interrupted=True)
     
-    # This 'finally' block will now only run on a successful, non-interrupted completion.
     finally:
-        executor.shutdown(wait=True)
+        if was_interrupted:
+            executor.shutdown(wait=False, cancel_futures=True)
+        else:
+            executor.shutdown(wait=True)
         if output_file and not output_file.closed:
             output_file.close()
 
-    # Final step: Sort the output file if the run completed successfully.
+    # On successful completion, call finalize_and_report.
     if not was_interrupted:
-        try:
-            with open(output_path, 'r', encoding='utf-8') as f:
-                all_results = list(csv.DictReader(f))
-            
-            # Sort by the 'Index' column, converting it to an integer for correct numerical sorting
-            sorted_results = sorted(all_results, key=lambda r: int(r['Index']))
-            
-            with open(output_path, 'w', encoding='utf-8', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(sorted_results)
-
-            # Final step: Sort the output file and print the summary.
-            if not was_interrupted:
-                finalize_and_report(output_path, fieldnames, all_lines)
-
-        except (IOError, csv.Error, KeyError) as e:
-            logging.error(f"Failed to sort and save the final output file: {e}")
+        finalize_and_report(output_path, fieldnames, all_lines, was_interrupted=False)
 
 if __name__ == "__main__":
     main()

@@ -15,6 +15,7 @@
   - Adds safe overwrite logic with interactive prompts and automatic backups to all data generation scripts.
   - Fixes critical bugs related to script hanging, inconsistent logging, and incorrect summary reporting.
   - Updates all relevant documentation, diagrams, and developer guides to reflect the new, more modular workflow.
+  
 ## 5.2.3 (2025-08-14)
 
 ### Bump
@@ -29,7 +30,7 @@
   - Improves logging by adding prominent banners for sub-processes and centralizing PDM detection messages to reduce noise.
   - Enhances user experience by replacing harsh red "FAILED" banners for controlled halts with clearer, yellow "HALTED" banners that provide specific, actionable advice.
   - Updates documentation and diagrams to reflect the script rename from `repair_study.ps1` to `fix_study.ps1`, ensuring consistency.
-  
+
 ## 5.2.2 (2025-08-14)
 
 ### Bump
