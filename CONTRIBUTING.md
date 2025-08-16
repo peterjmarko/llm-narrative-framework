@@ -126,6 +126,13 @@ To maintain the quality and consistency of the codebase, all contributions shoul
 
 *   **Guaranteed Reproducibility**: Experimental results must be verifiably linked to the parameters that created them. The pipeline ensures this by automatically archiving the `config.ini` file within each run's output directory, creating an immutable record.
 
+*   **Resilient and User-Friendly Pipeline Scripts**: All long-running data preparation and validation scripts must adhere to a standard, modern architecture to ensure a consistent and robust user experience. Key features of this standard include:
+    -   **Intelligent Startup**: Scripts must use a "Filter First, Then Decide" architecture to accurately determine if there is new work to be done.
+    -   **Automatic Stale Check**: Scripts must automatically detect if input files are newer than their own output and trigger a non-interactive re-run.
+    -   **Full Resumability**: Scripts must be able to resume an interrupted run, processing only the records that were not previously completed. This includes appending to existing output files rather than overwriting them.
+    -   **Interrupt Safety**: All processing loops must be wrapped in a `try...except KeyboardInterrupt` block to ensure that a user interruption (`Ctrl+C`) results in a graceful exit with partial results saved correctly.
+    -   **Polished Reporting**: Scripts must use a `finalize_and_report` function to provide consistent, informative status messages for all exit conditions (e.g., success, interruption, up-to-date).
+
 ## Contribution Workflow
 
 ### 1. Create a Branch

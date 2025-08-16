@@ -117,6 +117,23 @@ except ImportError:
 # Configure logging
 logging.basicConfig(level=logging.INFO, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
 
+
+def backup_and_overwrite(file_path: Path):
+    """Creates a backup of a file before deleting the original to allow a fresh start."""
+    try:
+        backup_dir = Path('data/backup')
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = backup_dir / f"{file_path.name}.{timestamp}.bak"
+        shutil.copy2(file_path, backup_path)
+        print(f"\n{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
+        file_path.unlink()
+        print(f"\n{Fore.YELLOW}--- Starting Fresh Run ---{Fore.RESET}")
+        print(f"Removed existing file: {file_path.name}")
+    except (IOError, OSError) as e:
+        logging.error(f"{Fore.RED}Failed to create backup or remove file: {e}")
+        sys.exit(1)
+
 def load_processed_ids(filepath: Path) -> set:
     """
     Reads an existing output file to find which idADBs have been processed.
@@ -262,7 +279,7 @@ def sort_and_reindex_scores(filepath: Path):
         
         # Save the sorted file, overwriting the original
         df.to_csv(filepath, index=False, float_format='%.2f')
-        logging.info(f"Successfully sorted and re-indexed '{filepath.name}'.")
+        print(f"Successfully sorted and re-indexed '{filepath.name}'.")
 
     except ImportError:
         logging.warning("Pandas not installed. Skipping sorting. Install with 'pdm add pandas'.")
@@ -291,7 +308,8 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
 
         top_10 = df.head(10)
 
-        report = ["="*50, "Eminence Scores Summary".center(50), "="*50]
+        banner = "="*50
+        report = [f"{Fore.CYAN}{banner}", f"{'Eminence Scores Summary'.center(50)}", f"{banner}{Fore.RESET}"]
         report.append(f"Total Scored:     {total_scored:,}")
         report.append(f"Total in Source:  {total_subjects_overall:,}")
         
@@ -308,7 +326,7 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         report.append("\n--- Top 10 Most Eminent ---")
         for _, row in top_10.iterrows():
             report.append(f"  {row['EminenceScore']:>5.2f} - {row['Name']}")
-        report.append("="*50)
+        report.append(f"{Fore.CYAN}{banner}{Fore.RESET}")
 
         completion_pct = (total_scored / total_subjects_overall) * 100 if total_subjects_overall > 0 else 0
         status_line = f"Completion: {total_scored}/{total_subjects_overall} ({completion_pct:.2f}%)"
@@ -319,10 +337,13 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         else:
             report.append(f"\n{Fore.RED}ERROR - {status_line} - Significantly incomplete.")
 
-        summary_content = "\n".join(report)
-        summary_path.write_text(summary_content, encoding='utf-8')
-        print(f"\n{summary_content}\n")
-        logging.info(f"Summary report saved to '{summary_path.name}'.")
+        summary_content_for_console = "\n".join(report)
+        # Remove ANSI color codes for the version saved to the file
+        summary_content_for_file = re.sub(r'\x1b\[[0-9;]*m', '', summary_content_for_console)
+        
+        summary_path.write_text(summary_content_for_file, encoding='utf-8')
+        print(f"\n{summary_content_for_console}\n")
+        print(f"{Fore.CYAN}Summary report saved to '{summary_path.name}'.\n{Fore.RESET}")
 
     except ImportError:
         logging.warning("Pandas not installed. Skipping summary report. Install with 'pdm add pandas'.")
@@ -364,32 +385,30 @@ def main():
 
     print(f"\n{Fore.YELLOW}--- Starting Eminence Score Generation ---{Fore.RESET}")
 
+    # --- Intelligent Startup Logic ---
+    if not args.force and output_path.exists() and input_path.exists():
+        if os.path.getmtime(input_path) > os.path.getmtime(output_path):
+            print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
+            print("Automatically re-running full selection process...")
+            backup_and_overwrite(output_path)
+            args.force = True
+
     # --- Handle Overwrite with Backup and Confirmation ---
-    proceed = True
     if output_path.exists():
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            print(f"This process incurs API costs and can take over 30 minutes to complete.{Fore.RESET}")
-            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-            if confirm != 'y':
-                proceed = False
-        
-        if proceed:
-            try:
-                backup_dir = Path('data/backup')
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = backup_dir / f"{output_path.name}.{timestamp}.bak"
-                shutil.copy2(output_path, backup_path)
-                logging.info(f"Created backup of existing file at: {backup_path}")
-                output_path.unlink()
-                logging.warning(f"Removed existing file to start fresh: {output_path.name}")
-            except (IOError, OSError) as e:
-                logging.error(f"{Fore.RED}Failed to create backup or remove file: {e}")
-                sys.exit(1)
+        if args.force:
+            # Non-interactive backup for runs started with --force
+            backup_and_overwrite(output_path)
         else:
-            print("\nOperation cancelled by user.\n")
-            sys.exit(0)
+            # Interactive prompt for manual runs on existing, non-stale data
+            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
+            print(f"This process incurs API costs and can take over 3 minutes to complete for each set of 1,000 records.{Fore.RESET}")
+            print(f"If you decide to go ahead with recreating the eminence scores, a backup of the existing file will be created first.")
+            confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
+            if confirm == 'y':
+                backup_and_overwrite(output_path)
+            else:
+                print(f"\n{Fore.YELLOW}Operation cancelled by user.\n")
+                sys.exit(0)
 
     # --- Load Data and Create To-Do List ---
     processed_ids = load_processed_ids(output_path)
@@ -397,7 +416,9 @@ def main():
 
     total_to_process = len(all_subjects)
     total_subjects_in_source = len(processed_ids) + total_to_process
-    logging.info(f"Found {len(processed_ids):,} existing scores. Processing {total_to_process:,} new subjects out of {total_subjects_in_source:,} total.")
+    print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
+    print(f"Found {len(processed_ids):,} existing scores.")
+    print(f"Processing {total_to_process:,} new subjects (out of {total_subjects_in_source:,} total).")
 
     if not all_subjects:
         print(f"\n{Fore.GREEN}All subjects have already been processed. Nothing to do. ✨\n")
@@ -511,27 +532,19 @@ def main():
         print(f"\n\n{Fore.YELLOW}Process interrupted by user. Exiting gracefully.{Fore.RESET}")
     finally:
         # --- Final Processing and Cleanup ---
-        print("\n--- Finalizing ---")
+        print(f"\n{Fore.YELLOW}--- Finalizing ---{Fore.RESET}")
         sort_and_reindex_scores(output_path)
         generate_scores_summary(output_path, total_subjects_in_source)
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
         
-        final_scored_count = len(processed_ids) + processed_count
-        
-        if run_completed_successfully:
-            if final_scored_count < total_subjects_in_source:
-                missing_count = total_subjects_in_source - final_scored_count
-                logging.warning("Eminence score generation complete for this run.")
-                logging.warning(f"Re-run the script to process the {missing_count} missing subjects. ✨\n")
-            else:
-                print(f"\n{Fore.GREEN}Eminence score generation completed successfully. All subjects processed. ✨\n")
-        elif not was_interrupted:
-            # If not interrupted, it must have been a critical error break
-            logging.critical("Eminence score generation halted due to critical errors. ✨\n")
-        else:
-            # It was a user interruption
+        if was_interrupted:
             logging.warning("Eminence score generation terminated by user. Re-run to continue. ✨\n")
+        elif not run_completed_successfully:
+            # Not interrupted, but didn't finish = critical error break
+            logging.critical("Eminence score generation halted due to critical errors. ✨\n")
+        # If the run completed, the summary report provides the definitive final status.
+        # No extra message is needed here to avoid redundancy.
 
 if __name__ == "__main__":
     main()

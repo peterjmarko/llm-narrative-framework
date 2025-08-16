@@ -93,4 +93,38 @@ def test_select_eligible_candidates_main_logic(mock_input_files):
     id_adbs = {line.strip().split('\t')[1] for line in lines[1:]}
     assert id_adbs == {"101", "103"}
 
+
+def test_select_eligible_candidates_resumes_correctly(mock_input_files):
+    """
+    Tests that the script correctly identifies an up-to-date state and exits.
+    """
+    raw_path, validation_path, output_path = mock_input_files
+
+    # Create a pre-existing, complete output file
+    output_content = (
+        "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tLink\n"
+        "1\t101\tSmith\tJohn\tM\t1\t1\t1950\t12:00\thttp://a.com\n"
+        "3\t103\tLee\tBruce\tM\t27\t11\t1940\t07:12\thttp://c.com\n"
+    )
+    output_path.write_text(output_content)
+    
+    # Mock the user input to prevent the script from hanging
+    with patch("builtins.input", return_value="n"):
+        test_args = [
+            "select_eligible_candidates.py",
+            "--input-file", str(raw_path),
+            "--validation-report", str(validation_path),
+            "--output-file", str(output_path),
+        ]
+        with patch("sys.argv", test_args):
+            # The script should exit gracefully after the prompt
+            with pytest.raises(SystemExit) as e:
+                select_eligible_candidates.main()
+            assert e.value.code == 0
+    
+    # Verify the output file was not changed
+    with open(output_path, 'r', encoding='utf-8') as f:
+        final_content = f.read()
+    assert final_content == output_content
+
 # === End of tests/test_select_eligible_candidates.py ===

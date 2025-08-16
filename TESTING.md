@@ -43,12 +43,13 @@ Module                              Cov. (%)        Status & Justification
 `src/validate_wikipedia_pages.py`   `~38%`          **COMPLETE.** Manual validation of the refactored script is
                                                     complete. Unit tests cover all critical validation logic.
 
-`src/select_eligible_candidates.py` `Pending`       **PENDING AUTOMATED TESTS.** The script has been fully refactored
-                                                    to the modern, resilient standard and has passed manual
-                                                    validation. Awaiting creation of the final `pytest` script.
+`src/select_eligible_candidates.py` `~72%`          **COMPLETE.** The script was fully refactored and manually
+                                                    validated. Unit tests cover all core filtering and resumability
+                                                    logic.
 
-`src/generate_eminence_scores.py`   `N/A`           **PENDING.** Primary function is live LLM interaction. To be
-                                                    validated by successful pipeline execution.
+`src/generate_eminence_scores.py`   `~55%`          **COMPLETE.** Unit tests cover the critical offline logic,
+                                                    including LLM response parsing, resumability, and a mocked
+                                                    orchestrator loop. Live LLM calls are validated via integration.
 
 `src/generate_ocean_scores.py`      `N/A`           **PENDING.** Primary function is live LLM interaction. To be
                                                     validated by successful pipeline execution.
