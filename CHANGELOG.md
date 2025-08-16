@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.4.1 (2025-08-16)
+
+### Bump
+
+- **version 5.4.0 → 5.4.1**
+
+### Refactor
+
+- **Establish test suite and refactor core scripts**
+  - Establishes a formal test suite with pytest and coverage.
+  - Creates a TESTING.md document to track strategy and status.
+  - Refactors select_eligible_candidates.py to a modern, resumable, Pandas-based architecture.
+  - Adds unit tests for fetch_adb_data, find_wikipedia_links, validate_wikipedia_pages, and select_eligible_candidates.
+  - Hardens pyproject.toml and build_docs.py for robustness.
 ## 5.4.0 (2025-08-16)
 
 ### Bump
