@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.4.4 (2025-08-16)
+
+### Bump
+
+- **version 5.4.3 → 5.4.4**
+
+### Fixes
+
+- **Add test suite for final candidate selection and fix linter**
+  - Creates a new pytest suite for select_final_candidates.py, covering its full data transformation workflow.
+  - Refactors select_final_candidates.py to align its startup logic (stale check, interactive prompt) with the modern project standard.
+  - Fixes an AttributeError in the lint_file_headers.py script.
+  - Updates TESTING.md with the status of the newly tested script.
 ## 5.4.3 (2025-08-16)
 
 ### Test
