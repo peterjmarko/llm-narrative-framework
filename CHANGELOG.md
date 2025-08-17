@@ -1,5 +1,37 @@
 # Changelog
 
+## 5.5.0 (2025-08-17)
+
+### Bump
+
+- **version 5.4.5 → 5.5.0**
+
+### Features
+
+- **Enhance and validate data preparation orchestrator**
+  This commit finalizes the data preparation pipeline by significantly enhancing the `prepare_data.ps1` orchestrator and ensuring all project documentation is consistent and accurate.
+  
+  The orchestrator has been successfully validated through a multi-stage testing process using mock scripts to confirm its state machine logic.
+  
+  Key changes include:
+  
+  **`prepare_data.ps1` Orchestrator:**
+  - Refactored to be a stateful, resumable script that is aware of the entire pipeline.
+  - Now intelligently pauses with clear user instructions when a manual step (e.g., Solar Fire processing) is required.
+  - Corrected several PowerShell syntax and variable parsing errors identified during interactive testing.
+  - Improved readability by refactoring complex strings to use PowerShell "here-strings".
+  - Polished final console output by suppressing the return value of the status function.
+  
+  **Documentation & Consistency:**
+  - Harmonized the study's sample size to 6,000 subjects across `DOCUMENTATION.template.md` and `article_main_text.md`.
+  - Corrected outdated script names and file paths in `DOCUMENTATION.template.md` and `data/README.md` to align with the current codebase.
+  - Added a "Project Philosophy" section to the main `README.md` to centralize core principles.
+  - Added a "Licensing" section to `README.md` to clarify the dual-license model (GPL-3.0 for code, CC BY-SA 4.0 for data/docs).
+  - Updated `ROADMAP.md` to remove a redundant documentation task and add new, specific pre-publication action items.
+  
+  **Testing Framework:**
+  - Updated `TESTING.md` to formally describe the multi-layered testing strategy (Unit, Orchestration, Integration).
+  - Updated the status of `prepare_data.ps1` to "IN PROGRESS" to reflect the successful completion of the orchestration logic tests, pending the final end-to-end integration test.
 ## 5.4.5 (2025-08-17)
 
 ### Bump
