@@ -69,39 +69,55 @@ def main():
         description="Select and transform the final set of candidates.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+    parser.add_argument("--eligible-candidates", default="data/intermediate/adb_eligible_candidates.txt", help="Path to the eligible candidates input file.")
+    parser.add_argument("--ocean-scores", default="data/foundational_assets/ocean_scores.csv", help="Path to the OCEAN scores file (defines the final set).")
+    parser.add_argument("--eminence-scores", default="data/foundational_assets/eminence_scores.csv", help="Path to the eminence scores file (for sorting).")
+    parser.add_argument("--country-codes", default="data/foundational_assets/country_codes.csv", help="Path to the country codes mapping file.")
     parser.add_argument("-o", "--output-file", default="data/intermediate/adb_final_candidates.txt", help="Path for the final candidates output file.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
-    # Define all file paths
-    eligible_path = Path("data/intermediate/adb_eligible_candidates.txt")
-    ocean_path = Path("data/foundational_assets/ocean_scores.csv")
-    eminence_path = Path("data/foundational_assets/eminence_scores.csv")
-    country_codes_path = Path("data/foundational_assets/country_codes.csv")
+    # Define all file paths from arguments
+    eligible_path = Path(args.eligible_candidates)
+    ocean_path = Path(args.ocean_scores)
+    eminence_path = Path(args.eminence_scores)
+    country_codes_path = Path(args.country_codes)
     output_path = Path(args.output_file)
-    proceed = True
+    input_files = [eligible_path, ocean_path, eminence_path, country_codes_path]
 
-    if output_path.exists():
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-            if confirm != 'y':
-                proceed = False
+    # --- Intelligent Startup Logic ---
+    is_stale = False
+    if not args.force and output_path.exists():
+        output_mtime = os.path.getmtime(output_path)
+        is_stale = any(p.exists() and os.path.getmtime(p) > output_mtime for p in input_files)
 
-        if proceed:
-            try:
-                backup_dir = Path("data/backup")
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = (backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak")
-                shutil.copy2(output_path, backup_path)
-                logging.info(f"Created backup of existing file at: {backup_path}")
-            except (IOError, OSError) as e:
-                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-                sys.exit(1)
+        if is_stale:
+            print(f"{Fore.YELLOW}\nInput file(s) are newer than the existing output. Stale data detected.")
+            print("Automatically re-running full selection process...")
+            args.force = True
+    
+    # If the file is not stale and exists, it's up-to-date. Prompt user for re-run.
+    if not args.force and output_path.exists() and not is_stale:
+        print(f"\n{Fore.GREEN}Output file '{output_path}' is already up to date. ✨")
+        confirm = input("If you decide to go ahead with recreating the list of final candidates, a backup of the existing file will be created first. \nDo you wish to proceed? (Y/N): ").lower().strip()
+        if confirm == 'y':
+            args.force = True
         else:
-            print("\nOperation cancelled by user.\n")
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n")
             sys.exit(0)
+
+    # Perform the backup and overwrite if a re-run has been triggered (either by --force or by the prompts)
+    if args.force and output_path.exists():
+        try:
+            backup_dir = Path("data/backup")
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = (backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak")
+            shutil.copy2(output_path, backup_path)
+            print(f"{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
+        except (IOError, OSError) as e:
+            logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+            sys.exit(1)
 
     print(f"\n{Fore.YELLOW}--- Loading Files ---")
     try:
@@ -131,7 +147,7 @@ def main():
     unmapped_count = final_df["Country"].isna().sum()
     if unmapped_count > 0:
         logging.warning(f"Could not map {unmapped_count} 'CountryState' values. 'Country' will be blank for these.")
-    final_df["Country"].fillna("", inplace=True)
+    final_df["Country"] = final_df["Country"].fillna("")
     logging.info("Resolved 'CountryState' abbreviations to full 'Country' names.")
     
     # Step 3: Merge with eminence scores and sort

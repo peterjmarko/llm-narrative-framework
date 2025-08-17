@@ -56,8 +56,9 @@ Module                              Cov. (%)        Status & Justification
                                                     data-driven cutoff logic. Live LLM calls are validated via
                                                     integration testing.
 
-`src/select_final_candidates.py`    `N/A`           **PENDING.** Simple data filter. Validated by the pipeline's
-                                                    output artifacts.
+`src/select_final_candidates.py`    `~65%`          **COMPLETE.** The script was fully refactored and manually
+                                                    validated. Unit tests cover the entire data transformation
+                                                    workflow, including filtering, mapping, and sorting.
 
 `src/prepare_sf_import.py`          `N/A`           **PENDING.** Simple data formatter. Validated by successful import
                                                     of its output into Solar Fire.

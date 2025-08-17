@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.4.3 (2025-08-16)
+
+### Test
+
+- **Add test suite for OCEAN scoring and align UX**
+  - Creates a new pytest suite for generate_ocean_scores.py, covering response parsing, variance calculation, and the pre-flight check.
+  - Refactors generate_ocean_scores.py to align its startup logic (stale check, interactive prompt) and UX with the modern project standard.
+  - Polishes the UX of the lint_file_headers.py script for consistency.
+  - Updates TESTING.md with the status of the newly tested script.
+
+## 5.4.2 (2025-08-16)
+
+### Test
+
+- **Add test suite for eminence scoring and update docs**
+  - Creates a new pytest suite for generate_eminence_scores.py, covering response parsing, resumability, and the main orchestrator loop.
+  - Refactors generate_eminence_scores.py to add a stale-check and align its UX with the modern project standard.
+  - Updates CONTRIBUTING.md to formally document the architectural standard for resilient pipeline scripts.
+  - Updates TESTING.md with the status of the newly tested script.
+
 ## 5.4.1 (2025-08-16)
 
 ### Bump
@@ -14,6 +34,7 @@
   - Refactors select_eligible_candidates.py to a modern, resumable, Pandas-based architecture.
   - Adds unit tests for fetch_adb_data, find_wikipedia_links, validate_wikipedia_pages, and select_eligible_candidates.
   - Hardens pyproject.toml and build_docs.py for robustness.
+
 ## 5.4.0 (2025-08-16)
 
 ### Bump
