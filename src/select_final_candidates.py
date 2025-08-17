@@ -98,8 +98,9 @@ def main():
     
     # If the file is not stale and exists, it's up-to-date. Prompt user for re-run.
     if not args.force and output_path.exists() and not is_stale:
-        print(f"\n{Fore.GREEN}Output file '{output_path}' is already up to date. ✨")
-        confirm = input("If you decide to go ahead with recreating the list of final candidates, a backup of the existing file will be created first. \nDo you wish to proceed? (Y/N): ").lower().strip()
+        print(f"\n{Fore.YELLOW}WARNING: The candidates file at '{output_path}' is already up to date. ✨")
+        print(f"{Fore.YELLOW}If you decide to go ahead with recreating the list of final candidates, a backup will be created first.{Fore.RESET}")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
             args.force = True
         else:

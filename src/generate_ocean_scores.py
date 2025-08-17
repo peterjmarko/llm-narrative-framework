@@ -610,9 +610,10 @@ def main():
         last_variance_checks = initial_checks
     
     # If resuming, check if there's anything to do
-    if not subjects_to_process:
-        print(f"\n{Fore.GREEN}All subjects have already been processed. Output is up to date. ✨")
-        print("If you decide to go ahead with recreating OCEAN scores, a backup of the existing file will be created first.")
+    if not subjects_to_process and not args.force:
+        print(f"\n{Fore.YELLOW}WARNING: The scores file at '{output_path}' is already up to date. ✨")
+        print(f"{Fore.YELLOW}The update process incurs API costs and can take some time to complete.")
+        print(f"{Fore.YELLOW}If you decide to go ahead with recreating OCEAN scores, a backup of the existing file will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
             backup_and_overwrite_related_files(output_path)
@@ -629,6 +630,11 @@ def main():
     # Correctly calculate the total to process *after* the interactive prompt has run
     total_to_process = len(subjects_to_process)
     total_possible_subjects = len(processed_ids) + total_to_process
+
+    # Display a non-interactive warning if the script is proceeding automatically
+    if total_to_process > 0 and not (output_path.exists() and not args.force and not is_stale):
+        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
+
     print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
     print(f"Found {len(processed_ids):,} existing scores.")
     print(f"Processing {total_to_process:,} new subjects (out of {total_possible_subjects:,} total).")

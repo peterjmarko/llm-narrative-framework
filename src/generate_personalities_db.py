@@ -44,6 +44,8 @@ import argparse
 import csv
 import logging
 import math
+import os
+import re
 import shutil
 import sys
 from datetime import datetime
@@ -153,45 +155,64 @@ def main():
     parser = argparse.ArgumentParser(description="Generate final personalities DB.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--subject-db", default="data/processed/subject_db.csv", help="Path to the master subject database CSV.")
     parser.add_argument("--delineations-dir", default="data/foundational_assets/neutralized_delineations", help="Directory with neutralized delineation CSVs.")
+    parser.add_argument("--point-weights", default="data/foundational_assets/point_weights.csv", help="Path to point weights config file.")
+    parser.add_argument("--thresholds", default="data/foundational_assets/balance_thresholds.csv", help="Path to balance thresholds config file.")
     parser.add_argument("--output-file", default="data/personalities_db.txt", help="Path for the final output database.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
+    subject_db_path = Path(args.subject_db)
+    delineations_dir = Path(args.delineations_dir)
     output_path = Path(args.output_file)
-    proceed = True
 
-    if output_path.exists():
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-            if confirm != 'y':
-                proceed = False
-        
-        if proceed:
-            try:
-                backup_dir = Path('data/backup')
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-                shutil.copy2(output_path, backup_path)
-                logging.info(f"Created backup of existing file at: {backup_path}")
-            except (IOError, OSError) as e:
-                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-                sys.exit(1)
-        else:
-            print("\nOperation cancelled by user.\n")
-            sys.exit(0)
-
-    data_dir = Path(args.output_file).parent
+    # Define all configuration and data input files for the stale check
+    data_dir = Path(__file__).parent.parent / "data" # Assumes script is in src/
     point_weights_path = data_dir / "foundational_assets" / "point_weights.csv"
     thresholds_path = data_dir / "foundational_assets" / "balance_thresholds.csv"
+    
+    input_files = [subject_db_path, point_weights_path, thresholds_path]
+    if delineations_dir.exists():
+        input_files.extend(delineations_dir.glob("*.csv"))
+
+    # --- Intelligent Startup Logic ---
+    is_stale = False
+    if not args.force and output_path.exists():
+        output_mtime = os.path.getmtime(output_path)
+        is_stale = any(p.exists() and os.path.getmtime(p) > output_mtime for p in input_files)
+
+        if is_stale:
+            print(f"{Fore.YELLOW}\nInput file(s) are newer than the existing output. Stale data detected.")
+            print("Automatically re-running database generation...")
+            args.force = True
+
+    if not args.force and output_path.exists() and not is_stale:
+        print(f"\n{Fore.YELLOW}WARNING: The database at '{output_path}' is already up to date. ✨")
+        print(f"{Fore.YELLOW}If you decide to go ahead with the update, a backup of the existing file will be created first.{Fore.RESET}")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
+        if confirm == 'y':
+            args.force = True
+        else:
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n")
+            sys.exit(0)
+
+    if args.force and output_path.exists():
+        try:
+            backup_dir = Path('data/backup')
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+            shutil.copy2(output_path, backup_path)
+            print(f"{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
+        except (IOError, OSError) as e:
+            logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+            sys.exit(1)
 
     print("\nLoading configuration and delineation files...")
     point_weights = load_point_weights(point_weights_path)
     thresholds = load_thresholds(thresholds_path)
-    delineations = load_delineations(Path(args.delineations_dir))
+    delineations = load_delineations(delineations_dir)
 
-    print(f"Processing subjects from {args.subject_db}...")
+    print(f"Processing subjects from {subject_db_path.name}...")
     try:
         with open(args.output_file, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.writer(outfile, delimiter='\t')
@@ -204,7 +225,12 @@ def main():
                     classifications = calculate_classifications(placements, point_weights, thresholds)
                     desc_parts = [delineations.get(c, "") for c in classifications]
                     full_desc = " ".join(part for part in desc_parts if part).strip()
-                    writer.writerow([row['Index'], row['idADB'], row['Name'], row['Date'].split()[-1], full_desc])
+                    
+                    # Extract year correctly, handling different date formats
+                    year_match = re.search(r'\b(\d{4})\b', row['Date'])
+                    birth_year = year_match.group(1) if year_match else row['Date']
+                    
+                    writer.writerow([row['Index'], row['idADB'], row['Name'], birth_year, full_desc])
         
         # Count the number of records processed
         with open(args.subject_db, 'r', encoding='utf-8') as infile:

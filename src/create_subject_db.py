@@ -39,6 +39,7 @@ Its key function is to bridge the manual software step deterministically:
 import argparse
 import csv
 import logging
+import os
 import re
 import shutil
 import sys
@@ -143,36 +144,50 @@ def main():
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
+    chart_export_path = Path(args.chart_export)
+    final_candidates_path = Path(args.final_candidates)
     output_path = Path(args.output_file)
-    proceed = True
 
-    if output_path.exists():
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-            if confirm != 'y':
-                proceed = False
-        
-        if proceed:
-            try:
-                backup_dir = Path('data/backup')
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-                shutil.copy2(output_path, backup_path)
-                logging.info(f"Created backup of existing file at: {backup_path}")
-            except (IOError, OSError) as e:
-                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-                sys.exit(1)
+    # --- Intelligent Startup Logic ---
+    is_stale = False
+    if not args.force and output_path.exists():
+        output_mtime = os.path.getmtime(output_path)
+        # Check if any of the input files are newer than the output
+        input_files = [chart_export_path, final_candidates_path]
+        is_stale = any(p.exists() and os.path.getmtime(p) > output_mtime for p in input_files)
+
+        if is_stale:
+            print(f"{Fore.YELLOW}\nInput file(s) are newer than the existing output. Stale data detected.")
+            print("Automatically re-running...")
+            args.force = True
+
+    if not args.force and output_path.exists() and not is_stale:
+        print(f"\n{Fore.YELLOW}WARNING: The subject database at '{output_path}' is already up to date. ✨")
+        print(f"{Fore.YELLOW}If you decide to go ahead with the update, a backup of the existing database will be created first.{Fore.RESET}")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
+        if confirm == 'y':
+            args.force = True
         else:
-            print("\nOperation cancelled by user.\n")
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n")
             sys.exit(0)
 
-    print(f"\nLoading and parsing chart data from {args.chart_export}...")
-    chart_data_map = load_chart_data_map(Path(args.chart_export))
+    if args.force and output_path.exists():
+        try:
+            backup_dir = Path('data/backup')
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+            shutil.copy2(output_path, backup_path)
+            print(f"{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
+        except (IOError, OSError) as e:
+            logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+            sys.exit(1)
+
+    print(f"\nLoading and parsing chart data from {chart_export_path.name}...")
+    chart_data_map = load_chart_data_map(chart_export_path)
 
     # --- Assemble final list by merging the filtered list and chart export ---
-    print(f"Assembling master database from primary list: {args.final_candidates}")
+    print(f"Assembling master database from primary list: {final_candidates_path.name}")
     all_subjects = []
     missing_subjects_log = []  # Initialize list before the try block
     header = ["Index", "idADB", "Name", "Date", "Time", "ZoneAbbrev", "ZoneTime", "Place", "Country", "Latitude", "Longitude", 
@@ -193,6 +208,9 @@ def main():
                 if not chart_data:
                     missing_subjects_log.append({ 'Index': row['Index'], 'idADB': id_adb_key, 'Name': full_name, 'Reason': 'Not found in chart export' })
                     continue
+
+                # Blank out the ZoneAbbrev field as it's no longer needed
+                chart_data['ZoneAbbrev'] = ""
                 
                 subject_data = { "Index": int(row['Index']), "idADB": id_adb_key, **chart_data }
                 all_subjects.append(subject_data)
@@ -221,7 +239,7 @@ def main():
         sys.exit(1)
 
     # --- Write final output if validation passes ---
-    logging.info(f"Writing {len(all_subjects)} records to {args.output_file}...")
+    print(f"{Fore.CYAN}Writing {len(all_subjects)} records to {args.output_file}...{Fore.RESET}")
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8', newline='') as f:

@@ -167,8 +167,9 @@ def main():
 
     # --- Step 4: Decide whether to run ---
     if final_candidates_to_save.empty and not args.force:
-        print(f"\n{Fore.GREEN}All records have already been processed. Output is up to date. ✨")
-        confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. \nDo you wish to proceed? (Y/N): ").lower().strip()
+        print(f"\n{Fore.YELLOW}WARNING: The candidates file at '{output_path}' is already up to date. ✨")
+        print(f"{Fore.YELLOW}If you decide to go ahead with updating the list of candidates, a backup of the the existing file will be created first.{Fore.RESET}")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
             backup_and_overwrite(output_path)
             args.force = True

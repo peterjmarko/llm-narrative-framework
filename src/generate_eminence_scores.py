@@ -385,7 +385,7 @@ def main():
 
     print(f"\n{Fore.YELLOW}--- Starting Eminence Score Generation ---{Fore.RESET}")
 
-    # --- Intelligent Startup Logic ---
+    # --- Intelligent Startup Logic (Stale Check) ---
     if not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
@@ -393,51 +393,47 @@ def main():
             backup_and_overwrite(output_path)
             args.force = True
 
-    # --- Handle Overwrite with Backup and Confirmation ---
-    if output_path.exists():
-        if args.force:
-            # Non-interactive backup for runs started with --force
-            backup_and_overwrite(output_path)
-        else:
-            # Interactive prompt for manual runs on existing, non-stale data
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            print(f"This process incurs API costs and can take over 3 minutes to complete for each set of 1,000 records.{Fore.RESET}")
-            print(f"If you decide to go ahead with recreating the eminence scores, a backup of the existing file will be created first.")
-            confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
-            if confirm == 'y':
-                backup_and_overwrite(output_path)
-            else:
-                print(f"\n{Fore.YELLOW}Operation cancelled by user.\n")
-                sys.exit(0)
-
-    # --- Load Data and Create To-Do List ---
+    # --- Load Data and Determine Scope ---
     processed_ids = load_processed_ids(output_path)
     all_subjects = load_subjects_to_process(input_path, processed_ids)
 
+    if not all_subjects and not args.force:
+        print(f"\n{Fore.YELLOW}WARNING: The scores file at '{output_path}' is already up to date. ✨")
+        print(f"{Fore.YELLOW}The update process incurs API costs and can take some time to complete.")
+        print(f"{Fore.YELLOW}If you decide to go ahead with recreating the eminence scores, a backup of the existing file will be created first.{Fore.RESET}")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
+        if confirm == 'y':
+            backup_and_overwrite(output_path)
+            args.force = True
+            processed_ids = load_processed_ids(output_path)
+            all_subjects = load_subjects_to_process(input_path, processed_ids)
+        else:
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n")
+            sys.exit(0)
+    
+    if args.force and output_path.exists():
+        backup_and_overwrite(output_path)
+        processed_ids = load_processed_ids(output_path)
+        all_subjects = load_subjects_to_process(input_path, processed_ids)
+
     total_to_process = len(all_subjects)
     total_subjects_in_source = len(processed_ids) + total_to_process
+
+    # Display a non-interactive warning if the script is proceeding automatically
+    if total_to_process > 0 and not (output_path.exists() and not args.force and not is_stale):
+         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
+
     print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
     print(f"Found {len(processed_ids):,} existing scores.")
     print(f"Processing {total_to_process:,} new subjects (out of {total_subjects_in_source:,} total).")
-
-    if not all_subjects:
-        print(f"\n{Fore.GREEN}All subjects have already been processed. Nothing to do. ✨\n")
-
-    # --- Create Temporary Config for Model Override ---
-    # Create a new config parser and copy all relevant sections from the global config.
-    temp_config = configparser.ConfigParser()
-    if APP_CONFIG.has_section('LLM'):
-        temp_config['LLM'] = APP_CONFIG['LLM']
-    if APP_CONFIG.has_section('API'):
-        temp_config['API'] = APP_CONFIG['API']
-
-    # Now, override the model name with the one from the script's arguments.
-    if not temp_config.has_section('LLM'):
-        temp_config.add_section('LLM')
-    temp_config.set('LLM', 'model_name', args.model)
     
-    with open(temp_config_file, 'w') as f:
-        temp_config.write(f)
+    # --- Create Temporary Config for Model Override ---
+    temp_config = configparser.ConfigParser()
+    if APP_CONFIG.has_section('LLM'): temp_config['LLM'] = APP_CONFIG['LLM']
+    if APP_CONFIG.has_section('API'): temp_config['API'] = APP_CONFIG['API']
+    if not temp_config.has_section('LLM'): temp_config.add_section('LLM')
+    temp_config.set('LLM', 'model_name', args.model)
+    with open(temp_config_file, 'w') as f: temp_config.write(f)
 
     # --- Main Batch Processing Loop ---
     processed_count = 0
@@ -445,9 +441,6 @@ def main():
     max_consecutive_failures = 3
     was_interrupted = False
     run_completed_successfully = False
-
-    # Initialize the starting index for new entries. The final sort will re-index
-    # from 1, but this keeps the index column consistent during generation.
     current_index = len(processed_ids) + 1
 
     try:
@@ -457,62 +450,46 @@ def main():
             total_batches = (total_to_process + args.batch_size - 1) // args.batch_size
 
             print(f"\n{Fore.CYAN}--- Processing Batch {batch_num} of {total_batches} ---{Fore.RESET}")
-
-            # 1. Construct prompt
             subject_list_str = "\n".join([f'"{b["FirstName"]} {b["LastName"]}" ({b["Year"]}), ID {b["idADB"]}' for b in batch])
-            prompt_text = EMINENCE_PROMPT_TEMPLATE.format(batch_size=len(batch), subject_list=subject_list_str)
+            prompt_text = EMINENCE_PROMPT_TEMPLATE.format(subject_list=subject_list_str)
             temp_query_file.write_text(prompt_text, encoding='utf-8')
 
-            # 2. Call LLM worker
             worker_cmd = [
                 sys.executable, str(script_dir / "llm_prompter.py"),
-                f"eminence_batch_{batch_num}",
-                "--input_query_file", str(temp_query_file),
-                "--output_response_file", str(temp_response_file),
-                "--output_error_file", str(temp_error_file),
-                "--config_path", str(temp_config_file),
-                "--quiet"
+                f"eminence_batch_{batch_num}", "--input_query_file", str(temp_query_file),
+                "--output_response_file", str(temp_response_file), "--output_error_file", str(temp_error_file),
+                "--config_path", str(temp_config_file), "--quiet"
             ]
-
             subprocess.run(worker_cmd, check=False)
 
-            # 3. Process response
             if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
                 error_msg = temp_error_file.read_text(encoding='utf-8')
                 logging.error(f"Worker failed for batch {batch_num}. Error: {error_msg.strip()}")
                 consecutive_failures += 1
-                
-                # Fast-fail for critical errors
                 if "401" in error_msg or "403" in error_msg or "Unauthorized" in error_msg or "Forbidden" in error_msg:
                     logging.critical("Halting due to a fatal API authentication/authorization error.")
                     break
                 if consecutive_failures >= max_consecutive_failures:
                     logging.critical(f"Halting after {max_consecutive_failures} consecutive batch failures.")
                     break
-                
-                temp_error_file.unlink() # Clean up error file before next iteration
+                temp_error_file.unlink()
                 continue
-
+            
             if not temp_response_file.exists():
                 logging.error(f"Worker did not produce a response file for batch {batch_num}.")
                 consecutive_failures += 1
                 continue
             
-            # Reset failure count on a successful call
             consecutive_failures = 0
-
             response_text = temp_response_file.read_text(encoding='utf-8')
             parsed_scores = parse_batch_response(response_text)
 
             if len(parsed_scores) != len(batch):
-                logging.warning(f"LLM did not return the correct number of scores for batch {batch_num}. "
-                                f"Expected: {len(batch)}, Got: {len(parsed_scores)}. Saving what was returned.")
-
+                logging.warning(f"LLM did not return the correct number of scores for batch {batch_num}. Expected: {len(batch)}, Got: {len(parsed_scores)}. Saving what was returned.")
             if not parsed_scores:
                 logging.error(f"Failed to parse any scores from the LLM response for batch {batch_num}.")
                 continue
 
-            # 4. Save results
             save_scores_to_csv(output_path, parsed_scores, current_index)
             processed_count += len(parsed_scores)
             current_index += len(parsed_scores)
@@ -523,15 +500,11 @@ def main():
             print(f"{session_progress} | {overall_progress}")
             time.sleep(1)
         
-        # If the script reaches this point without a critical error or interruption,
-        # the run is considered successful, even if no new records were processed.
         run_completed_successfully = True
-
     except KeyboardInterrupt:
         was_interrupted = True
         print(f"\n\n{Fore.YELLOW}Process interrupted by user. Exiting gracefully.{Fore.RESET}")
     finally:
-        # --- Final Processing and Cleanup ---
         print(f"\n{Fore.YELLOW}--- Finalizing ---{Fore.RESET}")
         sort_and_reindex_scores(output_path)
         generate_scores_summary(output_path, total_subjects_in_source)
@@ -541,10 +514,7 @@ def main():
         if was_interrupted:
             logging.warning("Eminence score generation terminated by user. Re-run to continue. ✨\n")
         elif not run_completed_successfully:
-            # Not interrupted, but didn't finish = critical error break
             logging.critical("Eminence score generation halted due to critical errors. ✨\n")
-        # If the run completed, the summary report provides the definitive final status.
-        # No extra message is needed here to avoid redundancy.
 
 if __name__ == "__main__":
     main()

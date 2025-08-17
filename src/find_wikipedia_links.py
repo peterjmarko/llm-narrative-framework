@@ -542,9 +542,9 @@ def main():
     fieldnames = ['Index', 'idADB', 'ADB_Name', 'BirthYear', 'Entry_Type', 'Wikipedia_URL', 'Notes']
     
     if not lines_to_process:
-        print(f"\n{Fore.GREEN}All records have already been processed. Output is up to date. ✨")
-        
-        confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. \nDo you wish to proceed? (Y/N): ").lower().strip()
+        print(f"\n{Fore.YELLOW}WARNING: The links data file at `{output_path}` is already up to date. ✨")
+        print(f"{Fore.YELLOW}If you decide to go ahead with finding links again, a backup of the existing file will be created first.{Fore.RESET}")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
             print(f"{Fore.YELLOW}Forcing overwrite of existing output file...")
             backup_and_overwrite(output_path)
@@ -552,7 +552,9 @@ def main():
             processed_ids, links_found_before, max_index_before, timeouts_before = set(), 0, 0, 0
             lines_to_process = all_lines
         else:
-            finalize_and_report(output_path, fieldnames, all_lines)
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n")
+            # We still call finalize here to print the summary of the existing file.
+            finalize_and_report(output_path, fieldnames, all_lines, was_interrupted=False)
             sys.exit(0)
 
     if processed_ids:

@@ -473,12 +473,13 @@ def main():
             print(f"\n{Fore.YELLOW}--force flag detected. Overwriting existing output file...")
             backup_and_overwrite(output_path)
         else:
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. Do you wish to proceed? (Y/N): ").lower().strip()
+            print(f"\n{Fore.YELLOW}WARNING: The exported data at '{output_path}' already exists.")
+            print(f"{Fore.YELLOW}If you decide to go ahead with fetching the data again, a backup of the the existing file will be created first.{Fore.RESET}")
+            confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
             if confirm == 'y':
                 backup_and_overwrite(output_path)
             else:
-                print("\nOperation cancelled by user. No files were changed.")
+                print(f"\n{Fore.YELLOW}Operation cancelled by user. No files were changed.{Fore.RESET}")
                 # Summarize the existing file before exiting
                 if output_path.exists():
                     try:

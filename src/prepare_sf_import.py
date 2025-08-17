@@ -40,6 +40,7 @@ import argparse
 import calendar
 import csv
 import logging
+import os
 import re
 import shutil
 import sys
@@ -100,32 +101,41 @@ def main():
         logging.error(f"Input file not found: {input_path}")
         sys.exit(1)
 
-    proceed = True
-    if output_path.exists():
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The output file '{output_path}' already exists.")
-            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
-            if confirm != 'y':
-                proceed = False
-        
-        if proceed:
-            try:
-                backup_dir = Path('data/backup')
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
-                shutil.copy2(output_path, backup_path)
-                logging.info(f"Created backup of existing file at: {backup_path}")
-            except (IOError, OSError) as e:
-                logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-                sys.exit(1)
+    # --- Intelligent Startup Logic ---
+    is_stale = False
+    if not args.force and output_path.exists():
+        output_mtime = os.path.getmtime(output_path)
+        if os.path.exists(input_path) and os.path.getmtime(input_path) > output_mtime:
+            is_stale = True
+            print(f"{Fore.YELLOW}\nInput file is newer than the existing output. Stale data detected.")
+            print("Automatically re-running...")
+            args.force = True
+
+    if not args.force and output_path.exists() and not is_stale:
+        print(f"\n{Fore.YELLOW}WARNING: The import file at '{output_path}' is already up to date. ✨")
+        print(f"{Fore.YELLOW}If you decide to go ahead with the update, a backup of the existing file will be created.{Fore.RESET}")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
+        if confirm == 'y':
+            args.force = True
         else:
-            print("\nOperation cancelled by user.\n")
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n")
             sys.exit(0)
 
+    if args.force and output_path.exists():
+        try:
+            backup_dir = Path('data/backup')
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
+            shutil.copy2(output_path, backup_path)
+            print(f"{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
+        except (IOError, OSError) as e:
+            logging.error(f"{Fore.RED}Failed to create backup file: {e}")
+            sys.exit(1)
+
     print("")
-    logging.info(f"Reading filtered data from: {input_path}")
-    logging.info(f"Writing Solar Fire import file to: {output_path}")
+    print(f"Reading filtered data from: {input_path}")
+    print(f"{Fore.CYAN}Writing Solar Fire import file to: {output_path}{Fore.RESET}")
 
     processed_records = []
     try:

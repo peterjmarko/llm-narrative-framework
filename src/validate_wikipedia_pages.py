@@ -603,8 +603,9 @@ def main():
                 finalize_and_report(output_path, fieldnames, total_subjects, False)
                 sys.exit(0)
         else:
-            print(f"\n{Fore.GREEN}All records have already been validated. Output is up to date. ✨")
-            confirm = input("If you decide to go ahead and overwrite the existing file, a backup will be created first. \nDo you wish to proceed? (Y/N): ").lower().strip()
+            print(f"\n{Fore.YELLOW}WARNING: All records have already been validated. Output is up to date. ✨")
+            print(f"{Fore.YELLOW}If you decide to go ahead with validating all pages again, a backup of the existing file will be created first.{Fore.RESET}")
+            confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
             print(f"{Fore.YELLOW}Forcing overwrite of existing report...")
             backup_and_overwrite(output_path)

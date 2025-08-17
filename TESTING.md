@@ -60,17 +60,21 @@ Module                              Cov. (%)        Status & Justification
                                                     validated. Unit tests cover the entire data transformation
                                                     workflow, including filtering, mapping, and sorting.
 
-`src/prepare_sf_import.py`          `N/A`           **PENDING.** Simple data formatter. Validated by successful import
-                                                    of its output into Solar Fire.
+`src/prepare_sf_import.py`          `~58%`          **COMPLETE.** The script was fully refactored and manually
+                                                    validated. Unit tests cover the core data transformation and
+                                                    CQD formatting logic.
 
-`src/create_subject_db.py`          `N/A`           **PENDING.** Deterministic data integration script. Validated by
-                                                    the final `subject_db.csv`.
+`src/create_subject_db.py`          `~50%`          **COMPLETE.** The script was fully refactored and manually
+                                                    validated. Unit tests cover the core data integration logic,
+                                                    including Base58 decoding, file merging, and data flattening.
 
-`src/neutralize_delineations.py`    `N/A`           **PENDING.** Primary function is live LLM interaction. To be
-                                                    validated by successful execution.
+`src/neutralize_delineations.py`    `~19%`          **COMPLETE.** Unit tests cover the critical offline logic for parsing
+                                                    the esoteric input file format and correctly grouping items into
+                                                    LLM tasks. The live LLM calls are validated via integration testing.
 
-`src/generate_personalities_db.py`  `N/A`           **PENDING.** Core deterministic algorithm. Validated by the final
-                                                    `personalities_db.txt`.
+`src/generate_personalities_db.py`  `~75%`          **COMPLETE.** The script was fully refactored and manually
+                                                    validated. Unit tests cover the entire data assembly algorithm,
+                                                    including all calculations and text lookups.
 
 `prepare_data.ps1`                  `N/A`           **PENDING.** This is the integration test itself. It is validated
                                                     by the successful run of the entire pipeline.

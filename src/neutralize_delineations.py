@@ -34,6 +34,7 @@ import argparse
 import configparser
 import csv
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -238,14 +239,14 @@ def main():
         print(f"{Fore.YELLOW}This process incurs API costs and can take 10 minutes or more to complete.{Fore.RESET}")
         confirm = input("Backups will be created. Are you sure? (Y/N): ").lower()
         if confirm != "y":
-            print("Operation cancelled by user."); sys.exit(0)
+            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n"); sys.exit(0)
         try:
             backup_dir = Path("data/backup")
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_name = f"{output_dir.name}_{timestamp}.zip"
             shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
-            logging.info(f"Successfully created backup at: {backup_dir / backup_name}")
+            print(f"{Fore.CYAN}Successfully created backup at: {backup_dir / backup_name}{Fore.RESET}")
             shutil.rmtree(output_dir)
         except Exception as e:
             logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)
@@ -298,12 +299,21 @@ def main():
     input_path, output_dir = Path(args.input_file), Path(args.output_dir)
     if not input_path.exists(): logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}"); sys.exit(1)
 
+    # --- Intelligent Startup Logic (Stale Check) ---
+    if not args.force and output_dir.exists() and input_path.exists():
+        # Check if the input file is newer than the output directory itself
+        if os.path.getmtime(input_path) > os.path.getmtime(output_dir):
+            print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
+            print("Automatically re-running full neutralization process...")
+            args.force = True
+
     proceed = True
     if output_dir.exists():
         if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The output directory '{output_dir}' already exists.")
-            print(f"This process incurs API costs and can take over 10 minutes to complete.{Fore.RESET}")
-            confirm = input("A backup will be created. Are you sure you want to continue? (Y/N): ").lower().strip()
+            print(f"\n{Fore.YELLOW}WARNING: The neutralized delineations at '{output_dir}' is already up to date.")
+            print(f"{Fore.YELLOW}The update process incurs API costs and can take 10 minutes or more to complete.")
+            print(f"{Fore.YELLOW}If you decide to go ahead with this update, backups of the existing files will be created first.{Fore.RESET}")
+            confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
             if confirm != "y":
                 proceed = False
 
@@ -371,6 +381,10 @@ def main():
     processed_count, failed_count = 0, 0
     resorting_needed = False
     
+    # Display a non-interactive warning if the script is proceeding automatically
+    if tasks_to_run:
+        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
+
     try:
         with tqdm(total=len(tasks_to_run), desc="Processing Tasks", ncols=100) as pbar:
             for task in tasks_to_run:
@@ -437,10 +451,10 @@ def main():
         print(f"  - Failed:    {failed_count} tasks")
         
         if failed_count > 0:
-            logging.warning(f"Neutralization process finished with {failed_count} failure(s).")
-            logging.warning("Re-run the script to automatically process the failed tasks.\n")
+            print(f"\n{Fore.RED}Neutralization process finished with {failed_count} failure(s).{Fore.RESET}")
+            print(f"{Fore.YELLOW}Re-run the script to automatically process the failed tasks.{Fore.RESET}\n")
         else:
-            print(f"\n{Fore.GREEN}Neutralization process finished successfully. ✨\n")
+            print(f"\n{Fore.GREEN}Neutralization process finished successfully. ✨{Fore.RESET}\n")
 
 def debug_and_exit(prompt, worker_result, pbar, temp_dir):
     """Prints debug info and halts the script."""

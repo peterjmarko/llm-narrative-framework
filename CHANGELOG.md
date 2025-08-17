@@ -13,6 +13,7 @@
   - Refactors select_final_candidates.py to align its startup logic (stale check, interactive prompt) with the modern project standard.
   - Fixes an AttributeError in the lint_file_headers.py script.
   - Updates TESTING.md with the status of the newly tested script.
+  
 ## 5.4.3 (2025-08-16)
 
 ### Test
