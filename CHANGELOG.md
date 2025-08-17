@@ -12,6 +12,7 @@
   - Creates new pytest suites for prepare_sf_import, create_subject_db, neutralize_delineations, and generate_personalities_db.
   - Completes the refactoring of all data preparation scripts to align their startup logic (stale check, interactive prompt) and UX with the modern project standard.
   - Updates TESTING.md with the completed status of all data preparation scripts.
+  
 ## 5.4.4 (2025-08-16)
 
 ### Bump
@@ -25,7 +26,7 @@
   - Refactors select_final_candidates.py to align its startup logic (stale check, interactive prompt) with the modern project standard.
   - Fixes an AttributeError in the lint_file_headers.py script.
   - Updates TESTING.md with the status of the newly tested script.
-  
+
 ## 5.4.3 (2025-08-16)
 
 ### Test

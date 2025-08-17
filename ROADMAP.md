@@ -20,9 +20,9 @@ This document outlines planned development tasks and tracks known issues for the
 
 ### Documentation
 
-- [ ] **Create "How to Reproduce" Guide**
-  - [ ] Add a top-level section to `DOCUMENTATION.md` that provides a clear, step-by-step guide for reproducing the study's findings from start to finish.
 - [ ] **Final Documentation Polish**
+  - [ ] Replace placeholder LLM names (e.g., `GPT-5`, `Gemini 2.5 Pro`) in `article_main_text.md` with the specific, versioned models that were actually used in the research. This is critical for scientific reproducibility.
+  - [ ] Update counts and test results with actual research results.
   - [ ] Ensure all data files, scripts, and supplementary materials are clean, well-documented, and easy for an external researcher to understand.
 
 ## Online Presence & Open Science

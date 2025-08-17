@@ -29,6 +29,14 @@ Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
 -   **Hierarchical Analysis & Aggregation**: Performs a bottom-up aggregation of all data, generating level-aware summary files for a fully auditable research archive.
 -   **Powerful Reprocessing Engine**: Re-run data processing and analysis on existing results without repeating expensive LLM calls, making it easy to apply analysis updates or bug fixes.
 
+## Project Philosophy
+
+This framework was designed with three core principles in mind:
+
+1.  **Promote Open Science:** In response to the replication crisis, this project provides a fully transparent, open-source, and computationally reproducible pipeline. All data, code, and documentation are publicly available to encourage verification and new research.
+2.  **Provide a Method, Not an Endorsement:** This study uses astrology as a challenging "hard problem" to validate the framework's ability to detect weak signals in complex, narrative-based systems. **The goal is not to validate astrology**, but to demonstrate a robust scientific methodology.
+3.  **Focus on Empirical Questions:** The framework is designed to answer a single, empirical question: is there a detectable, non-random signal in the data? The deeper philosophical implications of the findings are explicitly deferred to a separate, companion article.
+
 ## 🔧 Requirements
 
 -   Python 3.8+
@@ -48,3 +56,12 @@ This project is extensively documented to support different use cases. The resou
 -   **For Developers (Contributing):** To contribute to the project, please see the **[🤝 Developer's Guide (CONTRIBUTING.md)](CONTRIBUTING.md)** for development setup and contribution workflows.
 
 -   **To see what's planned and track known issues**, view the **[🗺️ Project Roadmap (ROADMAP.md)](ROADMAP.md)**.
+
+## ⚖️ Licensing
+
+This project uses a dual-licensing model to promote open science:
+
+-   All **source code** is licensed under the **[GNU General Public License v3.0](LICENSE.md)**.
+-   All **data, documentation, and other written content** are licensed under the **[Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/)**.
+
+This ensures that the framework and its derivatives will always remain open-source, while also allowing the data and research to be freely shared and adapted under terms that are standard for scientific and creative works.

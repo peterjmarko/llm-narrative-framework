@@ -19,6 +19,16 @@ The project uses `pytest` for Python unit tests and PowerShell scripts for integ
     pdm run cov-file validate_wikipedia_pages
     ```
 
+## Testing Strategy
+
+The framework is validated using a multi-layered testing strategy to ensure correctness at all levels, from individual functions to the full end-to-end pipeline.
+
+1.  **Unit Testing (Python / `pytest`):** Each Python script has a corresponding `pytest` file that tests its critical, offline logic in isolation. This includes testing data transformations, calculations, and response parsing logic. These tests are fast and run automatically as part of the main test suite.
+
+2.  **Orchestration Logic Testing (PowerShell + Mocks):** The PowerShell orchestrator scripts (e.g., `prepare_data.ps1`) are tested in isolation to validate their state machine logic. This is done by replacing the real Python scripts with simple "mock" scripts that instantly create empty output files. This allows for rapid and predictable testing of the orchestrator's core responsibilities: resumability, error handling, and correct sequencing of steps.
+
+3.  **End-to-End Integration Testing (Full Pipeline):** This is the final validation phase. The full pipeline is run using the **real** Python scripts on a small, controlled, and representative seed dataset. The goal is to verify that the data handoffs between each live script are correct and that the final output is as expected.
+
 ## Testing Process
 
 Each production script in the project is validated using the following three-step process:
@@ -76,8 +86,9 @@ Module                              Cov. (%)        Status & Justification
                                                     validated. Unit tests cover the entire data assembly algorithm,
                                                     including all calculations and text lookups.
 
-`prepare_data.ps1`                  `N/A`           **PENDING.** This is the integration test itself. It is validated
-                                                    by the successful run of the entire pipeline.
+`prepare_data.ps1`                  `N/A`           **IN PROGRESS.** Orchestration logic has been fully validated
+                                                    via mock script testing. Full end-to-end integration testing is
+                                                    now pending.
 --------------------------------------------------------------------------------------------------------------------
 
 ## Future Work

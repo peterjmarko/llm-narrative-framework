@@ -30,11 +30,11 @@
     interrupt-safe, and user-friendly.
 
     Key Features:
-    - Automatically checks the state of the pipeline and resumes from the last
-      completed step.
+    - Automatically checks the state of the pipeline and resumes from the first
+      incomplete step.
+    - Pauses with clear instructions when a manual user action (e.g., using
+      Solar Fire) is required.
     - Provides a clear summary report of which data files exist or are missing.
-    - Warns the user and requires confirmation before overwriting any existing data,
-      creating backups automatically.
     - Can be run in a read-only "report-only" mode to check the pipeline's status
       without making any changes.
     - Supports a '--force' flag for non-interactive, automated execution.
@@ -76,65 +76,31 @@ $C_YELLOW = "`e[93m"
 $C_RED = "`e[91m"
 $C_CYAN = "`e[96m"
 $C_GRAY = "`e[90m"
+$C_MAGENTA = "`e[95m"
 
 # --- Define Pipeline Steps and Artifacts ---
 $PipelineSteps = @(
-    @{
-        Name = "Fetch Raw ADB Data"
-        Script = "src/fetch_adb_data.py"
-        OutputFile = "data/sources/adb_raw_export.txt"
-    }
-    @{
-        Name = "Find Wikipedia Links"
-        Script = "src/find_wikipedia_links.py"
-        OutputFile = "data/processed/adb_wiki_links.csv"
-    }
-    @{
-        Name = "Validate Wikipedia Pages"
-        Script = "src/validate_wikipedia_pages.py"
-        OutputFile = "data/reports/adb_validation_report.csv"
-    }
-    @{
-        Name = "Select Eligible Candidates"
-        Script = "src/select_eligible_candidates.py"
-        OutputFile = "data/processed/adb_eligible_candidates.txt"
-    }
-    @{
-        Name = "Generate Eminence Scores"
-        Script = "src/generate_eminence_scores.py"
-        OutputFile = "data/foundational_assets/eminence_scores.csv"
-    }
-    @{
-        Name = "Generate OCEAN Scores"
-        Script = "src/generate_ocean_scores.py"
-        OutputFile = "data/foundational_assets/ocean_scores.csv"
-    }
-    @{
-        Name = "Select Final Candidates"
-        Script = "src/select_final_candidates.py"
-        OutputFile = "data/processed/adb_final_candidates.txt"
-    }
-    @{
-        Name = "Prepare SF Import File"
-        Script = "src/prepare_sf_import.py"
-        OutputFile = "data/intermediate/sf_data_import.txt"
-    }
-    # Manual step is not included here
-    @{
-        Name = "Neutralize Delineations"
-        Script = "src/neutralize_delineations.py"
-        OutputFile = "data/foundational_assets/neutralized_delineations/aspects.csv" # Check for one representative file
-    }
-    @{
-        Name = "Create Subject Database"
-        Script = "src/create_subject_db.py"
-        OutputFile = "data/processed/subject_db.csv"
-    }
-    @{
-        Name = "Generate Personalities Database"
-        Script = "src/generate_personalities_db.py"
-        OutputFile = "personalities_db.txt"
-    }
+    @{ Name="Fetch Raw ADB Data";         Script="src/fetch_adb_data.py";             OutputFile="data/sources/adb_raw_export.txt";                   Type="Automated" },
+    @{ Name="Find Wikipedia Links";       Script="src/find_wikipedia_links.py";        OutputFile="data/processed/adb_wiki_links.csv";                Type="Automated" },
+    @{ Name="Validate Wikipedia Pages";   Script="src/validate_wikipedia_pages.py";   OutputFile="data/reports/adb_validation_report.csv";           Type="Automated" },
+    @{ Name="Select Eligible Candidates"; Script="src/select_eligible_candidates.py"; OutputFile="data/processed/adb_eligible_candidates.txt";        Type="Automated" },
+    @{ Name="Generate Eminence Scores";   Script="src/generate_eminence_scores.py";   OutputFile="data/foundational_assets/eminence_scores.csv";     Type="Automated" },
+    @{ Name="Generate OCEAN Scores";      Script="src/generate_ocean_scores.py";      OutputFile="data/foundational_assets/ocean_scores.csv";        Type="Automated" },
+    @{ Name="Select Final Candidates";    Script="src/select_final_candidates.py";    OutputFile="data/processed/adb_final_candidates.txt";          Type="Automated" },
+    @{ Name="Prepare SF Import File";     Script="src/prepare_sf_import.py";          OutputFile="data/intermediate/sf_data_import.txt";             Type="Automated" },
+    @{ Name="MANUAL: Solar Fire Processing"; OutputFile="data/foundational_assets/sf_chart_export.csv"; Type="Manual"; Instructions=@"
+The script is paused. Please perform the manual Solar Fire import, calculation, and chart export process. The required output file is:
+$($C_CYAN)data/foundational_assets/sf_chart_export.csv$($C_RESET)
+"@
+    },
+    @{ Name="MANUAL: Delineation Export";    OutputFile="data/foundational_assets/sf_delineations_library.txt"; Type="Manual"; Instructions=@"
+The script is paused. Please perform the one-time Solar Fire delineation library export. The required output file is:
+$($C_CYAN)data/foundational_assets/sf_delineations_library.txt$($C_RESET)
+"@
+    },
+    @{ Name="Neutralize Delineations";    Script="src/neutralize_delineations.py";    OutputFile="data/foundational_assets/neutralized_delineations/aspects.csv"; Type="Automated" },
+    @{ Name="Create Subject Database";    Script="src/create_subject_db.py";          OutputFile="data/processed/subject_db.csv";                    Type="Automated" },
+    @{ Name="Generate Personalities DB";  Script="src/generate_personalities_db.py";  OutputFile="personalities_db.txt";                             Type="Automated" }
 )
 
 # --- Helper Functions ---
@@ -147,7 +113,7 @@ function Format-Banner {
     $leftPad = [Math]::Floor($paddingNeeded / 2)
     $rightPad = [Math]::Ceiling($paddingNeeded / 2)
     $centeredMsg = "$bookend $(' ' * $leftPad)$Message$(' ' * $rightPad) $bookend"
-    
+
     Write-Host ""
     Write-Host "$Color$line"
     Write-Host "$Color$centeredMsg"
@@ -157,9 +123,9 @@ function Format-Banner {
 
 function Show-PipelineStatus {
     param([array]$Steps)
-    
+
     Format-Banner "Data Preparation Pipeline Status" $C_YELLOW
-    
+
     $nameWidth = 40
     $statusWidth = 12
     Write-Host ("{0,-$nameWidth} {1}" -f "Step", "Status")
@@ -171,7 +137,11 @@ function Show-PipelineStatus {
             $status = "$($C_GREEN)[EXISTS]$($C_RESET)"
             $filesExist = $true
         } else {
-            $status = "$($C_RED}[MISSING]$($C_RESET)"
+            if ($step.Type -eq 'Manual') {
+                $status = "$($C_MAGENTA)[PENDING]$($C_RESET)"
+            } else {
+                $status = "$($C_RED)[MISSING]$($C_RESET)"
+            }
         }
         Write-Host ("{0,-$nameWidth} {1}" -f $step.Name, $status)
     }
@@ -193,16 +163,16 @@ try {
 
     # --- Step 1: Initial State Check and User Confirmation ---
     $anyFileExists = Show-PipelineStatus -Steps $PipelineSteps
-    
+
     if ($ReportOnly.IsPresent) {
-        Write-Host "Report-only mode enabled. Exiting." -ForegroundColor $C_CYAN
+        Write-Host "${C_CYAN}Report-only mode enabled. Exiting.${C_RESET}"
         return
     }
 
     if ($anyFileExists -and -not $Force.IsPresent) {
         Write-Host "${C_YELLOW}WARNING: One or more data files already exist."
-        Write-Host "The pipeline will resume from the first missing step. This may overwrite subsequent files."
-        $confirm = Read-Host "If you decide to go ahead and overwrite the existing file, a backup will be created first. Do you wish to proceed? (Y/N)"
+        Write-Host "The pipeline will resume from the first incomplete step."
+        $confirm = Read-Host "Do you wish to proceed? (Y/N)"
         if ($confirm.Trim().ToLower() -ne 'y') {
             Write-Host "`nOperation cancelled by user."
             Show-PipelineStatus -Steps $PipelineSteps # Show status again on exit
@@ -216,16 +186,22 @@ try {
     foreach ($step in $PipelineSteps) {
         $stepCounter++
         $stepName = $step.Name
-        $scriptPath = $step.Script
         $outputFile = $step.OutputFile
 
-        Format-Banner "Step $stepCounter/$totalSteps: $stepName"
+        Format-Banner "Step ${stepCounter}/${totalSteps}: ${stepName}"
 
         if (Test-Path $outputFile) {
             Write-Host "${C_GREEN}Output file '$outputFile' already exists. Skipping step.$($C_RESET)"
             continue
         }
 
+        # Handle manual vs automated steps
+        if ($step.Type -eq 'Manual') {
+            throw "Manual step required. $($step.Instructions)`n`nAfter completing this step, re-run this script to continue the pipeline."
+        }
+
+        # This is an automated step
+        $scriptPath = $step.Script
         $fullScriptPath = Join-Path $ScriptRoot $scriptPath
         $arguments = $prefixArgs + $fullScriptPath
 
@@ -241,13 +217,13 @@ try {
 }
 catch {
     $errorMessage = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { $_ }
-    Format-Banner "PIPELINE FAILED" $C_RED
-    Write-Host "${C_RED}ERROR: $errorMessage${C_RESET}`n"
+    Format-Banner "PIPELINE HALTED" $C_RED
+    Write-Host "${C_RED}REASON: $errorMessage${C_RESET}`n"
     $exitCode = 1
 }
 finally {
-    Write-Host "${C_GRAY}--- Final Pipeline Status ---"
-    Show-PipelineStatus -Steps $PipelineSteps
+    Write-Host "${C_GRAY}--- Final Pipeline Status ---${C_RESET}"
+    Show-PipelineStatus -Steps $PipelineSteps | Out-Null
     exit $exitCode
 }
 
