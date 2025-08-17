@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.4.5 (2025-08-17)
+
+### Bump
+
+- **version 5.4.4 → 5.4.5**
+
+### Refactor
+
+- **test suites and align UX for remaining data prep scripts**
+  - Creates new pytest suites for prepare_sf_import, create_subject_db, neutralize_delineations, and generate_personalities_db.
+  - Completes the refactoring of all data preparation scripts to align their startup logic (stale check, interactive prompt) and UX with the modern project standard.
+  - Updates TESTING.md with the completed status of all data preparation scripts.
 ## 5.4.4 (2025-08-16)
 
 ### Bump
