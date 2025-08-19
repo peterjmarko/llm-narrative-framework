@@ -1,5 +1,23 @@
 # Changelog
 
+## 5.6.1 (2025-08-19)
+
+### Bump
+
+- **version 5.6.0 → 5.6.1**
+
+### Fixes
+
+- **standardize logging and improve test harness**
+  - fix(logging): Standardized logging across experiment wrappers and their Python backends to ensure real-time, sequential, and clear output with standardized relative paths.
+  
+  - refactor(testing): Replaced the manual copy-paste workflow for Layer 4 integration testing with a robust, script-based harness that uses a state file to reliably manage and clean up multiple test runs.
+  
+  - docs(testing): Overhauled TESTING.md to document the new script-based harness with clearer, safer instructions.
+  
+  - chore(linting): Updated linters to exclude the new testing harness scripts.
+  
+  - chore: Updated ROADMAP.md to reflect the completion of the logging fix.
 ## 5.6.0 (2025-08-18)
 
 ### Bump
