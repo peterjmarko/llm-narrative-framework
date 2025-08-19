@@ -405,11 +405,12 @@ Module                                  Cov. (%)        Status & Justification
 
 `src/build_llm_queries.py`              `~68%`          **COMPLETE.** Unit tests cover the core orchestration logic,
                                                         including new runs, continued runs, and key failure modes.
-`src/llm_prompter.py`                   `PENDING`       **IN PROGRESS.** Unit testing will be performed next.
-
-`src/process_llm_responses.py`          `PENDING`       **PENDING.** Unit testing will be performed next.
-
-`src/analyze_llm_performance.py`        `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/llm_prompter.py`                   `~53%`          **COMPLETE.** Unit tests cover the core logic for successful API
+                                                        calls, error conditions (HTTP, timeout), and file I/O failures.
+`src/process_llm_responses.py`          `~67%`          **COMPLETE.** Unit tests cover the core parsing logic, including
+                                                        markdown, fallback, flexible spacing, reordered columns, and
+                                                        key failure modes.
+`src/analyze_llm_performance.py`        `PENDING`       **IN PROGRESS.** Unit testing will be performed next.
 
 `src/run_bias_analysis.py`              `PENDING`       **PENDING.** Unit testing will be performed next.
 

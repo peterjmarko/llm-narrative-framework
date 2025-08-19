@@ -14,6 +14,7 @@
   - refactor(build_queries): Refactored `build_llm_queries.py` to load configuration defaults inside the `main()` function instead of at the module level. This change was critical for making the script testable in isolation without affecting its production behavior.
   
   - docs(testing): Updated `TESTING.md` to reflect the completion of the `build_llm_queries.py` tests.
+  
 ## 5.6.2 (2025-08-19)
 
 ### Bump
@@ -30,7 +31,7 @@
   - style(changelog): Manually added a blank line between release entries in `CHANGELOG.md` for improved readability.
   - docs(testing): Updated `TESTING.md` with the latest test plan status and fixed table formatting.
   - chore: Updated `ROADMAP.md` to reflect the completion of the `process_study.ps1` logging fix.
-  
+
 ## 5.6.1 (2025-08-19)
 
 ### Bump

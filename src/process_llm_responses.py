@@ -231,21 +231,21 @@ def get_core_name(name_with_details):
 
 def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_ordered_from_query, is_rank_based=False):
     """
-    Robustly parses LLM response text into a k x k numerical score matrix using a fully manual
-    line-by-line, field-by-field approach to maximize flexibility and error tolerance.
-    It uses a two-stage strategy:
-    1. Primary: Extracts text from a markdown code block (```...```).
-    2. Fallback: If no markdown is found, it attempts to parse the last k+1 non-empty lines.
+    Robustly parses LLM response text into a k x k numerical score matrix.
 
-    It specifically handles:
-    - Markdown code block fences.
-    - Prioritizes tab-separated parsing as per instruction, falls back to flexible space/pipe splitting.
-    - Assumes the first valid line is the header, then robustly identifies "ID X" columns.
-    - Extracts only the k x k numerical scores, ignoring name columns or other extraneous data.
-    - Gracefully handling non-numeric or missing score values by defaulting to 0.0.
-    - Clamping final scores to the [0.0, 1.0] range.
-    Returns the matrix, a count of warnings encountered during parsing, and a boolean
-    indicating if the matrix should be rejected due to critical parsing errors.
+    This parser uses a multi-stage strategy for maximum flexibility:
+    1.  **Table Isolation**: It first tries to find a markdown code block (```...```).
+        If not found, it falls back to parsing the last k+1 non-empty lines of the response.
+    2.  **Header Parsing**: It identifies the header, determines the visual order of
+        the 'ID X' columns, and builds a map to reorder them correctly. It handles
+        both tab-separated and flexible space/pipe-separated headers.
+    3.  **Data Row Parsing**: It uses the `(YYYY)` birth year in each data row as a
+        reliable anchor to separate the name from the score values. It then
+        parses the scores and uses the header map to place them in the correct
+        final order (ID 1, ID 2, ...).
+
+    The function gracefully handles malformed data, clamps scores to the [0.0, 1.0]
+    range, and returns the final matrix, a warning count, and a rejection status.
     """
     warning_count = 0 # Initialize warning counter for this response
     is_rejected = False # Initialize rejection flag
@@ -311,7 +311,7 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
             # Attempt 2: Flexible space/pipe splitting if tab-separated didn't yield clear IDs
             logging.warning("Tab-separated header did not clearly contain 'ID 1' and 'ID k'. Trying flexible space/pipe splitting for header.")
             warning_count += 1
-            header_parts_raw = re.split(r'[\s|]+', header_line_content)
+            header_parts_raw = [p for p in re.split(r'\s*\|\s*|\s+', header_line_content) if p]
             header_split_method = 'flexible'
             logging.debug(f"Header identified by flexible split. Raw parts: {header_parts_raw}")
 
@@ -353,42 +353,67 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
         score_col_indices_ordered = [id_column_map[i] for i in range(1, k_value + 1)]
         logging.debug(f"Ordered score column indices: {score_col_indices_ordered}")
 
-        # 3. Extract score data rows
+        # 3. Extract score data rows using a more robust strategy
         collected_score_data = []
-        # Start from the second processed line, as the first is assumed to be the header
-        for i, line in enumerate(processed_lines[1:], start=1): # start=1 for correct line numbering in logs
-            # Use the same splitting method for data rows as was used for the header
-            if header_split_method == 'tab':
-                parts = line.split('\t')
-            else: # 'flexible'
-                parts = re.split(r'[\s|]+', line.strip())
+        data_lines = processed_lines[1:] # All lines after the header
+        
+        if len(data_lines) != k_value:
+             logging.warning(f"  Expected {k_value} data rows, but found {len(data_lines)}. The response may be incomplete or malformed.")
+             warning_count +=1
+             is_rejected = True
 
-            # Check if line is too short for any expected ID column
-            # max(score_col_indices_ordered) gives the highest column index we need to access
-            if not parts or len(parts) <= max(score_col_indices_ordered):
-                logging.warning(f"  Skipping short or malformed data line (L{i+1}): '{line.strip()}'. Not enough parts for all ID columns.")
+        for line in data_lines:
+            # Use the birth year in parentheses as a reliable anchor to split the name from the scores
+            match = re.search(r'(\(\d{4}\))', line)
+            if not match:
+                logging.warning(f"  Could not find birth year anchor '(YYYY)' in line. Skipping line: '{line}'")
                 warning_count += 1
-                is_rejected = True # Critical: Data line malformed
-                continue # Skip this line, but continue processing other lines if possible
-
-            current_row_scores = []
-            for col_idx in score_col_indices_ordered:
-                try:
-                    score_str = parts[col_idx]
-                    score_val = float(score_str)
-                    current_row_scores.append(score_val)
-                except (ValueError, IndexError):
-                    logging.warning(f"  Non-numeric or missing score at column {col_idx} in line L{i+1}. Using 0.0. Line: '{line.strip()}'")
-                    warning_count += 1
-                    is_rejected = True # Critical: Non-numeric score found
-                    current_row_scores.append(0.0)
+                is_rejected = True
+                continue
+                
+            # The scores are everything after the closing parenthesis of the year
+            split_point = match.end()
+            scores_part_of_line = line[split_point:].strip()
             
-            if len(current_row_scores) == k_value:
-                collected_score_data.append(current_row_scores)
-            else:
-                logging.warning(f"  Skipping malformed data row (incorrect number of scores after extraction) L{i+1}: '{line.strip()}'")
+            # Split only the scores part using the flexible regex
+            score_parts = [p for p in re.split(r'\s*\|\s*|\s+', scores_part_of_line) if p]
+
+            if len(score_parts) < k_value:
+                logging.warning(f"  Line contains too few score columns ({len(score_parts)} found, {k_value} expected). Line: '{line}'")
                 warning_count += 1
-                is_rejected = True # Critical: Data row malformed after extraction
+                is_rejected = True
+                continue
+
+            # The header map tells us which ID is in which original column position.
+            # We must use this map to reorder the scores into the correct final order (ID 1, ID 2, ...).
+            current_row_scores_ordered = [0.0] * k_value
+            is_row_valid = True
+            
+            # Create a map from a header column's index to the ID number it represents.
+            header_col_to_id_map = {v: k for k, v in id_column_map.items()}
+            # Get the indices of only the score columns, sorted by their visual appearance in the header.
+            sorted_score_header_indices = sorted(id_column_map.values())
+
+            # Iterate through the scores in the order they appear in the line.
+            for i, score_part in enumerate(score_parts):
+                try:
+                    # Find the original header column index for this score's visual position.
+                    header_col_index = sorted_score_header_indices[i]
+                    # Use the reverse map to find which ID this column corresponds to.
+                    id_num = header_col_to_id_map[header_col_index]
+                    
+                    score_val = float(score_part)
+                    # Place the score in the correct final position (id_num is 1-based).
+                    current_row_scores_ordered[id_num - 1] = score_val
+                except (ValueError, IndexError, KeyError):
+                    logging.warning(f"  Non-numeric, missing, or unmappable score at visual position {i+1}. Using 0.0. Line: '{line}'")
+                    warning_count += 1
+                    is_rejected = True
+                    is_row_valid = False
+                    break # Stop processing this invalid row
+            
+            if is_row_valid:
+                collected_score_data.append(current_row_scores_ordered)
 
         # 4. Convert collected scores to a NumPy array and ensure k x k shape
         if not collected_score_data:
