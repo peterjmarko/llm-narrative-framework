@@ -25,19 +25,30 @@ The project uses `pytest` for Python unit tests. All automated tests are managed
 
 This section provides a unified, step-by-step guide to the project's validation process, from developing a single script to performing a full end-to-end integration test of the data preparation pipeline.
 
-### The Three Layers of Validation
+### The Four Layers of Validation
 
 The framework is validated using a multi-layered strategy to ensure correctness at all levels:
 
-1.  **Unit Testing:** Validating a single Python script in isolation.
-2.  **Orchestration Logic Testing:** Validating a PowerShell orchestrator's logic using mock scripts.
-3.  **End-to-End Integration Testing:** Validating the entire pipeline with real scripts and a controlled seed dataset.
+1.  **Layer 1: Unit Testing:** Validating a single Python script in isolation.
+2.  **Layer 2: Orchestration Logic Testing:** Validating a PowerShell orchestrator's logic using mock scripts.
+3.  **Layer 3: Data Pipeline Integration Testing:** Validating the `prepare_data.ps1` pipeline from end to end with real scripts and a controlled seed dataset.
+4.  **Layer 4: Main Workflow Integration Testing:** Validating the core `new -> audit -> fix` experiment lifecycle with real scripts and a controlled seed dataset.
 
 ---
 
 ### Layer 1: Unit Testing (A Single Python Script)
 
 This is the iterative workflow for developing or modifying any individual Python script in the `src/` directory.
+
+#### **A Note on Workflow: The Smoke Test**
+After making any significant changes to the codebase—especially to core modules like `experiment_manager.py` or `orchestrate_replication.py`—it is highly recommended to perform a quick **smoke test** before proceeding with more detailed validation.
+
+This test simply runs the main `new_experiment.ps1` workflow. Its purpose is to catch obvious, critical bugs immediately.
+```powershell
+# Run a quick, minimal experiment to ensure the main pipeline is functional
+.\new_experiment.ps1
+```
+If this command completes successfully, you can proceed with confidence to the more detailed testing steps below. If it fails, you have found a major issue that should be fixed before continuing.
 
 #### **The Iterative Development Workflow**
 
@@ -278,193 +289,39 @@ Write-Host "Test environment cleaned up." -ForegroundColor Yellow
 
 ### Layer 4: End-to-End Integration Testing (Main Experiment Workflows)
 
-This procedure validates the core user-facing experiment lifecycle: creating a new experiment, auditing it, simulating a failure, and repairing it. It uses a minimal `config.ini` and a small, 3-subject `personalities_db.txt` to ensure the test is fast and makes minimal API calls.
+This procedure validates the core `new -> audit -> fix` experiment lifecycle using a set of dedicated, easy-to-use scripts. It follows a clean `Setup -> Test -> Cleanup` pattern.
 
-> **Troubleshooting:** If any step in this procedure fails, your recovery action is always the same: **re-run the "Step 1: Automated Setup and Reset" command.** This will safely clean up any failed artifacts and restore your project from the latest backups.
+> **Troubleshooting:** If any step fails, your recovery action is always the same: re-run the `Step 1: Automated Setup` script. This will safely clean up any failed artifacts and restore your project from the latest backups.
 
 #### Step 0: (CRITICAL) Manual Project Backup
-This automated test procedure is designed to be safe, but it will perform several actions that modify your project's state:
-*   It will temporarily replace your main `config.ini` and `data/personalities_db.txt` files. These will be restored during the cleanup phase.
-*   It will create a new experiment directory inside `output/new_experiments`, which will be deleted during the cleanup phase.
-
-To provide a complete safety net, it is critical that you first create a manual backup of these specific assets. The backup is intentionally selective; these are the only files and directories the test will touch. This ensures your project can be fully restored to its original state if anything unexpected happens.
-
-**Instructions:**
-
-1.  Create a new folder outside of the project directory (e.g., on your Desktop) and name it something like `project_backup`.
-2.  Using your file explorer, manually copy the following files and folders into your new `project_backup` folder:
-    *   The `config.ini` file from the project root.
-    *   The `personalities_db.txt` file from the `data/` directory.
-    *   The entire `output/new_experiments` directory.
+This procedure is designed to be safe, but it will temporarily modify core project files. To provide a complete safety net, it is critical that you first create a manual backup of these specific assets:
+*   The `config.ini` file from the project root.
+*   The `personalities_db.txt` file from the `data/` directory.
+*   The entire `output/new_experiments` directory.
 
 **Do not proceed until you have manually verified that these files are safely backed up.**
 
-#### Step 1: Automated Setup and Reset
-Run this command from the **project root**. It will safely clean up any artifacts from a previous run and create a fresh test environment by creating timestamped backups of your critical files.
+#### Step 1: Automated Setup
+Run this script from the **project root**. It will safely clean up any artifacts from a previous run and create a fresh test environment by creating timestamped backups of your critical files.
 
 ```powershell
-# --- A. Reset Environment (Idempotent Cleanup) ---
-Write-Host "Resetting test environment..." -ForegroundColor Yellow
-if (Get-Command deactivate -ErrorAction SilentlyContinue) { deactivate }
-# NOTE: We do NOT delete the 'output/new_experiments' directory.
-# The cleanup at the end of the test will surgically remove only the test-generated experiment.
-# Clean up any leftover test files before restoring backups
-Remove-Item -Path "config.ini" -Force -ErrorAction SilentlyContinue
-Remove-Item -Path "data/personalities_db.txt" -Force -ErrorAction SilentlyContinue
-
-# Restore original files from the latest backups to ensure a clean start
-$backupDir = "test_backups"; New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
-$latestConfigBackup = Get-ChildItem -Path $backupDir -Filter "config.ini.*.bak" | Sort-Object Name -Descending | Select-Object -First 1
-if ($latestConfigBackup) {
-    Copy-Item -Path $latestConfigBackup.FullName -Destination "config.ini" -Force
-}
-$latestDbBackup = Get-ChildItem -Path $backupDir -Filter "personalities_db.txt.*.bak" | Sort-Object Name -Descending | Select-Object -First 1
-if ($latestDbBackup) {
-    Copy-Item -Path $latestDbBackup.FullName -Destination "data/personalities_db.txt" -Force
-}
-
-# --- B. Backup and Setup ---
-$backupDir = "test_backups"; New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
-$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-# Backup original config.ini using a non-destructive COPY
-if (Test-Path -Path "config.ini") {
-    $backupFile = Join-Path $backupDir "config.ini.$timestamp.bak"
-    Write-Host "Backing up existing config.ini to $backupFile"
-    Copy-Item -Path "config.ini" -Destination $backupFile -Force
-}
-# Backup original personalities_db.txt using a non-destructive COPY
-if (Test-Path -Path "data/personalities_db.txt") {
-    $backupFile = Join-Path $backupDir "personalities_db.txt.$timestamp.bak"
-    Write-Host "Backing up existing data/personalities_db.txt to $backupFile"
-    Copy-Item -Path "data/personalities_db.txt" -Destination $backupFile -Force
-}
-
-# --- C. Create Test-Specific Artifacts ---
-# Create a minimal but complete config.ini for the test
-Set-Content -Path "config.ini" -Value @"
-[Study]
-num_replications = 1
-num_trials = 1
-group_size = 2
-mapping_strategy = correct
-
-[LLM]
-model_name = google/gemini-flash-1.5
-temperature = 0.2
-max_tokens = 8192
-max_parallel_sessions = 2
-
-[API]
-api_endpoint = https://openrouter.ai/api/v1/chat/completions
-referer_header = http://localhost:3000
-api_timeout_seconds = 120
-
-[General]
-base_output_dir = output
-queries_subdir = session_queries
-responses_subdir = session_responses
-analysis_inputs_subdir = analysis_inputs
-new_experiments_subdir = new_experiments
-experiment_dir_prefix = experiment_
-
-[Filenames]
-personalities_src = personalities_db.txt
-base_query_src = base_query.txt
-all_scores_for_analysis = all_scores.txt
-all_mappings_for_analysis = all_mappings.txt
-successful_indices_log = successful_query_indices.txt
-used_indices_log = used_personality_indices.txt
-
-[MetaAnalysis]
-default_top_k_accuracy = 3
-analysis_input_delimiter = \t
-
-[Schema]
-factors = model, mapping_strategy, temperature, k, m
-metrics = mean_mrr,mean_top_1_acc,mean_top_3_acc,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,mean_effect_size_r,mwu_stouffer_z,mwu_fisher_chi2,mean_rank_of_correct_id,n_valid_responses,top1_pred_bias_std,true_false_score_diff,bias_slope,bias_p_value
-csv_header_order = run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mwu_stouffer_z,mwu_stouffer_p,mwu_fisher_chi2,mwu_fisher_p,mean_effect_size_r,effect_size_r_p,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,mean_rank_of_correct_id,rank_of_correct_id_p,top1_pred_bias_std,true_false_score_diff,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err
-
-[Analysis]
-min_valid_response_threshold = 0
-"@ -Encoding utf8
-# --- Create the minimal personalities database in the DATA directory
-Set-Content -Path "data/personalities_db.txt" -Value @"
-Index`tidADB`tName`tBirthYear`tDescriptionText
-1`t1001`tSean Connery`t1930`tDescription for Connery.
-2`t1002`tAarón Hernán`t1930`tDescription for Hernan.
-3`t1003`tOdetta`t1930`tDescription for Odetta.
-"@ -Encoding utf8
-
-Write-Host "Main workflow test environment created successfully." -ForegroundColor Green
+.\scripts\testing_harness\layer4_step1_setup.ps1
 ```
 
-#### Step 2: Execute the Test and Clean Up
-This is a single, continuous workflow. **All commands must now be run from the project root.**
+#### Step 2: Execute the Test Workflow
+After setup is complete, run this script to execute the full `new -> audit -> fix` workflow. At the end, the test artifacts (e.g., the new experiment directory and its logs) are left intact for your inspection.
+
+> **Important:** You can re-run this script multiple times for debugging before proceeding to the final cleanup.
 
 ```powershell
-# a. Activate the venv from the project root
-. .\.venv\Scripts\Activate.ps1
+.\scripts\testing_harness\layer4_step2_test_workflow.ps1
+```
 
-# b. Run a new experiment from scratch.
-Write-Host "`n--- Running new_experiment.ps1 ---" -ForegroundColor Cyan
-.\new_experiment.ps1 -Verbose
+#### Step 3: Automated Cleanup
+After you have finished inspecting the experiment directory and its log files, run this script from the project root to restore your project to its original, clean state.
 
-# c. Find the new experiment directory and audit it
-Write-Host "`n--- Auditing new experiment (should be VALIDATED) ---" -ForegroundColor Cyan
-$expDir = Get-ChildItem -Path "output/new_experiments" -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
-.\audit_experiment.ps1 -TargetDirectory $expDir.FullName
-
-# d. Intentionally "break" the experiment
-Write-Host "`n--- Simulating failure by deleting a response file ---" -ForegroundColor Cyan
-$runDir = Get-ChildItem -Path $expDir.FullName -Directory "run_*" | Select-Object -First 1
-$responseFile = Get-ChildItem -Path (Join-Path $runDir.FullName "session_responses") -Include "llm_response_*.txt" -Recurse | Select-Object -First 1
-if ($null -ne $responseFile) {
-    Write-Host "Intentionally deleting response file: $($responseFile.Name)" -ForegroundColor Yellow
-    Remove-Item -Path $responseFile.FullName
-} else {
-    Write-Warning "Could not find a response file to delete for the test. The experiment may have failed to generate one."
-}
-
-# e. Audit the broken experiment (should report NEEDS REPAIR)
-Write-Host "`n--- Auditing broken experiment (should be NEEDS REPAIR) ---" -ForegroundColor Cyan
-.\audit_experiment.ps1 -TargetDirectory $expDir.FullName
-
-# f. Run the fix script to automatically repair the experiment
-Write-Host "`n--- Running fix_experiment.ps1 ---" -ForegroundColor Cyan
-.\fix_experiment.ps1 -TargetDirectory $expDir.FullName -NonInteractive
-
-# g. Run a final audit to confirm the repair (should be VALIDATED again)
-Write-Host "`n--- Final audit (should be VALIDATED) ---" -ForegroundColor Cyan
-.\audit_experiment.ps1 -TargetDirectory $expDir.FullName
-
-# h. Final Cleanup
-Write-Host "`n--- Test complete. Cleaning up... ---" -ForegroundColor Yellow
-if (Get-Command deactivate -ErrorAction SilentlyContinue) { deactivate }
-
-# Surgically remove ONLY the experiment directory created during this test
-if ($expDir -and (Test-Path $expDir.FullName)) {
-    Write-Host "Removing test experiment directory: $($expDir.FullName)"
-    Remove-Item -Path $expDir.FullName -Recurse -Force -ErrorAction SilentlyContinue
-}
-
-# Clean up other test artifacts from the project root
-Remove-Item -Path "config.ini" -Force -ErrorAction SilentlyContinue
-Remove-Item -Path "data/personalities_db.txt" -Force -ErrorAction SilentlyContinue
-
-# Restore original files from the latest backups using a non-destructive COPY
-$latestConfigBackup = Get-ChildItem -Path "test_backups" -Filter "config.ini.*.bak" | Sort-Object Name -Descending | Select-Object -First 1
-if ($latestConfigBackup) {
-    Write-Host "Restoring original config.ini from $($latestConfigBackup.Name)"
-    Copy-Item -Path $latestConfigBackup.FullName -Destination "config.ini" -Force
-}
-$latestDbBackup = Get-ChildItem -Path "test_backups" -Filter "personalities_db.txt.*.bak" | Sort-Object Name -Descending | Select-Object -First 1
-if ($latestDbBackup) {
-    Write-Host "Restoring original personalities_db.txt from $($latestDbBackup.Name)"
-    Copy-Item -Path $latestDbBackup.FullName -Destination "data/personalities_db.txt" -Force
-}
-
-Write-Host "`nMain workflow test environment cleaned up." -ForegroundColor Green
-Write-Host "The 'test_backups' directory still contains all backups for safety. You can delete it manually when ready." -ForegroundColor Yellow
+```powershell
+.\scripts\testing_harness\layer4_step3_cleanup.ps1
 ```
 
 ## Testing Status
@@ -527,20 +384,45 @@ Module                              Cov. (%)        Status & Justification
 
 The following table details the testing status for each script in the main experimental and analysis workflows.
 
---------------------------------------------------------------------------------------------------------------------
-Module                              Cov. (%)        Status & Justification
------------------------------------ --------------- -----------------------------------------------------------------
-`src/experiment_manager.py`         `~56%`          **COMPLETE.** Unit tests are complete, and the core `new`/`audit`/`fix`
-                                                    workflows have been successfully validated via the scripted
-                                                    end-to-end integration test.
+-----------------------------------------------------------------------------------------------------------------------------------------
+Module                                  Cov. (%)        Status & Justification
+--------------------------------------- --------------- ----------------------------------------------------------------------------------
+**Core Orchestrators**
+`src/experiment_manager.py`             `~56%`          **COMPLETE.** Unit tests are complete, and the core `new`/`audit`/`fix`
+                                                        workflows have been successfully validated via the scripted
+                                                        end-to-end integration test.
 
-`src/experiment_auditor.py`         `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/orchestrate_replication.py`        `PENDING`       **PENDING.** Unit testing will be performed next.
 
-`src/compile_*.py` (aggregators)    `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+**Single-Replication Pipeline**
+`src/build_llm_queries.py`              `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/llm_prompter.py`                   `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/process_llm_responses.py`          `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/analyze_llm_performance.py`        `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/run_bias_analysis.py`              `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/generate_replication_report.py`    `PENDING`       **PENDING.** Unit testing will be performed next.
 
-`src/study_analyzer.py`             `PENDING`       **PENDING.** Unit tests will be written for the statistical analysis
-                                                    script.
+**Auditing & Utility Scripts**
+`src/experiment_auditor.py`             `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/replication_log_manager.py`        `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/patch_old_experiment.py`           `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/restore_config.py`                 `PENDING`       **PENDING.** Unit testing will be performed next.
 
-PowerShell Wrappers (`*.ps1`)       `N/A`           **IN PROGRESS.** The core `new`, `audit`, and `fix` wrappers are
-                                                    validated. The `migrate` and `study`-level wrappers are pending.
---------------------------------------------------------------------------------------------------------------------
+**Aggregation & Analysis Scripts**
+`src/compile_replication_results.py`    `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+`src/compile_experiment_results.py`     `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+`src/compile_study_results.py`          `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+`src/study_analyzer.py`                 `PENDING`       **PENDING.** Unit tests will be written for the statistical analysis script.
+
+**PowerShell Wrappers (Experiment Level)**
+`new_experiment.ps1`                    `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+`audit_experiment.ps1`                  `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+`fix_experiment.ps1`                    `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+`migrate_experiment.ps1`                `N/A`           **PENDING.** Manual validation is pending.
+
+**PowerShell Wrappers (Study Level)**
+`audit_study.ps1`                       `N/A`           **PENDING.** Manual validation is pending.
+`fix_study.ps1`                         `N/A`           **PENDING.** Manual validation is pending.
+`migrate_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
+`process_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
+-----------------------------------------------------------------------------------------------------------------------------------------

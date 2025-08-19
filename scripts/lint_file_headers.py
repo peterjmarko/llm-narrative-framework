@@ -194,8 +194,12 @@ def main():
     print(f"Found {len(list(set(all_candidate_files)))} candidate files. Analyzing...")
     for f_path in sorted(list(set(all_candidate_files))):
         rel_path = os.path.relpath(f_path, project_root).replace(os.sep, '/')
-        if 'archive' in pathlib.Path(f_path).parts:
+        path_parts = pathlib.Path(f_path).parts
+        if 'archive' in path_parts:
             results['SKIPPED'].append(f"{rel_path} (in archive directory)")
+            continue
+        if 'testing_harness' in path_parts:
+            results['SKIPPED'].append(f"{rel_path} (in testing harness)")
             continue
         if os.path.basename(f_path) in EXCLUDED_FILENAMES:
             results['SKIPPED'].append(rel_path)

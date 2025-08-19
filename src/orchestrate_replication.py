@@ -154,7 +154,10 @@ def main():
             logging.error("FATAL: --run_output_dir must be a valid directory in --reprocess mode.")
             sys.exit(1)
         run_specific_dir_path = args.run_output_dir
-        print(f"\n{Fore.YELLOW}--- REPROCESS MODE for: ---\n{os.path.basename(run_specific_dir_path)}{Fore.RESET}")
+        
+        # Determine if this is a repair or a full reprocess for logging clarity
+        mode_string = "REPAIR MODE" if args.indices else "REPROCESS MODE"
+        print(f"\n{Fore.YELLOW}--- {mode_string} for: ---\n{os.path.basename(run_specific_dir_path)}{Fore.RESET}")
         
         config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
         if not os.path.exists(config_path):

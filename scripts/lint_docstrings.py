@@ -134,8 +134,11 @@ def main():
     files_to_process = []
     for f in sorted(list(set(all_candidate_files))):
         rel_path = os.path.relpath(f, project_root).replace(os.sep, '/')
-        if 'archive' in pathlib.Path(f).parts:
+        path_parts = pathlib.Path(f).parts
+        if 'archive' in path_parts:
             results['SKIPPED'].append(f"{rel_path} (in archive directory)")
+        elif 'testing_harness' in path_parts:
+            results['SKIPPED'].append(f"{rel_path} (in testing harness)")
         elif os.path.basename(f) in EXCLUDED_FILENAMES:
             results['SKIPPED'].append(rel_path)
         else:

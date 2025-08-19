@@ -74,7 +74,8 @@ try {
     if ($PSBoundParameters['Verbose']) { $pythonScriptArgs += "--verbose" }
     $pythonScriptArgs += "--force-color"
     $LogFilePath = Join-Path $ResolvedPath "experiment_audit_log.txt"
-    Write-Host "`nThe audit log will be saved to:"; Write-Host (Join-Path $TargetDirectory "experiment_audit_log.txt")
+    $relativeLogPath = Join-Path (Resolve-Path -Path $TargetDirectory -Relative) (Split-Path $LogFilePath -Leaf)
+    Write-Host "`nThe audit log will be saved to: $relativeLogPath"
     if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
 
     $finalArgs = @("python", $scriptName) + $pythonScriptArgs

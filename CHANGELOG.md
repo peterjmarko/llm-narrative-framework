@@ -24,6 +24,7 @@
   - Added a new high-level project overview diagram to `DOCUMENTATION.md`.
   - Updated the `TESTING.md` status tables to reflect the successful completion of the core workflow testing.
   - Made several strategic updates to the `ROADMAP.md` to improve the pre-publication workflow.
+  
 ## 5.5.0 (2025-08-17)
 
 ### Bump
@@ -56,7 +57,7 @@
   **Testing Framework:**
   - Updated `TESTING.md` to formally describe the multi-layered testing strategy (Unit, Orchestration, Integration).
   - Updated the status of `prepare_data.ps1` to "IN PROGRESS" to reflect the successful completion of the orchestration logic tests, pending the final end-to-end integration test.
-  
+
 ## 5.4.5 (2025-08-17)
 
 ### Bump

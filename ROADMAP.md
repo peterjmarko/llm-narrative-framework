@@ -19,10 +19,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
 
 The following issues will be addressed concurrently during the "Code Development and Testing" phase.
 
--   **Inconsistent Configuration Logic**:
-    -   Currently, `config.ini` entries for file paths (e.g., `personalities_src`) include the parent directory (`data/`). The best practice is for the config to only contain the filename, with the Python scripts being responsible for building the full path. This should be refactored across the codebase for consistency.
 -   **Inconsistent Logging**:
-    -   The log file for `repair_experiment.ps1` is not as detailed as those from other scripts.
     -   The `process_study.ps1` workflow does not currently generate a dedicated log file.
     -   Log files from migration scripts contain unnecessary PowerShell transcript headers and footers.
 -   **Redundant API Calls**: Forcing a migration on an already `VALIDATED` experiment unnecessarily re-runs all LLM API calls.

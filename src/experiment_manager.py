@@ -275,11 +275,20 @@ def _run_repair_mode(runs_to_repair, orchestrator_script_path, verbose, colors):
             cmd.append("--verbose")
 
         try:
-            # The orchestrator will now handle its own progress display.
-            subprocess.run(cmd, check=True)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, encoding='utf-8', errors='replace')
+            for line in proc.stdout:
+                print(line, end='', flush=True)
+            proc.wait()
+            stderr_output = proc.stderr.read()
+            if proc.returncode != 0:
+                raise subprocess.CalledProcessError(proc.returncode, proc.args, stderr=stderr_output)
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
             logging.error(f"Repair failed for {os.path.basename(run_dir)}.")
-            if isinstance(e, KeyboardInterrupt): sys.exit(AUDIT_ABORTED_BY_USER)
+            if isinstance(e, subprocess.CalledProcessError) and e.stderr:
+                print(e.stderr, file=sys.stderr)
+            if isinstance(e, KeyboardInterrupt):
+                sys.exit(AUDIT_ABORTED_BY_USER)
             return False # A single failure halts the entire repair operation.
             
     return True
@@ -504,12 +513,20 @@ def _run_reprocess_mode(runs_to_reprocess, notes, verbose, orchestrator_script, 
         if notes: cmd_orch.extend(["--notes", notes])
 
         try:
-            # The orchestrator is now responsible for the entire reprocessing lifecycle,
-            # including calling the bias analysis script.
-            subprocess.run(cmd_orch, check=True)
+            proc = subprocess.Popen(cmd_orch, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, encoding='utf-8', errors='replace')
+            for line in proc.stdout:
+                print(line, end='', flush=True)
+            proc.wait()
+            stderr_output = proc.stderr.read()
+            if proc.returncode != 0:
+                raise subprocess.CalledProcessError(proc.returncode, proc.args, stderr=stderr_output)
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
             logging.error(f"Reprocessing failed for {os.path.basename(run_dir)}.")
-            if isinstance(e, KeyboardInterrupt): sys.exit(1)
+            if isinstance(e, subprocess.CalledProcessError) and e.stderr:
+                print(e.stderr, file=sys.stderr)
+            if isinstance(e, KeyboardInterrupt):
+                sys.exit(AUDIT_ABORTED_BY_USER)
             return False
 
     # The main loop will handle the final aggregation.

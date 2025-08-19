@@ -129,8 +129,8 @@ function Write-Header($message, $color, $C_RESET) {
 }
 
 function Invoke-FinalizeExperiment-Local {
-    param($ProjectRoot, $TargetDirectory)
-    
+    param($ProjectRoot, $TargetDirectory, $LogFilePath)
+
     $pyScripts = @(
         @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("rebuild", $TargetDirectory); Msg="Log rebuild failed" },
         @{ Path=(Join-Path $ProjectRoot "src/compile_experiment_results.py"); Args=@($TargetDirectory); Msg="Aggregation failed" },
@@ -138,7 +138,8 @@ function Invoke-FinalizeExperiment-Local {
     )
 
     foreach($script in $pyScripts) {
-        & pdm run python $script.Path $script.Args
+        $finalArgs = @("python", $script.Path) + $script.Args
+        & pdm run $finalArgs *>&1 | Tee-Object -FilePath $LogFilePath -Append
         if ($LASTEXITCODE -ne 0) {
             throw $script.Msg
         }
@@ -153,24 +154,29 @@ $C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"
 $logFilePath = Join-Path $TargetDirectory "experiment_repair_log.txt"
 
 try {
-    Start-Transcript -Path $logFilePath -Force | Out-Null
-    Write-Host "`nThe repair log will be saved to: $(Resolve-Path -Path $logFilePath -Relative)" -ForegroundColor Gray
+    # Start with a clean log file for this run.
+    if (Test-Path $logFilePath) { Remove-Item $logFilePath -Force }
+    # Announce the intended log path using a standardized relative path.
+    $relativeLogPath = Join-Path (Resolve-Path -Path $TargetDirectory -Relative) (Split-Path $logFilePath -Leaf)
+    Write-Host "`nThe repair log will be saved to: $relativeLogPath" -ForegroundColor Gray
 
     if ($ForceUpdate.IsPresent) {
         $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive")
-        & pdm run python $procArgs
+        $finalArgs = @("python") + $procArgs
+        & pdm run $finalArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
         if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Forced update failed" }
         return
     }
 
     if ($ForceAggregate.IsPresent) {
-        Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory
+        Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory -LogFilePath $logFilePath
         return
     }
 
     Write-Header "STEP 1: DIAGNOSING EXPERIMENT STATE" $C_CYAN $C_RESET
-    $auditArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $TargetDirectory, "--force-color")
-    & pdm run python $auditArgs
+    $auditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $TargetDirectory, "--force-color")
+    $auditArgs = @("python") + $auditPyArgs
+    & pdm run $auditArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
     $auditExitCode = $LASTEXITCODE
     
     $actionTaken = $false
@@ -188,7 +194,7 @@ try {
                     } else { return }
                 }
                 '2' { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive") }
-                '3' { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory; $actionTaken = $true }
+                '3' { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory -LogFilePath $logFilePath; $actionTaken = $true }
                 'n' { return }
                 default { return }
             }
@@ -196,7 +202,7 @@ try {
         1 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive") }
         2 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $TargetDirectory, "--non-interactive") }
         3 { Write-Host "Experiment needs migration. Run migrate_experiment.ps1." -ForegroundColor Yellow; exit 1 }
-        4 { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory; $actionTaken = $true }
+        4 { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory -LogFilePath $logFilePath; $actionTaken = $true }
         default { throw "Audit failed with exit code $auditExitCode" }
     }
 
@@ -206,7 +212,8 @@ try {
         if ($Notes) { $procArgs += "--notes", $Notes }
         if ($Verbose) { $procArgs += "--verbose" }
         
-        & pdm run python $procArgs
+        $finalArgs = @("python") + $procArgs
+        & pdm run $finalArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
         $exitCode = $LASTEXITCODE
         if ($exitCode -ne 0 -and $exitCode -ne 99) { throw "Repair process failed with exit code $exitCode" }
         $actionTaken = $true
@@ -214,8 +221,9 @@ try {
 
     if ($actionTaken) {
         Write-Header "STEP 3: FINAL VERIFICATION" $C_CYAN $C_RESET
-        $finalAuditArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $TargetDirectory, "--force-color", "--non-interactive")
-        & pdm run python $finalAuditArgs
+        $finalAuditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $TargetDirectory, "--force-color", "--non-interactive")
+        $finalAuditArgs = @("python") + $finalAuditPyArgs
+        & pdm run $finalAuditArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
         $finalAuditCode = $LASTEXITCODE
         if ($finalAuditCode -ne 0) { throw "Final verification failed." }
         Write-Header "REPAIR SUCCESSFUL: Experiment is now valid." $C_GREEN $C_RESET
@@ -224,10 +232,19 @@ try {
 } catch {
     Write-Header "REPAIR FAILED" $C_RED $C_RESET
     Write-Host "$($C_RED)$($_.Exception.Message)$($C_RESET)`n"
+    # Write the error to the log file as well for completeness
+    if ($logFilePath) {
+        Add-Content -Path $logFilePath -Value "`nREPAIR FAILED: $($_.Exception.Message)"
+    }
     exit 1
 } finally {
-    Stop-Transcript | Out-Null
     if (Test-Path -LiteralPath $logFilePath) {
+        try {
+            $c = Get-Content -Path $logFilePath -Raw
+            $c = $c -replace "`e\[[0-9;]*m", ''
+            Set-Content -Path $logFilePath -Value $c.Trim() -Force
+        }
+        catch {}
         Write-Host "`nThe repair log has been saved to: $(Resolve-Path -Path $logFilePath -Relative)" -ForegroundColor Gray
     }
 }
