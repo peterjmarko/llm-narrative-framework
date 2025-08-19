@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.6.3 (2025-08-19)
+
+### Bump
+
+- **version 5.6.2 → 5.6.3**
+
+### Fixes
+
+- **add full unit test suite and refactor for testability**
+  - test(build_queries): Added a comprehensive unit test suite for `build_llm_queries.py`. Achieved 68% coverage, validating the orchestration logic for new runs, continued runs, and critical failure modes like insufficient data and worker script errors.
+  
+  - refactor(build_queries): Refactored `build_llm_queries.py` to load configuration defaults inside the `main()` function instead of at the module level. This change was critical for making the script testable in isolation without affecting its production behavior.
+  
+  - docs(testing): Updated `TESTING.md` to reflect the completion of the `build_llm_queries.py` tests.
 ## 5.6.2 (2025-08-19)
 
 ### Bump
