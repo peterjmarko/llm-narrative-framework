@@ -68,18 +68,7 @@ except ImportError:
             sys.exit(1)
 
 # --- Configuration from Config or Defaults (defined at module level) ---
-QUERY_GENERATOR_SCRIPT_NAME = "query_generator.py" 
-
-# Default filenames (these are just the names, paths resolved later)
-DEFAULT_MASTER_PERSONALITIES_FN = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="personalities_db.txt")
-# DEFAULT_BASE_QUERY_FN is used by query_generator.py, not directly by build_queries.py
-
-DEFAULT_BASE_OUTPUT_DIR_CFG = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback="output") 
-DEFAULT_QUERIES_SUBDIR_CFG = get_config_value(APP_CONFIG, 'General', 'queries_subdir', fallback="session_queries")
-
-DEFAULT_TEMP_SUBSET_FN = get_config_value(APP_CONFIG, 'Filenames', 'temp_subset_personalities', fallback="temp_subset_personalities.txt")
-DEFAULT_USED_INDICES_FN = get_config_value(APP_CONFIG, 'Filenames', 'used_indices_log', fallback="used_personality_indices.txt")
-DEFAULT_AGGREGATE_MAPPINGS_FN = get_config_value(APP_CONFIG, 'Filenames', 'aggregated_mappings_in_queries_dir', fallback="mappings.txt")
+QUERY_GENERATOR_SCRIPT_NAME = "query_generator.py"
 
 # --- Helper Functions ---
 # ... (load_all_personalities_df, load_used_indices, append_used_indices, 
@@ -184,17 +173,23 @@ def clear_output_files_for_fresh_run(output_dir, aggregate_mappings_filepath, us
 
 
 def main():
-    # Get defaults for argparse from module-level constants (which were loaded from config)
-    default_k_arg = get_config_value(APP_CONFIG, 'Study', 'group_size', fallback=10, value_type=int)
-    default_iter_arg = get_config_value(APP_CONFIG, 'Study', 'num_trials', fallback=100, value_type=int)
+    # --- Load dynamic defaults from config inside main() to ensure testability ---
+    DEFAULT_MASTER_PERSONALITIES_FN = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src', fallback="personalities_db.txt")
+    DEFAULT_BASE_OUTPUT_DIR_CFG = get_config_value(APP_CONFIG, 'General', 'base_output_dir', fallback="output")
+    DEFAULT_QUERIES_SUBDIR_CFG = get_config_value(APP_CONFIG, 'General', 'queries_subdir', fallback="session_queries")
+    DEFAULT_USED_INDICES_FN = get_config_value(APP_CONFIG, 'Filenames', 'used_indices_log', fallback="used_personality_indices.txt")
+    DEFAULT_AGGREGATE_MAPPINGS_FN = get_config_value(APP_CONFIG, 'Filenames', 'aggregated_mappings_in_queries_dir', fallback="mappings.txt")
+    DEFAULT_TEMP_SUBSET_FN = get_config_value(APP_CONFIG, 'Filenames', 'temp_subset_personalities', fallback="temp_subset_personalities.txt")
 
     parser = argparse.ArgumentParser(
         description="Generates multiple unique LLM query sets and a consolidated mapping file.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("-m", "--num_iterations", type=int, default=default_iter_arg,
+    parser.add_argument("-m", "--num_iterations", type=int,
+                        default=get_config_value(APP_CONFIG, 'Study', 'num_trials', fallback=100, value_type=int),
                         help="Number of unique query sets to generate in this run.")
-    parser.add_argument("-k", "--k_per_query", type=int, default=default_k_arg,
+    parser.add_argument("-k", "--k_per_query", type=int,
+                        default=get_config_value(APP_CONFIG, 'Study', 'group_size', fallback=10, value_type=int),
                         help="Number of items (k) per individual query set.")
     parser.add_argument("--master_personalities_file", default=DEFAULT_MASTER_PERSONALITIES_FN,
                         help=f"Filename of the master personalities file (expected in PROJECT_ROOT/data/). Default: {DEFAULT_MASTER_PERSONALITIES_FN}")

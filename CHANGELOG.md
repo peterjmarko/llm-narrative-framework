@@ -16,6 +16,7 @@
   - style(changelog): Manually added a blank line between release entries in `CHANGELOG.md` for improved readability.
   - docs(testing): Updated `TESTING.md` with the latest test plan status and fixed table formatting.
   - chore: Updated `ROADMAP.md` to reflect the completion of the `process_study.ps1` logging fix.
+  
 ## 5.6.1 (2025-08-19)
 
 ### Bump
@@ -34,7 +35,7 @@
   - chore(linting): Updated linters to exclude the new testing harness scripts.
   
   - chore: Updated ROADMAP.md to reflect the completion of the logging fix.
-  
+
 ## 5.6.0 (2025-08-18)
 
 ### Bump

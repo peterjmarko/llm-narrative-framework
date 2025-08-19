@@ -34,7 +34,9 @@ import tempfile
 import configparser
 import types
 import pandas as pd
+import importlib
 from pathlib import Path
+import subprocess
 
 # Import the script to test
 from src import build_llm_queries
@@ -48,6 +50,10 @@ class TestBuildLLMQueries(unittest.TestCase):
         self.project_root = self.test_dir.name
         self.run_output_dir = Path(self.project_root) / "run_123"
         self.run_output_dir.mkdir()
+        
+        # Create a dummy data directory and base_query file for a complete test environment
+        (Path(self.project_root) / "data").mkdir()
+        (Path(self.project_root) / "data" / "base_query.txt").touch()
 
         # Mock config_loader
         self.mock_config = configparser.ConfigParser()
@@ -71,6 +77,9 @@ class TestBuildLLMQueries(unittest.TestCase):
         
         self.config_patcher = patch.dict('sys.modules', {'config_loader': fake_mod})
         self.config_patcher.start()
+        
+        # Reload the module under test AFTER the mocks are in place
+        importlib.reload(build_llm_queries)
 
         # Mock subprocess to prevent real calls to query_generator.py
         self.subprocess_patcher = patch('src.build_llm_queries.subprocess.run')
@@ -142,11 +151,24 @@ class TestBuildLLMQueries(unittest.TestCase):
         self.assertEqual(seed1, 123)  # 123 + 1 - 1
         self.assertEqual(seed2, 124)  # 123 + 2 - 1
         
-        # Assert all expected output files were created
+        # Assert that the script attempted to copy the correct files
+        # This is a more direct test of the script's logic than checking for file existence
+        self.mock_shutil_copy.assert_any_call(
+            unittest.mock.ANY,  # Source path is complex, so we ignore it
+            str(queries_dir / "llm_query_001.txt")
+        )
+        self.mock_shutil_copy.assert_any_call(
+            unittest.mock.ANY,
+            str(queries_dir / "llm_query_002.txt")
+        )
+        self.mock_shutil_copy.assert_any_call(
+            unittest.mock.ANY,
+            str(queries_dir / "llm_query_001_manifest.txt")
+        )
+        
+        # These files are created directly, so we can check for their existence
         self.assertTrue((queries_dir / "mappings.txt").is_file())
         self.assertTrue((queries_dir / "used_indices.txt").is_file())
-        self.assertTrue((queries_dir / "llm_query_001.txt").is_file())
-        self.assertTrue((queries_dir / "llm_query_002.txt").is_file())
         
         # Assert content of aggregated mappings file is correct
         mappings_content = (queries_dir / "mappings.txt").read_text()
@@ -159,20 +181,87 @@ class TestBuildLLMQueries(unittest.TestCase):
         used_indices = {int(i) for i in used_indices_content.strip().split('\n')}
         self.assertEqual(len(used_indices), 6) # 2 iterations * 3 subjects
 
-    # @unittest.skip("Not yet implemented")
-    # def test_continue_run_starts_from_correct_index(self):
-    #     """Verify a continued run correctly identifies the next start index."""
-    #     pass
+    def test_continue_run_starts_from_correct_index(self):
+        """Verify a continued run correctly identifies the next start index."""
+        # --- Arrange ---
+        queries_dir = self.run_output_dir / "session_queries"
+        queries_dir.mkdir()
+        # Create a pre-existing file to establish the last-used index
+        (queries_dir / "llm_query_005.txt").touch()
 
-    # @unittest.skip("Not yet implemented")
-    # def test_insufficient_data_exits_gracefully(self):
-    #     """Verify the script exits if not enough unique personalities are available."""
-    #     pass
+        self.mock_load_df.return_value = (pd.DataFrame({
+            'Index': range(1, 21), 'idADB': range(101, 121),
+            'Name': [f'P_{i}' for i in range(1, 21)], 'BirthYear': ['1950'] * 20,
+            'BirthYearInt': [1950] * 20, 'DescriptionText': [f'D_{i}' for i in range(1, 21)]
+        }), "header")
+        
+        self.mock_subprocess.side_effect = MagicMock(returncode=0)
 
-    # @unittest.skip("Not yet implemented")
-    # def test_worker_failure_halts_execution(self):
-    #     """Verify that a failure in the worker script stops the main loop."""
-    #     pass
+        test_argv = ['build_llm_queries.py', '--run_output_dir', str(self.run_output_dir)]
+        
+        # --- Act ---
+        with patch.object(sys, 'argv', test_argv):
+            build_llm_queries.main()
+
+        # --- Assert ---
+        # The script should detect index 5 and start the next iteration at 6, then 7.
+        first_call_args = self.mock_subprocess.call_args_list[0].args[0]
+        second_call_args = self.mock_subprocess.call_args_list[1].args[0]
+        
+        self.assertIn("iter_006_", first_call_args[first_call_args.index('--output_basename_prefix') + 1])
+        self.assertIn("iter_007_", second_call_args[second_call_args.index('--output_basename_prefix') + 1])
+
+    @patch('src.build_llm_queries.sys.exit')
+    def test_insufficient_data_exits_gracefully(self, mock_exit):
+        """Verify the script exits if not enough unique personalities are available."""
+        # --- Arrange ---
+        mock_exit.side_effect = SystemExit # Make the mock raise an exception to halt execution
+        
+        # Provide only 5 personalities, but the run requires 2 * 3 = 6
+        self.mock_load_df.return_value = (pd.DataFrame({
+            'Index': range(1, 6), 'idADB': range(101, 106),
+            'Name': ['P1']*5, 'BirthYear': ['1950']*5,
+            'BirthYearInt': [1950]*5, 'DescriptionText': ['D1']*5
+        }), "header")
+        
+        test_argv = ['build_llm_queries.py', '--run_output_dir', str(self.run_output_dir)]
+
+        # --- Act & Assert ---
+        with self.assertRaises(SystemExit):
+            with patch.object(sys, 'argv', test_argv):
+                build_llm_queries.main()
+
+        # The worker script should never be called
+        self.mock_subprocess.assert_not_called()
+        # The script should exit with a non-zero status code
+        mock_exit.assert_called_with(1)
+
+    @patch('src.build_llm_queries.sys.exit')
+    def test_worker_failure_halts_execution(self, mock_exit):
+        """Verify that a failure in the worker script stops the main loop."""
+        # --- Arrange ---
+        mock_exit.side_effect = SystemExit
+        
+        self.mock_load_df.return_value = (pd.DataFrame({
+            'Index': range(1, 21), 'idADB': range(101, 121),
+            'Name': ['P1']*20, 'BirthYear': ['1950']*20,
+            'BirthYearInt': [1950]*20, 'DescriptionText': ['D1']*20
+        }), "header")
+        
+        # Simulate the worker failing on the first call
+        self.mock_subprocess.side_effect = subprocess.CalledProcessError(1, "cmd", stderr="Worker failed")
+
+        test_argv = ['build_llm_queries.py', '--run_output_dir', str(self.run_output_dir)]
+
+        # --- Act & Assert ---
+        with self.assertRaises(SystemExit):
+            with patch.object(sys, 'argv', test_argv):
+                build_llm_queries.main()
+
+        # The worker should only have been called once
+        self.mock_subprocess.assert_called_once()
+        # The script should exit with a non-zero status code
+        mock_exit.assert_called_with(1)
 
 if __name__ == '__main__':
     unittest.main()

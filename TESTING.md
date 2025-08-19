@@ -403,9 +403,9 @@ Module                                  Cov. (%)        Status & Justification
 
 **Single-Replication Pipeline**
 
-`src/build_llm_queries.py`              `PENDING`       **IN PROGRESS.** Unit testing will be performed next.
-
-`src/llm_prompter.py`                   `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/build_llm_queries.py`              `~68%`          **COMPLETE.** Unit tests cover the core orchestration logic,
+                                                        including new runs, continued runs, and key failure modes.
+`src/llm_prompter.py`                   `PENDING`       **IN PROGRESS.** Unit testing will be performed next.
 
 `src/process_llm_responses.py`          `PENDING`       **PENDING.** Unit testing will be performed next.
 
