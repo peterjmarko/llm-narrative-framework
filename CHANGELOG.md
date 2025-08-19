@@ -1,5 +1,29 @@
 # Changelog
 
+## 5.6.0 (2025-08-18)
+
+### Bump
+
+- **version 5.5.0 → 5.6.0**
+
+### Features
+
+- **Overhaul and validate core experiment workflow**
+  This is a major stabilization and validation release that hardens the entire experiment workflow. A full end-to-end test of the `new -> audit -> fix` lifecycle was conducted, revealing and leading to fixes for several deep, subtle bugs.
+  
+  **Features:**
+  - Overhauled all user-facing PowerShell wrappers (`new_experiment.ps1`, `audit_experiment.ps1`, etc.) with a robust `Get-ProjectRoot` function. This makes them context-independent and guarantees they function correctly.
+  - Completely refactored `TESTING.md` into a comprehensive guide with safe, scripted procedures for all manual and integration tests, including a new timestamped backup-and-restore mechanism.
+  
+  **Bug Fixes:**
+  - Fixed a critical, silent bug in `config_loader.py` where `.ini` files created by PowerShell were not being parsed correctly due to a file encoding (BOM) issue. The loader now correctly uses `encoding='utf-8-sig'`.
+  - Fixed a major control-flow bug in the `experiment_manager.py` main loop that could cause an infinite loop on step failure.
+  - Fixed a bug in the `TESTING.md` harness where the test configuration and data did not match the production code's expectations.
+  
+  **Documentation:**
+  - Added a new high-level project overview diagram to `DOCUMENTATION.md`.
+  - Updated the `TESTING.md` status tables to reflect the successful completion of the core workflow testing.
+  - Made several strategic updates to the `ROADMAP.md` to improve the pre-publication workflow.
 ## 5.5.0 (2025-08-17)
 
 ### Bump
