@@ -1,5 +1,21 @@
 # Changelog
 
+## 5.6.2 (2025-08-19)
+
+### Bump
+
+- **version 5.6.1 → 5.6.2**
+
+### Fixes
+
+- **add orchestrator tests and standardize logging**
+  - test(orchestrator): Added a comprehensive unit test suite for `orchestrate_replication.py` (77% coverage), validating all core control flows.
+  - test(build_queries): Created the initial test file and plan for `build_llm_queries.py`.
+  - fix(orchestrator): Corrected a bug to ensure a "FAILED" report is always generated when the pipeline fails.
+  - fix(logging): Implemented standardized transcript logging for `process_study.ps1`.
+  - style(changelog): Manually added a blank line between release entries in `CHANGELOG.md` for improved readability.
+  - docs(testing): Updated `TESTING.md` with the latest test plan status and fixed table formatting.
+  - chore: Updated `ROADMAP.md` to reflect the completion of the `process_study.ps1` logging fix.
 ## 5.6.1 (2025-08-19)
 
 ### Bump
