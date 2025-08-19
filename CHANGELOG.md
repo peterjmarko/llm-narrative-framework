@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.6.4 (2025-08-19)
+
+### Bump
+
+- **version 5.6.3 → 5.6.4**
+
+### Fixes
+
+- **fix parser column reordering and add full test suite**
+  - fix(parser): Refactored the LLM response parser to correctly reorder score columns based on the header, fixing a critical data integrity bug. The parser now uses the `(YYYY)` birth year as a reliable anchor for splitting data rows.
+  - test(parser): Added a comprehensive unit test suite for `process_llm_responses.py`. Achieved 67% coverage by validating various response formats and failure modes.
+  - docs(parser): Updated the docstring for the main parsing function to reflect its new, more robust logic.
+  - docs(testing): Updated `TESTING.md` to reflect the completion of the `process_llm_responses.py` tests.
 ## 5.6.3 (2025-08-19)
 
 ### Bump
