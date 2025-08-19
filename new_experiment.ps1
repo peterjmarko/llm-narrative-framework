@@ -49,109 +49,49 @@
 
 [CmdletBinding()]
 param(
-    # Optional notes for the run.
     [Parameter(Mandatory=$false)]
     [string]$Notes
 )
 
-# This is the main execution function.
-# --- Auto-detect execution environment ---
-$executable = "python"
-$prefixArgs = @()
-if (Get-Command pdm -ErrorAction SilentlyContinue) {
-    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
-    $executable = "pdm"
-    $prefixArgs = "run", "python"
-}
-else {
-    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+function Get-ProjectRoot {
+    $currentDir = Get-Location
+    while ($currentDir -ne $null -and $currentDir.Path -ne "") {
+        if (Test-Path (Join-Path $currentDir.Path "pyproject.toml")) { return $currentDir.Path }
+        $currentDir = Split-Path -Parent -Path $currentDir.Path
+    }
+    throw "FATAL: Could not find project root (pyproject.toml)."
 }
 
-# This is the main execution function.
-function Invoke-NewExperiment {
+function Write-Header { param([string[]]$Lines, [string]$Color = "White"); $s = "#" * 80; Write-Host "`n$s" -F $Color; foreach ($l in $Lines) { $pL = [math]::Floor((80 - $l.Length - 6) / 2); $pR = [math]::Ceiling((80 - $l.Length - 6) / 2); Write-Host "###$(' ' * $pL)$l$(' ' * $pR)###" -F $Color }; Write-Host $s -F $Color; Write-Host "" }
 
-    # --- Helper function to create standardized headers ---
-    function Write-Header {
-        param(
-            [string[]]$Lines,
-            [string]$Color = "White",
-            [int]$Width = 80
-        )
-        $separator = "#" * $Width
-        Write-Host "`n$separator" -ForegroundColor $Color
-        foreach ($line in $Lines) {
-            if ($line.Length -gt ($Width - 8)) {
-                Write-Host "### $($line) " -ForegroundColor $Color
-            } else {
-                $paddingLength = $Width - $line.Length - 6
-                $leftPad = [math]::Floor($paddingLength / 2)
-                $rightPad = [math]::Ceiling($paddingLength / 2)
-                $formattedLine = "###" + (" " * $leftPad) + $line + (" " * $rightPad) + "###"
-                Write-Host $formattedLine -ForegroundColor $Color
-            }
-        }
-        Write-Host $separator -ForegroundColor $Color
-        Write-Host ""
-    }
+$ProjectRoot = Get-ProjectRoot
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Write-Header -Lines "CREATING NEW EXPERIMENT FROM CONFIG.INI" -Color Cyan
 
-    Write-Host # Add blank line for spacing
+$pythonScriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
+$pythonArgs = @($pythonScriptPath)
+if (-not [string]::IsNullOrEmpty($Notes)) { $pythonArgs += "--notes", $Notes }
+if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) { $pythonArgs += "--verbose" }
+if ($Host.UI.SupportsVirtualTerminal) { $pythonArgs += "--force-color" }
 
-    # Ensure console output uses UTF-8.
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+& pdm run python $pythonArgs
+$pythonExitCode = $LASTEXITCODE
 
-    # Use '#' for banner consistency
-    Write-Host ("#" * 80) -ForegroundColor Cyan
-    Write-Host "###                 CREATING NEW EXPERIMENT FROM CONFIG.INI                  ###" -ForegroundColor Cyan
-    Write-Host ("#" * 80) -ForegroundColor Cyan
-    Write-Host
-
-    # Construct the arguments for the Python script.
-    # Note: No target directory is passed.
-    $pythonArgs = @("src/experiment_manager.py")
-    if (-not [string]::IsNullOrEmpty($Notes)) { $pythonArgs += "--notes", $Notes }
-
-    # Translate the common -Verbose parameter to the internal --verbose for Python.
-    if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) {
-        $pythonArgs += "--verbose"
-    }
-
-    # Add the --force-color flag if the calling environment supports it, for better logging.
-    if ($Host.UI.SupportsVirtualTerminal) {
-        $pythonArgs += "--force-color"
-    }
-    
-    # Combine prefix arguments with the script and its arguments
-    $finalArgs = $prefixArgs + $pythonArgs
-
-    # Execute the command with its final argument list
-    & $executable $finalArgs
-    $pythonExitCode = $LASTEXITCODE
-
-    # Check the exit code from the Python script.
-    if ($pythonExitCode -ne 0) {
-        Write-Host "`n!!! The experiment manager exited with an error. Check the output above. !!!" -ForegroundColor Red
-        exit $pythonExitCode
-    }
-
-    # --- Verification Step ---
-    # After a successful run, find the newly created directory and audit it.
-    try {
-        $basePath = "output\new_experiments"
-        $latestExperiment = Get-ChildItem -Path $basePath -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
-        
-        if ($null -ne $latestExperiment) {
-            Write-Header -Lines "Verifying Final Experiment State" -Color Cyan
-            $finalAuditArgs = @("src/experiment_auditor.py", $latestExperiment.FullName, "--force-color", "--non-interactive")
-            & $executable $prefixArgs $finalAuditArgs
-        }
-    } catch {
-        Write-Warning "Could not automatically verify the new experiment. Please run audit_experiment.ps1 manually."
-    }
+if ($pythonExitCode -ne 0) {
+    Write-Host "`n!!! The experiment manager exited with an error. Check the output above. !!!" -ForegroundColor Red
+    exit $pythonExitCode
 }
 
-# This invocation guard ensures the main logic is only triggered when the script is run directly.
-if ($MyInvocation.InvocationName -ne '.') {
-    Invoke-NewExperiment
+try {
+    $basePath = Join-Path $ProjectRoot "output/new_experiments"
+    $latestExperiment = Get-ChildItem -Path $basePath -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
+    if ($null -ne $latestExperiment) {
+        Write-Header -Lines "Verifying Final Experiment State" -Color Cyan
+        $auditScriptPath = Join-Path $ProjectRoot "audit_experiment.ps1"
+        & $auditScriptPath -TargetDirectory $latestExperiment.FullName
+    }
+} catch {
+    Write-Warning "Could not automatically verify the new experiment."
 }
 
 # === End of new_experiment.ps1 ===

@@ -39,17 +39,14 @@ REPORT_FILENAME = REPORT_OUTPUT_DIR / "project_scope_report.md"
 
 # Directories to completely exclude from the scan.
 EXCLUDE_DIRS = {
-    ".git", ".venv", "venv", "__pycache__", "node_modules", "output",
-    "htmlcov", ".pytest_cache", "main_archive", "archive", "images",
-    "llm_personality_matching.egg-info", "dist", "build",
-    "data/backup", "data/temp", "linter_backups"
+    ".git", ".pdm-build", ".pytest_cache", ".venv", "__pycache__", "archive",
+    "build", "config", "data/backup", "dist", "htmlcov", "images",
+    "linter_backups", "llm_personality_matching.egg-info",
+    "main_archive", "node_modules", "output", "venv"
 }
 
 # File extensions to exclude.
 EXCLUDE_EXTS = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp", ".lock", ".coverage", ".pdf", ".bak"}
-
-# Proxy for calculating document pages.
-WORDS_PER_PAGE = 250
 
 # ANSI color codes for better terminal output
 class Colors:
@@ -84,6 +81,10 @@ def get_file_size_kb(path: pathlib.Path) -> float:
 
 def should_exclude(path: pathlib.Path) -> bool:
     """Checks if a file or directory should be excluded from the report."""
+    # Exclude the documentation template to avoid double-counting
+    if path.name == 'DOCUMENTATION.template.md':
+        return True
+        
     if path.suffix.lower() in EXCLUDE_EXTS:
         return True
 
@@ -97,25 +98,25 @@ def should_exclude(path: pathlib.Path) -> bool:
 
 def should_exclude_dir(root_path: pathlib.Path, dir_name: str) -> bool:
     """Checks if a directory should be excluded based on its path."""
-    # Get the full path of the directory
+    # Exclude any top-level directory starting with 'temp'
+    if root_path == PROJECT_ROOT and dir_name.startswith("temp"):
+        return True
+
     full_dir_path = root_path / dir_name
-    
-    # Get the relative path from project root
     try:
         rel_path = full_dir_path.relative_to(PROJECT_ROOT).as_posix()
     except ValueError:
-        # If path is not relative to project root, don't exclude
         return False
-    
-    # Check against all exclusion patterns
+
+    # Handle wildcard for temp directories in data/
+    if rel_path.startswith("data/temp"):
+        return True
+
     for excluded in EXCLUDE_DIRS:
-        # Check exact match of directory name
         if dir_name == excluded:
             return True
-        # Check exact match of relative path
         if rel_path == excluded:
             return True
-        # Check if the relative path starts with an excluded path (for nested exclusions)
         if rel_path.startswith(excluded + '/'):
             return True
     
@@ -135,16 +136,18 @@ def generate_table(headers: list, rows: list, totals: list) -> str:
     return "\n".join([header_line, separator_line] + row_lines + [total_line])
 
 
-def main():
+def main(quiet=False):
     """Main function to generate the project scope report."""
-    print(f"{Colors.YELLOW}\n--- Starting Project Scope Analysis ---{Colors.RESET}")
+    if not quiet:
+        print(f"{Colors.YELLOW}\n--- Starting Project Scope Analysis ---{Colors.RESET}")
 
     documents = []
     scripts = []
     diagrams = []
     data_files = []
 
-    print("1. Scanning project and calculating metrics...")
+    if not quiet:
+        print("1. Scanning project and calculating metrics...")
     
     file_count = 0
     excluded_dirs_count = 0
@@ -175,8 +178,7 @@ def main():
             # Categorize files
             if path.suffix == ".md":
                 words = count_words(path)
-                pages = round(words / WORDS_PER_PAGE, 1)
-                documents.append((f"`{rel_path}`", words, f"~{pages}"))
+                documents.append((f"`{rel_path}`", words))
             elif path.suffix in [".py", ".ps1"]:
                 lines = count_non_empty_lines(path)
                 scripts.append((f"`{rel_path}`", lines))
@@ -187,23 +189,24 @@ def main():
                 size_kb = get_file_size_kb(path)
                 data_files.append((f"`{rel_path}`", size_kb))
 
-    print(f"   ...found and processed {file_count} files (excluded {excluded_dirs_count} directories).")
-
-    print("2. Assembling the report content...")
+    if not quiet:
+        print(f"   ...found and processed {file_count} files (excluded {excluded_dirs_count} directories).")
+        print("2. Assembling the report content...")
     # --- Generate Report Content ---
     report_content = [f"# Project Scope & Extent Report\n\n**Generated on:** {datetime.now().strftime('%Y-%m-%d')}\n\n---\n"]
 
     # --- Pre-calculate all totals for summary ---
     total_words = sum(row[1] for row in documents)
-    total_pages = round(total_words / WORDS_PER_PAGE, 1)
     total_lines_scripts = sum(row[1] for row in scripts)
     total_lines_diagrams = sum(row[1] for row in diagrams)
     total_size_data = round(sum(row[1] for row in data_files), 1)
 
     # Overall Summary Section
     report_content.append("## 📊 Project at a Glance\n")
+    total_artifacts = len(documents) + len(scripts) + len(diagrams) + len(data_files)
     summary_lines = [
-        f"-   **Documents:** {len(documents)} files (~{total_pages} pages)",
+        f"-   **Total Artifacts:** {total_artifacts:,} files",
+        f"-   **Documents:** {len(documents)} files ({total_words:,} words)",
         f"-   **Scripts:** {len(scripts)} files ({total_lines_scripts:,} LoC)",
         f"-   **Diagrams:** {len(diagrams)} files ({total_lines_diagrams:,} lines)",
         f"-   **Data Files:** {len(data_files)} files ({total_size_data:,} KB)"
@@ -214,11 +217,11 @@ def main():
     # Documents Section
     report_content.append("## 📄 Documents\n")
     report_content.append(f"-   **Total Files:** {len(documents)}")
-    report_content.append(f"-   **Total Estimated Pages:** ~{total_pages} (based on {total_words:,} words)\n")
+    report_content.append(f"-   **Total Word Count:** {total_words:,}\n")
     report_content.append(generate_table(
-        ["File", "Word Count", "Estimated Pages"],
+        ["File", "Word Count"],
         sorted(documents),
-        ["Total", f"{total_words:,}", f"~{total_pages}"]
+        ["Total", f"{total_words:,}"]
     ))
 
     # Scripts Section
@@ -255,16 +258,19 @@ def main():
     ))
 
     # --- Write Report File ---
-    print(f"3. Writing final report to {REPORT_FILENAME.relative_to(PROJECT_ROOT)}...")
+    if not quiet:
+        print(f"3. Writing final report to {REPORT_FILENAME.relative_to(PROJECT_ROOT)}...")
     try:
         # Ensure the output directory exists before writing the file.
         REPORT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         with open(REPORT_FILENAME, "w", encoding="utf-8") as f:
             f.write("\n".join(report_content))
-        print(f"\n{Colors.YELLOW}--- Analysis Complete ---{Colors.RESET}")
-        print(f"{Colors.GREEN}Successfully generated report: {REPORT_FILENAME.relative_to(PROJECT_ROOT)}{Colors.RESET}\n")
+        if not quiet:
+            print(f"\n{Colors.YELLOW}--- Analysis Complete ---{Colors.RESET}")
+            print(f"{Colors.GREEN}Successfully generated report: {REPORT_FILENAME.relative_to(PROJECT_ROOT)}{Colors.RESET}\n")
     except IOError as e:
-        print(f"\n{Colors.RED}Error: Could not write report to {REPORT_FILENAME}. Details: {e}{Colors.RESET}")
+        if not quiet:
+            print(f"\n{Colors.RED}Error: Could not write report to {REPORT_FILENAME}. Details: {e}{Colors.RESET}")
 
 if __name__ == "__main__":
     main()

@@ -25,22 +25,9 @@ dependencies = [
     "seaborn",
     "matplotlib",
     "pingouin>=0.5.5",
-    "python-docx", # Added for DOCX post-processing
     "thefuzz[speedup]>=0.22.1",
     "beautifulsoup4>=4.13.4",
     "certifi>=2025.8.3",
-]
-
-[tool.pdm.dev-dependencies]
-dev = [
-    "pytest",
-    "pre-commit",
-    "pypandoc>=1.15",
-    "pillow>=10.4.0",
-    "pytest-cov>=5.0.0",
-    "pytest-mock>=3.14.1",
-    "commitizen>=3.31.0",
-    "python-docx>=0.8.11",
 ]
 
 [tool.pdm]
@@ -73,7 +60,8 @@ cov-html = {cmd = "coverage erase && coverage run -m pytest -p no:cov && coverag
 cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
 # ------------------------------------
 
-lint = "pre-commit run --all-files"
+gen-scope-report = "python scripts/generate_scope_report.py"
+lint = "pdm run lint-headers && pdm run lint-docstrings"
 lint-headers = {cmd = "python scripts/lint_file_headers.py --fix ./src/*.py ./tests/*.py ./*.ps1 ./scripts/*.py", help = "Fix headers and footers on all project scripts."}
 check-headers = {cmd = "python scripts/lint_file_headers.py ./src/*.py ./tests/*.py ./*.ps1 ./scripts/*.py", help = "Check headers and footers on all project scripts."}
 build-docs = "python scripts/build_docs.py"
@@ -118,3 +106,14 @@ version_files = [
 tag_format = "v$version"
 changelog_file = "CHANGELOG.md"
 changelog_format = "keep_a_changelog"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pre-commit",
+    "pypandoc>=1.15",
+    "pillow>=10.4.0",
+    "pytest-cov>=5.0.0",
+    "pytest-mock>=3.14.1",
+    "commitizen>=3.31.0",
+]

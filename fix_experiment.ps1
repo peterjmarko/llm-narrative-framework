@@ -57,11 +57,11 @@
 
 .EXAMPLE
     # Automatically find and fix any issues in the specified experiment.
-    .\repair_experiment.ps1 -TargetDirectory "output/studies/MyStudy/Exp1"
+    .\fix_experiment.ps1 -TargetDirectory "output/studies/MyStudy/Exp1"
 
 .EXAMPLE
     # Run on a valid experiment to bring up the interactive "force action" menu.
-    .\repair_experiment.ps1 "output/studies/MyStudy/Exp1"
+    .\fix_experiment.ps1 "output/studies/MyStudy/Exp1"
 #>
 
 [CmdletBinding()]
@@ -100,6 +100,18 @@ param(
     [switch]$NoHeader
 )
 
+function Get-ProjectRoot {
+    # This robust method works even when the script is pasted into a terminal.
+    $currentDir = Get-Location
+    while ($currentDir -ne $null -and $currentDir.Path -ne "") {
+        if (Test-Path (Join-Path $currentDir.Path "pyproject.toml")) {
+            return $currentDir.Path
+        }
+        $currentDir = Split-Path -Parent -Path $currentDir.Path
+    }
+    throw "FATAL: Could not find project root (pyproject.toml). Please run this script from within the project directory."
+}
+
 function Write-Header($message, $color, $C_RESET) {
     $line = '#' * 80
     $bookend = "###"
@@ -116,216 +128,108 @@ function Write-Header($message, $color, $C_RESET) {
     Write-Host ""
 }
 
-# --- Auto-detect execution environment ---
-$executable = "python"
-$prefixArgs = @()
-if (Get-Command pdm -ErrorAction SilentlyContinue) {
-    if (-not $NoHeader.IsPresent) { Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan }
-    $executable = "pdm"
-    $prefixArgs = "run", "python"
-}
-else {
-    if (-not $NoHeader.IsPresent) { Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow }
-}
-
-function Invoke-FixExperiment {
-    $C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"; $C_RESET = "`e[0m"
+function Invoke-FinalizeExperiment-Local {
+    param($ProjectRoot, $TargetDirectory)
     
-    function Invoke-FinalizeExperiment-Local {
-        # This nested function handles the three-step finalization process.
-        # It uses variables from the parent scope ($TargetDirectory, $executable, $prefixArgs).
-        Write-Host "`n--- Rebuilding batch run log from replication data... ---" -ForegroundColor Cyan
-        $logRebuildArgs = @("src/replication_log_manager.py", "rebuild", $TargetDirectory)
-        & $executable $prefixArgs $logRebuildArgs
-        if ($LASTEXITCODE -ne 0) { throw "Log rebuild failed with exit code $LASTEXITCODE" }
+    $pyScripts = @(
+        @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("rebuild", $TargetDirectory); Msg="Log rebuild failed" },
+        @{ Path=(Join-Path $ProjectRoot "src/compile_experiment_results.py"); Args=@($TargetDirectory); Msg="Aggregation failed" },
+        @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("finalize", $TargetDirectory); Msg="Log finalization failed" }
+    )
 
-        Write-Host "`n--- Compiling final experiment summary... ---" -ForegroundColor Cyan
-        $aggArgs = @("src/compile_experiment_results.py", $TargetDirectory)
-        & $executable $prefixArgs $aggArgs
-        if ($LASTEXITCODE -ne 0) { throw "Result aggregation failed with exit code $LASTEXITCODE" }
-
-        Write-Host "`n--- Finalizing batch run log with summary... ---" -ForegroundColor Cyan
-        $logFinalizeArgs = @("src/replication_log_manager.py", "finalize", $TargetDirectory)
-        & $executable $prefixArgs $logFinalizeArgs
-        if ($LASTEXITCODE -ne 0) { throw "Log finalization failed with exit code $LASTEXITCODE" }
-        
-        # The calling function is responsible for the final success message/audit.
-    }
-    
-    $nonInteractive = $false
-    
-    # Ensure console output uses UTF-8.
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-
-    # --- Logging Setup ---
-    $logFileName = "experiment_repair_log.txt"
-    $logFilePath = Join-Path $TargetDirectory $logFileName
-
-    try {
-        # Use -Force to overwrite the log file, even if it's read-only.
-        Start-Transcript -Path $logFilePath -Force | Out-Null
-        
-        Write-Host "" # Blank line before message
-        Write-Host "The repair log will be saved to:" -ForegroundColor Gray
-        $relativePath = Resolve-Path -Path $logFilePath -Relative
-        Write-Host $relativePath -ForegroundColor Gray
-        # --- Handle non-interactive force flags first ---
-        if ($ForceUpdate.IsPresent) {
-            Write-Host "`n--- Forcing experiment reprocessing... ---" -ForegroundColor Cyan
-            $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
-            & $executable $prefixArgs $procArgs
-            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Forced update process failed with exit code $LASTEXITCODE" }
-            # A final verification is not needed here, as the calling script (`repair_study.ps1`) will do it.
-            return
-        }
-
-        if ($ForceAggregate.IsPresent) {
-            Write-Host "`n--- Forcing experiment re-aggregation... ---" -ForegroundColor Cyan
-            Write-Host "Forcing re-aggregation on a VALIDATED experiment. All summary files will be re-created." -ForegroundColor Yellow
-            Write-Host "--- Entering RE-AGGREGATION Mode ---" -ForegroundColor Yellow
-            Invoke-FinalizeExperiment-Local
-            # A final verification is not needed here, as the calling script (`repair_study.ps1`) will do it.
-            return
-        }
-        Write-Header "STEP 1: DIAGNOSING EXPERIMENT STATE" $C_CYAN $C_RESET
-
-        # Perform a single, direct audit. The script will display the full report,
-        # and we will capture the exit code to determine the next action.
-        $auditArgs = @("src/experiment_auditor.py", $TargetDirectory, "--force-color")
-        & $executable $prefixArgs $auditArgs
-        $auditExitCode = $LASTEXITCODE
-
-        $actionTaken = $false
-        $procArgs = $null
-
-        switch ($auditExitCode) {
-            0 { # AUDIT_ALL_VALID
-                if ($NonInteractive.IsPresent) {
-                    Write-Host "Experiment is already valid. No action needed." -ForegroundColor Green
-                    return
-                }
-
-                # The audit report is already on screen.
-                Write-Host "`nExperiment is already complete and valid." -ForegroundColor Yellow
-                
-                $prompt = @"
-
-Do you still want to proceed with repair?
-
-(1) Full Repair: Deletes all LLM responses and re-runs all API calls. (Expensive & Destructive)
-(2) Full Update: Re-runs analysis on existing data for all replications. (Quick & Safe)
-(3) Aggregation Only: Re-creates only the top-level summary files. (Fastest)
-(N) No Action
-
-Enter your choice (1, 2, 3, or N)
-"@
-                $choice = Read-Host -Prompt $prompt
-                switch ($choice.Trim().ToLower()) {
-                    '1' { # Force Full Repair
-                        Write-Host "`nWARNING: This will delete all LLM responses in '$TargetDirectory' and re-run the API sessions." -ForegroundColor Red
-                        Write-Host "Are you absolutely sure that you want to OVERWRITE the existing LLM responses? (Type 'YES' to confirm): " -NoNewline -ForegroundColor Red
-                        $confirm = Read-Host
-                        if ($confirm.Trim() -ceq 'YES') {
-                            Write-Host ""; Write-Host "Deleting LLM responses..." -ForegroundColor Yellow
-                            Get-ChildItem -Path $TargetDirectory -Filter "llm_response_*.txt" -Recurse | Remove-Item -Force
-                            Write-Header "STEP 2: APPLYING REPAIRS / UPDATES" $C_CYAN $C_RESET
-                            $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
-                        } else { Write-Host "`nAction aborted by user.`n" -ForegroundColor Yellow; return }
-                    }
-                    '2' { # Force Full Update
-                        Write-Header "STEP 2: APPLYING REPAIRS / UPDATES" $C_CYAN $C_RESET
-                        $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
-                    }
-                    '3' { # Force Aggregation
-                        Write-Host "`n--- Starting experiment finalization... ---" -ForegroundColor Cyan
-                        Invoke-FinalizeExperiment-Local
-                        $actionTaken = $true
-                    }
-                    'n' { Write-Host "`nNo action taken.`n" -ForegroundColor Yellow; return }
-                    default { Write-Warning "`nInvalid choice. No action taken.`n"; return }
-                }
-            }
-            1 { # AUDIT_NEEDS_REPROCESS
-                Write-Header "STEP 2: APPLYING ANALYSIS-ONLY UPDATE" $C_CYAN $C_RESET
-                Write-Host "Diagnosis: Analysis or report files are outdated." -ForegroundColor Gray
-                Write-Host "Action:    Applying a safe, local analysis update (no API calls needed)." -ForegroundColor Gray
-                $procArgs = @("src/experiment_manager.py", "--reprocess", $TargetDirectory, "--non-interactive")
-            }
-            2 { # AUDIT_NEEDS_REPAIR
-                Write-Header "STEP 2: APPLYING DATA-LEVEL REPAIR" $C_CYAN $C_RESET
-                Write-Host "Diagnosis: Critical data (queries/responses) is missing or incomplete."
-                Write-Host "Action:    Applying a data-level repair. This may re-run API calls."
-                $procArgs = @("src/experiment_manager.py", $TargetDirectory, "--non-interactive")
-            }
-            3 { # AUDIT_NEEDS_MIGRATION
-                Write-Header "REPAIR HALTED" $C_CYAN $C_RESET
-                $message = "This experiment is not fixable in its current state. Please see the audit result and recommendation above."
-                Write-Host "$($C_YELLOW)$message`n$($C_RESET)"
-                exit 1
-            }
-            4 { # AUDIT_NEEDS_AGGREGATION
-                Write-Host "`n--- Starting experiment finalization... ---" -ForegroundColor Cyan
-                Invoke-FinalizeExperiment-Local
-                $actionTaken = $true
-            }
-            default { throw "Audit script failed unexpectedly with exit code $auditExitCode. Cannot proceed." }
-        }
-
-        # If a python process was configured, run it now.
-        if ($procArgs) {
-            if ($StartRep) { $procArgs += "--start-rep", $StartRep }
-            if ($EndRep) { $procArgs += "--end-rep", $EndRep }
-            if ($Notes) { $procArgs += "--notes", $Notes }
-            if ($Verbose.IsPresent) { $procArgs += "--verbose" }
-            
-            & $executable $prefixArgs $procArgs
-            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Repair process failed with exit code $LASTEXITCODE" }
-            $actionTaken = $true
-        }
-
-        # If any action was successfully taken, run a final verification to confirm the new state.
-        if ($actionTaken) {
-            Write-Header "STEP 3: FINAL VERIFICATION" $C_CYAN $C_RESET
-            
-            # Run the audit in non-interactive mode to suppress its default banner.
-            $finalAuditArgs = @("src/experiment_auditor.py", $TargetDirectory, "--force-color", "--non-interactive")
-            & $executable $prefixArgs $finalAuditArgs
-            $finalAuditCode = $LASTEXITCODE
-
-            if ($finalAuditCode -eq 0) { # 0 is AUDIT_ALL_VALID
-                Write-Header "REPAIR SUCCESSFUL: Experiment is now valid." $C_GREEN $C_RESET
-            } else {
-                throw "Final verification failed. The experiment is still not valid."
-            }
-        }
-
-    } catch {
-        # Use the existing Write-Header function for a standardized failure banner.
-        Write-Header "REPAIR FAILED" $C_RED $C_RESET
-        
-        # Print the specific error message from the 'throw' statement.
-        Write-Host "$($C_RED)$($_.Exception.Message)$($C_RESET)`n"
-        
-        # Exit with a non-zero status code to signal failure to calling scripts.
-        exit 1
-    } finally {
-        # Stop the transcript silently to suppress the default message
-        Stop-Transcript | Out-Null
-        
-        # Only print the custom message if a log file was actually created.
-        if (Test-Path -LiteralPath $logFilePath) {
-            Write-Host "`nThe repair log has been saved to:" -ForegroundColor Gray
-            $relativePath = Resolve-Path -Path $logFilePath -Relative
-            Write-Host $relativePath -ForegroundColor Gray
-            Write-Host "" # Add a blank line for spacing
+    foreach($script in $pyScripts) {
+        & pdm run python $script.Path $script.Args
+        if ($LASTEXITCODE -ne 0) {
+            throw $script.Msg
         }
     }
 }
 
-# This invocation guard ensures the main execution logic is only triggered
-# when the script is run directly (not dot-sourced).
-if ($MyInvocation.InvocationName -ne '.') {
-    Invoke-FixExperiment
+# --- Main Execution ---
+$ProjectRoot = Get-ProjectRoot
+$C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"; $C_RESET = "`e[0m"
+
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$logFilePath = Join-Path $TargetDirectory "experiment_repair_log.txt"
+
+try {
+    Start-Transcript -Path $logFilePath -Force | Out-Null
+    Write-Host "`nThe repair log will be saved to: $(Resolve-Path -Path $logFilePath -Relative)" -ForegroundColor Gray
+
+    if ($ForceUpdate.IsPresent) {
+        $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive")
+        & pdm run python $procArgs
+        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Forced update failed" }
+        return
+    }
+
+    if ($ForceAggregate.IsPresent) {
+        Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory
+        return
+    }
+
+    Write-Header "STEP 1: DIAGNOSING EXPERIMENT STATE" $C_CYAN $C_RESET
+    $auditArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $TargetDirectory, "--force-color")
+    & pdm run python $auditArgs
+    $auditExitCode = $LASTEXITCODE
+    
+    $actionTaken = $false
+    $procArgs = $null
+
+    switch ($auditExitCode) {
+        0 { # AUDIT_ALL_VALID
+            if ($NonInteractive) { return }
+            $choice = Read-Host -Prompt "Experiment is valid. Choose action: (1) Full Repair, (2) Full Update, (3) Aggregation Only, (N) No Action"
+            switch($choice.Trim().ToLower()) {
+                '1' {
+                    if ((Read-Host -Prompt "Type 'YES' to confirm OVERWRITE of LLM responses") -eq 'YES') {
+                        Get-ChildItem -Path $TargetDirectory -Filter "llm_response_*.txt" -Recurse | Remove-Item -Force
+                        $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $TargetDirectory, "--non-interactive")
+                    } else { return }
+                }
+                '2' { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive") }
+                '3' { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory; $actionTaken = $true }
+                'n' { return }
+                default { return }
+            }
+        }
+        1 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive") }
+        2 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $TargetDirectory, "--non-interactive") }
+        3 { Write-Host "Experiment needs migration. Run migrate_experiment.ps1." -ForegroundColor Yellow; exit 1 }
+        4 { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory; $actionTaken = $true }
+        default { throw "Audit failed with exit code $auditExitCode" }
+    }
+
+    if ($procArgs) {
+        if ($StartRep) { $procArgs += "--start-rep", $StartRep }
+        if ($EndRep) { $procArgs += "--end-rep", $EndRep }
+        if ($Notes) { $procArgs += "--notes", $Notes }
+        if ($Verbose) { $procArgs += "--verbose" }
+        
+        & pdm run python $procArgs
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0 -and $exitCode -ne 99) { throw "Repair process failed with exit code $exitCode" }
+        $actionTaken = $true
+    }
+
+    if ($actionTaken) {
+        Write-Header "STEP 3: FINAL VERIFICATION" $C_CYAN $C_RESET
+        $finalAuditArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $TargetDirectory, "--force-color", "--non-interactive")
+        & pdm run python $finalAuditArgs
+        $finalAuditCode = $LASTEXITCODE
+        if ($finalAuditCode -ne 0) { throw "Final verification failed." }
+        Write-Header "REPAIR SUCCESSFUL: Experiment is now valid." $C_GREEN $C_RESET
+    }
+
+} catch {
+    Write-Header "REPAIR FAILED" $C_RED $C_RESET
+    Write-Host "$($C_RED)$($_.Exception.Message)$($C_RESET)`n"
+    exit 1
+} finally {
+    Stop-Transcript | Out-Null
+    if (Test-Path -LiteralPath $logFilePath) {
+        Write-Host "`nThe repair log has been saved to: $(Resolve-Path -Path $logFilePath -Relative)" -ForegroundColor Gray
+    }
 }
 
 # === End of fix_experiment.ps1 ===

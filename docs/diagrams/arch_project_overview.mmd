@@ -1,0 +1,31 @@
+graph TD
+    subgraph A [User-Facing Interface]
+        direction LR
+        A1["Orchestration Scripts (.ps1)"]
+    end
+
+    subgraph B [Core Logic]
+        direction LR
+        B1["Production Scripts (src)"]
+    end
+
+    subgraph C [Project Governance]
+        C1["Documentation (.md)"]
+        C2["Diagrams (.mmd)"]
+        C3["Validation Suite (tests)"]
+        C4["Developer Utilities (scripts)"]
+    end
+    
+    subgraph D [Data & Artifacts]
+        D1["Input Data (data)"]
+        D2["Generated Experiments &<br/>Analysis Reports (output)"]
+        D3["Generated Project Reports<br/>(output/project_reports)"]
+    end
+
+    A -- Executes --> B
+    B -- Consumes --> D1
+    B -- Produces --> D2
+    C4 -- Produces --> D3
+    C -- Describes & Validates --> A
+    C -- Describes & Validates --> B
+    C -- Describes & Validates --> D

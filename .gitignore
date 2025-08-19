@@ -49,6 +49,7 @@ commit.txt
 /data/foundational_assets/ocean_scores.csv
 
 # Generated reports, backup and temporary files
+/archive/
 /data/backup/
 /data/reports/
 /data/temp/
@@ -57,11 +58,6 @@ commit.txt
 # Temporary files for manual testing
 data/temp_manual_test/
 
-# Generated reports, backup and temporary files
-/data/backup/
-/data/reports/
-/data/temp/
-/linter_backups/
 
 # --- Secrets ---
 # Ignore the .env file, which should contain sensitive API keys.

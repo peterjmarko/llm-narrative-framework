@@ -309,6 +309,7 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet, col
     """Deletes and fully regenerates runs with critical issues (e.g., missing queries, config issues)."""
     C_YELLOW = colors['yellow']
     C_RED = colors['red']
+    C_CYAN = colors['cyan']
     C_RESET = colors['reset']
     print(f"{C_YELLOW}--- Entering FULL REPLICATION REPAIR Mode: Deleting and regenerating {len(runs_to_repair)} run(s) with critical issues ---{C_RESET}")
 
@@ -656,6 +657,7 @@ def main():
             # --- For all other modes, use the iterative state-machine loop ---
             force_reprocess_once = args.reprocess
             loop_count = 0
+            pipeline_successful = True
             while loop_count < args.max_loops:
                 loop_count += 1
                 action_taken = False
@@ -695,22 +697,21 @@ def main():
 
                 if not success:
                     print(f"{C_RED}--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
-                    sys.exit(1)
-                
-                # The premature break was a bug. The loop should continue until state is COMPLETE.
-                # if action_taken and success:
-                #     break
+                    pipeline_successful = False
+                    break
 
             if loop_count >= args.max_loops:
                 print(f"{C_RED}--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
-                sys.exit(1)
+                pipeline_successful = False
             
-            _run_finalization(final_output_dir, script_paths, colors)
-
-        relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
-        print(f"\n{C_GREEN}Experiment run finished successfully for:{C_RESET}")
-        print(f"{C_GREEN}{relative_path}{C_RESET}")
-        print()
+            if pipeline_successful:
+                _run_finalization(final_output_dir, script_paths, colors)
+                relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
+                print(f"\n{C_GREEN}Experiment run finished successfully for:{C_RESET}")
+                print(f"{C_GREEN}{relative_path}{C_RESET}")
+                print()
+            else:
+                sys.exit(1)
 
     except KeyboardInterrupt:
         print(f"\n{C_YELLOW}--- Operation interrupted by user (Ctrl+C). Exiting gracefully. ---{C_RESET}", file=sys.stderr)

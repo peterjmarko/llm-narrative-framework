@@ -53,104 +53,42 @@ param (
     [string]$TargetDirectory
 )
 
-# --- Auto-detect execution environment ---
-$executable = "python"
-$prefixArgs = @()
-if (Get-Command pdm -ErrorAction SilentlyContinue) {
-    Write-Host "`nPDM detected. Using 'pdm run' to execute Python scripts." -ForegroundColor Cyan
-    $executable = "pdm"
-    $prefixArgs = "run", "python"
-}
-else {
-    Write-Host "PDM not detected. Using standard 'python' command." -ForegroundColor Yellow
+function Get-ProjectRoot {
+    $currentDir = Get-Location
+    while ($currentDir -ne $null -and $currentDir.Path -ne "") {
+        if (Test-Path (Join-Path $currentDir.Path "pyproject.toml")) { return $currentDir.Path }
+        $currentDir = Split-Path -Parent -Path $currentDir.Path
+    }
+    throw "FATAL: Could not find project root (pyproject.toml)."
 }
 
-# --- Main Script Logic ---
+$ProjectRoot = Get-ProjectRoot
 $scriptExitCode = 0
-$LogFilePath = $null # Initialize to null
+$LogFilePath = $null
 
 try {
-    # Clean and validate the input path to prevent errors from hidden characters or typos.
-    $TargetDirectory = $TargetDirectory.Trim()
-    if (-not (Test-Path $TargetDirectory -PathType Container)) {
-        throw "The specified directory '$TargetDirectory' does not exist."
-    }
+    if (-not (Test-Path $TargetDirectory -PathType Container)) { throw "Directory '$TargetDirectory' does not exist." }
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
-
-    $scriptName = "src/experiment_auditor.py"
-    # Build the argument list for the python script itself.
+    $scriptName = Join-Path $ProjectRoot "src/experiment_auditor.py"
     $pythonScriptArgs = @($ResolvedPath)
-    if ($PSBoundParameters['Verbose']) {
-        $pythonScriptArgs += "--verbose"
-    }
-    # Force the python script to generate color for stream processing
+    if ($PSBoundParameters['Verbose']) { $pythonScriptArgs += "--verbose" }
     $pythonScriptArgs += "--force-color"
-
-    # Define the log file name and path
-    $logFileName = "experiment_audit_log.txt"
-    $LogFilePath = Join-Path $ResolvedPath $logFileName
-    
-    Write-Host "" # Add blank line for spacing
-    Write-Host "The audit log will be saved to:"
-    $relativeLogPathForDisplay = Join-Path $TargetDirectory $logFileName
-    Write-Host $relativeLogPathForDisplay
-    
-    # Remove the old log file if it exists to ensure a clean run
+    $LogFilePath = Join-Path $ResolvedPath "experiment_audit_log.txt"
+    Write-Host "`nThe audit log will be saved to:"; Write-Host (Join-Path $TargetDirectory "experiment_audit_log.txt")
     if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
 
-    # Execute the python script, stream its output to both the console and the log file,
-    # and capture the exit code. This is the correct method for this script.
-    & $executable $prefixArgs $scriptName $pythonScriptArgs *>&1 | Tee-Object -FilePath $LogFilePath
-    $pythonExitCode = $LASTEXITCODE
-
-    # The Python script handles all UI. This wrapper just passes the exit code through.
-    $scriptExitCode = $pythonExitCode
-}
-catch {
-    $line = '#' * 80
-    
-    # Dynamically center the message to ensure it is always aligned correctly.
-    $messageText = " AUDIT FAILED "
-    $bookend = "###"
-    $contentWidth = $line.Length - ($bookend.Length * 2)
-    $paddingNeeded = $contentWidth - $messageText.Length
-    $leftPadCount = [Math]::Floor($paddingNeeded / 2)
-    $rightPadCount = [Math]::Ceiling($paddingNeeded / 2)
-    $centeredMessage = "$bookend$(' ' * $leftPadCount)$messageText$(' ' * $rightPadCount)$bookend"
-
-    Write-Host ""
-    Write-Host $line -ForegroundColor Red
-    Write-Host $centeredMessage -ForegroundColor Red
-    Write-Host $line -ForegroundColor Red
-    Write-Host ""
-    
-    # Display a clean, user-friendly error message.
-    Write-Host "$($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Please provide a valid path to an existing experiment directory.`n" -ForegroundColor Yellow
-    
+    $finalArgs = @("python", $scriptName) + $pythonScriptArgs
+    & pdm run $finalArgs *>&1 | Tee-Object -FilePath $LogFilePath
+    $scriptExitCode = $LASTEXITCODE
+} catch {
+    Write-Host "`nAUDIT FAILED: $($_.Exception.Message)" -ForegroundColor Red
     $scriptExitCode = 1
-}
-finally {
+} finally {
     if ($LogFilePath -and (Test-Path -LiteralPath $LogFilePath)) {
-        # Post-process the log file to remove ANSI escape codes.
-        try {
-            $logContent = Get-Content -Path $LogFilePath -Raw
-            # Regex to match and replace ANSI color codes. `e is the escape character.
-            $cleanedContent = $logContent -replace "`e\[[0-9;]*m", ''
-            Set-Content -Path $LogFilePath -Value $cleanedContent.Trim() -Force
-        }
-        catch {
-            # If cleanup fails, do not crash the script. The original log is preserved.
-            Write-Warning "Could not clean ANSI codes from the log file: $($_.Exception.Message)"
-        }
-
-        Write-Host "`nThe audit log has been saved to:" -ForegroundColor Gray
-        $relativePath = Resolve-Path -Path $LogFilePath -Relative
-        Write-Host $relativePath -ForegroundColor Gray
-        Write-Host "" # Add a blank line for spacing
+        try { $c = Get-Content -Path $LogFilePath -Raw; $c = $c -replace "`e\[[0-9;]*m", ''; Set-Content -Path $LogFilePath -Value $c.Trim() -Force } catch {}
+        Write-Host "`nLog saved to: $(Resolve-Path -Path $LogFilePath -Relative)" -ForegroundColor Gray
     }
 }
-
 exit $scriptExitCode
 
 # === End of audit_experiment.ps1 ===

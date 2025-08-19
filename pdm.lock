@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:fd787a56598b97ef2aabfffd8f3e3ea0bf07e9319bb3d3263fb089c407c60c3c"
+content_hash = "sha256:bfae37f223e2689dd11d9bc041273e4a70ae8d3ff6db941ef175f00f3154ffbf"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
@@ -658,7 +658,7 @@ name = "lxml"
 version = "6.0.0"
 requires_python = ">=3.8"
 summary = "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API."
-groups = ["default", "dev"]
+groups = ["default"]
 files = [
     {file = "lxml-6.0.0-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:4ee56288d0df919e4aac43b539dd0e34bb55d6a12a6562038e8d6f3ed07f9e36"},
     {file = "lxml-6.0.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:b8dd6dd0e9c1992613ccda2bcb74fc9d49159dbe0f0ca4753f37527749885c25"},
@@ -1278,7 +1278,7 @@ name = "python-docx"
 version = "1.2.0"
 requires_python = ">=3.9"
 summary = "Create, read, and update Microsoft Word .docx files."
-groups = ["default", "dev"]
+groups = ["default"]
 dependencies = [
     "lxml>=3.1.0",
     "typing-extensions>=4.9.0",
@@ -1706,7 +1706,7 @@ name = "typing-extensions"
 version = "4.14.1"
 requires_python = ">=3.9"
 summary = "Backported and Experimental Type Hints for Python 3.9+"
-groups = ["default", "dev"]
+groups = ["default"]
 files = [
     {file = "typing_extensions-4.14.1-py3-none-any.whl", hash = "sha256:d1e1e3b58374dc93031d6eda2420a48ea44a36c2b4766a4fdeb3710755731d76"},
     {file = "typing_extensions-4.14.1.tar.gz", hash = "sha256:38b39f4aeeab64884ce9f74c94263ef78f3c22467c8724005483154c26648d36"},

@@ -13,7 +13,9 @@ To make changes, please edit the template file and then run 'pdm run build-docs'
 
 This document is the **Framework Manual** for the project. It provides a comprehensive technical guide to the fully automated, resilient, and reproducible framework designed for conducting large-scale LLM experiments with complex narrative systems. It offers an end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
 
-This manual is intended for developers, contributors, and researchers who wish to understand the system's architecture or use the framework for **conceptual replication and new research**.
+This manual is intended for developers, contributors, and researchers who wish to understand the system's architecture or use the framework for **direct replication, conceptual replication, and new research**.
+
+{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=75% | caption=Project Architecture: A high-level overview of the project's main functional components and their relationships.}}
 
 ## Research Question
 At its core, this project investigates whether a Large Language Model (LLM) can solve a complex matching task: given a set of sanitized, narrative personality descriptions (derived from birth data) and a corresponding set of general biographical profiles, can the LLM correctly pair them at a rate significantly greater than chance?

@@ -4,32 +4,51 @@ This document outlines planned development tasks and tracks known issues for the
 
 ## Tasks Prior to Publication
 
-### Code Development
+### Code Development and Testing
 
-- [ ] **Update and Restore Test Coverage**
-  - [ ] Update all PowerShell and Python tests to reflect the current codebase.
-  - [ ] Ensure the test suite is robust and provides thorough coverage.
+This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
+
+- [ ] **Complete Test Coverage for Existing Framework**
+  - [ ] Update and complete the test suites for all existing Python scripts and PowerShell wrappers.
+- [ ] **Develop `new_study.ps1` Orchestrator**
+  - [ ] Implement the `new_study.ps1` workflow to automate multi-experiment studies based on a factor matrix in `config.ini`.
+- [ ] **Test the New Study Orchestrator**
+  - [ ] Create and execute a scripted integration test for the `new_study.ps1` script to ensure it correctly manages the study lifecycle.
 
 ### Resolution of Known Issues
 
+The following issues will be addressed concurrently during the "Code Development and Testing" phase.
+
+-   **Inconsistent Configuration Logic**:
+    -   Currently, `config.ini` entries for file paths (e.g., `personalities_src`) include the parent directory (`data/`). The best practice is for the config to only contain the filename, with the Python scripts being responsible for building the full path. This should be refactored across the codebase for consistency.
 -   **Inconsistent Logging**:
     -   The log file for `repair_experiment.ps1` is not as detailed as those from other scripts.
     -   The `process_study.ps1` workflow does not currently generate a dedicated log file.
     -   Log files from migration scripts contain unnecessary PowerShell transcript headers and footers.
 -   **Redundant API Calls**: Forcing a migration on an already `VALIDATED` experiment unnecessarily re-runs all LLM API calls.
 
-### Documentation
+### Final Validation and Data Generation
 
-- [ ] **Final Documentation Polish**
-  - [ ] Replace placeholder LLM names (e.g., `GPT-5`, `Gemini 2.5 Pro`) in `article_main_text.md` with the specific, versioned models that were actually used in the research. This is critical for scientific reproducibility.
-  - [ ] Update counts and test results with actual research results.
-  - [ ] Ensure all data files, scripts, and supplementary materials are clean, well-documented, and easy for an external researcher to understand.
+- [ ] **Execute Full End-to-End Study**
+  - [ ] Run the complete data preparation pipeline (`prepare_data.ps1`) to generate a fresh, final dataset from live sources.
+  - [ ] Conduct the full experimental study, varying all three core factors (model name, group size, mapping strategy) to produce the final results.
+  - [ ] This will serve as the final end-to-end validation of the entire framework and will generate the definitive data used in the manuscript.
 
-## Online Presence & Open Science
+### Final Documentation Polish
+
+- [ ] **Update All Documents with Final Results**
+  - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
+  - [ ] Update all tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
+  - [ ] Perform a final review of all documents to ensure they are clean, consistent, and easy for an external researcher to understand.
+
+## Online Presence & Final Review
 
 - [ ] **Establish Public Repository**
   - [ ] Create a public GitHub repository for the project.
   - [ ] Push all final code, data, and documentation to the repository.
+- [ ] **Final Co-Author Review**
+  - [ ] Provide the co-author with the final manuscript, the live repository link, and a summary of the final results.
+  - [ ] Incorporate any final revisions from the co-author and push updates to the repository.
 - [ ] **Update Author Profiles**
   - [ ] Update ORCID profile with the new publication/project.
 - [ ] **Preprint Publication**
@@ -38,8 +57,10 @@ This document outlines planned development tasks and tracks known issues for the
 ## Paper Submission (PCI Psychology & Meta-Psychology)
 
 - [ ] **Solicit Pre-Submission Expert Feedback**
-  - [ ] Identify and contact key field experts (e.g., Currey, Godbout, Kosinski) for friendly pre-submission reviews.
+  - [ ] Identify and contact key field experts (e.g., Currey, Godbout) for friendly pre-submission reviews.
   - [ ] Incorporate feedback into the final manuscript draft.
+- [ ] **Final Co-Author Approval**
+  - [ ] Secure final approval from the co-author on the revised manuscript before submission.
 - [ ] **Manuscript Finalization**
   - [ ] Prepare the final version of the manuscript with numbered lines.
 - [ ] **Compliance & Disclosure**
@@ -61,16 +82,12 @@ This document outlines planned development tasks and tracks known issues for the
 
 ### Code Development
 
-- [ ] **Refactor `experiment_manager.py`**
-  - [ ] Split the script into two distinct modules: `experiment_auditor.py` (for verification logic) and `experiment_manager.py` (for state-machine control) to improve maintainability and testability.
 - [ ] **Improve Experiment Execution and Reproducibility**
   - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.
   - [ ] Generate an experiment manifest file with results to permanently record all parameters used (this will replace config.ini as the source of parameters).
   - [ ] Update `audit`, `repair`, and `migrate` workflows to use the manifest as the ground truth.
-- [ ] **Automate Study Generation (`new_study.ps1`)**
-  - [ ] Develop the `new_study.ps1` workflow to orchestrate multiple `new_experiment.ps1` calls based on a factor matrix, creating entire studies automatically.
-- [ ] **Concurrent LLM Averaging for Eminence Scores**
-  - [ ] Use a "wisdom of the crowd" approach by querying 4 different LLMs for the same batch and averaging their scores to get a more stable, less biased result.
+- [ ] **Concurrent LLM Averaging for Eminence and OCEAN Scores**
+  - [ ] Use a "wisdom of the crowd" approach by querying multiple different LLMs for the same batch and averaging their scores to get more stable, less biased results for both eminence and personality scoring.
 - [ ] **Pre-Run Estimate of Cost and Time**
   - [ ] Before processing the first batch, the script would calculate and display:
     - [ ] The total number of new subjects to be processed.

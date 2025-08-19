@@ -64,6 +64,7 @@ Usage by other scripts:
 import configparser
 import os
 import logging
+import pathlib
 from dotenv import load_dotenv # For .env loading
 
 CONFIG_FILENAME = "config.ini"
@@ -80,49 +81,32 @@ if not logger.hasHandlers():
     logger.setLevel(logging.INFO) # Default level for this module's direct logs
 
 def get_project_root() -> str:
-    """Determines the project root directory (assumed to be parent of src/)."""
-    # Assumes this file (config_loader.py) is in a directory like 'src/'
-    # which is a direct child of the project root.
-    current_file_path = os.path.abspath(__file__)
-    src_dir = os.path.dirname(current_file_path)
-    project_root = os.path.dirname(src_dir)
-    return project_root
+    """Determines the project root by searching upwards for pyproject.toml."""
+    current_path = pathlib.Path(__file__).resolve()
+    while current_path != current_path.parent:
+        if (current_path / "pyproject.toml").exists():
+            return str(current_path)
+        current_path = current_path.parent
+    raise FileNotFoundError("Could not find project root (containing pyproject.toml).")
 
 PROJECT_ROOT = get_project_root()
 
 def load_app_config():
     config = configparser.ConfigParser()
+    config_path = os.path.join(PROJECT_ROOT, CONFIG_FILENAME)
     
-    # For tests, CWD will be the temp test dir containing the mock config.
-    # For normal runs, CWD might be project root, or script dir if src/ is CWD.
-    # Simplest: prioritize CWD for config.ini, then try calculated project root.
-    
-    config_path_cwd = os.path.join(os.getcwd(), CONFIG_FILENAME)
-    
-    current_file_path = os.path.abspath(__file__)
-    src_dir_of_loader = os.path.dirname(current_file_path)
-    project_root_of_loader = os.path.dirname(src_dir_of_loader)
-    config_path_project_root_default = os.path.join(project_root_of_loader, CONFIG_FILENAME)
-
-    config_path_found = None
-    if os.path.exists(config_path_cwd): # Check CWD first
-        config_path_found = config_path_cwd
-    elif os.path.exists(config_path_project_root_default): # Then default project structure
-        config_path_found = config_path_project_root_default
-    
-    if config_path_found:
-        config_path_found = os.path.abspath(config_path_found)
+    if os.path.exists(config_path):
         try:
-            config.read(config_path_found)
-            logger.debug(f"Successfully loaded configuration from: {config_path_found}")
+            # Explicitly specify 'utf-8-sig' to handle files with a BOM,
+            # which can be created by PowerShell's Set-Content.
+            config.read(config_path, encoding='utf-8-sig')
+            logger.debug(f"Successfully loaded configuration from: {config_path}")
         except configparser.Error as e:
-            logger.error(f"Error parsing configuration file {config_path_found}: {e}")
+            logger.error(f"Error parsing configuration file {config_path}: {e}")
     else:
-        logger.warning(f"{CONFIG_FILENAME} not found in CWD ({config_path_cwd}) or project root relative to loader ({config_path_project_root_default}). Using fallbacks.")
+        logger.warning(f"{CONFIG_FILENAME} not found at project root: {config_path}. Using fallbacks.")
         
     return config
-
-APP_CONFIG = load_app_config()
 
 def load_env_vars():
     """Loads environment variables from .env file located at the project root."""

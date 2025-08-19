@@ -78,6 +78,7 @@ import subprocess
 import sys
 import argparse
 import time
+import pathlib
 
 # Add the script's own directory ('src') to the Python path.
 # This ensures that sibling modules (like docx_postprocessor) can be imported
@@ -551,7 +552,7 @@ def main():
     parser.add_argument('--force-documents', action='store_true', help="Force regeneration of all markdown and docx documents.")
     args = parser.parse_args()
     
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    project_root = pathlib.Path(__file__).resolve().parent.parent
     
     # Determine which stages to force
     do_force_diagrams = args.force or args.force_diagrams
@@ -604,10 +605,13 @@ def main():
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Content for DOCX Conversion ---{Colors.RESET}")
     try:
         import pypandoc
+        word_docs_dir = os.path.join(project_root, 'docs', 'word_docs')
+        os.makedirs(word_docs_dir, exist_ok=True)
+        
         pandoc_content = build_readme_content(project_root, flavor='pandoc')
         
         # --- 1. Convert the main documentation (from in-memory content) ---
-        readme_docx_path = os.path.join(project_root, 'docs/DOCUMENTATION.docx')
+        readme_docx_path = os.path.join(word_docs_dir, 'DOCUMENTATION.docx')
         
         should_build_main_doc = False
         if do_force_documents or not os.path.exists(readme_docx_path):
@@ -621,44 +625,52 @@ def main():
         else:
             print(f"    - Skipping DOCX conversion for {Colors.CYAN}DOCUMENTATION.docx{Colors.RESET} (up-to-date).")
 
-        # --- 2. Convert other markdown files, processing placeholders where needed ---
-        files_to_convert = {
-            "TESTING.md": False,
-            "CONTRIBUTING.md": False,
-            "CHANGELOG.md": False,
-            "LICENSE.md": False,
-            "output/project_reports/project_scope_report.md": False,
-            "docs/article_main_text.md": True,
-            "docs/article_supplementary_material.md": True,
-            "docs/article_cover_letter.md": True
+        # --- 2. Dynamically find and convert all other markdown files ---
+        print(f"\n{Colors.BOLD}{Colors.CYAN}--- Converting all other Markdown files to DOCX ---{Colors.RESET}")
+        
+        files_needing_placeholders = {
+            os.path.join(project_root, 'docs', 'article_main_text.md'),
+            os.path.join(project_root, 'docs', 'article_supplementary_material.md'),
+            os.path.join(project_root, 'docs', 'article_cover_letter.md')
         }
         
-        for rel_path, process_placeholders in files_to_convert.items():
-            source_path = os.path.join(project_root, rel_path)
-            output_filename = os.path.splitext(os.path.basename(rel_path))[0] + ".docx"
-            output_path = os.path.join(project_root, 'docs', output_filename)
+        exclude_dirs = {'.git', '.venv', 'node_modules', 'docs/word_docs'}
+        
+        # Use a set comprehension to automatically handle duplicates
+        all_md_files = {p for p in project_root.glob('**/*.md')}
+        
+        for source_path in sorted(list(all_md_files)): # Sort for deterministic order
+            # Skip files in excluded directories and all template files
+            if any(part in exclude_dirs for part in source_path.parts) or source_path.name in {'DOCUMENTATION.template.md', 'changelog_template.md'}:
+                continue
 
+            # Determine output name and path
+            if source_path.name == 'README.md' and source_path.parent.name == 'data':
+                output_filename = "README_DATA.docx"
+            else:
+                output_filename = source_path.with_suffix(".docx").name
+            output_path = os.path.join(word_docs_dir, output_filename)
+            
+            # Check if build is needed based on modification times
             should_build = False
             if do_force_documents or not os.path.exists(output_path):
                 should_build = True
-            elif os.path.exists(source_path) and os.path.getmtime(output_path) < os.path.getmtime(source_path):
+            elif os.path.getmtime(output_path) < os.path.getmtime(source_path):
                 should_build = True
 
             if not should_build:
                 print(f"    - Skipping DOCX conversion for {Colors.CYAN}{output_filename}{Colors.RESET} (up-to-date).")
                 continue
-
-            if not os.path.exists(source_path):
-                print(f"    - {Colors.YELLOW}[DIAGNOSTIC] Source file not found at path: '{source_path}'. Skipping.{Colors.RESET}")
-                continue
-
-            # This code is now correctly placed *after* the existence check.
+            
+            # Determine if placeholders need processing for this specific file
+            process_placeholders = str(source_path) in files_needing_placeholders
             content_to_convert = None
-            path_to_convert = source_path
+            path_to_convert = str(source_path)
+            
             if process_placeholders:
                 with open(source_path, 'r', encoding='utf-8') as f:
                     content_to_convert = process_markdown_content(f.read(), project_root, flavor='pandoc')
-                path_to_convert = None
+                path_to_convert = None # Pass content instead of path
             
             if not convert_to_docx(pypandoc, output_path, project_root, 
                                    source_md_path=path_to_convert, 

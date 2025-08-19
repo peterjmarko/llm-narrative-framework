@@ -32,6 +32,7 @@
   **Testing Framework:**
   - Updated `TESTING.md` to formally describe the multi-layered testing strategy (Unit, Orchestration, Integration).
   - Updated the status of `prepare_data.ps1` to "IN PROGRESS" to reflect the successful completion of the orchestration logic tests, pending the final end-to-end integration test.
+  
 ## 5.4.5 (2025-08-17)
 
 ### Bump
@@ -44,7 +45,7 @@
   - Creates new pytest suites for prepare_sf_import, create_subject_db, neutralize_delineations, and generate_personalities_db.
   - Completes the refactoring of all data preparation scripts to align their startup logic (stale check, interactive prompt) and UX with the modern project standard.
   - Updates TESTING.md with the completed status of all data preparation scripts.
-  
+
 ## 5.4.4 (2025-08-16)
 
 ### Bump
