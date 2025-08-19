@@ -18,6 +18,7 @@
   - chore(linting): Updated linters to exclude the new testing harness scripts.
   
   - chore: Updated ROADMAP.md to reflect the completion of the logging fix.
+  
 ## 5.6.0 (2025-08-18)
 
 ### Bump
@@ -42,7 +43,7 @@
   - Added a new high-level project overview diagram to `DOCUMENTATION.md`.
   - Updated the `TESTING.md` status tables to reflect the successful completion of the core workflow testing.
   - Made several strategic updates to the `ROADMAP.md` to improve the pre-publication workflow.
-  
+
 ## 5.5.0 (2025-08-17)
 
 ### Bump

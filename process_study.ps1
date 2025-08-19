@@ -49,7 +49,10 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target top-level study directory.")]
-    [string]$TargetDirectory
+    [string]$TargetDirectory,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NoLog
 )
 
 # --- Helper Functions ---
@@ -210,7 +213,18 @@ function Invoke-PythonScript {
 }
 
 # --- Main Script Logic ---
+$LogFilePath = $null
 try {
+    if (-not $NoLog.IsPresent) {
+        $LogFilePath = Join-Path -Path $TargetDirectory -ChildPath "study_processing_log.txt"
+        Start-Transcript -Path $LogFilePath -Force | Out-Null
+        
+        Write-Host ""
+        Write-Host "The processing log will be saved to:" -ForegroundColor Gray
+        $relativePath = Resolve-Path -Path $LogFilePath -Relative
+        Write-Host $relativePath -ForegroundColor Gray
+    }
+
     # Resolve the path to ensure it's absolute and check for existence
     $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
     
@@ -277,6 +291,26 @@ catch {
     Write-Host "`nERROR: $($_.Exception.Message)`n" -ForegroundColor Red # Print the captured exception message cleanly
     # Exit with a non-zero status code to indicate failure to other automation tools
     exit 1
+}
+finally {
+    if (-not $NoLog.IsPresent -and (Test-Path -LiteralPath $LogFilePath)) {
+        Stop-Transcript | Out-Null
+        
+        try {
+            $logContent = Get-Content -Path $LogFilePath -Raw
+            $cleanedContent = $logContent -replace '(?s)\*+\r?\nPowerShell transcript start.*?\*+\r?\n\r?\n', ''
+            $cleanedContent = $cleanedContent -replace '(?s)\*+\r?\nPowerShell transcript end.*', ''
+            Set-Content -Path $LogFilePath -Value $cleanedContent.Trim() -Force
+        }
+        catch {
+            Write-Warning "Could not clean the transcript log file: $($_.Exception.Message)"
+        }
+
+        Write-Host "`nThe processing log has been saved to:" -ForegroundColor Gray
+        $relativePath = Resolve-Path -Path $LogFilePath -Relative
+        Write-Host $relativePath -ForegroundColor Gray
+        Write-Host ""
+    }
 }
 
 # === End of process_study.ps1 ===

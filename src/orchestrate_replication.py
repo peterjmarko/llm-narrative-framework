@@ -368,14 +368,18 @@ def main():
         
         logging.error(f"\n\n{Fore.RED}--- PIPELINE {pipeline_status} ---{Fore.RESET}")
 
-        # If the error is from a subprocess, log its stderr to show the root cause.
         if isinstance(e, subprocess.CalledProcessError):
             logging.error(e.stderr)
         else:
-            # For other exceptions, log the exception info.
             logging.exception("An unexpected error occurred in the orchestrator.")
 
-        # CRITICAL: Exit with a non-zero code to signal failure to the manager.
+        # On any failure, attempt to generate a final report with the FAILED status.
+        try:
+            cmd_report = [sys.executable, generate_report_script, "--run_output_dir", run_specific_dir_path, "--replication_num", str(args.replication_num), "--notes", args.notes]
+            run_script(cmd_report, "5. Generate Failure Report", verbose=args.verbose)
+        except Exception as report_e:
+            logging.error(f"Could not generate a failure report: {report_e}")
+
         sys.exit(1)
 
     # --- Finalization: Update Report Status ---

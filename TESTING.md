@@ -333,6 +333,8 @@ The following table details the testing status for each script in the data prepa
 --------------------------------------------------------------------------------------------------------------------
 Module                              Cov. (%)        Status & Justification
 ----------------------------------- --------------- -----------------------------------------------------------------
+**Sourcing**
+
 `src/fetch_adb_data.py`             `~37%`          **COMPLETE.** Unit tests cover critical offline logic. Live
                                                     network code is validated via integration testing.
 
@@ -346,6 +348,8 @@ Module                              Cov. (%)        Status & Justification
                                                     validated. Unit tests cover all core filtering and resumability
                                                     logic.
 
+**Scoring**
+
 `src/generate_eminence_scores.py`   `~55%`          **COMPLETE.** Unit tests cover the critical offline logic,
                                                     including LLM response parsing, resumability, and a mocked
                                                     orchestrator loop. Live LLM calls are validated via integration.
@@ -358,6 +362,8 @@ Module                              Cov. (%)        Status & Justification
 `src/select_final_candidates.py`    `~65%`          **COMPLETE.** The script was fully refactored and manually
                                                     validated. Unit tests cover the entire data transformation
                                                     workflow, including filtering, mapping, and sorting.
+
+**Generation**
 
 `src/prepare_sf_import.py`          `~58%`          **COMPLETE.** The script was fully refactored and manually
                                                     validated. Unit tests cover the core data transformation and
@@ -388,41 +394,64 @@ The following table details the testing status for each script in the main exper
 Module                                  Cov. (%)        Status & Justification
 --------------------------------------- --------------- ----------------------------------------------------------------------------------
 **Core Orchestrators**
+
 `src/experiment_manager.py`             `~56%`          **COMPLETE.** Unit tests are complete, and the core `new`/`audit`/`fix`
                                                         workflows have been successfully validated via the scripted
                                                         end-to-end integration test.
-
-`src/orchestrate_replication.py`        `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/orchestrate_replication.py`        `~77%`          **COMPLETE.** Unit tests cover the core control flow for both
+                                                        "new run" and "reprocess" modes, including failure handling.
 
 **Single-Replication Pipeline**
-`src/build_llm_queries.py`              `PENDING`       **PENDING.** Unit testing will be performed next.
+
+`src/build_llm_queries.py`              `PENDING`       **IN PROGRESS.** Unit testing will be performed next.
+
 `src/llm_prompter.py`                   `PENDING`       **PENDING.** Unit testing will be performed next.
+
 `src/process_llm_responses.py`          `PENDING`       **PENDING.** Unit testing will be performed next.
+
 `src/analyze_llm_performance.py`        `PENDING`       **PENDING.** Unit testing will be performed next.
+
 `src/run_bias_analysis.py`              `PENDING`       **PENDING.** Unit testing will be performed next.
+
 `src/generate_replication_report.py`    `PENDING`       **PENDING.** Unit testing will be performed next.
 
 **Auditing & Utility Scripts**
+
 `src/experiment_auditor.py`             `PENDING`       **PENDING.** Unit testing will be performed next.
+
 `src/replication_log_manager.py`        `PENDING`       **PENDING.** Unit testing will be performed next.
+
 `src/patch_old_experiment.py`           `PENDING`       **PENDING.** Unit testing will be performed next.
+
 `src/restore_config.py`                 `PENDING`       **PENDING.** Unit testing will be performed next.
 
 **Aggregation & Analysis Scripts**
+
 `src/compile_replication_results.py`    `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+
 `src/compile_experiment_results.py`     `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+
 `src/compile_study_results.py`          `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+
 `src/study_analyzer.py`                 `PENDING`       **PENDING.** Unit tests will be written for the statistical analysis script.
 
-**PowerShell Wrappers (Experiment Level)**
+**PowerShell Wrappers (Experiments)**
+
 `new_experiment.ps1`                    `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+
 `audit_experiment.ps1`                  `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+
 `fix_experiment.ps1`                    `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+
 `migrate_experiment.ps1`                `N/A`           **PENDING.** Manual validation is pending.
 
-**PowerShell Wrappers (Study Level)**
+**PowerShell Wrappers (Studies)**
+
 `audit_study.ps1`                       `N/A`           **PENDING.** Manual validation is pending.
+
 `fix_study.ps1`                         `N/A`           **PENDING.** Manual validation is pending.
+
 `migrate_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
+
 `process_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
 -----------------------------------------------------------------------------------------------------------------------------------------

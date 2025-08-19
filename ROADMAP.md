@@ -20,7 +20,6 @@ This phase focuses on achieving a fully validated and stable codebase before the
 The following issues will be addressed concurrently during the "Code Development and Testing" phase.
 
 -   **Inconsistent Logging**:
-    -   The `process_study.ps1` workflow does not currently generate a dedicated log file.
     -   Log files from migration scripts contain unnecessary PowerShell transcript headers and footers.
 -   **Redundant API Calls**: Forcing a migration on an already `VALIDATED` experiment unnecessarily re-runs all LLM API calls.
 
