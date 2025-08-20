@@ -249,11 +249,11 @@ This utility workflow provides a safe, non-destructive process to upgrade older 
 
 {{grouped_figure:docs/diagrams/flow_main_4_migrate_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
 
-#### Workflow 5: Process a Study
+#### Workflow 5: Evaluate a Study
 
-This workflow is used after all experiments are validated to compile and analyze the entire study. It performs a robust pre-flight check by calling `audit_study.ps1`. If the study is not ready for processing (or is already complete), it will halt with a clear recommendation. Otherwise, it proceeds to compile all results and run the final statistical analysis.
+This workflow is used after all experiments are validated to compile, analyze, and evaluate the entire study. It performs a robust pre-flight check by calling `audit_study.ps1`. If the study is not ready for processing (or is already complete), it will halt with a clear recommendation. Otherwise, it proceeds to compile all results and run the final statistical analysis.
 
-{{grouped_figure:docs/diagrams/flow_main_5_process_study.mmd | scale=2.5 | width=80% | caption=Workflow 5: Process a Study. Audits, compiles, and analyzes all experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_main_5_evaluate_study.mmd | scale=2.5 | width=80% | caption=Workflow 5: Evaluate a Study. Audits, compiles, and analyzes all experiments in a study.}}
 
 #### Workflow 6: (Planned) Create a New Study
 This workflow is a planned feature. It will provide a top-level script (`new_study.ps1`) to automate the creation of entire studies. It will be designed to read a matrix of factors to vary from `config.ini` (e.g., a list of models and mapping strategies) and then orchestrate the entire process by calling `new_experiment.ps1` for each required experiment.
@@ -504,11 +504,11 @@ This script provides a safe, batch-migration workflow for a study containing leg
 .\migrate_study.ps1 -StudyDirectory "output/studies/My_Legacy_Study"
 ```
 
-### Processing a Study (`process_study.ps1`)
+### Evaluating a Study (`evaluate_study.ps1`)
 
-This script orchestrates the entire post-processing workflow for a study. It compiles all experiment data and performs the final statistical analysis.
+This script orchestrates the entire evaluation workflow for a study. It audits, compiles, and performs the final statistical analysis on all experiments.
 
-**Important:** This script begins with a robust pre-flight check by calling the enhanced `audit_study.ps1`. If the audit reveals that any experiment is not `VALIDATED`, or that the study is already `COMPLETE`, the process will halt with a detailed report and a clear recommendation. This guarantees that analysis is only performed on a complete and ready set of data.
+**Important:** This script begins with a robust pre-flight check by calling `audit_study.ps1`. If the audit reveals that any experiment is not `VALIDATED`, or that the study is already `COMPLETE`, the process will halt with a detailed report and a clear recommendation. This guarantees that analysis is only performed on a complete and ready set of data.
 
 For organizational purposes, one would typically move all experiment folders belonging to a single study into a common directory (e.g., `output/studies/My_First_Study/`).
 
@@ -516,8 +516,8 @@ For organizational purposes, one would typically move all experiment folders bel
 Point the script at the top-level directory containing all relevant experiment folders. It will provide a clean, high-level summary of its progress.
 
 ```powershell
-# Example: Process all experiments located in the "My_First_Study" directory
-.\process_study.ps1 -StudyDirectory "output/studies/My_First_Study"
+# Example: Evaluate all experiments located in the "My_First_Study" directory
+.\evaluate_study.ps1 -TargetDirectory "output/studies/My_First_Study"
 ```
 For detailed, real-time logs, add the `-Verbose` switch.
 

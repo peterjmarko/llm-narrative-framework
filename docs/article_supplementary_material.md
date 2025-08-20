@@ -352,7 +352,7 @@ This script orchestrates the final evaluation. It audits all experiments in the 
 **Execution:**
 ```powershell
 # Compile and evaluate all experiments in the study directory
-.\evaluate_study.ps1 -StudyDirectory "output/studies/My_Replication_Study"
+.\evaluate_study.ps1 -TargetDirectory "output/studies/My_Replication_Study"
 ```
 
 **Final Artifacts:**

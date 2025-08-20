@@ -1,12 +1,12 @@
 graph TD;
-    A[process_study.ps1<br>User Entry Point]:::entry --> B;
+    A[evaluate_study.ps1<br>User Entry Point]:::entry --> B;
 
-    subgraph "Workflow 5: Process a Study"
+    subgraph "Workflow 5: Evaluate a Study"
         direction TB
         
         B["1. Audit Study<br><small>via audit_study.ps1</small>"]:::step;
         C["2. Compile Study Results<br><small>via compile_study_results.py</small>"]:::step;
-        D["3. Analyze Study<br><small>via study_analyzer.py</small>"]:::step;
+        D["3. Analyze Study Results<br><small>via analyze_study_results.py</small>"]:::step;
 
         B --> E{"Audit Result?"}:::decision;
         E -- "Not Validated" --> F((Halt & Report Error)):::stop_node;

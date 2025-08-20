@@ -19,15 +19,15 @@ graph TD
         
         %% Branch 2: Fix / Update
         case_2["**Fix or Update**<br/>I want to fix all repairable, interrupted, or outdated experiments."]:::case_node
-        instruction_2["*Use: repair_study.ps1*"]:::instruction_node
+        instruction_2["*Use: fix_study.ps1*"]:::instruction_node
 
         %% Branch 3: Upgrade
         case_3["**Upgrade**<br/>I want to upgrade all legacy or severely corrupted experiments."]:::case_node
         instruction_3["*Use: migrate_study.ps1*"]:::instruction_node
 
-        %% Branch 4: Analyze
-        case_4["**Analyze**<br/>My study is fully validated and I want the final reports and plots."]:::case_node
-        instruction_4["*Use: process_study.ps1*"]:::instruction_node
+        %% Branch 4: Evaluate
+        case_4["**Evaluate**<br/>My study is fully validated and I want the final reports and plots."]:::case_node
+        instruction_4["*Use: evaluate_study.ps1*"]:::instruction_node
     end
 
     end_node(["End"]):::start_end_node;

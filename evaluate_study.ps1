@@ -17,39 +17,39 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: process_study.ps1
+# Filename: evaluate_study.ps1
 
 <#
 .SYNOPSIS
-    Audits, compiles, and analyzes a full study.
+    Audits, compiles, and evaluates a full study.
 
 .DESCRIPTION
-    This script is the main entry point for the entire post-processing workflow. It
-    orchestrates three key Python scripts in sequence:
+    This script is the main entry point for the entire study evaluation workflow. It
+    orchestrates three key scripts in sequence:
     1.  `audit_study.ps1`: Performs a full audit of the study. The script will halt
         if any experiment is not in a validated state.
     2.  `compile_study_results.py`: Compiles all experiment data into a master CSV.
-    3.  `study_analyzer.py`: Performs statistical analysis on the master CSV.
+    3.  `analyze_study_results.py`: Performs statistical analysis on the master CSV.
 
     By default, it provides a clean, high-level summary. For detailed, real-time
     output, use the -Verbose switch.
 
-.PARAMETER TargetDirectory
+.PARAMETER StudyDirectory
     The path to the top-level study directory containing experiment folders that need
-    to be processed (e.g., 'output/studies'). This is a mandatory parameter.
+    to be evaluated (e.g., 'output/studies'). This is a mandatory parameter.
 
 .EXAMPLE
-    # Process a study with the default high-level summary.
-    .\process_study.ps1 "output/studies/My_Full_Study"
+    # Evaluate a study with the default high-level summary.
+    .\evaluate_study.ps1 -StudyDirectory "output/studies/My_Full_Study"
 
 .EXAMPLE
-    # Process a study with detailed, real-time output for debugging.
-    .\process_study.ps1 "output/studies/My_Full_Study" -Verbose
+    # Evaluate a study with detailed, real-time output for debugging.
+    .\evaluate_study.ps1 -StudyDirectory "output/studies/My_Full_Study" -Verbose
 #>
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target top-level study directory.")]
-    [string]$TargetDirectory,
+    [string]$StudyDirectory,
 
     [Parameter(Mandatory=$false)]
     [switch]$NoLog
@@ -153,14 +153,18 @@ function Invoke-PythonScript {
         [string[]]$Arguments
     )
 
-    # Combine prefix arguments with the script and its arguments
+    # --- Display Logic (using relative path for cleanliness) ---
+    $displayArguments = $Arguments.Clone()
+    if ($displayArguments.Count -gt 0 -and (Test-Path -Path $displayArguments[0])) {
+        $displayArguments[0] = Resolve-Path -Path $displayArguments[0] -Relative
+    }
+    $displayFinalArgs = $prefixArgs + $ScriptName + $displayArguments
+    
+    Write-Host "  Executing:" -ForegroundColor Gray
+    Write-Host "  $executable $($displayFinalArgs -join ' ')"
+
+    # --- Execution Logic (using original absolute path for robustness) ---
     $finalArgs = $prefixArgs + $ScriptName + $Arguments
-
-    # Use -join to correctly format the command for logging
-    Write-Host "[${StepName}] Executing:" -ForegroundColor Yellow
-    Write-Host "  $executable $($finalArgs -join ' ')"
-
-    # Execute the command with its final argument list, capturing output
     $output = & $executable $finalArgs 2>&1
 
     # Check the exit code of the last command immediately
@@ -209,84 +213,116 @@ function Invoke-PythonScript {
     }
 
     Write-Host "Step '${StepName}' completed successfully." -ForegroundColor Green
-    Write-Host ""
 }
 
 # --- Main Script Logic ---
 $LogFilePath = $null
 try {
     if (-not $NoLog.IsPresent) {
-        $LogFilePath = Join-Path -Path $TargetDirectory -ChildPath "study_processing_log.txt"
+        $LogFilePath = Join-Path -Path $StudyDirectory -ChildPath "study_evaluation_log.txt"
         Start-Transcript -Path $LogFilePath -Force | Out-Null
         
         Write-Host ""
-        Write-Host "The processing log will be saved to:" -ForegroundColor Gray
+        Write-Host "The evaluation log will be saved to:" -ForegroundColor Gray
         $relativePath = Resolve-Path -Path $LogFilePath -Relative
         Write-Host $relativePath -ForegroundColor Gray
     }
 
     # Resolve the path to ensure it's absolute and check for existence
-    $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
+    $ResolvedPath = Resolve-Path -Path $StudyDirectory -ErrorAction Stop
     
     $headerLine = "#" * 80
-    $relativePath = Resolve-Path -Path $TargetDirectory -Relative
+    $relativePath = Resolve-Path -Path $StudyDirectory -Relative
     Write-Host "`n$headerLine" -ForegroundColor Green
-    Write-Host (Format-Banner "Starting Study Processing for:") -ForegroundColor Green
+    Write-Host (Format-Banner "Starting Study Evaluation for:") -ForegroundColor Green
     Write-Host (Format-Banner "'$($relativePath)'") -ForegroundColor Green
-    Write-Host "$headerLine`n" -ForegroundColor Green
+    Write-Host "$headerLine" -ForegroundColor Green
 
-    # --- Step 1: Run Pre-Analysis Audit ---
-    Write-Host "[1/3: Pre-Analysis Audit] Verifying study readiness..." -ForegroundColor Yellow
+    # --- Step 1/5: Run Pre-Analysis Audit ---
+    Write-Host "[1/5: Pre-Analysis Audit] Verifying study readiness..." -ForegroundColor Cyan
     $auditScriptPath = Join-Path $PSScriptRoot "audit_study.ps1"
-    if (-not (Test-Path $auditScriptPath)) {
-        throw "FATAL: audit_study.ps1 script not found at '$auditScriptPath'. Cannot verify study."
+    $auditOutput = & $auditScriptPath -StudyDirectory $StudyDirectory -NoHeader -ErrorAction Stop
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`n--- Audit Report on Failure ---" -ForegroundColor Yellow
+        $auditOutput | Write-Host # Display the captured report from the audit script
+        throw "Pre-analysis audit failed. See report above. Evaluation cannot continue."
     }
+    Write-Host "Step '1/5: Pre-Analysis Audit' completed successfully." -ForegroundColor Green
 
-    # Run the audit and capture its output to check the final status.
-    # The audit script prints its own report, so we don't need to explicitly write the output here.
-    $auditOutput = & $auditScriptPath -TargetDirectory $TargetDirectory -NoProgress -NoHeader -ErrorAction Stop
-    $auditExitCode = $LASTEXITCODE
+    # --- Step 2/5: Check for Existing Results & Staleness ---
+    Write-Host "`n[2/5: Staleness Check] Checking for existing analysis results..." -ForegroundColor Cyan
+    $inputFiles = Get-ChildItem -Path $StudyDirectory -Recurse -Filter "EXPERIMENT_results.csv"
+    $studyCsvPath = Join-Path $StudyDirectory "STUDY_results.csv"
+    $anovaDirPath = Join-Path $StudyDirectory "anova"
+    $outputArtifacts = @( (Get-Item -Path $studyCsvPath -ErrorAction SilentlyContinue), (Get-Item -Path $anovaDirPath -ErrorAction SilentlyContinue) ) | Where-Object { $_ }
 
-    if ($auditExitCode -ne 0) {
-        # The audit script has already printed its detailed report and recommendation.
-        # We add context here about what this means for the processing workflow.
-        Write-Host "`n[2/3: Compile Study Results] SKIPPED" -ForegroundColor Yellow
-        Write-Host "[3/3: Run Final Analysis (ANOVA)] SKIPPED" -ForegroundColor Yellow
-        throw "Pre-analysis audit failed. Processing cannot continue."
+    if ($outputArtifacts.Count -eq 0) {
+        Write-Host "  - No existing analysis artifacts found. Proceeding automatically." -ForegroundColor Green
     }
+    else {
+        $newestInputTimestamp = ($inputFiles | Measure-Object -Property LastWriteTime -Maximum).Maximum
+        $oldestOutputTimestamp = ($outputArtifacts | Measure-Object -Property LastWriteTime -Minimum).Minimum
 
-    # If the audit passed (exit code 0), check if the study is already fully processed.
-    if (($auditOutput | Out-String) -match "AUDIT FINISHED: STUDY IS COMPLETE") {
-        Write-Host "`nWarning: This study is already marked as COMPLETE." -ForegroundColor Yellow
-        $choice = Read-Host "Re-running will overwrite existing analysis files. Do you wish to proceed? (Y/N)"
-        if ($choice.Trim().ToLower() -ne 'y') {
-            Write-Host "`nProcessing aborted by user.`n" -ForegroundColor Yellow
-            Write-Host "[2/3: Compile Study Results] SKIPPED" -ForegroundColor Yellow
-            Write-Host "[3/3: Run Final Analysis (ANOVA)] SKIPPED`n" -ForegroundColor Yellow
-            return # Use 'return' for a clean exit from the 'try' block.
+        if ($newestInputTimestamp -gt $oldestOutputTimestamp) {
+            Write-Host "  - STALE DATA: Input experiment files are newer than existing analysis." -ForegroundColor Yellow
+            Write-Host "  - Automatically re-running..." -ForegroundColor Cyan
         }
-        Write-Host "`nProceeding with re-analysis..." -ForegroundColor Yellow
+        else {
+            Write-Host "  - WARNING: This study has already been evaluated, and the results are up to date. ✨" -ForegroundColor Yellow
+            Write-Host "  - If you choose to proceed, a backup of the existing results will be created first." -ForegroundColor Yellow
+            $choice = Read-Host "  - Do you wish to re-run the evaluation? (Y/N)"
+            if ($choice.Trim().ToLower() -ne 'y') {
+                Write-Host "`nEvaluation aborted by user.`n" -ForegroundColor Yellow
+                Write-Host "[3/5: Backup Previous Results] SKIPPED" -ForegroundColor Cyan
+                Write-Host "[4/5: Compile Study Results] SKIPPED" -ForegroundColor Cyan
+                Write-Host "[5/5: Run Final Analysis (ANOVA)] SKIPPED" -ForegroundColor Cyan
+                return
+            }
+             Write-Host "  - Proceeding with re-analysis as requested." -ForegroundColor Cyan
+        }
     }
-    
-    Write-Host "Step '1/3: Pre-Analysis Audit' completed successfully." -ForegroundColor Green
-    Write-Host ""
+    Write-Host "Step '2/5: Staleness Check' completed successfully." -ForegroundColor Green
 
-        # --- Step 2: Compile All Results into a Master CSV ---
-        Invoke-PythonScript -StepName "2/3: Compile Study Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
+    # --- Step 3/5: Backup Previous Results ---
+    if ($outputArtifacts.Count -gt 0) {
+        Write-Host "`n[3/5: Backup] Backing up previous analysis results..." -ForegroundColor Cyan
+        $archiveDir = Join-Path $StudyDirectory "archive"
+        New-Item -Path $archiveDir -ItemType Directory -Force | Out-Null
+        foreach ($artifact in $outputArtifacts) {
+            $destination = Join-Path $archiveDir $artifact.Name
+            if (Test-Path $destination) {
+                Write-Host "  - Removing previous backup: $($artifact.Name)"
+                Remove-Item -Path $destination -Recurse -Force
+            }
+            Write-Host "  - Archiving: $($artifact.Name)"
+            Move-Item -Path $artifact.FullName -Destination $destination -Force
+        }
+        Write-Host "Step '3/5: Backup' completed successfully." -ForegroundColor Green
+    }
+    else {
+        Write-Host "`n[3/5: Backup] No previous results to back up. SKIPPED" -ForegroundColor Cyan
+    }
 
-    # --- Step 3: Run Final Statistical Analysis ---
-    Invoke-PythonScript -StepName "3/3: Run Final Analysis (ANOVA)" -ScriptName "src/study_analyzer.py" -Arguments $ResolvedPath
+    # --- Step 4/5: Compile All Results into a Master CSV ---
+    $step4Header = "[4/5: Compile Study Results] Compiling all experiment data..."
+    Write-Host "`n$step4Header" -ForegroundColor Cyan
+    Invoke-PythonScript -StepName "4/5: Compile Study Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
+
+    # --- Step 5/5: Run Final Analysis (ANOVA) ---
+    $step5Header = "[5/5: Run Final Analysis (ANOVA)] Performing statistical analysis..."
+    Write-Host "`n$step5Header" -ForegroundColor Cyan
+    Invoke-PythonScript -StepName "5/5: Run Final Analysis (ANOVA)" -ScriptName "src/analyze_study_results.py" -Arguments $ResolvedPath
 
     $headerLine = "#" * 80
+    Write-Host "`n$headerLine" -ForegroundColor Green
+    Write-Host (Format-Banner "Study Evaluation Finished Successfully!") -ForegroundColor Green
     Write-Host "$headerLine" -ForegroundColor Green
-    Write-Host (Format-Banner "Study Processing Finished Successfully!") -ForegroundColor Green
-    Write-Host "$headerLine`n" -ForegroundColor Green
 
 }
 catch {
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Red
-    Write-Host (Format-Banner "STUDY PROCESSING FAILED") -ForegroundColor Red
+    Write-Host (Format-Banner "STUDY EVALUATION FAILED") -ForegroundColor Red
     Write-Host "$headerLine" -ForegroundColor Red
     Write-Host "`nERROR: $($_.Exception.Message)`n" -ForegroundColor Red # Print the captured exception message cleanly
     # Exit with a non-zero status code to indicate failure to other automation tools
@@ -306,11 +342,11 @@ finally {
             Write-Warning "Could not clean the transcript log file: $($_.Exception.Message)"
         }
 
-        Write-Host "`nThe processing log has been saved to:" -ForegroundColor Gray
+        Write-Host "`nThe evaluation log has been saved to:" -ForegroundColor Gray
         $relativePath = Resolve-Path -Path $LogFilePath -Relative
         Write-Host $relativePath -ForegroundColor Gray
-        Write-Host ""
+        Write-Host "" # Add a final blank line for spacing
     }
 }
 
-# === End of process_study.ps1 ===
+# === End of evaluate_study.ps1 ===

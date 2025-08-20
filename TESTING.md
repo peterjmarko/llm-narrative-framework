@@ -436,7 +436,8 @@ Module                                  Cov. (%)        Status & Justification
                                                         workflow and robustly handle edge cases like empty or missing
                                                         experiment files.
 
-`src/study_analyzer.py`                 `PENDING`       **PENDING.** Unit tests will be written for the statistical analysis script.
+`src/analyze_study_results.py`          `PENDING`       **PENDING.** Unit testing for the final statistical analysis
+                                                        script will be the last step in this workflow.
 
 **Auditing & Utility Scripts**
 
@@ -460,7 +461,7 @@ Module                                  Cov. (%)        Status & Justification
 
 **PowerShell Wrappers (Studies)**
 
-`process_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
+`evaluate_study.ps1`                    `N/A`           **PENDING.** Manual validation is pending.
 
 `new_study.ps1`                         `N/A`           **PENDING.** Manual validation is pending.
 

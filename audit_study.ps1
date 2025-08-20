@@ -29,7 +29,7 @@
     consolidated summary report. This helps determine if the entire study is ready for
     final analysis via 'process_study.ps1'.
 
-.PARAMETER TargetDirectory
+.PARAMETER StudyDirectory
     The path to the study directory containing multiple experiment folders.
 
 .PARAMETER Verbose
@@ -38,16 +38,16 @@
 
 .EXAMPLE
     # Run a summary audit on a study.
-    .\audit_study.ps1 -TargetDirectory "output/studies/My_First_Study"
+    .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
 
 .EXAMPLE
     # Run a detailed audit, showing the full report for each experiment.
-    .\audit_study.ps1 -TargetDirectory "output/studies/My_First_Study" -Verbose
+    .\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study" -Verbose
 #>
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target directory containing one or more experiments.")]
-    [string]$TargetDirectory,
+    [string]$StudyDirectory,
 
     [Parameter(Mandatory=$false)]
     [switch]$NoLog,
@@ -112,7 +112,7 @@ function Format-HeaderLine {
 $scriptExitCode = 0
 
 if (-not $NoLog.IsPresent) {
-    $LogFilePath = Join-Path -Path $TargetDirectory -ChildPath "study_audit_log.txt"
+    $LogFilePath = Join-Path -Path $StudyDirectory -ChildPath "study_audit_log.txt"
     Start-Transcript -Path $LogFilePath -Force | Out-Null
     
     Write-Host "" # Blank line before message
@@ -122,7 +122,7 @@ if (-not $NoLog.IsPresent) {
 }
 
 try {
-    $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
+    $ResolvedPath = Resolve-Path -Path $StudyDirectory -ErrorAction Stop
 
     $scriptName = "src/experiment_auditor.py"
     $auditResults = @()
@@ -133,11 +133,11 @@ try {
     Write-Host (Format-HeaderLine "RUNNING STUDY AUDIT") -ForegroundColor Cyan
     Write-Host "$headerLine`n" -ForegroundColor Cyan
     Write-Host "Auditing Study Directory:"
-    $relativePathForDisplay = Resolve-Path -Path $TargetDirectory -Relative
-    Write-Host "$relativePathForDisplay`n"
+    $relativePathForDisplay = Resolve-Path -Path $StudyDirectory -Relative
+    Write-Host "$relativePathForDisplay"
 
-    # Find all subdirectories, excluding known output folders like 'anova'.
-    $experimentDirs = Get-ChildItem -Path $ResolvedPath -Directory | Where-Object { $_.Name -ne 'anova' }
+    # Find all subdirectories, excluding known output folders like 'anova' and 'archive'.
+    $experimentDirs = Get-ChildItem -Path $ResolvedPath -Directory | Where-Object { $_.Name -notin @('anova', 'archive') }
 
     if ($experimentDirs.Count -eq 0) {
         Write-Host "No experiment directories found in '$ResolvedPath'." -ForegroundColor Yellow
@@ -259,14 +259,14 @@ try {
         # Case 1: All experiments are valid AND the final study artifacts exist.
         Write-Output "$c_green`n$headerLine$c_reset"
         Write-Output "$c_green$(Format-HeaderLine "AUDIT FINISHED: STUDY IS COMPLETE")$c_reset"
-        Write-Output "$c_green$(Format-HeaderLine "Recommendation: No further action is required.")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'evaluate_study.ps1' to re-run.")$c_reset"
         Write-Output "$c_green$headerLine`n$c_reset"
     }
     elseif ($isStudyReadyForProcessing) {
         # Case 2: All experiments are valid BUT the final study artifacts are missing.
         Write-Output "$c_green`n$headerLine$c_reset"
         Write-Output "$c_green$(Format-HeaderLine "AUDIT FINISHED: STUDY IS VALIDATED")$c_reset"
-        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'process_study.ps1' to")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'evaluate_study.ps1' to")$c_reset"
         Write-Output "$c_green$(Format-HeaderLine "complete the final analysis.")$c_reset"
         Write-Output "$c_green$headerLine`n$c_reset"
     }
