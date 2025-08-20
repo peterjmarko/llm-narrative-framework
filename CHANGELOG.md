@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.9.0 (2025-08-20)
+
+### Bump
+
+- **version 5.8.0 → 5.9.0**
+
+### Features
+
+- **add test suites for experiment and study compilers**
+  - feat(testing): Added comprehensive unit test suites for `compile_experiment_results.py` (74% coverage) and `compile_study_results.py` (76% coverage), completing the validation of the entire aggregation pipeline.
+  - fix(compiler): Fixed critical `ValueError` crashes in the experiment and study compilers by adding `return` statements after `sys.exit` calls, ensuring they handle empty/missing data gracefully.
+  - fix(testing): Corrected several flawed assertions and mocking strategies in the test suites for `compile_replication_results.py` and `generate_replication_report.py` that were identified during this testing phase.
+  - docs(testing): Updated `TESTING.md` to reflect the `COMPLETE` status of the entire aggregation pipeline.
+
 ## 5.8.0 (2025-08-20)
 
 ### Bump
