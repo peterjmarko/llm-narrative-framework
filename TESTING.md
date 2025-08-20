@@ -410,7 +410,9 @@ Module                                  Cov. (%)        Status & Justification
 `src/process_llm_responses.py`          `~67%`          **COMPLETE.** Unit tests cover the core parsing logic, including
                                                         markdown, fallback, flexible spacing, reordered columns, and
                                                         key failure modes.
-`src/analyze_llm_performance.py`        `PENDING`       **IN PROGRESS.** Unit testing will be performed next.
+`src/analyze_llm_performance.py`        `~63%`          **COMPLETE.** Unit tests cover the main orchestrator, all core
+                                                        statistical calculations (including edge cases), and the robust
+                                                        parsing of complex file formats (e.g., Markdown).
 
 `src/run_bias_analysis.py`              `PENDING`       **PENDING.** Unit testing will be performed next.
 

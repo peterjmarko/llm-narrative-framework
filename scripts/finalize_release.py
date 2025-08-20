@@ -164,9 +164,10 @@ def generate_detailed_changelog(new_version):
         header_match = re.search(r"(# Changelog\n\n)", old_content)
         if header_match:
             start_of_entries = header_match.end(1)
-            new_content = old_content[:start_of_entries] + "\n".join(new_changelog_section) + old_content[start_of_entries:]
+            # Prepend the new section, ensuring a blank line separates it from old content
+            new_content = old_content[:start_of_entries] + "\n".join(new_changelog_section) + "\n" + old_content[start_of_entries:]
         else: # Fallback if header is missing
-            new_content = "\n".join(new_changelog_section) + old_content
+            new_content = "\n".join(new_changelog_section) + "\n" + old_content
 
         with open(changelog_path, 'w', encoding='utf-8') as f:
             f.write(new_content)

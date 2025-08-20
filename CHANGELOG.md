@@ -13,6 +13,7 @@
   - test(parser): Added a comprehensive unit test suite for `process_llm_responses.py`. Achieved 67% coverage by validating various response formats and failure modes.
   - docs(parser): Updated the docstring for the main parsing function to reflect its new, more robust logic.
   - docs(testing): Updated `TESTING.md` to reflect the completion of the `process_llm_responses.py` tests.
+  
 ## 5.6.3 (2025-08-19)
 
 ### Bump
@@ -27,7 +28,7 @@
   - refactor(build_queries): Refactored `build_llm_queries.py` to load configuration defaults inside the `main()` function instead of at the module level. This change was critical for making the script testable in isolation without affecting its production behavior.
   
   - docs(testing): Updated `TESTING.md` to reflect the completion of the `build_llm_queries.py` tests.
-  
+
 ## 5.6.2 (2025-08-19)
 
 ### Bump

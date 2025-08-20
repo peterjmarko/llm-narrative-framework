@@ -603,9 +603,6 @@ def save_metric_distribution(metric_values, output_dir, filename, quiet=False):
         # Errors should always be printed.
         print(f"Error: Could not save metric distribution to {filename}. Reason: {e}")
 
-    except Exception as e:
-        print(f"Error: Could not save metric distribution to {filename}. Reason: {e}")
-
 
 def main():
     parser = argparse.ArgumentParser(description="Performs statistical analysis on LLM matching scores.")
@@ -691,10 +688,13 @@ def main():
         # Print success marker for the orchestrator
         print("\nANALYZER_VALIDATION_SUCCESS\n")
         sys.exit(0) # Exit successfully
+        return # Eject from function for testability
 
+    # --- Main processing logic now starts, confident that mappings_list is valid ---
     if k_val_from_map_func is None:
         print("Critical Error: Mappings list is not empty, but could not determine k. Halting.")
         sys.exit(1)
+        return # Eject from function for testability
     
     k_to_use = k_val_from_map_func 
     delimiter_for_scores = delimiter_determined_for_map
@@ -752,6 +752,7 @@ def main():
         if validation_errors > 0:
             print(f"\nCRITICAL: ANALYZER VALIDATION FAILED WITH {validation_errors} ERRORS. Halting analysis.\n")
             sys.exit(1)
+            return # Eject from function for testability
         else:
             # This success message MUST always be printed for the orchestrator to see.
             print("\nANALYZER_VALIDATION_SUCCESS\n")
