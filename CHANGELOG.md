@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.0.0 (2025-08-20)
+
+### Bump
+
+- **version 5.9.1 → 6.0.0**
+
+### Refactor
+
+- **standardize parameter naming and fix reporter**
+  The primary path parameter for all experiment-level wrappers (`audit_experiment.ps1`, `fix_experiment.ps1`, `migrate_experiment.ps1`) has been renamed from -TargetDirectory to -ExperimentDirectory.
+  
+  BREAKING CHANGE:
+
 ## 5.9.1 (2025-08-20)
 
 ### Bump
