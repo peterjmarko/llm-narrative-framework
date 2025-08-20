@@ -414,9 +414,25 @@ Module                                  Cov. (%)        Status & Justification
                                                         statistical calculations (including edge cases), and the robust
                                                         parsing of complex file formats (e.g., Markdown).
 
-`src/run_bias_analysis.py`              `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/run_bias_analysis.py`              `~86%`           **COMPLETE.** Unit tests cover the main orchestrator workflow,
+                                                        core bias calculations, and robust handling of empty or
+                                                        malformed data files.
 
-`src/generate_replication_report.py`    `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/generate_replication_report.py`    `~90%`           **COMPLETE.** Unit tests cover the main workflow, including
+                                                        robust error handling for missing/corrupted files and correct
+                                                        fallback for optional data sources.
+
+**Aggregation & Analysis Scripts**
+
+`src/compile_replication_results.py`    `~78%`           **COMPLETE.** Unit tests cover the main workflow, data merging
+                                                        logic, and robust error handling for missing or invalid input
+                                                        files.
+
+`src/compile_experiment_results.py`     `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+
+`src/compile_study_results.py`          `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
+
+`src/study_analyzer.py`                 `PENDING`       **PENDING.** Unit tests will be written for the statistical analysis script.
 
 **Auditing & Utility Scripts**
 
@@ -427,16 +443,6 @@ Module                                  Cov. (%)        Status & Justification
 `src/patch_old_experiment.py`           `PENDING`       **PENDING.** Unit testing will be performed next.
 
 `src/restore_config.py`                 `PENDING`       **PENDING.** Unit testing will be performed next.
-
-**Aggregation & Analysis Scripts**
-
-`src/compile_replication_results.py`    `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
-
-`src/compile_experiment_results.py`     `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
-
-`src/compile_study_results.py`          `PENDING`       **PENDING.** Unit tests will be written for the aggregation scripts.
-
-`src/study_analyzer.py`                 `PENDING`       **PENDING.** Unit tests will be written for the statistical analysis script.
 
 **PowerShell Wrappers (Experiments)**
 
@@ -450,11 +456,13 @@ Module                                  Cov. (%)        Status & Justification
 
 **PowerShell Wrappers (Studies)**
 
+`process_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
+
+`new_study.ps1`                         `N/A`           **PENDING.** Manual validation is pending.
+
 `audit_study.ps1`                       `N/A`           **PENDING.** Manual validation is pending.
 
 `fix_study.ps1`                         `N/A`           **PENDING.** Manual validation is pending.
 
 `migrate_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
-
-`process_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
 -----------------------------------------------------------------------------------------------------------------------------------------

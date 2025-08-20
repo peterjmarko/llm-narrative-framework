@@ -11,7 +11,7 @@ To make changes, please edit the template file and then run 'pdm run build-docs'
 
 # A Framework for Testing Complex Narrative Systems
 
-This document is the **Framework Manual** for the project. It provides a comprehensive technical guide to the fully automated, resilient, and reproducible framework designed for conducting large-scale LLM experiments with complex narrative systems. It offers an end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
+This document is the **Framework Manual** for the project. It provides a comprehensive technical guide to the fully automated and resilient framework designed for conducting reproducible large-scale LLM experiments with complex narrative systems. It offers an end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
 
 This manual is intended for developers, contributors, and researchers who wish to understand the system's architecture or use the framework for **direct replication, conceptual replication, and new research**.
 

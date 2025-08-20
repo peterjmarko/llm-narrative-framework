@@ -127,6 +127,7 @@ def main():
     if not os.path.isdir(args.run_directory) or not os.path.basename(args.run_directory).startswith('run_'):
         logging.error(f"Error: The specified path is not a valid run directory: {args.run_directory}")
         sys.exit(1)
+        return  # Eject for testability
 
     metrics_filepath = os.path.join(args.run_directory, "analysis_inputs", "replication_metrics.json")
     config_path = os.path.join(args.run_directory, 'config.ini.archived')
@@ -134,6 +135,7 @@ def main():
     if not os.path.exists(metrics_filepath) or not os.path.exists(config_path):
         logging.error(f"Error: Required file (metrics.json or config.ini.archived) not found in {args.run_directory}")
         sys.exit(1)
+        return  # Eject for testability
 
     try:
         with open(metrics_filepath, 'r', encoding='utf-8') as f:
@@ -141,6 +143,7 @@ def main():
     except (json.JSONDecodeError, IOError) as e:
         logging.error(f"Error: Could not read or parse {os.path.basename(metrics_filepath)}. Error: {e}")
         sys.exit(1)
+        return  # Eject for testability
 
     metrics = _flatten_bias_metrics(metrics)
     run_params = parse_config_params(config_path)

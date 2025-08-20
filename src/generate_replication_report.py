@@ -75,9 +75,11 @@ def main():
     except FileNotFoundError as e:
         print(f"Error: A required file was not found. {e}", file=sys.stderr)
         sys.exit(1)
+        return  # Eject for testability
     except (json.JSONDecodeError, configparser.Error) as e:
         print(f"Error: Could not parse a required data file. {e}", file=sys.stderr)
         sys.exit(1)
+        return  # Eject for testability
 
     # --- Clean and Prepare for Writing ---
     for old_report in glob.glob(os.path.join(run_specific_dir_path, 'replication_report_*.txt')):
@@ -156,6 +158,7 @@ def main():
     except IOError as e:
         print(f"Error: Could not write final report to {report_path}. Reason: {e}", file=sys.stderr)
         sys.exit(1)
+        return  # Eject for testability
 
 if __name__ == "__main__":
     main()
