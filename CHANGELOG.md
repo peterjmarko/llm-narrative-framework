@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.9.1 (2025-08-20)
+
+### Bump
+
+- **version 5.9.0 → 5.9.1**
+
+### Refactor
+
+- **refactor entire study evaluation workflow**
+  The main user-facing script for study analysis has been renamed from `process_study.ps1` to `evaluate_study.ps1`. The underlying Python analyzer has been renamed from `study_analyzer.py` to `analyze_study_results.py`. All study-level wrappers now consistently use the `-StudyDirectory` parameter.
+
 ## 5.9.0 (2025-08-20)
 
 ### Bump
