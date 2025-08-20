@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.8.0 (2025-08-20)
+
+### Bump
+
+- **version 5.7.0 → 5.8.0**
+
+### Features
+
+- **add test suites for bias, reporter, and compiler**
+  - feat(testing): Added comprehensive unit test suites for `run_bias_analysis.py` (86%), `generate_replication_report.py` (90%), and `compile_replication_results.py` (78%).
+  - fix(core): Fixed critical `UnboundLocalError` bugs in the reporter and compiler by adding `return` statements after `sys.exit` calls, ensuring scripts terminate correctly after fatal errors.
+  - fix(testing): Corrected flawed assertions and mocking strategies across the test suites for the bias analyzer, report generator, and replication compiler to ensure they pass reliably.
+  - docs(testing): Updated `TESTING.md` to reflect the `COMPLETE` status for multiple modules and reorganized the table to prioritize aggregation scripts.
+  - docs(framework): Clarified the definition of reproducibility in the Framework Manual introduction for improved technical accuracy.
+
 ## 5.7.0 (2025-08-19)
 
 ### Bump
