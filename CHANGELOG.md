@@ -1,5 +1,21 @@
 # Changelog
 
+## 5.7.0 (2025-08-19)
+
+### Bump
+
+- **version 5.6.4 → 5.7.0**
+
+### Features
+
+- **add full test suite and fixes for performance analyzer**
+  - feat(analyzer): Added a comprehensive unit test suite for `analyze_llm_performance.py`. The suite validates the main orchestrator, all core statistical functions with edge cases, and the robust parsing of complex file formats, achieving 63% coverage.
+  - fix(analyzer): Fixed a critical bug where the script would continue execution after a fatal error or a clean "zero response" exit when `sys.exit` was mocked during testing.
+  - fix(testing): Corrected failing tests for the analyzer that were improperly using `assertRaises(SystemExit)`. The tests now correctly assert that the mock was called with the appropriate exit code.
+  - fix(release): The `finalize_release.py` script now automatically adds a blank line after each new entry in CHANGELOG.md for improved formatting.
+  - docs(testing): Updated `TESTING.md` to reflect the `COMPLETE` status of the `analyze_llm_performance.py` test suite.
+  - docs(contributing): Clarified in `CONTRIBUTING.md` that the release script is solely responsible for changelog formatting.
+
 ## 5.6.4 (2025-08-19)
 
 ### Bump
