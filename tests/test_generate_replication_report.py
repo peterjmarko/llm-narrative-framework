@@ -158,3 +158,5 @@ class TestGenerateReplicationReport(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+# === End of tests/test_generate_replication_report.py ===

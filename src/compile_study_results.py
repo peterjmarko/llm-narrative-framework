@@ -92,6 +92,7 @@ def main():
     if not experiment_files:
         logging.warning(f"No 'EXPERIMENT_results.csv' files found in subdirectories of {args.study_directory}. Nothing to compile.")
         sys.exit(0)
+        return  # Eject for testability
     
     logging.info(f"Found {len(experiment_files)} experiment result files to compile.")
 
@@ -109,6 +110,7 @@ def main():
     if not all_experiment_data:
         logging.error("No valid data could be read from any experiment files. Halting.")
         sys.exit(1)
+        return  # Eject for testability
 
     study_df = pd.concat(all_experiment_data, ignore_index=True)
 

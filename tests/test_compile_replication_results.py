@@ -170,3 +170,5 @@ class TestCompileReplicationResults(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+# === End of tests/test_compile_replication_results.py ===

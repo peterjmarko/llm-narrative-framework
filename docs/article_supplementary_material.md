@@ -332,20 +332,27 @@ This intelligent script automatically applies the safest, most efficient fix. If
 .\fix_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_..."
 ```
 
-### Step 3: Analyzing a Full Study
+**c. Migrate Legacy Data (`migrate_experiment.ps1`)**
+For legacy data or severely corrupted experiments, this script provides a safe, non-destructive upgrade path. It creates a clean, timestamped copy of the target experiment and runs the full repair and validation process on the copy, leaving the original data untouched.
+```powershell
+# Create a clean, upgraded copy of a legacy experiment
+.\migrate_experiment.ps1 -TargetDirectory "output/legacy/My_Old_Experiment"
+```
+
+### Step 3: Evaluating a Full Study
 
 After running several experiments (e.g., one for `mapping_strategy = correct` and another for `random`), you can analyze them together as a single study.
 
 **a. Organize the Study**
 Manually create a directory in `output/studies/` (e.g., `output/studies/My_Replication_Study/`) and move your completed experiment folders into it.
 
-**b. Process the Study (`process_study.ps1`)**
-This script orchestrates the final analysis. It audits all experiments in the study directory, compiles the results into a master `STUDY_results.csv` file, and runs the final statistical analysis (Two-Way ANOVA).
+**b. Evaluate the Study (`evaluate_study.ps1`)**
+This script orchestrates the final evaluation. It audits all experiments in the study directory, compiles the results into a master `STUDY_results.csv` file, and runs the final statistical analysis (Two-Way ANOVA).
 
 **Execution:**
 ```powershell
-# Compile and analyze all experiments in the study directory
-.\process_study.ps1 -StudyDirectory "output/studies/My_Replication_Study"
+# Compile and evaluate all experiments in the study directory
+.\evaluate_study.ps1 -StudyDirectory "output/studies/My_Replication_Study"
 ```
 
 **Final Artifacts:**
@@ -354,6 +361,15 @@ The script generates two key outputs in your study directory:
 2.  A new `anova/` subdirectory containing:
     *   `STUDY_analysis_log.txt`: A comprehensive text report of the statistical findings.
     *   `boxplots/`: Publication-quality plots visualizing the results.
+
+### Step 4: Scaling Up: The Study-Level Workflow
+
+Once you are familiar with managing individual experiments, the framework provides a parallel set of powerful wrappers for managing entire studies. These scripts allow you to automate and scale your research efficiently.
+
+*   **`new_study.ps1`**: Automates the creation of an entire study by running multiple experiments based on a matrix of factors defined in `config.ini` (e.g., testing several models against both `correct` and `random` mapping strategies).
+*   **`audit_study.ps1`**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
+*   **`fix_study.ps1`**: The primary "fix-it" tool for a study. It audits all experiments and automatically calls `fix_experiment.ps1` on any that need to be resumed, repaired, or updated.
+*   **`migrate_study.ps1`**: A batch utility for safely upgrading an entire study that contains legacy or corrupted experiments.
 
 ## Related Files
 

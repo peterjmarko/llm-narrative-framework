@@ -89,6 +89,7 @@ def main():
     if not replication_files:
         logging.warning(f"No 'REPLICATION_results.csv' files found in subdirectories of {args.experiment_directory}. Nothing to compile.")
         sys.exit(0)
+        return  # Eject for testability
     
     logging.info(f"Found {len(replication_files)} replication result files to compile.")
 
@@ -106,6 +107,7 @@ def main():
     if not all_replication_data:
         logging.error("No valid data could be read from any replication files. Halting.")
         sys.exit(1)
+        return  # Eject for testability
 
     experiment_df = pd.concat(all_replication_data, ignore_index=True)
 
