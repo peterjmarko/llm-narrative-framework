@@ -427,7 +427,7 @@ This is the primary diagnostic tool. It performs a read-only check and provides 
 
 ```powershell
 # Get a status report for an existing experiment
-.\audit_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
+.\audit_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250727_143214"
 ```
 
 ### Fixing or Updating an Experiment (`fix_experiment.ps1`)
@@ -438,7 +438,7 @@ This is the main "fix-it" tool for any existing experiment. It automatically dia
 The script will run an audit, identify the problem (e.g., missing responses, outdated analysis), and automatically apply the correct fix.
 ```powershell
 # Automatically fix a broken experiment
-.\fix_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
+.\fix_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250727_143214"
 ```
 
 **To interactively force an action on a valid experiment:**
@@ -449,7 +449,7 @@ If you run the script on a complete and valid experiment, it will present an int
 
 ```powershell
 # Run on a valid experiment to bring up the interactive force menu
-.\fix_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_20250727_143214"
+.\fix_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250727_143214"
 ```
 
 ### Migrating Old Experiment Data (`migrate_experiment.ps1`)
@@ -472,7 +472,7 @@ Point the script at the target directory of the experiment you want to migrate. 
 
 ```powershell
 # Target "Legacy_Experiment_1" for migration, saving the result to a new timestamped folder.
-.\migrate_experiment.ps1 -TargetDirectory "output/legacy/Legacy_Experiment_1"
+.\migrate_experiment.ps1 -ExperimentDirectory "output/legacy/Legacy_Experiment_1"
 ```
 
 ### Auditing a Study (`audit_study.ps1`)
@@ -517,7 +517,7 @@ Point the script at the top-level directory containing all relevant experiment f
 
 ```powershell
 # Example: Evaluate all experiments located in the "My_First_Study" directory
-.\evaluate_study.ps1 -TargetDirectory "output/studies/My_First_Study"
+.\evaluate_study.ps1 -ExperimentDirectory "output/studies/My_First_Study"
 ```
 For detailed, real-time logs, add the `-Verbose` switch.
 

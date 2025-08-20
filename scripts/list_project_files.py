@@ -73,12 +73,29 @@ import argparse
 #   - -1: Show all contents recursively (infinite depth).
 # Any folder NOT listed here will use the default --depth from the command line.
 CUSTOM_DEPTH_MAP = {
-    "docs": 2,          # Show contents of 'docs' down to 2 levels deep
-    "htmlcov": 0,       # Hide contents of 'htmlcov' folder
-    "output": 3,        # Show contents of 'output' down to 3 levels deep, except:
-    "output/analysis_inputs": 0,        # Hide contents of 'output\analysis_inputs'
-    "src": 1,           # Show contents of 'src' down to 1 level deep
-    "tests": 1,         # Show contents of 'tests' down to 1 level deep
+    "archive": 0,           # Hide contents of 'archive'
+    "data": 3,              # Show contents of 'data' down to 3 levels deep, except:
+    "data/backup": 0,           # 'backup' (hide)
+    "debug": 0,             # Hide contents of 'archive'
+    "docs": 2,              # Show contents of 'docs' down to 2 levels deep
+    "htmlcov": 0,           # Hide contents of 'htmlcov' folder
+    "linter_backups": 0,    # Hide contents of 'linter_backups'
+    "node_modules": 0,      # Hide contents of 'node_modules'
+    "output": 1,            # Show contents of 'output' down to 3 levels deep, except:
+    "output/project_code_as_txt": 0,    # 'project_code_as_txt' (hide)
+    "output/project_reports": 0,        # 'project_reports' (hide)
+    "output/test*": 0,      # Hide contents of 'output/test*' folders
+    "scripts": 2,           # Show contents of 'scripts' down to 2 levels deep, except:
+    "scripts/__pycache__": 0,   # '__pycache__' (hide)
+    "src": 2,               # Show contents of 'src' down to 2 levels deep, except:
+    "src/__pycache__": 0,                        # '__pycache__' (hide)
+    "src/archive": 0,                           # 'archive' (hide)
+    "src/llm_personality_matching.egg-info": 0, # 'llm_personality_matching.egg-info' (hide)
+    "src/temp": 0,                              # 'temp' (hide)
+    "test_backups": 0,      # Hide contents of 'test_backups'
+    "tests": 1,             # Show contents of 'tests' down to 1 level deep, except:
+    "tests/__pycache__": 0,     # '__pycache__' (hide)
+    "tests/archive": 0,         # 'archive' (hide)
 }
 
 # Directories to completely exclude from the scan (names, not paths)

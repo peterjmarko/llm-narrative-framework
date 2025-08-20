@@ -322,21 +322,21 @@ If a run is interrupted (e.g., due to a network error), you can use the framewor
 This read-only script provides a detailed status report and recommends the correct next step.
 ```powershell
 # Get a status report for a specific experiment
-.\audit_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_..."
+.\audit_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_..."
 ```
 
 **b. Fix the Experiment (`fix_experiment.ps1`)**
 This intelligent script automatically applies the safest, most efficient fix. If it detects missing LLM responses, it will re-run only the failed API calls. If it detects only outdated analysis, it will perform a fast, local update without making any API calls.
 ```powershell
 # Automatically diagnose and fix the experiment
-.\fix_experiment.ps1 -TargetDirectory "output/new_experiments/experiment_..."
+.\fix_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_..."
 ```
 
 **c. Migrate Legacy Data (`migrate_experiment.ps1`)**
 For legacy data or severely corrupted experiments, this script provides a safe, non-destructive upgrade path. It creates a clean, timestamped copy of the target experiment and runs the full repair and validation process on the copy, leaving the original data untouched.
 ```powershell
 # Create a clean, upgraded copy of a legacy experiment
-.\migrate_experiment.ps1 -TargetDirectory "output/legacy/My_Old_Experiment"
+.\migrate_experiment.ps1 -ExperimentDirectory "output/legacy/My_Old_Experiment"
 ```
 
 ### Step 3: Evaluating a Full Study
@@ -352,7 +352,7 @@ This script orchestrates the final evaluation. It audits all experiments in the 
 **Execution:**
 ```powershell
 # Compile and evaluate all experiments in the study directory
-.\evaluate_study.ps1 -TargetDirectory "output/studies/My_Replication_Study"
+.\evaluate_study.ps1 -ExperimentDirectory "output/studies/My_Replication_Study"
 ```
 
 **Final Artifacts:**

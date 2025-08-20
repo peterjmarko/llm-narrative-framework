@@ -33,19 +33,19 @@
     context-aware prompt that explains the safety of the process and accurately
     describes when API calls might be necessary to repair missing data.
 
-.PARAMETER TargetDirectory
+.PARAMETER ExperimentDirectory
     The path to the experiment directory that will be targeted for migration.
     This original directory will be copied, not modified.
 
 .EXAMPLE
     # Copy and migrate "Legacy_Experiment_1"
     # This creates a folder like "output/migrated_experiments/Legacy_Experiment_1_migrated_20250712_103000"
-    .\migrate_experiment.ps1 -TargetDirectory "output/legacy/Legacy_Experiment_1"
+    .\migrate_experiment.ps1 -ExperimentDirectory "output/legacy/Legacy_Experiment_1"
 #>
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to migrate.")]
-    [string]$TargetDirectory,
+    [string]$ExperimentDirectory,
 
     [Parameter(Mandatory = $false, HelpMessage = "Specifies a custom parent directory for the migrated experiment.")]
     [string]$DestinationParent,
@@ -77,8 +77,8 @@ $C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"
 
 $logFilePath = $null
 try {
-    if (-not (Test-Path $TargetDirectory -PathType Container)) { throw "The specified TargetDirectory '$TargetDirectory' does not exist." }
-    $TargetPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
+    if (-not (Test-Path $ExperimentDirectory -PathType Container)) { throw "The specified ExperimentDirectory '$ExperimentDirectory' does not exist." }
+    $TargetPath = Resolve-Path -Path $ExperimentDirectory -ErrorAction Stop
 
     # --- Setup destination and logging ---
     $TargetBaseName = (Get-Item -Path $TargetPath).Name
@@ -95,7 +95,7 @@ try {
 
     # --- Step 1: Initial Audit ---
     $auditScriptPath = Join-Path $ProjectRoot "audit_experiment.ps1"
-    & $auditScriptPath -TargetDirectory $TargetPath
+    & $auditScriptPath -ExperimentDirectory $TargetPath
     $auditExitCode = $LASTEXITCODE
 
     # --- Step 2: Confirmation Prompt ---
@@ -119,7 +119,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Migration process failed." }
 
     # --- Step 5: Final Validation ---
-    & $auditScriptPath -TargetDirectory $DestinationPath
+    & $auditScriptPath -ExperimentDirectory $DestinationPath
     if ($LASTEXITCODE -ne 0) { throw "VALIDATION FAILED! The final migrated result is not valid." }
 
     Write-Host "`nMigration process complete. Migrated data is in: '$((Resolve-Path $DestinationPath -Relative).TrimStart(".\"))'`n" -ForegroundColor Green

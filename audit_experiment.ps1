@@ -33,7 +33,7 @@
     It never makes any changes to the data. The full, detailed output is also
     saved to an 'experiment_audit_log.txt' file inside the target directory.
 
-.PARAMETER TargetDirectory
+.PARAMETER ExperimentDirectory
     The path to the experiment directory to audit. This is a mandatory parameter.
 
 .PARAMETER Verbose
@@ -41,7 +41,7 @@
 
 .EXAMPLE
     # Run a standard audit on an experiment.
-    .\audit_experiment.ps1 -TargetDirectory "output/reports/My_Experiment"
+    .\audit_experiment.ps1 -ExperimentDirectory "output/reports/My_Experiment"
 
 .EXAMPLE
     # Run a detailed audit.
@@ -50,7 +50,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to audit.")]
-    [string]$TargetDirectory
+    [string]$ExperimentDirectory
 )
 
 function Get-ProjectRoot {
@@ -67,14 +67,14 @@ $scriptExitCode = 0
 $LogFilePath = $null
 
 try {
-    if (-not (Test-Path $TargetDirectory -PathType Container)) { throw "Directory '$TargetDirectory' does not exist." }
-    $ResolvedPath = Resolve-Path -Path $TargetDirectory -ErrorAction Stop
+    if (-not (Test-Path $ExperimentDirectory -PathType Container)) { throw "Directory '$ExperimentDirectory' does not exist." }
+    $ResolvedPath = Resolve-Path -Path $ExperimentDirectory -ErrorAction Stop
     $scriptName = Join-Path $ProjectRoot "src/experiment_auditor.py"
     $pythonScriptArgs = @($ResolvedPath)
     if ($PSBoundParameters['Verbose']) { $pythonScriptArgs += "--verbose" }
     $pythonScriptArgs += "--force-color"
     $LogFilePath = Join-Path $ResolvedPath "experiment_audit_log.txt"
-    $relativeLogPath = Join-Path (Resolve-Path -Path $TargetDirectory -Relative) (Split-Path $LogFilePath -Leaf)
+    $relativeLogPath = Join-Path (Resolve-Path -Path $ExperimentDirectory -Relative) (Split-Path $LogFilePath -Leaf)
     Write-Host "`nThe audit log will be saved to: $relativeLogPath"
     if (Test-Path $LogFilePath) { Remove-Item $LogFilePath -Force }
 

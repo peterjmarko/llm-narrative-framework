@@ -38,7 +38,7 @@
     - If the experiment is found to be unfixable (i.e., requires migration), the
       script will halt with a clear message and recommendation.
 
-.PARAMETER TargetDirectory
+.PARAMETER ExperimentDirectory
     (Required) The path to the existing experiment directory that needs to be
     fixed or updated.
 
@@ -57,7 +57,7 @@
 
 .EXAMPLE
     # Automatically find and fix any issues in the specified experiment.
-    .\fix_experiment.ps1 -TargetDirectory "output/studies/MyStudy/Exp1"
+    .\fix_experiment.ps1 -ExperimentDirectory "output/studies/MyStudy/Exp1"
 
 .EXAMPLE
     # Run on a valid experiment to bring up the interactive "force action" menu.
@@ -69,11 +69,11 @@ param(
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to repair or update.")]
     [ValidateScript({
         if (-not (Test-Path $_ -PathType Container)) {
-            throw "The specified TargetDirectory does not exist or is not a directory: $_"
+            throw "The specified ExperimentDirectory does not exist or is not a directory: $_"
         }
         return $true
     })]
-    [string]$TargetDirectory,
+    [string]$ExperimentDirectory,
 
     [Parameter(Mandatory = $false)]
     [int]$StartRep,
@@ -129,12 +129,12 @@ function Write-Header($message, $color, $C_RESET) {
 }
 
 function Invoke-FinalizeExperiment-Local {
-    param($ProjectRoot, $TargetDirectory, $LogFilePath)
+    param($ProjectRoot, $ExperimentDirectory, $LogFilePath)
 
     $pyScripts = @(
-        @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("rebuild", $TargetDirectory); Msg="Log rebuild failed" },
-        @{ Path=(Join-Path $ProjectRoot "src/compile_experiment_results.py"); Args=@($TargetDirectory); Msg="Aggregation failed" },
-        @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("finalize", $TargetDirectory); Msg="Log finalization failed" }
+        @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("rebuild", $ExperimentDirectory); Msg="Log rebuild failed" },
+        @{ Path=(Join-Path $ProjectRoot "src/compile_experiment_results.py"); Args=@($ExperimentDirectory); Msg="Aggregation failed" },
+        @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("finalize", $ExperimentDirectory); Msg="Log finalization failed" }
     )
 
     foreach($script in $pyScripts) {
@@ -151,17 +151,17 @@ $ProjectRoot = Get-ProjectRoot
 $C_CYAN = "`e[96m"; $C_GREEN = "`e[92m"; $C_YELLOW = "`e[93m"; $C_RED = "`e[91m"; $C_RESET = "`e[0m"
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$logFilePath = Join-Path $TargetDirectory "experiment_repair_log.txt"
+$logFilePath = Join-Path $ExperimentDirectory "experiment_repair_log.txt"
 
 try {
     # Start with a clean log file for this run.
     if (Test-Path $logFilePath) { Remove-Item $logFilePath -Force }
     # Announce the intended log path using a standardized relative path.
-    $relativeLogPath = Join-Path (Resolve-Path -Path $TargetDirectory -Relative) (Split-Path $logFilePath -Leaf)
+    $relativeLogPath = Join-Path (Resolve-Path -Path $ExperimentDirectory -Relative) (Split-Path $logFilePath -Leaf)
     Write-Host "`nThe repair log will be saved to: $relativeLogPath" -ForegroundColor Gray
 
     if ($ForceUpdate.IsPresent) {
-        $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive")
+        $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $ExperimentDirectory, "--non-interactive")
         $finalArgs = @("python") + $procArgs
         & pdm run $finalArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
         if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Forced update failed" }
@@ -169,12 +169,12 @@ try {
     }
 
     if ($ForceAggregate.IsPresent) {
-        Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory -LogFilePath $logFilePath
+        Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -ExperimentDirectory $ExperimentDirectory -LogFilePath $logFilePath
         return
     }
 
     Write-Header "STEP 1: DIAGNOSING EXPERIMENT STATE" $C_CYAN $C_RESET
-    $auditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $TargetDirectory, "--force-color")
+    $auditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $ExperimentDirectory, "--force-color")
     $auditArgs = @("python") + $auditPyArgs
     & pdm run $auditArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
     $auditExitCode = $LASTEXITCODE
@@ -189,20 +189,20 @@ try {
             switch($choice.Trim().ToLower()) {
                 '1' {
                     if ((Read-Host -Prompt "Type 'YES' to confirm OVERWRITE of LLM responses") -eq 'YES') {
-                        Get-ChildItem -Path $TargetDirectory -Filter "llm_response_*.txt" -Recurse | Remove-Item -Force
-                        $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $TargetDirectory, "--non-interactive")
+                        Get-ChildItem -Path $ExperimentDirectory -Filter "llm_response_*.txt" -Recurse | Remove-Item -Force
+                        $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $ExperimentDirectory, "--non-interactive")
                     } else { return }
                 }
-                '2' { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive") }
-                '3' { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory -LogFilePath $logFilePath; $actionTaken = $true }
+                '2' { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $ExperimentDirectory, "--non-interactive") }
+                '3' { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -ExperimentDirectory $ExperimentDirectory -LogFilePath $logFilePath; $actionTaken = $true }
                 'n' { return }
                 default { return }
             }
         }
-        1 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $TargetDirectory, "--non-interactive") }
-        2 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $TargetDirectory, "--non-interactive") }
+        1 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $ExperimentDirectory, "--non-interactive") }
+        2 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $ExperimentDirectory, "--non-interactive") }
         3 { Write-Host "Experiment needs migration. Run migrate_experiment.ps1." -ForegroundColor Yellow; exit 1 }
-        4 { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -TargetDirectory $TargetDirectory -LogFilePath $logFilePath; $actionTaken = $true }
+        4 { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -ExperimentDirectory $ExperimentDirectory -LogFilePath $logFilePath; $actionTaken = $true }
         default { throw "Audit failed with exit code $auditExitCode" }
     }
 
@@ -221,7 +221,7 @@ try {
 
     if ($actionTaken) {
         Write-Header "STEP 3: FINAL VERIFICATION" $C_CYAN $C_RESET
-        $finalAuditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $TargetDirectory, "--force-color", "--non-interactive")
+        $finalAuditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $ExperimentDirectory, "--force-color", "--non-interactive")
         $finalAuditArgs = @("python") + $finalAuditPyArgs
         & pdm run $finalAuditArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
         $finalAuditCode = $LASTEXITCODE
