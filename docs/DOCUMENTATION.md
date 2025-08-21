@@ -195,17 +195,17 @@ The pipeline can be understood through the following architectural and logical d
 The main pipeline's architecture can be understood through four different views: the code architecture, the workflows, the data flow, and the experimental logic.
 
 #### Code Architecture Diagram
-The codebase for the main pipeline can be divided into the following components:
+The codebase for the main pipeline is organized into a clear hierarchy:
 
-1.  **Main User Entry Points**: The PowerShell scripts that users directly execute to initiate various workflows (e.g., `run_experiment.ps1`, `analyze_study.ps1`).
+1.  **Main User Entry Points**: User-facing PowerShell scripts (`.ps1`) that orchestrate high-level workflows like creating, auditing, or fixing experiments and studies.
 
-2.  **Experiment Lifecycle**: Python scripts primarily responsible for conducting a single experiment, including query generation, LLM interaction, response processing, and performance analysis.
+2.  **Experiment Lifecycle Management**: The core Python backend for managing a single experiment. This includes primary orchestrators (`experiment_manager.py`, `experiment_auditor.py`) and dedicated finalization scripts (`manage_experiment_log.py`, `compile_experiment_results.py`).
 
-3.  **Data Migration Processes**: Utility scripts used specifically for updating and cleaning older experiment data to ensure compatibility with the current analysis pipeline.
+3.  **Single Replication Pipeline**: A set of scripts, managed by `replication_manager.py`, that execute the end-to-end process for a single run, from query generation to final reporting.
 
-4.  **Study-Level Analysis**: Python scripts that aggregate results from multiple experiments and perform comprehensive statistical analysis for an entire study.
+4.  **Study-Level Analysis**: Python scripts that operate on the outputs of multiple experiments to perform study-wide aggregation and statistical analysis.
 
-5.  **Shared Utilities**: Helper scripts and modules, like `config_loader.py`, that provide common functionality and are imported by multiple other scripts across different workflows.
+5.  **Utility & Other Scripts**: Shared modules and standalone utility scripts that provide common functionality (e.g., `config_loader.py`) or perform auxiliary tasks.
 
 <div align="center">
   <p>Codebase Architecture: A comprehensive map of the entire Python codebase. PowerShell scripts (blue) are user-facing entry points that execute core Python logic. Solid lines indicate execution, while dotted lines show module imports.</p>

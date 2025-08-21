@@ -11,9 +11,16 @@ graph TD
         evaluate_study_ps1["evaluate_study.ps1"]
     end
 
-    subgraph "2. Experiment-Level Orchestration"
-        exp_manager["experiment_manager.py"]
-        exp_auditor["experiment_auditor.py"]
+    subgraph "2. Experiment Lifecycle Management"
+        direction TB
+        subgraph "Primary Orchestrators"
+            exp_manager["experiment_manager.py"]
+            exp_auditor["experiment_auditor.py"]
+        end
+        subgraph "Finalization Scripts"
+            log_manager["manage_experiment_log.py"]
+            compile_experiment["compile_experiment_results.py"]
+        end
     end
     
     subgraph "4. Study-Level Analysis"
@@ -38,8 +45,6 @@ graph TD
     end
 
     subgraph "Utility & Other Scripts"
-        log_manager["manage_experiment_log.py"]
-        compile_experiment["compile_experiment_results.py"]
         patch_old["patch_old_experiment.py"]
         config_loader["config_loader.py"]
     end
@@ -96,12 +101,13 @@ graph TD
 
     style exp_manager fill:#fff3cd,stroke:#f1c40f
     style exp_auditor fill:#fff3cd,stroke:#f1c40f
+    style log_manager fill:#fff3cd,stroke:#f1c40f
+    style compile_experiment fill:#fff3cd,stroke:#f1c40f
     
     style compile_study_results_py fill:#d1e7dd,stroke:#0f5132
     style study_analysis fill:#d1e7dd,stroke:#0f5132
     
     style replication_manager fill:#fdebd0,stroke:#e59866
-    style query_generator fill:#fdebd0,stroke:#e59866
     
     style stage1 fill:#d4edda,stroke:#155724
     style stage2 fill:#d4edda,stroke:#155724
@@ -111,7 +117,6 @@ graph TD
     style stage5 fill:#d4edda,stroke:#155724
     style stage6 fill:#d4edda,stroke:#155724
 
-    style log_manager fill:#e9ecef,stroke:#adb5bd
-    style compile_experiment fill:#e9ecef,stroke:#adb5bd
+    style query_generator fill:#e9ecef,stroke:#adb5bd
     style patch_old fill:#e9ecef,stroke:#adb5bd
     style config_loader fill:#e9ecef,stroke:#adb5bd

@@ -444,9 +444,16 @@ Module                                  Cov. (%)        Status & Justification
 
 **Auditing & Utility Scripts**
 
-`src/experiment_auditor.py`             `PENDING`       PENDING. Unit testing will be performed next.
+`src/experiment_auditor.py`             `71%`           COMPLETE. The unit test suite validates the auditor's
+                                                        ability to correctly identify all major experiment states
+                                                        (New, Complete, Aggregation Needed, Reprocess Needed, Repair
+                                                        Needed, and Migration Needed) by using a mocked file system
+                                                        to simulate various data completeness scenarios.
 
-`src/manage_experiment_log.py`          `PENDING`       PENDING. Unit testing will be performed next.
+`src/manage_experiment_log.py`          `79%`           COMPLETE. The unit test suite validates all core commands
+                                                        (`rebuild`, `finalize`, `start`) and their file I/O
+                                                        operations. It confirms correct CSV parsing, generation, and
+                                                        the idempotency of the `finalize` command.
 
 `src/patch_old_experiment.py`           `PENDING`       PENDING. Unit testing will be performed next.
 
