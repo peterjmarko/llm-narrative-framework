@@ -41,7 +41,7 @@ The framework is validated using a multi-layered strategy to ensure correctness 
 This is the iterative workflow for developing or modifying any individual Python script in the `src/` directory.
 
 #### **A Note on Workflow: The Smoke Test**
-After making any significant changes to the codebase—especially to core modules like `experiment_manager.py` or `orchestrate_replication.py`—it is highly recommended to perform a quick **smoke test** before proceeding with more detailed validation.
+After making any significant changes to the codebase—especially to core modules like `experiment_manager.py` or `replication_manager.py`—it is highly recommended to perform a quick **smoke test** before proceeding with more detailed validation.
 
 This test simply runs the main `new_experiment.ps1` workflow. Its purpose is to catch obvious, critical bugs immediately.
 ```powershell
@@ -398,7 +398,7 @@ Module                                  Cov. (%)        Status & Justification
 `src/experiment_manager.py`             `56%`           COMPLETE. Unit tests are complete, and the core `new`/`audit`/`fix`
                                                         workflows have been successfully validated via the scripted
                                                         end-to-end integration test.
-`src/orchestrate_replication.py`        `77%`           COMPLETE. Unit tests cover the core control flow for both
+`src/replication_manager.py`            `77%`           COMPLETE. Unit tests cover the core control flow for both
                                                         "new run" and "reprocess" modes, including failure handling.
 
 **Single-Replication Pipeline**
@@ -446,7 +446,7 @@ Module                                  Cov. (%)        Status & Justification
 
 `src/experiment_auditor.py`             `PENDING`       PENDING. Unit testing will be performed next.
 
-`src/replication_log_manager.py`        `PENDING`       PENDING. Unit testing will be performed next.
+`src/manage_experiment_log.py`          `PENDING`       PENDING. Unit testing will be performed next.
 
 `src/patch_old_experiment.py`           `PENDING`       PENDING. Unit testing will be performed next.
 

@@ -121,20 +121,18 @@ function Write-Header($message, $color, $C_RESET) {
     $rightPad = [Math]::Ceiling($paddingNeeded / 2)
     $centeredMsg = "$bookend$(' ' * $leftPad)$message$(' ' * $rightPad)$bookend"
     
-    Write-Host ""
-    Write-Host "$color$line"
+    Write-Host "`n$color$line"
     Write-Host "$color$centeredMsg"
     Write-Host "$color$line$C_RESET"
-    Write-Host ""
 }
 
 function Invoke-FinalizeExperiment-Local {
     param($ProjectRoot, $ExperimentDirectory, $LogFilePath)
 
     $pyScripts = @(
-        @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("rebuild", $ExperimentDirectory); Msg="Log rebuild failed" },
+        @{ Path=(Join-Path $ProjectRoot "src/manage_experiment_log.py"); Args=@("rebuild", $ExperimentDirectory); Msg="Log rebuild failed" },
         @{ Path=(Join-Path $ProjectRoot "src/compile_experiment_results.py"); Args=@($ExperimentDirectory); Msg="Aggregation failed" },
-        @{ Path=(Join-Path $ProjectRoot "src/replication_log_manager.py"); Args=@("finalize", $ExperimentDirectory); Msg="Log finalization failed" }
+        @{ Path=(Join-Path $ProjectRoot "src/manage_experiment_log.py"); Args=@("finalize", $ExperimentDirectory); Msg="Log finalization failed" }
     )
 
     foreach($script in $pyScripts) {
@@ -158,7 +156,7 @@ try {
     if (Test-Path $logFilePath) { Remove-Item $logFilePath -Force }
     # Announce the intended log path using a standardized relative path.
     $relativeLogPath = Join-Path (Resolve-Path -Path $ExperimentDirectory -Relative) (Split-Path $logFilePath -Leaf)
-    Write-Host "`nThe repair log will be saved to: $relativeLogPath" -ForegroundColor Gray
+    Write-Host "`nThe repair log will be saved to:`n$relativeLogPath" -ForegroundColor Gray
 
     if ($ForceUpdate.IsPresent) {
         $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $ExperimentDirectory, "--non-interactive")
@@ -227,6 +225,7 @@ try {
         $finalAuditCode = $LASTEXITCODE
         if ($finalAuditCode -ne 0) { throw "Final verification failed." }
         Write-Header "REPAIR SUCCESSFUL: Experiment is now valid." $C_GREEN $C_RESET
+        Write-Host "" # Add a single blank line for spacing
     }
 
 } catch {
@@ -245,7 +244,7 @@ try {
             Set-Content -Path $logFilePath -Value $c.Trim() -Force
         }
         catch {}
-        Write-Host "`nThe repair log has been saved to: $(Resolve-Path -Path $logFilePath -Relative)" -ForegroundColor Gray
+        Write-Host "`nThe repair log has been saved to:`n$(Resolve-Path -Path $logFilePath -Relative)`n" -ForegroundColor Gray
     }
 }
 

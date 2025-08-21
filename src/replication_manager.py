@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/orchestrate_replication.py
+# Filename: src/replication_manager.py
 
 """
-Orchestrator for a Single Experimental Replication.
+Manager for a Single Experimental Replication.
 
 This script is the engine for executing or reprocessing a single, self-contained
 experimental replication. It manages the entire lifecycle by calling a dedicated
@@ -40,10 +40,10 @@ It can also operate in a `--reprocess` mode, which re-runs only the data
 processing and analysis stages (3-6) on existing raw data.
 
 Usage (as called by experiment_manager.py):
-    python src/orchestrate_replication.py --replication_num 1 --base_output_dir path/to/exp
+    python src/replication_manager.py --replication_num 1 --base_output_dir path/to/exp
 
 Usage (for manual reprocessing):
-    python src/orchestrate_replication.py --reprocess --run_output_dir path/to/run_dir
+    python src/replication_manager.py --reprocess --run_output_dir path/to/run_dir
 """
 
 import argparse
@@ -415,4 +415,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/orchestrate_replication.py ===
+# === End of src/replication_manager.py ===

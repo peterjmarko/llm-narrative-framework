@@ -29,7 +29,7 @@ graph TD
         Art_rep_results[("REPLICATION_results.csv")]
         Art_exp_results[("EXPERIMENT_results.csv")]
         Art_study_results[("STUDY_results.csv")]
-        Art_batch_log[("batch_run_log.csv")]
+        Art_batch_log[("experiment_log.csv")]
     end
     
     subgraph "Final Output"
@@ -49,7 +49,7 @@ graph TD
     Art_metrics --> Script5
     Art_metrics & Art_archive & Input_Query --> Script6
     Script6 --> Art_report
-    Art_report --> Art_batch_log
+    Art_report --> Art_exp_log
     Art_metrics & Art_archive --> Script7
     Script7 --> Art_rep_results
     Art_rep_results --> Script8
@@ -85,7 +85,7 @@ graph TD
     style Art_rep_results fill:#e9ecef,stroke:#adb5bd
     style Art_exp_results fill:#e9ecef,stroke:#adb5bd
     style Art_study_results fill:#e9ecef,stroke:#adb5bd
-    style Art_batch_log fill:#e9ecef,stroke:#adb5bd
+    style Art_exp_log fill:#e9ecef,stroke:#adb5bd
     
     style FinalOutputs fill:#d4edda,stroke:#155724
     

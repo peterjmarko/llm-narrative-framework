@@ -359,21 +359,21 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
 def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
     is_complete = True
     details = []
-    required_files = ["batch_run_log.csv", "EXPERIMENT_results.csv"]
+    required_files = ["experiment_log.csv", "EXPERIMENT_results.csv"]
     for filename in required_files:
         if not (target_dir / filename).exists():
             is_complete = False
             details.append(f"MISSING: {filename}")
-    log_path = target_dir / "batch_run_log.csv"
+    log_path = target_dir / "experiment_log.csv"
     if log_path.exists():
         try:
             with open(log_path, 'r', encoding='utf-8') as f:
                 if "BatchSummary" not in f.read():
                     is_complete = False
-                    details.append("batch_run_log.csv NOT FINALIZED")
+                    details.append("experiment_log.csv NOT FINALIZED")
         except Exception:
             is_complete = False
-            details.append("batch_run_log.csv UNREADABLE")
+            details.append("experiment_log.csv UNREADABLE")
     return is_complete, details
 
 def get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -> tuple[str, list, dict]:

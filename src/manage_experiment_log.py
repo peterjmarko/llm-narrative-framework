@@ -17,18 +17,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/replication_log_manager.py
+# Filename: src/manage_experiment_log.py
 
 """
-Manages the lifecycle of the human-readable `batch_run_log.csv`.
+Manages the lifecycle of the `experiment_log.csv`.
 
 This script provides a robust, command-based interface for creating and
-maintaining the experiment's batch log. It is called by `experiment_manager.py`
+maintaining the experiment's log. It is called by `experiment_manager.py`
 at key stages of a run to ensure the log is always accurate and complete.
 
 Core Commands:
 -   `start`: Initializes a new experiment. It overwrites any existing log file
-    and creates a fresh `batch_run_log.csv` with only a header.
+    and creates a fresh `experiment_log.csv` with only a header.
 
 -   `rebuild`: The primary method for ensuring log integrity. It scans the
     experiment directory, parses every `replication_report.txt`, and builds a
@@ -186,7 +186,7 @@ def finalize_log(log_file_path):
         f.write('BatchSummary,StartTime,EndTime,TotalDuration,Completed,Failed\n')
         f.write(f'Totals,{summary_start_time},{summary_end_time},{total_duration_str},{completed_count},{failed_count}\n')
     relative_path = os.path.relpath(log_file_path, PROJECT_ROOT)
-    print(f"Cleaned and appended batch summary to:\n{relative_path}")
+    print(f"Cleaned and appended batch summary to:\n{relative_path}\n")
 
 # --- Main Execution ---
 
@@ -216,7 +216,7 @@ def main():
     fieldnames = ["ReplicationNum", "Status", "StartTime", "EndTime", "Duration", "ParsingStatus", "MeanMRR", "MeanTop1Acc", "RunDirectory", "ErrorMessage"]
     
     if args.mode == 'start':
-        log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
+        log_file_path = os.path.join(args.output_dir, "experiment_log.csv")
         # Overwrite any existing log file by opening in 'w' mode.
         with open(log_file_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -226,7 +226,7 @@ def main():
     # The 'update' command has been removed.
 
     elif args.mode == 'rebuild':
-        log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
+        log_file_path = os.path.join(args.output_dir, "experiment_log.csv")
         report_files = glob.glob(os.path.join(args.output_dir, "run_*", "replication_report_*.txt"))
 
         # Overwrite any existing log by opening in 'w' mode. This removes the need for backups.
@@ -245,13 +245,13 @@ def main():
         if not report_files:
             print("No report files found. An empty log with a header has been created.", file=sys.stderr)
         else:
-            print(f"Successfully rebuilt {os.path.basename(log_file_path)} from {len(report_files)} reports.")
+            print(f"\nSuccessfully rebuilt {os.path.basename(log_file_path)} from {len(report_files)} reports.")
 
     elif args.mode == 'finalize':
-        log_file_path = os.path.join(args.output_dir, "batch_run_log.csv")
+        log_file_path = os.path.join(args.output_dir, "experiment_log.csv")
         finalize_log(log_file_path)
 
 if __name__ == "__main__":
     main()
 
-# === End of src/replication_log_manager.py ===
+# === End of src/manage_experiment_log.py ===

@@ -19,6 +19,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
 
 The following issues will be addressed concurrently during the "Code Development and Testing" phase.
 
+-   **Migration Workflow Outdated**: The `migrate_experiment.ps1` and `migrate_study.ps1` workflows have not been updated to handle the new `experiment_log.csv` filename. They will fail if run on a modern experiment that is flagged for migration.
 -   **Inconsistent Logging**:
     -   Log files from migration scripts contain unnecessary PowerShell transcript headers and footers.
 -   **Redundant API Calls**: Forcing a migration on an already `VALIDATED` experiment unnecessarily re-runs all LLM API calls.

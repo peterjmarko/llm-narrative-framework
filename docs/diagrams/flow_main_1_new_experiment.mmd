@@ -9,7 +9,7 @@ graph TD
 
     subgraph C [Action: Run New Replication]
         direction TB
-        Orchestrator["orchestrate_replication.py"]:::layer_green
+        Orchestrator["replication_manager.py"]:::layer_green
         subgraph InternalStages [Internal Stages]
             direction TB
             S1["<b>1. Build Queries</b><br><small>via build_llm_queries.py</small>"] --> S2;

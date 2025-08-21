@@ -42,6 +42,10 @@ import pandas as pd
 import logging
 import argparse
 import glob
+from colorama import Fore, init
+
+# Initialize colorama
+init(autoreset=True)
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
@@ -72,7 +76,8 @@ def write_summary_csv(output_path, results_list):
     df = df[fieldnames]
     df.to_csv(output_path, index=False)
     relative_path = os.path.relpath(output_path, PROJECT_ROOT)
-    logging.info(f"  -> Generated experiment summary:\n    {relative_path} ({len(df)} rows)")
+    # Use a standard print for this output to avoid log-level coloring
+    print(f"  -> Generated experiment summary:\n    {relative_path} ({len(df)} rows)")
 
 def main():
     parser = argparse.ArgumentParser(description="Compile all replication results for a single experiment.")
@@ -91,7 +96,7 @@ def main():
         sys.exit(0)
         return  # Eject for testability
     
-    logging.info(f"Found {len(replication_files)} replication result files to compile.")
+    print(f"{Fore.YELLOW}Found {len(replication_files)} replication result files to compile.")
 
     all_replication_data = []
     for f in replication_files:

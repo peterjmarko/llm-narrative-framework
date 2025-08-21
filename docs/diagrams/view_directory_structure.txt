@@ -38,11 +38,11 @@ personality_matching/
 │   ├── id_encoder.py
 │   ├── llm_prompter.py
 │   ├── neutralize_delineations.py
-│   ├── orchestrate_replication.py
+│   ├── manage_experiment_log.py
 │   ├── prepare_sf_import.py
 │   ├── process_llm_responses.py
 │   ├── query_generator.py
-│   ├── replication_log_manager.py
+│   ├── replication_manager.py
 │   ├── run_bias_analysis.py
 │   ├── select_eligible_candidates.py
 │   ├── select_final_candidates.py
@@ -77,7 +77,7 @@ personality_matching/
 │           │   ├── config.ini.archived                 # Config snapshot for the run
 │           │   ├── replication_report_DATE-TIME.txt    # Detailed report for this run
 │           │   └── REPLICATION_results.csv             # AGGREGATE: Summary of all trials within a replication
-│           ├── batch_run_log.csv                       # Log of all replication runs in an experiment
+│           ├── experiment_log.csv                      # Log of all replication runs in an experiment
 │           └── EXPERIMENT_results.csv                  # AGGREGATE: Summary of all replications within an experiment
 │   └── studies/                                    # Contains all experiment and study outputs
 │       └── <Study_Name>/                           # e.g., "Study_1"
@@ -94,7 +94,7 @@ personality_matching/
 │           │   │   ├── config.ini.archived                 # Config snapshot for the run
 │           │   │   ├── replication_report_DATE-TIME.txt    # Detailed report for this run
 │           │   │   └── REPLICATION_results.csv             # AGGREGATE: Summary of all trials within a replication
-│           │   ├── batch_run_log.csv                       # Log of all replication runs in an experiment
+│           │   ├── experiment_log.csv                      # Log of all replication runs in an experiment
 │           │   └── EXPERIMENT_results.csv                  # AGGREGATE: Summary of all replications within an experiment
 │           └── STUDY_results.csv                           # AGGREGATE: Summary of all experiments in a study
 |

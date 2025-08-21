@@ -32,7 +32,7 @@ importing and calling the `get_experiment_state` function from the
 (e.g., creating, repairing, or reprocessing runs) to bring the experiment to
 completion.
 
-Its core function is to orchestrate `orchestrate_replication.py` to execute
+Its core function is to orchestrate `replication_manager.py` to execute
 the required changes for individual replication runs.
 """
 
@@ -242,7 +242,7 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
 
     return True
 
-# This '_session_worker' function is no longer needed here and has been moved into orchestrate_replication.py's logic.
+# This '_session_worker' function is no longer needed here and has been moved into replication_manager.py's logic.
 
 def _run_repair_mode(runs_to_repair, orchestrator_script_path, verbose, colors):
     """Delegates repair work to the orchestrator for each failed run."""
@@ -364,7 +364,7 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet, col
             capture_output_flag = False # Let output stream directly to console
         
         try:
-            # Execute orchestrate_replication.py. 
+            # Execute replication_manager.py. 
             # If not capturing, output streams directly to console (fixing spinner).
             result = subprocess.run(cmd_orch, check=True, capture_output=capture_output_flag, text=capture_output_flag)
             
@@ -561,9 +561,9 @@ def _setup_environment_and_paths():
 
     # --- Script path setup ---
     script_paths = {
-        'orchestrator': os.path.join(PROJECT_ROOT, "src", "orchestrate_replication.py"),
+        'orchestrator': os.path.join(PROJECT_ROOT, "src", "replication_manager.py"),
         'compile_experiment': os.path.join(PROJECT_ROOT, "src", 'compile_experiment_results.py'),
-        'log_manager': os.path.join(PROJECT_ROOT, "src", 'replication_log_manager.py'),
+        'log_manager': os.path.join(PROJECT_ROOT, "src", 'manage_experiment_log.py'),
         'patch': os.path.join(PROJECT_ROOT, "src", "patch_old_experiment.py"),
         'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_config.py")
     }
@@ -627,10 +627,10 @@ def main():
     # --- Script Paths ---
     # --- Bundle script paths and colors for cleaner function calls ---
     script_paths = {
-        'orchestrator': os.path.join(PROJECT_ROOT, "src", "orchestrate_replication.py"),
+        'orchestrator': os.path.join(PROJECT_ROOT, "src", "replication_manager.py"),
         'auditor': os.path.join(PROJECT_ROOT, "src", "experiment_auditor.py"),
         'compile_experiment': os.path.join(PROJECT_ROOT, "src", 'compile_experiment_results.py'),
-        'log_manager': os.path.join(PROJECT_ROOT, "src", 'replication_log_manager.py'),
+        'log_manager': os.path.join(PROJECT_ROOT, "src", 'manage_experiment_log.py'),
         'patch': os.path.join(PROJECT_ROOT, "src", "patch_old_experiment.py"),
         'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_config.py")
     }

@@ -144,7 +144,7 @@ The pipeline can be understood through the following architectural and logical d
 -   **Guaranteed Reproducibility**: On every new run, the `config.ini` file is automatically archived in the run's output directory, permanently linking the results to the exact parameters that generated them.
 -   **Standardized, Comprehensive Reporting**: Each replication produces a `replication_report.txt` file containing run parameters, status, a human-readable statistical summary, and a machine-parsable JSON block with all key metrics. This format is identical for new runs and reprocessed runs.
 -   **Hierarchical Analysis & Aggregation**: The pipeline uses a set of dedicated compiler scripts for a fully auditable, bottom-up aggregation of results. `compile_replication_results.py` creates a summary for each run, `compile_experiment_results.py` combines those into an experiment-level summary, and finally `compile_study_results.py` creates a master `STUDY_results.csv` for the entire study.
--   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `replication_log_manager.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
+-   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `manage_experiment_log.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
 -   **Standardized Console Banners**: All audit results, whether for success, failure, or a required update, are now presented in a consistent, easy-to-read, 4-line colored banner, providing clear and unambiguous status reports.
 -   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `compile_study_results.py` prepares a master dataset, which `analyze_study_results.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
 
@@ -192,7 +192,7 @@ The project's functionality is organized into six primary workflows, each initia
 
 This is the primary workflow for generating new experimental data. The PowerShell entry point (`new_experiment.ps1`) calls the Python batch controller (`experiment_manager.py`). The manager creates a new, timestamped directory and runs the full set of replications from scratch.
 
-The `orchestrate_replication.py` script executes the full pipeline for a single run, which is broken into six distinct stages:
+The `replication_manager.py` script executes the full pipeline for a single run, which is broken into six distinct stages:
 
 1.  **Build Queries**: Generates all necessary query files and trial manifests.
 2.  **Run LLM Sessions**: Interacts with the LLM API in parallel to get responses.
@@ -227,7 +227,7 @@ If a replication run has **two or more** distinct problems (e.g., a missing conf
 
 The `Details` string provides a semicolon-separated list of all detected issues (e.g., `CONFIG_MISSING; RESPONSE_FILES_INCOMPLETE`).
 
-In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Aggregation Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`), confirming whether the last aggregation step for the experiment was successfully completed.
+In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Aggregation Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `experiment_log.csv`), confirming whether the last aggregation step for the experiment was successfully completed.
 
 #### Workflow 3: Fixing or Updating an Experiment
 
@@ -445,7 +445,7 @@ The script will run an audit, identify the problem (e.g., missing responses, out
 If you run the script on a complete and valid experiment, it will present an interactive menu allowing you to force one of three actions:
 *   **Full Repair**: A destructive action that deletes all LLM responses and re-runs all API calls.
 *   **Full Update**: A safe and quick action that re-runs only the analysis and reporting stages on existing data.
-*   **Aggregation Only**: The fastest action, which re-creates only the top-level experiment summary files (`EXPERIMENT_results.csv`, `batch_run_log.csv`).
+*   **Aggregation Only**: The fastest action, which re-creates only the top-level experiment summary files (`EXPERIMENT_results.csv`, `experiment_log.csv`).
 
 ```powershell
 # Run on a valid experiment to bring up the interactive force menu
