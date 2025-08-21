@@ -1,5 +1,21 @@
 # Changelog
 
+## 6.2.0 (2025-08-21)
+
+### Bump
+
+- **version 6.1.5 → 6.2.0**
+
+### Features
+
+- **add scripted test harnesses and standardize testing framework**
+  Implements a full suite of scripted, end-to-end integration tests by adding new harnesses for Layer 2 (Orchestration), Layer 3 (Data Pipeline), and Layer 5 (Migration).
+  
+  This commit also refactors the entire testing framework for consistency and clarity:
+  - Relocates the `testing_harness` directory from `scripts/` to `tests/` to align with project standards.
+  - Standardizes all test harness scripts with consistent console headers and parameter names.
+  - Updates `TESTING.md` and `ROADMAP.md` to reflect the new, streamlined procedures and project status.
+
 ## 6.1.5 (2025-08-21)
 
 ### Bump
