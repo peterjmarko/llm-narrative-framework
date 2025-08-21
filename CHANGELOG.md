@@ -1,5 +1,22 @@
 # Changelog
 
+## 6.1.4 (2025-08-21)
+
+### Bump
+
+- **version 6.1.3 → 6.1.4**
+
+### Refactor
+
+- **streamline utility scripts and associated tests**
+  Refactors the test suite for utility scripts by creating new, dedicated test files for `restore_experiment_config.py` and `upgrade_legacy_experiment.py`.
+  
+  Renames `restore_experiment_configuration.py` to `restore_experiment_config.py` for brevity.
+  
+  Removes obsolete test files for `replication_log_manager` and `run_llm_sessions`.
+  
+  All related documentation, diagrams, and calling scripts have been updated to reflect these changes.
+
 ## 6.1.3 (2025-08-21)
 
 ### Bump
