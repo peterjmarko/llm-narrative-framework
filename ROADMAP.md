@@ -79,6 +79,7 @@ The following issues will be addressed concurrently during the "Code Development
 ### Code Development
 
 - [ ] **Improve Experiment Execution and Reproducibility**
+  - [ ] Refactor inter-script communication for robustness. Modify core Python scripts (`experiment_manager.py`, etc.) to send all human-readable logs to `stderr` and use `stdout` exclusively for machine-readable output (e.g., the final experiment path). Update PowerShell wrappers to correctly handle these separate streams.
   - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.
   - [ ] Generate an experiment manifest file with results to permanently record all parameters used (this will replace config.ini as the source of parameters).
   - [ ] Update `audit`, `repair`, and `migrate` workflows to use the manifest as the ground truth.

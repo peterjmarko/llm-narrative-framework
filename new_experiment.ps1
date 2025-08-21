@@ -88,7 +88,7 @@ try {
     if ($null -ne $latestExperiment) {
         Write-Header -Lines "Verifying Final Experiment State" -Color Cyan
         $auditScriptPath = Join-Path $ProjectRoot "audit_experiment.ps1"
-        & $auditScriptPath -TargetDirectory $latestExperiment.FullName
+        & $auditScriptPath -ExperimentDirectory $latestExperiment.FullName
     }
 } catch {
     Write-Warning "Could not automatically verify the new experiment."

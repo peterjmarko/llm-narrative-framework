@@ -146,7 +146,7 @@ The pipeline can be understood through the following architectural and logical d
 -   **Hierarchical Analysis & Aggregation**: The pipeline uses a set of dedicated compiler scripts for a fully auditable, bottom-up aggregation of results. `compile_replication_results.py` creates a summary for each run, `compile_experiment_results.py` combines those into an experiment-level summary, and finally `compile_study_results.py` creates a master `STUDY_results.csv` for the entire study.
 -   **Resilient and Idempotent Operations**: The pipeline is designed for resilience. The `replication_log_manager.py` script can `rebuild` experiment logs from scratch, and its `finalize` command is idempotent, ensuring that data summaries are always correct even after interruptions.
 -   **Standardized Console Banners**: All audit results, whether for success, failure, or a required update, are now presented in a consistent, easy-to-read, 4-line colored banner, providing clear and unambiguous status reports.
--   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `compile_study_results.py` prepares a master dataset, which `study_analyzer.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
+-   **Streamlined ANOVA Workflow**: The final statistical analysis is a simple two-step process. `compile_study_results.py` prepares a master dataset, which `analyze_study_results.py` then automatically analyzes to generate tables and publication-quality plots using user-friendly display names defined in `config.ini`.
 
 ### Visual Architecture of the Main Pipeline
 
@@ -165,7 +165,7 @@ The codebase for the main pipeline can be divided into the following components:
 
 5.  **Shared Utilities**: Helper scripts and modules, like `config_loader.py`, that provide common functionality and are imported by multiple other scripts across different workflows.
 
-{{grouped_figure:docs/diagrams/arch_main_codebase.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase, showing how scripts execute (solid lines) or import (dotted lines) one another.}}
+{{grouped_figure:docs/diagrams/arch_main_codebase.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase. PowerShell scripts (blue) are user-facing entry points that execute core Python logic. Solid lines indicate execution, while dotted lines show module imports.}}
 
 #### Workflow Diagrams
 The project's functionality is organized into six primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
@@ -178,7 +178,7 @@ The project's functionality is organized into six primary workflows, each initia
 
 4.  **Migrate Old Experiment Data**: A utility workflow designed to bring older, legacy experimental data into compliance with the modern pipeline.
 
-5.  **Process a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
+5.  **Evaluate a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
 
 6.  **(Planned) Create a New Study**: A future workflow to automate the creation of an entire study by orchestrating multiple `new_experiment.ps1` runs based on a matrix of factors (e.g., models, mapping strategies).
 
@@ -517,7 +517,7 @@ Point the script at the top-level directory containing all relevant experiment f
 
 ```powershell
 # Example: Evaluate all experiments located in the "My_First_Study" directory
-.\evaluate_study.ps1 -ExperimentDirectory "output/studies/My_First_Study"
+.\evaluate_study.ps1 -StudyDirectory "output/studies/My_First_Study"
 ```
 For detailed, real-time logs, add the `-Verbose` switch.
 
@@ -547,7 +547,7 @@ Each report contains a clear header, the base query used, a human-readable analy
 
 ### Study Analysis Log Format
 
-The final analysis script (`study_analyzer.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
+The final analysis script (`analyze_study_results.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
 {{diagram:docs/diagrams/format_analysis_log.txt}}
 

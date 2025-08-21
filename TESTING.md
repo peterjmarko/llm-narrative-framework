@@ -335,53 +335,53 @@ Module                              Cov. (%)        Status & Justification
 ----------------------------------- --------------- -----------------------------------------------------------------
 **Sourcing**
 
-`src/fetch_adb_data.py`             `37%`          **COMPLETE.** Unit tests cover critical offline logic. Live
+`src/fetch_adb_data.py`             `37%`           COMPLETE. Unit tests cover critical offline logic. Live
                                                     network code is validated via integration testing.
 
-`src/find_wikipedia_links.py`       `38%`          **COMPLETE.** Unit tests cover key logic, including HTML parsing
+`src/find_wikipedia_links.py`       `38%`           COMPLETE. Unit tests cover key logic, including HTML parsing
                                                     and mocked API calls. Orchestration is validated via integration.
 
-`src/validate_wikipedia_pages.py`   `38%`          **COMPLETE.** Manual validation of the refactored script is
+`src/validate_wikipedia_pages.py`   `38%`           COMPLETE. Manual validation of the refactored script is
                                                     complete. Unit tests cover all critical validation logic.
 
-`src/select_eligible_candidates.py` `72%`          **COMPLETE.** The script was fully refactored and manually
+`src/select_eligible_candidates.py` `72%`           COMPLETE. The script was fully refactored and manually
                                                     validated. Unit tests cover all core filtering and resumability
                                                     logic.
 
 **Scoring**
 
-`src/generate_eminence_scores.py`   `55%`          **COMPLETE.** Unit tests cover the critical offline logic,
+`src/generate_eminence_scores.py`   `55%`           COMPLETE. Unit tests cover the critical offline logic,
                                                     including LLM response parsing, resumability, and a mocked
                                                     orchestrator loop. Live LLM calls are validated via integration.
 
-`src/generate_ocean_scores.py`      `17%`          **COMPLETE.** Unit tests cover the critical offline logic,
+`src/generate_ocean_scores.py`      `17%`           COMPLETE. Unit tests cover the critical offline logic,
                                                     including LLM response parsing, variance calculation, and the
                                                     data-driven cutoff logic. Live LLM calls are validated via
                                                     integration testing.
 
-`src/select_final_candidates.py`    `65%`          **COMPLETE.** The script was fully refactored and manually
+`src/select_final_candidates.py`    `65%`           COMPLETE. The script was fully refactored and manually
                                                     validated. Unit tests cover the entire data transformation
                                                     workflow, including filtering, mapping, and sorting.
 
 **Generation**
 
-`src/prepare_sf_import.py`          `58%`          **COMPLETE.** The script was fully refactored and manually
+`src/prepare_sf_import.py`          `58%`           COMPLETE. The script was fully refactored and manually
                                                     validated. Unit tests cover the core data transformation and
                                                     CQD formatting logic.
 
-`src/create_subject_db.py`          `50%`          **COMPLETE.** The script was fully refactored and manually
+`src/create_subject_db.py`          `50%`           COMPLETE. The script was fully refactored and manually
                                                     validated. Unit tests cover the core data integration logic,
                                                     including Base58 decoding, file merging, and data flattening.
 
-`src/neutralize_delineations.py`    `19%`          **COMPLETE.** Unit tests cover the critical offline logic for parsing
+`src/neutralize_delineations.py`    `19%`           COMPLETE. Unit tests cover the critical offline logic for parsing
                                                     the esoteric input file format and correctly grouping items into
                                                     LLM tasks. The live LLM calls are validated via integration testing.
 
-`src/generate_personalities_db.py`  `75%`          **COMPLETE.** The script was fully refactored and manually
+`src/generate_personalities_db.py`  `75%`           COMPLETE. The script was fully refactored and manually
                                                     validated. Unit tests cover the entire data assembly algorithm,
                                                     including all calculations and text lookups.
 
-`prepare_data.ps1`                  `N/A`           **IN PROGRESS.** Orchestration logic has been fully validated
+`prepare_data.ps1`                  `N/A`           IN PROGRESS. Orchestration logic has been fully validated
                                                     via mock script testing. Full end-to-end integration testing is
                                                     now pending.
 --------------------------------------------------------------------------------------------------------------------
@@ -395,79 +395,82 @@ Module                                  Cov. (%)        Status & Justification
 --------------------------------------- --------------- ----------------------------------------------------------------------------------
 **Core Orchestrators**
 
-`src/experiment_manager.py`             `56%`          **COMPLETE.** Unit tests are complete, and the core `new`/`audit`/`fix`
+`src/experiment_manager.py`             `56%`           COMPLETE. Unit tests are complete, and the core `new`/`audit`/`fix`
                                                         workflows have been successfully validated via the scripted
                                                         end-to-end integration test.
-`src/orchestrate_replication.py`        `77%`          **COMPLETE.** Unit tests cover the core control flow for both
+`src/orchestrate_replication.py`        `77%`           COMPLETE. Unit tests cover the core control flow for both
                                                         "new run" and "reprocess" modes, including failure handling.
 
 **Single-Replication Pipeline**
 
-`src/build_llm_queries.py`              `68%`          **COMPLETE.** Unit tests cover the core orchestration logic,
+`src/build_llm_queries.py`              `68%`           COMPLETE. Unit tests cover the core orchestration logic,
                                                         including new runs, continued runs, and key failure modes.
-`src/llm_prompter.py`                   `53%`          **COMPLETE.** Unit tests cover the core logic for successful API
+`src/llm_prompter.py`                   `53%`           COMPLETE. Unit tests cover the core logic for successful API
                                                         calls, error conditions (HTTP, timeout), and file I/O failures.
-`src/process_llm_responses.py`          `67%`          **COMPLETE.** Unit tests cover the core parsing logic, including
+`src/process_llm_responses.py`          `67%`           COMPLETE. Unit tests cover the core parsing logic, including
                                                         markdown, fallback, flexible spacing, reordered columns, and
                                                         key failure modes.
-`src/analyze_llm_performance.py`        `63%`          **COMPLETE.** Unit tests cover the main orchestrator, all core
+`src/analyze_llm_performance.py`        `63%`           COMPLETE. Unit tests cover the main orchestrator, all core
                                                         statistical calculations (including edge cases), and the robust
                                                         parsing of complex file formats (e.g., Markdown).
 
-`src/run_bias_analysis.py`              `86%`          **COMPLETE.** Unit tests cover the main orchestrator workflow,
+`src/run_bias_analysis.py`              `86%`           COMPLETE. Unit tests cover the main orchestrator workflow,
                                                         core bias calculations, and robust handling of empty or
                                                         malformed data files.
 
-`src/generate_replication_report.py`    `90%`          **COMPLETE.** Unit tests cover the main workflow, including
+`src/generate_replication_report.py`    `90%`           COMPLETE. Unit tests cover the main workflow, including
                                                         robust error handling for missing/corrupted files and correct
                                                         fallback for optional data sources.
 
 **Aggregation & Analysis Scripts**
 
-`src/compile_replication_results.py`    `78%`          **COMPLETE.** Unit tests cover the main workflow, data merging
+`src/compile_replication_results.py`    `78%`           COMPLETE. Unit tests cover the main workflow, data merging
                                                         logic, and robust error handling for missing or invalid input
                                                         files.
 
-`src/compile_experiment_results.py`     `74%`           **COMPLETE.** Unit tests cover the main aggregation workflow and
+`src/compile_experiment_results.py`     `74%`           COMPLETE. Unit tests cover the main aggregation workflow and
                                                         robustly handle edge cases like empty or missing replication
                                                         files.
 
-`src/compile_study_results.py`          `76%`           **COMPLETE.** Unit tests cover the recursive aggregation
+`src/compile_study_results.py`          `76%`           COMPLETE. Unit tests cover the recursive aggregation
                                                         workflow and robustly handle edge cases like empty or missing
                                                         experiment files.
 
-`src/analyze_study_results.py`          `PENDING`       **PENDING.** Unit testing for the final statistical analysis
-                                                        script will be the last step in this workflow.
+`src/analyze_study_results.py`          `66%`           COMPLETE. The unit test suite fully validates the script's
+                                                        core logic, including data filtering, control flow for different
+                                                        analysis scenarios (e.g., zero variance), and graceful
+                                                        shutdowns. Key statistical and plotting functions are mocked
+                                                        to ensure isolated validation.
 
 **Auditing & Utility Scripts**
 
-`src/experiment_auditor.py`             `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/experiment_auditor.py`             `PENDING`       PENDING. Unit testing will be performed next.
 
-`src/replication_log_manager.py`        `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/replication_log_manager.py`        `PENDING`       PENDING. Unit testing will be performed next.
 
-`src/patch_old_experiment.py`           `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/patch_old_experiment.py`           `PENDING`       PENDING. Unit testing will be performed next.
 
-`src/restore_config.py`                 `PENDING`       **PENDING.** Unit testing will be performed next.
+`src/restore_config.py`                 `PENDING`       PENDING. Unit testing will be performed next.
 
 **PowerShell Wrappers (Experiments)**
 
-`new_experiment.ps1`                    `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+`new_experiment.ps1`                    `N/A`           COMPLETE. Validated via end-to-end integration testing.
 
-`audit_experiment.ps1`                  `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+`audit_experiment.ps1`                  `N/A`           COMPLETE. Validated via end-to-end integration testing.
 
-`fix_experiment.ps1`                    `N/A`           **COMPLETE.** Validated via end-to-end integration testing.
+`fix_experiment.ps1`                    `N/A`           COMPLETE. Validated via end-to-end integration testing.
 
-`migrate_experiment.ps1`                `N/A`           **PENDING.** Manual validation is pending.
+`migrate_experiment.ps1`                `N/A`           PENDING. Manual validation is pending.
 
 **PowerShell Wrappers (Studies)**
 
-`evaluate_study.ps1`                    `N/A`           **PENDING.** Manual validation is pending.
+`evaluate_study.ps1`                    `N/A`           PENDING. Manual validation is pending.
 
-`new_study.ps1`                         `N/A`           **PENDING.** Manual validation is pending.
+`new_study.ps1`                         `N/A`           PENDING. Manual validation is pending.
 
-`audit_study.ps1`                       `N/A`           **PENDING.** Manual validation is pending.
+`audit_study.ps1`                       `N/A`           PENDING. Manual validation is pending.
 
-`fix_study.ps1`                         `N/A`           **PENDING.** Manual validation is pending.
+`fix_study.ps1`                         `N/A`           PENDING. Manual validation is pending.
 
-`migrate_study.ps1`                     `N/A`           **PENDING.** Manual validation is pending.
+`migrate_study.ps1`                     `N/A`           PENDING. Manual validation is pending.
 -----------------------------------------------------------------------------------------------------------------------------------------
