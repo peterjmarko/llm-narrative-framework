@@ -1,5 +1,19 @@
 # Changelog
 
+## 6.1.1 (2025-08-21)
+
+### Bump
+
+- **version 6.1.0 → 6.1.1**
+
+### Refactor
+
+- **align script and artifact naming for consistency**
+  - Renamed orchestrate_replication.py to replication_manager.py and replication_log_manager.py to manage_experiment_log.py to clarify their roles and improve naming consistency.
+  - Renamed the output log file from batch_run_log.csv to experiment_log.csv to align with other experiment-level artifacts.
+  - Updated all diagrams, documentation, and script calls throughout the codebase to reflect these changes.
+  - Added a comprehensive unit test suite for the experiment auditor.
+
 ## 6.1.0 (2025-08-21)
 
 ### Bump
