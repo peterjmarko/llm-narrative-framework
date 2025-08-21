@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.1.3 (2025-08-21)
+
+### Bump
+
+- **version 6.1.2 → 6.1.3**
+
+### Refactor
+
+- **align utility naming with repair and migration workflows**
+  - Renamed `restore_config.py` to `restore_experiment_configuration.py` and `patch_old_experiment.py` to `upgrade_legacy_experiment.py` to better align their names with the 'repair' and 'migrate' user workflows.
+  - Fixed a `Resolve-Path` error in `migrate_experiment.ps1` by ensuring the destination directory is created before its path is used.
+  - Updated all calling scripts, diagrams, and documentation to use the new, more descriptive script names.
+
 ## 6.1.2 (2025-08-21)
 
 ### Bump
