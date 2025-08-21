@@ -1,5 +1,20 @@
 # Changelog
 
+## 6.1.5 (2025-08-21)
+
+### Bump
+
+- **version 6.1.4 → 6.1.5**
+
+### Fixes
+
+- **resolve query generator bugs and complete unit tests**
+  Resolves bugs in `query_generator.py` related to standalone execution and incorrect manifest reporting for the 'random' mapping strategy.
+  
+  These issues were discovered during the implementation of comprehensive unit test suites for `query_generator.py` and `config_loader.py`, which are included in this commit. This completes the test coverage for all Python scripts in the main experiment pipeline.
+  
+  `TESTING.md` is also updated to reflect the new 'COMPLETE' status and final code coverage for these scripts.
+
 ## 6.1.4 (2025-08-21)
 
 ### Bump
