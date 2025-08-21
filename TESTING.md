@@ -428,7 +428,9 @@ Module                                  Cov. (%)        Status & Justification
 `src/build_llm_queries.py`              `68%`           COMPLETE. Unit tests cover the core orchestration logic,
                                                         including new runs, continued runs, and key failure modes.
 
-`src/query_generator.py`                `N/A`           PENDING. Unit tests will be written.
+`src/query_generator.py`                `74%`           COMPLETE. Unit tests cover both 'correct' and 'random'
+                                                        mapping strategies, edge cases (e.g., k=max), and key
+                                                        failure modes like missing or insufficient input data.
 
 `src/llm_prompter.py`                   `53%`           COMPLETE. Unit tests cover the core logic for successful API
                                                         calls, error conditions (HTTP, timeout), and file I/O failures.
@@ -470,14 +472,17 @@ Module                                  Cov. (%)        Status & Justification
                                                         batch-processing logic, ensuring it correctly finds all
                                                         target directories and halts immediately if its worker
                                                         script reports an error.
-                                                        
+
 `src/restore_experiment_config.py`      `83%`           COMPLETE. The unit test suite validates the script's ability
                                                         to parse legacy report files and correctly generate a new,
                                                         valid `config.ini.archived` file. It also confirms that the
                                                         script exits gracefully if the target directory or report
                                                         files are missing.
 
-`src/config_loader.py`                  `N/A`           PENDING. Unit tests will be written.
+`src/config_loader.py`                  `51%`           COMPLETE. Unit tests cover the core `get_config_value`
+                                                        helper, including successful parsing, type conversions,
+                                                        fallbacks, and robust error handling for missing sections or
+                                                        keys.
 
 **PowerShell Wrappers (Experiments)**
 

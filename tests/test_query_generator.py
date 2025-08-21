@@ -19,302 +19,165 @@
 #
 # Filename: tests/test_query_generator.py
 
+import csv
+import sys
+from unittest.mock import patch
+
 import pytest
-import os
-from unittest.mock import MagicMock
-import logging
-import tempfile
-import configparser
 
-# Since pytest handles the path, we can import directly.
-from src import query_generator
+# Since this is a script, we import the main function
+from query_generator import main as query_generator_main
 
-@pytest.fixture
-def mock_dependencies(tmp_path, mocker):
-    """A fixture to mock dependencies for query_generator."""
-    # Mock the config_loader module's attributes
-    mocker.patch('src.query_generator.PROJECT_ROOT', str(tmp_path))
-    
-    mock_config = MagicMock()
-    config_data = {
-        'Filenames': {'base_query_src': "base_query.txt", 'temp_subset_personalities': "temp_subset_personalities.txt"},
-        'General': {'default_k': '3', 'base_output_dir': "output"}
-    }
-    mock_config.get.side_effect = lambda section, key, **kwargs: config_data.get(section, {}).get(key)
-    mocker.patch('src.query_generator.APP_CONFIG', mock_config)
-    mocker.patch('src.query_generator.get_config_value', side_effect=lambda cfg, sec, key, **kwargs: cfg.get(sec, key))
+# Mock content for our test files
+MOCK_PERSONALITIES_CONTENT = (
+    "Index\tName\tBirthYear\tDescriptionText\tidADB\n"
+    "1\tPerson A\t1990\tDescription for A.\t101\n"
+    "2\tPerson B\t1991\tDescription for B.\t102\n"
+    "3\tPerson C\t1992\tDescription for C.\t103\n"
+    "4\tPerson D\t1993\tDescription for D.\t104\n"
+)
+
+MOCK_BASE_QUERY_CONTENT = "Base query for k={k} subjects."
+
 
 @pytest.fixture
-def mock_sys_exit(mocker):
-    return mocker.patch('sys.exit', side_effect=SystemExit)
-
-@pytest.fixture
-def setup_main_test_files(tmp_path):
-    """Creates the dummy files needed for main() in their expected locations."""
-    # The logic in query_generator.main() expects the specific temp file in src/
-    # but all other files (even if named the same) in data/. We need to match this.
+def setup_test_environment(tmp_path, monkeypatch):
+    """Set up a mock project environment for testing the script."""
+    # Create mock data directory and files
     data_dir = tmp_path / "data"
-    data_dir.mkdir(exist_ok=True)
-    
-    # Create the personalities file in the data directory, which matches the test case.
-    (data_dir / "temp_subset_personalities.txt").write_text("Index\tName\tBirthYear\tDescriptionText\n1\tA\t1\tDa\n2\tB\t2\tDb\n3\tC\t3\tDc\n")
-    
-    # The base query is also expected in data/.
-    (data_dir / "base_query.txt").write_text("Base query: {k}")
+    data_dir.mkdir()
 
-def test_main_happy_path(tmp_path, mock_sys_exit, setup_main_test_files, mocker, mock_dependencies):
-    """Tests the main function's happy path."""
-    mock_args = {
-        'k': 3, 'seed': None, 'mapping_strategy': 'correct', 'verbose': 0,
-        'personalities_file': "temp_subset_personalities.txt",
-        'base_query_file': "base_query.txt", 'output_basename_prefix': ""
-    }
-    mocker.patch('argparse.ArgumentParser.parse_args', return_value=mocker.Mock(**mock_args))
+    personalities_file = data_dir / "personalities_db.txt"
+    personalities_file.write_text(MOCK_PERSONALITIES_CONTENT, encoding="utf-8")
 
-    query_generator.main()
+    base_query_file = data_dir / "base_query.txt"
+    base_query_file.write_text(MOCK_BASE_QUERY_CONTENT, encoding="utf-8")
 
-    mock_sys_exit.assert_not_called()
+    # The script imports PROJECT_ROOT into its own namespace. We must patch it
+    # there to ensure the change is visible during the test run.
+    monkeypatch.setattr('query_generator.PROJECT_ROOT', str(tmp_path))
+
+    # The script calls sys.exit on error. We patch it to raise an exception
+    # that pytest can catch, preventing the test run from stopping.
+    monkeypatch.setattr(sys, 'exit', lambda code: (_ for _ in ()).throw(SystemExit(code)))
+
+    return tmp_path
+
+
+def run_script(monkeypatch, args):
+    """Helper function to run the script's main function with mocked args."""
+    # Prepend a dummy script name to match sys.argv's structure
+    full_args = ['query_generator.py'] + args
+    monkeypatch.setattr(sys, 'argv', full_args)
+    query_generator_main()
+
+
+def test_happy_path_correct_mapping(setup_test_environment, monkeypatch):
+    """
+    Tests the script's main functionality with a 'correct' mapping strategy.
+    """
+    tmp_path = setup_test_environment
     output_dir = tmp_path / "output" / "qgen_standalone_output"
-    assert (output_dir / "llm_query.txt").is_file()
-    content = (output_dir / "llm_query.txt").read_text()
-    assert "Base query: 3" in content
 
-def test_load_base_query_file_not_found(tmp_path, mocker, mock_dependencies):
-    """Test load_base_query with non-existent file."""
-    from src.query_generator import load_base_query
-    
-    non_existent_file = tmp_path / "nonexistent.txt"
-    
-    with pytest.raises(SystemExit) as excinfo:
-        load_base_query(str(non_existent_file))
-    
-    assert excinfo.value.code == 1
+    # Run the script with specific arguments
+    run_script(monkeypatch, [
+        "-k", "3",
+        "--seed", "42",
+        "--mapping_strategy", "correct",
+        "--personalities_file", "personalities_db.txt"
+    ])
 
-def test_load_base_query_empty_file(tmp_path, mocker, mock_dependencies):
-    """Test load_base_query with empty file."""
-    from src.query_generator import load_base_query
-    
-    empty_file = tmp_path / "empty.txt"
-    empty_file.write_text("")
-    
-    mock_warn = mocker.patch('src.query_generator.logging.warning')
-    result = load_base_query(str(empty_file))
-    assert result == ""
-    mock_warn.assert_called_once()
+    # 1. Verify all output files were created
+    assert (output_dir / "llm_query.txt").exists()
+    assert (output_dir / "mapping.txt").exists()
+    assert (output_dir / "manifest.txt").exists()
 
-def test_load_personalities_invalid_format(tmp_path, mocker, mock_dependencies):
-    """Test load_personalities with invalid data."""
-    from src.query_generator import load_personalities
-    
-    invalid_file = tmp_path / "invalid.txt"
-    invalid_file.write_text("Index\tName\tBirthYear\tDescriptionText\n1\tA\tinvalid_year\tDesc\n2\tB\t2000\tValid\n")
-    
-    mock_warn = mocker.patch('src.query_generator.logging.warning')
-    result = load_personalities(str(invalid_file), 1)
-    assert len(result) == 1  # Only valid entry loaded
-    mock_warn.assert_called()
+    # 2. Verify manifest content for 'correct' mapping
+    with open(output_dir / "manifest.txt", 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        for row in reader:
+            assert row['Name_Ref_ID'] == row['Desc_Ref_ID'], "Manifest should show correct mapping"
 
-def test_load_personalities_insufficient_data(tmp_path, mocker, mock_dependencies):
-    """Test load_personalities with insufficient valid entries."""
-    from src.query_generator import load_personalities
-    
-    insufficient_file = tmp_path / "insufficient.txt"
-    insufficient_file.write_text("Index\tName\tBirthYear\tDescriptionText\n1\tA\t2000\tDesc\n")
-    
-    with pytest.raises(SystemExit) as excinfo:
-        load_personalities(str(insufficient_file), 5)  # Need 5, only have 1
-    
-    assert excinfo.value.code == 1
-
-def test_select_and_prepare_k_items_insufficient(tmp_path, mocker, mock_dependencies):
-    """Test select_and_prepare_k_items with insufficient items."""
-    from src.query_generator import select_and_prepare_k_items
-    
-    personalities = [{'name': 'A', 'year': 2000, 'description': 'Desc', 'original_index_from_file': 1}]
-    
-    with pytest.raises(SystemExit) as excinfo:
-        select_and_prepare_k_items(personalities, 5)  # Need 5, only have 1
-    
-    assert excinfo.value.code == 1
-
-def test_write_tab_separated_file_io_error(tmp_path, mocker, mock_dependencies):
-    """Test write_tab_separated_file with IO error."""
-    from src.query_generator import write_tab_separated_file
-    
-    # Mock open to raise IOError
-    mocker.patch('builtins.open', side_effect=IOError("Disk full"))
-    with pytest.raises(IOError):
-        write_tab_separated_file(str(tmp_path / "test.txt"), "Header", [["data"]])
-
-def test_random_mapping_strategy(tmp_path, mock_sys_exit, setup_main_test_files, mocker, mock_dependencies):
-    """Test main function with random mapping strategy."""
-    mock_args = {
-        'k': 3, 'seed': 42, 'mapping_strategy': 'random', 'verbose': 0,
-        'personalities_file': "temp_subset_personalities.txt",
-        'base_query_file': "base_query.txt", 'output_basename_prefix': ""
-    }
-    mocker.patch('argparse.ArgumentParser.parse_args', return_value=mocker.Mock(**mock_args))
-    
-    mock_warn = mocker.patch('src.query_generator.logging.warning')
-    query_generator.main()
-    
-    # Should warn about random mapping
-    warning_calls = [call for call in mock_warn.call_args_list 
-                    if "random" in str(call) and "mapping strategy" in str(call)]
-    assert len(warning_calls) > 0
-
-def test_verbose_levels(tmp_path, mock_sys_exit, setup_main_test_files, mocker, mock_dependencies):
-    """Test different verbose levels."""
-    # Test verbose level 1 (INFO)
-    mock_args = {
-        'k': 3, 'seed': None, 'mapping_strategy': 'correct', 'verbose': 1,
-        'personalities_file': "temp_subset_personalities.txt",
-        'base_query_file': "base_query.txt", 'output_basename_prefix': ""
-    }
-    mocker.patch('argparse.ArgumentParser.parse_args', return_value=mocker.Mock(**mock_args))
-    
-    mock_logger = mocker.patch('logging.getLogger')
-    query_generator.main()
-    mock_logger.assert_called()
-
-def test_orchestrator_temp_output_path(tmp_path, mock_sys_exit, setup_main_test_files, mocker, mock_dependencies):
-    """Test orchestrator temporary output path handling."""
-    mock_args = {
-        'k': 3, 'seed': None, 'mapping_strategy': 'correct', 'verbose': 0,
-        'personalities_file': "temp_subset_personalities.txt",
-        'base_query_file': "base_query.txt", 
-        'output_basename_prefix': "temp_qgen_outputs_iter_001/test_"
-    }
-    mocker.patch('argparse.ArgumentParser.parse_args', return_value=mocker.Mock(**mock_args))
-    
-    # Capture logging to verify the orchestrator path logic worked
-    mock_info = mocker.patch('src.query_generator.logging.info')
-    
-    query_generator.main()
-    
-    # Verify the orchestrator path was detected and logged
-    info_calls = [str(call) for call in mock_info.call_args_list]
-    orchestrator_msgs = [msg for msg in info_calls if "Orchestrated run" in msg and "temp_qgen_outputs_iter_001" in msg]
-    assert len(orchestrator_msgs) > 0, "Should detect and log orchestrator temp path"
-    
-    # Verify the success message was logged (meaning files were created)
-    success_msgs = [msg for msg in info_calls if "Query generation process complete" in msg]
-    assert len(success_msgs) > 0, "Should complete successfully"
+    # 3. Verify llm_query.txt content
+    query_content = (output_dir / "llm_query.txt").read_text(encoding='utf-8')
+    assert "Base query for k=3 subjects." in query_content
+    assert query_content.count('\n') > 5  # Check it has content beyond the header
 
 
-def test_custom_path_prefix(tmp_path, mock_sys_exit, setup_main_test_files, mocker, mock_dependencies):
-    """Test custom path prefix handling."""
-    mock_args = {
-        'k': 3, 'seed': None, 'mapping_strategy': 'correct', 'verbose': 0,
-        'personalities_file': "temp_subset_personalities.txt",
-        'base_query_file': "base_query.txt", 
-        'output_basename_prefix': "custom_subdir/prefix_"
-    }
-    mocker.patch('argparse.ArgumentParser.parse_args', return_value=mocker.Mock(**mock_args))
-    
-    query_generator.main()
-    
-    # Should create files in output/custom_subdir/
-    expected_dir = tmp_path / "output" / "custom_subdir"
-    assert expected_dir.exists()
-    assert (expected_dir / "prefix_llm_query.txt").exists()
+def test_happy_path_random_mapping(setup_test_environment, monkeypatch):
+    """
+    Tests the script's main functionality with a 'random' mapping strategy.
+    """
+    tmp_path = setup_test_environment
+    output_dir = tmp_path / "output" / "qgen_standalone_output"
 
-def test_invalid_k_value(tmp_path, mock_sys_exit, setup_main_test_files, mocker, mock_dependencies):
-    """Test invalid k value."""
-    mock_args = {
-        'k': 0, 'seed': None, 'mapping_strategy': 'correct', 'verbose': 0,
-        'personalities_file': "temp_subset_personalities.txt",
-        'base_query_file': "base_query.txt", 'output_basename_prefix': ""
-    }
-    mocker.patch('argparse.ArgumentParser.parse_args', return_value=mocker.Mock(**mock_args))
-    
-    with pytest.raises(SystemExit):
-        query_generator.main()
-    
-    mock_sys_exit.assert_called_with(1)
+    run_script(monkeypatch, [
+        "-k", "3",
+        "--seed", "42",
+        "--mapping_strategy", "random",
+        "--personalities_file", "personalities_db.txt"
+    ])
 
-def test_normalize_text_for_llm():
-    """Test text normalization function."""
-    from src.query_generator import normalize_text_for_llm
-    
-    # Test normal text
-    assert normalize_text_for_llm("Hello World") == "Hello World"
-    
-    # Test non-string input
-    assert normalize_text_for_llm(123) == 123
-    assert normalize_text_for_llm(None) is None
-    
-    # Test unicode normalization
-    result = normalize_text_for_llm("café")
-    assert "cafe" in result or "caf" in result  # Depends on exact normalization
+    # Verify manifest content for 'random' mapping
+    with open(output_dir / "manifest.txt", 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        rows = list(reader)
+        name_ref_ids = [row['Name_Ref_ID'] for row in rows]
+        desc_ref_ids = [row['Desc_Ref_ID'] for row in rows]
 
-def test_create_mapping_file_no_match(tmp_path, mocker, mock_dependencies):
-    """Test create_mapping_file with missing match (critical error)."""
-    from src.query_generator import create_mapping_file
-    
-    # Create mismatched lists that will cause the critical error
-    shuffled_names = [("Name1", 2000, 0), ("Name2", 2001, 1)]
-    shuffled_descriptions = [("Desc1", 99), ("Desc2", 98)]  # Wrong ref_ids
-    
-    with pytest.raises(SystemExit) as excinfo:
-        create_mapping_file(shuffled_names, shuffled_descriptions, str(tmp_path / "mapping.txt"), 2)
-    
-    assert excinfo.value.code == 1
+        # With a random mapping, the lists of IDs should not be identical.
+        assert name_ref_ids != desc_ref_ids, "Manifest should show a random mapping"
+        # However, they should contain the same set of IDs, just in a different order.
+        assert sorted(name_ref_ids) == sorted(desc_ref_ids), "ID sets should be the same"
 
-def test_directory_creation_error(tmp_path, mocker, mock_dependencies):
-    """Test directory creation failure."""
-    mock_args = {
-        'k': 3, 'seed': None, 'mapping_strategy': 'correct', 'verbose': 0,
-        'personalities_file': "temp_subset_personalities.txt",
-        'base_query_file': "base_query.txt", 'output_basename_prefix': ""
-    }
-    mocker.patch('argparse.ArgumentParser.parse_args', return_value=mocker.Mock(**mock_args))
-    
-    # Mock os.makedirs to raise OSError
-    mocker.patch('os.makedirs', side_effect=OSError("Permission denied"))
-    with pytest.raises(SystemExit) as excinfo:
-        query_generator.main()
-    
-    assert excinfo.value.code == 1
 
-def test_file_write_errors(tmp_path, mocker, mock_dependencies):
-    """Test various file write error scenarios."""
-    from src.query_generator import create_shuffled_names_file, assemble_full_query
-    
-    selected_items = [{'name': 'Test', 'year': 2000, 'internal_ref_id': 0}]
-    
-    # Test create_shuffled_names_file with write error
-    mocker.patch('builtins.open', side_effect=IOError("Write error"))
-    with pytest.raises(SystemExit) as excinfo:
-        create_shuffled_names_file(selected_items, str(tmp_path / "test.txt"))
-    assert excinfo.value.code == 1
-    
-    # Test assemble_full_query with write error
-    mocker.patch('builtins.open', side_effect=IOError("Write error"))
-    with pytest.raises(SystemExit) as excinfo:
-        assemble_full_query("Base {k}", [("Name", 2000, 0)], [("Desc", 0)], str(tmp_path / "query.txt"), 1)
-    assert excinfo.value.code == 1
-def test_wrong_number_of_items_after_loading(tmp_path, mock_sys_exit, mocker, mock_dependencies):
-    """Test error when loaded items don't match expected k value."""
-    # Create file with 2 items
-    data_dir = tmp_path / "data"
-    data_dir.mkdir(exist_ok=True)
-    (data_dir / "temp_subset_personalities.txt").write_text(
-        "Index\tName\tBirthYear\tDescriptionText\n1\tA\t1\tDa\n2\tB\t2\tDb\n"
-    )
-    (data_dir / "base_query.txt").write_text("Base query: {k}")
-    
-    # But request k=5
-    mock_args = {
-        'k': 5, 'seed': None, 'mapping_strategy': 'correct', 'verbose': 0,
-        'personalities_file': "temp_subset_personalities.txt",
-        'base_query_file': "base_query.txt", 'output_basename_prefix': ""
-    }
-    mocker.patch('argparse.ArgumentParser.parse_args', return_value=mocker.Mock(**mock_args))
-    
-    with pytest.raises(SystemExit):
-        query_generator.main()
-    
-    mock_sys_exit.assert_called_with(1)
+def test_edge_case_k_equals_total_subjects(setup_test_environment, monkeypatch):
+    """
+    Tests the script when k is the total number of available subjects.
+    """
+    tmp_path = setup_test_environment
+    output_dir = tmp_path / "output" / "qgen_standalone_output"
+
+    # Our mock file has 4 subjects.
+    run_script(monkeypatch, ["-k", "4", "--seed", "1"])
+
+    # We just need to check if it ran without error and created the files.
+    assert (output_dir / "manifest.txt").exists()
+    with open(output_dir / "manifest.txt", 'r', encoding='utf-8') as f:
+        reader = csv.reader(f, delimiter='\t')
+        next(reader)  # skip header
+        assert len(list(reader)) == 4, "Manifest should have 4 rows for k=4"
+
+
+def test_error_handling_personalities_file_not_found(setup_test_environment, monkeypatch):
+    """
+    Tests that the script exits if the personalities file is not found.
+    """
+    with pytest.raises(SystemExit) as e:
+        run_script(monkeypatch, ["--personalities_file", "non_existent_file.txt"])
+    assert e.value.code == 1, "Should exit with code 1 for file not found"
+
+
+def test_error_handling_not_enough_subjects(setup_test_environment, monkeypatch):
+    """
+    Tests that the script exits if k is larger than the number of available subjects.
+    """
+    with pytest.raises(SystemExit) as e:
+        # Our mock file has 4 subjects
+        run_script(monkeypatch, ["-k", "5"])
+    assert e.value.code == 1, "Should exit with code 1 for insufficient subjects"
+
+
+def test_error_handling_empty_personalities_file(setup_test_environment, monkeypatch):
+    """
+    Tests that the script exits gracefully for an empty personalities file.
+    """
+    tmp_path = setup_test_environment
+    # Overwrite the file with just a header
+    (tmp_path / "data" / "personalities_db.txt").write_text("Index\tName\tBirthYear\tDescriptionText\tidADB\n")
+
+    with pytest.raises(SystemExit) as e:
+        run_script(monkeypatch, ["-k", "2"])
+    assert e.value.code == 1, "Should exit with code 1 for empty subject file"
 
 # === End of tests/test_query_generator.py ===

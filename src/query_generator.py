@@ -229,26 +229,30 @@ def create_mapping_file(shuffled_name_year_list, shuffled_description_list, file
     header_parts = [f"Map_idx{i+1}" for i in range(k_val)]
     write_tab_separated_file(filepath, "\t".join(header_parts), [mapping_indices_1_based]) # write_tab_separated_file handles os.makedirs
 
-def create_manifest_file(shuffled_name_year_list, shuffled_description_list, filepath, k_val):
+def create_manifest_file(shuffled_name_year_list, shuffled_description_list, filepath, k_val, desc_text_to_original_id_map):
     """
     Creates a manifest file for auditing the name-to-description mapping.
     """
     header = "Name_in_Query\tName_Ref_ID\tShuffled_Desc_Index\tDesc_Ref_ID\tDesc_in_Query"
     data_rows = []
 
-    # Create a lookup map from description ref_id to its new shuffled index and text
-    desc_ref_id_to_details = {
+    # Create a lookup map from the mapping_ref_id to its new shuffled index and text
+    desc_mapping_ref_id_to_details = {
         ref_id: (idx + 1, desc) for idx, (desc, ref_id) in enumerate(shuffled_description_list)
     }
 
     for name, year, name_ref_id in shuffled_name_year_list:
-        if name_ref_id in desc_ref_id_to_details:
-            shuffled_desc_index, desc_text = desc_ref_id_to_details[name_ref_id]
+        if name_ref_id in desc_mapping_ref_id_to_details:
+            shuffled_desc_index, desc_text = desc_mapping_ref_id_to_details[name_ref_id]
+
+            # Look up the original ID of the description text to correctly report it.
+            original_desc_ref_id = desc_text_to_original_id_map.get(desc_text, "ERROR_NOT_FOUND")
+
             data_rows.append([
                 f"{name} ({year})",
                 name_ref_id,
                 shuffled_desc_index,
-                name_ref_id,  # This should be the same as the name_ref_id
+                original_desc_ref_id, # This is the fix for random mapping reporting
                 desc_text[:75] + '...' if len(desc_text) > 75 else desc_text
             ])
         else:
@@ -427,18 +431,30 @@ def main():
     logging.info(f"Loading personalities from '{personalities_filepath}'...")
     all_personalities = load_personalities(personalities_filepath, k_value)
 
-    # The input file is already a subset of k items prepared by the caller.
-    # Do NOT re-sample. Just add the internal reference ID for subsequent shuffling logic.
     selected_items = []
-    for i, entry in enumerate(all_personalities):
-        entry['internal_ref_id'] = i
-        selected_items.append(entry)
+    # If using the temporary subset file, this is an orchestrated run. Assume it has exactly k items.
+    # Otherwise, this is a standalone run and we must sample k items from the full database.
+    if args.personalities_file == DEFAULT_TEMP_SUBSET_FN_QGEN:
+        logging.info("Orchestrated run detected. Using pre-selected subset of personalities.")
+        if len(all_personalities) != k_value:
+            logging.error(f"Error: Temporary subset file should contain k={k_value} items, but found {len(all_personalities)}.")
+            sys.exit(1)
 
-    if len(selected_items) != k_value:
-        logging.error(f"Error: Expected to process k={k_value} items, but found {len(selected_items)} after loading.")
+        # Add internal ref ID to the k pre-selected items
+        for i, entry in enumerate(all_personalities):
+            entry['internal_ref_id'] = i
+            selected_items.append(entry)
+    else:
+        # Standalone mode: Sample k items from the full list.
+        logging.info(f"Standalone run detected. Sampling {k_value} items from the {len(all_personalities)} available.")
+        # This function handles the sampling and adds the internal_ref_id
+        selected_items = select_and_prepare_k_items(all_personalities, k_value)
+
+    if not selected_items:
+        logging.error("No items were selected for processing. This should not happen.")
         sys.exit(1)
 
-    logging.info(f"Loaded {len(selected_items)} items for processing.")
+    logging.info(f"Selected {len(selected_items)} items for processing.")
 
     # Determine mapping strategy from args (which defaults to config value)
     mapping_strategy = args.mapping_strategy
@@ -477,7 +493,11 @@ def main():
     shuffled_name_year_list = create_shuffled_names_file(name_items, shuffled_names_out_filepath)
     shuffled_description_list = create_shuffled_descriptions_file(description_items, shuffled_descriptions_out_filepath, k_value)
     create_mapping_file(shuffled_name_year_list, shuffled_description_list, mapping_out_filepath, k_value)
-    create_manifest_file(shuffled_name_year_list, shuffled_description_list, manifest_out_filepath, k_value) # ADD THIS
+    
+    # Create a lookup map from description text to its original, pre-randomization ref ID.
+    # This is necessary for the manifest to report the true original ID for a description.
+    desc_text_to_original_id_map = {item['description']: item['internal_ref_id'] for item in selected_items}
+    create_manifest_file(shuffled_name_year_list, shuffled_description_list, manifest_out_filepath, k_value, desc_text_to_original_id_map)
 
     logging.info(f"Assembling final query file '{os.path.basename(full_query_out_filepath)}'...")
     assemble_full_query(base_prompt_content, shuffled_name_year_list, shuffled_description_list, full_query_out_filepath, k_value)
