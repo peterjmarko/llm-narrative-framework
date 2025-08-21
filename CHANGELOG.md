@@ -1,5 +1,22 @@
 # Changelog
 
+## 6.1.0 (2025-08-21)
+
+### Bump
+
+- **version 6.0.0 → 6.1.0**
+
+### Features
+
+- **add full test suite and fixes for study analyzer**
+  - feat(testing): Added a comprehensive unit test suite for analyze_study_results.py, achieving 66% coverage and validating all core logic and edge cases.
+  - fix(analyzer): Fixed a critical shutdown bug where early exits would prevent the finally block from running, which caused PermissionErrors during testing by leaving log files locked.
+  - fix(analyzer): Corrected logging logic to ensure all relevant messages are written before the script exits when all data is filtered out.
+  - fix(analyzer): Resolved a PendingDeprecationWarning from seaborn by updating the boxplot generation call.
+  - fix(runner): Fixed a bug in new_experiment.ps1 where the final verification audit failed due to using an outdated parameter name.
+  - ci(gitignore): Added generated boxplot images to .gitignore and untracked existing files.
+  - docs(testing): Updated TESTING.md to reflect the completed status of the study analyzer test suite.
+
 ## 6.0.0 (2025-08-20)
 
 ### Bump
