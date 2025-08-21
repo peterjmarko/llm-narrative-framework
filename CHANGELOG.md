@@ -1,5 +1,22 @@
 # Changelog
 
+## 6.1.2 (2025-08-21)
+
+### Bump
+
+- **version 6.1.1 → 6.1.2**
+
+### Refactor
+
+- **align architecture, add tests for core utilities**
+  - feat(testing): Added a comprehensive unit test suite for experiment_auditor.py (71% coverage), validating all major state detection logic.
+  - feat(testing): Added a comprehensive unit test suite for manage_experiment_log.py (79% coverage), validating all core commands.
+  - fix(core): Fixed a critical bug in fix_experiment.ps1 where it was calling a renamed script, causing aggregation to fail.
+  - fix(ux): Improved console output formatting for fix_experiment.ps1 and several Python compilers for better readability.
+  - docs(diagrams): Updated all architecture and workflow diagrams to reflect recent script/artifact renames and to improve logical groupings.
+  - docs(framework): Updated TESTING.md and other documentation to reflect the completed test suites and architectural changes.
+  - chore: Removed several obsolete test files.
+
 ## 6.1.1 (2025-08-21)
 
 ### Bump
