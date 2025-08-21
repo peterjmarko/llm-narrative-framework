@@ -33,7 +33,11 @@ graph TD
         
         subgraph "Pipeline Stages (executed by replication_manager.py)"
             direction TB
-            stage1["1. build_llm_queries.py"]
+            subgraph "Stage 1: Build Queries"
+                direction LR
+                stage1["build_llm_queries.py"]
+                query_generator["query_generator.py"]
+            end
             stage2["2. llm_prompter.py (in parallel)"]
             stage3["3. process_llm_responses.py"]
             stage4["4. analyze_llm_performance.py"]
@@ -41,11 +45,10 @@ graph TD
             stage5["6. generate_replication_report.py"]
             stage6["7. compile_replication_results.py"]
         end
-        query_generator["query_generator.py"]
     end
 
     subgraph "Utility & Other Scripts"
-        restore_config["restore_experiment_configuration.py"]
+        restore_config["restore_experiment_config.py"]
         patch_old["upgrade_legacy_experiment.py"]
         config_loader["config_loader.py"]
     end
@@ -87,7 +90,7 @@ graph TD
     stage5 --> stage6
 
     %% Worker Connections
-    stage1 -.-> query_generator
+    stage1 --> query_generator
 
     %% Import Connections (dotted)
     exp_manager -.-> exp_auditor
@@ -114,6 +117,7 @@ graph TD
     style replication_manager fill:#fdebd0,stroke:#e59866
     
     style stage1 fill:#d4edda,stroke:#155724
+    style query_generator fill:#d4edda,stroke:#155724
     style stage2 fill:#d4edda,stroke:#155724
     style stage3 fill:#d4edda,stroke:#155724
     style stage4 fill:#d4edda,stroke:#155724

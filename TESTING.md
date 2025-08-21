@@ -393,23 +393,49 @@ The following table details the testing status for each script in the main exper
 -----------------------------------------------------------------------------------------------------------------------------------------
 Module                                  Cov. (%)        Status & Justification
 --------------------------------------- --------------- ----------------------------------------------------------------------------------
-**Core Orchestrators**
+**EXPERIMENT LIFECYCLE MANAGEMENT**
+**Primary Orchestrators**
 
 `src/experiment_manager.py`             `56%`           COMPLETE. Unit tests are complete, and the core `new`/`audit`/`fix`
                                                         workflows have been successfully validated via the scripted
                                                         end-to-end integration test.
+
+`src/experiment_auditor.py`             `71%`           COMPLETE. The unit test suite validates the auditor's
+                                                        ability to correctly identify all major experiment states
+                                                        (New, Complete, Aggregation Needed, Reprocess Needed, Repair
+                                                        Needed, and Migration Needed) by using a mocked file system
+                                                        to simulate various data completeness scenarios.
+
+**Finalization Scripts**
+
+`src/manage_experiment_log.py`          `79%`           COMPLETE. The unit test suite validates all core commands
+                                                        (`rebuild`, `finalize`, `start`) and their file I/O
+                                                        operations. It confirms correct CSV parsing, generation, and
+                                                        the idempotency of the `finalize` command.
+
+`src/compile_experiment_results.py`     `74%`           COMPLETE. Unit tests cover the main aggregation workflow and
+                                                        robustly handle edge cases like empty or missing replication
+                                                        files.
+
+**SINGLE REPLICATION PIPELINE**
+**Primary Orchestrator**
+
 `src/replication_manager.py`            `77%`           COMPLETE. Unit tests cover the core control flow for both
                                                         "new run" and "reprocess" modes, including failure handling.
 
-**Single-Replication Pipeline**
+**Pipeline Stages**
 
 `src/build_llm_queries.py`              `68%`           COMPLETE. Unit tests cover the core orchestration logic,
                                                         including new runs, continued runs, and key failure modes.
+
+`src/query_generator.py`                `N/A`           PENDING. Unit tests will be written.
+
 `src/llm_prompter.py`                   `53%`           COMPLETE. Unit tests cover the core logic for successful API
                                                         calls, error conditions (HTTP, timeout), and file I/O failures.
 `src/process_llm_responses.py`          `67%`           COMPLETE. Unit tests cover the core parsing logic, including
                                                         markdown, fallback, flexible spacing, reordered columns, and
                                                         key failure modes.
+
 `src/analyze_llm_performance.py`        `63%`           COMPLETE. Unit tests cover the main orchestrator, all core
                                                         statistical calculations (including edge cases), and the robust
                                                         parsing of complex file formats (e.g., Markdown).
@@ -422,15 +448,11 @@ Module                                  Cov. (%)        Status & Justification
                                                         robust error handling for missing/corrupted files and correct
                                                         fallback for optional data sources.
 
-**Aggregation & Analysis Scripts**
-
 `src/compile_replication_results.py`    `78%`           COMPLETE. Unit tests cover the main workflow, data merging
                                                         logic, and robust error handling for missing or invalid input
                                                         files.
 
-`src/compile_experiment_results.py`     `74%`           COMPLETE. Unit tests cover the main aggregation workflow and
-                                                        robustly handle edge cases like empty or missing replication
-                                                        files.
+**Study-Level & Analysis**
 
 `src/compile_study_results.py`          `76%`           COMPLETE. Unit tests cover the recursive aggregation
                                                         workflow and robustly handle edge cases like empty or missing
@@ -442,23 +464,20 @@ Module                                  Cov. (%)        Status & Justification
                                                         shutdowns. Key statistical and plotting functions are mocked
                                                         to ensure isolated validation.
 
-**Auditing & Utility Scripts**
+**Utility & Other Scripts**
 
-`src/experiment_auditor.py`             `71%`           COMPLETE. The unit test suite validates the auditor's
-                                                        ability to correctly identify all major experiment states
-                                                        (New, Complete, Aggregation Needed, Reprocess Needed, Repair
-                                                        Needed, and Migration Needed) by using a mocked file system
-                                                        to simulate various data completeness scenarios.
+`src/upgrade_legacy_experiment.py`      `75%`           COMPLETE. The unit test suite validates the script's core
+                                                        batch-processing logic, ensuring it correctly finds all
+                                                        target directories and halts immediately if its worker
+                                                        script reports an error.
+                                                        
+`src/restore_experiment_config.py`      `83%`           COMPLETE. The unit test suite validates the script's ability
+                                                        to parse legacy report files and correctly generate a new,
+                                                        valid `config.ini.archived` file. It also confirms that the
+                                                        script exits gracefully if the target directory or report
+                                                        files are missing.
 
-`src/manage_experiment_log.py`          `79%`           COMPLETE. The unit test suite validates all core commands
-                                                        (`rebuild`, `finalize`, `start`) and their file I/O
-                                                        operations. It confirms correct CSV parsing, generation, and
-                                                        the idempotency of the `finalize` command.
-
-`src/upgrade_legacy_experiment.py`      `PENDING`       PENDING. Unit testing will be performed next.
-
-`src/restore_experiment_configuration.py`
-                                        `PENDING`       PENDING. Unit testing will be performed next.
+`src/config_loader.py`                  `N/A`           PENDING. Unit tests will be written.
 
 **PowerShell Wrappers (Experiments)**
 

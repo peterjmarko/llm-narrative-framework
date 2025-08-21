@@ -565,7 +565,7 @@ def _setup_environment_and_paths():
         'compile_experiment': os.path.join(PROJECT_ROOT, "src", 'compile_experiment_results.py'),
         'log_manager': os.path.join(PROJECT_ROOT, "src", 'manage_experiment_log.py'),
         'patch': os.path.join(PROJECT_ROOT, "src", "upgrade_legacy_experiment.py"),
-        'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_experiment_configuration.py")
+        'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_experiment_config.py")
     }
 
     # --- Directory setup ---
@@ -632,7 +632,7 @@ def main():
         'compile_experiment': os.path.join(PROJECT_ROOT, "src", 'compile_experiment_results.py'),
         'log_manager': os.path.join(PROJECT_ROOT, "src", 'manage_experiment_log.py'),
         'patch': os.path.join(PROJECT_ROOT, "src", "upgrade_legacy_experiment.py"),
-        'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_experiment_configuration.py")
+        'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_experiment_config.py")
     }
     colors = {
         'cyan': C_CYAN, 'green': C_GREEN, 'yellow': C_YELLOW, 'red': C_RED, 'reset': C_RESET

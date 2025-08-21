@@ -24,7 +24,7 @@ Upgrades a legacy experiment by creating missing config archives.
 
 This script serves as a batch controller that recursively scans a target
 experiment directory for all `run_*` subfolders. For each run, it calls the
-`restore_experiment_configuration.py` utility to reverse-engineer a
+`restore_experiment_config.py` utility to reverse-engineer a
 `config.ini.archived` file from a `replication_report.txt`.
 
 This process makes legacy data compatible with the modern reprocessing and
@@ -46,12 +46,12 @@ def main():
         print(f"Error: Root directory not found at '{root_dir}'")
         sys.exit(1)
 
-    # Find the restore_experiment_configuration.py script relative to this script
+    # Find the restore_experiment_config.py script relative to this script
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    restore_script_path = os.path.join(current_dir, "restore_experiment_configuration.py")
+    restore_script_path = os.path.join(current_dir, "restore_experiment_config.py")
 
     if not os.path.exists(restore_script_path):
-        print(f"Error: Cannot find 'restore_experiment_configuration.py' in the same directory.")
+        print(f"Error: Cannot find 'restore_experiment_config.py' in the same directory.")
         sys.exit(1)
 
     # Find all potential run directories recursively

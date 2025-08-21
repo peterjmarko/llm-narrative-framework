@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/restore_experiment_configuration.py
+# Filename: src/restore_experiment_config.py
 
 """
 Restores a `config.ini.archived` file from a `replication_report.txt`.
@@ -88,11 +88,13 @@ def main():
     if len(sys.argv) != 2:
         print("Usage: python restore_config.py <path_to_run_directory>")
         sys.exit(1)
+        return # Eject for testability
 
     run_dir = sys.argv[1]
     if not os.path.isdir(run_dir):
         print(f"Error: Directory not found at '{run_dir}'")
         sys.exit(1)
+        return # Eject for testability
 
     # The calling script is responsible for checking if work needs to be done.
     # This worker will now always attempt to create or overwrite the file.
@@ -103,6 +105,7 @@ def main():
     if not report_files:
         print(f"\nError: No 'replication_report_*.txt' file found in:\n'{run_dir}'")
         sys.exit(1)
+        return # Eject for testability
 
     # FIX: Sort the files alphabetically by name and select the LAST one.
     # Since the timestamp is at the beginning of the filename suffix, this reliably
@@ -147,4 +150,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/restore_experiment_configuration.py ===
+# === End of src/restore_experiment_config.py ===
