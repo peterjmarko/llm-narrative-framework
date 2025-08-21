@@ -11,6 +11,7 @@ $ProjectRoot = Get-ProjectRoot
 Set-Location $ProjectRoot
 
 Write-Host ""
+Write-Host "--- Layer 4: Main Workflow Integration Testing ---" -ForegroundColor Magenta
 Write-Host "--- Step 2: Execute the Test Workflow ---" -ForegroundColor Cyan
 
 # a. Activate the venv from the project root
@@ -22,14 +23,14 @@ Write-Host "`n--- Running new_experiment.ps1 ---" -ForegroundColor Cyan
 
 # c. Find the new experiment directory and append its path to the state file
 $expDir = Get-ChildItem -Path "output/new_experiments" -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
-$stateFilePath = Join-Path $ProjectRoot "scripts/testing_harness/.l4_test_dir.txt"
+$stateFilePath = Join-Path $ProjectRoot "tests/testing_harness/.l4_test_dir.txt"
 Add-Content -Path $stateFilePath -Value $expDir.FullName
 $relativeExpDir = Resolve-Path -Path $expDir.FullName -Relative
 Write-Host "`n--- Test will be performed on: $relativeExpDir ---" -ForegroundColor Yellow
 
 # d. Audit the new experiment (should be VALIDATED)
 Write-Host "`n--- Auditing new experiment (should be VALIDATED) ---" -ForegroundColor Cyan
-.\audit_experiment.ps1 -TargetDirectory $expDir.FullName
+.\audit_experiment.ps1 -ExperimentDirectory $expDir.FullName
 
 # e. Intentionally "break" the experiment
 Write-Host "`n--- Simulating failure by deleting a response file ---" -ForegroundColor Cyan
@@ -44,15 +45,15 @@ if ($null -ne $responseFile) {
 
 # f. Audit the broken experiment (should report NEEDS REPAIR)
 Write-Host "`n--- Auditing broken experiment (should be NEEDS REPAIR) ---" -ForegroundColor Cyan
-.\audit_experiment.ps1 -TargetDirectory $script:expDir.FullName
+.\audit_experiment.ps1 -ExperimentDirectory $script:expDir.FullName
 
 # g. Run the fix script to automatically repair the experiment
 Write-Host "`n--- Running fix_experiment.ps1 ---" -ForegroundColor Cyan
-.\fix_experiment.ps1 -TargetDirectory $script:expDir.FullName -NonInteractive
+.\fix_experiment.ps1 -ExperimentDirectory $script:expDir.FullName -NonInteractive
 
 # h. Run a final audit to confirm the repair (should be VALIDATED again)
 Write-Host "`n--- Final audit (should be VALIDATED) ---" -ForegroundColor Cyan
-.\audit_experiment.ps1 -TargetDirectory $script:expDir.FullName
+.\audit_experiment.ps1 -ExperimentDirectory $script:expDir.FullName
 
 # i. Deactivate the virtual environment
 Write-Host "`n--- Test workflow complete. You may now inspect the artifacts. ---" -ForegroundColor Green

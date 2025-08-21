@@ -15,7 +15,7 @@ $stateFilePath = Join-Path $ProjectRoot "scripts/testing_harness/.l4_test_dir.tx
 Remove-Item $stateFilePath -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
-Write-Host "--- Layer 4: End-to-End Integration Testing ---" -ForegroundColor Magenta
+Write-Host "--- Layer 4: Main Workflow Integration Testing ---" -ForegroundColor Magenta
 Write-Host "--- Step 1: Automated Setup ---" -ForegroundColor Cyan
 
 # --- A. Reset Environment (Idempotent Cleanup) ---

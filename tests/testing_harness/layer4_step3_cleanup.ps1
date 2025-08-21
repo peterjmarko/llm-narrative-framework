@@ -11,10 +11,11 @@ $ProjectRoot = Get-ProjectRoot
 Set-Location $ProjectRoot
 
 Write-Host ""
+Write-Host "--- Layer 4: Main Workflow Integration Testing ---" -ForegroundColor Magenta
 Write-Host "--- Step 3: Automated Cleanup ---" -ForegroundColor Cyan
 
 # Read the target directory path from the state file created by Step 2.
-$stateFilePath = Join-Path $ProjectRoot "scripts/testing_harness/.l4_test_dir.txt"
+$stateFilePath = Join-Path $ProjectRoot "tests/testing_harness/.l4_test_dir.txt"
 if (-not (Test-Path $stateFilePath)) {
     Write-Host ""
     Write-Host "FATAL: State file '.l4_test_dir.txt' not found." -ForegroundColor Red

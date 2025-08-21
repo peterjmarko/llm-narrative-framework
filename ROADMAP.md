@@ -15,15 +15,6 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Test the New Study Orchestrator**
   - [ ] Create and execute a scripted integration test for the `new_study.ps1` script to ensure it correctly manages the study lifecycle.
 
-### Resolution of Known Issues
-
-The following issues will be addressed concurrently during the "Code Development and Testing" phase.
-
--   **Migration Workflow Outdated**: The `migrate_experiment.ps1` and `migrate_study.ps1` workflows have not been updated to handle the new `experiment_log.csv` filename. They will fail if run on a modern experiment that is flagged for migration.
--   **Inconsistent Logging**:
-    -   Log files from migration scripts contain unnecessary PowerShell transcript headers and footers.
--   **Redundant API Calls**: Forcing a migration on an already `VALIDATED` experiment unnecessarily re-runs all LLM API calls.
-
 ### Final Validation and Data Generation
 
 - [ ] **Execute Full End-to-End Study**
@@ -92,3 +83,6 @@ The following issues will be addressed concurrently during the "Code Development
     - [ ] The total number of API calls (batches) that will be made.
     - [ ] An estimated total cost for the entire run, based on the chosen model's pricing.
     - [ ] A very rough estimated time to completion.
+- [ ] **Improve Migration Workflow**
+  - [ ] Optimize the `migrate` command to skip re-running API calls for replications that are already valid.
+  - [ ] Clean up `migrate_experiment.ps1` log files by removing PowerShell transcript headers and footers.
