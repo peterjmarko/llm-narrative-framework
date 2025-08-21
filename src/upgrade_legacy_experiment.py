@@ -17,20 +17,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/patch_old_experiment.py
+# Filename: src/upgrade_legacy_experiment.py
 
 """
-Batch-patches historical experiments by creating missing config archives.
+Upgrades a legacy experiment by creating missing config archives.
 
 This script serves as a batch controller that recursively scans a target
-directory for all subfolders matching the 'run_*' pattern. For each `run_*`
-directory found, it calls the `restore_config.py` utility. The script now
-includes robust error handling, ensuring that any failure in the worker script
-is immediately reported and halts the entire batch process.
+experiment directory for all `run_*` subfolders. For each run, it calls the
+`restore_experiment_configuration.py` utility to reverse-engineer a
+`config.ini.archived` file from a `replication_report.txt`.
 
-`restore_config.py` reverse-engineers the `replication_report.txt` to
-generate a `config.ini.archived` file, making legacy data compatible with
-modern reprocessing and analysis scripts.
+This process makes legacy data compatible with the modern reprocessing and
+analysis pipeline. It is a key part of the `migrate_experiment.ps1` workflow.
 """
 
 import os
@@ -48,12 +46,12 @@ def main():
         print(f"Error: Root directory not found at '{root_dir}'")
         sys.exit(1)
 
-    # Find the restore_config.py script relative to this script
+    # Find the restore_experiment_configuration.py script relative to this script
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    restore_script_path = os.path.join(current_dir, "restore_config.py")
+    restore_script_path = os.path.join(current_dir, "restore_experiment_configuration.py")
 
     if not os.path.exists(restore_script_path):
-        print(f"Error: Cannot find 'restore_config.py' in the same directory.")
+        print(f"Error: Cannot find 'restore_experiment_configuration.py' in the same directory.")
         sys.exit(1)
 
     # Find all potential run directories recursively
@@ -101,4 +99,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/patch_old_experiment.py ===
+# === End of src/upgrade_legacy_experiment.py ===

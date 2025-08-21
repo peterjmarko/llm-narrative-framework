@@ -45,7 +45,8 @@ graph TD
     end
 
     subgraph "Utility & Other Scripts"
-        patch_old["patch_old_experiment.py"]
+        restore_config["restore_experiment_configuration.py"]
+        patch_old["upgrade_legacy_experiment.py"]
         config_loader["config_loader.py"]
     end
 
@@ -71,7 +72,10 @@ graph TD
     exp_manager --> replication_manager
     exp_manager --> compile_experiment
     exp_manager --> log_manager
+    exp_manager --> restore_config
     exp_manager -.-> patch_old
+
+    patch_old --> restore_config
 
     %% Sequential Pipeline Execution
     replication_manager --> stage1
@@ -87,7 +91,7 @@ graph TD
 
     %% Import Connections (dotted)
     exp_manager -.-> exp_auditor
-    exp_manager & exp_auditor & replication_manager & stage1 & stage2 & stage3 & stage4 & stage4b & stage5 & stage6 & query_generator & log_manager & compile_experiment & compile_study_results_py & study_analysis & patch_old -.-> config_loader
+    exp_manager & exp_auditor & replication_manager & stage1 & stage2 & stage3 & stage4 & stage4b & stage5 & stage6 & query_generator & log_manager & compile_experiment & compile_study_results_py & study_analysis & patch_old & restore_config -.-> config_loader
 
     %% --- Inline Styling ---
     style new_experiment_ps1 fill:#cde4ff,stroke:#6c93be
@@ -119,4 +123,5 @@ graph TD
 
     style query_generator fill:#e9ecef,stroke:#adb5bd
     style patch_old fill:#e9ecef,stroke:#adb5bd
+    style restore_config fill:#e9ecef,stroke:#adb5bd
     style config_loader fill:#e9ecef,stroke:#adb5bd

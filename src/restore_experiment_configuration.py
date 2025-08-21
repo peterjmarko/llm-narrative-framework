@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/restore_config.py
+# Filename: src/restore_experiment_configuration.py
 
 """
-Reverse-engineers a `config.ini.archived` file from a `replication_report.txt`.
+Restores a `config.ini.archived` file from a `replication_report.txt`.
 
 This single-purpose utility operates on a single run directory. It reads a
 human-readable report file, parses key experimental parameters using a robust
@@ -28,8 +28,9 @@ set of regular expressions, and writes them into a new, structured
 `config.ini.archived` file.
 
 This script is a key part of the framework's self-healing capabilities,
-allowing a corrupted or missing config file to be rebuilt from other artifacts.
-It is also used by `patch_old_experiment.py` to upgrade legacy datasets.
+allowing a corrupted or missing config file to be restored from other artifacts.
+It is called by the experiment manager during a config repair and by the
+legacy upgrader script.
 """
 
 import os
@@ -146,4 +147,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/restore_config.py ===
+# === End of src/restore_experiment_configuration.py ===

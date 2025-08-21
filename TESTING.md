@@ -455,9 +455,10 @@ Module                                  Cov. (%)        Status & Justification
                                                         operations. It confirms correct CSV parsing, generation, and
                                                         the idempotency of the `finalize` command.
 
-`src/patch_old_experiment.py`           `PENDING`       PENDING. Unit testing will be performed next.
+`src/upgrade_legacy_experiment.py`      `PENDING`       PENDING. Unit testing will be performed next.
 
-`src/restore_config.py`                 `PENDING`       PENDING. Unit testing will be performed next.
+`src/restore_experiment_configuration.py`
+                                        `PENDING`       PENDING. Unit testing will be performed next.
 
 **PowerShell Wrappers (Experiments)**
 

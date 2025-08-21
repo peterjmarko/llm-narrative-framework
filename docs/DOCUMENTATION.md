@@ -552,7 +552,7 @@ The `migrate_experiment.ps1` script automates a copy-then-migrate process:
 
 1.  **Copy**: It takes a source directory and copies it to a new, timestamped folder inside `output/migrated_experiments/`.
 2.  **Migrate**: It then calls `experiment_manager.py --migrate` on this new directory. The manager orchestrates the internal upgrade steps:
-    *   **Patching Configs**: Creating `config.ini.archived` files from old reports.
+    *   **Patching Configs**: The `upgrade_legacy_experiment.py` script is called to scan for runs missing a `config.ini.archived` file. For each one it finds, it calls the `restore_experiment_configuration.py` utility, which reverse-engineers the `replication_report.txt` to create the missing config file.
     *   **Rebuilding Reports**: Regenerating all reports into the modern format.
     *   **Finalizing**: Generating clean, modern summary files for the migrated experiment.
 

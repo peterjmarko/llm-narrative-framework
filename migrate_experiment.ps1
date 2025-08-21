@@ -90,7 +90,12 @@ try {
     if (-not (Test-Path -Path $DestParent)) { New-Item -ItemType Directory -Path $DestParent -Force | Out-Null }
     $logFilePath = Join-Path $DestinationPath "experiment_migration_log.txt"
     
-    Write-Host "`nThe migration log will be saved to: $(Resolve-Path $logFilePath -Relative)" -ForegroundColor Gray
+    # Ensure the destination directory exists *before* starting the transcript.
+    if (-not (Test-Path -Path $DestinationPath)) { New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null }
+
+    # Manually construct the relative path to avoid the Resolve-Path error.
+    $relativeLogPath = Join-Path (Resolve-Path -Path $DestParent -Relative) $NewFolderName (Split-Path $logFilePath -Leaf)
+    Write-Host "`nThe migration log will be saved to: $relativeLogPath" -ForegroundColor Gray
     Start-Transcript -Path $logFilePath -Force | Out-Null
 
     # --- Step 1: Initial Audit ---
