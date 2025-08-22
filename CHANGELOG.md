@@ -1,5 +1,23 @@
 # Changelog
 
+## 6.4.0 (2025-08-22)
+
+### Bump
+
+- **version 6.3.0 → 6.4.0**
+
+### Features
+
+- **complete sandboxing refactor for all test layers**
+  This commit completes the system-wide refactoring to a fully isolated, sandboxed testing framework, eliminating the intrusive backup-and-restore method.
+  
+  The new architecture uses a `PROJECT_CONFIG_OVERRIDE` environment variable, set via a standard `-ConfigPath` parameter, to run tests in a non-destructive environment.
+  
+  - All user-facing PowerShell wrappers (experiment and study level) now accept the `-ConfigPath` parameter.
+  - The test harnesses for Layer 4 (Main Workflow) and Layer 5 (Migration Workflow) have been completely rewritten to use the new sandboxed model.
+  - `TESTING.md` is now updated to reflect the simpler, safer procedures.
+  - Fixed a key bug where `replication_manager.py` archived the wrong config file during tests.
+
 ## 6.3.0 (2025-08-22)
 
 ### Bump
