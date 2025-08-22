@@ -1,5 +1,35 @@
 # Changelog
 
+## 6.3.0 (2025-08-22)
+
+### Bump
+
+- **version 6.2.0 → 6.3.0**
+
+### Features
+
+- **Implement sandboxed testing framework & rename study script**
+  This commit introduces a new, partially implemented sandboxed testing architecture and renames the primary study evaluation script for clarity.
+  
+  The previous integration testing model was intrusive, requiring manual backups of core project files. The new architecture uses a `PROJECT_CONFIG_OVERRIDE` environment variable, set via a standard `-ConfigPath` parameter on user-facing scripts, to run tests in a completely isolated environment without modifying the main workspace.
+  
+  Key Changes:
+  
+  **Sandboxed Testing Framework (Partial Implementation)**
+  -   `config_loader.py` now checks for the override environment variable.
+  -   `new_experiment.ps1` and `audit_experiment.ps1` are the first scripts to be fully refactored with the `-ConfigPath` parameter.
+  -   The backends (`experiment_manager.py`, `experiment_auditor.py`) now support this sandboxing mechanism.
+  -   The `replication_manager.py` now correctly archives the specified test config, not the default one.
+  
+  **Script Renaming and Documentation Update**
+  -   Renamed `evaluate_study.ps1` to `compile_study.ps1` for better consistency with the overall pipeline terminology.
+  -   Updated all related documentation and diagrams (`DOCUMENTATION.md`, `arch_main_codebase.mmd`, etc.) to reflect this name change.
+  
+  **Bug Fixes & UX Improvements**
+  -   Restored visibility of the `tqdm` progress bar for LLM sessions, which was previously being suppressed.
+  -   Changed the ETA timer color in the console output to magenta for better visibility.
+  -   Improved the formatting of final log messages for `experiment_manager` and `audit_experiment`.
+
 ## 6.2.0 (2025-08-21)
 
 ### Bump
