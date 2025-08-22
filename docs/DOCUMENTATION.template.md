@@ -178,7 +178,7 @@ The project's functionality is organized into six primary workflows, each initia
 
 4.  **Migrate Old Experiment Data**: A utility workflow designed to bring older, legacy experimental data into compliance with the modern pipeline.
 
-5.  **Evaluate a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
+5.  **Compile a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
 
 6.  **(Planned) Create a New Study**: A future workflow to automate the creation of an entire study by orchestrating multiple `new_experiment.ps1` runs based on a matrix of factors (e.g., models, mapping strategies).
 
@@ -249,11 +249,11 @@ This utility workflow provides a safe, non-destructive process to upgrade older 
 
 {{grouped_figure:docs/diagrams/flow_main_4_migrate_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 4: Migrate Old Experiment Data, a safe, non-destructive process for upgrading legacy data.}}
 
-#### Workflow 5: Evaluate a Study
+#### Workflow 5: Compile a Study
 
 This workflow is used after all experiments are validated to compile, analyze, and evaluate the entire study. It performs a robust pre-flight check by calling `audit_study.ps1`. If the study is not ready for processing (or is already complete), it will halt with a clear recommendation. Otherwise, it proceeds to compile all results and run the final statistical analysis.
 
-{{grouped_figure:docs/diagrams/flow_main_5_evaluate_study.mmd | scale=2.5 | width=80% | caption=Workflow 5: Evaluate a Study. Audits, compiles, and analyzes all experiments in a study.}}
+{{grouped_figure:docs/diagrams/flow_main_5_compile_study.mmd | scale=2.5 | width=80% | caption=Workflow 5: Compile a Study. Audits, compiles, and analyzes all experiments in a study.}}
 
 #### Workflow 6: (Planned) Create a New Study
 This workflow is a planned feature. It will provide a top-level script (`new_study.ps1`) to automate the creation of entire studies. It will be designed to read a matrix of factors to vary from `config.ini` (e.g., a list of models and mapping strategies) and then orchestrate the entire process by calling `new_experiment.ps1` for each required experiment.
@@ -504,20 +504,20 @@ This script provides a safe, batch-migration workflow for a study containing leg
 .\migrate_study.ps1 -StudyDirectory "output/studies/My_Legacy_Study"
 ```
 
-### Evaluating a Study (`evaluate_study.ps1`)
+### Compiling a Study (`compile_study.ps1`)
 
-This script orchestrates the entire evaluation workflow for a study. It audits, compiles, and performs the final statistical analysis on all experiments.
+This script orchestrates the entire compilation and analysis workflow for a study. It audits, compiles, and performs the final statistical analysis on all experiments.
 
 **Important:** This script begins with a robust pre-flight check by calling `audit_study.ps1`. If the audit reveals that any experiment is not `VALIDATED`, or that the study is already `COMPLETE`, the process will halt with a detailed report and a clear recommendation. This guarantees that analysis is only performed on a complete and ready set of data.
 
 For organizational purposes, one would typically move all experiment folders belonging to a single study into a common directory (e.g., `output/studies/My_First_Study/`).
 
-**To run the analysis:**
+**To run the compilation and analysis:**
 Point the script at the top-level directory containing all relevant experiment folders. It will provide a clean, high-level summary of its progress.
 
 ```powershell
-# Example: Evaluate all experiments located in the "My_First_Study" directory
-.\evaluate_study.ps1 -StudyDirectory "output/studies/My_First_Study"
+# Example: Compile and analyze all experiments in the "My_First_Study" directory
+.\compile_study.ps1 -StudyDirectory "output/studies/My_First_Study"
 ```
 For detailed, real-time logs, add the `-Verbose` switch.
 

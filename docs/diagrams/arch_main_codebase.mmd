@@ -8,7 +8,7 @@ graph TD
         audit_study_ps1["audit_study.ps1"]
         fix_study_ps1["fix_study.ps1"]
         migrate_study_ps1["migrate_study.ps1"]
-        evaluate_study_ps1["evaluate_study.ps1"]
+        compile_study_ps1["compile_study.ps1"]
     end
 
     subgraph "2. Experiment Lifecycle Management"
@@ -21,13 +21,12 @@ graph TD
             log_manager["manage_experiment_log.py"]
             compile_experiment["compile_experiment_results.py"]
         end
+        subgraph "Study-Level Aggregation"
+            compile_study_results_py["compile_study_results.py"]
+            study_analysis["analyze_study_results.py"]
+        end
     end
     
-    subgraph "4. Study-Level Analysis"
-        compile_study_results_py["compile_study_results.py"]
-        study_analysis["analyze_study_results.py"]
-    end
-
     subgraph "3. Single Replication Pipeline"
         replication_manager["replication_manager.py"]
         
@@ -69,8 +68,8 @@ graph TD
     migrate_study_ps1 --> exp_auditor
     migrate_study_ps1 --> exp_manager
 
-    evaluate_study_ps1 --> compile_study_results_py
-    evaluate_study_ps1 --> study_analysis
+    compile_study_ps1 --> compile_study_results_py
+    compile_study_ps1 --> study_analysis
 
     exp_manager --> replication_manager
     exp_manager --> compile_experiment
@@ -104,15 +103,14 @@ graph TD
     style audit_study_ps1 fill:#cde4ff,stroke:#6c93be
     style fix_study_ps1 fill:#cde4ff,stroke:#6c93be
     style migrate_study_ps1 fill:#cde4ff,stroke:#6c93be
-    style evaluate_study_ps1 fill:#cde4ff,stroke:#6c93be
+    style compile_study_ps1 fill:#cde4ff,stroke:#6c93be
 
     style exp_manager fill:#fff3cd,stroke:#f1c40f
     style exp_auditor fill:#fff3cd,stroke:#f1c40f
     style log_manager fill:#fff3cd,stroke:#f1c40f
     style compile_experiment fill:#fff3cd,stroke:#f1c40f
-    
-    style compile_study_results_py fill:#d1e7dd,stroke:#0f5132
-    style study_analysis fill:#d1e7dd,stroke:#0f5132
+    style compile_study_results_py fill:#fff3cd,stroke:#f1c40f
+    style study_analysis fill:#fff3cd,stroke:#f1c40f
     
     style replication_manager fill:#fdebd0,stroke:#e59866
     

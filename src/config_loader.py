@@ -93,8 +93,16 @@ PROJECT_ROOT = get_project_root()
 
 def load_app_config():
     config = configparser.ConfigParser()
-    config_path = os.path.join(PROJECT_ROOT, CONFIG_FILENAME)
     
+    # Check for an override path from an environment variable first.
+    # This is used for sandboxed testing.
+    override_path = os.getenv('PROJECT_CONFIG_OVERRIDE')
+    if override_path and os.path.exists(override_path):
+        config_path = override_path
+        logger.debug(f"Using override config from env var: {config_path}")
+    else:
+        config_path = os.path.join(PROJECT_ROOT, CONFIG_FILENAME)
+
     if os.path.exists(config_path):
         try:
             # Explicitly specify 'utf-8-sig' to handle files with a BOM,

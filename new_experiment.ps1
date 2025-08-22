@@ -50,7 +50,10 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$false)]
-    [string]$Notes
+    [string]$Notes,
+
+    [Parameter(Mandatory=$false)]
+    [string]$ConfigPath
 )
 
 function Get-ProjectRoot {
@@ -73,6 +76,7 @@ $pythonArgs = @($pythonScriptPath)
 if (-not [string]::IsNullOrEmpty($Notes)) { $pythonArgs += "--notes", $Notes }
 if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) { $pythonArgs += "--verbose" }
 if ($Host.UI.SupportsVirtualTerminal) { $pythonArgs += "--force-color" }
+if (-not [string]::IsNullOrEmpty($ConfigPath)) { $pythonArgs += "--config-path", $ConfigPath }
 
 & pdm run python $pythonArgs
 $pythonExitCode = $LASTEXITCODE
@@ -88,7 +92,14 @@ try {
     if ($null -ne $latestExperiment) {
         Write-Header -Lines "Verifying Final Experiment State" -Color Cyan
         $auditScriptPath = Join-Path $ProjectRoot "audit_experiment.ps1"
-        & $auditScriptPath -ExperimentDirectory $latestExperiment.FullName
+        
+        # Call the audit script, passing the ConfigPath parameter only if it was provided.
+        # This more explicit call is more robust than argument splatting.
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) {
+            & $auditScriptPath -ExperimentDirectory $latestExperiment.FullName -ConfigPath $ConfigPath
+        } else {
+            & $auditScriptPath -ExperimentDirectory $latestExperiment.FullName
+        }
     }
 } catch {
     Write-Warning "Could not automatically verify the new experiment."

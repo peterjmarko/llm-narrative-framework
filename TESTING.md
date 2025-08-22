@@ -216,6 +216,41 @@ After you have finished inspecting the experiment directory and its log files, r
 .\tests\testing_harness\layer4_step3_cleanup.ps1
 ```
 
+### Layer 6: Post-Hoc Study Evaluation (Planned)
+
+> **Note:** This is a planned testing layer. The harness scripts will be created as part of the study-level workflow development.
+
+This procedure will validate the workflow for creating a formal study from a collection of pre-existing, independent experiments using the `compile_study.ps1` script.
+
+#### Step 1: Automated Setup
+The setup script will create a study directory and populate it with two small, independently generated, valid experiments.
+
+#### Step 2: Execute the Test Workflow
+This script will run `compile_study.ps1` on the prepared study directory and verify that the final analysis artifacts (`STUDY_results.csv`, `anova/` directory) are created successfully.
+
+#### Step 3: Automated Cleanup
+The cleanup script will delete the entire test study directory and restore the project's base files.
+
+### Layer 7: New Study Generation and Lifecycle (Planned)
+
+> **Note:** This is a planned testing layer. The harness scripts will be created after the `new_study.ps1` script is developed.
+
+This procedure will validate the entire lifecycle for a study generated from scratch using the `new_study.ps1` orchestrator.
+
+#### Step 1: Automated Setup
+The setup script will create a test-specific `config.ini` that includes the `[StudyFactors]` section, configured to generate a small study of two experiments.
+
+#### Step 2: Execute the Test Workflow
+This script will validate the full `create -> audit -> break -> fix` lifecycle for a study:
+1.  **Create:** Run `new_study.ps1` to generate the test study.
+2.  **Audit & Verify:** Run `audit_study.ps1` to confirm the new study is `VALIDATED`.
+3.  **Break:** Deliberately break one of the experiments within the study.
+4.  **Audit & Fix:** Run `audit_study.ps1` (to confirm the broken state) and then `fix_study.ps1` to repair it.
+5.  **Final Verification:** Run `audit_study.ps1` a final time to confirm the study is `VALIDATED` again.
+
+#### Step 3: Automated Cleanup
+The cleanup script will delete the test study directory and restore the project.
+
 ## Testing Status
 
 ### Data Preparation Pipeline
@@ -388,9 +423,9 @@ Module                                  Cov. (%)        Status & Justification
                                                         test (Layer 5), which confirms the script correctly handles a
                                                         severely corrupted experiment and produces a valid, repaired output.
 
-**PowerShell Wrappers (Studies)**
+`compile_study.ps1`                     `N/A`           PENDING. Manual validation is pending.
 
-`evaluate_study.ps1`                    `N/A`           PENDING. Manual validation is pending.
+**PowerShell Wrappers (Studies)**
 
 `new_study.ps1`                         `N/A`           PENDING. Manual validation is pending.
 

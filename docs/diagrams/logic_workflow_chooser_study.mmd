@@ -25,9 +25,6 @@ graph TD
         case_3["**Upgrade**<br/>I want to upgrade all legacy or severely corrupted experiments."]:::case_node
         instruction_3["*Use: migrate_study.ps1*"]:::instruction_node
 
-        %% Branch 4: Evaluate
-        case_4["**Evaluate**<br/>My study is fully validated and I want the final reports and plots."]:::case_node
-        instruction_4["*Use: evaluate_study.ps1*"]:::instruction_node
     end
 
     end_node(["End"]):::start_end_node;
@@ -38,14 +35,11 @@ graph TD
     main_decision --> case_1;
     main_decision --> case_2;
     main_decision --> case_3;
-    main_decision --> case_4;
 
     case_1 --> instruction_1;
     case_2 --> instruction_2;
     case_3 --> instruction_3;
-    case_4 --> instruction_4;
     
     instruction_1 --> end_node;
     instruction_2 --> end_node;
     instruction_3 --> end_node;
-    instruction_4 --> end_node;

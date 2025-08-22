@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: evaluate_study.ps1
+# Filename: compile_study.ps1
 
 <#
 .SYNOPSIS
@@ -349,4 +349,4 @@ finally {
     }
 }
 
-# === End of evaluate_study.ps1 ===
+# === End of compile_study.ps1 ===

@@ -39,6 +39,7 @@ the required changes for individual replication runs.
 import sys
 import os
 import subprocess
+import importlib
 import logging
 import glob
 import time
@@ -109,7 +110,7 @@ try:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
     from experiment_auditor import get_experiment_state, _get_file_indices, FILE_MANIFEST
 except ImportError as e:
-    print(f"FATAL: Could not import a required module. Error: {e}", file=sys.stderr)
+    print(f"FATAL: Could not import config_loader.py. Error: {e}", file=sys.stderr)
     sys.exit(1)
 
 # This constant is specific to the manager's internal flow when a user aborts.
@@ -177,7 +178,7 @@ def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, qui
     except Exception as e:
         return rep_num, False, f"An unexpected error occurred in replication worker {rep_num}: {e}"
 
-def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_script, colors):
+def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_script, colors, use_color=False):
     """Executes 'NEW' mode by calling the orchestrator for each replication."""
     C_CYAN, C_YELLOW, C_RESET = colors['cyan'], colors['yellow'], colors['reset']
 
@@ -204,29 +205,25 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
         if verbose: cmd_orch.append("--verbose")
         
         try:
-            # Use Popen to stream stdout in real-time while capturing stderr.
-            proc = subprocess.Popen(cmd_orch, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            # Let stderr pass through to show the progress bar from the child process.
+            # We still capture stdout to control its printing.
+            proc = subprocess.Popen(cmd_orch, stdout=subprocess.PIPE,
                                     text=True, encoding='utf-8', errors='replace')
             
             # Stream and print stdout line by line as it comes in.
             for line in proc.stdout:
                 print(line, end='', flush=True)
 
-            # Wait for the process to complete and get the final return code and any stderr output.
+            # Wait for the process to complete.
             proc.wait()
-            stderr_output = proc.stderr.read()
 
             if proc.returncode != 0:
-                # If the process failed, manually raise a CalledProcessError with the captured stderr.
-                raise subprocess.CalledProcessError(proc.returncode, proc.args, stderr=stderr_output)
+                # Raise an error. Stderr has already been printed to the console in real-time.
+                raise subprocess.CalledProcessError(proc.returncode, proc.args)
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
             logging.error(f"Orchestrator for replication {rep_num} failed or was interrupted.")
-            if isinstance(e, subprocess.CalledProcessError):
-                # Print the captured stderr from the failed orchestrator process.
-                # This will contain the full traceback from the underlying script.
-                if e.stderr:
-                    print(e.stderr, file=sys.stderr)
+            # No need to print e.stderr here, as it has already been displayed.
             if isinstance(e, KeyboardInterrupt):
                 # If interrupted, exit the manager immediately.
                 sys.exit(1)
@@ -238,7 +235,9 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
         remaining_reps = len(reps_to_run) - (i + 1)
         time_remaining = remaining_reps * avg_time
         eta = datetime.datetime.now() + datetime.timedelta(seconds=time_remaining)
-        print(f"\n{C_YELLOW}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | Time Remaining: {str(datetime.timedelta(seconds=int(time_remaining)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
+        # Use a new magenta color for the ETA line for better visibility.
+        C_MAGENTA = '\033[95m' if use_color else ''
+        print(f"\n{C_MAGENTA}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | Time Remaining: {str(datetime.timedelta(seconds=int(time_remaining)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
 
     return True
 
@@ -459,7 +458,9 @@ def _run_migrate_mode(target_dir, patch_script, orchestrator_script, colors, ver
 
 def _run_finalization(final_output_dir, script_paths, colors):
     """Compiles all results and finalizes logs for a complete experiment."""
-    C_CYAN, _, _, _, C_RESET = colors.values()
+    # Unpack only the colors needed for this function.
+    C_CYAN = colors['cyan']
+    C_RESET = colors['reset']
 
     finalization_message = "ALL TASKS COMPLETE. BEGINNING FINALIZATION."
     print(f"\n{C_CYAN}{'#' * 80}{C_RESET}")
@@ -612,19 +613,34 @@ def main():
     parser.add_argument('--force-color', action='store_true', help=argparse.SUPPRESS) # Hidden from user help
     parser.add_argument('--non-interactive', action='store_true', help="Run in non-interactive mode, suppressing user prompts for confirmation.")
     parser.add_argument('--quiet', action='store_true', help="Suppress all non-essential output from the audit. Used for scripting.")
+    parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
     args = parser.parse_args()
 
+    # If a test-specific config path is provided, set an environment variable.
+    # Then, reload the config_loader module to ensure the global APP_CONFIG
+    # is updated with the new path. This is the key to sandboxed testing.
+    if args.config_path:
+        os.environ['PROJECT_CONFIG_OVERRIDE'] = os.path.abspath(args.config_path)
+        # We need to find the config_loader module to reload it
+        if 'config_loader' in sys.modules:
+            importlib.reload(sys.modules['config_loader'])
+        # Re-import APP_CONFIG into the local scope after reload
+        from config_loader import APP_CONFIG
+        from experiment_auditor import get_experiment_state
+
     # Define color constants, defaulting to empty strings
-    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = ('', '', '', '', '')
+    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET, C_MAGENTA = ('', '', '', '', '', '')
     use_color = sys.stdout.isatty() or args.force_color
     if use_color:
         C_CYAN = '\033[96m'
         C_GREEN = '\033[92m'
         C_YELLOW = '\033[93m'
         C_RED = '\033[91m'
+        C_MAGENTA = '\033[95m'
         C_RESET = '\033[0m'
 
     # --- Script Paths ---
+    from config_loader import APP_CONFIG # Ensure APP_CONFIG is available
     # --- Bundle script paths and colors for cleaner function calls ---
     script_paths = {
         'orchestrator': os.path.join(PROJECT_ROOT, "src", "replication_manager.py"),
@@ -635,7 +651,7 @@ def main():
         'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_experiment_config.py")
     }
     colors = {
-        'cyan': C_CYAN, 'green': C_GREEN, 'yellow': C_YELLOW, 'red': C_RED, 'reset': C_RESET
+        'cyan': C_CYAN, 'green': C_GREEN, 'yellow': C_YELLOW, 'red': C_RED, 'magenta': C_MAGENTA, 'reset': C_RESET
     }
 
     try:
@@ -683,7 +699,7 @@ def main():
                 state_name, payload_details, _ = get_experiment_state(Path(final_output_dir), end_rep)
 
                 if state_name == "NEW_NEEDED":
-                    success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, args.verbose, script_paths['orchestrator'], colors)
+                    success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, args.verbose, script_paths['orchestrator'], colors, use_color=use_color)
                     action_taken = True
 
                 elif state_name == "REPAIR_NEEDED":
@@ -724,9 +740,7 @@ def main():
             if pipeline_successful:
                 _run_finalization(final_output_dir, script_paths, colors)
                 relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
-                print(f"\n{C_GREEN}Experiment run finished successfully for:{C_RESET}")
-                print(f"{C_GREEN}{relative_path}{C_RESET}")
-                print()
+                print(f"\n{C_GREEN}Experiment run finished successfully for:\n{relative_path}{C_RESET}\n")
             else:
                 sys.exit(1)
 

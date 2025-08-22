@@ -37,6 +37,7 @@ It is invoked by `audit_experiment.ps1`, `fix_experiment.ps1`, and is imported b
 
 import sys
 import os
+import importlib
 import logging
 import glob
 import json
@@ -434,7 +435,17 @@ def main():
     parser.add_argument('--non-interactive', action='store_true', help="Suppress user-facing recommendation text.")
     parser.add_argument('--quiet', action='store_true', help="Suppress all non-essential output. For scripting.")
     parser.add_argument('--force-color', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
     args = parser.parse_args()
+
+    # If a test-specific config path is provided, set an environment variable
+    # and reload the config_loader module to ensure the global APP_CONFIG is updated.
+    if args.config_path:
+        os.environ['PROJECT_CONFIG_OVERRIDE'] = os.path.abspath(args.config_path)
+        if 'config_loader' in sys.modules:
+            importlib.reload(sys.modules['config_loader'])
+        # Re-import APP_CONFIG into the local scope of main() after the reload.
+        from config_loader import APP_CONFIG
 
     use_color = sys.stdout.isatty() or args.force_color
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = ('','','','','')

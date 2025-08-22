@@ -189,7 +189,15 @@ def main():
         run_specific_dir_path = os.path.join(base_output_dir, run_dir_name)
         os.makedirs(run_specific_dir_path, exist_ok=True)
         logging.info(f"Created unique output directory: {run_specific_dir_path}")
-        shutil.copy2(os.path.join(PROJECT_ROOT, 'config.ini'), os.path.join(run_specific_dir_path, 'config.ini.archived'))
+        
+        # Determine which config file to archive. Use the override if it exists.
+        config_override_path = os.getenv('PROJECT_CONFIG_OVERRIDE')
+        if config_override_path and os.path.exists(config_override_path):
+            source_config_path = config_override_path
+        else:
+            source_config_path = os.path.join(PROJECT_ROOT, 'config.ini')
+            
+        shutil.copy2(source_config_path, os.path.join(run_specific_dir_path, 'config.ini.archived'))
 
     src_dir = os.path.join(PROJECT_ROOT, 'src')
     build_script = os.path.join(src_dir, 'build_llm_queries.py')

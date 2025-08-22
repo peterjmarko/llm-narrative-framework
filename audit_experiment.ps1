@@ -50,7 +50,11 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to audit.")]
-    [string]$ExperimentDirectory
+    [string]$ExperimentDirectory,
+
+    [Parameter(Mandatory = $false, HelpMessage = "Path to a specific config.ini file to use for the audit.")]
+    [Alias('config-path')]
+    [string]$ConfigPath
 )
 
 function Get-ProjectRoot {
@@ -73,6 +77,7 @@ try {
     $pythonScriptArgs = @($ResolvedPath)
     if ($PSBoundParameters['Verbose']) { $pythonScriptArgs += "--verbose" }
     $pythonScriptArgs += "--force-color"
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $pythonScriptArgs += "--config-path", $ConfigPath }
     $LogFilePath = Join-Path $ResolvedPath "experiment_audit_log.txt"
     $relativeLogPath = Join-Path (Resolve-Path -Path $ExperimentDirectory -Relative) (Split-Path $LogFilePath -Leaf)
     Write-Host "`nThe audit log will be saved to: $relativeLogPath"
@@ -87,7 +92,8 @@ try {
 } finally {
     if ($LogFilePath -and (Test-Path -LiteralPath $LogFilePath)) {
         try { $c = Get-Content -Path $LogFilePath -Raw; $c = $c -replace "`e\[[0-9;]*m", ''; Set-Content -Path $LogFilePath -Value $c.Trim() -Force } catch {}
-        Write-Host "`nLog saved to: $(Resolve-Path -Path $LogFilePath -Relative)" -ForegroundColor Gray
+        $relativeLogPath = Resolve-Path -Path $LogFilePath -Relative
+        Write-Host "`nLog saved to:`n$relativeLogPath`n" -ForegroundColor Gray
     }
 }
 exit $scriptExitCode
