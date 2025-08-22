@@ -1,5 +1,22 @@
 # Changelog
 
+## 6.5.0 (2025-08-22)
+
+### Bump
+
+- **version 6.4.0 → 6.5.0**
+
+### Features
+
+- **automate and optimize Layer 3 data pipeline test**
+  The Layer 3 data pipeline integration test was previously slow, costly, and required manual user interaction. This commit completely refactors the harness to be fully automated and significantly more efficient.
+  
+  - The test now bypasses the expensive `neutralize_delineations.py` LLM step by providing a minimal, pre-generated set of its output files as seed data.
+  - The workflow is now a single, non-interactive script call, making it suitable for CI environments.
+  - The now-obsolete `layer3_simulate_manual_step.ps1` has been deleted.
+  - `TESTING.md` has been updated to describe the new, streamlined procedure.
+  - `CONTRIBUTING.md` now includes a "Pre-Commit Checklist" to clarify the developer workflow.
+
 ## 6.4.0 (2025-08-22)
 
 ### Bump
