@@ -244,15 +244,43 @@ This approach is the required standard for maintaining test quality and coverage
 
 ### 4. Commit Your Changes
 
-This project uses a standardized workflow to ensure all code is clean, documented, and properly formatted before being committed. After ensuring all tests pass (see previous section), follow these steps in order.
+This project uses a standardized workflow to ensure all code is clean, documented, and properly formatted before being committed.
 
-**Step 1: Lint File Headers**
+#### Pre-Commit Checklist
+
+Before committing, please perform the following steps in order. For detailed explanations, see the guide below.
+
+1.  **Run Linters**:
+    ```bash
+    pdm run python scripts/lint_file_headers.py
+    pdm run python scripts/lint_docstrings.py --deep
+    ```
+
+2.  **Build Documentation**:
+    ```bash
+    pdm run build-docs
+    ```
+
+3.  **Review and Stage Changes**:
+    Review your work with `git status`, then stage all changes with `git add .`.
+
+4.  **Commit with Commitizen**:
+    Use the interactive tool to create a compliant commit message.
+    ```bash
+    pdm run commit
+    ```
+
+#### Detailed Workflow Guide
+
+After ensuring all tests pass (see the previous section), follow this detailed workflow.
+
+**Linting File Headers**
 Run the header linter. This script will check all Python and PowerShell files for a compliant header/footer and prompt you to fix any issues automatically.
 ```bash
 pdm run python scripts/lint_file_headers.py
 ```
 
-**Step 2: Lint Docstrings (Manual Fix)**
+**Linting Docstrings (Manual Fix)**
 Run the docstring linter. This is a **read-only** tool that will report any missing or incomplete docstrings. You must manually edit the reported files to fix the issues.
 ```bash
 # Run a high-level scan first (checks module-level docstrings)

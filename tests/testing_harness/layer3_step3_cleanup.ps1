@@ -1,20 +1,21 @@
-# Filename: tests/testing_harness/layer3_step3_cleanup.ps1
-function Get-ProjectRoot {
-    $currentDir = Get-Location
-    while ($currentDir -ne $null -and $currentDir.Path -ne "") {
-        if (Test-Path (Join-Path $currentDir.Path "pyproject.toml")) { return $currentDir.Path }
-        $currentDir = Split-Path -Parent -Path $currentDir.Path
-    }
-    throw "FATAL: Could not find project root (pyproject.toml)."
+#!/usr/bin/env pwsh
+# --- Layer 3: Data Pipeline Integration Testing ---
+# --- Step 3: Automated Cleanup ---
+
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
+
+Write-Host ""
+Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Cyan
+Write-Host "--- Step 3: Automated Cleanup ---" -ForegroundColor Cyan
+Write-Host ""
+
+if (Test-Path $SandboxDir) {
+    Write-Host "Removing Layer 3 sandbox directory..."
+    Remove-Item -Path $SandboxDir -Recurse -Force
+    Write-Host "  -> Done."
+} else {
+    Write-Host "Layer 3 sandbox directory not found. Nothing to remove."
 }
 
-$ProjectRoot = Get-ProjectRoot
-Set-Location $ProjectRoot
-
-Write-Host ""
-Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
-Write-Host "--- Step 3: Automated Cleanup ---" -ForegroundColor Cyan
-
-Remove-Item -Path "temp_integration_test" -Recurse -Force
-Write-Host "`nIntegration test environment cleaned up successfully." -ForegroundColor Green
-Write-Host ""
+Write-Host "`nCleanup complete." -ForegroundColor Green

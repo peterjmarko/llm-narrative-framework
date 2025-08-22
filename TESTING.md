@@ -88,35 +88,24 @@ After inspecting the artifacts, run this script to delete the test directory.
 
 ### Layer 3: Data Pipeline Integration Testing (`prepare_data.ps1`)
 
-This procedure validates the real data preparation pipeline with a controlled seed dataset. This is an **interactive** test that requires manual steps.
+This procedure validates the real data preparation pipeline with a controlled seed dataset. It is a **fully automated** test that verifies the end-to-end data flow of the pipeline *without* making expensive LLM calls for text neutralization, making it fast and efficient.
 
-**Prerequisites:** A configured `.env` file in the project root with a valid API key.
+**Prerequisites:** A configured `.env` file in the project root with a valid API key (for the eminence and OCEAN scoring steps).
 
 #### Step 1: Automated Setup
-Run this script to create the test environment with all required scripts and seed data.
+Run this script to create the sandboxed test environment with all required scripts and minimal seed data.
 ```powershell
 .\tests\testing_harness\layer3_step1_setup.ps1
 ```
 
-#### Step 2: Execute the Test Workflow (Interactive)
-This script guides you through the interactive test. It will run the first part of the pipeline, then pause and provide instructions for the required manual step.
+#### Step 2: Execute the Test Workflow
+This script now fully automates the test workflow. It runs the entire `prepare_data.ps1` pipeline, which intelligently skips the manual and neutralization steps because their outputs are provided as seed data.
 ```powershell
-# Run this once to start the pipeline
-.\tests\testing_harness\layer3_step2_test_workflow.ps1
-```
-When prompted, run the helper script to simulate the manual data creation:
-```powershell
-# Run this when instructed by the main workflow script
-.\tests\testing_harness\layer3_simulate_manual_step.ps1
-```
-Finally, re-run the main workflow script to complete the pipeline and verify the results:
-```powershell
-# Run this again to complete the test
 .\tests\testing_harness\layer3_step2_test_workflow.ps1
 ```
 
 #### Step 3: Automated Cleanup
-After inspecting the artifacts, run this script to delete the test directory.
+After inspecting the artifacts, run this script to delete the Layer 3 test sandbox.
 ```powershell
 .\tests\testing_harness\layer3_step3_cleanup.ps1
 ```

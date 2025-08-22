@@ -1,63 +1,44 @@
-# Filename: tests/testing_harness/layer3_step2_test_workflow.ps1
-# NOTE: This is an interactive test that requires user input.
-function Get-ProjectRoot {
-    $currentDir = Get-Location
-    while ($currentDir -ne $null -and $currentDir.Path -ne "") {
-        if (Test-Path (Join-Path $currentDir.Path "pyproject.toml")) { return $currentDir.Path }
-        $currentDir = Split-Path -Parent -Path $currentDir.Path
-    }
-    throw "FATAL: Could not find project root (pyproject.toml)."
-}
+#!/usr/bin/env pwsh
+# --- Layer 3: Data Pipeline Integration Testing ---
+# --- Step 2: Execute the Test Workflow ---
 
-$ProjectRoot = Get-ProjectRoot
-Set-Location $ProjectRoot
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
 
-$testDir = "temp_integration_test"
-if (-not (Test-Path $testDir)) { throw "FATAL: Test directory '$testDir' not found. Please run Step 1 first." }
+if (-not (Test-Path $SandboxDir)) { throw "FATAL: Test sandbox not found. Please run Step 1 first." }
 
 Write-Host ""
-Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
-Write-Host "--- Step 2: Execute the Test Workflow (Interactive) ---" -ForegroundColor Cyan
-
-. .\.venv\Scripts\Activate.ps1
-Set-Location $testDir
+Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Cyan
+Write-Host "--- Step 2: Execute the Test Workflow ---" -ForegroundColor Cyan
 
 try {
-    # Part 1: Run the pipeline until it pauses for the manual step.
-    Write-Host "`n--- Running pipeline (Part 1)... ---" -ForegroundColor Yellow
-    Write-Host "This will take several minutes and will pause when it requires manual input."
-    .\prepare_data.ps1
+    Set-Location $SandboxDir
+    
+    Write-Host "`n--- Running the full data preparation pipeline... ---" -ForegroundColor Cyan
+    # The pipeline will intelligently skip the manual and neutralized steps
+    # because their output artifacts are already provided by the setup script.
+    & .\prepare_data.ps1 -NonInteractive
+    if ($LASTEXITCODE -ne 0) { throw "prepare_data.ps1 failed." }
 
-    # Part 2: Guide user through the manual step.
-    $manualFile = "data/foundational_assets/sf_chart_export.csv"
-    if (-not (Test-Path $manualFile)) {
-        Write-Host "`n--- User Action Required ---" -ForegroundColor Yellow
-        Write-Host "The pipeline has paused as expected. To continue the test:"
-        Write-Host "1. Run the following command to simulate the manual step:"
-        Write-Host "`n   .\tests\testing_harness\layer3_simulate_manual_step.ps1`n" -ForegroundColor White
-        Write-Host "2. After the file is created, re-run this script (layer3_step2_test_workflow.ps1) to complete the test."
-        exit
+    Write-Host "`n--- Verifying final output... ---" -ForegroundColor Cyan
+    $finalDbPath = "data/personalities_db.txt"
+    if (-not (Test-Path $finalDbPath)) {
+        throw "FAIL: The final 'personalities_db.txt' file was not created."
     }
-
-    # Part 3: Run the pipeline again to completion.
-    Write-Host "`n--- Manual step complete. Resuming pipeline (Part 2)... ---" -ForegroundColor Yellow
-    .\prepare_data.ps1
-
-    # Part 4: Verification
-    Write-Host "`n--- Verifying final output... ---" -ForegroundColor Yellow
-    if (-not (Test-Path -Path "personalities_db.txt")) {
-        Write-Host "`nFAIL: personalities_db.txt was not created." -ForegroundColor Red
-    } elseif ((Get-Content "personalities_db.txt" | Measure-Object -Line).Lines -ne 4) {
-        Write-Host "`nFAIL: personalities_db.txt has the wrong number of lines." -ForegroundColor Red
-    } else {
-        Write-Host "`nPASS: The final personalities_db.txt was created successfully with 3 subject records." -ForegroundColor Green
+    
+    $lineCount = (Get-Content $finalDbPath | Measure-Object -Line).Lines
+    if ($lineCount -ne 4) { # Header + 3 subjects
+        throw "FAIL: The final 'personalities_db.txt' has an incorrect number of lines (Expected 4, Found $lineCount)."
     }
-
-} finally {
-    Set-Location $ProjectRoot
-    if (Get-Command deactivate -ErrorAction SilentlyContinue) { deactivate }
+    
+    Write-Host "`nSUCCESS: The data pipeline integration test completed successfully." -ForegroundColor Green
+    Write-Host "The final 'personalities_db.txt' was created with the correct number of records."
+    Write-Host "Inspect the artifacts, then run Step 3 to clean up."
 }
-
-Write-Host "`nTest workflow complete. You may now inspect the artifacts." -ForegroundColor Green
-Write-Host "This completes Step 2. Proceed to Step 3 for cleanup." -ForegroundColor Yellow
-Write-Host ""
+catch {
+    Write-Host "`nERROR: Layer 3 test workflow failed.`n$($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
+finally {
+    Set-Location $ProjectRoot
+}
