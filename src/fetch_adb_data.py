@@ -34,6 +34,7 @@ This script replaces the manual data extraction process by:
 
 import argparse
 import csv
+from datetime import date
 import json
 import logging
 import os
@@ -332,7 +333,7 @@ def parse_results_from_json(json_data, category_map):
             
     return results, total_hits
 
-def fetch_all_data(session, output_path, initial_stat_data, category_ids, category_map):
+def fetch_all_data(session, output_path, initial_stat_data, category_ids, category_map, start_date=None, end_date=None):
     """Fetches all paginated data from the API, saving results incrementally."""
     print("")
     logging.info(f"{Fore.YELLOW}Starting data extraction from API...")
@@ -369,6 +370,19 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
                         "with-bio": "on",
                         "with-cat": "on"
                     }
+
+                    if start_date:
+                        options.update({
+                            "day": str(start_date.day),
+                            "month": str(start_date.month),
+                            "years-from": str(start_date.year)
+                        })
+                    if end_date:
+                        options.update({
+                            "day2": str(end_date.day),
+                            "month2": str(end_date.month),
+                            "years-to": str(end_date.year)
+                        })
                     
                     payload = {
                         "categories": category_ids, "categories2": [], "events": [], "events2": [],
@@ -450,7 +464,19 @@ def main():
     parser = argparse.ArgumentParser(description="Fetch raw birth data from the Astro-Databank website.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-o", "--output-file", default="data/sources/adb_raw_export.txt", help="Path for the output data file.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file without a prompt.")
+    parser.add_argument("--start-date", type=str, help="Start date for search filter (YYYY-MM-DD). For testing.")
+    parser.add_argument("--end-date", type=str, help="End date for search filter (YYYY-MM-DD). For testing.")
     args = parser.parse_args()
+
+    start_date, end_date = None, None
+    try:
+        if args.start_date:
+            start_date = date.fromisoformat(args.start_date)
+        if args.end_date:
+            end_date = date.fromisoformat(args.end_date)
+    except ValueError:
+        logging.error(f"{Fore.RED}Invalid date format. Please use YYYY-MM-DD.")
+        sys.exit(1)
 
     output_path = Path(args.output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -502,7 +528,7 @@ def main():
     with requests.Session() as session:
         login_to_adb(session, adb_username, adb_password)
         initial_stat_data, category_ids, category_map = scrape_search_page_data(session)
-        fetch_all_data(session, output_path, initial_stat_data, category_ids, category_map)
+        fetch_all_data(session, output_path, initial_stat_data, category_ids, category_map, start_date, end_date)
 
 if __name__ == "__main__":
     main()

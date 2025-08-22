@@ -99,7 +99,7 @@ Run this script to create the sandboxed test environment with all required scrip
 ```
 
 #### Step 2: Execute the Test Workflow
-This script now fully automates the test workflow. It runs the entire `prepare_data.ps1` pipeline, which intelligently skips the manual and neutralization steps because their outputs are provided as seed data.
+This script fully automates the test workflow. It calls the main `prepare_data.ps1` orchestrator with a `-Force` flag, which ensures the process is **non-interactive** and forces the script to **re-validate every step** rather than skipping them if an output file already exists. The pipeline will still intelligently bypass the manual and neutralization steps, as their pre-made outputs are provided by the setup script.
 ```powershell
 .\tests\testing_harness\layer3_step2_test_workflow.ps1
 ```

@@ -213,6 +213,7 @@ def get_processed_keys_from_csv(filepath: Path) -> set:
 
 def main():
     """Main function to orchestrate the neutralization process."""
+    global pbar, temp_dir
     # --- Config and Arguments ---
     default_model = get_config_value(APP_CONFIG, "DataGeneration", "neutralization_model", "anthropic/claude-3.5-sonnet")
     default_points_str = "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, Midheaven"
@@ -300,6 +301,7 @@ def main():
     if not input_path.exists(): logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}"); sys.exit(1)
 
     # --- Intelligent Startup Logic (Stale Check) ---
+    # --- Intelligent Startup Logic (Stale Check) ---
     if not args.force and output_dir.exists() and input_path.exists():
         # Check if the input file is newer than the output directory itself
         if os.path.getmtime(input_path) > os.path.getmtime(output_dir):
@@ -308,16 +310,16 @@ def main():
             args.force = True
 
     proceed = True
-    if output_dir.exists():
-        if not args.force:
-            print(f"\n{Fore.YELLOW}WARNING: The neutralized delineations at '{output_dir}' is already up to date.")
-            print(f"{Fore.YELLOW}The update process incurs API costs and can take 10 minutes or more to complete.")
-            print(f"{Fore.YELLOW}If you decide to go ahead with this update, backups of the existing files will be created first.{Fore.RESET}")
-            confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
-            if confirm != "y":
-                proceed = False
+    if output_dir.exists() and not args.force:
+        print(f"\n{Fore.YELLOW}WARNING: The neutralized delineations at '{output_dir}' is already up to date.")
+        print(f"{Fore.YELLOW}The update process incurs API costs and can take 10 minutes or more to complete.")
+        print(f"{Fore.YELLOW}If you decide to go ahead with this update, backups of the existing files will be created first.{Fore.RESET}")
+        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
+        if confirm != "y":
+            print("\nOperation cancelled by user.\n"); sys.exit(0)
 
-        if proceed:
+        # Proceed with backup if the directory exists and we are forcing an overwrite
+        if output_dir.exists():
             try:
                 backup_dir = Path("data/backup"); backup_dir.mkdir(parents=True, exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

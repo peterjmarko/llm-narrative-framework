@@ -19,8 +19,8 @@ New-Item -ItemType Directory -Path $SandboxDir -Force | Out-Null
     New-Item -Path (Join-Path $SandboxDir $_) -ItemType Directory -Force | Out-Null
 }
 
-# --- Copy required assets and source code into the sandbox ---
-Copy-Item -Path "prepare_data.ps1", "src", ".env" -Destination $SandboxDir -Recurse
+# --- Copy required assets into the sandbox. DO NOT copy source code. ---
+Copy-Item -Path ".env" -Destination $SandboxDir
 Copy-Item -Path "data/foundational_assets/country_codes.csv", "data/foundational_assets/point_weights.csv", "data/foundational_assets/balance_thresholds.csv" -Destination (Join-Path $SandboxDir "data/foundational_assets/")
 
 # --- Copy the pre-neutralized seed data into the sandbox ---
@@ -40,6 +40,15 @@ Index`tidADB`tLastName`tFirstName`tGender`tDay`tMonth`tYear`tTime`tZoneAbbr`tZon
 "@
 $rawAdbContent | Set-Content -Path (Join-Path $SandboxDir "data/sources/adb_raw_export.txt") -Encoding UTF8
 
+# Pre-seed the output of find_wikipedia_links.py
+$wikiLinksContent = @"
+Index,idADB,ADB_Name,BirthYear,Entry_Type,Wikipedia_URL,Notes
+1,1001,"Connery, Sean",1930,Person,https://en.wikipedia.org/wiki/Sean_Connery,
+2,1002,"Odetta",1930,Person,https://en.wikipedia.org/wiki/Odetta,
+3,1003,"Hernán, Aarón",1930,Person,https://en.wikipedia.org/wiki/Aar%C3%B3n_Hern%C3%A1n,
+"@
+$wikiLinksContent | Set-Content -Path (Join-Path $SandboxDir "data/processed/adb_wiki_links.csv") -Encoding UTF8
+
 $validationReportContent = @"
 Index,idADB,ADB_Name,Entry_Type,WP_URL,WP_Name,Name_Match_Score,Death_Date_Found,Status,Notes
 1,1001,"Connery, Sean",Person,https://en.wikipedia.org/wiki/Sean_Connery,Sean Connery,100,True,OK,
@@ -49,8 +58,9 @@ Index,idADB,ADB_Name,Entry_Type,WP_URL,WP_Name,Name_Match_Score,Death_Date_Found
 $validationReportContent | Set-Content -Path (Join-Path $SandboxDir "data/reports/adb_validation_report.csv") -Encoding UTF8
 
 Write-Host ""
-Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Cyan
+Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
 Write-Host "--- Step 1: Automated Setup ---" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'."
-Write-Host "Your next action is Step 2: Execute the Test Workflow."
+Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green
+Write-Host "Your next action is Step 2: Execute the Test Workflow." -ForegroundColor Yellow
+Write-Host ""

@@ -66,6 +66,7 @@ param(
     [switch]$ReportOnly,
 
     [Parameter(Mandatory=$false)]
+    [Alias('NonInteractive')]
     [switch]$Force
 )
 
@@ -124,7 +125,7 @@ function Format-Banner {
 function Show-PipelineStatus {
     param([array]$Steps)
 
-    Format-Banner "Data Preparation Pipeline Status" $C_YELLOW
+    Format-Banner "Data Preparation Pipeline Status" $C_RESET # No color for banner
 
     $nameWidth = 40
     $statusWidth = 12
@@ -135,15 +136,20 @@ function Show-PipelineStatus {
     foreach ($step in $Steps) {
         if (Test-Path $step.OutputFile) {
             $status = "$($C_GREEN)[EXISTS]$($C_RESET)"
+            $line = ("{0,-$nameWidth} {1}" -f $step.Name, $status)
+            Write-Host $line
             $filesExist = $true
         } else {
             if ($step.Type -eq 'Manual') {
-                $status = "$($C_MAGENTA)[PENDING]$($C_RESET)"
+                $status = "[PENDING]"
+                $line = ("{0,-$nameWidth} {1}" -f $step.Name, $status)
+                Write-Host "${C_YELLOW}$line${C_RESET}"
             } else {
                 $status = "$($C_RED)[MISSING]$($C_RESET)"
+                $line = ("{0,-$nameWidth} {1}" -f $step.Name, $status)
+                Write-Host $line
             }
         }
-        Write-Host ("{0,-$nameWidth} {1}" -f $step.Name, $status)
     }
     Write-Host ""
     return $filesExist
@@ -186,12 +192,14 @@ try {
     foreach ($step in $PipelineSteps) {
         $stepCounter++
         $stepName = $step.Name
-        $outputFile = $step.OutputFile
+        # Build path relative to the script's current location
+        $outputFile = Join-Path $ScriptRoot $step.OutputFile
 
         Format-Banner "Step ${stepCounter}/${totalSteps}: ${stepName}"
 
-        if (Test-Path $outputFile) {
-            Write-Host "${C_GREEN}Output file '$outputFile' already exists. Skipping step.$($C_RESET)"
+        if ((Test-Path $outputFile) -and (-not $Force.IsPresent)) {
+            $relativePath = Resolve-Path -Path $outputFile -Relative
+            Write-Host "Output file '$relativePath' already exists. Skipping step."
             continue
         }
 
@@ -202,8 +210,11 @@ try {
 
         # This is an automated step
         $scriptPath = $step.Script
-        $fullScriptPath = Join-Path $ScriptRoot $scriptPath
+        $fullScriptPath = Join-Path $PSScriptRoot $scriptPath # Use PSScriptRoot for reliability
         $arguments = $prefixArgs + $fullScriptPath
+        if ($Force.IsPresent) {
+            $arguments += "--force"
+        }
 
         & $executable @arguments
         $exitCode = $LASTEXITCODE

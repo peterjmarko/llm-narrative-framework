@@ -562,11 +562,11 @@ def main():
         print(f"Found {len(processed_ids):,} already processed records ({links_found_before:,} links found).")
         print(f"Now processing {len(lines_to_process):,} new records using {args.workers} workers.")
     else:
-        print(f"\n{Fore.YELLOW}--- Finding Wikipedia Links ---")
+        print("\n--- Finding Wikipedia Links ---")
         print(f"Processing {len(lines_to_process):,} records using {args.workers} workers.")
 
-    print(f"{Fore.CYAN}NOTE: Each set of 1,000 records can take 3 minutes or more to process.")
-    print(f"{Fore.CYAN}You can safely interrupt with Ctrl+C at any time to resume later.\n")
+    print("NOTE: Each set of 1,000 records can take 3 minutes or more to process.")
+    print("You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     links_found_this_session, timeouts_this_session = 0, 0
     links_found_lock, timeouts_lock = Lock(), Lock()
