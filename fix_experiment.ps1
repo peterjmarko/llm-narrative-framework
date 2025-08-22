@@ -66,6 +66,10 @@
 
 [CmdletBinding()]
 param(
+    [Parameter(Mandatory = $false, HelpMessage = "Path to a specific config.ini file to use for this operation.")]
+    [Alias('config-path')]
+    [string]$ConfigPath,
+    
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to repair or update.")]
     [ValidateScript({
         if (-not (Test-Path $_ -PathType Container)) {
@@ -173,6 +177,7 @@ try {
 
     Write-Header "STEP 1: DIAGNOSING EXPERIMENT STATE" $C_CYAN $C_RESET
     $auditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $ExperimentDirectory, "--force-color")
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditPyArgs += "--config-path", $ConfigPath }
     $auditArgs = @("python") + $auditPyArgs
     & pdm run $auditArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
     $auditExitCode = $LASTEXITCODE
@@ -209,6 +214,7 @@ try {
         if ($EndRep) { $procArgs += "--end-rep", $EndRep }
         if ($Notes) { $procArgs += "--notes", $Notes }
         if ($Verbose) { $procArgs += "--verbose" }
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $procArgs += "--config-path", $ConfigPath }
         
         $finalArgs = @("python") + $procArgs
         & pdm run $finalArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
@@ -220,6 +226,7 @@ try {
     if ($actionTaken) {
         Write-Header "STEP 3: FINAL VERIFICATION" $C_CYAN $C_RESET
         $finalAuditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $ExperimentDirectory, "--force-color", "--non-interactive")
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $finalAuditPyArgs += "--config-path", $ConfigPath }
         $finalAuditArgs = @("python") + $finalAuditPyArgs
         & pdm run $finalAuditArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
         $finalAuditCode = $LASTEXITCODE

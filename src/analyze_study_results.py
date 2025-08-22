@@ -46,6 +46,7 @@ Usage:
 """
 
 import argparse
+import importlib
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
@@ -399,6 +400,7 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
 
 def main():
     """Main entry point for the ANOVA analysis script."""
+    global APP_CONFIG
     parser = argparse.ArgumentParser(
         description="Perform ANOVA on experiment results.",
         formatter_class=argparse.RawTextHelpFormatter,
@@ -416,7 +418,14 @@ def main():
         """)
     )
     parser.add_argument("input_path", help="Path to the top-level experiment directory containing the master CSV.")
+    parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
     args = parser.parse_args()
+
+    if args.config_path:
+        os.environ['PROJECT_CONFIG_OVERRIDE'] = os.path.abspath(args.config_path)
+        if 'config_loader' in sys.modules:
+            importlib.reload(sys.modules['config_loader'])
+        from config_loader import APP_CONFIG
 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     base_dir = os.path.abspath(args.input_path)

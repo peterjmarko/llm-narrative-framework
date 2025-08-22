@@ -48,6 +48,10 @@
 
 [CmdletBinding()]
 param (
+    [Parameter(Mandatory = $false, HelpMessage = "Path to a specific config.ini file to use for this operation.")]
+    [Alias('config-path')]
+    [string]$ConfigPath,
+
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target directory containing one or more experiments.")]
     [string]$TargetDirectory
 )
@@ -133,7 +137,10 @@ try {
     $auditorScriptPath = "src/experiment_auditor.py"
 
     foreach ($dir in $experimentDirs) {
-        & $executable $prefixArgs $auditorScriptPath $dir.FullName --quiet --force-color
+        $auditorArgs = @($dir.FullName, "--quiet", "--force-color")
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditorArgs += "--config-path", $ConfigPath }
+        
+        & $executable $prefixArgs $auditorScriptPath @auditorArgs
         $exitCode = $LASTEXITCODE
 
         if ($exitCode -eq $AUDIT_NEEDS_MIGRATION) {
@@ -147,7 +154,9 @@ try {
     
     # --- Phase 2: Show the user the official audit report ---
     # We call the main audit script to give a consistent, rich report.
-    & $StudyAuditScriptPath -TargetDirectory $TargetDirectory -NoLog -NoHeader
+    $auditStudyArgs = @{ TargetDirectory = $TargetDirectory; NoLog = $true; NoHeader = $true }
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditStudyArgs['ConfigPath'] = $ConfigPath }
+    & $StudyAuditScriptPath @auditStudyArgs
 
     # --- Main Logic branches based on the reliable audit results ---
 
@@ -192,7 +201,9 @@ Enter your choice (1, 2, or N)
                 foreach ($experimentDir in $experimentDirs) {
                     $i++
                     Write-Host "`n--- Forcing Update on experiment $i of $($experimentDirs.Count): $($experimentDir.Name) ---" -ForegroundColor Cyan
-                    & $fixScriptPath -TargetDirectory $experimentDir.FullName -ForceUpdate
+                    $fixUpdArgs = @{ TargetDirectory = $experimentDir.FullName; ForceUpdate = $true }
+                    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $fixUpdArgs['ConfigPath'] = $ConfigPath }
+                    & $fixScriptPath @fixUpdArgs
                     if ($LASTEXITCODE -ne 0) { throw "Forced update failed for experiment: $($experimentDir.Name)." }
                 }
                 $actionTaken = $true
@@ -202,7 +213,9 @@ Enter your choice (1, 2, or N)
                 foreach ($experimentDir in $experimentDirs) {
                     $i++
                     Write-Host "`n--- Forcing Aggregation on experiment $i of $($experimentDirs.Count): $($experimentDir.Name) ---" -ForegroundColor Cyan
-                    & $fixScriptPath -TargetDirectory $experimentDir.FullName -ForceAggregate
+                    $fixAggArgs = @{ TargetDirectory = $experimentDir.FullName; ForceAggregate = $true }
+                    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $fixAggArgs['ConfigPath'] = $ConfigPath }
+                    & $fixScriptPath @fixAggArgs
                     if ($LASTEXITCODE -ne 0) { throw "Forced aggregation failed for experiment: $($experimentDir.Name)." }
                 }
                 $actionTaken = $true
@@ -213,7 +226,9 @@ Enter your choice (1, 2, or N)
 
         if ($actionTaken) {
             Write-Host "`n--- Running post-action audit to verify all changes... ---" -ForegroundColor Cyan
-            & $StudyAuditScriptPath -TargetDirectory $TargetDirectory -NoLog -NoHeader
+            $auditStudyArgs = @{ TargetDirectory = $TargetDirectory; NoLog = $true; NoHeader = $true }
+            if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditStudyArgs['ConfigPath'] = $ConfigPath }
+            & $StudyAuditScriptPath @auditStudyArgs
             $headerLine = "#" * 80
             Write-Host "`n$headerLine" -ForegroundColor Green
             Write-Host (Format-Banner "Study Action Completed Successfully") -ForegroundColor Green
@@ -251,6 +266,7 @@ Enter your choice (1, 2, or N)
             NoHeader        = $true
         }
         if ($PSBoundParameters['Verbose']) { $fixArgs['Verbose'] = $true }
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $fixArgs['ConfigPath'] = $ConfigPath }
         & $fixScriptPath @fixArgs
         
         if ($LASTEXITCODE -ne 0) {
@@ -259,7 +275,9 @@ Enter your choice (1, 2, or N)
     }
 
     Write-Host "`n--- Running post-fix audit to verify all changes... ---" -ForegroundColor Cyan
-    & $StudyAuditScriptPath -TargetDirectory $TargetDirectory -NoLog -NoHeader
+    $auditStudyArgs = @{ TargetDirectory = $TargetDirectory; NoLog = $true; NoHeader = $true }
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditStudyArgs['ConfigPath'] = $ConfigPath }
+    & $StudyAuditScriptPath @auditStudyArgs
     
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Green

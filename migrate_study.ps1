@@ -50,6 +50,10 @@
 
 [CmdletBinding()]
 param (
+    [Parameter(Mandatory = $false, HelpMessage = "Path to a specific config.ini file to use for this operation.")]
+    [Alias('config-path')]
+    [string]$ConfigPath,
+
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target directory containing one or more experiments.")]
     [string]$TargetDirectory
 )
@@ -125,7 +129,10 @@ try {
 
     # This loop performs a reliable, quiet audit on each experiment.
     foreach ($dir in $experimentDirs) {
-        & $executable $prefixArgs $auditorScriptPath $dir.FullName --quiet
+        $auditorArgs = @($dir.FullName, "--quiet")
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditorArgs += "--config-path", $ConfigPath }
+        
+        & $executable $prefixArgs $auditorScriptPath @auditorArgs
         $exitCode = $LASTEXITCODE
 
         if ($exitCode -eq $AUDIT_NEEDS_MIGRATION) {
@@ -137,7 +144,9 @@ try {
 
     # Now, run the full, visible audit so the user sees the report.
     $auditScriptPath = Join-Path $ScriptRoot "audit_study.ps1"
-    & $auditScriptPath -TargetDirectory $TargetDirectory -NoLog -NoHeader
+    $auditStudyArgs = @{ TargetDirectory = $TargetDirectory; NoLog = $true; NoHeader = $true }
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditStudyArgs['ConfigPath'] = $ConfigPath }
+    & $auditScriptPath @auditStudyArgs
 
     # --- Main Logic branches based on the reliable audit results ---
     if ($needsRepair) {
@@ -199,6 +208,7 @@ Enter your choice (1 or N)
                     NoHeader          = $true
                 }
                 if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
+                if (-not [string]::IsNullOrEmpty($ConfigPath)) { $migrateArgs['ConfigPath'] = $ConfigPath }
                 & $migrateScriptPath @migrateArgs
                 
                 if ($LASTEXITCODE -ne 0) {
@@ -243,6 +253,7 @@ Enter your choice (1 or N)
             NoHeader        = $true
         }
         if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $migrateArgs['ConfigPath'] = $ConfigPath }
         & $migrateScriptPath @migrateArgs
         
         if ($LASTEXITCODE -ne 0) {

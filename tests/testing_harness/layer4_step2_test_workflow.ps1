@@ -1,62 +1,48 @@
-function Get-ProjectRoot {
-    $currentDir = Get-Location
-    while ($currentDir -ne $null -and $currentDir.Path -ne "") {
-        if (Test-Path (Join-Path $currentDir.Path "pyproject.toml")) { return $currentDir.Path }
-        $currentDir = Split-Path -Parent -Path $currentDir.Path
-    }
-    throw "FATAL: Could not find project root (pyproject.toml)."
+#!/usr/bin/env pwsh
+# --- Layer 4: Main Workflow Integration Testing ---
+# --- Step 2: Execute the Test Workflow ---
+
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer4_sandbox"
+$TestConfigPath = Join-Path $SandboxDir "config.ini"
+
+function Write-TestHeader { param($Message) Write-Host "`n--- $($Message) ---" -ForegroundColor Cyan }
+
+try {
+    Write-TestHeader "STEP 1: Creating a new experiment using the sandboxed config..."
+    $output = & "$ProjectRoot\new_experiment.ps1" -ConfigPath $TestConfigPath -Verbose
+    if ($LASTEXITCODE -ne 0) { throw "new_experiment.ps1 failed." }
+    
+    $NewExperimentPath = ($output | Out-String) -split '\r?\n' | Select-Object -Last 1
+    if (-not (Test-Path $NewExperimentPath -PathType Container)) { throw "Could not parse new experiment path from output." }
+    Write-Host "  -> New experiment created at: $NewExperimentPath"
+
+    Write-TestHeader "STEP 2: Auditing the new experiment (should be VALIDATED)..."
+    & "$ProjectRoot\audit_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath
+    if ($LASTEXITCODE -ne 0) { throw "Initial audit failed. Experiment should be VALIDATED." }
+
+    Write-TestHeader "STEP 3: Deliberately breaking the experiment..."
+    $responseFile = Get-ChildItem -Path $NewExperimentPath -Filter "llm_response_*.txt" -Recurse | Select-Object -First 1
+    if (-not $responseFile) { throw "Could not find a response file to delete." }
+    Remove-Item -Path $responseFile.FullName -Force
+    Write-Host "  -> Deleted response file: $($responseFile.Name)"
+
+    Write-TestHeader "STEP 4: Auditing the broken experiment (should need REPAIR)..."
+    & "$ProjectRoot\audit_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath
+    if ($LASTEXITCODE -ne 2) { throw "Audit did not correctly identify the experiment as needing REPAIR (Exit Code 2)." }
+
+    Write-TestHeader "STEP 5: Fixing the experiment automatically..."
+    & "$ProjectRoot\fix_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath -NonInteractive -Verbose
+    if ($LASTEXITCODE -ne 0) { throw "fix_experiment.ps1 failed to repair the experiment." }
+
+    Write-TestHeader "STEP 6: Running final verification audit (should be VALIDATED)..."
+    & "$ProjectRoot\audit_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath
+    if ($LASTEXITCODE -ne 0) { throw "Final verification audit failed. Experiment should be VALIDATED." }
+    
+    Write-Host "`nSUCCESS: The full 'new -> audit -> break -> fix' lifecycle completed successfully." -ForegroundColor Green
+    Write-Host "Inspect the artifacts, then run Step 3 to clean up."
 }
-
-$ProjectRoot = Get-ProjectRoot
-Set-Location $ProjectRoot
-
-Write-Host ""
-Write-Host "--- Layer 4: Main Workflow Integration Testing ---" -ForegroundColor Magenta
-Write-Host "--- Step 2: Execute the Test Workflow ---" -ForegroundColor Cyan
-
-# a. Activate the venv from the project root
-. .\.venv\Scripts\Activate.ps1
-
-# b. Run a new experiment from scratch.
-Write-Host "`n--- Running new_experiment.ps1 ---" -ForegroundColor Cyan
-.\new_experiment.ps1
-
-# c. Find the new experiment directory and append its path to the state file
-$expDir = Get-ChildItem -Path "output/new_experiments" -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
-$stateFilePath = Join-Path $ProjectRoot "tests/testing_harness/.l4_test_dir.txt"
-Add-Content -Path $stateFilePath -Value $expDir.FullName
-$relativeExpDir = Resolve-Path -Path $expDir.FullName -Relative
-Write-Host "`n--- Test will be performed on: $relativeExpDir ---" -ForegroundColor Yellow
-
-# d. Audit the new experiment (should be VALIDATED)
-Write-Host "`n--- Auditing new experiment (should be VALIDATED) ---" -ForegroundColor Cyan
-.\audit_experiment.ps1 -ExperimentDirectory $expDir.FullName
-
-# e. Intentionally "break" the experiment
-Write-Host "`n--- Simulating failure by deleting a response file ---" -ForegroundColor Cyan
-$runDir = Get-ChildItem -Path $script:expDir.FullName -Directory "run_*" | Select-Object -First 1
-$responseFile = Get-ChildItem -Path (Join-Path $runDir.FullName "session_responses") -Include "llm_response_*.txt" -Recurse | Select-Object -First 1
-if ($null -ne $responseFile) {
-    Write-Host "Intentionally deleting response file: $($responseFile.Name)" -ForegroundColor Yellow
-    Remove-Item -Path $responseFile.FullName
-} else {
-    Write-Warning "Could not find a response file to delete for the test. The experiment may have failed to generate one."
+catch {
+    Write-Host "`nERROR: Layer 4 test workflow failed.`n$($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }
-
-# f. Audit the broken experiment (should report NEEDS REPAIR)
-Write-Host "`n--- Auditing broken experiment (should be NEEDS REPAIR) ---" -ForegroundColor Cyan
-.\audit_experiment.ps1 -ExperimentDirectory $script:expDir.FullName
-
-# g. Run the fix script to automatically repair the experiment
-Write-Host "`n--- Running fix_experiment.ps1 ---" -ForegroundColor Cyan
-.\fix_experiment.ps1 -ExperimentDirectory $script:expDir.FullName -NonInteractive
-
-# h. Run a final audit to confirm the repair (should be VALIDATED again)
-Write-Host "`n--- Final audit (should be VALIDATED) ---" -ForegroundColor Cyan
-.\audit_experiment.ps1 -ExperimentDirectory $script:expDir.FullName
-
-# i. Deactivate the virtual environment
-Write-Host "`n--- Test workflow complete. You may now inspect the artifacts. ---" -ForegroundColor Green
-if (Get-Command deactivate -ErrorAction SilentlyContinue) { deactivate }
-Write-Host "This completes Step 2. You can re-run this script for debugging or proceed to Step 3 for cleanup." -ForegroundColor Yellow
-Write-Host ""

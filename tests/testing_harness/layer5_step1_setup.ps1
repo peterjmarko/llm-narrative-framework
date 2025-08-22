@@ -1,70 +1,76 @@
-# Filename: tests/testing_harness/layer5_step1_setup.ps1
-function Get-ProjectRoot {
-    $currentDir = Get-Location
-    while ($currentDir -ne $null -and $currentDir.Path -ne "") {
-        if (Test-Path (Join-Path $currentDir.Path "pyproject.toml")) { return $currentDir.Path }
-        $currentDir = Split-Path -Parent -Path $currentDir.Path
-    }
-    throw "FATAL: Could not find project root (pyproject.toml)."
+#!/usr/bin/env pwsh
+# --- Layer 5: Migration Workflow Integration Testing ---
+# --- Step 1: Automated Setup ---
+
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$TestEnvRoot = Join-Path $ProjectRoot "temp_test_environment"
+$SandboxDir = Join-Path $TestEnvRoot "layer5_sandbox"
+$TestConfigPath = Join-Path $SandboxDir "config.ini"
+$TestDbPath = Join-Path $SandboxDir "personalities_db.txt"
+$NewExperimentsDir = Join-Path $ProjectRoot "output/new_experiments"
+
+# --- Cleanup from previous failed runs ---
+if (Test-Path $SandboxDir) {
+    Write-Host "Cleaning up previous Layer 5 sandbox..."
+    Remove-Item -Path $SandboxDir -Recurse -Force
 }
+Get-ChildItem -Path $NewExperimentsDir -Directory "l5_test_exp_*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+Get-ChildItem -Path (Join-Path $ProjectRoot "output/migrated_experiments") -Directory "l5_test_exp_*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
 
-$ProjectRoot = Get-ProjectRoot
-Set-Location $ProjectRoot
+# --- Create the test environment ---
+New-Item -ItemType Directory -Path $TestEnvRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $SandboxDir -Force | Out-Null
 
-# --- State File Management ---
-$l5StateFile = Join-Path $ProjectRoot "tests/testing_harness/.l5_test_dir.txt"
-Remove-Item $l5StateFile -Force -ErrorAction SilentlyContinue
+# --- Create minimal, test-specific seed files ---
+$dbContent = @"
+1,Biography 1,Personality Text 1
+2,Biography 2,Personality Text 2
+3,Biography 3,Personality Text 3
+4,Biography 4,Personality Text 4
+"@
+$dbContent | Set-Content -Path $TestDbPath -Encoding UTF8
+
+$configContent = @"
+[Study]
+num_replications = 1
+num_trials = 2
+group_size = 4
+mapping_strategy = random
+[LLM]
+model_name = google/gemini-flash-1.5
+temperature = 0.2
+[Filenames]
+personalities_db_file = $($TestDbPath -replace [regex]::Escape($ProjectRoot + "\"), "" -replace "\\", "/")
+"@
+$configContent | Set-Content -Path $TestConfigPath -Encoding UTF8
 
 Write-Host ""
-Write-Host "--- Layer 5: Migration Workflow Integration Testing ---" -ForegroundColor Magenta
+Write-Host "--- Layer 5: Migration Workflow Integration Testing ---" -ForegroundColor Cyan
 Write-Host "--- Step 1: Automated Setup ---" -ForegroundColor Cyan
-Write-Host "This will create a deliberately corrupted experiment that requires migration."
-
-# --- A. Use Layer 4 Setup to Create a Clean Environment ---
-Write-Host "`nInitializing a clean test environment..." -ForegroundColor Yellow
-& (Join-Path $ProjectRoot "tests/testing_harness/layer4_step1_setup.ps1")
-
-# Create an empty L4 state file to satisfy the L4 cleanup script's dependency
-$l4StateFile = Join-Path $ProjectRoot "tests/testing_harness/.l4_test_dir.txt"
-New-Item -Path $l4StateFile -ItemType File -Force | Out-Null
-
-# --- B. Create a Base Experiment to Corrupt ---
-Write-Host "`nGenerating a small, valid experiment to serve as the corruption target..." -ForegroundColor Yellow
-. .\.venv\Scripts\Activate.ps1
-.\new_experiment.ps1 -ErrorAction Stop
-if (Get-Command deactivate -ErrorAction SilentlyContinue) { deactivate }
-
-$expDir = Get-ChildItem -Path "output/new_experiments" -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
-Add-Content -Path $l5StateFile -Value $expDir.FullName
-$relativeExpDir = Resolve-Path -Path $expDir.FullName -Relative
-
-Write-Host "`nSuccessfully created base experiment: $relativeExpDir" -ForegroundColor Green
-
-# --- C. Deliberately Corrupt the Experiment ---
-Write-Host "`n--- Layer 5: Corrupting Experiment ---" -ForegroundColor Magenta
-Write-Host "`nCorrupting experiment to trigger migration requirement..." -ForegroundColor Yellow
-$runDir = Get-ChildItem -Path $expDir.FullName -Directory "run_*" | Select-Object -First 1
-if (-not $runDir) { throw "FATAL: Could not find a 'run_*' directory in the new experiment." }
-
-# Corruption Action 1: Delete a response file (Error 1)
-$responseFile = Get-ChildItem -Path (Join-Path $runDir.FullName "session_responses") -Filter "*.txt" | Select-Object -First 1
-if ($responseFile) {
-    Write-Host "  - Deleting response file: $($responseFile.Name)"
-    Remove-Item -Path $responseFile.FullName -Force
-} else {
-    throw "FATAL: Could not find a response file to delete for the corruption step."
-}
-
-# Corruption Action 2: Delete the archived config (Error 2)
-$archivedConfigFile = Join-Path $runDir.FullName "config.ini.archived"
-if (Test-Path $archivedConfigFile) {
-    Write-Host "  - Deleting archived config: $(Split-Path $archivedConfigFile -Leaf)"
-    Remove-Item -Path $archivedConfigFile -Force
-} else {
-    throw "FATAL: Could not find 'config.ini.archived' to delete for the corruption step."
-}
-
-Write-Host "`nMigration test environment created successfully." -ForegroundColor Green
-Write-Host "The experiment at '$relativeExpDir' is now corrupted and ready for testing."
-Write-Host "Your next action is Step 2: Execute the Test Workflow." -ForegroundColor Yellow
 Write-Host ""
+Write-Host "1. Creating a valid base experiment using the sandbox config..."
+$output = & "$ProjectRoot\new_experiment.ps1" -ConfigPath $TestConfigPath -Verbose
+if ($LASTEXITCODE -ne 0) { throw "Setup failed: new_experiment.ps1 could not create the base experiment." }
+
+$OriginalExpPath = ($output | Out-String) -split '\r?\n' | Select-Object -Last 1
+if (-not (Test-Path $OriginalExpPath)) { throw "Setup failed: Could not parse the new experiment path from output." }
+
+# Rename the experiment to make it identifiable for this test layer
+$CorruptedExpPath = Join-Path $NewExperimentsDir "l5_test_exp_corrupted_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+Rename-Item -Path $OriginalExpPath -NewName $CorruptedExpPath.Split('\')[-1]
+Write-Host "  -> Base experiment created and renamed to: $($CorruptedExpPath.Split('\')[-1])"
+
+Write-Host "`n2. Deliberately corrupting the experiment..."
+$runDir = Get-ChildItem -Path $CorruptedExpPath -Directory "run_*" | Select-Object -First 1
+if (-not $runDir) { throw "Setup failed: No run directory found in the new experiment." }
+
+# Corruption 1: Delete the archived config (CONFIG_ISSUE)
+Remove-Item -Path (Join-Path $runDir.FullName "config.ini.archived") -Force
+Write-Host "  -> Deleted archived config file."
+# Corruption 2: Delete a response file (RESPONSE_ISSUE)
+$responseFile = Get-ChildItem -Path $runDir.FullName -Filter "llm_response_*.txt" -Recurse | Select-Object -First 1
+Remove-Item -Path $responseFile.FullName -Force
+Write-Host "  -> Deleted a response file."
+
+Write-Host "`nIntegration test sandbox for Layer 5 created and corrupted successfully."
+Write-Host "Your next action is Step 2: Execute the Test Workflow."

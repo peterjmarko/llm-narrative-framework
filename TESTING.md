@@ -21,7 +21,7 @@ The project uses `pytest` for Python unit tests. All automated tests are managed
 
 ## A Guide to Manual & Integration Testing
 
-> **Warning:** The test procedures below involve creating temporary files and backing up your main `config.ini`. You **must** complete the entire "Setup -> Test -> Cleanup" workflow for each test case. Running only the setup step will leave your project in a modified state.
+> **Note:** The integration test procedures below (Layers 3 and higher) create a temporary `temp_test_environment` directory at the project root to run in a safe, isolated sandbox. These tests are non-destructive and will not modify your main project files.
 
 This section provides a unified, step-by-step guide to the project's validation process, from developing a single script to performing a full end-to-end integration test of the data preparation pipeline.
 
@@ -123,97 +123,46 @@ After inspecting the artifacts, run this script to delete the test directory.
 
 ### Layer 4: Main Workflow Integration Testing
 
-This procedure validates the core `new -> audit -> fix` experiment lifecycle using a set of dedicated, easy-to-use scripts. It follows a clean `Setup -> Test -> Cleanup` pattern.
-
-> **Troubleshooting:** If any step fails, your recovery action is always the same: re-run the `Step 1: Automated Setup` script. This will safely clean up any failed artifacts and restore your project from the latest backups.
-
-#### Step 0: (CRITICAL) Manual Project Backup
-This procedure is designed to be safe, but it will temporarily modify core project files. To provide a complete safety net, it is critical that you first create a manual backup of these specific assets:
-*   The `config.ini` file from the project root.
-*   The `personalities_db.txt` file from the `data/` directory.
-*   The entire `output/new_experiments` directory.
-
-**Do not proceed until you have manually verified that these files are safely backed up.**
+This procedure validates the core `new -> audit -> break -> fix` experiment lifecycle in a safe, isolated sandbox. It follows a clean `Setup -> Test -> Cleanup` pattern.
 
 #### Step 1: Automated Setup
-Run this script from the **project root**. It will safely clean up any artifacts from a previous run and create a fresh test environment by creating timestamped backups of your critical files.
-
+Run this script to create the test environment, including a sandboxed `config.ini` and a minimal dataset.
 ```powershell
 .\tests\testing_harness\layer4_step1_setup.ps1
 ```
 
 #### Step 2: Execute the Test Workflow
-After setup is complete, run this script to execute the full `new -> audit -> fix` workflow. At the end, the test artifacts (e.g., the new experiment directory and its logs) are left intact for your inspection.
-
-> **Important:** You can re-run this script multiple times for debugging before proceeding to the final cleanup.
-
+This script fully automates the `new -> audit -> break -> fix` lifecycle and verifies the final output.
 ```powershell
 .\tests\testing_harness\layer4_step2_test_workflow.ps1
 ```
 
 #### Step 3: Automated Cleanup
-After you have finished inspecting the experiment directory and its log files, run this script from the project root to restore your project to its original, clean state.
-
+After inspecting the artifacts, run this script to delete the test sandbox and all generated experiment files.
 ```powershell
 .\tests\testing_harness\layer4_step3_cleanup.ps1
 ```
 
 ### Layer 5: Migration Workflow Integration Testing
 
-This procedure validates the `migrate_experiment.ps1` workflow. It automatically creates a severely corrupted experiment, runs the migration, and validates the final, repaired output.
+This procedure validates the `migrate_experiment.ps1` workflow in a safe, isolated sandbox. It automatically creates a valid experiment, corrupts it, runs the migration, and validates the final, repaired output.
 
 #### Step 1: Automated Setup
-Run this script from the project root. It will generate a new experiment and then deliberately corrupt it to a state that requires migration.
-
+Run this script to create a sandboxed test environment and a deliberately corrupted experiment.
 ```powershell
 .\tests\testing_harness\layer5_step1_setup.ps1
 ```
 
 #### Step 2: Execute the Test Workflow
-This script will audit the corrupted experiment, run the migration, and perform a final validation audit on the newly created, repaired experiment.
-
+This script fully automates the `audit -> migrate -> validate` lifecycle and verifies the final repaired experiment.
 ```powershell
 .\tests\testing_harness\layer5_step2_test_workflow.ps1
 ```
 
 #### Step 3: Automated Cleanup
-After inspecting the artifacts, run this script to remove all test-related directories and restore your project to its original state.
-
+After inspecting the artifacts, run this script to delete the test sandbox and all generated experiment files.
 ```powershell
 .\tests\testing_harness\layer5_step3_cleanup.ps1
-```
-
-> **Troubleshooting:** If any step fails, your recovery action is always the same: re-run the `Step 1: Automated Setup` script. This will safely clean up any failed artifacts and restore your project from the latest backups.
-
-#### Step 0: (CRITICAL) Manual Project Backup
-This procedure is designed to be safe, but it will temporarily modify core project files. To provide a complete safety net, it is critical that you first create a manual backup of these specific assets:
-*   The `config.ini` file from the project root.
-*   The `personalities_db.txt` file from the `data/` directory.
-*   The entire `output/new_experiments` directory.
-
-**Do not proceed until you have manually verified that these files are safely backed up.**
-
-#### Step 1: Automated Setup
-Run this script from the **project root**. It will safely clean up any artifacts from a previous run and create a fresh test environment by creating timestamped backups of your critical files.
-
-```powershell
-.\tests\testing_harness\layer4_step1_setup.ps1
-```
-
-#### Step 2: Execute the Test Workflow
-After setup is complete, run this script to execute the full `new -> audit -> fix` workflow. At the end, the test artifacts (e.g., the new experiment directory and its logs) are left intact for your inspection.
-
-> **Important:** You can re-run this script multiple times for debugging before proceeding to the final cleanup.
-
-```powershell
-.\tests\testing_harness\layer4_step2_test_workflow.ps1
-```
-
-#### Step 3: Automated Cleanup
-After you have finished inspecting the experiment directory and its log files, run this script from the project root to restore your project to its original, clean state.
-
-```powershell
-.\tests\testing_harness\layer4_step3_cleanup.ps1
 ```
 
 ### Layer 6: Post-Hoc Study Evaluation (Planned)

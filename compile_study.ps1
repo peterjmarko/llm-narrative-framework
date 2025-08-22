@@ -48,6 +48,10 @@
 #>
 [CmdletBinding()]
 param (
+    [Parameter(Mandatory = $false, HelpMessage = "Path to a specific config.ini file to use for this operation.")]
+    [Alias('config-path')]
+    [string]$ConfigPath,
+
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target top-level study directory.")]
     [string]$StudyDirectory,
 
@@ -92,12 +96,13 @@ else {
 # --- Load and parse model display names from config.ini ---
 $modelNameMap = @{}
 try {
-    # Assume config.ini is in the project root (where the script is).
-    $configPath = Join-Path $PSScriptRoot "config.ini"
-    if (-not (Test-Path $configPath)) {
-        throw "config.ini not found at '$configPath'"
+    # Use the provided ConfigPath if it exists, otherwise default to the project root's config.ini.
+    $effectiveConfigPath = if (-not [string]::IsNullOrEmpty($ConfigPath) -and (Test-Path $ConfigPath)) { $ConfigPath } else { Join-Path $PSScriptRoot "config.ini" }
+    
+    if (-not (Test-Path $effectiveConfigPath)) {
+        throw "config.ini not found at '$effectiveConfigPath'"
     }
-    $configContent = Get-Content -Path $configPath -Raw
+    $configContent = Get-Content -Path $effectiveConfigPath -Raw
 
     # Use [regex]::Match to correctly extract the section content as a string.
     $normalizationSection = ([regex]::Match($configContent, '(?msi)^\[ModelNormalization\]\r?\n(.*?)(?=\r?\n^\[)')).Groups[1].Value
@@ -241,7 +246,11 @@ try {
     # --- Step 1/5: Run Pre-Analysis Audit ---
     Write-Host "[1/5: Pre-Analysis Audit] Verifying study readiness..." -ForegroundColor Cyan
     $auditScriptPath = Join-Path $PSScriptRoot "audit_study.ps1"
-    $auditOutput = & $auditScriptPath -StudyDirectory $StudyDirectory -NoHeader -ErrorAction Stop
+    $auditArgs = @("-StudyDirectory", $StudyDirectory, "-NoHeader", "-ErrorAction", "Stop")
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) {
+        $auditArgs += "-ConfigPath", $ConfigPath
+    }
+    $auditOutput = & $auditScriptPath @auditArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n--- Audit Report on Failure ---" -ForegroundColor Yellow
         $auditOutput | Write-Host # Display the captured report from the audit script
@@ -306,12 +315,16 @@ try {
     # --- Step 4/5: Compile All Results into a Master CSV ---
     $step4Header = "[4/5: Compile Study Results] Compiling all experiment data..."
     Write-Host "`n$step4Header" -ForegroundColor Cyan
-    Invoke-PythonScript -StepName "4/5: Compile Study Results" -ScriptName "src/compile_study_results.py" -Arguments $ResolvedPath
+    $compileArgs = @($ResolvedPath)
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $compileArgs += "--config-path", $ConfigPath }
+    Invoke-PythonScript -StepName "4/5: Compile Study Results" -ScriptName "src/compile_study_results.py" -Arguments $compileArgs
 
     # --- Step 5/5: Run Final Analysis (ANOVA) ---
     $step5Header = "[5/5: Run Final Analysis (ANOVA)] Performing statistical analysis..."
     Write-Host "`n$step5Header" -ForegroundColor Cyan
-    Invoke-PythonScript -StepName "5/5: Run Final Analysis (ANOVA)" -ScriptName "src/analyze_study_results.py" -Arguments $ResolvedPath
+    $analyzeArgs = @($ResolvedPath)
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $analyzeArgs += "--config-path", $ConfigPath }
+    Invoke-PythonScript -StepName "5/5: Run Final Analysis (ANOVA)" -ScriptName "src/analyze_study_results.py" -Arguments $analyzeArgs
 
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Green

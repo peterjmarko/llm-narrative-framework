@@ -46,6 +46,10 @@
 #>
 [CmdletBinding()]
 param (
+    [Parameter(Mandatory = $false, HelpMessage = "Path to a specific config.ini file to use for this operation.")]
+    [Alias('config-path')]
+    [string]$ConfigPath,
+
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target directory containing one or more experiments.")]
     [string]$StudyDirectory,
 
@@ -147,7 +151,9 @@ try {
     $i = 0
     foreach ($dir in $experimentDirs) {
         $i++
+        # Pass the config path down to the individual experiment auditor.
         $arguments = @($dir.FullName, "--quiet", "--force-color")
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $arguments += "--config-path", $ConfigPath }
         
         if ($PSBoundParameters['Verbose']) {
             Write-Host "`n--- Auditing Experiment $($i)/$($experimentDirs.Count) (Verbose): $($dir.Name) ---" -ForegroundColor Yellow
@@ -259,14 +265,14 @@ try {
         # Case 1: All experiments are valid AND the final study artifacts exist.
         Write-Output "$c_green`n$headerLine$c_reset"
         Write-Output "$c_green$(Format-HeaderLine "AUDIT FINISHED: STUDY IS COMPLETE")$c_reset"
-        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'evaluate_study.ps1' to re-run.")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'compile_study.ps1' to re-run.")$c_reset"
         Write-Output "$c_green$headerLine`n$c_reset"
     }
     elseif ($isStudyReadyForProcessing) {
         # Case 2: All experiments are valid BUT the final study artifacts are missing.
         Write-Output "$c_green`n$headerLine$c_reset"
         Write-Output "$c_green$(Format-HeaderLine "AUDIT FINISHED: STUDY IS VALIDATED")$c_reset"
-        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'evaluate_study.ps1' to")$c_reset"
+        Write-Output "$c_green$(Format-HeaderLine "Recommendation: Run 'compile_study.ps1' to")$c_reset"
         Write-Output "$c_green$(Format-HeaderLine "complete the final analysis.")$c_reset"
         Write-Output "$c_green$headerLine`n$c_reset"
     }
