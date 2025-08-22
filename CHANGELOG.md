@@ -1,5 +1,23 @@
 # Changelog
 
+## 6.6.0 (2025-08-22)
+
+### Bump
+
+- **version 6.5.0 → 6.6.0**
+
+### Features
+
+- **implement live, limited-scope data pipeline integration test**
+  This commit refactors the Layer 3 integration test into a high-fidelity, live, limited-scope validation of the entire data preparation pipeline. The previous test was offline and did not accurately validate API interactions.
+  
+  - `fetch_adb_data.py` is now testable, accepting `--start-date` and `--end-date` flags to fetch a small, predictable number of live records from Astro-Databank.
+  - `neutralize_delineations.py` now accepts a `--force` flag for non-interactive execution in automated workflows.
+  - The Layer 3 test harness is rewritten to orchestrate a live end-to-end run using a more diverse and representative set of test subjects (Busch, McCartney, Cainer).
+  - The harness now correctly bypasses only the manual steps, allowing all automated scripts, including those with network/LLM calls, to run against the limited live data.
+  - Fixes bugs in `prepare_data.ps1` related to the `-Force` flag logic and improves its console output.
+  - Adds temporary test directories to `.gitignore`.
+
 ## 6.5.0 (2025-08-22)
 
 ### Bump
