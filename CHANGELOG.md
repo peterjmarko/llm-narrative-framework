@@ -1,5 +1,24 @@
 # Changelog
 
+## 6.6.1 (2025-08-23)
+
+### Bump
+
+- **version 6.6.0 → 6.6.1**
+
+### Refactor
+
+- **standardize all PowerShell wrapper interfaces and calls**
+  This commit completes a comprehensive refactoring to standardize the entire suite of user-facing PowerShell scripts and their interactions with Python backends, enhancing robustness and consistency.
+  
+  Guiding Principles Implemented:
+  - PowerShell-to-Python calls now uniformly use the robust array-building method.
+  - PowerShell-to-PowerShell calls now uniformly use the robust hashtable splatting method.
+  - Directory parameters are standardized to `$ExperimentDirectory` for single experiments and `$StudyDirectory` for studies.
+  - Python backends now have consistent argument interfaces.
+  
+  This resolves multiple subtle argument-passing bugs and aligns all scripts with the architectural guidelines now documented in CONTRIBUTING.md.
+
 ## 6.6.0 (2025-08-22)
 
 ### Bump
