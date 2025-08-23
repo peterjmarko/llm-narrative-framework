@@ -37,28 +37,36 @@ The framework is validated using a multi-layered strategy to ensure correctness 
 
 ---
 
-### Layer 1: Unit Testing (A Single Python Script)
+### Layer 1: Unit & Integration Testing (A Single Python Script)
 
-This is the iterative workflow for developing or modifying any individual Python script. It follows a clean `Develop -> Test -> Finalize` pattern.
+This is the iterative, three-stage workflow for developing or modifying any individual Python script. It follows a robust `Refactor -> Unit Test -> Integration Test` pattern to ensure quality at every step.
 
-#### A. The Smoke Test
-After making any significant changes to the codebase, perform a quick **smoke test** by running the main `new_experiment.ps1` workflow. This catches critical bugs immediately.
+#### Stage 1: Refactor
+Make the necessary code changes to the target Python script (e.g., `src/data_preparation/my_script.py`).
+
+#### Stage 2: Unit Test
+After refactoring, run the script's dedicated unit test suite to verify its internal logic and catch any regressions.
 ```powershell
-# Run a quick, minimal experiment to ensure the main pipeline is functional
-.\new_experiment.ps1
+# Run the specific test file with code coverage
+pdm run cov-file <script_name>
 ```
-If this fails, fix the issue before proceeding.
+If the unit tests fail, fix the script before proceeding to the next stage.
 
-#### B. The Iterative Development Workflow
-The core process involves alternating between quick manual checks and building a permanent automated test suite.
+#### Stage 3: Integration Test
+Once unit tests pass, perform an integration test to validate that the script functions correctly within the live pipeline. For data preparation scripts, this is done using the Layer 3 test harness.
 
-1.  **Manual Testing (Initial Check):** Before writing formal tests, perform a quick manual run in a temporary directory to confirm the script's core logic.
-2.  **Automated Unit Testing (`pytest`):** Once the logic seems sound, create a permanent, automated unit test for it. Use this to validate all functions and edge cases.
+1.  **Add a Checkpoint:** Temporarily modify `tests/testing_harness/layer3_step2_test_workflow.ps1`. Add an `exit 0` command immediately after the line that calls the script you just modified.
+2.  **Run the Test:** Execute the Layer 3 test from the project root.
     ```powershell
-    # Run the specific test file with code coverage
-    pdm run cov-file <script_name>
+    # Run setup, then the workflow.
+    .\tests\testing_harness\layer3_step1_setup.ps1
+    .\tests\testing_harness\layer3_step2_test_workflow.ps1
     ```
-3.  **Final Manual Validation:** If you modify the script's code while writing automated tests, you **must** perform a final manual test to ensure the changes did not introduce unintended side effects.
+3.  **Verify:** The test should run successfully up to your checkpoint and exit gracefully. Manually inspect the artifacts created in the `temp_test_environment/layer3_sandbox/` to confirm your script produced the correct output.
+4.  **Clean Up:** Once verified, remove the temporary `exit 0` from the workflow script and run the cleanup script.
+    ```powershell
+    .\tests\testing_harness\layer3_step3_cleanup.ps1
+    ```
 
 ---
 

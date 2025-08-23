@@ -70,6 +70,12 @@ This phase focuses on achieving a fully validated and stable codebase before the
 
 ### Code Development
 
+- [ ] **Architectural Refactoring for Modularity**
+  - [ ] Reorganize the `src/` directory into logical subdirectories (`data_preparation/`, `experimentation/`) to improve separation of concerns and navigability.
+  - [ ] Mirror the new `src/` structure in the `tests/` directory to create a parallel test suite.
+  - [ ] Move tests for developer utility scripts from `tests/` to a self-contained `scripts/tests/` directory.
+  - [ ] Systematically update all import statements and script paths across the entire project to reflect the new structure.
+
 - [ ] **Improve Experiment Execution and Reproducibility**
   - [ ] Refactor inter-script communication for robustness. Modify core Python scripts (`experiment_manager.py`, etc.) to send all human-readable logs to `stderr` and use `stdout` exclusively for machine-readable output (e.g., the final experiment path). Update PowerShell wrappers to correctly handle these separate streams.
   - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.

@@ -158,6 +158,8 @@ def login_to_adb(session, username, password):
 
 def scrape_search_page_data(session):
     """Scrapes security tokens, finds category IDs, and builds a category name map."""
+    # This utility function needs to be imported here to be available.
+    from config_loader import get_path
     logging.info("Fetching security tokens and category data...")
     page_response = session.get(SEARCH_PAGE_URL, headers={'User-Agent': USER_AGENT}, timeout=REQUEST_TIMEOUT)
     page_response.raise_for_status()
@@ -194,14 +196,13 @@ def scrape_search_page_data(session):
     logging.info(f"Built a lookup map with {len(category_map)} category translations.")
 
     # --- Save the category map to a CSV file ---
-    output_dir = Path('data/foundational_assets')
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / 'adb_category_map.csv'
+    output_path = Path(get_path('data/foundational_assets/adb_category_map.csv'))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if output_path.exists():
         logging.info(f"Category map '{output_path}' already exists. Creating a backup before overwriting.")
         try:
-            backup_dir = Path('data/backup')
+            backup_dir = Path(get_path('data/backup'))
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
@@ -462,7 +463,7 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
 def main():
     os.system('')
     parser = argparse.ArgumentParser(description="Fetch raw birth data from the Astro-Databank website.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("-o", "--output-file", default="data/sources/adb_raw_export.txt", help="Path for the output data file.")
+    parser.add_argument("-o", "--output-file", default=None, help="Path for the output data file. Defaults to the path in config.ini.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file without a prompt.")
     parser.add_argument("--start-date", type=str, help="Start date for search filter (YYYY-MM-DD). For testing.")
     parser.add_argument("--end-date", type=str, help="End date for search filter (YYYY-MM-DD). For testing.")
@@ -478,13 +479,16 @@ def main():
         logging.error(f"{Fore.RED}Invalid date format. Please use YYYY-MM-DD.")
         sys.exit(1)
 
-    output_path = Path(args.output_file)
+    # Import here to ensure it's available after potential reloads in test environments
+    from config_loader import get_path
+
+    output_path = Path(args.output_file if args.output_file else get_path("data/sources/adb_raw_export.txt"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     def backup_and_overwrite(file_path: Path):
         """Creates a backup of the file before overwriting."""
         try:
-            backup_dir = Path('data/backup')
+            backup_dir = Path(get_path('data/backup'))
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"

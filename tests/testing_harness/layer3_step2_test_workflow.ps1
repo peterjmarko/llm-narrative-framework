@@ -41,17 +41,37 @@ try {
         Remove-Item $tempOutputFile
     }
 
-    # CRITICAL: Filter the fetched data to only our 3 target subjects.
-    Write-Host "`n--- Filtering fetched data to target subjects... ---" -ForegroundColor Yellow
-    # Define patterns that will match the "LastName<tab>FirstName" format in the raw data.
-    $targetPatterns = "Busch`tErnst", "McCartney`tPaul", "Cainer`tJonathan"
+    # CRITICAL: Filter the aggregated data to only our 3 target subjects before proceeding.
+    Write-Host "`n--- Filtering aggregated data to target subjects... ---" -ForegroundColor Yellow
+    $targetIDs = "52735", "9129", "42399" # Ernst Busch, Paul McCartney, Jonathan Cainer
     
     $header = Get-Content $outputFile | Select-Object -First 1
-    # Use Select-String with an array of patterns to find all matching lines, and expand the Line property.
-    $filteredData = (Get-Content $outputFile | Select-String -Pattern $targetPatterns).Line
+    $dataRows = Get-Content $outputFile | Select-Object -Skip 1
+    
+    # Filter rows where the second column (idADB) is one of our target IDs.
+    $filteredData = $dataRows | Where-Object { $targetIDs -contains ($_.Split("`t"))[1] }
 
-    Set-Content -Path $outputFile -Value ($header + $filteredData)
+    # Construct the final content as a single array of strings for robust file writing.
+    $finalContent = @($header) + $filteredData
+    Set-Content -Path $outputFile -Value $finalContent
+
     Write-Host "  -> Filtering complete. Final record count: $($filteredData.Length)."
+
+    # --- Integration Test Checkpoint ---
+    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: fetch_adb_data.py ---" -ForegroundColor Green
+    
+    # Verification Step: Read the file back and confirm it contains the correct data.
+    $targetIDs = "52735", "9129", "42399" # Ernst Busch, Paul McCartney, Jonathan Cainer
+    $fileContent = Get-Content $outputFile | Select-Object -Skip 1
+    $foundIDs = $fileContent | ForEach-Object { ($_.Split("`t"))[1] } | Sort-Object
+    
+    if (($foundIDs | Compare-Object -ReferenceObject ($targetIDs | Sort-Object)).Length -ne 0) {
+        throw "FAIL: The final 'adb_raw_export.txt' file does not contain the correct 3 test subjects."
+    }
+    
+    Write-Host "Verification PASSED: 'adb_raw_export.txt' contains the correct 3 subjects." -ForegroundColor Yellow
+    Write-Host ""
+    exit 0 # Temporarily exit after this stage for methodical testing.
     
     # --- 2. Run the Automated Pipeline Scripts Sequentially ---
     Write-Host "`n--- Running automated data pipeline scripts... ---" -ForegroundColor Yellow
