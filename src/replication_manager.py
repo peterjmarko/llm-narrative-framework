@@ -417,7 +417,7 @@ def main():
     if final_status_msg not in ["COMPLETED", "REPAIRED"]:
         status_color = Fore.RED
 
-    print(f"\n{status_color}Replication run finished. Final status: {final_status_msg}{Fore.RESET}")
+    print(f"\n{status_color}Replication run finished. Final status: {final_status_msg}.{Fore.RESET}", file=sys.stderr)
 
 
 if __name__ == "__main__":

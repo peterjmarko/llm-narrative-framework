@@ -49,12 +49,12 @@
 #>
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to audit.")]
-    [string]$ExperimentDirectory,
-
-    [Parameter(Mandatory = $false, HelpMessage = "Path to a specific config.ini file to use for the audit.")]
+    [Parameter(Mandatory = $false, HelpMessage = "Path to a specific config.ini file to use for this operation.")]
     [Alias('config-path')]
-    [string]$ConfigPath
+    [string]$ConfigPath,
+
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the experiment directory to audit.")]
+    [string]$ExperimentDirectory
 )
 
 function Get-ProjectRoot {
@@ -74,10 +74,11 @@ try {
     if (-not (Test-Path $ExperimentDirectory -PathType Container)) { throw "Directory '$ExperimentDirectory' does not exist." }
     $ResolvedPath = Resolve-Path -Path $ExperimentDirectory -ErrorAction Stop
     $scriptName = Join-Path $ProjectRoot "src/experiment_auditor.py"
-    $pythonScriptArgs = @($ResolvedPath)
+    
+    $pythonScriptArgs = @($ResolvedPath, "--force-color")
     if ($PSBoundParameters['Verbose']) { $pythonScriptArgs += "--verbose" }
-    $pythonScriptArgs += "--force-color"
     if (-not [string]::IsNullOrEmpty($ConfigPath)) { $pythonScriptArgs += "--config-path", $ConfigPath }
+
     $LogFilePath = Join-Path $ResolvedPath "experiment_audit_log.txt"
     $relativeLogPath = Join-Path (Resolve-Path -Path $ExperimentDirectory -Relative) (Split-Path $LogFilePath -Leaf)
     Write-Host "`nThe audit log will be saved to: $relativeLogPath"

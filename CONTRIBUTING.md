@@ -126,6 +126,12 @@ To maintain the quality and consistency of the codebase, all contributions shoul
 
 *   **Guaranteed Reproducibility**: Experimental results must be verifiably linked to the parameters that created them. The pipeline ensures this by automatically archiving the `config.ini` file within each run's output directory, creating an immutable record.
 
+*   **Standardized Wrapper and Backend Interfaces**: All user-facing PowerShell wrappers and their Python backends must adhere to a consistent architectural pattern to ensure robustness and predictability.
+    -   **Parameter Naming**: Wrappers that operate on a single experiment use the parameter `$ExperimentDirectory`. Wrappers that operate on a study (a directory of experiments) use `$StudyDirectory`.
+    -   **PowerShell-to-Python Calls**: All calls from a PowerShell wrapper to a Python backend must use the **robust array-building method** to pass arguments. This correctly handles the mix of commands, flags, and positional arguments.
+    -   **PowerShell-to-PowerShell Calls**: All calls from one PowerShell wrapper to another must use the **robust hashtable splatting method** for passing named parameters.
+    -   **Python Argument Parsing**: Python backends maintain simple and conventional command-line interfaces, typically using a single primary positional argument for the target directory or a `verb + noun` pattern for more complex operations.
+
 *   **Resilient and User-Friendly Pipeline Scripts**: All long-running data preparation and validation scripts must adhere to a standard, modern architecture to ensure a consistent and robust user experience. Key features of this standard include:
     -   **Intelligent Startup**: Scripts must use a "Filter First, Then Decide" architecture to accurately determine if there is new work to be done.
     -   **Automatic Stale Check**: Scripts must automatically detect if input files are newer than their own output and trigger a non-interactive re-run.

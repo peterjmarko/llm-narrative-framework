@@ -54,8 +54,8 @@ param (
     [Alias('config-path')]
     [string]$ConfigPath,
 
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target directory containing one or more experiments.")]
-    [string]$TargetDirectory
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the study directory containing one or more experiments.")]
+    [string]$StudyDirectory
 )
 
 function Format-Banner {
@@ -86,10 +86,10 @@ $ScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
 # --- Logging Setup ---
 $logFileName = "study_migration_log.txt"
-if (-not (Test-Path -Path $TargetDirectory -PathType Container)) {
-    throw "Study directory not found: $TargetDirectory"
+if (-not (Test-Path -Path $StudyDirectory -PathType Container)) {
+    throw "Study directory not found: $StudyDirectory"
 }
-$logFilePath = Join-Path $TargetDirectory $logFileName
+$logFilePath = Join-Path $StudyDirectory $logFileName
 
 # --- Auto-detect execution environment (once, at the top) ---
 $executable = "python"
@@ -117,9 +117,9 @@ try {
     $AUDIT_NEEDS_MIGRATION = 3
 
     Write-Host "`n--- Performing pre-migration audit of the entire study... ---" -ForegroundColor Cyan
-    $experimentDirs = Get-ChildItem -Path $TargetDirectory -Directory | Where-Object { $_.Name -ne 'anova' }
+    $experimentDirs = Get-ChildItem -Path $StudyDirectory -Directory | Where-Object { $_.Name -ne 'anova' }
     if ($experimentDirs.Count -eq 0) {
-        Write-Host "No experiment directories found in '$TargetDirectory'." -ForegroundColor Yellow
+        Write-Host "No experiment directories found in '$StudyDirectory'." -ForegroundColor Yellow
         return
     }
 
@@ -144,9 +144,13 @@ try {
 
     # Now, run the full, visible audit so the user sees the report.
     $auditScriptPath = Join-Path $ScriptRoot "audit_study.ps1"
-    $auditStudyArgs = @{ TargetDirectory = $TargetDirectory; NoLog = $true; NoHeader = $true }
-    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditStudyArgs['ConfigPath'] = $ConfigPath }
-    & $auditScriptPath @auditStudyArgs
+    $auditStudySplat = @{
+        StudyDirectory = $StudyDirectory
+        NoLog          = $true
+        NoHeader       = $true
+    }
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditStudySplat['ConfigPath'] = $ConfigPath }
+    & $auditScriptPath @auditStudySplat
 
     # --- Main Logic branches based on the reliable audit results ---
     if ($needsRepair) {
@@ -179,7 +183,7 @@ Enter your choice (1 or N)
         
         if ($choice.Trim().ToLower() -eq '1') {
             # Create a new, timestamped directory for the entire migrated study.
-            $studyBaseName = (Get-Item -Path $TargetDirectory).Name
+            $studyBaseName = (Get-Item -Path $StudyDirectory).Name
             $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
             $newStudyFolderName = "${studyBaseName}_migrated_${timestamp}"
             $migratedStudyParent = "output/migrated_studies"
@@ -202,10 +206,10 @@ Enter your choice (1 or N)
                 
                 # Pass the new study directory as the destination for the worker script.
                 $migrateArgs = @{
-                    TargetDirectory   = $experimentDir.FullName
-                    DestinationParent = $migratedStudyPath
-                    NonInteractive    = $true
-                    NoHeader          = $true
+                    ExperimentDirectory = $experimentDir.FullName
+                    DestinationParent   = $migratedStudyPath
+                    NonInteractive      = $true
+                    NoHeader            = $true
                 }
                 if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
                 if (-not [string]::IsNullOrEmpty($ConfigPath)) { $migrateArgs['ConfigPath'] = $ConfigPath }
@@ -239,7 +243,7 @@ Enter your choice (1 or N)
 
     foreach ($experimentName in $experimentsToMigrate) {
         $i++
-        $experimentPath = Join-Path $TargetDirectory $experimentName
+        $experimentPath = Join-Path $StudyDirectory $experimentName
         $bannerMessage = "Migrating Experiment $i of $($experimentsToMigrate.Count): $experimentName"
         Write-Host "`n$($C_CYAN)$headerLine"
         Write-Host "$($C_CYAN)$(Format-Banner $bannerMessage)"
@@ -248,9 +252,9 @@ Enter your choice (1 or N)
         # Add NonInteractive = $true to suppress the redundant confirmation prompt
         # in the worker script.
         $migrateArgs = @{
-            TargetDirectory = $experimentPath
-            NonInteractive  = $true
-            NoHeader        = $true
+            ExperimentDirectory = $experimentPath
+            NonInteractive      = $true
+            NoHeader            = $true
         }
         if ($PSBoundParameters['Verbose']) { $migrateArgs['Verbose'] = $true }
         if (-not [string]::IsNullOrEmpty($ConfigPath)) { $migrateArgs['ConfigPath'] = $ConfigPath }

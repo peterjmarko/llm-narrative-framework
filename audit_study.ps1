@@ -50,7 +50,7 @@ param (
     [Alias('config-path')]
     [string]$ConfigPath,
 
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the target directory containing one or more experiments.")]
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path to the study directory containing one or more experiments.")]
     [string]$StudyDirectory,
 
     [Parameter(Mandatory=$false)]
@@ -151,20 +151,18 @@ try {
     $i = 0
     foreach ($dir in $experimentDirs) {
         $i++
-        # Pass the config path down to the individual experiment auditor.
-        $arguments = @($dir.FullName, "--quiet", "--force-color")
-        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $arguments += "--config-path", $ConfigPath }
+        # Use the standard array-building method for calls to Python scripts.
+        $auditArgs = @($dir.FullName, "--quiet", "--force-color")
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditArgs += "--config-path", $ConfigPath }
         
         if ($PSBoundParameters['Verbose']) {
             Write-Host "`n--- Auditing Experiment $($i)/$($experimentDirs.Count) (Verbose): $($dir.Name) ---" -ForegroundColor Yellow
-            $finalArgs = $prefixArgs + $scriptName + $arguments
-            & $executable @finalArgs 2>&1
+            & $executable $prefixArgs $scriptName $auditArgs
             $exitCode = $LASTEXITCODE
             Write-Host "--- End of Audit for: $($dir.Name) ---" -ForegroundColor Yellow
         }
         else {
-            $finalArgs = $prefixArgs + $scriptName + $arguments
-            & $executable @finalArgs 2>&1 | Out-Null # Suppress Python output in non-verbose
+            & $executable $prefixArgs $scriptName $auditArgs | Out-Null # Suppress Python output in non-verbose
             $exitCode = $LASTEXITCODE
         }
 

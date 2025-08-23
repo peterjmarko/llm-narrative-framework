@@ -163,9 +163,10 @@ try {
     Write-Host "`nThe repair log will be saved to:`n$relativeLogPath" -ForegroundColor Gray
 
     if ($ForceUpdate.IsPresent) {
-        $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $ExperimentDirectory, "--non-interactive")
-        $finalArgs = @("python") + $procArgs
-        & pdm run $finalArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
+        $scriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
+        $procArgs = @($scriptPath, $ExperimentDirectory, "--reprocess", "--non-interactive")
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $procArgs += "--config-path", $ConfigPath }
+        & pdm run python $procArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
         if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 99) { throw "Forced update failed" }
         return
     }
@@ -176,10 +177,10 @@ try {
     }
 
     Write-Header "STEP 1: DIAGNOSING EXPERIMENT STATE" $C_CYAN $C_RESET
-    $auditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $ExperimentDirectory, "--force-color")
-    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditPyArgs += "--config-path", $ConfigPath }
-    $auditArgs = @("python") + $auditPyArgs
-    & pdm run $auditArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
+    $auditScriptPath = Join-Path $ProjectRoot "audit_experiment.ps1"
+    $auditSplat = @{ ExperimentDirectory = $ExperimentDirectory }
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditSplat['ConfigPath'] = $ConfigPath }
+    & $auditScriptPath @auditSplat *>&1 | Tee-Object -FilePath $logFilePath -Append
     $auditExitCode = $LASTEXITCODE
     
     $actionTaken = $false
@@ -189,21 +190,23 @@ try {
         0 { # AUDIT_ALL_VALID
             if ($NonInteractive) { return }
             $choice = Read-Host -Prompt "Experiment is valid. Choose action: (1) Full Repair, (2) Full Update, (3) Aggregation Only, (N) No Action"
+            $scriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
             switch($choice.Trim().ToLower()) {
                 '1' {
                     if ((Read-Host -Prompt "Type 'YES' to confirm OVERWRITE of LLM responses") -eq 'YES') {
                         Get-ChildItem -Path $ExperimentDirectory -Filter "llm_response_*.txt" -Recurse | Remove-Item -Force
-                        $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $ExperimentDirectory, "--non-interactive")
+                        $procArgs = @($scriptPath, $ExperimentDirectory, "--non-interactive")
                     } else { return }
                 }
-                '2' { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $ExperimentDirectory, "--non-interactive") }
+                '2' { $procArgs = @($scriptPath, $ExperimentDirectory, "--reprocess", "--non-interactive") }
                 '3' { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -ExperimentDirectory $ExperimentDirectory -LogFilePath $logFilePath; $actionTaken = $true }
                 'n' { return }
                 default { return }
             }
         }
-        1 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), "--reprocess", $ExperimentDirectory, "--non-interactive") }
-        2 { $procArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $ExperimentDirectory, "--non-interactive") }
+        $scriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
+        1 { $procArgs = @($scriptPath, $ExperimentDirectory, "--reprocess", "--non-interactive") }
+        2 { $procArgs = @($scriptPath, $ExperimentDirectory, "--non-interactive") }
         3 { Write-Host "Experiment needs migration. Run migrate_experiment.ps1." -ForegroundColor Yellow; exit 1 }
         4 { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -ExperimentDirectory $ExperimentDirectory -LogFilePath $logFilePath; $actionTaken = $true }
         default { throw "Audit failed with exit code $auditExitCode" }
@@ -216,8 +219,7 @@ try {
         if ($Verbose) { $procArgs += "--verbose" }
         if (-not [string]::IsNullOrEmpty($ConfigPath)) { $procArgs += "--config-path", $ConfigPath }
         
-        $finalArgs = @("python") + $procArgs
-        & pdm run $finalArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
+        & pdm run python $procArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
         $exitCode = $LASTEXITCODE
         if ($exitCode -ne 0 -and $exitCode -ne 99) { throw "Repair process failed with exit code $exitCode" }
         $actionTaken = $true
@@ -225,10 +227,12 @@ try {
 
     if ($actionTaken) {
         Write-Header "STEP 3: FINAL VERIFICATION" $C_CYAN $C_RESET
-        $finalAuditPyArgs = @((Join-Path $ProjectRoot "src/experiment_auditor.py"), $ExperimentDirectory, "--force-color", "--non-interactive")
-        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $finalAuditPyArgs += "--config-path", $ConfigPath }
-        $finalAuditArgs = @("python") + $finalAuditPyArgs
-        & pdm run $finalAuditArgs *>&1 | Tee-Object -FilePath $logFilePath -Append
+        $auditScriptPath = Join-Path $ProjectRoot "audit_experiment.ps1"
+        $auditSplat = @{
+            ExperimentDirectory = $ExperimentDirectory
+        }
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditSplat['ConfigPath'] = $ConfigPath }
+        & $auditScriptPath @auditSplat *>&1 | Tee-Object -FilePath $logFilePath -Append
         $finalAuditCode = $LASTEXITCODE
         if ($finalAuditCode -ne 0) { throw "Final verification failed." }
         Write-Header "REPAIR SUCCESSFUL: Experiment is now valid." $C_GREEN $C_RESET

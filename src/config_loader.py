@@ -273,6 +273,27 @@ def get_config_section_as_dict(config, section):
         return dict(config.items(section))
     return {}
 
+def get_path(relative_path: str) -> str:
+    """
+    Resolves a path relative to the sandbox or project root.
+
+    Checks for a PROJECT_SANDBOX_PATH environment variable. If set, it treats
+    that path as the root for all file operations. Otherwise, it defaults to
+    the main PROJECT_ROOT. This enables fully isolated, sandboxed testing.
+
+    Args:
+        relative_path (str): The path relative to the project root
+                             (e.g., 'data/sources/file.txt').
+
+    Returns:
+        str: The absolute path to the resource, resolved correctly for either
+             a normal run or a sandboxed test run.
+    """
+    sandbox_path = os.getenv('PROJECT_SANDBOX_PATH')
+    if sandbox_path:
+        return os.path.join(sandbox_path, relative_path)
+    return os.path.join(PROJECT_ROOT, relative_path)
+
 # Global config object, loaded once
 APP_CONFIG = load_app_config()
 ENV_LOADED = load_env_vars() # Load .env once globally as well

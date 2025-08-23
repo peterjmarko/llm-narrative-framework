@@ -6,7 +6,7 @@ $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
 
 Write-Host ""
-Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Cyan
+Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
 Write-Host "--- Step 3: Automated Cleanup ---" -ForegroundColor Cyan
 Write-Host ""
 
@@ -19,3 +19,4 @@ if (Test-Path $SandboxDir) {
 }
 
 Write-Host "`nCleanup complete." -ForegroundColor Green
+Write-Host ""

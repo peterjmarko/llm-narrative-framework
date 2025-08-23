@@ -417,7 +417,7 @@ def main():
         specified directory and saves all output to an 'anova/' subfolder.
         """)
     )
-    parser.add_argument("input_path", help="Path to the top-level experiment directory containing the master CSV.")
+    parser.add_argument("study_directory", help="Path to the top-level study directory containing the master CSV.")
     parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
     args = parser.parse_args()
 
@@ -425,10 +425,12 @@ def main():
         os.environ['PROJECT_CONFIG_OVERRIDE'] = os.path.abspath(args.config_path)
         if 'config_loader' in sys.modules:
             importlib.reload(sys.modules['config_loader'])
-        from config_loader import APP_CONFIG
+        # Re-import and re-assign the global APP_CONFIG
+        from config_loader import APP_CONFIG as RELOADED_APP_CONFIG
+        APP_CONFIG = RELOADED_APP_CONFIG
 
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    base_dir = os.path.abspath(args.input_path)
+    base_dir = os.path.abspath(args.study_directory)
     output_dir = os.path.join(base_dir, 'anova')
     os.makedirs(output_dir, exist_ok=True)
 

@@ -246,11 +246,17 @@ try {
     # --- Step 1/5: Run Pre-Analysis Audit ---
     Write-Host "[1/5: Pre-Analysis Audit] Verifying study readiness..." -ForegroundColor Cyan
     $auditScriptPath = Join-Path $PSScriptRoot "audit_study.ps1"
-    $auditArgs = @("-StudyDirectory", $StudyDirectory, "-NoHeader", "-ErrorAction", "Stop")
-    if (-not [string]::IsNullOrEmpty($ConfigPath)) {
-        $auditArgs += "-ConfigPath", $ConfigPath
+    
+    # Use a hashtable for splatting to ensure named parameters are used correctly.
+    $auditSplat = @{
+        StudyDirectory = $StudyDirectory
+        NoHeader       = $true
+        ErrorAction    = "Stop"
     }
-    $auditOutput = & $auditScriptPath @auditArgs
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) {
+        $auditSplat['ConfigPath'] = $ConfigPath
+    }
+    $auditOutput = & $auditScriptPath @auditSplat
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n--- Audit Report on Failure ---" -ForegroundColor Yellow
         $auditOutput | Write-Host # Display the captured report from the audit script

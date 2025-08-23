@@ -211,7 +211,9 @@ try {
         # This is an automated step
         $scriptPath = $step.Script
         $fullScriptPath = Join-Path $PSScriptRoot $scriptPath # Use PSScriptRoot for reliability
-        $arguments = $prefixArgs + $fullScriptPath
+        # Pass the current script's directory as the working directory for the Python script.
+        # This makes the Python script "sandbox-aware".
+        $arguments = $prefixArgs + "-c", "import os; os.chdir('$PSScriptRoot'); exec(open('$fullScriptPath').read())"
         if ($Force.IsPresent) {
             $arguments += "--force"
         }

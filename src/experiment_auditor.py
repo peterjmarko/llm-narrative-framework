@@ -430,6 +430,8 @@ def get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) ->
     return "UNKNOWN", [], granular
 
 def main():
+    # Make APP_CONFIG global so we can modify it upon reload.
+    global APP_CONFIG
     parser = argparse.ArgumentParser(description="Read-only auditor for experiments.")
     parser.add_argument('target_dir', help="The target directory for the experiment.")
     parser.add_argument('--non-interactive', action='store_true', help="Suppress user-facing recommendation text.")
@@ -443,8 +445,10 @@ def main():
     if args.config_path:
         os.environ['PROJECT_CONFIG_OVERRIDE'] = os.path.abspath(args.config_path)
         if 'config_loader' in sys.modules:
+            # Reloading the module will re-execute its top-level code,
+            # which re-assigns the global APP_CONFIG variable.
             importlib.reload(sys.modules['config_loader'])
-        # Re-import APP_CONFIG into the local scope of main() after the reload.
+        # Re-import the newly reloaded module to update our reference to it.
         from config_loader import APP_CONFIG
 
     use_color = sys.stdout.isatty() or args.force_color

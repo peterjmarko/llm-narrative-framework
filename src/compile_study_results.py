@@ -78,6 +78,7 @@ def write_summary_csv(output_path, results_list):
     logging.info(f"  -> Generated study summary:\n    {output_path} ({len(df)} rows)")
 
 def main():
+    global APP_CONFIG
     parser = argparse.ArgumentParser(description="Compile all experiment results for a single study.")
     parser.add_argument("study_directory", help="The path to the study directory containing experiment subfolders.")
     parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
@@ -87,7 +88,9 @@ def main():
         os.environ['PROJECT_CONFIG_OVERRIDE'] = os.path.abspath(args.config_path)
         if 'config_loader' in sys.modules:
             importlib.reload(sys.modules['config_loader'])
-        from config_loader import APP_CONFIG
+        # Re-import and re-assign the global APP_CONFIG
+        from config_loader import APP_CONFIG as RELOADED_APP_CONFIG
+        APP_CONFIG = RELOADED_APP_CONFIG
 
     if not os.path.isdir(args.study_directory):
         logging.error(f"Error: The specified directory does not exist: {args.study_directory}")

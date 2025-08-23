@@ -191,7 +191,7 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
         print("All required replications already exist. Nothing to do in NEW mode.")
         return True
 
-    print(f"Will create {len(reps_to_run)} new replication(s), from {min(reps_to_run)} to {max(reps_to_run)}.")
+    print(f"{C_YELLOW}Will create {len(reps_to_run)} new replication(s), from {min(reps_to_run)} to {max(reps_to_run)}.{C_RESET}")
     batch_start_time = time.time()
     
     for i, rep_num in enumerate(reps_to_run):
@@ -236,7 +236,7 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
         time_remaining = remaining_reps * avg_time
         eta = datetime.datetime.now() + datetime.timedelta(seconds=time_remaining)
         # Use a new magenta color for the ETA line for better visibility.
-        C_MAGENTA = '\033[95m' if use_color else ''
+        C_MAGENTA = colors.get('magenta', '')
         print(f"\n{C_MAGENTA}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | Time Remaining: {str(datetime.timedelta(seconds=int(time_remaining)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
 
     return True
@@ -600,6 +600,8 @@ def main():
     2. Running the main state-machine loop to create, repair, or update the experiment.
     3. Finalizing the experiment by compiling results and logs.
     """
+    # Import here to ensure the function is in the local scope of main.
+    from experiment_auditor import get_experiment_state
     parser = argparse.ArgumentParser(description="State-machine controller for running experiments.")
     parser.add_argument('target_dir', nargs='?', default=None,
                         help="Optional. The target directory for the experiment. If not provided, a unique directory will be created.")
@@ -624,7 +626,10 @@ def main():
         # We need to find the config_loader module to reload it
         if 'config_loader' in sys.modules:
             importlib.reload(sys.modules['config_loader'])
-        # Re-import APP_CONFIG into the local scope after reload
+        # Also reload the auditor to ensure it picks up the new config.
+        if 'experiment_auditor' in sys.modules:
+            importlib.reload(sys.modules['experiment_auditor'])
+        # Re-import the necessary components into the local scope after reload.
         from config_loader import APP_CONFIG
         from experiment_auditor import get_experiment_state
 

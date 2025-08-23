@@ -53,6 +53,7 @@ param(
     [string]$Notes,
 
     [Parameter(Mandatory=$false)]
+    [Alias('config-path')]
     [string]$ConfigPath
 )
 
@@ -93,13 +94,14 @@ try {
         Write-Header -Lines "Verifying Final Experiment State" -Color Cyan
         $auditScriptPath = Join-Path $ProjectRoot "audit_experiment.ps1"
         
-        # Call the audit script, passing the ConfigPath parameter only if it was provided.
-        # This more explicit call is more robust than argument splatting.
-        if (-not [string]::IsNullOrEmpty($ConfigPath)) {
-            & $auditScriptPath -ExperimentDirectory $latestExperiment.FullName -ConfigPath $ConfigPath
-        } else {
-            & $auditScriptPath -ExperimentDirectory $latestExperiment.FullName
+        # Use a hashtable for splatting to ensure named parameters are passed robustly.
+        $auditSplat = @{
+            ExperimentDirectory = $latestExperiment.FullName
         }
+        if (-not [string]::IsNullOrEmpty($ConfigPath)) {
+            $auditSplat['ConfigPath'] = $ConfigPath
+        }
+        & $auditScriptPath @auditSplat
     }
 } catch {
     Write-Warning "Could not automatically verify the new experiment."

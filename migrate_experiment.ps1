@@ -104,11 +104,9 @@ try {
 
     # --- Step 1: Initial Audit ---
     $auditScriptPath = Join-Path $ProjectRoot "audit_experiment.ps1"
-    if (-not [string]::IsNullOrEmpty($ConfigPath)) {
-        & $auditScriptPath -ExperimentDirectory $TargetPath -ConfigPath $ConfigPath
-    } else {
-        & $auditScriptPath -ExperimentDirectory $TargetPath
-    }
+    $auditSplat = @{ ExperimentDirectory = $TargetPath }
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditSplat['ConfigPath'] = $ConfigPath }
+    & $auditScriptPath @auditSplat
     $auditExitCode = $LASTEXITCODE
 
     # --- Step 2: Confirmation Prompt ---
@@ -127,17 +125,16 @@ try {
 
     # --- Step 4: Upgrade Copy ---
     Write-Header -Lines "Step 2/2: Upgrading New Experiment Copy" -Color Cyan
-    $migrateArgs = @((Join-Path $ProjectRoot "src/experiment_manager.py"), $DestinationPath, "--migrate", "--force-color", "--verbose")
+    $scriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
+    $migrateArgs = @($scriptPath, "migrate", $DestinationPath, "--force-color", "--verbose")
     if (-not [string]::IsNullOrEmpty($ConfigPath)) { $migrateArgs += "--config-path", $ConfigPath }
     & pdm run python $migrateArgs
     if ($LASTEXITCODE -ne 0) { throw "Migration process failed." }
 
     # --- Step 5: Final Validation ---
-    if (-not [string]::IsNullOrEmpty($ConfigPath)) {
-        & $auditScriptPath -ExperimentDirectory $DestinationPath -ConfigPath $ConfigPath
-    } else {
-        & $auditScriptPath -ExperimentDirectory $DestinationPath
-    }
+    $auditSplat = @{ ExperimentDirectory = $DestinationPath }
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $auditSplat['ConfigPath'] = $ConfigPath }
+    & $auditScriptPath @auditSplat
     if ($LASTEXITCODE -ne 0) { throw "VALIDATION FAILED! The final migrated result is not valid." }
 
     Write-Host "`nMigration process complete. Migrated data is in: '$((Resolve-Path $DestinationPath -Relative).TrimStart(".\"))'`n" -ForegroundColor Green
