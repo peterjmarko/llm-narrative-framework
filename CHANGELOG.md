@@ -1,5 +1,21 @@
 # Changelog
 
+## 6.7.0 (2025-08-23)
+
+### Bump
+
+- **version 6.6.1 → 6.7.0**
+
+### Features
+
+- **establish sandbox-aware architecture for data pipeline tests**
+  This commit lays the foundation for a new, high-fidelity testing architecture for the data preparation pipeline. It introduces a sandbox-aware pathing system to enable robust, isolated integration tests.
+  
+  - Adds a new `get_path()` utility to `config_loader.py` that intelligently resolves file paths relative to a sandbox directory when the `PROJECT_SANDBOX_PATH` environment variable is set.
+  - Refactors `fetch_adb_data.py` as the first script to be fully compliant with this new architecture.
+  - Updates the Layer 3 test harness to orchestrate the targeted live fetch and verification for `fetch_adb_data.py`.
+  - Formalizes the "Refactor -> Unit Test -> Integration Test" workflow in TESTING.md.
+
 ## 6.6.1 (2025-08-23)
 
 ### Bump
