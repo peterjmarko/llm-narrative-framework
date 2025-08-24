@@ -1,5 +1,17 @@
 # Changelog
 
+## 6.8.3 (2025-08-24)
+
+### Bump
+
+- **version 6.8.2 → 6.8.3**
+
+### Refactor
+
+- **refactor candidate selection for sandboxing**
+  Refactors the select_eligible_candidates.py script to be fully sandbox-aware, replacing explicit file I/O arguments with --sandbox-path.
+  Updates the corresponding unit test suite to use a mock sandbox environment, aligning it with the script's new interface. Also advances the Layer 3 integration test checkpoint to verify the script's output within the pipeline.
+
 ## 6.8.2 (2025-08-24)
 
 ### Bump
