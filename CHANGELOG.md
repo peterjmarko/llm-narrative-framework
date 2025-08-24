@@ -1,5 +1,24 @@
 # Changelog
 
+## 6.8.0 (2025-08-24)
+
+### Bump
+
+- **version 6.7.0 → 6.8.0**
+
+### Features
+
+- **implement live, chdir-based Layer 3 integration test**
+  This commit implements a robust, live, limited-scope integration test for the data preparation pipeline (Layer 3).
+  
+  A new `--work-dir` architecture is introduced, where Python scripts explicitly change their working directory via `os.chdir()` to a provided sandbox. This correctly isolates all file operations and works reliably with PDM's execution environment.
+  
+  - Refactored `fetch_adb_data.py` and `find_wikipedia_links.py` to use the `--work-dir` standard.
+  - Fixed unit tests for `find_wikipedia_links.py` to correctly mock dependencies.
+  - The Layer 3 test harness now successfully orchestrates a live fetch, filters data, and validates the first two pipeline stages.
+  
+  A known cosmetic issue with inconsistent path logging remains.
+
 ## 6.7.0 (2025-08-23)
 
 ### Bump
