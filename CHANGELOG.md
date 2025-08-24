@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.8.1 (2025-08-24)
+
+### Bump
+
+- **version 6.8.0 → 6.8.1**
+
+### Fixes
+
+- **standardize relative paths in test logs**
+  Resolves inconsistent and ambiguous file path logging during the Layer 3 integration test.
+  
+  Previously, some scripts and the test harness logged paths relative to the sandbox directory, which was confusing. All logged paths are now consistently relative to the project root for clarity.
+
 ## 6.8.0 (2025-08-24)
 
 ### Bump
