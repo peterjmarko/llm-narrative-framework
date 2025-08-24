@@ -85,7 +85,8 @@ SESSION.mount("https://", adapter)
 SESSION.mount("http://", adapter)
 
 # --- Research Category Management ---
-RESEARCH_CATEGORIES_FILE = Path("data/config/adb_research_categories.json")
+# We will resolve the full path inside the load function
+RESEARCH_CATEGORIES_FILE_REL_PATH = "data/config/adb_research_categories.json"
 RESEARCH_CATEGORIES_CACHE = None
 
 # --- Debug Mode ---
@@ -123,27 +124,34 @@ class CustomFormatter(logging.Formatter):
 
 def load_research_categories() -> Dict:
     """Loads research categories from the configuration file."""
+    from config_loader import get_path
     global RESEARCH_CATEGORIES_CACHE
     if RESEARCH_CATEGORIES_CACHE is not None:
         return RESEARCH_CATEGORIES_CACHE
+
+    research_categories_path = Path(get_path(RESEARCH_CATEGORIES_FILE_REL_PATH))
     
-    if not RESEARCH_CATEGORIES_FILE.exists():
-        RESEARCH_CATEGORIES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not research_categories_path.exists():
+        research_categories_path.parent.mkdir(parents=True, exist_ok=True)
         default_categories = {
             "categories": {"prefixes": [], "patterns": [], "exact_matches": []},
             "auto_detected": {"entries": []}
         }
-        with open(RESEARCH_CATEGORIES_FILE, 'w', encoding='utf-8') as f:
+        with open(research_categories_path, 'w', encoding='utf-8') as f:
             json.dump(default_categories, f, indent=2)
         RESEARCH_CATEGORIES_CACHE = default_categories
     else:
-        with open(RESEARCH_CATEGORIES_FILE, 'r', encoding='utf-8') as f:
+        with open(research_categories_path, 'r', encoding='utf-8') as f:
             RESEARCH_CATEGORIES_CACHE = json.load(f)
     return RESEARCH_CATEGORIES_CACHE
 
 def is_research_entry(name: str, first_name: str = "") -> bool:
     """Determines if an entry is a Research entry based on known category patterns."""
-    full_name = name if ',' in name else f"{name} {first_name}".strip()
+    # Simplified logic: always construct the full name for consistent matching.
+    full_name = f"{name} {first_name}".strip()
+    if ',' in name:
+        full_name = name
+    
     categories = load_research_categories()
     
     if full_name in categories["categories"].get("exact_matches", []): return True
@@ -455,18 +463,27 @@ def finalize_and_report(output_path: Path, fieldnames: list, all_lines: list, wa
             print(f"Output saved to: {output_path} ✨")
             print(f"{Fore.YELLOW}NOTE: {timeouts:,} records timed out. Please re-run the script to retry them.\n")
         else:
+            from config_loader import PROJECT_ROOT
+            # Display path relative to the project root for unambiguous logging.
+            display_path = os.path.relpath(output_path, PROJECT_ROOT)
             print(f"\n{Fore.GREEN}SUCCESS: Link finding complete.")
             print(summary_msg)
-            print(f"Output saved to: {output_path} ✨\n")
+            print(f"Output saved to: {display_path} ✨\n")
 
 def main():
+    # Import here to allow for sandbox path setting
+    from config_loader import get_path
     parser = argparse.ArgumentParser(description="Find Wikipedia links for subjects in the raw ADB export.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("-i", "--input-file", default="data/sources/adb_raw_export.txt", help="Path to the raw ADB export file.")
-    parser.add_argument("-o", "--output-file", default="data/processed/adb_wiki_links.csv", help="Path for the output CSV with found Wikipedia links.")
+    parser.add_argument("--work-dir", default=".", help="Set the working directory for all file operations.")
+    parser.add_argument("-i", "--input-file", default=None, help="Path to the raw ADB export file.")
+    parser.add_argument("-o", "--output-file", default=None, help="Path for the output CSV with found Wikipedia links.")
     parser.add_argument("-w", "--workers", type=int, default=MAX_WORKERS, help="Number of parallel worker threads.")
     parser.add_argument("--force", action="store_true", help="Force reprocessing of all records, overwriting the existing output file.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output, including warnings.")
     args = parser.parse_args()
+
+    if args.work_dir and os.path.isdir(args.work_dir):
+        os.chdir(args.work_dir)
 
     # --- Configure Logging ---
     log_level = logging.INFO if args.verbose else logging.ERROR
@@ -474,7 +491,8 @@ def main():
     handler.setFormatter(CustomFormatter())
     logging.basicConfig(level=log_level, handlers=[handler], force=True)
 
-    input_path, output_path = Path(args.input_file), Path(args.output_file)
+    input_path = Path(args.input_file or get_path("data/sources/adb_raw_export.txt"))
+    output_path = Path(args.output_file or get_path("data/processed/adb_wiki_links.csv"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not input_path.exists():
@@ -483,7 +501,7 @@ def main():
     def backup_and_overwrite(file_path: Path):
         """Creates a backup of the file and then deletes the original."""
         try:
-            backup_dir = Path('data/backup')
+            backup_dir = Path(get_path('data/backup'))
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"

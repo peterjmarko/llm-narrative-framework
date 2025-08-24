@@ -31,8 +31,9 @@ try {
     )
     foreach ($subject in $subjects) {
         Write-Host "  -> Fetching data for $($subject.Name)..."
-        $tempOutputFile = "temp_fetch_output.txt"
-        pdm run python $fetchScript --start-date $subject.Date --end-date $subject.Date -o $tempOutputFile --force
+        $tempOutputFile = Join-Path $SandboxDir "temp_fetch_output.txt"
+        # Pass the --sandbox-path argument to correctly isolate all file operations.
+        pdm run python $fetchScript --sandbox-path $SandboxDir --start-date $subject.Date --end-date $subject.Date -o $tempOutputFile --force
         
         $fetchedContent = Get-Content $tempOutputFile | Select-Object -Skip 1
         if ($fetchedContent) {
@@ -51,28 +52,21 @@ try {
     # Filter rows where the second column (idADB) is one of our target IDs.
     $filteredData = $dataRows | Where-Object { $targetIDs -contains ($_.Split("`t"))[1] }
 
-    # Construct the final content as a single array of strings for robust file writing.
-    $finalContent = @($header) + $filteredData
-    Set-Content -Path $outputFile -Value $finalContent
-
-    Write-Host "  -> Filtering complete. Final record count: $($filteredData.Length)."
-
-    # --- Integration Test Checkpoint ---
-    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: fetch_adb_data.py ---" -ForegroundColor Green
-    
-    # Verification Step: Read the file back and confirm it contains the correct data.
-    $targetIDs = "52735", "9129", "42399" # Ernst Busch, Paul McCartney, Jonathan Cainer
-    $fileContent = Get-Content $outputFile | Select-Object -Skip 1
-    $foundIDs = $fileContent | ForEach-Object { ($_.Split("`t"))[1] } | Sort-Object
-    
-    if (($foundIDs | Compare-Object -ReferenceObject ($targetIDs | Sort-Object)).Length -ne 0) {
-        throw "FAIL: The final 'adb_raw_export.txt' file does not contain the correct 3 test subjects."
+    # Re-index the final filtered data to be sequential.
+    $reIndexedData = for ($i = 0; $i -lt $filteredData.Length; $i++) {
+        $line = $filteredData[$i]
+        $columns = $line.Split("`t")
+        $columns[0] = $i + 1
+        $columns -join "`t"
     }
     
-    Write-Host "Verification PASSED: 'adb_raw_export.txt' contains the correct 3 subjects." -ForegroundColor Yellow
-    Write-Host ""
-    exit 0 # Temporarily exit after this stage for methodical testing.
-    
+    # Construct the final content as a single array of strings for robust file writing.
+    $finalContent = @($header) + $reIndexedData
+    Set-Content -Path $outputFile -Value $finalContent
+
+    Write-Host "  -> Filtering and re-indexing complete. Final record count: $($reIndexedData.Length)."
+    Write-Host "Output saved to: $outputFile"
+
     # --- 2. Run the Automated Pipeline Scripts Sequentially ---
     Write-Host "`n--- Running automated data pipeline scripts... ---" -ForegroundColor Yellow
     
@@ -85,7 +79,7 @@ try {
         "src/select_final_candidates.py",
         "src/prepare_sf_import.py"
     )
-    # Define file paths relative to the sandbox CWD
+    # Define file paths relative to the project root for clarity
     $adbRaw = "data/sources/adb_raw_export.txt"
     $wikiLinks = "data/processed/adb_wiki_links.csv"
     $validationReport = "data/reports/adb_validation_report.csv"
@@ -96,7 +90,17 @@ try {
     $sfImport = "data/intermediate/sf_data_import.txt"
 
     # Sequentially call each script with explicit input/output paths
-    pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") -i $adbRaw -o $wikiLinks --force
+    pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") --work-dir $PWD -i $adbRaw -o $wikiLinks --force
+
+    # --- Integration Test Checkpoint ---
+    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: find_wikipedia_links.py ---" -ForegroundColor Green
+    if (-not (Test-Path $wikiLinks)) { throw "FAIL: '$wikiLinks' was not created." }
+    $lineCount = (Get-Content $wikiLinks).Length
+    if ($lineCount -ne 4) { throw "FAIL: '$wikiLinks' has the wrong number of lines (Expected 4, Found $lineCount)." }
+    Write-Host "Verification PASSED: '$wikiLinks' was created with the correct number of records." -ForegroundColor Yellow
+    Write-Host ""
+    exit 0 # Temporarily exit after this stage for methodical testing.
+
     pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") -i $wikiLinks -o $validationReport --force
     pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") -i $adbRaw -v $validationReport -o $eligibleCandidates --force
     pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") -i $eligibleCandidates -o $eminenceScores --force

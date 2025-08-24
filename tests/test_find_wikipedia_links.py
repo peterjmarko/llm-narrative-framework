@@ -34,6 +34,8 @@ from unittest.mock import MagicMock
 import pytest
 from bs4 import BeautifulSoup
 from tqdm import tqdm
+# Import the entire module so we can patch objects within it
+from src import find_wikipedia_links
 from src.find_wikipedia_links import (
     find_best_wikipedia_match,
     find_matching_disambiguation_link_from_search,
@@ -75,12 +77,16 @@ def test_is_research_entry(name, first_name, expected, mocker, mock_research_con
     """
     Tests the is_research_entry function against various name patterns.
     """
-    # Patch the global constant to point to our temporary config file
-    mocker.patch('src.find_wikipedia_links.RESEARCH_CATEGORIES_FILE', mock_research_config)
-    # Reset the cache to force reloading from the mock file
-    mocker.patch('src.find_wikipedia_links.RESEARCH_CATEGORIES_CACHE', None)
+    # Load the mock config content into a dictionary
+    with open(mock_research_config, 'r') as f:
+        mock_categories_data = json.load(f)
 
-    assert is_research_entry(name, first_name) == expected
+    # Directly mock the load_research_categories function to return our test data.
+    # This is the most robust way to test this function's logic.
+    mocker.patch('src.find_wikipedia_links.load_research_categories', return_value=mock_categories_data)
+    
+    # We no longer need to reload the module or reset the cache.
+    assert find_wikipedia_links.is_research_entry(name, first_name) == expected
 
 
 # --- Tests for HTML parsing helpers ---
@@ -235,7 +241,7 @@ def test_worker_task(mocker, adb_link, search_result, expected_url, expected_not
     # Mock is_research_entry to return True only for the specific research case
     mocker.patch('src.find_wikipedia_links.is_research_entry', return_value=is_research)
     
-    result = worker_task(line, mock_pbar, 1)
+    result = find_wikipedia_links.worker_task(line, mock_pbar, 1)
 
     assert result is not None
     assert result['Wikipedia_URL'] == expected_url

@@ -294,6 +294,10 @@ def get_path(relative_path: str) -> str:
         return os.path.join(sandbox_path, relative_path)
     return os.path.join(PROJECT_ROOT, relative_path)
 
+def get_sandbox_path() -> str | None:
+    """Returns the path to the current sandbox, or None if not in a sandbox."""
+    return os.getenv('PROJECT_SANDBOX_PATH')
+
 # Global config object, loaded once
 APP_CONFIG = load_app_config()
 ENV_LOADED = load_env_vars() # Load .env once globally as well
