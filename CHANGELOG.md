@@ -1,5 +1,20 @@
 # Changelog
 
+## 6.8.2 (2025-08-24)
+
+### Bump
+
+- **version 6.8.1 → 6.8.2**
+
+### Refactor
+
+- **refactor validation script and improve log cosmetics**
+  This commit continues the sandbox-aware refactoring of the data preparation pipeline and improves console output readability.
+  
+   - Refactored `validate_wikipedia_pages.py` to be fully sandbox-aware, replacing explicit file path arguments with `--sandbox-path`.
+   - Advanced the Layer 3 integration test checkpoint to run after the validation script.
+   - Improved log cosmetics by removing color from report files and standardizing console colors for notes (yellow) and file paths (cyan).
+
 ## 6.8.1 (2025-08-24)
 
 ### Bump
