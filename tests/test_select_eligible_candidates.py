@@ -35,11 +35,16 @@ from src import select_eligible_candidates
 
 
 @pytest.fixture
-def mock_input_files(tmp_path: Path) -> tuple[Path, Path, Path]:
-    """Creates temporary input and output files for testing."""
-    raw_export_path = tmp_path / "adb_raw_export.txt"
-    validation_report_path = tmp_path / "adb_validation_report.csv"
-    output_path = tmp_path / "eligible_candidates.txt"
+def mock_sandbox(tmp_path: Path) -> Path:
+    """Creates a temporary sandbox directory with mock input files."""
+    # Create the necessary directory structure inside the temp path
+    (tmp_path / "data" / "sources").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "data" / "reports").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "data" / "intermediate").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "data" / "backup").mkdir(parents=True, exist_ok=True)
+
+    raw_export_path = tmp_path / "data" / "sources" / "adb_raw_export.txt"
+    validation_report_path = tmp_path / "data" / "reports" / "adb_validation_report.csv"
 
     # Create dummy raw export file (TSV format)
     raw_content = (
@@ -64,20 +69,19 @@ def mock_input_files(tmp_path: Path) -> tuple[Path, Path, Path]:
     )
     validation_report_path.write_text(validation_content)
 
-    return raw_export_path, validation_report_path, output_path
+    return tmp_path
 
 
-def test_select_eligible_candidates_main_logic(mock_input_files):
+def test_select_eligible_candidates_main_logic(mock_sandbox):
     """
     Tests the main filtering logic of the select_eligible_candidates script.
     """
-    raw_path, validation_path, output_path = mock_input_files
+    sandbox_path = mock_sandbox
+    output_path = sandbox_path / "data" / "intermediate" / "adb_eligible_candidates.txt"
 
     test_args = [
         "select_eligible_candidates.py",
-        "--input-file", str(raw_path),
-        "--validation-report", str(validation_path),
-        "--output-file", str(output_path),
+        "--sandbox-path", str(sandbox_path),
         "--force", # Bypasses the interactive prompt
     ]
     with patch("sys.argv", test_args):
@@ -94,11 +98,12 @@ def test_select_eligible_candidates_main_logic(mock_input_files):
     assert id_adbs == {"101", "103"}
 
 
-def test_select_eligible_candidates_resumes_correctly(mock_input_files):
+def test_select_eligible_candidates_resumes_correctly(mock_sandbox):
     """
     Tests that the script correctly identifies an up-to-date state and exits.
     """
-    raw_path, validation_path, output_path = mock_input_files
+    sandbox_path = mock_sandbox
+    output_path = sandbox_path / "data" / "intermediate" / "adb_eligible_candidates.txt"
 
     # Create a pre-existing, complete output file
     output_content = (
@@ -112,9 +117,7 @@ def test_select_eligible_candidates_resumes_correctly(mock_input_files):
     with patch("builtins.input", return_value="n"):
         test_args = [
             "select_eligible_candidates.py",
-            "--input-file", str(raw_path),
-            "--validation-report", str(validation_path),
-            "--output-file", str(output_path),
+            "--sandbox-path", str(sandbox_path),
         ]
         with patch("sys.argv", test_args):
             # The script should exit gracefully after the prompt

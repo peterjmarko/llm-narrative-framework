@@ -53,6 +53,7 @@ The data preparation pipeline is a fully automated workflow that transforms raw 
 The data preparation pipeline is a fully automated, multi-stage workflow. It begins with data extraction from the live Astro-Databank website and concludes with the generation of the final `personalities_db.txt` file used in the experiments.
 
 **Replication Paths:** Researchers can approach this project in two ways:
+
 1.  **Direct Replication (Validating Findings):** To most directly replicate the original study, researchers should clone this repository and use the data files as provided. This ensures the experiment starts with the exact same input data used in the original analysis.
 2.  **Conceptual Replication (New Research):** To perform a new study or conceptual replication, researchers can run the automated scripts to generate a completely new dataset from live sources. This will test the methodology with different, up-to-date data.
 
@@ -75,6 +76,7 @@ The script is fully resumable. It automatically detects which steps have already
 The `prepare_data.ps1` script orchestrates a sequence of individual Python scripts followed by a manual processing step. The following is a detailed breakdown of this underlying workflow.
 
 **Stage 1: Data Sourcing and Initial Processing (Automated)**
+
 1.  **Fetching (`fetch_adb_data.py`):** This is the primary entry point. The script logs into the ADB website, queries its internal API, and fetches a complete dataset of over 10,000 subjects. It performs two crucial transformations at the source:
     *   **Identifier Standardization:** It replaces the unstable, temporary record number (`ARN`) with a file-specific sequential `Index`, and renames the permanent Astro-Databank ID (`ADBNo`) to `idADB`.
     *   **Timezone Calculation:** It immediately processes the raw timezone code from the API into the final `ZoneAbbr` and `ZoneTimeOffset` values required by downstream software.
@@ -82,6 +84,7 @@ The `prepare_data.ps1` script orchestrates a sequence of individual Python scrip
 
 **Stage 2: Link Finding, Validation, and Scoring (Automated)**
 This stage identifies the correct Wikipedia page for each subject, validates its content, and scores the candidates to ensure only high-quality subjects proceed.
+
 2.  **Link Finding (`find_wikipedia_links.py`):** This script takes the raw ADB export and finds the best-guess English Wikipedia URL for each subject. It scrapes the ADB page and uses a Wikipedia search as a fallback. The output is an intermediate file, `adb_wiki_links.csv`.
 3.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name, and confirms their death date. The final output is the detailed `adb_validation_report.csv`.
 4.  **Eligibility Selection (`select_eligible_candidates.py`):** Performs all initial data quality checks (e.g., valid birth year, 'OK' status, uniqueness), producing a clean list of all subjects potentially viable for the study.
@@ -89,18 +92,22 @@ This stage identifies the correct Wikipedia page for each subject, validates its
 6.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** A fully automated, resilient script that determines the final dataset size. It processes subjects by eminence and stops when diversity (variance) shows a sustained drop. Its robust pre-flight check re-analyzes existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention. The output also includes `BirthYear`.
 
 **Stage 3: Final Subject Selection (Automated)**
+
 7.  **Final Selection (`select_final_candidates.py`):** Performs the final filtering. It takes the eligible candidates list, selects only those present in the definitive `ocean_scores.csv` set, resolves country codes, and sorts the final list by eminence.
 
 **Stage 4: Chart Calculation (Manual)**
+
 8.  **Formatting (`prepare_sf_import.py`):** Formats the final subject list for import into the Solar Fire software, encoding each subject's unique ID for data integrity.
 9.  **Manual Processing (Solar Fire):** The formatted file is imported into Solar Fire, which calculates the required celestial data and exports it as `sf_chart_export.csv`.
 
 **Stage 5: Delineation Neutralization (Automated)**
+
 10. **Neutralization (`neutralize_delineations.py`):** This script uses a powerful hybrid strategy to rewrite the esoteric source texts.
     *   **Fast Mode (`--fast`):** For initial runs, this mode bundles tasks into large, high-speed API calls (e.g., all 12 "Sun in Signs" delineations at once). This is highly efficient but may fail on some large tasks.
     *   **Robust/Resume Mode (default):** For resuming or fixing failed runs, this mode processes each of the 149 delineations as a separate, atomic task. This granular approach is slower but guarantees completion by solving potential response truncation issues from the LLM.
 
 **Stage 6: Final Database Generation (Automated)**
+
 11. **Integration (`create_subject_db.py`):** Integrates the manually generated chart data with the final subject list, decodes the unique IDs, and produces a clean master database.
 12. **Generation (`generate_personalities_db.py`):** Assembles the final `personalities_db.txt` by combining the subject data with the neutralized delineation library according to a deterministic algorithm.
 
@@ -198,13 +205,9 @@ The main pipeline's architecture can be understood through four different views:
 The codebase for the main pipeline is organized into a clear hierarchy:
 
 1.  **Main User Entry Points**: User-facing PowerShell scripts (`.ps1`) that orchestrate high-level workflows like creating, auditing, or fixing experiments and studies.
-
 2.  **Experiment Lifecycle Management**: The core Python backend for managing a single experiment. This includes primary orchestrators (`experiment_manager.py`, `experiment_auditor.py`) and dedicated finalization scripts (`manage_experiment_log.py`, `compile_experiment_results.py`).
-
 3.  **Single Replication Pipeline**: A set of scripts, managed by `replication_manager.py`, that execute the end-to-end process for a single run, from query generation to final reporting.
-
 4.  **Study-Level Analysis**: Python scripts that operate on the outputs of multiple experiments to perform study-wide aggregation and statistical analysis.
-
 5.  **Utility & Other Scripts**: Shared modules and standalone utility scripts that provide common functionality (e.g., `config_loader.py`) or perform auxiliary tasks.
 
 <div align="center">
@@ -216,21 +219,13 @@ The codebase for the main pipeline is organized into a clear hierarchy:
 The project's functionality is organized into six primary workflows, each initiated by a dedicated PowerShell script (Main User Entry Points):
 
 1.  **Run an Experiment**: The most common action; used for starting a new experiment or resuming/healing an interrupted one.
-
 2.  **Audit an Experiment**: Provides a read-only, detailed completeness report for an experiment, acting as the primary diagnostic tool.
-
 3.  **Update an Experiment**: A specific action for existing experiments, used to reapply analysis or bug fixes without re-running expensive LLM calls.
-
 4.  **Migrate Old Experiment Data**: A utility workflow designed to bring older, legacy experimental data into compliance with the modern pipeline.
-
 5.  **Compile a Study**: The highest-level workflow, used after a study is validated to audit, compile, and analyze all data, producing the final reports and plots.
-
 6.  **(Planned) Create a New Study**: A future workflow to automate the creation of an entire study by orchestrating multiple `new_experiment.ps1` runs based on a matrix of factors (e.g., models, mapping strategies).
-
 7.  **Audit a Study**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
-
 8.  **Fix a Study**: The primary "fix-it" tool for a study. It audits all experiments and automatically calls `fix_experiment.ps1` on any that need to be resumed, repaired, or updated.
-
 9.  **Migrate a Study**: A batch utility for safely upgrading legacy or corrupted experiments. It audits the study and calls `migrate_experiment.ps1` on any experiments that require it.
 
 #### Workflow 1: Create a New Experiment
@@ -265,6 +260,7 @@ The audit script is the primary diagnostic tool for identifying issues in a fail
 
 **Repairable Issues (Single Error)**
 If a replication run has **exactly one** identifiable problem, it is considered safe to repair in-place. The `Status` column will show a specific, targeted error code:
+
 *   **`INVALID_NAME`**: The run directory name is malformed.
 *   **`CONFIG_ISSUE`**: The `config.ini.archived` file is missing or has inconsistent parameters.
 *   **`QUERY_ISSUE`**: Core query files or manifests are missing.
@@ -534,6 +530,7 @@ The script will run an audit, identify the problem (e.g., missing responses, out
 
 **To interactively force an action on a valid experiment:**
 If you run the script on a complete and valid experiment, it will present an interactive menu allowing you to force one of three actions:
+
 *   **Full Repair**: A destructive action that deletes all LLM responses and re-runs all API calls.
 *   **Full Update**: A safe and quick action that re-runs only the analysis and reporting stages on existing data.
 *   **Aggregation Only**: The fastest action, which re-creates only the top-level experiment summary files (`EXPERIMENT_results.csv`, `experiment_log.csv`).
@@ -569,6 +566,7 @@ Point the script at the target directory of the experiment you want to migrate. 
 ### Auditing a Study (`audit_study.ps1`)
 
 This is the main diagnostic tool for a study. It performs a comprehensive, two-part, read-only audit and provides a consolidated summary report with a final recommendation.
+
 1.  **Readiness Audit**: Checks each experiment to determine its status (e.g., `VALIDATED`, `NEEDS REPAIR`).
 2.  **Completeness Audit**: If all experiments are ready, it then checks for the final study-level artifacts (`STUDY_results.csv`, `anova/boxplots/`, etc.) to determine if the study has already been processed.
 
@@ -614,6 +612,7 @@ For detailed, real-time logs, add the `-Verbose` switch.
 
 **Final Artifacts:**
 The script generates two key outputs:
+
 1.  A master `STUDY_results.csv` file in your study directory, containing the aggregated data from all experiments.
 2.  A new `anova/` subdirectory containing the final analysis:
     *   `STUDY_analysis_log.txt`: A comprehensive text report of the statistical findings.
@@ -635,6 +634,7 @@ Each report contains a clear header, the base query used, a human-readable analy
 </div>
 
 **Date Handling by Mode:**
+
 -   **Normal Mode**: The report title is `REPLICATION RUN REPORT` and the `Date` field shows the time of the original run.
 -   **`--reprocess` Mode**: The report title is `REPLICATION RUN REPORT (YYYY-MM-DD HH:MM:SS)` with the reprocessing timestamp. The `Date` field continues to show the time of the **original** run for clear traceability.
 
@@ -731,6 +731,7 @@ The project includes a comprehensive test suite managed by PDM scripts, which pr
 ### Automated CI Checks
 
 The project uses a GitHub Actions workflow for Continuous Integration (CI). On every push or pull request, it automatically runs a series of checks on Windows, Linux, and macOS to ensure code quality and consistency. This includes:
+
 -   Linting all source files for correct formatting and headers.
 -   Verifying that the documentation is up-to-date.
 

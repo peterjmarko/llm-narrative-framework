@@ -58,19 +58,23 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 def backup_and_overwrite(file_path: Path):
     """Creates a backup of the file before overwriting."""
+    from config_loader import get_path, PROJECT_ROOT
     try:
-        backup_dir = Path('data/backup')
+        backup_dir = Path(get_path('data/backup'))
         backup_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
         shutil.copy2(file_path, backup_path)
-        print(f"\n{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
+        display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
+        print(f"\n{Fore.CYAN}Created backup of existing file at: {display_backup_path}{Fore.RESET}")
     except (IOError, OSError) as e:
         logging.error(f"{Fore.RED}Failed to create backup file: {e}")
         sys.exit(1)
 
 def finalize_and_report(output_path: Path, new_count: int, was_interrupted: bool = False):
     """Generates the final summary and prints the status message."""
+    from config_loader import PROJECT_ROOT
+    display_path = os.path.relpath(output_path, PROJECT_ROOT)
     try:
         total_eligible = len(pd.read_csv(output_path, sep='\t'))
         summary_msg = f"Found {new_count:,} new eligible candidates. Total now saved: {total_eligible:,}."
@@ -80,12 +84,12 @@ def finalize_and_report(output_path: Path, new_count: int, was_interrupted: bool
     if was_interrupted:
         print(f"\n{Fore.YELLOW}WARNING: Processing interrupted by user.")
         print(summary_msg)
-        print(f"{Fore.CYAN}Partial results saved to: {output_path} ✨{Fore.RESET}\n")
+        print(f"{Fore.CYAN}Partial results saved to: {display_path} ✨{Fore.RESET}\n")
         os._exit(1)
     else:
         print(f"\n{Fore.GREEN}SUCCESS: Selection complete.")
         print(summary_msg)
-        print(f"{Fore.CYAN}Output saved to: {output_path} ✨{Fore.RESET}\n")
+        print(f"{Fore.CYAN}Output saved to: {display_path} ✨{Fore.RESET}\n")
 
 
 def normalize_name_for_deduplication(series: pd.Series) -> pd.Series:
@@ -108,15 +112,18 @@ def main():
         description="Filter raw ADB data to generate a list of eligible candidates.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--input-file", default="data/sources/adb_raw_export.txt", help="Path to the raw ADB export file.")
-    parser.add_argument("--validation-report", default="data/reports/adb_validation_report.csv", help="Path to the validation report CSV.")
-    parser.add_argument("-o", "--output-file", default="data/intermediate/adb_eligible_candidates.txt", help="Path for the eligible candidates output file.")
+    parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
-    input_path = Path(args.input_file)
-    validation_path = Path(args.validation_report)
-    output_path = Path(args.output_file)
+    if args.sandbox_path:
+        os.environ['PROJECT_SANDBOX_PATH'] = os.path.abspath(args.sandbox_path)
+
+    from config_loader import get_path, PROJECT_ROOT
+
+    input_path = Path(get_path("data/sources/adb_raw_export.txt"))
+    validation_path = Path(get_path("data/reports/adb_validation_report.csv"))
+    output_path = Path(get_path("data/intermediate/adb_eligible_candidates.txt"))
 
     if not args.force and output_path.exists():
         output_mtime = os.path.getmtime(output_path)
@@ -167,7 +174,8 @@ def main():
 
     # --- Step 4: Decide whether to run ---
     if final_candidates_to_save.empty and not args.force:
-        print(f"\n{Fore.YELLOW}WARNING: The candidates file at '{output_path}' is already up to date. ✨")
+        display_path = os.path.relpath(output_path, PROJECT_ROOT)
+        print(f"\n{Fore.YELLOW}WARNING: The candidates file at '{display_path}' is already up to date. ✨")
         print(f"{Fore.YELLOW}If you decide to go ahead with updating the list of candidates, a backup of the the existing file will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':

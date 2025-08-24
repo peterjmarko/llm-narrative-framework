@@ -93,17 +93,17 @@ try {
     # Sequentially call each script
     pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") --work-dir $PWD -i $adbRaw -o $wikiLinks --force
     pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") --sandbox-path . --force
+    pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") --sandbox-path . --force
 
     # --- Integration Test Checkpoint ---
-    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: validate_wikipedia_pages.py ---" -ForegroundColor Green
-    $displayValidationReportPath = (Join-Path $PWD $validationReport).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    if (-not (Test-Path $validationReport)) { throw "FAIL: '$displayValidationReportPath' was not created." }
-    $lineCount = (Get-Content $validationReport).Length
-    if ($lineCount -ne 4) { throw "FAIL: '$displayValidationReportPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
-    Write-Host "Verification PASSED: '$displayValidationReportPath' was created with the correct number of records." -ForegroundColor Yellow
+    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: select_eligible_candidates.py ---" -ForegroundColor Green
+    $displayEligibleCandidatesPath = (Join-Path $PWD $eligibleCandidates).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
+    if (-not (Test-Path $eligibleCandidates)) { throw "FAIL: '$displayEligibleCandidatesPath' was not created." }
+    $lineCount = (Get-Content $eligibleCandidates).Length
+    if ($lineCount -ne 4) { throw "FAIL: '$displayEligibleCandidatesPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
+    Write-Host "Verification PASSED: '$displayEligibleCandidatesPath' was created with the correct number of records." -ForegroundColor Yellow
     Write-Host ""
     exit 0 # Temporarily exit after this stage for methodical testing.
-    pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") -i $adbRaw -v $validationReport -o $eligibleCandidates --force
     pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") -i $eligibleCandidates -o $eminenceScores --force
     pdm run python (Join-Path $ProjectRoot "src/generate_ocean_scores.py") -i $eminenceScores -o $oceanScores --force
     pdm run python (Join-Path $ProjectRoot "src/select_final_candidates.py") -e $eligibleCandidates -s $eminenceScores -o $oceanScores -c (Join-Path $ProjectRoot "data/foundational_assets/country_codes.csv") -f $finalCandidates --force
