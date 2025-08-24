@@ -159,7 +159,7 @@ def login_to_adb(session, username, password):
 def scrape_search_page_data(session):
     """Scrapes security tokens, finds category IDs, and builds a category name map."""
     # This utility function needs to be imported here to be available.
-    from config_loader import get_path, get_sandbox_path
+    from config_loader import get_path, PROJECT_ROOT
     logging.info("Fetching security tokens and category data...")
     page_response = session.get(SEARCH_PAGE_URL, headers={'User-Agent': USER_AGENT}, timeout=REQUEST_TIMEOUT)
     page_response.raise_for_status()
@@ -199,8 +199,7 @@ def scrape_search_page_data(session):
     output_path = Path(get_path('data/foundational_assets/adb_category_map.csv'))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    sandbox_path = get_sandbox_path()
-    display_path = os.path.relpath(output_path, sandbox_path) if sandbox_path else output_path
+    display_path = os.path.relpath(output_path, PROJECT_ROOT)
 
     if output_path.exists():
         logging.info(f"Category map '{display_path}' already exists. Creating a backup before overwriting.")
@@ -210,7 +209,7 @@ def scrape_search_page_data(session):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
             shutil.copy2(output_path, backup_path)
-            display_backup_path = os.path.relpath(backup_path, sandbox_path) if sandbox_path else backup_path
+            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
             logging.info(f"  -> Backup created at: {display_backup_path}")
         except (IOError, OSError) as e:
             logging.warning(f"Could not create backup for category map: {e}")
@@ -458,9 +457,8 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
             f.write("\t".join(map(str, row)) + "\n")
 
     # Final summary message
-    from config_loader import get_sandbox_path
-    sandbox_path = get_sandbox_path()
-    display_path = os.path.relpath(output_path, sandbox_path) if sandbox_path else output_path
+    from config_loader import PROJECT_ROOT
+    display_path = os.path.relpath(output_path, PROJECT_ROOT)
 
     processed_count = len(sorted_results)
     percentage = (processed_count / total_hits) * 100 if total_hits > 0 else 0

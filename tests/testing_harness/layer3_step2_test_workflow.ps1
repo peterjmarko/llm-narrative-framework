@@ -64,8 +64,9 @@ try {
     $finalContent = @($header) + $reIndexedData
     Set-Content -Path $outputFile -Value $finalContent
 
+    $displayPath = (Join-Path $PWD $outputFile).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
     Write-Host "  -> Filtering and re-indexing complete. Final record count: $($reIndexedData.Length)."
-    Write-Host "Output saved to: $outputFile"
+    Write-Host "Output saved to: $displayPath"
 
     # --- 2. Run the Automated Pipeline Scripts Sequentially ---
     Write-Host "`n--- Running automated data pipeline scripts... ---" -ForegroundColor Yellow
@@ -94,10 +95,11 @@ try {
 
     # --- Integration Test Checkpoint ---
     Write-Host "`n--- INTEGRATION TEST CHECKPOINT: find_wikipedia_links.py ---" -ForegroundColor Green
-    if (-not (Test-Path $wikiLinks)) { throw "FAIL: '$wikiLinks' was not created." }
+    $displayWikiLinksPath = (Join-Path $PWD $wikiLinks).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
+    if (-not (Test-Path $wikiLinks)) { throw "FAIL: '$displayWikiLinksPath' was not created." }
     $lineCount = (Get-Content $wikiLinks).Length
-    if ($lineCount -ne 4) { throw "FAIL: '$wikiLinks' has the wrong number of lines (Expected 4, Found $lineCount)." }
-    Write-Host "Verification PASSED: '$wikiLinks' was created with the correct number of records." -ForegroundColor Yellow
+    if ($lineCount -ne 4) { throw "FAIL: '$displayWikiLinksPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
+    Write-Host "Verification PASSED: '$displayWikiLinksPath' was created with the correct number of records." -ForegroundColor Yellow
     Write-Host ""
     exit 0 # Temporarily exit after this stage for methodical testing.
 
