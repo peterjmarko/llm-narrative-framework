@@ -223,7 +223,7 @@ def scrape_search_page_data(session):
             writer.writerow(['ID', 'CategoryName']) # Write the header
             writer.writerows(sorted_categories)     # Write the sorted data rows
         
-        logging.info(f"Successfully saved/updated category map at '{display_path}'.")
+        logging.info(f"{Fore.CYAN}Successfully saved/updated category map at '{display_path}'.{Fore.RESET}")
     except (IOError, csv.Error) as e:
         logging.warning(f"Could not save category map to '{output_path}': {e}")
 

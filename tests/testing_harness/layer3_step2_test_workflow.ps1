@@ -66,7 +66,7 @@ try {
 
     $displayPath = (Join-Path $PWD $outputFile).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
     Write-Host "  -> Filtering and re-indexing complete. Final record count: $($reIndexedData.Length)."
-    Write-Host "Output saved to: $displayPath"
+    Write-Host "Output saved to: $displayPath" -ForegroundColor Cyan
 
     # --- 2. Run the Automated Pipeline Scripts Sequentially ---
     Write-Host "`n--- Running automated data pipeline scripts... ---" -ForegroundColor Yellow
@@ -90,20 +90,19 @@ try {
     $finalCandidates = "data/intermediate/adb_final_candidates.txt"
     $sfImport = "data/intermediate/sf_data_import.txt"
 
-    # Sequentially call each script with explicit input/output paths
+    # Sequentially call each script
     pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") --work-dir $PWD -i $adbRaw -o $wikiLinks --force
+    pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") --sandbox-path . --force
 
     # --- Integration Test Checkpoint ---
-    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: find_wikipedia_links.py ---" -ForegroundColor Green
-    $displayWikiLinksPath = (Join-Path $PWD $wikiLinks).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    if (-not (Test-Path $wikiLinks)) { throw "FAIL: '$displayWikiLinksPath' was not created." }
-    $lineCount = (Get-Content $wikiLinks).Length
-    if ($lineCount -ne 4) { throw "FAIL: '$displayWikiLinksPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
-    Write-Host "Verification PASSED: '$displayWikiLinksPath' was created with the correct number of records." -ForegroundColor Yellow
+    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: validate_wikipedia_pages.py ---" -ForegroundColor Green
+    $displayValidationReportPath = (Join-Path $PWD $validationReport).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
+    if (-not (Test-Path $validationReport)) { throw "FAIL: '$displayValidationReportPath' was not created." }
+    $lineCount = (Get-Content $validationReport).Length
+    if ($lineCount -ne 4) { throw "FAIL: '$displayValidationReportPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
+    Write-Host "Verification PASSED: '$displayValidationReportPath' was created with the correct number of records." -ForegroundColor Yellow
     Write-Host ""
     exit 0 # Temporarily exit after this stage for methodical testing.
-
-    pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") -i $wikiLinks -o $validationReport --force
     pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") -i $adbRaw -v $validationReport -o $eligibleCandidates --force
     pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") -i $eligibleCandidates -o $eminenceScores --force
     pdm run python (Join-Path $ProjectRoot "src/generate_ocean_scores.py") -i $eminenceScores -o $oceanScores --force

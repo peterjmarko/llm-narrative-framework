@@ -361,27 +361,32 @@ def sort_output_file(filepath: Path, fieldnames: list):
 
 def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int, was_interrupted: bool = False):
     """Sorts the final CSV, generates the summary, and prints the final status message."""
+    from config_loader import PROJECT_ROOT
     sort_output_file(output_path, fieldnames)
     generate_summary_report(output_path) # This already prints the full summary to console
     
     summary_path = output_path.with_name("adb_validation_summary.txt")
+    
+    display_output_path = os.path.relpath(output_path, PROJECT_ROOT)
+    display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT)
 
     if was_interrupted:
         print(f"\n{Fore.YELLOW}WARNING: Validation incomplete.")
         print(f"Partial results have been sorted and saved.")
-        print(f"{Fore.CYAN}  - Detailed Report: {output_path}")
-        print(f"{Fore.CYAN}  - Summary Report:  {summary_path} ✨")
+        print(f"{Fore.CYAN}  - Detailed Report: {display_output_path}")
+        print(f"{Fore.CYAN}  - Summary Report:  {display_summary_path} ✨")
         print(f"{Fore.YELLOW}\nPlease re-run the script to resume validation.\n")
         os._exit(1)
     else:
         # The success message and summary have already been printed by generate_summary_report
         # We just need to confirm the file locations.
         print(f"{Fore.GREEN}\nSUCCESS: Validation complete.")
-        print(f"{Fore.CYAN}  - Detailed Report: {output_path}")
-        print(f"{Fore.CYAN}  - Summary Report:  {summary_path} ✨\n")
+        print(f"{Fore.CYAN}  - Detailed Report: {display_output_path}")
+        print(f"{Fore.CYAN}  - Summary Report:  {display_summary_path} ✨\n")
 
 def generate_summary_report(report_path: Path):
     """Reads the detailed CSV report and generates a summary text file."""
+    from config_loader import get_path, PROJECT_ROOT
     if not report_path.exists():
         print(f"{Fore.RED}ERROR: Input report file not found at '{report_path}'")
         return
@@ -390,12 +395,13 @@ def generate_summary_report(report_path: Path):
     
     if summary_path.exists():
         try:
-            backup_dir = Path('data/backup')
+            backup_dir = Path(get_path('data/backup'))
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{summary_path.stem}.{timestamp}{summary_path.suffix}.bak"
             shutil.copy2(summary_path, backup_path)
-            print(f"Backed up existing summary to: {backup_path}")
+            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
+            print(f"Backed up existing summary to: {display_backup_path}")
         except (IOError, OSError) as e:
             print(f"{Fore.YELLOW}Could not create backup for summary report: {e}")
             
@@ -472,16 +478,26 @@ def generate_summary_report(report_path: Path):
                 line = f"{label:<{label_col}}{count:>{count_col},}{perc_str:>{perc_col}}"
                 failure_analysis.append(line)
         
-        report_lines = [
-            f"{Fore.CYAN}{banner}", f"{title.center(banner_width)}", f"{banner}{Fore.RESET}",
+        # For the console version, with colors
+        report_lines_color = [
+            banner, title.center(banner_width), banner,
             f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
             *overall_stats, *entry_type_stats, *failure_analysis,
-            f"{Fore.CYAN}{banner}{Fore.RESET}"
+            banner
         ]
         
-        summary_content = "\n".join(report_lines)
-        with open(summary_path, 'w', encoding='utf-8') as f: f.write(summary_content)
-        print("\n" + summary_content)
+        # For the file version, strip ANSI color codes
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        report_lines_plain = [ansi_escape.sub('', line) for line in report_lines_color]
+        
+        # Write the plain text version to the file
+        summary_content_plain = "\n".join(report_lines_plain)
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            f.write(summary_content_plain)
+
+        # Print the color version to the console
+        summary_content_color = "\n".join(report_lines_color)
+        print("\n" + summary_content_color)
 
     except (IOError, csv.Error) as e:
         print(f"{Fore.RED}ERROR: Failed to generate summary report: {e}")
@@ -520,13 +536,20 @@ def worker_task_with_timeout(row: dict, pbar: tqdm, index: int) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Validate Wikipedia page content for ADB subjects.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("-i", "--input-file", default="data/processed/adb_wiki_links.csv", help="Path to the CSV file with Wikipedia links.")
-    parser.add_argument("-o", "--output-file", default="data/reports/adb_validation_report.csv", help="Path for the final validation report CSV.")
+    parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("-w", "--workers", type=int, default=MAX_WORKERS, help="Number of parallel worker threads.")
     parser.add_argument("--force", action="store_true", help="Force reprocessing of all records.")
     parser.add_argument("--report-only", action="store_true", help="Generate the summary report for an existing validation CSV and exit.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
     args = parser.parse_args()
+
+    # If a sandbox path is provided, set the environment variable.
+    # This must be done before any other modules are used.
+    if args.sandbox_path:
+        os.environ['PROJECT_SANDBOX_PATH'] = os.path.abspath(args.sandbox_path)
+
+    # Now that the environment is set, we can safely load modules that depend on it.
+    from config_loader import get_path, PROJECT_ROOT
 
     # --- Configure Logging ---
     log_level = logging.INFO if args.verbose else logging.ERROR
@@ -534,7 +557,8 @@ def main():
     handler.setFormatter(CustomFormatter())
     logging.basicConfig(level=log_level, handlers=[handler], force=True)
 
-    input_path, output_path = Path(args.input_file), Path(args.output_file)
+    input_path = Path(get_path("data/processed/adb_wiki_links.csv"))
+    output_path = Path(get_path("data/reports/adb_validation_report.csv"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if args.report_only:
@@ -545,12 +569,13 @@ def main():
     def backup_and_overwrite(file_path: Path):
         """Creates a backup of the file and then deletes the original."""
         try:
-            backup_dir = Path('data/backup')
+            backup_dir = Path(get_path('data/backup'))
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
             shutil.copy2(file_path, backup_path)
-            print(f"{Fore.CYAN}Backed up existing report to: {backup_path}")
+            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
+            print(f"{Fore.CYAN}Backed up existing report to: {display_backup_path}")
             file_path.unlink()
         except (IOError, OSError) as e:
             logging.error(f"Failed to create backup or remove file: {e}")
@@ -619,8 +644,8 @@ def main():
     print(f"\n{Fore.YELLOW}--- Validating Wikipedia Pages ---")
     print(f"Found {processed_before:,} already processed records ({valid_before:,} valid).")
     print(f"Now processing {len(records_to_process):,} new records using {args.workers} workers.")
-    print(f"{Fore.CYAN}NOTE: Each set of 1,000 records can take 1.5 minutes or more to process.")
-    print(f"{Fore.CYAN}You can safely interrupt with Ctrl+C at any time to resume later.\n")
+    print(f"{Fore.YELLOW}NOTE: Each set of 1,000 records can take 1.5 minutes or more to process.")
+    print(f"You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     was_interrupted = False
     valid_this_session = 0

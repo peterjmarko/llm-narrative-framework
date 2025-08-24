@@ -468,7 +468,7 @@ def finalize_and_report(output_path: Path, fieldnames: list, all_lines: list, wa
             display_path = os.path.relpath(output_path, PROJECT_ROOT)
             print(f"\n{Fore.GREEN}SUCCESS: Link finding complete.")
             print(summary_msg)
-            print(f"Output saved to: {display_path} ✨\n")
+            print(f"{Fore.CYAN}Output saved to: {display_path} ✨{Fore.RESET}\n")
 
 def main():
     # Import here to allow for sandbox path setting
@@ -583,7 +583,7 @@ def main():
         print("\n--- Finding Wikipedia Links ---")
         print(f"Processing {len(lines_to_process):,} records using {args.workers} workers.")
 
-    print("NOTE: Each set of 1,000 records can take 3 minutes or more to process.")
+    print(f"{Fore.YELLOW}NOTE: Each set of 1,000 records can take 3 minutes or more to process.{Fore.RESET}")
     print("You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     links_found_this_session, timeouts_this_session = 0, 0
