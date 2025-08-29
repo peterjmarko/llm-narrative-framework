@@ -1,0 +1,48 @@
+graph TD
+    classDef process fill:#f9f9f9,stroke:#333,stroke-width:1px
+    classDef artifact fill:#e5e5e5,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5
+    classDef source fill:#cce5ff,stroke:#333,stroke-width:2px
+    classDef finalProduct fill:#d5e8d4,stroke:#82b366,stroke-width:2px,font-weight:bold
+    classDef manualStyle fill:#f8cecc,stroke:#b85450,stroke-width:2px
+    classDef llmProcess fill:#fff2cc,stroke:#d6b656,stroke-width:2px
+    classDef db fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
+
+    subgraph "Input from Previous Stage"
+        final_candidates[adb_final_candidates.txt]:::source
+    end
+    
+    subgraph "Pipeline Scripts"
+        prepare_import[src/prepare_sf_import.py]:::process
+        neutralize["src/neutralize_delineations.py<br>(Uses LLM)"]:::llmProcess
+        create_db[src/create_subject_db.py]:::process
+        generate_db[src/generate_personalities_db.py]:::process
+    end
+
+    subgraph "Manual & External Processes"
+        sf_import[sf_data_import.txt]:::artifact --> manual_step{{Use Solar Fire Software}}:::manualStyle
+        manual_step --> chart_export[sf_chart_export.csv]:::artifact
+        manual_step --> delineations_lib[sf_delineations_library.txt]:::artifact
+    end
+
+    subgraph "Data Artifacts"
+        neutralized_dir[neutralized_delineations/]:::artifact
+        subject_db[subject_db.csv]:::db
+    end
+
+    subgraph "Final Product"
+        personalities_db[personalities_db.txt]:::finalProduct
+    end
+
+    final_candidates --> prepare_import
+    prepare_import --> sf_import
+
+    delineations_lib --> neutralize
+    neutralize --> neutralized_dir
+    
+    final_candidates --> create_db
+    chart_export --> create_db
+    create_db --> subject_db
+
+    subject_db --> generate_db
+    neutralized_dir --> generate_db
+    generate_db --> personalities_db

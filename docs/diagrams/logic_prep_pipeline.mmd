@@ -1,0 +1,29 @@
+graph TD
+    subgraph "Setup"
+        A[Start] --> B[Fetch Raw Data from ADB]
+    end
+
+    subgraph "Filtering & Selection"
+        B --> C{Find Wikipedia Link}
+        C -- Found --> D{Validate Page Content}
+        D -- Valid --> E{Apply Data Quality Rules}
+        E -- Eligible --> F[Score Candidates for Eminence & OCEAN]
+        F --> G{Apply Statistical Diversity Cutoff}
+        G -- In Final Set --> H[Final Candidate Set Ready]
+    end
+    
+    subgraph "Generation"
+        H --> I{{Perform Manual Chart Calculation}}
+        I --> J[Neutralize Esoteric Text Library]
+        H & J --> K[Assemble Final Database from Candidates & Text]
+    end
+
+    subgraph "Finalization"
+        K --> L[Write personalities_db.txt]
+        L --> Z[End]
+    end
+
+    C -- Not Found --> X[Discard Record]
+    D -- Invalid --> X
+    E -- Ineligible --> X
+    G -- Not in Set --> X

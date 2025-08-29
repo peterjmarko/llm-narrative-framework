@@ -46,10 +46,6 @@ The result is a clean dataset of personality profiles where the connection to an
 
 ## Data Preparation Pipeline
 
-The data preparation pipeline is a fully automated workflow that transforms raw data from the Astro-Databank (ADB) into the final `personalities_db.txt` used in the experiments.
-
-### Data Sourcing and Preparation Pipeline
-
 The data preparation pipeline is a fully automated, multi-stage workflow. It begins with data extraction from the live Astro-Databank website and concludes with the generation of the final `personalities_db.txt` file used in the experiments.
 
 **Replication Paths:** Researchers can approach this project in two ways:
@@ -113,36 +109,53 @@ This stage identifies the correct Wikipedia page for each subject, validates its
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
 
-The pipeline can be understood through the following architectural and logical diagrams.
+The pipeline can be understood through the following architecture, workflow, data flow, and logic diagrams.
 
-### Data Preparation: Visual Architecture
+### Data Preparation: Architecture
+
+This diagram provides a map of the scripts in the data preparation pipeline, showing how they are orchestrated and which utilities they share.
+
+<div align="center">
+  <p>Data Preparation Code Architecture: The execution flow of the data processing scripts.</p>
+  <img src="images/arch_prep_codebase.png" width="100%">
+</div>
+
+### Data Preparation: Workflow
+
+This diagram shows the high-level, multi-stage workflow for the entire data preparation pipeline, including both automated and manual processes.
 
 <div align="center">
   <p>Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated databases, showing both manual and automated steps.</p>
-  <img src="images/flow_prep_pipeline.png" width="75%">
+  <img src="images/flow_prep_pipeline.png" width="35%">
 </div>
+
+### Data Preparation: Data Flow
+
+These diagrams show the sequence of data artifacts (files) created and transformed by the pipeline scripts at each major stage.
 
 <div align="center">
   <p>Data Prep Flow 1: Sourcing raw data and creating a validated list of eligible candidates.</p>
-  <img src="images/data_prep_flow_1_sourcing.png" width="70%">
+  <img src="images/flow_prep_1_sourcing.png" width="70%">
 </div>
 
 <div align="center">
   <p>Data Prep Flow 2: Scoring eligible candidates to determine the final, rank-ordered subject set.</p>
-  <img src="images/data_prep_flow_2_scoring.png" width="70%">
+  <img src="images/flow_prep_2_scoring.png" width="80%">
 </div>
 
 <div align="center">
   <p>Data Prep Flow 3: Generating the final personalities database from the subject set and neutralized text library.</p>
-  <img src="images/data_prep_flow_3_generation.png" width="90%">
+  <img src="images/flow_prep_3_generation.png" width="100%">
 </div>
+
+### Data Preparation: Logic
+
+These diagrams illustrate the internal decision-making logic and control flow of each script in the data preparation pipeline.
 
 <div align="center">
-  <p>Data Preparation Code Architecture: The execution flow of the data processing scripts.</p>
-  <img src="images/arch_prep_codebase.png" width="50%">
+  <p>Overall Logic for the Data Preparation Pipeline: A high-level view of the key filtering, selection, and generation stages.</p>
+  <img src="images/logic_prep_pipeline.png" width="55%">
 </div>
-
-### Data Preparation: Logic Flowcharts
 
 <div align="center">
   <p>Logic for Link Finding (`find_wikipedia_links.py`): The algorithm for finding Wikipedia URLs by scraping ADB and using a Wikipedia search fallback.</p>
@@ -151,37 +164,37 @@ The pipeline can be understood through the following architectural and logical d
 
 <div align="center">
   <p>Logic for Page Validation (`validate_wikipedia_pages.py`): The algorithm for validating Wikipedia page content, including redirect and disambiguation handling.</p>
-  <img src="images/logic_prep_validate_pages.png" width="65%">
+  <img src="images/logic_prep_validate_pages.png" width="75%">
 </div>
 
 <div align="center">
   <p>Logic for Eligibility Selection (`select_eligible_candidates.py`): The algorithm for performing initial data quality checks to create a pool of eligible candidates.</p>
-  <img src="images/logic_prep_eligible_candidates.png" width="65%">
+  <img src="images/logic_prep_eligible_candidates.png" width="70%">
 </div>
 
 <div align="center">
   <p>Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.</p>
-  <img src="images/logic_prep_eminence_scoring.png" width="65%">
+  <img src="images/logic_prep_eminence_scoring.png" width="60%">
 </div>
 
 <div align="center">
   <p>Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size. A robust pre-flight check re-analyzes all existing data to ensure correct resumption or finalization after interruptions.</p>
-  <img src="images/logic_prep_ocean_scoring.png" width="65%">
+  <img src="images/logic_prep_ocean_scoring.png" width="60%">
 </div>
 
 <div align="center">
   <p>Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.</p>
-  <img src="images/logic_prep_final_candidates.png" width="65%">
+  <img src="images/logic_prep_final_candidates.png" width="100%">
 </div>
 
 <div align="center">
   <p>Logic for Delineation Neutralization (`neutralize_delineations.py`): The hybrid algorithm for rewriting texts. Fast mode bundles tasks for speed, while the robust default mode processes each item individually to guarantee completion.</p>
-  <img src="images/logic_prep_neutralization.png" width="65%">
+  <img src="images/logic_prep_neutralization.png" width="60%">
 </div>
 
 <div align="center">
   <p>Logic for Database Generation (`generate_personalities_db.py`): The algorithm for assembling the final description text for each subject.</p>
-  <img src="images/logic_prep_generation.png" width="65%">
+  <img src="images/logic_prep_generation.png" width="70%">
 </div>
 
 ## Main Experiment & Analysis Pipeline

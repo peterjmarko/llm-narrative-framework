@@ -43,10 +43,6 @@ The result is a clean dataset of personality profiles where the connection to an
 
 ## Data Preparation Pipeline
 
-The data preparation pipeline is a fully automated workflow that transforms raw data from the Astro-Databank (ADB) into the final `personalities_db.txt` used in the experiments.
-
-### Data Sourcing and Preparation Pipeline
-
 The data preparation pipeline is a fully automated, multi-stage workflow. It begins with data extraction from the live Astro-Databank website and concludes with the generation of the final `personalities_db.txt` file used in the experiments.
 
 **Replication Paths:** Researchers can approach this project in two ways:
@@ -110,37 +106,51 @@ This stage identifies the correct Wikipedia page for each subject, validates its
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
 
-The pipeline can be understood through the following architectural and logical diagrams.
+The pipeline can be understood through the following architecture, workflow, data flow, and logic diagrams.
 
-### Data Preparation: Visual Architecture
+### Data Preparation: Architecture
 
-{{grouped_figure:docs/diagrams/flow_prep_pipeline.mmd | scale=2.5 | width=75% | caption=Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated databases, showing both manual and automated steps.}}
+This diagram provides a map of the scripts in the data preparation pipeline, showing how they are orchestrated and which utilities they share.
 
-{{grouped_figure:docs/diagrams/data_prep_flow_1_sourcing.mmd | scale=2.5 | width=70% | caption=Data Prep Flow 1: Sourcing raw data and creating a validated list of eligible candidates.}}
+{{grouped_figure:docs/diagrams/arch_prep_codebase.mmd | scale=2.5 | width=100% | caption=Data Preparation Code Architecture: The execution flow of the data processing scripts.}}
 
-{{grouped_figure:docs/diagrams/data_prep_flow_2_scoring.mmd | scale=2.5 | width=70% | caption=Data Prep Flow 2: Scoring eligible candidates to determine the final, rank-ordered subject set.}}
+### Data Preparation: Workflow
 
-{{grouped_figure:docs/diagrams/data_prep_flow_3_generation.mmd | scale=2.5 | width=90% | caption=Data Prep Flow 3: Generating the final personalities database from the subject set and neutralized text library.}}
+This diagram shows the high-level, multi-stage workflow for the entire data preparation pipeline, including both automated and manual processes.
 
-{{grouped_figure:docs/diagrams/arch_prep_codebase.mmd | scale=2.5 | width=50% | caption=Data Preparation Code Architecture: The execution flow of the data processing scripts.}}
+{{grouped_figure:docs/diagrams/flow_prep_pipeline.mmd | scale=2.5 | width=35% | caption=Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated databases, showing both manual and automated steps.}}
 
-### Data Preparation: Logic Flowcharts
+### Data Preparation: Data Flow
+
+These diagrams show the sequence of data artifacts (files) created and transformed by the pipeline scripts at each major stage.
+
+{{grouped_figure:docs/diagrams/flow_prep_1_sourcing.mmd | scale=2.5 | width=70% | caption=Data Prep Flow 1: Sourcing raw data and creating a validated list of eligible candidates.}}
+
+{{grouped_figure:docs/diagrams/flow_prep_2_scoring.mmd | scale=2.5 | width=80% | caption=Data Prep Flow 2: Scoring eligible candidates to determine the final, rank-ordered subject set.}}
+
+{{grouped_figure:docs/diagrams/flow_prep_3_generation.mmd | scale=2.5 | width=100% | caption=Data Prep Flow 3: Generating the final personalities database from the subject set and neutralized text library.}}
+
+### Data Preparation: Logic
+
+These diagrams illustrate the internal decision-making logic and control flow of each script in the data preparation pipeline.
+
+{{grouped_figure:docs/diagrams/logic_prep_pipeline.mmd | scale=2.5 | width=55% | caption=Overall Logic for the Data Preparation Pipeline: A high-level view of the key filtering, selection, and generation stages.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_find_links.mmd | scale=2.5 | width=65% | caption=Logic for Link Finding (`find_wikipedia_links.py`): The algorithm for finding Wikipedia URLs by scraping ADB and using a Wikipedia search fallback.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_validate_pages.mmd | scale=2.5 | width=65% | caption=Logic for Page Validation (`validate_wikipedia_pages.py`): The algorithm for validating Wikipedia page content, including redirect and disambiguation handling.}}
+{{grouped_figure:docs/diagrams/logic_prep_validate_pages.mmd | scale=2.5 | width=75% | caption=Logic for Page Validation (`validate_wikipedia_pages.py`): The algorithm for validating Wikipedia page content, including redirect and disambiguation handling.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_eligible_candidates.mmd | scale=2.5 | width=65% | caption=Logic for Eligibility Selection (`select_eligible_candidates.py`): The algorithm for performing initial data quality checks to create a pool of eligible candidates.}}
+{{grouped_figure:docs/diagrams/logic_prep_eligible_candidates.mmd | scale=2.5 | width=70% | caption=Logic for Eligibility Selection (`select_eligible_candidates.py`): The algorithm for performing initial data quality checks to create a pool of eligible candidates.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_eminence_scoring.mmd | scale=2.5 | width=65% | caption=Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.}}
+{{grouped_figure:docs/diagrams/logic_prep_eminence_scoring.mmd | scale=2.5 | width=60% | caption=Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=65% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size. A robust pre-flight check re-analyzes all existing data to ensure correct resumption or finalization after interruptions.}}
+{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=60% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size. A robust pre-flight check re-analyzes all existing data to ensure correct resumption or finalization after interruptions.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_final_candidates.mmd | scale=2.5 | width=65% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.}}
+{{grouped_figure:docs/diagrams/logic_prep_final_candidates.mmd | scale=2.5 | width=100% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_neutralization.mmd | scale=2.5 | width=65% | caption=Logic for Delineation Neutralization (`neutralize_delineations.py`): The hybrid algorithm for rewriting texts. Fast mode bundles tasks for speed, while the robust default mode processes each item individually to guarantee completion.}}
+{{grouped_figure:docs/diagrams/logic_prep_neutralization.mmd | scale=2.5 | width=60% | caption=Logic for Delineation Neutralization (`neutralize_delineations.py`): The hybrid algorithm for rewriting texts. Fast mode bundles tasks for speed, while the robust default mode processes each item individually to guarantee completion.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_generation.mmd | scale=2.5 | width=65% | caption=Logic for Database Generation (`generate_personalities_db.py`): The algorithm for assembling the final description text for each subject.}}
+{{grouped_figure:docs/diagrams/logic_prep_generation.mmd | scale=2.5 | width=70% | caption=Logic for Database Generation (`generate_personalities_db.py`): The algorithm for assembling the final description text for each subject.}}
 
 ## Main Experiment & Analysis Pipeline
 

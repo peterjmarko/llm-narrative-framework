@@ -1,0 +1,40 @@
+graph TD
+    classDef process fill:#f9f9f9,stroke:#333,stroke-width:1px
+    classDef artifact fill:#e5e5e5,stroke:#666,stroke-width:1px,stroke-dasharray: 5 5
+    classDef source fill:#cce5ff,stroke:#333,stroke-width:2px
+    classDef finalProduct fill:#d5e8d4,stroke:#82b366,stroke-width:2px,font-weight:bold
+
+    subgraph "Input"
+        adb_source(("Live Astro-Databank<br/>Website")):::source
+    end
+
+    subgraph "Pipeline Scripts"
+        fetch[src/fetch_adb_data.py]:::process
+        find_links[src/find_wikipedia_links.py]:::process
+        validate[src/validate_wikipedia_pages.py]:::process
+        select_eligible[src/select_eligible_candidates.py]:::process
+    end
+
+    subgraph "Data Artifacts"
+        raw_export[adb_raw_export.txt]:::artifact
+        wiki_links[adb_wiki_links.csv]:::artifact
+        validation_report[adb_validation_report.csv]:::artifact
+    end
+    
+    subgraph "Output"
+        eligible_candidates[adb_eligible_candidates.txt]:::finalProduct
+    end
+
+    adb_source --> fetch
+    fetch --> raw_export
+
+    raw_export --> find_links
+    find_links --> wiki_links
+    
+    wiki_links --> validate
+    validate --> validation_report
+    
+    raw_export --> select_eligible
+    validation_report --> select_eligible
+    
+    select_eligible --> eligible_candidates
