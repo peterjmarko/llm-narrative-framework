@@ -1,5 +1,24 @@
 # Changelog
 
+## 6.8.4 (2025-08-29)
+
+### Bump
+
+- **version 6.8.3 → 6.8.4**
+
+### Documentation
+
+- **restructure and enhance data prep diagrams**
+  This commit overhauls the documentation for the Data Preparation Pipeline to improve clarity and logical flow.
+  
+  *   Reorganizes the diagram sections into a more intuitive Architecture -> Workflow -> Data Flow -> Logic structure.
+  *   Adds four new diagrams: a high-level logic flowchart and three detailed stage-by-stage data flow diagrams.
+  *   Corrects the layout for two existing diagrams (`arch_prep_codebase.mmd` and `logic_prep_final_candidates.mmd`) to improve readability and fix rendering errors.
+
+### Fixes
+
+- **trigger release for documentation updates**
+
 ## 6.8.3 (2025-08-24)
 
 ### Bump
