@@ -1,5 +1,29 @@
 # Changelog
 
+## 6.8.8 (2025-08-30)
+
+### Bump
+
+- **version 6.8.7 → 6.8.8**
+
+### Refactor
+
+- **refactor data integration pipeline and improve documentation**
+  This commit refactors the final data integration scripts and improves
+  the resilience of the test pipeline, while also clarifying core project
+  documentation.
+  
+  - Refactored `create_subject_db.py` to be fully sandbox-aware.
+  - Standardized all console output paths to be project-relative and fixed
+    Unicode errors in success messages.
+  - Enhanced `neutralize_delineations.py` with pipe-aware logging and a
+    more robust startup sequence.
+  - Improved the Layer 3 integration test harness with an automated debug
+    workflow to diagnose neutralization failures.
+  - Updated the abstract in `article_main_text.md` to more accurately
+    describe the LLM matching task.
+  - Added a "Prerequisites" section to `article_supplementary_material.md`.
+
 ## 6.8.7 (2025-08-30)
 
 ### Bump
