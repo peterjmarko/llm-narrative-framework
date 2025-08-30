@@ -1,5 +1,28 @@
 # Changelog
 
+## 6.8.7 (2025-08-30)
+
+### Bump
+
+- **version 6.8.6 → 6.8.7**
+
+### Refactor
+
+- **refactor selection and import scripts for sandbox awareness**
+  This commit continues the sandbox refactoring for the data preparation
+  pipeline, updating `select_final_candidates.py` and
+  `prepare_sf_import.py`.
+  
+  - Refactored `select_final_candidates.py` and `prepare_sf_import.py` to be
+    fully sandbox-aware, using the `--sandbox-path` argument for all file
+    I/O.
+  - Updated the console output for both scripts to match the new
+    standardized format.
+  - Updated the unit tests for both scripts to reflect the new
+    sandbox-aware interface.
+  - Enhanced the Layer 3 integration test harness by copying required
+    static assets into the sandbox and streamlining test log output.
+
 ## 6.8.6 (2025-08-30)
 
 ### Bump
