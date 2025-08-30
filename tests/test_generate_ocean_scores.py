@@ -80,13 +80,13 @@ def test_calculate_average_variance():
 
 def test_perform_pre_flight_check(mocker, tmp_path):
     """Tests the pre-flight check logic for resuming or finalizing a run."""
+    output_path = tmp_path / "scores.csv"
     mock_args = SimpleNamespace(
         cutoff_start_point=100,
         variance_check_window=3,
         variance_trigger_count=2,
         variance_analysis_window=50,
         variance_cutoff_percentage=0.5,
-        output_file=str(tmp_path / "scores.csv"),
         benchmark_population_size=100 # Add dummy values for summary report
     )
     # Mock the functions that would perform file I/O
@@ -95,7 +95,7 @@ def test_perform_pre_flight_check(mocker, tmp_path):
 
     # Case 1: Not enough data to start checks
     df_too_small = pd.DataFrame({'idADB': range(99)})
-    status, _ = perform_pre_flight_check(mock_args, df_too_small, 0.5, deque())
+    status, _ = perform_pre_flight_check(output_path, mock_args, df_too_small, 0.5, deque())
     assert status == "CONTINUE"
 
     # Case 2: Enough data, but cutoff condition is NOT met
@@ -107,7 +107,7 @@ def test_perform_pre_flight_check(mocker, tmp_path):
     df_normal = pd.DataFrame(data_normal)
     # Window 1 (0-100) has var=0 (met). Window 2 (50-150) has var > 0 (not met).
     # Total met_count will be 1, which is less than the trigger count of 2.
-    status, checks = perform_pre_flight_check(mock_args, df_normal, 0.5, deque())
+    status, checks = perform_pre_flight_check(output_path, mock_args, df_normal, 0.5, deque())
     assert status == "CONTINUE"
     assert len(checks) == 2
     assert sum(1 for c in checks if c[2]) == 1 # Only one of the two checks should be met
@@ -120,7 +120,7 @@ def test_perform_pre_flight_check(mocker, tmp_path):
         (200, 0.2, True, 40.0), # Met -> This is the 2nd of 3, so trigger stop
     ], maxlen=3)
     df_cutoff = pd.DataFrame({'idADB': range(200)})
-    status, _ = perform_pre_flight_check(mock_args, df_cutoff, 0.5, initial_checks)
+    status, _ = perform_pre_flight_check(output_path, mock_args, df_cutoff, 0.5, initial_checks)
     assert status == "EXIT"
 
 # === End of tests/test_generate_ocean_scores.py ===

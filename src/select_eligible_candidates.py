@@ -20,21 +20,26 @@
 # Filename: src/select_eligible_candidates.py
 
 """
-Selects eligible candidates for LLM scoring from the raw ADB data export.
+Selects eligible candidates for LL-M scoring from the raw ADB data export.
 
-This script serves as the first filtering stage in the data preparation pipeline.
-It takes the raw data dump and the validation report to produce a clean list of
-all subjects who are potentially viable for the study. This pre-filtering
-ensures that subsequent, expensive LLM-based scoring is only performed on
-high-quality, valid data.
+This script serves as a key filtering stage in the data preparation pipeline. It
+takes the raw data dump and the validation report to produce a clean list of all
+subjects who are potentially viable for the study. This pre-filtering ensures
+that subsequent, expensive LLM-based scoring is only performed on high-quality,
+valid data.
 
-Inputs:
-  - Raw data from `fetch_adb_data.py`.
-  - Status report from `validate_wikipedia_pages.py`.
-
-Output:
-  - A clean, tab-delimited file containing all subjects who pass the initial
-    quality checks.
+Key Features:
+-   **Sandbox-Aware**: Fully supports sandboxed execution via a `--sandbox-path`
+    argument for isolated testing.
+-   **Robust Filtering**: Applies a series of deterministic quality checks:
+    -   Excludes non-person "Research" entries.
+    -   Keeps only subjects with a final validation status of 'OK'.
+    -   Filters by birth year (1900-1999).
+    -   Validates the birth time format.
+-   **Deduplication**: Uses a normalized name and birth date to identify and
+    remove duplicate entries.
+-   **Resumability**: Can be safely re-run, as it will only append newly
+    eligible candidates that are not already present in the output file.
 """
 
 import argparse
@@ -87,9 +92,15 @@ def finalize_and_report(output_path: Path, new_count: int, was_interrupted: bool
         print(f"{Fore.CYAN}Partial results saved to: {display_path} ✨{Fore.RESET}\n")
         os._exit(1)
     else:
-        print(f"\n{Fore.GREEN}SUCCESS: Selection complete.")
-        print(summary_msg)
-        print(f"{Fore.CYAN}Output saved to: {display_path} ✨{Fore.RESET}\n")
+        try:
+            total_eligible = len(pd.read_csv(output_path, sep='\t'))
+            key_metric = f"Found {total_eligible:,} eligible candidates"
+        except (FileNotFoundError, pd.errors.EmptyDataError):
+            key_metric = f"Found {new_count:,} eligible candidates"
+
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Eligible candidates saved to: {display_path}{Fore.RESET}")
+        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Selection completed successfully. ✨{Fore.RESET}\n")
 
 
 def normalize_name_for_deduplication(series: pd.Series) -> pd.Series:

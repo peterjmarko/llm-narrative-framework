@@ -22,26 +22,30 @@
 """
 Validates Wikipedia page content and generates the final validation reports.
 
-This is the second and final step in the data validation pipeline. It takes the
-intermediate file of Wikipedia links (`adb_wiki_links.csv`) and performs an
-intensive, content-level validation for each page.
+This script takes the intermediate file of Wikipedia links and performs an
+intensive, content-level validation for each page to ensure data quality before
+any expensive LLM-based processing occurs.
 
-The script's validation process includes:
-1.  **Resolving Redirects:** Follows all HTTP redirects, meta-refresh tags, and
-    canonical URL declarations to find the true source page.
-2.  **Handling Disambiguation:** Detects disambiguation pages and intelligently
-    searches for the correct subject link using their birth year.
-3.  **Validating Names:** Performs a fuzzy string comparison between the ADB name
-    and the Wikipedia article title to check for mismatches.
-4.  **Verifying Death Date:** Uses a multi-strategy approach to confirm that the
-    subject is deceased by checking infoboxes, categories, and text patterns.
-
-Upon completion, it produces two key outputs:
-- A detailed, machine-readable CSV report (`adb_validation_report.csv`).
-- A human-readable text summary (`adb_validation_summary.txt`).
-
-The script is fully resumable, interrupt-safe, and includes a `--report-only`
-flag to regenerate the text summary from an existing CSV report.
+Key Features:
+-   **Sandbox-Aware**: Fully supports sandboxed execution via a `--sandbox-path`
+    argument for isolated testing.
+-   **Intelligent Validation**: The script's validation process includes:
+    1.  **Resolving Redirects:** Follows all HTTP redirects, meta-refresh tags,
+        and canonical URL declarations to find the true source page.
+    2.  **Handling Disambiguation:** Detects disambiguation pages and
+        intelligently searches for the correct subject link using their birth
+        year.
+    3.  **Validating Names:** Performs a fuzzy string comparison between the ADB
+        name and the Wikipedia article title to check for mismatches.
+    4.  **Verifying Death Date:** Uses a multi-strategy approach to confirm
+        that the subject is deceased by checking infoboxes, categories, and text
+        patterns.
+-   **Comprehensive Reporting**: Upon completion, it produces two key outputs:
+    - A detailed, machine-readable CSV report (`adb_validation_report.csv`).
+    - A human-readable text summary (`adb_validation_summary.txt`).
+-   **Resumable & Flexible**: The script is fully resumable, interrupt-safe, and
+    includes a `--report-only` flag to regenerate the text summary from an
+    existing CSV report without re-running the validation.
 """
 
 import argparse
@@ -378,11 +382,19 @@ def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int
         print(f"{Fore.YELLOW}\nPlease re-run the script to resume validation.\n")
         os._exit(1)
     else:
-        # The success message and summary have already been printed by generate_summary_report
-        # We just need to confirm the file locations.
-        print(f"{Fore.GREEN}\nSUCCESS: Validation complete.")
-        print(f"{Fore.CYAN}  - Detailed Report: {display_output_path}")
-        print(f"{Fore.CYAN}  - Summary Report:  {display_summary_path} ✨\n")
+        # Get final counts for the success message
+        try:
+            df = pd.read_csv(output_path)
+            valid_count = len(df[df['Status'].isin(['OK', 'VALID'])])
+            total_count = len(df)
+            key_metric = f"{valid_count:,} of {total_count:,} records are valid"
+        except Exception:
+            key_metric = f"{total_subjects:,} records processed"
+
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Detailed report saved to: {display_output_path}{Fore.RESET}")
+        print(f"{Fore.CYAN} - Summary report saved to: {display_summary_path}{Fore.RESET}")
+        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Validation completed successfully. ✨{Fore.RESET}\n")
 
 def generate_summary_report(report_path: Path):
     """Reads the detailed CSV report and generates a summary text file."""

@@ -79,8 +79,12 @@ try {
     Set-Content -Path $outputFile -Value $finalContent
 
     $displayPath = (Join-Path $PWD $outputFile).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    Write-Host "  -> Filtering and re-indexing complete. Final record count: $($reIndexedData.Length)."
-    Write-Host "Output saved to: $displayPath" -ForegroundColor Cyan
+    $finalRecordCount = $reIndexedData.Length
+
+    Write-Host "`n--- Final Output ---" -ForegroundColor Yellow
+    Write-Host " - Raw data export saved to: $displayPath" -ForegroundColor Cyan
+    $keyMetric = "Created initial dataset with $finalRecordCount subjects"
+    Write-Host "`nSUCCESS: $keyMetric. Initial data fetch completed successfully. ✨`n" -ForegroundColor Green
 
     # --- 2. Run the Automated Pipeline Scripts Sequentially ---
     Write-Host "`n--- Running automated data pipeline scripts... ---" -ForegroundColor Yellow
@@ -105,35 +109,51 @@ try {
     $sfImport = "data/intermediate/sf_data_import.txt"
 
     # Sequentially call each script
-    pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") --work-dir $PWD -i $adbRaw -o $wikiLinks --force
+    pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") --sandbox-path . --force
 
-    # --- Harness Intervention: Inject Non-English URL ---
-    Write-Host "`n--- HARNESS INTERVENTION: Injecting non-English URL for Jane Maguenat... ---" -ForegroundColor Cyan
-    $wikiLinksCsv = Import-Csv -Path $wikiLinks
-    foreach ($row in $wikiLinksCsv) {
-        if ($row.idADB -eq '80011') {
-            $row.WikipediaURL = 'https://fr.wikipedia.org/wiki/Jane_Maguenat'
+    # --- HARNESS INTERVENTION: Injecting validation failures... ---
+    Write-Host "`n--- HARNESS INTERVENTION: Injecting validation failures... ---" -ForegroundColor Magenta
+    $hirohitoID = "215"    # Philip, Duke of Edinburgh
+    $marquesID = "101097"  # Romário Marques
+    $rennaID = "94360"     # Jonathan Renna
+
+    # Read the content, modify it, and write it back. Using Get-Content/Set-Content
+    # is more robust for preserving the exact format than Import/Export-Csv.
+    $modifiedLinks = (Get-Content $wikiLinks) | ForEach-Object {
+        if ($_ -match ",$($hirohitoID),") {
+            # This subject will naturally fail the name match, so no change is needed.
+            $_
+        } elseif ($_ -match ",$($marquesID),") {
+            # Replace Marques's English URL with a French one to fail the language check.
+            $_ -replace "https://en.wikipedia.org/wiki/Rom%C3%A1rio", "https://fr.wikipedia.org/wiki/Rom%C3%A1rio"
+        } elseif ($_ -match ",$($rennaID),") {
+            # Blank out Renna's URL to simulate a "No Link Found" failure.
+            # This requires careful regex to replace only the URL part.
+            $_ -replace 'http[^,]*', ''
+        } else {
+            $_
         }
     }
-    $wikiLinksCsv | Export-Csv -Path $wikiLinks -NoTypeInformation
-    Write-Host "  -> Done."
+    Set-Content -Path $wikiLinks -Value $modifiedLinks
+    Write-Host "  -> Injected Non-English URL and No Link Found failures."
 
     pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") --sandbox-path . --force
     pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") --sandbox-path . --force
 
+    pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") --sandbox-path . --force
+
+    pdm run python (Join-Path $ProjectRoot "src/generate_ocean_scores.py") --sandbox-path . --force
+
     # --- Integration Test Checkpoint ---
-    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: select_eligible_candidates.py ---" -ForegroundColor Green
-    $displayEligibleCandidatesPath = (Join-Path $PWD $eligibleCandidates).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    if (-not (Test-Path $eligibleCandidates)) { throw "FAIL: '$displayEligibleCandidatesPath' was not created." }
-    $lineCount = (Get-Content $eligibleCandidates).Length
-    # We expect the 3 control subjects + 1 header line = 4 lines total.
-    # The research entry is now correctly filtered out.
-    if ($lineCount -ne 4) { throw "FAIL: '$displayEligibleCandidatesPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
-    Write-Host "Verification PASSED: '$displayEligibleCandidatesPath' was created with the correct number of records." -ForegroundColor Yellow
+    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: generate_ocean_scores.py ---" -ForegroundColor Magenta
+    $displayOceanScoresPath = (Join-Path $PWD $oceanScores).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
+    if (-not (Test-Path $oceanScores)) { throw "FAIL: '$displayOceanScoresPath' was not created." }
+    $lineCount = (Get-Content $oceanScores).Length
+    # We expect the 3 control subjects + 1 header line = 4 lines total, as the cutoff logic won't trigger.
+    if ($lineCount -ne 4) { throw "FAIL: '$displayOceanScoresPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
+    Write-Host "Verification PASSED: '$displayOceanScoresPath' was created with the correct number of records." -ForegroundColor Green
     Write-Host ""
     exit 0 # Temporarily exit after this stage for methodical testing.
-    pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") -i $eligibleCandidates -o $eminenceScores --force
-    pdm run python (Join-Path $ProjectRoot "src/generate_ocean_scores.py") -i $eminenceScores -o $oceanScores --force
     pdm run python (Join-Path $ProjectRoot "src/select_final_candidates.py") -e $eligibleCandidates -s $eminenceScores -o $oceanScores -c (Join-Path $ProjectRoot "data/foundational_assets/country_codes.csv") -f $finalCandidates --force
     pdm run python (Join-Path $ProjectRoot "src/prepare_sf_import.py") -i $finalCandidates -o $sfImport --force
     

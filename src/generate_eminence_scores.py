@@ -22,12 +22,15 @@
 """
 Orchestrator to generate eminence scores for all eligible subjects using an LLM.
 
-This script reads the pre-filtered `adb_eligible_candidates.txt` file, which
-contains only high-quality subjects, groups them into batches, and invokes the
-`llm_prompter.py` worker to query a Large Language Model (LLM) for a
-calibrated "eminence" score for each individual.
+This script reads the pre-filtered list of eligible candidates, groups them into
+batches, and invokes the `llm_prompter.py` worker to query a Large Language
+Model (LLM) for a calibrated "eminence" score for each individual.
 
 Key Features:
+-   **Configuration Driven & Sandbox Aware**: Default input/output paths and
+    model settings are managed in `config.ini`. The script is fully sandboxed
+    via a `--sandbox-path` argument, ensuring all file operations can be
+    isolated for testing.
 -   **Resilient & Resumable**: Safely stops with Ctrl+C and resumes from the
     last completed batch on the next run.
 -   **Calibrated Prompting**: Uses a sophisticated prompt with fixed historical
@@ -120,16 +123,19 @@ logging.basicConfig(level=logging.INFO, format=f"{Fore.YELLOW}%(levelname)s:{For
 
 def backup_and_overwrite(file_path: Path):
     """Creates a backup of a file before deleting the original to allow a fresh start."""
+    from config_loader import get_path, PROJECT_ROOT
     try:
-        backup_dir = Path('data/backup')
+        backup_dir = Path(get_path('data/backup'))
         backup_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = backup_dir / f"{file_path.name}.{timestamp}.bak"
         shutil.copy2(file_path, backup_path)
-        print(f"\n{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
+        display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
+        print(f"\n{Fore.CYAN}Created backup of existing file at: {display_backup_path}{Fore.RESET}")
         file_path.unlink()
+        display_path = os.path.relpath(file_path, PROJECT_ROOT)
         print(f"\n{Fore.YELLOW}--- Starting Fresh Run ---{Fore.RESET}")
-        print(f"Removed existing file: {file_path.name}")
+        print(f"Removed existing file: {display_path}")
     except (IOError, OSError) as e:
         logging.error(f"{Fore.RED}Failed to create backup or remove file: {e}")
         sys.exit(1)
@@ -152,18 +158,22 @@ def load_processed_ids(filepath: Path) -> set:
 
             if 'idADB' not in header:
                 if 'ARN' in header:
+                    from config_loader import PROJECT_ROOT
+                    display_path = os.path.relpath(filepath, PROJECT_ROOT)
                     # Legacy format detected. Halt with instructions.
                     logging.critical("Incompatible legacy file format detected.")
-                    logging.error(f"The existing file '{filepath}' uses the old 'ARN' column.")
+                    logging.error(f"The existing file '{display_path}' uses the old 'ARN' column.")
                     logging.error("The new script requires an 'idADB' column to function correctly.")
                     print("\nTo fix this, you have two options:")
                     print(f"  1. Manually rename or delete the old file: '{filepath}'")
                     print(f"  2. Re-run the script with the {Fore.CYAN}--force{Fore.RESET} flag to automatically back up and overwrite it.")
                     sys.exit(1)
                 else:
+                    from config_loader import PROJECT_ROOT
+                    display_path = os.path.relpath(filepath, PROJECT_ROOT)
                     # Header is malformed.
                     logging.critical("Malformed CSV header.")
-                    logging.error(f"Could not find required 'idADB' column in '{filepath}'.")
+                    logging.error(f"Could not find required 'idADB' column in '{display_path}'.")
                     sys.exit(1)
 
             # If header is valid, proceed to read the rest of the file.
@@ -309,7 +319,7 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         top_10 = df.head(10)
 
         banner = "="*50
-        report = [f"{Fore.CYAN}{banner}", f"{'Eminence Scores Summary'.center(50)}", f"{banner}{Fore.RESET}"]
+        report = [banner, f"{'Eminence Scores Summary'.center(50)}", banner]
         report.append(f"Total Scored:     {total_scored:,}")
         report.append(f"Total in Source:  {total_subjects_overall:,}")
         
@@ -326,7 +336,7 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         report.append("\n--- Top 10 Most Eminent ---")
         for _, row in top_10.iterrows():
             report.append(f"  {row['EminenceScore']:>5.2f} - {row['Name']}")
-        report.append(f"{Fore.CYAN}{banner}{Fore.RESET}")
+        report.append(banner)
 
         completion_pct = (total_scored / total_subjects_overall) * 100 if total_subjects_overall > 0 else 0
         status_line = f"Completion: {total_scored}/{total_subjects_overall} ({completion_pct:.2f}%)"
@@ -342,8 +352,18 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         summary_content_for_file = re.sub(r'\x1b\[[0-9;]*m', '', summary_content_for_console)
         
         summary_path.write_text(summary_content_for_file, encoding='utf-8')
-        print(f"\n{summary_content_for_console}\n")
-        print(f"{Fore.CYAN}Summary report saved to '{summary_path.name}'.\n{Fore.RESET}")
+        print(f"\n{summary_content_for_console}")
+        
+        from config_loader import PROJECT_ROOT
+        display_scores_path = os.path.relpath(filepath, PROJECT_ROOT)
+        display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT)
+
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Eminence scores saved to: {display_scores_path}{Fore.RESET}")
+        print(f"{Fore.CYAN} - Summary report saved to: {display_summary_path}{Fore.RESET}")
+
+        key_metric = f"Scored {total_scored:,} of {total_subjects_overall:,} subjects"
+        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Eminence scoring completed successfully. ✨{Fore.RESET}\n")
 
     except ImportError:
         logging.warning("Pandas not installed. Skipping summary report. Install with 'pdm add pandas'.")
@@ -362,17 +382,24 @@ def main():
         description="Generate eminence scores for ADB subjects using an LLM.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("-i", "--input-file", default=default_input, help="Path to the pre-filtered eligible candidates file. Default is from config.ini.")
-    parser.add_argument("-o", "--output-file", default=default_output, help="Path for the output CSV file. Default is from config.ini.")
+    parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("--model", default=default_model, help="Name of the LLM to use for scoring. Default is from config.ini.")
     parser.add_argument("--batch-size", type=int, default=default_batch_size, help="Number of subjects per API call. Default is from config.ini.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
     args = parser.parse_args()
 
+    # If a sandbox path is provided, set the environment variable.
+    # This must be done before any other modules are used.
+    if args.sandbox_path:
+        os.environ['PROJECT_SANDBOX_PATH'] = os.path.abspath(args.sandbox_path)
+    
+    # Now that the environment is set, we can safely load modules that depend on it.
+    from config_loader import get_path, PROJECT_ROOT
+
     # --- Setup Paths ---
     script_dir = Path(__file__).parent
-    input_path = Path(args.input_file)
-    output_path = Path(args.output_file)
+    input_path = Path(get_path(default_input))
+    output_path = Path(get_path(default_output))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     # --- Temp files for worker ---
@@ -398,7 +425,8 @@ def main():
     all_subjects = load_subjects_to_process(input_path, processed_ids)
 
     if not all_subjects and not args.force:
-        print(f"\n{Fore.YELLOW}WARNING: The scores file at '{output_path}' is already up to date. ✨")
+        display_path = os.path.relpath(output_path, PROJECT_ROOT)
+        print(f"\n{Fore.YELLOW}WARNING: The scores file at '{display_path}' is already up to date. ✨")
         print(f"{Fore.YELLOW}The update process incurs API costs and can take some time to complete.")
         print(f"{Fore.YELLOW}If you decide to go ahead with recreating the eminence scores, a backup of the existing file will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()

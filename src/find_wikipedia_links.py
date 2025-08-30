@@ -23,21 +23,27 @@
 Finds the best-guess English Wikipedia URL for each subject in the raw ADB export.
 
 This is the first step in the data validation pipeline. It takes the raw export
-from Astro-Databank and focuses on a single task: identifying the correct
-Wikipedia page for each entry.
+from Astro-Databank and focuses on identifying the correct Wikipedia page for
+each entry.
 
-The script uses a robust, multi-step process:
-1.  **Scrapes the ADB Page:** For each subject, it fetches their Astro-Databank
-    page to find a direct link to Wikipedia, trying multiple URL variants
-    for research entries.
-2.  **Searches Wikipedia:** If no link is found on the ADB page for a "Person"
-    entry, it performs a fallback search using the Wikipedia API.
-3.  **Resolves to English:** Any non-English Wikipedia links are resolved to their
-    English-language equivalent.
+Key Features:
+-   **Sandbox-Aware**: Fully supports sandboxed execution via a `--sandbox-path`
+    argument for isolated testing.
+-   **Robust, Multi-Step Process**:
+    1.  **Scrapes the ADB Page:** For each subject, it fetches their
+        Astro-Databank page to find a direct link to Wikipedia.
+    2.  **Validates Scraped Link:** It performs a quick fuzzy title match on any
+        scraped link to ensure it's plausible before accepting it.
+    3.  **Searches Wikipedia:** If no valid link is found on the ADB page for a
+        "Person" entry, it performs a fallback search using the Wikipedia API.
+    4.  **Resolves to English:** Any non-English Wikipedia links are resolved to
+        their English-language equivalent.
+-   **Resumable**: The script can be safely interrupted and resumed, as it
+    automatically skips records that have already been processed.
 
 The output is an intermediate CSV file (`adb_wiki_links.csv`) that maps each
-`idADB` to a `Wikipedia_URL`. This file serves as the input for the next
-script in the pipeline, `validate_wikipedia_pages.py`.
+`idADB` to a `Wikipedia_URL`. This file serves as the input for the next script
+in the pipeline, `validate_wikipedia_pages.py`.
 """
 
 import argparse
@@ -482,26 +488,27 @@ def finalize_and_report(output_path: Path, fieldnames: list, all_lines: list, wa
             print(f"{Fore.YELLOW}NOTE: {timeouts:,} records timed out. Please re-run the script to retry them.\n")
         else:
             from config_loader import PROJECT_ROOT
-            # Display path relative to the project root for unambiguous logging.
             display_path = os.path.relpath(output_path, PROJECT_ROOT)
-            print(f"\n{Fore.GREEN}SUCCESS: Link finding complete.")
-            print(summary_msg)
-            print(f"{Fore.CYAN}Output saved to: {display_path} ✨{Fore.RESET}\n")
+            
+            print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+            print(f"{Fore.CYAN} - Wikipedia links saved to: {display_path}{Fore.RESET}")
+            
+            key_metric = f"Found {found_links:,} links for {total_subjects:,} subjects"
+            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Link finding completed successfully. ✨{Fore.RESET}\n")
 
 def main():
-    # Import here to allow for sandbox path setting
-    from config_loader import get_path
     parser = argparse.ArgumentParser(description="Find Wikipedia links for subjects in the raw ADB export.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--work-dir", default=".", help="Set the working directory for all file operations.")
-    parser.add_argument("-i", "--input-file", default=None, help="Path to the raw ADB export file.")
-    parser.add_argument("-o", "--output-file", default=None, help="Path for the output CSV with found Wikipedia links.")
+    parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("-w", "--workers", type=int, default=MAX_WORKERS, help="Number of parallel worker threads.")
     parser.add_argument("--force", action="store_true", help="Force reprocessing of all records, overwriting the existing output file.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output, including warnings.")
     args = parser.parse_args()
 
-    if args.work_dir and os.path.isdir(args.work_dir):
-        os.chdir(args.work_dir)
+    # If a sandbox path is provided, set the environment variable.
+    if args.sandbox_path:
+        os.environ['PROJECT_SANDBOX_PATH'] = os.path.abspath(args.sandbox_path)
+
+    from config_loader import get_path
 
     # --- Configure Logging ---
     log_level = logging.INFO if args.verbose else logging.ERROR
@@ -509,8 +516,8 @@ def main():
     handler.setFormatter(CustomFormatter())
     logging.basicConfig(level=log_level, handlers=[handler], force=True)
 
-    input_path = Path(args.input_file or get_path("data/sources/adb_raw_export.txt"))
-    output_path = Path(args.output_file or get_path("data/processed/adb_wiki_links.csv"))
+    input_path = Path(get_path("data/sources/adb_raw_export.txt"))
+    output_path = Path(get_path("data/processed/adb_wiki_links.csv"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not input_path.exists():
@@ -518,13 +525,15 @@ def main():
 
     def backup_and_overwrite(file_path: Path):
         """Creates a backup of the file and then deletes the original."""
+        from config_loader import PROJECT_ROOT
         try:
             backup_dir = Path(get_path('data/backup'))
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
             shutil.copy2(file_path, backup_path)
-            print(f"{Fore.CYAN}Backed up existing file to: {backup_path}")
+            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
+            print(f"{Fore.CYAN}Backed up existing file to: {display_backup_path}")
             file_path.unlink()
         except (IOError, OSError) as e:
             logging.error(f"Failed to create backup or remove file: {e}")

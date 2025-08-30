@@ -97,10 +97,15 @@ def test_load_processed_ids(tmp_path):
 
 
 @pytest.fixture
-def mock_main_files(tmp_path: Path) -> tuple[Path, Path]:
-    """Creates temporary input and output files for the main orchestrator test."""
-    input_file = tmp_path / "eligible.txt"
-    output_file = tmp_path / "scores.csv"
+def mock_main_sandbox(tmp_path: Path) -> Path:
+    """Creates a temporary sandbox with mock input files for the main orchestrator test."""
+    # Define paths relative to the sandbox root
+    input_dir = tmp_path / "data" / "intermediate"
+    output_dir = tmp_path / "data" / "foundational_assets"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    input_file = input_dir / "adb_eligible_candidates.txt"
     
     input_content = (
         "idADB\tFirstName\tLastName\tYear\n"
@@ -109,13 +114,14 @@ def mock_main_files(tmp_path: Path) -> tuple[Path, Path]:
     )
     input_file.write_text(input_content)
     
-    return input_file, output_file
+    return tmp_path
 
-def test_main_orchestrator_loop(mocker, mock_main_files):
+def test_main_orchestrator_loop(mocker, mock_main_sandbox):
     """
     Tests the main orchestrator loop by mocking the subprocess call to the LLM worker.
     """
-    input_path, output_path = mock_main_files
+    sandbox_path = mock_main_sandbox
+    output_path = sandbox_path / "data" / "foundational_assets" / "eminence_scores.csv"
     
     # Mock the subprocess.run call to simulate the LLM worker
     mock_subprocess = mocker.patch('subprocess.run')
@@ -141,8 +147,7 @@ def test_main_orchestrator_loop(mocker, mock_main_files):
     # Run the main function with mocked args
     test_args = [
         "generate_eminence_scores.py",
-        "--input-file", str(input_path),
-        "--output-file", str(output_path),
+        "--sandbox-path", str(sandbox_path),
         "--batch-size", "2",
         "--force" # Use force to simplify the test by ensuring a fresh run
     ]

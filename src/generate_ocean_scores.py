@@ -23,18 +23,20 @@
 Orchestrator to generate OCEAN scores and determine the final dataset size.
 
 This script is the final arbiter of the subject pool size. It reads the rank-
-ordered list from `eminence_scores.csv` and queries an LLM for OCEAN scores,
+ordered list from the eminence scores file and queries an LLM for OCEAN scores,
 stopping automatically when personality diversity declines. The final count of
 subjects in its output file, `ocean_scores.csv`, dictates the number of
 subjects to be used in the experiment.
 
 Key Features:
+-   **Configuration Driven & Sandbox Aware**: All paths and parameters are
+    managed in `config.ini`. The script is fully sandboxed via a
+    `--sandbox-path` argument for isolated testing.
 -   **Data-Driven Cutoff**: The script stops processing when it detects a
     sustained drop in the variance of OCEAN scores. The cutoff point is set
     at the beginning of the last window that triggered the stop condition.
 -   **Fixed Benchmark**: The variance of new subject windows is compared against a
     stable benchmark calculated from a fixed number of the most eminent
-    subjects, ensuring a consistent standard.
 -   **Robust & Resumable**: The script's pre-flight check re-analyzes all
     existing data on startup. This ensures that if a previous run was
     interrupted after the cutoff condition was met, the script will
@@ -45,8 +47,8 @@ Key Features:
 -   **Comprehensive Reporting**: Generates a detailed summary with descriptive
     statistics and a full breakdown of the cutoff analysis.
 
-The final output, `data/foundational_assets/ocean_scores.csv`, determines the
-final list and number of subjects for the experiment.
+The final output, `ocean_scores.csv`, determines the final list and number of
+subjects for the experiment.
 """
 
 import argparse
@@ -439,8 +441,7 @@ def generate_summary_report(
         summary_content = "\n".join(report)
         summary_path.write_text(summary_content, encoding='utf-8')
         print(f"\n{summary_content}\n")
-        logging.info(f"Summary report saved to '{summary_path}'.")
-
+        
     except Exception as e:
         logging.error(f"Could not generate summary report: {e}")
 
@@ -471,7 +472,7 @@ def load_cutoff_state(summary_path: Path, maxlen: int) -> (float, deque):
 
     return benchmark_variance, last_checks
 
-def perform_pre_flight_check(args, all_scores_df, benchmark_variance, initial_checks):
+def perform_pre_flight_check(output_path, args, all_scores_df, benchmark_variance, initial_checks):
     """
     Analyzes the current data to decide if the run should continue or stop.
     It returns the authoritative, up-to-date variance check state for resumption.
@@ -507,9 +508,9 @@ def perform_pre_flight_check(args, all_scores_df, benchmark_variance, initial_ch
     cutoff_start_point = last_check_checkpoint - args.variance_analysis_window
     final_rounded_count = (cutoff_start_point // args.variance_analysis_window) * args.variance_analysis_window
 
-    truncate_and_archive_scores(Path(args.output_file), final_rounded_count)
+    truncate_and_archive_scores(output_path, final_rounded_count)
     generate_summary_report(
-        Path(args.output_file), "Finalized by pre-flight check (cutoff met).", len(all_scores_df), final_rounded_count,
+        output_path, "Finalized by pre-flight check (cutoff met).", len(all_scores_df), final_rounded_count,
         benchmark_variance, recalculated_checks, args.variance_analysis_window,
         args.benchmark_population_size, args.variance_check_window, args.variance_trigger_count
     )
@@ -533,8 +534,7 @@ def main():
         description="Generate OCEAN scores for ADB subjects with a variance-based cutoff.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("-i", "--input-file", default=default_input, help="Path to the eminence scores CSV file.")
-    parser.add_argument("-o", "--output-file", default=default_output, help="Path for the output OCEAN scores CSV file.")
+    parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("--model", default=default_model, help="Name of the LLM to use for scoring.")
     parser.add_argument("--batch-size", type=int, default=default_batch_size, help="Number of subjects per API call.")
     parser.add_argument("--variance-cutoff-percentage", type=float, default=default_cutoff_pct, help="Stop when window variance is <% of benchmark variance.")
@@ -546,16 +546,22 @@ def main():
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
     args = parser.parse_args()
 
+    # If a sandbox path is provided, set the environment variable.
+    if args.sandbox_path:
+        os.environ['PROJECT_SANDBOX_PATH'] = os.path.abspath(args.sandbox_path)
+
+    from config_loader import get_path
+
     # --- Setup Paths & Worker ---
     script_dir = Path(__file__).parent
-    input_path = Path(args.input_file)
+    input_path = Path(get_path(default_input))
     
     # --- Configure Logging ---
     log_level = logging.INFO
     if os.environ.get('DEBUG_OCEAN', '').lower() == 'true':
         log_level = logging.DEBUG
     logging.basicConfig(level=log_level, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
-    output_path = Path(args.output_file)
+    output_path = Path(get_path(default_output))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path = output_path.parent.parent / "reports" / f"{output_path.stem}_summary.txt"
     missing_report_path = output_path.parent.parent / "reports" / "missing_ocean_scores.txt"
@@ -602,7 +608,7 @@ def main():
     benchmark_variance, initial_checks = load_cutoff_state(summary_path, args.variance_check_window)
     
     if not args.force:
-        status, last_variance_checks = perform_pre_flight_check(args, all_scores_df, benchmark_variance, initial_checks)
+        status, last_variance_checks = perform_pre_flight_check(output_path, args, all_scores_df, benchmark_variance, initial_checks)
         if status == "EXIT":
             sys.exit(0)
     else:
@@ -802,8 +808,19 @@ def main():
             logging.critical("OCEAN score generation halted due to critical errors. ✨\n")
         else:
             final_df = pd.read_csv(output_path) if output_path.exists() and output_path.stat().st_size > 0 else pd.DataFrame()
-            status_line = f"Final Count: {len(final_df):,} subjects."
-            print(f"\n{Fore.GREEN}SUCCESS: {status_line} OCEAN score generation completed as designed. ✨\n")
+            
+            from config_loader import PROJECT_ROOT
+            display_output_path = os.path.relpath(output_path, PROJECT_ROOT)
+            display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT)
+            display_missing_path = os.path.relpath(missing_report_path, PROJECT_ROOT)
+
+            print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+            print(f"{Fore.CYAN} - OCEAN scores saved to: {display_output_path}{Fore.RESET}")
+            print(f"{Fore.CYAN} - Missing scores report saved to: {display_missing_path}{Fore.RESET}")
+            print(f"{Fore.CYAN} - Summary report saved to: {display_summary_path}{Fore.RESET}")
+
+            key_metric = f"Final Count: {len(final_df):,} subjects"
+            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. OCEAN score generation completed as designed. ✨{Fore.RESET}\n")
 
 def generate_missing_scores_report(
     filepath: Path,
@@ -840,7 +857,7 @@ def generate_missing_scores_report(
             else:
                 f.write("  None\n")
 
-        logging.info(f"Generated missing scores report at '{filepath.name}'.")
+        # Final log messages are handled by the main finally block.
 
     except Exception as e:
         logging.error(f"Failed to generate missing scores report: {e}")

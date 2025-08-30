@@ -22,14 +22,23 @@
 """
 Automates the fetching of raw birth data from the Astro-Databank website.
 
-This script replaces the manual data extraction process by:
-1.  Logging into astro.com using credentials stored in the .env file.
-2.  Scraping security tokens and dynamically parsing a JavaScript file to find
-    the correct numeric IDs for the required search categories.
-3.  Sending a structured JSON request to the website's internal API to
-    get paginated search results.
-4.  Parsing the JSON response and saving the data into a tab-separated
-    file compatible with the downstream data preparation pipeline.
+This script replaces the manual data extraction process by logging into astro.com,
+querying its internal API, and saving the results into a clean, tab-separated
+file for the downstream data preparation pipeline.
+
+Key Features:
+-   **Sandbox-Aware**: Fully supports sandboxed execution via a `--sandbox-path`
+    argument for isolated testing. All file outputs (raw data, category maps,
+    backups) are correctly redirected.
+-   **Automated Authentication**: Logs into astro.com using credentials stored in
+    the project's `.env` file.
+-   **Dynamic Scraping**: Scrapes security tokens and dynamically parses a
+    JavaScript file to find the correct numeric IDs for the required search
+    categories, making the script resilient to minor website changes.
+-   **Targeted Fetching**: Supports `--start-date` and `--end-date` flags to
+    allow fetching of small, targeted data slices for testing.
+-   **Data Standardization**: Performs crucial on-the-fly transformations, such as
+    calculating correct timezone offsets from ADB's esoteric codes.
 """
 
 import argparse
@@ -459,12 +468,21 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
     # Final summary message
     from config_loader import PROJECT_ROOT
     display_path = os.path.relpath(output_path, PROJECT_ROOT)
-
     processed_count = len(sorted_results)
     percentage = (processed_count / total_hits) * 100 if total_hits > 0 else 0
-    print(f"\n{Fore.GREEN}Data fetching complete. ✨")
-    print(f"Successfully fetched {processed_count:,} out of {total_hits:,} total records ({percentage:.0f}%).")
-    print(f"Output saved to: {display_path}\n")
+    
+    # Only print the full, standardized summary block for the primary output file.
+    # For temporary files used by the test harness, print a minimal message.
+    if output_path.name == "adb_raw_export.txt":
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Raw data export saved to: {display_path}{Fore.RESET}")
+        
+        key_metric = f"Fetched {processed_count:,} of {total_hits:,} records ({percentage:.0f}%)"
+        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Data fetching completed successfully. ✨{Fore.RESET}\n")
+    else:
+        print(f"\nData fetching complete. ✨")
+        print(f"Successfully fetched {processed_count:,} out of {total_hits:,} total records ({percentage:.0f}%).")
+        print(f"Output saved to: {display_path}\n")
 
 def main():
     os.system('')
