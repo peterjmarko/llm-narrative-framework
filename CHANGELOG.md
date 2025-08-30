@@ -1,5 +1,36 @@
 # Changelog
 
+## 6.8.9 (2025-08-30)
+
+### Bump
+
+- **version 6.8.8 → 6.8.9**
+
+### Refactor
+
+- **improve test harness interactivity and resolve sandboxing bugs**
+  This commit significantly overhauls the Layer 3 integration test harness
+  to improve usability, interactivity, and correctness.
+  
+  - Introduces an interactive "guided tour" mode via an `-Interactive`
+    switch to help new users learn the data pipeline step-by-step.
+  - Renames test harness scripts from `step` to `stage` and updates all
+    documentation to use a consistent "Layer > Stage > Step" terminology.
+  
+  - Resolves several critical sandboxing bugs where the harness would
+    incorrectly read from or write to the main project's data
+    directory.
+  - Simplifies and hardens the startup logic in
+    `validate_wikipedia_pages.py` to prevent it from reading the wrong
+    input file.
+  - Adds `adb_category_map.csv` to the list of static assets copied
+    into the sandbox.
+  
+  - Adds "step back" functionality to the project roadmap as a future
+    enhancement.
+  - Removes sparkle emojis from console output to prevent
+    `UnicodeEncodeError`.
+
 ## 6.8.8 (2025-08-30)
 
 ### Bump
