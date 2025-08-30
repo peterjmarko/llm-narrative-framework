@@ -47,8 +47,8 @@ from typing import Dict, List
 from colorama import Fore, init
 from tqdm import tqdm
 
-# Initialize colorama
-init(autoreset=True)
+# Initialize colorama, forcing it not to strip ANSI codes when piped
+init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -213,74 +213,6 @@ def get_processed_keys_from_csv(filepath: Path) -> set:
 
 def main():
     """Main function to orchestrate the neutralization process."""
-    global pbar, temp_dir
-    # --- Config and Arguments ---
-    default_model = get_config_value(APP_CONFIG, "DataGeneration", "neutralization_model", "anthropic/claude-3.5-sonnet")
-    default_points_str = "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, Midheaven"
-    points_to_process = get_config_value(APP_CONFIG, "DataGeneration", "points_for_neutralization", default_points_str)
-    points_list = [p.strip() for p in points_to_process.split(',')]
-    
-    parser = argparse.ArgumentParser(description="Neutralize raw astrological delineations using an LLM.")
-    parser.add_argument("-i", "--input-file", default="data/foundational_assets/sf_delineations_library.txt")
-    parser.add_argument("-o", "--output-dir", default="data/foundational_assets/neutralized_delineations")
-    parser.add_argument("--model", default=default_model)
-    parser.add_argument("--force", action="store_true", help="Force re-processing of all groups.")
-    parser.add_argument("--debug-first-prompt", action="store_true", help="Process only the first item, print prompt/response, and exit.")
-    parser.add_argument("--debug-task", type=str, default=None, help="Debug a specific task (e.g., 'Sun', 'Quadrants'). Prints prompt/response and exits.")
-    args = parser.parse_args()
-    
-    # --- File Handling and Backup ---
-    input_path, output_dir = Path(args.input_file), Path(args.output_dir)
-    if not input_path.exists():
-        logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}")
-        sys.exit(1)
-
-    if args.force and output_dir.exists():
-        print(f"\n{Fore.YELLOW}WARNING: You are about to overwrite all neutralized delineation files.{Fore.RESET}")
-        print(f"{Fore.YELLOW}This process incurs API costs and can take 10 minutes or more to complete.{Fore.RESET}")
-        confirm = input("Backups will be created. Are you sure? (Y/N): ").lower()
-        if confirm != "y":
-            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n"); sys.exit(0)
-        try:
-            backup_dir = Path("data/backup")
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_name = f"{output_dir.name}_{timestamp}.zip"
-            shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
-            print(f"{Fore.CYAN}Successfully created backup at: {backup_dir / backup_name}{Fore.RESET}")
-            shutil.rmtree(output_dir)
-        except Exception as e:
-            logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # --- Worker Setup ---
-    script_dir, temp_dir = Path(__file__).parent, Path(__file__).parent / "temp_neutralize_worker"
-    temp_dir.mkdir(exist_ok=True)
-    temp_config = configparser.ConfigParser()
-    if APP_CONFIG.has_section('LLM'): temp_config['LLM'] = APP_CONFIG['LLM']
-    if APP_CONFIG.has_section('API'): temp_config['API'] = APP_CONFIG['API']
-    if not temp_config.has_section('LLM'): temp_config.add_section('LLM')
-    temp_config.set('LLM', 'model_name', args.model)
-    with open(temp_dir / "temp_config.ini", 'w') as f: temp_config.write(f)
-
-    print(f"\n{Fore.YELLOW}--- Starting Delineation Neutralization ---")
-    all_delineations = parse_llm_response(input_path)
-    grouped_delineations = group_delineations(all_delineations, points_list)
-    # Get the master sort order for points_in_signs from the original file
-    points_in_signs_master_order = list(get_points_in_signs_delineations(all_delineations, points_list).keys())
-
-    # Calculate total tasks for the weighted progress bar
-    num_balance_tasks = len(grouped_delineations) - 1
-    num_points_tasks = len(points_list)
-    total_bar_points = (num_balance_tasks * 1) + (num_points_tasks * 2) + 1
-
-    processed_count, skipped_count, failed_count = 0, 0, 0
-    pbar = None
-    is_first_item_for_debug = True
-
-def main():
-    """Main function to orchestrate the neutralization process."""
     # --- Config and Arguments ---
     default_model = get_config_value(APP_CONFIG, "DataGeneration", "neutralization_model", "anthropic/claude-3.5-sonnet")
     default_points_str = "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, Midheaven"
@@ -301,36 +233,31 @@ def main():
     if not input_path.exists(): logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}"); sys.exit(1)
 
     # --- Intelligent Startup Logic (Stale Check) ---
-    # --- Intelligent Startup Logic (Stale Check) ---
     if not args.force and output_dir.exists() and input_path.exists():
-        # Check if the input file is newer than the output directory itself
         if os.path.getmtime(input_path) > os.path.getmtime(output_dir):
             print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
             print("Automatically re-running full neutralization process...")
             args.force = True
 
-    proceed = True
-    if output_dir.exists() and not args.force:
-        print(f"\n{Fore.YELLOW}WARNING: The neutralized delineations at '{output_dir}' is already up to date.")
-        print(f"{Fore.YELLOW}The update process incurs API costs and can take 10 minutes or more to complete.")
-        print(f"{Fore.YELLOW}If you decide to go ahead with this update, backups of the existing files will be created first.{Fore.RESET}")
-        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
-        if confirm != "y":
-            print("\nOperation cancelled by user.\n"); sys.exit(0)
-
-        # Proceed with backup if the directory exists and we are forcing an overwrite
-        if output_dir.exists():
-            try:
-                backup_dir = Path("data/backup"); backup_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_name = f"{output_dir.name}_{timestamp}.zip"
-                shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
-                logging.info(f"Successfully created backup at: {backup_dir / backup_name}")
-                shutil.rmtree(output_dir)
-            except Exception as e:
-                logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)
-        else:
-            print("\nOperation cancelled by user.\n"); sys.exit(0)
+    # --- Handle --force flag with interactive confirmation ---
+    if args.force and output_dir.exists():
+        # Only prompt if running in an interactive terminal
+        if sys.stdout.isatty():
+            print(f"\n{Fore.YELLOW}WARNING: You have used --force to overwrite all neutralized delineations.{Fore.RESET}")
+            print(f"{Fore.YELLOW}This process incurs API costs and can take 10 minutes or more to complete.{Fore.RESET}")
+            confirm = input("Backups will be created. Are you sure? (Y/N): ").lower().strip()
+            if confirm != "y":
+                print("\nOperation cancelled by user.\n"); sys.exit(0)
+        
+        try:
+            backup_dir = Path("data/backup"); backup_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_name = f"{output_dir.name}_{timestamp}.zip"
+            shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
+            logging.info(f"Successfully created backup at: {backup_dir / backup_name}")
+            shutil.rmtree(output_dir)
+        except Exception as e:
+            logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -383,21 +310,78 @@ def main():
     processed_count, failed_count = 0, 0
     resorting_needed = False
     
-    # Display a non-interactive warning if the script is proceeding automatically
-    if tasks_to_run:
-        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
+    # --- Dedicated Debug Workflow ---
+    if args.debug_task:
+        task_found = False
+        for task in tasks_to_run:
+            if args.debug_task.lower() == task['name'].lower():
+                print(f"--- DEBUG MODE: ISOLATING TASK '{task['name']}' ---")
+                block = "\n".join([f"*{k}\n{v}" for k, v in task['data'].items()])
+                prompt = NEUTRALIZE_PROMPT_TEMPLATE.format(delineation_block=block)
+                debug_and_exit(prompt, run_llm_worker(script_dir, temp_dir, "debug_task", prompt), None, temp_dir)
+                task_found = True
+                break
+        if not task_found:
+            print(f"{Fore.RED}Debug task '{args.debug_task}' not found in tasks to be processed.{Fore.RESET}")
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        sys.exit(0)
+
+    # --- Main Processing Workflow ---
+    if not tasks_to_run:
+        print(f"\n{Fore.GREEN}All delineation files are already up to date. Nothing to do. ✨{Fore.RESET}\n")
+        sys.exit(0)
+        
+    print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
+
+    is_interactive = sys.stdout.isatty()
 
     try:
-        with tqdm(total=len(tasks_to_run), desc="Processing Tasks", ncols=100) as pbar:
-            for task in tasks_to_run:
-                task_msg = f"Neutralizing {task['name']}..."
-                tqdm.write(task_msg)
+        if is_interactive:
+            with tqdm(total=len(tasks_to_run), desc="Processing Tasks", ncols=100) as pbar:
+                for task in tasks_to_run:
+                    task_msg = f"Neutralizing {task['name']}..."
+                    tqdm.write(task_msg)
+                    
+                    block = "\n".join([f"*{k}\n{v}" for k, v in task['data'].items()])
+                    prompt = NEUTRALIZE_PROMPT_TEMPLATE.format(delineation_block=block)
+                    
+                    response, error = run_llm_worker(script_dir, temp_dir, task['name'], prompt)
+                    
+                    success = False
+                    if response:
+                        parsed = parse_llm_response(response)
+                        if len(parsed) == len(task['data']):
+                            success = True
+                            if task['type'] == 'balance':
+                                save_group_to_csv(output_dir / task['filename'], parsed)
+                            elif task['type'] in ['point_in_sign', 'point_bundle']:
+                                append_to_csv(points_output_path, parsed)
+                                resorting_needed = True
+                            elif task['type'] == 'balance_bundle':
+                                for fname, grp_data in grouped_delineations.items():
+                                    if fname != "points_in_signs.csv":
+                                        subset_data = {k: parsed[k] for k in grp_data.keys() if k in parsed}
+                                        if subset_data:
+                                            save_group_to_csv(output_dir / fname, subset_data)
+
+                    if success:
+                        tqdm.write(f"  -> {Fore.GREEN}Completed.{Fore.RESET}")
+                        processed_count += 1
+                    else:
+                        tqdm.write(f"  -> {Fore.RED}Failed.{Fore.RESET}")
+                        failed_count += 1
+                        if error:
+                            error_text = error.read_text(encoding='utf-8').strip()
+                            tqdm.write(f"{Fore.RED}      Reason: {error_text}{Fore.RESET}")
+                    
+                    pbar.update(1)
+                    time.sleep(0.1)
+        else:  # Non-interactive mode (e.g., piped output)
+            for i, task in enumerate(tasks_to_run):
+                print(f"[{i + 1}/{len(tasks_to_run)}] Neutralizing {task['name']}...")
                 
                 block = "\n".join([f"*{k}\n{v}" for k, v in task['data'].items()])
                 prompt = NEUTRALIZE_PROMPT_TEMPLATE.format(delineation_block=block)
-                
-                if args.debug_task and args.debug_task.lower() == task['name'].lower():
-                    debug_and_exit(prompt, run_llm_worker(script_dir, temp_dir, "debug_task", prompt), pbar, temp_dir)
 
                 response, error = run_llm_worker(script_dir, temp_dir, task['name'], prompt)
                 
@@ -419,18 +403,17 @@ def main():
                                         save_group_to_csv(output_dir / fname, subset_data)
 
                 if success:
-                    tqdm.write(f"  -> {Fore.GREEN}Completed.{Fore.RESET}")
+                    print(f"  -> {Fore.GREEN}Completed.{Fore.RESET}")
                     processed_count += 1
                 else:
-                    tqdm.write(f"  -> {Fore.RED}Failed.{Fore.RESET}")
+                    print(f"  -> {Fore.RED}Failed.{Fore.RESET}")
                     failed_count += 1
                     if error:
                         error_text = error.read_text(encoding='utf-8').strip()
-                        tqdm.write(f"{Fore.RED}      Reason: {error_text}{Fore.RESET}")
+                        print(f"      Reason: {Fore.RED}{error_text}{Fore.RESET}")
                 
-                pbar.update(1)
                 time.sleep(0.1)
-                
+
     except KeyboardInterrupt:
         print(f"\n\n{Fore.YELLOW}Process interrupted by user.{Fore.RESET}")
     finally:
@@ -456,7 +439,7 @@ def main():
             print(f"\n{Fore.RED}Neutralization process finished with {failed_count} failure(s).{Fore.RESET}")
             print(f"{Fore.YELLOW}Re-run the script to automatically process the failed tasks.{Fore.RESET}\n")
         else:
-            print(f"\n{Fore.GREEN}Neutralization process finished successfully. ✨{Fore.RESET}\n")
+            print(f"\n{Fore.GREEN}Neutralization process finished successfully.{Fore.RESET}\n")
 
 def debug_and_exit(prompt, worker_result, pbar, temp_dir):
     """Prints debug info and halts the script."""

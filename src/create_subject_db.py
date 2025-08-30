@@ -48,8 +48,11 @@ from pathlib import Path
 
 from colorama import Fore, init
 
+# Ensure the src directory is in the Python path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from config_loader import get_path  # noqa: E402
 # --- Local Imports ---
-from id_encoder import from_base58
+from id_encoder import from_base58  # noqa: E402
 
 # Initialize colorama
 init(autoreset=True)
@@ -138,15 +141,20 @@ def load_chart_data_map(filepath: Path) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Create a master subject database.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--chart-export", default="data/foundational_assets/sf_chart_export.csv")
-    parser.add_argument("--final-candidates", default="data/intermediate/adb_final_candidates.txt")
-    parser.add_argument("--output-file", default="data/processed/subject_db.csv")
+    parser.add_argument(
+        "--sandbox-path",
+        type=str,
+        help="Path to the sandbox directory for testing.",
+    )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
-    chart_export_path = Path(args.chart_export)
-    final_candidates_path = Path(args.final_candidates)
-    output_path = Path(args.output_file)
+    if args.sandbox_path:
+        os.environ["PROJECT_SANDBOX_PATH"] = args.sandbox_path
+
+    chart_export_path = Path(get_path("data/foundational_assets/sf_chart_export.csv"))
+    final_candidates_path = Path(get_path("data/intermediate/adb_final_candidates.txt"))
+    output_path = Path(get_path("data/processed/subject_db.csv"))
 
     # --- Intelligent Startup Logic ---
     is_stale = False
@@ -162,7 +170,7 @@ def main():
             args.force = True
 
     if not args.force and output_path.exists() and not is_stale:
-        print(f"\n{Fore.YELLOW}WARNING: The subject database at '{output_path}' is already up to date. ✨")
+        print(f"\n{Fore.YELLOW}WARNING: The subject database at '{output_path}' is already up to date.")
         print(f"{Fore.YELLOW}If you decide to go ahead with the update, a backup of the existing database will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
@@ -173,7 +181,7 @@ def main():
 
     if args.force and output_path.exists():
         try:
-            backup_dir = Path('data/backup')
+            backup_dir = Path(get_path('data/backup'))
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
@@ -183,18 +191,29 @@ def main():
             logging.error(f"{Fore.RED}Failed to create backup file: {e}")
             sys.exit(1)
 
-    print(f"\nLoading and parsing chart data from {chart_export_path.name}...")
+    # --- Calculate project-relative paths for display ---
+    project_root = Path.cwd()
+    while not (project_root / ".git").exists() and project_root != project_root.parent:
+        project_root = project_root.parent
+    try:
+        display_chart_path = chart_export_path.relative_to(project_root)
+        display_candidates_path = final_candidates_path.relative_to(project_root)
+    except ValueError:
+        display_chart_path = chart_export_path
+        display_candidates_path = final_candidates_path
+
+    print(f"\nLoading and parsing chart data from {display_chart_path}...")
     chart_data_map = load_chart_data_map(chart_export_path)
 
     # --- Assemble final list by merging the filtered list and chart export ---
-    print(f"Assembling master database from primary list: {final_candidates_path.name}")
+    print(f"Assembling master database from primary list: {display_candidates_path}")
     all_subjects = []
     missing_subjects_log = []  # Initialize list before the try block
     header = ["Index", "idADB", "Name", "Date", "Time", "ZoneAbbrev", "ZoneTime", "Place", "Country", "Latitude", "Longitude", 
               "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto", "Ascendant", "Midheaven"]
     
     try:
-        with open(args.final_candidates, 'r', encoding='utf-8') as f:
+        with open(final_candidates_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f, delimiter='\t')
             for row in reader:
                 full_name = " ".join(filter(None, [row['FirstName'], row['LastName']]))
@@ -216,15 +235,15 @@ def main():
                 all_subjects.append(subject_data)
 
     except FileNotFoundError:
-        logging.error(f"Filtered list not found: {args.final_candidates}")
+        logging.error(f"Filtered list not found: {final_candidates_path}")
         sys.exit(1)
     except KeyError as e:
-        logging.error(f"Missing expected column {e} in {args.final_candidates}. Please ensure it is correctly formatted.")
+        logging.error(f"Missing expected column {e} in {final_candidates_path}. Please ensure it is correctly formatted.")
         sys.exit(1)
 
     # --- Final Validation and Output ---
     if missing_subjects_log:
-        reports_dir = Path('data/reports')
+        reports_dir = Path(get_path('data/reports'))
         reports_dir.mkdir(parents=True, exist_ok=True)
         report_path = reports_dir / 'missing_sf_subjects.csv'
         
@@ -239,7 +258,12 @@ def main():
         sys.exit(1)
 
     # --- Write final output if validation passes ---
-    print(f"{Fore.CYAN}Writing {len(all_subjects)} records to {args.output_file}...{Fore.RESET}")
+    try:
+        display_output_path = output_path.relative_to(project_root)
+    except (ValueError, NameError):  # Handle if project_root fails to be found
+        display_output_path = output_path
+
+    print(f"{Fore.CYAN}Writing {len(all_subjects)} records to {display_output_path}...{Fore.RESET}")
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
@@ -247,7 +271,13 @@ def main():
             writer.writeheader()
             writer.writerows(all_subjects)
 
-        print(f"\n{Fore.GREEN}SUCCESS: Master subject database with {len(all_subjects)} records created successfully. ✨\n")
+        print(f"\n{Fore.YELLOW}--- Final Output ---")
+        print(f"{Fore.CYAN} - Master subject database saved to: {display_output_path}")
+        key_metric = f"Final Count: {len(all_subjects)} subjects"
+        print(
+            f"\n{Fore.GREEN}SUCCESS: {key_metric}. Master subject database "
+            f"created successfully.\n"
+        )
     except IOError as e:
         logging.error(f"Failed to write to output file: {e}\n")
         sys.exit(1)

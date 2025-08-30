@@ -264,6 +264,20 @@ The output is `personalities_db.txt`, a tab-delimited file with the fields: `Ind
 
 With the `personalities_db.txt` file generated, the data preparation phase is complete. The following sections describe how to run the main experimental pipeline.
 
+## Prerequisites
+
+The framework was developed and validated on a specific stack of technologies. Variations are possible but not currently supported. Before proceeding, please ensure you have the following:
+
+*   **Software:**
+    *   **Operating System:** Windows (the primary development and testing platform).
+    *   **PowerShell:** Version 7.0 or higher.
+    *   **Git:** For cloning the repository.
+    *   **Solar Fire:** A licensed copy of version 9.
+
+*   **Accounts & Services:**
+    *   **OpenRouter:** An account with a valid API key and sufficient funds to cover the cost of LLM queries.
+    *   **Astro-Databank:** A registered account at `astro.com` (this is only required if you intend to generate a new dataset via **Path 2: Conceptual Replication**).
+
 ## Setup and Installation
 
 This project uses **PDM** for dependency and environment management.

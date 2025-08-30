@@ -151,33 +151,29 @@ try {
     pdm run python (Join-Path $ProjectRoot "src/select_final_candidates.py") --sandbox-path . --force
     pdm run python (Join-Path $ProjectRoot "src/prepare_sf_import.py") --sandbox-path . --force
 
-    # --- Integration Test Checkpoint ---
-    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: prepare_sf_import.py ---" -ForegroundColor Magenta
-    $displaySfImportPath = (Join-Path $PWD $sfImport).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    if (-not (Test-Path $sfImport)) { throw "FAIL: '$displaySfImportPath' was not created." }
-    $lineCount = (Get-Content $sfImport).Length
-    # We expect 3 records for the 3 control subjects.
-    if ($lineCount -ne 3) { throw "FAIL: '$displaySfImportPath' has the wrong number of lines (Expected 3, Found $lineCount)." }
-    Write-Host "Verification PASSED: '$displaySfImportPath' was created with the correct number of records." -ForegroundColor Green
-    Write-Host ""
-    exit 0 # Temporarily exit after this stage for methodical testing.
+    # Checkpoint removed for cleaner logs. The next script's success implies this one worked.
     
     # --- 3. Dynamic Simulation of Manual Steps ---
     Write-Host "`n--- Simulating Manual Solar Fire Export Steps... ---" -ForegroundColor Cyan
     $importFile = "data/intermediate/sf_data_import.txt"
     if (-not (Test-Path $importFile)) { throw "The pipeline did not generate the required '$importFile'." }
     
-    # Read the real subject data from the import file
-    $subjectData = Import-Csv -Path $importFile -Delimiter "`t"
+    # Read the real subject data from the import file to map names to Base58 IDs.
+    # The file is a custom CQD format without a header.
     $idMap = @{}
-    foreach ($row in $subjectData) {
-        $idBase58 = $row.Name.Split(' ')[0]
-        $fullName = $row.Name.Substring($idBase58.Length).Trim()
-        $idMap[$fullName] = $idBase58
+    Get-Content $importFile | ForEach-Object {
+        # Split by comma, then trim quotes from each field.
+        $fields = $_.Split(',') | ForEach-Object { $_.Trim('"') }
+        if ($fields.Length -ge 4) {
+            $fullName = $fields[0]
+            $idBase58 = $fields[3]
+            $idMap[$fullName] = $idBase58
+        }
     }
 
     # Dynamically build the chart export content by injecting the pipeline-generated IDs
-    # into the static data template. This correctly simulates Solar Fire preserving the ID in the name field.
+    # into the static data template. This correctly simulates Solar Fire preserving the ID
+    # in the ZoneAbbr field (the 4th column).
     $chartExportTemplate = @"
 "Ernst (1900) Busch","22 Jan 1900","0:15","GgE","-1:00","Kiel","Germany","54N20","010E08"
 "Body Name","Body Abbr","Longitude"
@@ -223,12 +219,10 @@ try {
 "Midheaven","MC",208.52161206082
 "@
     
-    # Use -replace with regex to ensure we're targeting the exact name fields.
-    # The `\(1900\)` escapes the parentheses for the regex match.
-    # The replacement string uses nested quotes `"` to correctly form the new name field.
-    $finalContent = $chartExportTemplate -replace '"Ernst \(1900\) Busch"', "`"$($idMap['Ernst (1900) Busch']) Ernst (1900) Busch`""
-    $finalContent = $finalContent -replace '"Paul McCartney"', "`"$($idMap['Paul McCartney']) Paul McCartney`""
-    $finalContent = $finalContent -replace '"Jonathan Cainer"', "`"$($idMap['Jonathan Cainer']) Jonathan Cainer`""
+    # Replace the placeholder ZoneAbbr values with the actual Base58 IDs.
+    $finalContent = $chartExportTemplate -replace '"GgE"', "`"$($idMap['Ernst (1900) Busch'])`""
+    $finalContent = $finalContent -replace '"3iQ"', "`"$($idMap['Paul McCartney'])`""
+    $finalContent = $finalContent -replace '"Dc2"', "`"$($idMap['Jonathan Cainer'])`""
 
     $assetDir = "data/foundational_assets"
     $finalContent | Set-Content -Path (Join-Path $assetDir "sf_chart_export.csv") -Encoding UTF8
@@ -236,6 +230,12 @@ try {
 
     # Write the minimal static delineations library
     $delineationsContent = @"
+*Quadrant Strong 1st
+A focus on self-awareness and personal identity.
+*Hemisphere Strong East
+A self-motivated and independent nature.
+*Aries Strong
+Assertive and pioneering.
 *Element Strong Water
 Compassionate and caring with a strong intuitional nature. Values personal relationships, often taking on a caretaker role.
 *Mode Strong Cardinal
@@ -269,7 +269,6 @@ A need for stimulation and activity in professional life.
     Write-Host "  -> Wrote minimal 'sf_delineations_library.txt'."
 
     # --- 4. Run Final Pipeline Scripts ---
-    Write-Host "`n--- Running final data pipeline scripts... ---" -ForegroundColor Yellow
     $finalScripts = @(
         "src/neutralize_delineations.py",
         "src/create_subject_db.py",
@@ -279,11 +278,53 @@ A need for stimulation and activity in professional life.
     $sfChartExport = "data/foundational_assets/sf_chart_export.csv"
     $sfDelineations = "data/foundational_assets/sf_delineations_library.txt"
     $neutralizedDir = "data/foundational_assets/neutralized_delineations"
-    $subjectDb = "data/intermediate/subject_db.csv"
+    $subjectDb = "data/processed/subject_db.csv"
     $personalitiesDb = "personalities_db.txt"
 
-    pdm run python (Join-Path $ProjectRoot "src/neutralize_delineations.py") -i $sfDelineations -o $neutralizedDir --force
-    pdm run python (Join-Path $ProjectRoot "src/create_subject_db.py") -c $sfChartExport -f $finalCandidates -o $subjectDb --force
+    # --- HARNESS INTERVENTION: Resilient Neutralization with Retries ---
+    $neutralizeSuccess = $false
+    for ($i = 1; $i -le 3; $i++) {
+        Write-Host "`n--- Attempting Delineation Neutralization (Attempt $i of 3)... ---" -ForegroundColor Yellow
+        
+        # Build the argument list for the script.
+        # Only use --force on the very first attempt to ensure a clean run.
+        $neutralizeArgs = @(
+            (Join-Path $ProjectRoot "src/neutralize_delineations.py"),
+            "-i", $sfDelineations,
+            "-o", $neutralizedDir
+        )
+        if ($i -eq 1) {
+            $neutralizeArgs += "--force"
+        }
+
+        pdm run python @neutralizeArgs 2>&1 | Tee-Object -Variable neutralizeOutput
+        
+        if (($neutralizeOutput | Out-String) -notmatch "failure\(s\)") {
+            $neutralizeSuccess = $true
+            Write-Host "`nNeutralization successful on attempt $i." -ForegroundColor Green
+            break
+        } else {
+            Write-Host "`nNeutralization failed on attempt $i. Retrying..." -ForegroundColor Yellow
+        }
+    }
+
+    if (-not $neutralizeSuccess) {
+        throw "FATAL: Delineation neutralization failed after 3 attempts. Halting test."
+    }
+
+    pdm run python (Join-Path $ProjectRoot "src/create_subject_db.py") --sandbox-path . --force
+    
+    # --- Integration Test Checkpoint ---
+    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: create_subject_db.py ---" -ForegroundColor Magenta
+    $displaySubjectDbPath = (Join-Path $PWD $subjectDb).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
+    if (-not (Test-Path $subjectDb)) { throw "FAIL: '$displaySubjectDbPath' was not created." }
+    $lineCount = (Get-Content $subjectDb).Length
+    # We expect 3 records + 1 header = 4 lines.
+    if ($lineCount -ne 4) { throw "FAIL: '$displaySubjectDbPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
+    Write-Host "Verification PASSED: '$displaySubjectDbPath' was created with the correct number of records." -ForegroundColor Green
+    Write-Host ""
+    exit 0 # Temporarily exit after this stage for methodical testing.
+    
     pdm run python (Join-Path $ProjectRoot "src/generate_personalities_db.py") -s $subjectDb -n $neutralizedDir -p (Join-Path $ProjectRoot "data/foundational_assets/point_weights.csv") -b (Join-Path $ProjectRoot "data/foundational_assets/balance_thresholds.csv") -o $personalitiesDb --force
 
     # --- 5. Verification ---

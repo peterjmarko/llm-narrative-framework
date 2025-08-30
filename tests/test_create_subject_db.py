@@ -38,22 +38,32 @@ from src import create_subject_db
 
 @pytest.fixture
 def mock_input_files(tmp_path: Path) -> dict:
-    """Creates temporary input files and defines the output path for testing."""
-    paths = {
-        "candidates": tmp_path / "final_candidates.txt",
-        "chart_export": tmp_path / "sf_chart_export.csv",
-        "output": tmp_path / "subject_db.csv",
-    }
+    """
+    Creates mock input files in a sandboxed directory structure and returns
+    the path to the sandbox and the expected output file.
+    """
+    # Create directory structure
+    intermediate_dir = tmp_path / "data" / "intermediate"
+    foundational_dir = tmp_path / "data" / "foundational_assets"
+    processed_dir = tmp_path / "data" / "processed"
+    intermediate_dir.mkdir(parents=True, exist_ok=True)
+    foundational_dir.mkdir(parents=True, exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
+
+    candidates_path = intermediate_dir / "adb_final_candidates.txt"
+    chart_export_path = foundational_dir / "sf_chart_export.csv"
+    output_path = processed_dir / "subject_db.csv"
 
     # Create dummy final candidates file
-    paths["candidates"].write_text(
+    candidates_path.write_text(
         "Index\tidADB\tLastName\tFirstName\n"
         "1\t101\tNewton\tIsaac\n"
         "2\t103\tMonroe\tMarilyn\n"
     )
 
     # Create dummy Solar Fire chart export
-    paths["chart_export"].write_text(
+    # NOTE: The script decodes the ID from the 4th field (ZoneAbbr), not the name.
+    chart_export_path.write_text(
         '"Isaac Newton","4 January 1643","1:00","2k","-0:01","London","UK","51n30","0w5"\n'
         '"Body Name","Body Abbr","Longitude"\n'
         '"Sun","Sun","285.65"\n"Moon","Mon","85.21"\n"Mercury","Mer","295.11"\n'
@@ -67,27 +77,28 @@ def mock_input_files(tmp_path: Path) -> dict:
         '"Saturn","Sat","205.32"\n"Uranus","Ura","358.99"\n"Neptune","Nep","145.43"\n'
         '"Pluto","Plu","105.21"\n"Ascendant","Asc","230.12"\n"Midheaven","MC","145.34"\n'
     )
-    return paths
+    return {"sandbox_path": tmp_path, "output_path": output_path}
 
 
 def test_create_subject_db_logic(mock_input_files):
     """
     Tests the main data integration and database creation logic.
     """
-    paths = mock_input_files
+    sandbox_path = mock_input_files["sandbox_path"]
+    output_path = mock_input_files["output_path"]
+
     test_args = [
         "create_subject_db.py",
-        "--chart-export", str(paths["chart_export"]),
-        "--final-candidates", str(paths["candidates"]),
-        "--output-file", str(paths["output"]),
+        "--sandbox-path",
+        str(sandbox_path),
         "--force",
     ]
 
     with patch("sys.argv", test_args):
         create_subject_db.main()
 
-    assert paths["output"].exists()
-    output_df = pd.read_csv(paths["output"])
+    assert output_path.exists()
+    output_df = pd.read_csv(output_path)
 
     # 1. Verify the number of records is correct
     assert len(output_df) == 2

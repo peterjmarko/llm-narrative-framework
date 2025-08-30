@@ -133,9 +133,20 @@ def main():
             logging.error(f"{Fore.RED}Failed to create backup file: {e}")
             sys.exit(1)
 
+    # --- Calculate project-relative paths for display ---
+    project_root = Path.cwd()
+    while not (project_root / ".git").exists() and project_root != project_root.parent:
+        project_root = project_root.parent
+    try:
+        display_input_path = input_path.relative_to(project_root)
+        display_output_path = output_path.relative_to(project_root)
+    except ValueError:
+        display_input_path = input_path
+        display_output_path = output_path
+
     print("")
-    print(f"Reading filtered data from: {input_path}")
-    print(f"{Fore.CYAN}Writing Solar Fire import file to: {output_path}{Fore.RESET}")
+    print(f"Reading filtered data from: {display_input_path}")
+    print(f"{Fore.CYAN}Writing Solar Fire import file to: {display_output_path}{Fore.RESET}")
 
     processed_records = []
     try:
@@ -189,11 +200,11 @@ def main():
                 outfile.write(formatted_line + "\n")
         
         print(f"\n{Fore.YELLOW}--- Final Output ---")
-        print(f"{Fore.CYAN} - Solar Fire import file saved to: {output_path}")
+        print(f"{Fore.CYAN} - Solar Fire import file saved to: {display_output_path}")
         key_metric = f"Final Count: {len(processed_records)} subjects"
         print(
             f"\n{Fore.GREEN}SUCCESS: {key_metric}. Solar Fire import file "
-            f"created successfully. ✨\n"
+            f"created successfully.\n"
         )
     except IOError as e:
         logging.error(f"Failed to write to output file {output_path}: {e}")

@@ -182,12 +182,22 @@ def main():
     # --- Save the final list ---
     final_df.to_csv(output_path, sep="\t", index=False, encoding="utf-8")
 
+    # To get a clean project-relative path, find the project root
+    project_root = Path.cwd()
+    while not (project_root / ".git").exists() and project_root != project_root.parent:
+        project_root = project_root.parent
+    
+    try:
+        display_path = output_path.relative_to(project_root)
+    except ValueError:
+        display_path = output_path # Fallback to absolute if not within project
+
     print(f"\n{Fore.YELLOW}--- Final Output ---")
-    print(f"{Fore.CYAN} - Final candidates list saved to: {output_path}")
+    print(f"{Fore.CYAN} - Final candidates list saved to: {display_path}")
     key_metric = f"Final Count: {len(final_df)} subjects"
     print(
         f"\n{Fore.GREEN}SUCCESS: {key_metric}. Final candidate selection "
-        f"completed successfully. ✨\n"
+        f"completed successfully.\n"
     )
 
 
