@@ -1,5 +1,22 @@
 # Changelog
 
+## 6.8.5 (2025-08-29)
+
+### Bump
+
+- **version 6.8.4 → 6.8.5**
+
+### Fixes
+
+- **fix research entry filter and harden integration test**
+  This commit introduces a critical bug fix to the data preparation pipeline's filtering logic, hardens the link-finding script, and overhauls the integration test suite to be more robust and deterministic.
+  
+  - **`select_eligible_candidates.py` (Bug Fix):** Corrected the core filtering logic to properly exclude non-person "Research" entries.
+  - **`find_wikipedia_links.py` (Enhancement):** Added a title-match validation step for any URL scraped from an ADB page to prevent incorrect links from being passed downstream.
+  - **Integration Test Overhaul:** Redesigned the Layer 3 test to fetch a new 7-subject cohort and use a "Fetch, then Corrupt" strategy to deterministically test all key failure paths.
+  - **Unit Tests:** Updated unit tests for both scripts to align with the code changes.
+  - **Documentation:** Updated `DOCUMENTATION.md` to clarify the types of scientific replication and updated the `logic_prep_eligible_candidates.mmd` flowchart to reflect the new logic.
+
 ## 6.8.4 (2025-08-29)
 
 ### Bump
