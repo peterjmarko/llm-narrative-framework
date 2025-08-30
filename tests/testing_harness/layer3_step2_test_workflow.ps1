@@ -89,6 +89,13 @@ try {
     # --- 2. Run the Automated Pipeline Scripts Sequentially ---
     Write-Host "`n--- Running automated data pipeline scripts... ---" -ForegroundColor Yellow
     
+    # --- HARNESS INTERVENTION: Provide static data files... ---
+    Write-Host "`n--- HARNESS INTERVENTION: Providing static data files... ---" -ForegroundColor Magenta
+    $foundationalAssetDir = "data/foundational_assets"
+    New-Item -Path $foundationalAssetDir -ItemType Directory -Force | Out-Null
+    Copy-Item -Path (Join-Path $ProjectRoot $foundationalAssetDir "country_codes.csv") -Destination $foundationalAssetDir
+    Write-Host "  -> Copied 'country_codes.csv' into the sandbox."
+
     $scriptsToRun = @(
         "src/find_wikipedia_links.py",
         "src/validate_wikipedia_pages.py",
@@ -139,23 +146,21 @@ try {
 
     pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") --sandbox-path . --force
     pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") --sandbox-path . --force
-
     pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") --sandbox-path . --force
-
     pdm run python (Join-Path $ProjectRoot "src/generate_ocean_scores.py") --sandbox-path . --force
+    pdm run python (Join-Path $ProjectRoot "src/select_final_candidates.py") --sandbox-path . --force
+    pdm run python (Join-Path $ProjectRoot "src/prepare_sf_import.py") --sandbox-path . --force
 
     # --- Integration Test Checkpoint ---
-    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: generate_ocean_scores.py ---" -ForegroundColor Magenta
-    $displayOceanScoresPath = (Join-Path $PWD $oceanScores).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    if (-not (Test-Path $oceanScores)) { throw "FAIL: '$displayOceanScoresPath' was not created." }
-    $lineCount = (Get-Content $oceanScores).Length
-    # We expect the 3 control subjects + 1 header line = 4 lines total, as the cutoff logic won't trigger.
-    if ($lineCount -ne 4) { throw "FAIL: '$displayOceanScoresPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
-    Write-Host "Verification PASSED: '$displayOceanScoresPath' was created with the correct number of records." -ForegroundColor Green
+    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: prepare_sf_import.py ---" -ForegroundColor Magenta
+    $displaySfImportPath = (Join-Path $PWD $sfImport).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
+    if (-not (Test-Path $sfImport)) { throw "FAIL: '$displaySfImportPath' was not created." }
+    $lineCount = (Get-Content $sfImport).Length
+    # We expect 3 records for the 3 control subjects.
+    if ($lineCount -ne 3) { throw "FAIL: '$displaySfImportPath' has the wrong number of lines (Expected 3, Found $lineCount)." }
+    Write-Host "Verification PASSED: '$displaySfImportPath' was created with the correct number of records." -ForegroundColor Green
     Write-Host ""
     exit 0 # Temporarily exit after this stage for methodical testing.
-    pdm run python (Join-Path $ProjectRoot "src/select_final_candidates.py") -e $eligibleCandidates -s $eminenceScores -o $oceanScores -c (Join-Path $ProjectRoot "data/foundational_assets/country_codes.csv") -f $finalCandidates --force
-    pdm run python (Join-Path $ProjectRoot "src/prepare_sf_import.py") -i $finalCandidates -o $sfImport --force
     
     # --- 3. Dynamic Simulation of Manual Steps ---
     Write-Host "`n--- Simulating Manual Solar Fire Export Steps... ---" -ForegroundColor Cyan

@@ -35,10 +35,16 @@ from src import prepare_sf_import
 
 
 @pytest.fixture
-def mock_input_file(tmp_path: Path) -> tuple[Path, Path]:
-    """Creates temporary input and output files for testing."""
-    input_path = tmp_path / "final_candidates.txt"
-    output_path = tmp_path / "sf_import.txt"
+def mock_input_file(tmp_path: Path) -> dict:
+    """
+    Creates a mock input file in a sandboxed directory structure and returns
+    the path to the sandbox and the expected output file.
+    """
+    intermediate_dir = tmp_path / "data" / "intermediate"
+    intermediate_dir.mkdir(parents=True, exist_ok=True)
+
+    input_path = intermediate_dir / "adb_final_candidates.txt"
+    output_path = intermediate_dir / "sf_data_import.txt"
 
     input_content = (
         "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tZoneAbbr\tZoneTimeOffset\tCity\tCountry\tLongitude\tLatitude\tRating\tBio\tCategories\tLink\n"
@@ -46,19 +52,20 @@ def mock_input_file(tmp_path: Path) -> tuple[Path, Path]:
         "2\t103\tMonroe\tMarilyn\tF\t1\t6\t1926\t09:30\tPST\t+08:00\tLos Angeles\tUnited States\t118w15\t34n03\tAA\t...\t...\thttp://c.com\n"
     )
     input_path.write_text(input_content)
-    return input_path, output_path
+    return {"sandbox_path": tmp_path, "output_path": output_path}
 
 
 def test_prepare_sf_import_logic(mock_input_file):
     """
     Tests the main data formatting and CQD file generation logic.
     """
-    input_path, output_path = mock_input_file
+    sandbox_path = mock_input_file["sandbox_path"]
+    output_path = mock_input_file["output_path"]
 
     test_args = [
         "prepare_sf_import.py",
-        "-i", str(input_path),
-        "-o", str(output_path),
+        "--sandbox-path",
+        str(sandbox_path),
         "--force",
     ]
 

@@ -50,8 +50,10 @@ from pathlib import Path
 # --- Local Imports ---
 from colorama import Fore, init
 
-# --- Local Imports ---
-from id_encoder import to_base58
+# Ensure the src directory is in the Python path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from config_loader import get_path  # noqa: E402
+from id_encoder import to_base58  # noqa: E402
 
 # Initialize colorama
 init(autoreset=True)
@@ -82,20 +84,18 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "-i", "--input-file",
-        default="data/intermediate/adb_final_candidates.txt",
-        help="Path to the final, tab-delimited subject data file."
-    )
-    parser.add_argument(
-        "-o", "--output-file",
-        default="data/intermediate/sf_data_import.txt",
-        help="Path to write the final CQD-formatted output file."
+        "--sandbox-path",
+        type=str,
+        help="Path to the sandbox directory for testing.",
     )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
-    input_path = Path(args.input_file)
-    output_path = Path(args.output_file)
+    if args.sandbox_path:
+        os.environ["PROJECT_SANDBOX_PATH"] = args.sandbox_path
+
+    input_path = Path(get_path("data/intermediate/adb_final_candidates.txt"))
+    output_path = Path(get_path("data/intermediate/sf_data_import.txt"))
 
     if not input_path.exists():
         logging.error(f"Input file not found: {input_path}")
@@ -188,7 +188,13 @@ def main():
                 formatted_line = ",".join([f'"{field}"' for field in record])
                 outfile.write(formatted_line + "\n")
         
-        print(f"\n{Fore.GREEN}SUCCESS: Successfully wrote {len(processed_records)} records to {output_path}. ✨\n")
+        print(f"\n{Fore.YELLOW}--- Final Output ---")
+        print(f"{Fore.CYAN} - Solar Fire import file saved to: {output_path}")
+        key_metric = f"Final Count: {len(processed_records)} subjects"
+        print(
+            f"\n{Fore.GREEN}SUCCESS: {key_metric}. Solar Fire import file "
+            f"created successfully. ✨\n"
+        )
     except IOError as e:
         logging.error(f"Failed to write to output file {output_path}: {e}")
         sys.exit(1)

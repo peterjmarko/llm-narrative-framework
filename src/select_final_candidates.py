@@ -56,6 +56,10 @@ from pathlib import Path
 import pandas as pd
 from colorama import Fore, init
 
+# Ensure the src directory is in the Python path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from config_loader import get_path  # noqa: E402
+
 # Initialize colorama
 init(autoreset=True)
 
@@ -69,20 +73,23 @@ def main():
         description="Select and transform the final set of candidates.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--eligible-candidates", default="data/intermediate/adb_eligible_candidates.txt", help="Path to the eligible candidates input file.")
-    parser.add_argument("--ocean-scores", default="data/foundational_assets/ocean_scores.csv", help="Path to the OCEAN scores file (defines the final set).")
-    parser.add_argument("--eminence-scores", default="data/foundational_assets/eminence_scores.csv", help="Path to the eminence scores file (for sorting).")
-    parser.add_argument("--country-codes", default="data/foundational_assets/country_codes.csv", help="Path to the country codes mapping file.")
-    parser.add_argument("-o", "--output-file", default="data/intermediate/adb_final_candidates.txt", help="Path for the final candidates output file.")
+    parser.add_argument(
+        "--sandbox-path",
+        type=str,
+        help="Path to the sandbox directory for testing.",
+    )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
+    if args.sandbox_path:
+        os.environ["PROJECT_SANDBOX_PATH"] = args.sandbox_path
+
     # Define all file paths from arguments
-    eligible_path = Path(args.eligible_candidates)
-    ocean_path = Path(args.ocean_scores)
-    eminence_path = Path(args.eminence_scores)
-    country_codes_path = Path(args.country_codes)
-    output_path = Path(args.output_file)
+    eligible_path = Path(get_path("data/intermediate/adb_eligible_candidates.txt"))
+    ocean_path = Path(get_path("data/foundational_assets/ocean_scores.csv"))
+    eminence_path = Path(get_path("data/foundational_assets/eminence_scores.csv"))
+    country_codes_path = Path(get_path("data/foundational_assets/country_codes.csv"))
+    output_path = Path(get_path("data/intermediate/adb_final_candidates.txt"))
     input_files = [eligible_path, ocean_path, eminence_path, country_codes_path]
 
     # --- Intelligent Startup Logic ---
@@ -173,9 +180,15 @@ def main():
     final_df = final_df[final_column_order]
 
     # --- Save the final list ---
-    final_df.to_csv(args.output_file, sep="\t", index=False, encoding="utf-8")
+    final_df.to_csv(output_path, sep="\t", index=False, encoding="utf-8")
 
-    print(f"\n{Fore.GREEN}SUCCESS: Successfully saved {len(final_df)} final candidates to {args.output_file}. ✨\n")
+    print(f"\n{Fore.YELLOW}--- Final Output ---")
+    print(f"{Fore.CYAN} - Final candidates list saved to: {output_path}")
+    key_metric = f"Final Count: {len(final_df)} subjects"
+    print(
+        f"\n{Fore.GREEN}SUCCESS: {key_metric}. Final candidate selection "
+        f"completed successfully. ✨\n"
+    )
 
 
 if __name__ == "__main__":

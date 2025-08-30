@@ -27,6 +27,7 @@ providing a set of mock input files and asserting that the final output is
 correctly filtered, mapped, sorted, and formatted.
 """
 
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -37,50 +38,57 @@ from src import select_final_candidates
 
 @pytest.fixture
 def mock_input_files(tmp_path: Path) -> dict:
-    """Creates a dictionary of temporary input file paths for testing."""
-    paths = {
-        "eligible": tmp_path / "eligible.txt",
-        "ocean": tmp_path / "ocean.csv",
-        "eminence": tmp_path / "eminence.csv",
-        "country": tmp_path / "country.csv",
-        "output": tmp_path / "final_candidates.txt",
-    }
+    """
+    Creates mock input files in a sandboxed directory structure and returns
+    the path to the sandbox and the expected output file.
+    """
+    # Create the directory structure inside the temp sandbox
+    intermediate_dir = tmp_path / "data" / "intermediate"
+    foundational_dir = tmp_path / "data" / "foundational_assets"
+    intermediate_dir.mkdir(parents=True, exist_ok=True)
+    foundational_dir.mkdir(parents=True, exist_ok=True)
+
+    # Define paths for mock files
+    eligible_path = intermediate_dir / "adb_eligible_candidates.txt"
+    ocean_path = foundational_dir / "ocean_scores.csv"
+    eminence_path = foundational_dir / "eminence_scores.csv"
+    country_path = foundational_dir / "country_codes.csv"
+    output_path = intermediate_dir / "adb_final_candidates.txt"
 
     # Create dummy input files
-    paths["eligible"].write_text(
+    eligible_path.write_text(
         "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tZoneAbbr\tZoneTimeOffset\tCity\tCountryState\tLongitude\tLatitude\tRating\tBio\tCategories\tLink\n"
         "1\t101\tNewton\tIsaac\tM\t4\t1\t1643\t01:00\t...\t...\t...\tUK\t...\t...\tAA\t...\t...\thttp://a.com\n"
         "2\t102\tPlato\t_\tM\t1\t1\t-427\t12:00\t...\t...\t...\tGR\t...\t...\tAA\t...\t...\thttp://b.com\n"
         "3\t103\tMonroe\tMarilyn\tF\t1\t6\t1926\t09:30\t...\t...\t...\tUSA\t...\t...\tAA\t...\t...\thttp://c.com\n"
         "4\t104\tExtra\tPerson\tF\t1\t1\t1990\t12:00\t...\t...\t...\tFR\t...\t...\tA\t...\t...\thttp://d.com\n"
     )
-    paths["ocean"].write_text("idADB\n101\n102\n103")
-    paths["eminence"].write_text("idADB,EminenceScore\n103,85.0\n101,99.5\n102,99.5")
-    paths["country"].write_text("Abbreviation,Country\nUK,United Kingdom\nGR,Greece\nUSA,United States\nFR,France")
+    ocean_path.write_text("idADB\n101\n102\n103")
+    eminence_path.write_text("idADB,EminenceScore\n103,85.0\n101,99.5\n102,99.5")
+    country_path.write_text("Abbreviation,Country\nUK,United Kingdom\nGR,Greece\nUSA,United States\nFR,France")
 
-    return paths
+    return {"sandbox_path": tmp_path, "output_path": output_path}
 
 
 def test_select_final_candidates_logic(mock_input_files):
     """
     Tests the main filtering, mapping, and sorting logic of the script.
     """
-    paths = mock_input_files
+    sandbox_path = mock_input_files["sandbox_path"]
+    output_path = mock_input_files["output_path"]
+
     test_args = [
         "select_final_candidates.py",
-        "--eligible-candidates", str(paths["eligible"]),
-        "--ocean-scores", str(paths["ocean"]),
-        "--eminence-scores", str(paths["eminence"]),
-        "--country-codes", str(paths["country"]),
-        "--output-file", str(paths["output"]),
+        "--sandbox-path",
+        str(sandbox_path),
         "--force",
     ]
 
     with patch("sys.argv", test_args):
         select_final_candidates.main()
 
-    assert paths["output"].exists()
-    output_df = pd.read_csv(paths["output"], sep="\t")
+    assert output_path.exists()
+    output_df = pd.read_csv(output_path, sep="\t")
 
     # 1. Verify Filtering: "Extra Person" (104) should be removed.
     assert len(output_df) == 3
