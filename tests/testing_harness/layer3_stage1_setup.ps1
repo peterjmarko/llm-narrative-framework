@@ -22,8 +22,8 @@ New-Item -ItemType Directory -Path $SandboxDir -Force | Out-Null
 
 Write-Host ""
 Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
-Write-Host "--- Step 1: Automated Setup ---" -ForegroundColor Cyan
+Write-Host "--- Stage 1: Automated Setup ---" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green
-Write-Host "Your next action is Step 2: Execute the Test Workflow." -ForegroundColor Yellow
+Write-Host "Your next action is Stage 2: Execute the Test Workflow." -ForegroundColor Yellow
 Write-Host ""

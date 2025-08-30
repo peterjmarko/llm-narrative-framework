@@ -96,3 +96,9 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Improve Migration Workflow**
   - [ ] Optimize the `migrate` command to skip re-running API calls for replications that are already valid.
   - [ ] Clean up `migrate_experiment.ps1` log files by removing PowerShell transcript headers and footers.
+
+- [ ] **Enhance Interactive Test Harness with Step-Back Functionality**
+  - [ ] Allow developers to step backward and forward through the guided tour for easier debugging and learning.
+  - [ ] Refactor the test harness to manage pipeline steps as a stateful list.
+  - [ ] Implement a command parser in the interactive prompt to handle 'back' and 'repeat' commands.
+  - [ ] Develop logic to automatically delete the output artifacts of any steps being re-run to ensure a clean state.

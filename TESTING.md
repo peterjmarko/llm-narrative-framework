@@ -55,17 +55,17 @@ If the unit tests fail, fix the script before proceeding to the next stage.
 #### Stage 3: Integration Test
 Once unit tests pass, perform an integration test to validate that the script functions correctly within the live pipeline. For data preparation scripts, this is done using the Layer 3 test harness.
 
-1.  **Add a Checkpoint:** Temporarily modify `tests/testing_harness/layer3_step2_test_workflow.ps1`. Add an `exit 0` command immediately after the line that calls the script you just modified.
+1.  **Add a Checkpoint:** Temporarily modify `tests/testing_harness/layer3_stage2_test_workflow.ps1`. Add an `exit 0` command immediately after the line that calls the script you just modified.
 2.  **Run the Test:** Execute the Layer 3 test from the project root.
     ```powershell
     # Run setup, then the workflow.
-    .\tests\testing_harness\layer3_step1_setup.ps1
-    .\tests\testing_harness\layer3_step2_test_workflow.ps1
+    .\tests\testing_harness\layer3_stage1_setup.ps1
+    .\tests\testing_harness\layer3_stage2_test_workflow.ps1
     ```
 3.  **Verify:** The test should run successfully up to your checkpoint and exit gracefully. Manually inspect the artifacts created in the `temp_test_environment/layer3_sandbox/` to confirm your script produced the correct output.
 4.  **Clean Up:** Once verified, remove the temporary `exit 0` from the workflow script and run the cleanup script.
     ```powershell
-    .\tests\testing_harness\layer3_step3_cleanup.ps1
+    .\tests\testing_harness\layer3_stage3_cleanup.ps1
     ```
 
 ---
@@ -96,26 +96,35 @@ After inspecting the artifacts, run this script to delete the test directory.
 
 ### Layer 3: Data Pipeline Integration Testing (`prepare_data.ps1`)
 
-This procedure validates the real data preparation pipeline with a controlled seed dataset. It is a **fully automated** test that verifies the end-to-end data flow of the pipeline *without* making expensive LLM calls for text neutralization, making it fast and efficient.
+This procedure validates the real data preparation pipeline with a controlled seed dataset. It can be run in two modes:
+
+*   **Automated Mode (Default):** A fully automated test that verifies the end-to-end data flow of the pipeline.
+*   **Interactive Mode (Guided Tour):** A step-by-step guided tour of the pipeline. The script will pause before executing each Python script, explain what it is about to do, and wait for you to press Enter. This is an excellent way for new contributors to learn how the data pipeline works.
+
+To run the interactive guided tour, use the `-Interactive` flag:
+```powershell
+# In the project root, run setup, then the workflow with the -Interactive flag.
+.\tests\testing_harness\layer3_stage1_setup.ps1
+.\tests\testing_harness\layer3_stage2_test_workflow.ps1 -Interactive
 
 **Prerequisites:** A configured `.env` file in the project root with a valid API key (for the eminence and OCEAN scoring steps).
 
-#### Step 1: Automated Setup
+#### Stage 1: Automated Setup
 Run this script to create the sandboxed test environment with all required scripts and minimal seed data.
 ```powershell
-.\tests\testing_harness\layer3_step1_setup.ps1
+.\tests\testing_harness\layer3_stage1_setup.ps1
 ```
 
-#### Step 2: Execute the Test Workflow
+#### Stage 2: Execute the Test Workflow
 This script fully automates the test workflow. It calls the main `prepare_data.ps1` orchestrator with a `-Force` flag, which ensures the process is **non-interactive** and forces the script to **re-validate every step** rather than skipping them if an output file already exists. The pipeline will still intelligently bypass the manual and neutralization steps, as their pre-made outputs are provided by the setup script.
 ```powershell
-.\tests\testing_harness\layer3_step2_test_workflow.ps1
+.\tests\testing_harness\layer3_stage2_test_workflow.ps1
 ```
 
-#### Step 3: Automated Cleanup
+#### Stage 3: Automated Cleanup
 After inspecting the artifacts, run this script to delete the Layer 3 test sandbox.
 ```powershell
-.\tests\testing_harness\layer3_step3_cleanup.ps1
+.\tests\testing_harness\layer3_stage3_cleanup.ps1
 ```
 
 ### Layer 4: Main Workflow Integration Testing

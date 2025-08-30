@@ -254,7 +254,7 @@ def main():
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_name = f"{output_dir.name}_{timestamp}.zip"
             shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
-            logging.info(f"Successfully created backup at: {backup_dir / backup_name}")
+            print(f"{Fore.CYAN}Successfully created backup at: {backup_dir / backup_name}{Fore.RESET}")
             shutil.rmtree(output_dir)
         except Exception as e:
             logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)

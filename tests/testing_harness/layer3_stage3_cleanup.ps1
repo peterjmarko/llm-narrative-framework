@@ -7,7 +7,7 @@ $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
 
 Write-Host ""
 Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
-Write-Host "--- Step 3: Automated Cleanup ---" -ForegroundColor Cyan
+Write-Host "--- Stage 3: Automated Cleanup ---" -ForegroundColor Cyan
 Write-Host ""
 
 if (Test-Path $SandboxDir) {

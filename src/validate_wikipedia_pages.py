@@ -378,7 +378,7 @@ def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int
         print(f"\n{Fore.YELLOW}WARNING: Validation incomplete.")
         print(f"Partial results have been sorted and saved.")
         print(f"{Fore.CYAN}  - Detailed Report: {display_output_path}")
-        print(f"{Fore.CYAN}  - Summary Report:  {display_summary_path} ✨")
+        print(f"{Fore.CYAN}  - Summary Report:  {display_summary_path}")
         print(f"{Fore.YELLOW}\nPlease re-run the script to resume validation.\n")
         os._exit(1)
     else:
@@ -394,7 +394,7 @@ def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int
         print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
         print(f"{Fore.CYAN} - Detailed report saved to: {display_output_path}{Fore.RESET}")
         print(f"{Fore.CYAN} - Summary report saved to: {display_summary_path}{Fore.RESET}")
-        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Validation completed successfully. ✨{Fore.RESET}\n")
+        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Validation completed successfully.{Fore.RESET}\n")
 
 def generate_summary_report(report_path: Path):
     """Reads the detailed CSV report and generates a summary text file."""
@@ -593,65 +593,32 @@ def main():
             logging.error(f"Failed to create backup or remove file: {e}")
             sys.exit(1)
             
-    # Handle --force flag first for non-interactive overwrite
-    if args.force and output_path.exists():
-        print(f"{Fore.YELLOW}\nForcing overwrite of existing report...")
-        backup_and_overwrite(output_path)
-    
-    # Automatically re-run if the input link file is newer than the report
-    elif not args.force and output_path.exists() and input_path.exists():
+    # --- Intelligent Startup Logic ---
+    # Check for stale data first. If the input is newer, we must force a re-run.
+    if not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
-            print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing report.")
-            print("Stale data detected. Automatically re-running validation...")
-            backup_and_overwrite(output_path)
-            # Set force=True for the loader to ensure a full re-run
+            print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the report. Stale data detected.")
+            print("Automatically forcing a re-run...")
             args.force = True
 
+    # If --force is active (either from the command line or stale data),
+    # back up and delete the old report before loading the state.
+    if args.force and output_path.exists():
+        print(f"{Fore.YELLOW}\n--force is active. Backing up and removing existing report to ensure a clean run.{Fore.RESET}")
+        backup_and_overwrite(output_path)
+    
+    # Now, load the current state. This will be a fresh start if --force was used.
     records_to_process, timed_out_ids, max_index_before, valid_before, processed_before, total_subjects = load_and_filter_input(input_path, output_path, args.force)
-    
-    fieldnames = ['Index', 'idADB', 'ADB_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Status', 'Notes']
-    
-    # If there are timed-out records, they must be retried.
-    if timed_out_ids:
-        print(f"{Fore.YELLOW}Found {len(timed_out_ids)} records that previously timed out. Retrying them now.")
-        temp_path = output_path.with_suffix('.tmp')
-        with open(output_path, 'r', encoding='utf-8') as infile, open(temp_path, 'w', encoding='utf-8', newline='') as outfile:
-            reader = csv.DictReader(infile)
-            writer = csv.DictWriter(outfile, fieldnames=reader.fieldnames)
-            writer.writeheader()
-            for row in reader:
-                if row['idADB'] not in timed_out_ids:
-                    writer.writerow(row)
-        shutil.move(temp_path, output_path)
-        
-        # Reload state after cleaning the file
-        records_to_process, _, max_index_before, valid_before, processed_before, _ = load_and_filter_input(input_path, output_path, False)
 
+    # If there's nothing to do, the process is complete.
     if not records_to_process:
-        # If there are no new records to process, check for pending retries.
-        if timed_out_ids:
-            print(f"\n{Fore.GREEN}All records have been processed, but {len(timed_out_ids)} previously timed out.")
-            confirm = input(f"Do you want to retry these {len(timed_out_ids)} records? (Y/n): ").lower().strip()
-            if confirm != 'n':
-                print(f"{Fore.YELLOW}Preparing to retry {len(timed_out_ids)} timed-out records...")
-                # The existing retry logic below will handle the rest.
-            else:
-                print("Operation cancelled by user.")
-                finalize_and_report(output_path, fieldnames, total_subjects, False)
-                sys.exit(0)
-        else:
-            print(f"\n{Fore.YELLOW}WARNING: All records have already been validated. Output is up to date. ✨")
-            print(f"{Fore.YELLOW}If you decide to go ahead with validating all pages again, a backup of the existing file will be created first.{Fore.RESET}")
-            confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
-        if confirm == 'y':
-            print(f"{Fore.YELLOW}Forcing overwrite of existing report...")
-            backup_and_overwrite(output_path)
-            # Re-initialize state for a full run
-            records_to_process, timed_out_ids, max_index_before, valid_before, processed_before, total_subjects = load_and_filter_input(input_path, output_path, True)
-        else:
-            # Just generate the summary text file and print it without modifying the main report
-            generate_summary_report(output_path)
-            sys.exit(0)
+        print(f"\n{Fore.GREEN}All records are already validated and up to date.{Fore.RESET}")
+        # An interactive prompt to force a re-run is not needed for this script,
+        # as a re-run can be triggered with the --force flag.
+        generate_summary_report(output_path)
+        sys.exit(0)
+
+    fieldnames = ['Index', 'idADB', 'ADB_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Status', 'Notes']
         
     print(f"\n{Fore.YELLOW}--- Validating Wikipedia Pages ---")
     print(f"Found {processed_before:,} already processed records ({valid_before:,} valid).")

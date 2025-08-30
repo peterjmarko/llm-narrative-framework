@@ -2,27 +2,81 @@
 # --- Layer 3: Data Pipeline Integration Testing ---
 # --- Step 2: Execute the Test Workflow ---
 
+param(
+    [Parameter(Mandatory=$false)]
+    [switch]$Interactive
+)
+
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
+$relativeSandboxDir = (Resolve-Path $SandboxDir -Relative).TrimStart('.\')
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path $SandboxDir)) { throw "FATAL: Test sandbox not found. Please run Step 1 first." }
+function Invoke-PipelineStep {
+    param(
+        [string]$ScriptName,
+        [string]$Description,
+        [string[]]$InputFiles,
+        [string[]]$OutputFiles,
+        [scriptblock]$Action
+    )
+    
+    if ($Interactive) {
+        $script:stepCounter = if ($script:stepCounter) { $script:stepCounter + 1 } else { 1 }
+        $stepHeader = ">>> Step $($script:stepCounter): $ScriptName <<<"
+        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
+        Write-Host $stepHeader -ForegroundColor Blue
+        Write-Host $Description -ForegroundColor Blue
+        Write-Host "`n  INPUTS:"
+        $InputFiles | ForEach-Object {
+            if ($_ -match "[\\/]") {
+                Write-Host "    - $(Join-Path $relativeSandboxDir $_)"
+            } else {
+                Write-Host "    - $_"
+            }
+        }
+        Write-Host "`n  OUTPUTS:"
+        $OutputFiles | ForEach-Object {
+            if ($_ -match "[\\/]") {
+                Write-Host "    - $(Join-Path $relativeSandboxDir $_)"
+            } else {
+                Write-Host "    - $_"
+            }
+        }
+        Write-Host "" # Add a blank line for spacing
+        Read-Host -Prompt "Press Enter to execute this step (Ctrl+C to exit)..."
+    }
+
+    & $Action
+
+    if ($Interactive) {
+        Write-Host "" # Add a blank line for spacing
+        Read-Host -Prompt "Step complete. Inspect the output files, then press Enter to continue (Ctrl+C to exit)..."
+    }
+}
+
+if (-not (Test-Path $SandboxDir)) { throw "FATAL: Test sandbox not found. Please run Stage 1 first." }
 
 Write-Host ""
 Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
-Write-Host "--- Step 2: Execute the Test Workflow ---" -ForegroundColor Cyan
+Write-Host "--- Stage 2: Execute the Test Workflow ---" -ForegroundColor Cyan
 
 try {
-    Set-Location $SandboxDir
 
     $fetchScript = Join-Path $ProjectRoot "src/fetch_adb_data.py"
     $outputFile = "data/sources/adb_raw_export.txt"
 
     # --- 1. Targeted Live Fetch ---
-    Write-Host "`n--- Performing targeted live fetch for 7 test subjects... ---" -ForegroundColor Yellow
-    
-    New-Item -Path (Split-Path $outputFile) -ItemType Directory -Force | Out-Null
-    "Index`tidADB`tLastName`tFirstName`tGender`tDay`tMonth`tYear`tTime`tZoneAbbr`tZoneTimeOffset`tCity`tCountryState`tLongitude`tLatitude`tRating`tBio`tCategories`tLink" | Set-Content -Path $outputFile -Encoding UTF8
+    Invoke-PipelineStep `
+        -ScriptName "fetch_adb_data.py (Targeted Fetch)" `
+        -Description "Performs a targeted live fetch from Astro-Databank to create the initial seed dataset." `
+        -InputFiles @("Live Astro-Databank Website") `
+        -OutputFiles @($outputFile) `
+        -Action {
+            Write-Host "`n--- Performing targeted live fetch for 7 test subjects... ---" -ForegroundColor Yellow
+            
+            New-Item -Path (Split-Path $outputFile) -ItemType Directory -Force | Out-Null
+    "Index`tidADB`tLastName`tFirstName`tGender`tDay`tMonth`tYear`tTime`tZoneAbbr`tZoneTimeOffset`tCity`tCountryState`tLongitude`tLatitude`tRating`tBio`tCategories`tLink" | Set-Content -Path (Join-Path $SandboxDir $outputFile) -Encoding UTF8
     
     $subjects = @(
         # Control Group (Known Good)
@@ -47,7 +101,7 @@ try {
         if (Test-Path $tempOutputFile) {
             $fetchedContent = Get-Content $tempOutputFile | Select-Object -Skip 1
             if ($fetchedContent) {
-                Add-Content -Path $outputFile -Value $fetchedContent
+                Add-Content -Path (Join-Path $SandboxDir $outputFile) -Value $fetchedContent
             }
             Remove-Item $tempOutputFile
         } else {
@@ -60,8 +114,9 @@ try {
     Write-Host "`n--- Filtering aggregated data to target subjects... ---" -ForegroundColor Yellow
     $targetIDs = $subjects.idADB
     
-    $header = Get-Content $outputFile | Select-Object -First 1
-    $dataRows = Get-Content $outputFile | Select-Object -Skip 1
+    $fullOutputFile = Join-Path $SandboxDir $outputFile
+    $header = Get-Content $fullOutputFile | Select-Object -First 1
+    $dataRows = Get-Content $fullOutputFile | Select-Object -Skip 1
     
     # Filter rows where the second column (idADB) is one of our target IDs.
     $filteredData = $dataRows | Where-Object { $targetIDs -contains ($_.Split("`t"))[1] }
@@ -76,25 +131,31 @@ try {
     
     # Construct the final content as a single array of strings for robust file writing.
     $finalContent = @($header) + $reIndexedData
-    Set-Content -Path $outputFile -Value $finalContent
+    Set-Content -Path $fullOutputFile -Value $finalContent
 
-    $displayPath = (Join-Path $PWD $outputFile).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
+    $displayPath = (Join-Path $PWD $fullOutputFile).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
     $finalRecordCount = $reIndexedData.Length
 
     Write-Host "`n--- Final Output ---" -ForegroundColor Yellow
     Write-Host " - Raw data export saved to: $displayPath" -ForegroundColor Cyan
     $keyMetric = "Created initial dataset with $finalRecordCount subjects"
     Write-Host "`nSUCCESS: $keyMetric. Initial data fetch completed successfully. ✨`n" -ForegroundColor Green
+        }
 
     # --- 2. Run the Automated Pipeline Scripts Sequentially ---
     Write-Host "`n--- Running automated data pipeline scripts... ---" -ForegroundColor Yellow
     
     # --- HARNESS INTERVENTION: Provide static data files... ---
     Write-Host "`n--- HARNESS INTERVENTION: Providing static data files... ---" -ForegroundColor Magenta
-    $foundationalAssetDir = "data/foundational_assets"
-    New-Item -Path $foundationalAssetDir -ItemType Directory -Force | Out-Null
-    Copy-Item -Path (Join-Path $ProjectRoot $foundationalAssetDir "country_codes.csv") -Destination $foundationalAssetDir
+    $sourceAssetDir = Join-Path $ProjectRoot "data/foundational_assets"
+    $destAssetDir = Join-Path $SandboxDir "data/foundational_assets"
+    New-Item -Path $destAssetDir -ItemType Directory -Force | Out-Null
+    Copy-Item -Path (Join-Path $sourceAssetDir "country_codes.csv") -Destination $destAssetDir
     Write-Host "  -> Copied 'country_codes.csv' into the sandbox."
+    # The category map is created by the fetch script, but the link finder also needs it.
+    # We must copy the master version into the sandbox to ensure it's available.
+    Copy-Item -Path (Join-Path $sourceAssetDir "adb_category_map.csv") -Destination $destAssetDir
+    Write-Host "  -> Copied 'adb_category_map.csv' into the sandbox."
 
     $scriptsToRun = @(
         "src/find_wikipedia_links.py",
@@ -116,46 +177,85 @@ try {
     $sfImport = "data/intermediate/sf_data_import.txt"
 
     # Sequentially call each script
-    pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") --sandbox-path . --force
-
-    # --- HARNESS INTERVENTION: Injecting validation failures... ---
-    Write-Host "`n--- HARNESS INTERVENTION: Injecting validation failures... ---" -ForegroundColor Magenta
-    $hirohitoID = "215"    # Philip, Duke of Edinburgh
-    $marquesID = "101097"  # Romário Marques
-    $rennaID = "94360"     # Jonathan Renna
-
-    # Read the content, modify it, and write it back. Using Get-Content/Set-Content
-    # is more robust for preserving the exact format than Import/Export-Csv.
-    $modifiedLinks = (Get-Content $wikiLinks) | ForEach-Object {
-        if ($_ -match ",$($hirohitoID),") {
-            # This subject will naturally fail the name match, so no change is needed.
-            $_
-        } elseif ($_ -match ",$($marquesID),") {
-            # Replace Marques's English URL with a French one to fail the language check.
-            $_ -replace "https://en.wikipedia.org/wiki/Rom%C3%A1rio", "https://fr.wikipedia.org/wiki/Rom%C3%A1rio"
-        } elseif ($_ -match ",$($rennaID),") {
-            # Blank out Renna's URL to simulate a "No Link Found" failure.
-            # This requires careful regex to replace only the URL part.
-            $_ -replace 'http[^,]*', ''
-        } else {
-            $_
+    Invoke-PipelineStep `
+        -ScriptName "find_wikipedia_links.py" `
+        -Description "Finds a best-guess Wikipedia URL for each subject." `
+        -InputFiles @($adbRaw) `
+        -OutputFiles @($wikiLinks) `
+        -Action {
+            pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") --sandbox-path $SandboxDir --force
         }
-    }
-    Set-Content -Path $wikiLinks -Value $modifiedLinks
-    Write-Host "  -> Injected Non-English URL and No Link Found failures."
 
-    pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") --sandbox-path . --force
-    pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") --sandbox-path . --force
-    pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") --sandbox-path . --force
-    pdm run python (Join-Path $ProjectRoot "src/generate_ocean_scores.py") --sandbox-path . --force
-    pdm run python (Join-Path $ProjectRoot "src/select_final_candidates.py") --sandbox-path . --force
-    pdm run python (Join-Path $ProjectRoot "src/prepare_sf_import.py") --sandbox-path . --force
+    Invoke-PipelineStep `
+        -ScriptName "validate_wikipedia_pages.py" `
+        -Description "Validates each Wikipedia page for content and language. Includes a harness intervention to inject known failures." `
+        -InputFiles @($wikiLinks) `
+        -OutputFiles @($validationReport) `
+        -Action {
+            # --- HARNESS INTERVENTION: Injecting validation failures... ---
+            Write-Host "`n--- HARNESS INTERVENTION: Injecting validation failures... ---" -ForegroundColor Magenta
+            $hirohitoID = "215"; $marquesID = "101097"; $rennaID = "94360"
+            $modifiedLinks = (Get-Content (Join-Path $SandboxDir $wikiLinks)) | ForEach-Object {
+                if ($_ -match ",$($hirohitoID),") { $_ } 
+                elseif ($_ -match ",$($marquesID),") { $_ -replace "https://en.wikipedia.org/wiki/Rom%C3%A1rio", "https://fr.wikipedia.org/wiki/Rom%C3%A1rio" } 
+                elseif ($_ -match ",$($rennaID),") { $_ -replace 'http[^,]*', '' } 
+                else { $_ }
+            }
+            Set-Content -Path (Join-Path $SandboxDir $wikiLinks) -Value $modifiedLinks
+            Write-Host "  -> Injected Non-English URL and No Link Found failures."
+            pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") --sandbox-path $SandboxDir --force
+        }
+
+    Invoke-PipelineStep `
+        -ScriptName "select_eligible_candidates.py" `
+        -Description "Performs initial data quality checks to create a pool of eligible candidates." `
+        -InputFiles @($adbRaw, $validationReport) `
+        -OutputFiles @($eligibleCandidates) `
+        -Action {
+            pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") --sandbox-path $SandboxDir --force
+        }
+
+    Invoke-PipelineStep `
+        -ScriptName "generate_eminence_scores.py" `
+        -Description "Generates a calibrated eminence score for each eligible candidate." `
+        -InputFiles @($eligibleCandidates) `
+        -OutputFiles @($eminenceScores) `
+        -Action {
+            pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") --sandbox-path $SandboxDir --force
+        }
+
+    Invoke-PipelineStep `
+        -ScriptName "generate_ocean_scores.py" `
+        -Description "Generates OCEAN scores and determines the final dataset size." `
+        -InputFiles @($eminenceScores) `
+        -OutputFiles @($oceanScores) `
+        -Action {
+            pdm run python (Join-Path $ProjectRoot "src/generate_ocean_scores.py") --sandbox-path $SandboxDir --force
+        }
+
+    Invoke-PipelineStep `
+        -ScriptName "select_final_candidates.py" `
+        -Description "Filters, transforms, and sorts the final subject set." `
+        -InputFiles @($eligibleCandidates, $oceanScores, $eminenceScores) `
+        -OutputFiles @($finalCandidates) `
+        -Action {
+            pdm run python (Join-Path $ProjectRoot "src/select_final_candidates.py") --sandbox-path $SandboxDir --force
+        }
+
+    Invoke-PipelineStep `
+        -ScriptName "prepare_sf_import.py" `
+        -Description "Formats the final subject list for import into Solar Fire." `
+        -InputFiles @($finalCandidates) `
+        -OutputFiles @($sfImport) `
+        -Action {
+            pdm run python (Join-Path $ProjectRoot "src/prepare_sf_import.py") --sandbox-path $SandboxDir --force
+        }
 
     # Checkpoint removed for cleaner logs. The next script's success implies this one worked.
     
     # --- 3. Dynamic Simulation of Manual Steps ---
     Write-Host "`n--- Simulating Manual Solar Fire Export Steps... ---" -ForegroundColor Cyan
-    $importFile = "data/intermediate/sf_data_import.txt"
+    $importFile = Join-Path $SandboxDir "data/intermediate/sf_data_import.txt"
     if (-not (Test-Path $importFile)) { throw "The pipeline did not generate the required '$importFile'." }
     
     # Read the real subject data from the import file to map names to Base58 IDs.
@@ -224,7 +324,7 @@ try {
     $finalContent = $finalContent -replace '"3iQ"', "`"$($idMap['Paul McCartney'])`""
     $finalContent = $finalContent -replace '"Dc2"', "`"$($idMap['Jonathan Cainer'])`""
 
-    $assetDir = "data/foundational_assets"
+    $assetDir = Join-Path $SandboxDir "data/foundational_assets"
     $finalContent | Set-Content -Path (Join-Path $assetDir "sf_chart_export.csv") -Encoding UTF8
     Write-Host "  -> Dynamically generated 'sf_chart_export.csv'."
 
@@ -269,11 +369,6 @@ A need for stimulation and activity in professional life.
     Write-Host "  -> Wrote minimal 'sf_delineations_library.txt'."
 
     # --- 4. Run Final Pipeline Scripts ---
-    $finalScripts = @(
-        "src/neutralize_delineations.py",
-        "src/create_subject_db.py",
-        "src/generate_personalities_db.py"
-    )
     # Define final set of paths
     $sfChartExport = "data/foundational_assets/sf_chart_export.csv"
     $sfDelineations = "data/foundational_assets/sf_delineations_library.txt"
@@ -281,44 +376,51 @@ A need for stimulation and activity in professional life.
     $subjectDb = "data/processed/subject_db.csv"
     $personalitiesDb = "personalities_db.txt"
 
-    # --- HARNESS INTERVENTION: Resilient Neutralization with Retries ---
-    $neutralizeSuccess = $false
-    for ($i = 1; $i -le 3; $i++) {
-        Write-Host "`n--- Attempting Delineation Neutralization (Attempt $i of 3)... ---" -ForegroundColor Yellow
-        
-        # Build the argument list for the script.
-        # Only use --force on the very first attempt to ensure a clean run.
-        $neutralizeArgs = @(
-            (Join-Path $ProjectRoot "src/neutralize_delineations.py"),
-            "-i", $sfDelineations,
-            "-o", $neutralizedDir
-        )
-        if ($i -eq 1) {
-            $neutralizeArgs += "--force"
+    Invoke-PipelineStep `
+        -ScriptName "neutralize_delineations.py" `
+        -Description "Rewrites esoteric texts into neutral psychological descriptions using an LLM. Includes a retry mechanism." `
+        -InputFiles @($sfDelineations) `
+        -OutputFiles @("$($neutralizedDir)/*.csv") `
+        -Action {
+            $neutralizeSuccess = $false
+            for ($i = 1; $i -le 3; $i++) {
+                if ($Interactive) { Write-Host "`n--- Neutralization Attempt $i of 3 ---" -ForegroundColor Magenta }
+                
+                $neutralizeArgs = @(
+                    (Join-Path $ProjectRoot "src/neutralize_delineations.py"),
+                    "-i", (Join-Path $SandboxDir $sfDelineations),
+                    "-o", (Join-Path $SandboxDir $neutralizedDir)
+                )
+                if ($i -eq 1) { $neutralizeArgs += "--force" }
+
+                pdm run python @neutralizeArgs 2>&1 | Tee-Object -Variable neutralizeOutput
+                
+                if (($neutralizeOutput | Out-String) -notmatch "failure\(s\)") {
+                    $neutralizeSuccess = $true
+                    if ($Interactive) { Write-Host "`nNeutralization successful on attempt $i." -ForegroundColor Green }
+                    break
+                } else {
+                    if ($Interactive) { Write-Host "`nNeutralization failed on attempt $i. Retrying..." -ForegroundColor Yellow }
+                }
+            }
+            if (-not $neutralizeSuccess) { throw "FATAL: Delineation neutralization failed after 3 attempts. Halting test." }
         }
 
-        pdm run python @neutralizeArgs 2>&1 | Tee-Object -Variable neutralizeOutput
-        
-        if (($neutralizeOutput | Out-String) -notmatch "failure\(s\)") {
-            $neutralizeSuccess = $true
-            Write-Host "`nNeutralization successful on attempt $i." -ForegroundColor Green
-            break
-        } else {
-            Write-Host "`nNeutralization failed on attempt $i. Retrying..." -ForegroundColor Yellow
+    Invoke-PipelineStep `
+        -ScriptName "create_subject_db.py" `
+        -Description "Integrates chart data with the final subject list to create a master database." `
+        -InputFiles @($sfChartExport, $finalCandidates) `
+        -OutputFiles @($subjectDb) `
+        -Action {
+            pdm run python (Join-Path $ProjectRoot "src/create_subject_db.py") --sandbox-path $SandboxDir --force
         }
-    }
-
-    if (-not $neutralizeSuccess) {
-        throw "FATAL: Delineation neutralization failed after 3 attempts. Halting test."
-    }
-
-    pdm run python (Join-Path $ProjectRoot "src/create_subject_db.py") --sandbox-path . --force
     
     # --- Integration Test Checkpoint ---
     Write-Host "`n--- INTEGRATION TEST CHECKPOINT: create_subject_db.py ---" -ForegroundColor Magenta
-    $displaySubjectDbPath = (Join-Path $PWD $subjectDb).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    if (-not (Test-Path $subjectDb)) { throw "FAIL: '$displaySubjectDbPath' was not created." }
-    $lineCount = (Get-Content $subjectDb).Length
+    $fullSubjectDbPath = Join-Path $SandboxDir $subjectDb
+    $displaySubjectDbPath = $fullSubjectDbPath.Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
+    if (-not (Test-Path $fullSubjectDbPath)) { throw "FAIL: '$displaySubjectDbPath' was not created." }
+    $lineCount = (Get-Content $fullSubjectDbPath).Length
     # We expect 3 records + 1 header = 4 lines.
     if ($lineCount -ne 4) { throw "FAIL: '$displaySubjectDbPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
     Write-Host "Verification PASSED: '$displaySubjectDbPath' was created with the correct number of records." -ForegroundColor Green
@@ -329,7 +431,7 @@ A need for stimulation and activity in professional life.
 
     # --- 5. Verification ---
     Write-Host "`n--- Verifying final output... ---" -ForegroundColor Cyan
-    $finalDbPath = "personalities_db.txt"
+    $finalDbPath = Join-Path $SandboxDir "personalities_db.txt"
     if (-not (Test-Path $finalDbPath)) {
         throw "FAIL: The final 'personalities_db.txt' file was not created."
     }
@@ -347,7 +449,4 @@ A need for stimulation and activity in professional life.
 catch {
     Write-Host "`nERROR: Layer 3 test workflow failed.`n$($_.Exception.Message)" -ForegroundColor Red
     exit 1
-}
-finally {
-    Set-Location $ProjectRoot
 }
