@@ -55,17 +55,19 @@ def mock_sandbox(tmp_path: Path) -> Path:
         "4\t104\tKing\tMartin\tM\t15\t1\t1929\t12:00\thttp://d.com\n"   # Invalid (Status FAIL)
         "5\t105\tCurie\tMarie\tF\t4\t7\t1934\t1200\thttp://e.com\n"    # Invalid (Bad time format)
         "6\t101\tSmith\tJohn\tM\t1\t1\t1950\t12:00\thttp://f.com\n"   # Duplicate
+        "7\t201\tResearch: Event\t\t\t1\t1\t1960\t12:00\thttp://g.com\n" # Research Entry
     )
     raw_export_path.write_text(raw_content)
 
     # Create dummy validation report (CSV format)
     validation_content = (
-        "idADB,Status\n"
-        "101,OK\n"
-        "102,OK\n"
-        "103,VALID\n"
-        "104,FAIL\n"
-        "105,OK\n"
+        "idADB,Status,Entry_Type\n"
+        "101,OK,Person\n"
+        "102,OK,Person\n"
+        "103,OK,Person\n"
+        "104,FAIL,Person\n"
+        "105,OK,Person\n"
+        "201,VALID,Research\n"
     )
     validation_report_path.write_text(validation_content)
 

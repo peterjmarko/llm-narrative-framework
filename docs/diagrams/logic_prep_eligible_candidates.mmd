@@ -4,18 +4,11 @@ graph TD
         B --> C{Loop through all raw records};
 
         subgraph "Integrated Filtering"
-            C --> D{"Is Unique by<br/>Name and Date?"};
-            D -- No (Skip) --> C;
-            D -- Yes --> E{"Is Status 'OK'?"};
-            E -- No --> C;
-            E -- Yes --> F{"Birth Year 1900-1999?"};
-            F -- No --> C;
-            F -- Yes --> G{"Valid Birth Time Format?"};
-            G -- No --> C;
-            G -- Yes --> H[Add to Eligible Candidates list];
-            H --> C;
+            C["Filter for Status 'OK' AND Entry Type 'Person'"] --> D["Filter for Birth Year 1900-1999"];
+            D --> E["Filter for Valid Time Format"];
+            E --> F["Deduplicate by Normalized Name and Birth Date"];
         end
 
-        C -- End of File --> I[Write eligible list to adb_eligible_candidates.txt];
+        F --> I[Write eligible list to adb_eligible_candidates.txt];
         I --> J[End];
     end

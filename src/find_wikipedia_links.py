@@ -305,6 +305,24 @@ def worker_task(line: str, pbar: tqdm, index: int) -> dict | None:
     result = {'Index': index, 'idADB': id_adb, 'ADB_Name': adb_name, 'BirthYear': birth_year, 'Entry_Type': entry_type, 'Wikipedia_URL': '', 'Notes': ''}
     
     wiki_url = get_initial_wiki_url_from_adb(adb_url)
+
+    # If a URL was scraped from the ADB page, validate its title before accepting it.
+    if wiki_url:
+        soup = fetch_page_content(wiki_url)
+        if soup:
+            h1 = soup.find('h1', id='firstHeading')
+            wp_title = h1.get_text(strip=True) if h1 else ""
+            
+            # Clean names for a fair comparison
+            adb_base_name = ' '.join(reversed(adb_name.split(',', 1))).strip()
+            wp_base_title = re.sub(r'\s*\(.*?\)$', '', wp_title).strip()
+            
+            score = fuzz.ratio(adb_base_name.lower(), wp_base_title.lower())
+            if score < 60:
+                logging.info(f"  -> Rejecting ADB link for {adb_name}. Mismatch score: {score} ('{wp_title}')")
+                wiki_url = None # Nullify the bad URL to trigger a search or fail correctly.
+        else:
+            wiki_url = None # If we can't fetch the page, the link is bad.
     
     if not wiki_url and entry_type == 'Person':
         logging.info(f"No link on ADB for {adb_name}. Searching Wikipedia...")

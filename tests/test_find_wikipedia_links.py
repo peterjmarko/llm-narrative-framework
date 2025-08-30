@@ -231,8 +231,14 @@ def test_worker_task(mocker, adb_link, search_result, expected_url, expected_not
     mocker.patch('src.find_wikipedia_links.search_wikipedia', return_value=[("Some Result", "some_url")])
     mocker.patch('src.find_wikipedia_links.find_best_wikipedia_match', return_value=search_result)
     mocker.patch('src.find_wikipedia_links.get_english_wiki_url', return_value="https://en.wikipedia.org/wiki/English_Test" if adb_link else search_result)
-
-    # Use a flag to differentiate the research entry case
+    
+    # Mock the new dependencies introduced in the worker_task validation logic
+    mock_soup = MagicMock()
+    mock_h1 = MagicMock()
+    mock_h1.get_text.return_value = "Doe, John" # A name that will pass the fuzz ratio
+    mock_soup.find.return_value = mock_h1
+    mocker.patch('src.find_wikipedia_links.fetch_page_content', return_value=mock_soup)
+    mocker.patch('thefuzz.fuzz.ratio', return_value=95) # Assume a good match
     is_research = (expected_notes == "" and expected_url == "")
     entry_name = "Research Event 2000" if is_research else "Doe, John"
     

@@ -137,15 +137,20 @@ def main():
 
     try:
         raw_df = pd.read_csv(input_path, sep='\t', dtype={'idADB': str})
-        validation_df = pd.read_csv(validation_path, usecols=['idADB', 'Status'], dtype={'idADB': str})
+        # The validation report is now the source of truth for Entry_Type
+        validation_df = pd.read_csv(validation_path, usecols=['idADB', 'Status', 'Entry_Type'], dtype={'idADB': str})
     except FileNotFoundError as e:
         logging.error(f"{Fore.RED}FATAL: Input file not found: {e.filename}")
         sys.exit(1)
 
     # --- Step 1: Find ALL theoretically eligible candidates from source ---
     print(f"\n{Fore.YELLOW}--- Analyzing Full Dataset ---")
+    # Join the raw data with the validation report to get the Status and Entry_Type for each subject.
     df = pd.merge(raw_df, validation_df, on="idADB", how="left")
-    df = df[df['Status'].isin(['OK', 'VALID'])]
+
+    # The core filter: only keep 'Person' entries with a final status of 'OK'.
+    # Research entries (status 'VALID') and other failures are now correctly excluded.
+    df = df[(df['Status'] == 'OK') & (df['Entry_Type'] == 'Person')]
     logging.info(f"Initial filtering complete. {len(df)} records passed status check.")
     
     # --- Step 2: Apply all deterministic filters ---

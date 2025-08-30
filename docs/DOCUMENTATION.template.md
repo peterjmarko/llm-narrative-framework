@@ -11,9 +11,9 @@ To make changes, please edit the template file and then run 'pdm run build-docs'
 
 # A Framework for Testing Complex Narrative Systems
 
-This document is the **Framework Manual** for the project. It provides a comprehensive technical guide to the fully automated and resilient framework designed for conducting reproducible large-scale LLM experiments with complex narrative systems. It offers an end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
+This document is the **Framework Manual** for the project. It provides a comprehensive technical guide to the framework, which is designed for the resilient and reproducible testing of large-scale LLM experiments with complex narrative systems. It offers a fully automated, end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
 
-This manual is intended for developers, contributors, and researchers who wish to understand the system's architecture or use the framework for **direct replication, conceptual replication, and new research**.
+This manual is intended for developers, contributors, and researchers who wish to understand the system's architecture or use the framework for several types of scientific validation, including **direct, methodological, and conceptual replication, as well as for new research**.
 
 {{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=75% | caption=Project Architecture: A high-level overview of the project's main functional components and their relationships.}}
 
@@ -45,10 +45,15 @@ The result is a clean dataset of personality profiles where the connection to an
 
 The data preparation pipeline is a fully automated, multi-stage workflow. It begins with data extraction from the live Astro-Databank website and concludes with the generation of the final `personalities_db.txt` file used in the experiments.
 
-**Replication Paths:** Researchers can approach this project in two ways:
+**Replication Paths:** Researchers can approach this project in several ways to validate and extend the findings:
 
-1.  **Direct Replication (Validating Findings):** To most directly replicate the original study, researchers should clone this repository and use the data files as provided. This ensures the experiment starts with the exact same input data used in the original analysis.
-2.  **Conceptual Replication (New Research):** To perform a new study or conceptual replication, researchers can run the automated scripts to generate a completely new dataset from live sources. This will test the methodology with different, up-to-date data.
+1.  **Direct Replication (Computational Reproducibility):** To verify that the framework produces the exact findings reported in the article, clone this repository and use the static data and randomization seeds as provided. This is a bit-for-bit validation of the original results.
+
+2.  **Methodological Replication (Testing Robustness):** To validate that the findings are robust and not an artifact of a specific dataset or randomization seed, use the framework as-is but vary the inputs. This can be done in two ways:
+    *   **With a New Dataset:** Run the full `prepare_data.ps1` pipeline to generate a fresh dataset from the live Astro-Databank. This tests the statistical robustness of the method on a new sample.
+    *   **With New Randomization:** Use the provided static dataset but specify a different set of randomization seeds in `config.ini`. This validates the stability of the results across different random permutations.
+
+3.  **Conceptual Replication (Extending the Research):** To test the underlying scientific concepts with an improved or modified method, researchers can alter the framework itself. This could involve using a different LLM, modifying the analysis scripts, or changing other core parameters to conduct new research built upon this study's foundation.
 
 #### The Automated Workflow
 

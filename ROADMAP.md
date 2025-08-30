@@ -10,6 +10,10 @@ This phase focuses on achieving a fully validated and stable codebase before the
 
 - [ ] **Complete Test Coverage for Existing Framework**
   - [ ] Update and complete the test suites for all existing Python scripts and PowerShell wrappers.
+- [ ] **Add Filtering for Northern Hemisphere**
+  - [ ] Eliminate subjects with 'S' in their Latitude. Southern Hemisphere births introduce unnecessary noise to the dataset (because it's likely that signs for them are offset by 180 degrees). 
+- [ ] **Add the Option of Bypassing the Filtering of Subjects by Eminence/OCEAN Scores**
+  - [ ] 'Final candidates' become the same as 'eligible candidates'. This simplifies replication and strengthens the codebase. Needs validation by creating a new study.
 - [ ] **Develop `new_study.ps1` Orchestrator**
   - [ ] Implement the `new_study.ps1` workflow to automate multi-experiment studies based on a factor matrix in `config.ini`.
 - [ ] **Test the New Study Orchestrator**
