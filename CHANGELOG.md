@@ -1,5 +1,21 @@
 # Changelog
 
+## 6.8.6 (2025-08-30)
+
+### Bump
+
+- **version 6.8.5 → 6.8.6**
+
+### Refactor
+
+- **refactor scoring scripts and standardize console logs**
+  This commit refactors the LLM-based scoring scripts for sandbox awareness and standardizes console output across the data preparation pipeline.
+  
+  - Refactored `generate_eminence_scores.py` and `generate_ocean_scores.py` to be fully sandbox-aware, replacing file path arguments with `--sandbox-path`.
+  - Standardized the final console output block for all six refactored data-prep scripts to a consistent, more readable format.
+  - Updated the Layer 3 integration test to call the refactored scripts and use the final 7-subject test cohort.
+  - Updated unit tests for the scoring scripts to align with their new interfaces.
+
 ## 6.8.5 (2025-08-29)
 
 ### Bump
