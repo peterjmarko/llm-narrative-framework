@@ -156,6 +156,10 @@ try {
     # We must copy the master version into the sandbox to ensure it's available.
     Copy-Item -Path (Join-Path $sourceAssetDir "adb_category_map.csv") -Destination $destAssetDir
     Write-Host "  -> Copied 'adb_category_map.csv' into the sandbox."
+    Copy-Item -Path (Join-Path $sourceAssetDir "point_weights.csv") -Destination $destAssetDir
+    Write-Host "  -> Copied 'point_weights.csv' into the sandbox."
+    Copy-Item -Path (Join-Path $sourceAssetDir "balance_thresholds.csv") -Destination $destAssetDir
+    Write-Host "  -> Copied 'balance_thresholds.csv' into the sandbox."
 
     $scriptsToRun = @(
         "src/find_wikipedia_links.py",
@@ -414,36 +418,32 @@ A need for stimulation and activity in professional life.
         -Action {
             pdm run python (Join-Path $ProjectRoot "src/create_subject_db.py") --sandbox-path $SandboxDir --force
         }
-    
-    # --- Integration Test Checkpoint ---
-    Write-Host "`n--- INTEGRATION TEST CHECKPOINT: create_subject_db.py ---" -ForegroundColor Magenta
-    $fullSubjectDbPath = Join-Path $SandboxDir $subjectDb
-    $displaySubjectDbPath = $fullSubjectDbPath.Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    if (-not (Test-Path $fullSubjectDbPath)) { throw "FAIL: '$displaySubjectDbPath' was not created." }
-    $lineCount = (Get-Content $fullSubjectDbPath).Length
-    # We expect 3 records + 1 header = 4 lines.
-    if ($lineCount -ne 4) { throw "FAIL: '$displaySubjectDbPath' has the wrong number of lines (Expected 4, Found $lineCount)." }
-    Write-Host "Verification PASSED: '$displaySubjectDbPath' was created with the correct number of records." -ForegroundColor Green
-    Write-Host ""
-    exit 0 # Temporarily exit after this stage for methodical testing.
-    
-    pdm run python (Join-Path $ProjectRoot "src/generate_personalities_db.py") -s $subjectDb -n $neutralizedDir -p (Join-Path $ProjectRoot "data/foundational_assets/point_weights.csv") -b (Join-Path $ProjectRoot "data/foundational_assets/balance_thresholds.csv") -o $personalitiesDb --force
 
-    # --- 5. Verification ---
+    Invoke-PipelineStep `
+        -ScriptName "generate_personalities_db.py" `
+        -Description "Assembles the final personalities database from the subject data and neutralized text library." `
+        -InputFiles @($subjectDb, "$($neutralizedDir)/*.csv") `
+        -OutputFiles @($personalitiesDb) `
+        -Action {
+            pdm run python (Join-Path $ProjectRoot "src/generate_personalities_db.py") --sandbox-path $SandboxDir --force
+        }
+    
+    # --- 5. Final Verification ---
     Write-Host "`n--- Verifying final output... ---" -ForegroundColor Cyan
     $finalDbPath = Join-Path $SandboxDir "personalities_db.txt"
     if (-not (Test-Path $finalDbPath)) {
         throw "FAIL: The final 'personalities_db.txt' file was not created."
     }
     
+    # We expect 3 subjects + 1 header line = 4 lines total.
     $lineCount = (Get-Content $finalDbPath).Length
-    if ($lineCount -lt 4) { 
-        throw "FAIL: The final 'personalities_db.txt' has too few lines (Expected at least 4, Found $lineCount)."
+    if ($lineCount -ne 4) { 
+        throw "FAIL: The final 'personalities_db.txt' has the wrong number of lines (Expected 4, Found $lineCount)."
     }
     
     Write-Host "`nPASS: The final personalities_db.txt was created successfully." -ForegroundColor Green
     Write-Host "`nSUCCESS: The live data pipeline integration test completed successfully." -ForegroundColor Green
-    Write-Host "Inspect the artifacts, then run Step 3 to clean up."
+    Write-Host "Inspect the artifacts, then run Stage 3 to clean up."
     Write-Host ""
 }
 catch {

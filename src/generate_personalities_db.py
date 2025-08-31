@@ -53,6 +53,10 @@ from pathlib import Path
 
 from colorama import Fore, init
 
+# Ensure the src directory is in the Python path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from config_loader import get_path  # noqa: E402
+
 # Initialize colorama
 init(autoreset=True)
 
@@ -116,7 +120,7 @@ def calculate_classifications(placements: dict, point_weights: dict, thresholds:
     for point, lon in placements.items():
         if point_weights.get(point, 0) > 0:
             sign = get_sign(lon)
-            classifications.append(f"{point} In {sign}")
+            classifications.append(f"{point} in {sign}")
 
     def get_category_scores(use_all_points=True):
         points_to_consider = points_for_balances if use_all_points else points_for_quad_hemi
@@ -144,31 +148,39 @@ def calculate_classifications(placements: dict, point_weights: dict, thresholds:
         weak_thresh = avg_score * thresholds[category]["weak_ratio"]
         strong_thresh = avg_score * thresholds[category]["strong_ratio"]
         for division, score in scores.items():
-            key_name = f"{category.rstrip('s')} {division}" if category != "Signs" else division
+            # Correctly format the key to match the delineation library's structure.
+            # e.g., "Element Strong Fire" instead of "Element Fire Strong"
+            if category == "Signs":
+                base_key = division
+            else:
+                base_key = f"{category.rstrip('s')}"
+
             if weak_thresh > 0 and score < weak_thresh:
-                classifications.append(f"{key_name} Weak")
+                classifications.append(f"{base_key} Weak {division}")
             if score >= strong_thresh:
-                classifications.append(f"{key_name} Strong")
+                classifications.append(f"{base_key} Strong {division}")
     return classifications
 
 def main():
     parser = argparse.ArgumentParser(description="Generate final personalities DB.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--subject-db", default="data/processed/subject_db.csv", help="Path to the master subject database CSV.")
-    parser.add_argument("--delineations-dir", default="data/foundational_assets/neutralized_delineations", help="Directory with neutralized delineation CSVs.")
-    parser.add_argument("--point-weights", default="data/foundational_assets/point_weights.csv", help="Path to point weights config file.")
-    parser.add_argument("--thresholds", default="data/foundational_assets/balance_thresholds.csv", help="Path to balance thresholds config file.")
-    parser.add_argument("--output-file", default="data/personalities_db.txt", help="Path for the final output database.")
+    parser.add_argument(
+        "--sandbox-path",
+        type=str,
+        help="Path to the sandbox directory for testing.",
+    )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     args = parser.parse_args()
 
-    subject_db_path = Path(args.subject_db)
-    delineations_dir = Path(args.delineations_dir)
-    output_path = Path(args.output_file)
+    if args.sandbox_path:
+        os.environ["PROJECT_SANDBOX_PATH"] = args.sandbox_path
+
+    subject_db_path = Path(get_path("data/processed/subject_db.csv"))
+    delineations_dir = Path(get_path("data/foundational_assets/neutralized_delineations"))
+    output_path = Path(get_path("personalities_db.txt"))
 
     # Define all configuration and data input files for the stale check
-    data_dir = Path(__file__).parent.parent / "data" # Assumes script is in src/
-    point_weights_path = data_dir / "foundational_assets" / "point_weights.csv"
-    thresholds_path = data_dir / "foundational_assets" / "balance_thresholds.csv"
+    point_weights_path = Path(get_path("data/foundational_assets/point_weights.csv"))
+    thresholds_path = Path(get_path("data/foundational_assets/balance_thresholds.csv"))
     
     input_files = [subject_db_path, point_weights_path, thresholds_path]
     if delineations_dir.exists():
@@ -197,7 +209,7 @@ def main():
 
     if args.force and output_path.exists():
         try:
-            backup_dir = Path('data/backup')
+            backup_dir = Path(get_path('data/backup'))
             backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
@@ -214,11 +226,11 @@ def main():
 
     print(f"Processing subjects from {subject_db_path.name}...")
     try:
-        with open(args.output_file, 'w', encoding='utf-8', newline='') as outfile:
+        with open(output_path, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.writer(outfile, delimiter='\t')
             writer.writerow(['Index', 'idADB', 'Name', 'BirthYear', 'DescriptionText'])
             
-            with open(args.subject_db, 'r', encoding='utf-8') as infile:
+            with open(subject_db_path, 'r', encoding='utf-8') as infile:
                 reader = csv.DictReader(infile)
                 for row in reader:
                     placements = {p: float(row[p]) for p in point_weights if row.get(p)}
@@ -233,13 +245,19 @@ def main():
                     writer.writerow([row['Index'], row['idADB'], row['Name'], birth_year, full_desc])
         
         # Count the number of records processed
-        with open(args.subject_db, 'r', encoding='utf-8') as infile:
+        with open(subject_db_path, 'r', encoding='utf-8') as infile:
             num_records = sum(1 for line in infile) - 1 # Subtract header
         
-        print(f"\n{Fore.GREEN}SUCCESS: Personalities database with {num_records} records created successfully. ✨\n")
+        print(f"\n{Fore.YELLOW}--- Final Output ---")
+        print(f"{Fore.CYAN} - Personalities database saved to: {output_path}")
+        key_metric = f"Final Count: {num_records} subjects"
+        print(
+            f"\n{Fore.GREEN}SUCCESS: {key_metric}. Personalities database "
+            f"created successfully.\n"
+        )
 
     except KeyError as e:
-        logging.error(f"Missing column {e} in '{args.subject_db}'. Please ensure the file is correctly formatted.\n")
+        logging.error(f"Missing column {e} in '{subject_db_path}'. Please ensure the file is correctly formatted.\n")
         sys.exit(1)
     except Exception as e:
         logging.error(f"An unexpected error occurred during database generation: {e}\n")

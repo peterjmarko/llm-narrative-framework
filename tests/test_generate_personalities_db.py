@@ -38,55 +38,57 @@ from src import generate_personalities_db
 
 @pytest.fixture
 def mock_input_files(tmp_path: Path) -> dict:
-    """Creates a temporary directory structure with all necessary input files."""
-    data_dir = tmp_path / "data"
-    delineations_dir = data_dir / "foundational_assets/neutralized_delineations"
-    delineations_dir.mkdir(parents=True)
+    """
+    Creates mock input files in a sandboxed directory structure and returns
+    the path to the sandbox and the expected output file.
+    """
+    # Create the directory structure inside the temp sandbox
+    processed_dir = tmp_path / "data" / "processed"
+    foundational_dir = tmp_path / "data" / "foundational_assets"
+    delineations_dir = foundational_dir / "neutralized_delineations"
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    delineations_dir.mkdir(parents=True, exist_ok=True)
 
-    paths = {
-        "subject_db": data_dir / "processed/subject_db.csv",
-        "point_weights": data_dir / "foundational_assets/point_weights.csv",
-        "thresholds": data_dir / "foundational_assets/balance_thresholds.csv",
-        "delineations_dir": str(delineations_dir),
-        "output": data_dir / "personalities_db.txt",
-    }
-    
-    paths["subject_db"].parent.mkdir(parents=True)
-    paths["subject_db"].write_text(
+    # Define paths for mock files
+    subject_db_path = processed_dir / "subject_db.csv"
+    point_weights_path = foundational_dir / "point_weights.csv"
+    thresholds_path = foundational_dir / "balance_thresholds.csv"
+    output_path = tmp_path / "personalities_db.txt"
+
+    subject_db_path.write_text(
         "Index,idADB,Name,Date,Sun,Moon,Ascendant,Midheaven\n"
-        "1,101,Pioneer,1950-01-01,10.0,100.0,10.0,100.0\n" # Sun & Ascendant in Aries
-        "2,102,Stable,1960-01-01,100.0,40.0,100.0,100.0\n" # Moon in Taurus
+        "1,101,Pioneer,1950-01-01,10.0,100.0,10.0,100.0\n"  # Sun & Asc in Aries
+        "2,102,Stable,1960-01-01,100.0,40.0,100.0,100.0\n"   # Moon in Taurus
     )
-    paths["point_weights"].write_text("Point,Weight\nSun,10\nMoon,10\nAscendant,10\nMidheaven,5")
-    paths["thresholds"].write_text("Category,WeakRatio,StrongRatio\nSigns,0.1,1.01\nElements,0.1,1.01\nModes,0.1,1.01\nQuadrants,0.1,1.01\nHemispheres,0.1,1.01")
+    point_weights_path.write_text("Point,Weight\nSun,10\nMoon,10\nAscendant,10\nMidheaven,5")
+    thresholds_path.write_text("Category,WeakRatio,StrongRatio\nSigns,0.1,1.01\nElements,0.1,1.01\nModes,0.1,1.01\nQuadrants,0.1,1.01\nHemispheres,0.1,1.01")
     
     # Delineation files
-    (delineations_dir / "points.csv").write_text('"Sun In Aries","Is a pioneer."\n"Moon In Taurus","Is grounded."')
-    (delineations_dir / "balances.csv").write_text('"Element Fire Strong","Has a fiery nature."')
+    (delineations_dir / "points.csv").write_text('"Sun in Aries","Is a pioneer."\n"Moon in Taurus","Is grounded."')
+    (delineations_dir / "balances.csv").write_text('"Element Strong Fire","Has a fiery nature."')
 
-    return paths
+    return {"sandbox_path": tmp_path, "output_path": output_path}
 
 
 def test_generate_personalities_db_logic(mock_input_files):
     """
     Tests the main database generation algorithm.
     """
-    paths = mock_input_files
+    sandbox_path = mock_input_files["sandbox_path"]
+    output_path = mock_input_files["output_path"]
+
     test_args = [
         "generate_personalities_db.py",
-        "--subject-db", str(paths["subject_db"]),
-        "--delineations-dir", str(paths["delineations_dir"]),
-        "--point-weights", str(paths["point_weights"]),
-        "--thresholds", str(paths["thresholds"]),
-        "--output-file", str(paths["output"]),
+        "--sandbox-path",
+        str(sandbox_path),
         "--force",
     ]
     
     with patch("sys.argv", test_args):
         generate_personalities_db.main()
 
-    assert paths["output"].exists()
-    output_df = pd.read_csv(paths["output"], sep="\t")
+    assert output_path.exists()
+    output_df = pd.read_csv(output_path, sep="\t")
 
     assert len(output_df) == 2
     
