@@ -69,6 +69,7 @@ data/temp_manual_test/
 # Ignore pytest cache and coverage reports.
 .pytest_cache/
 .coverage
+/temp_assembly_logic_validation/
 /temp_test_environment/
 
 # --- IDE & OS Specific Files ---

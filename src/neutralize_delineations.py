@@ -115,46 +115,41 @@ def group_delineations(all_dels: Dict[str, str], points: List[str]) -> Dict[str,
     return groups
 
 
-def parse_llm_response(response_filepath: Path) -> Dict[str, str]:
-    """
-    Parses a delineation file (*Key / Text format) into a dictionary.
-    This is used for both the initial library and the LLM response.
-    """
+def parse_sf_content(content_lines: List[str]) -> Dict[str, str]:
+    """Parses a list of lines from a Solar Fire report into a dictionary."""
     delineations = {}
     current_key = None
     current_text = []
 
-    if not response_filepath.exists():
-        return delineations
-
-    with open(response_filepath, "r", encoding="utf-8", errors="ignore") as f:
-        # Read all lines to allow lookahead for the next key
-        lines = f.readlines()
-
-    for line in lines:
+    for line in content_lines:
         stripped_line = line.strip()
         if not stripped_line or stripped_line.startswith(";"):
             continue
 
         if stripped_line.startswith("*"):
-            # If we were building a key, save it now.
             if current_key:
                 delineations[current_key] = " ".join(current_text).strip()
-            
-            # Start the new key.
             current_key = stripped_line[1:].strip()
             current_text = []
         elif current_key:
-            # Append text only if we are inside a key block.
             cleaned_line = stripped_line.replace("|", " ").strip()
             if cleaned_line:
                 current_text.append(cleaned_line)
 
-    # Save the very last entry after the loop finishes.
     if current_key:
         delineations[current_key] = " ".join(current_text).strip()
-
     return delineations
+
+
+def parse_llm_response(response_filepath: Path) -> Dict[str, str]:
+    """
+    Reads and parses a delineation file (*Key / Text format) into a dictionary.
+    """
+    if not response_filepath.exists():
+        return {}
+    
+    lines = response_filepath.read_text(encoding="utf-8", errors="ignore").splitlines()
+    return parse_sf_content(lines)
 
 
 def save_group_to_csv(filepath: Path, data: Dict[str, str]):

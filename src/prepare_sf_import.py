@@ -77,6 +77,56 @@ def format_coordinate(coord_str: str) -> str:
     minutes = min_sec_digits[:2].zfill(2)
     return f"{degrees}{direction.upper()}{minutes}"
 
+def format_for_solar_fire(input_data, output_path):
+    """
+    Core logic to format subject data into Solar Fire's CQD format.
+    
+    Args:
+        input_data (list of dict): A list of subject records to process.
+        output_path (Path): The path to write the output file to.
+    """
+    processed_records = []
+    for row in input_data:
+        # 1. Assemble and clean the name
+        full_name = " ".join(filter(None, [row.get('FirstName'), row.get('LastName')]))
+        full_name = full_name.replace('"', '')
+
+        # 2. Format the date
+        try:
+            month_name = calendar.month_name[int(row['Month'])]
+            sf_date_str = f"{row['Day']} {month_name} {row['Year']}"
+        except (ValueError, KeyError):
+            logging.warning(f"Skipping record for {full_name} due to invalid date.")
+            continue
+
+        # 3. Assemble the final 9-field CQD record
+        encoded_id = to_base58(int(row['idADB']))
+
+        output_record = [
+            full_name, sf_date_str, row.get('Time'), encoded_id,
+            row.get('ZoneTimeOffset'), row.get('City'), row.get('Country'),
+            format_coordinate(row.get('Latitude', '')),
+            format_coordinate(row.get('Longitude', ''))
+        ]
+        processed_records.append(output_record)
+
+    if not processed_records:
+        logging.error("No valid records were processed. Output file will not be created.")
+        return
+
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8', newline='') as outfile:
+            for record in processed_records:
+                formatted_line = ",".join([f'"{field}"' for field in record])
+                outfile.write(formatted_line + "\n")
+        
+        return len(processed_records)
+    except IOError as e:
+        logging.error(f"Failed to write to output file {output_path}: {e}")
+        return None
+
+
 def main():
     """Main function to read, format, and write the Solar Fire import file."""
     parser = argparse.ArgumentParser(
@@ -148,66 +198,26 @@ def main():
     print(f"Reading filtered data from: {display_input_path}")
     print(f"{Fore.CYAN}Writing Solar Fire import file to: {display_output_path}{Fore.RESET}")
 
-    processed_records = []
     try:
         with open(input_path, 'r', encoding='utf-8') as infile:
             reader = csv.DictReader(infile, delimiter='\t')
-            for row in reader:
-                # 1. Assemble and clean the name
-                # Handles cases where FirstName or LastName might be empty (e.g., 'Pelé')
-                full_name = " ".join(filter(None, [row['FirstName'], row['LastName']]))
-                full_name = full_name.replace('"', '')
+            input_data = list(reader)
 
-                # 2. Format the date
-                try:
-                    month_name = calendar.month_name[int(row['Month'])]
-                    sf_date_str = f"{row['Day']} {month_name} {row['Year']}"
-                except (ValueError, KeyError):
-                    logging.warning(f"Skipping record for {full_name} due to invalid date.")
-                    continue
+        num_processed = format_for_solar_fire(input_data, output_path)
 
-                # 3. Assemble the final 9-field CQD record
-                # Encode the idADB for safe transport in the ZoneAbbr field
-                encoded_id = to_base58(int(row['idADB']))
-
-                output_record = [
-                    full_name,
-                    sf_date_str,
-                    row['Time'],
-                    encoded_id,
-                    row['ZoneTimeOffset'],
-                    row['City'],
-                    row['Country'],
-                    format_coordinate(row['Latitude']),
-                    format_coordinate(row['Longitude'])
-                ]
-                processed_records.append(output_record)
+        if num_processed:
+            print(f"\n{Fore.YELLOW}--- Final Output ---")
+            print(f"{Fore.CYAN} - Solar Fire import file saved to: {display_output_path}")
+            key_metric = f"Final Count: {num_processed} subjects"
+            print(
+                f"\n{Fore.GREEN}SUCCESS: {key_metric}. Solar Fire import file "
+                f"created successfully.\n"
+            )
+        else:
+            sys.exit(1)
 
     except Exception as e:
         logging.error(f"An unexpected error occurred while processing the input file: {e}")
-        sys.exit(1)
-
-    if not processed_records:
-        logging.error("No valid records were processed. Output file will not be created.")
-        sys.exit(1)
-
-    try:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, 'w', encoding='utf-8', newline='') as outfile:
-            for record in processed_records:
-                # Manually construct the CQD line to ensure all fields are quoted
-                formatted_line = ",".join([f'"{field}"' for field in record])
-                outfile.write(formatted_line + "\n")
-        
-        print(f"\n{Fore.YELLOW}--- Final Output ---")
-        print(f"{Fore.CYAN} - Solar Fire import file saved to: {display_output_path}")
-        key_metric = f"Final Count: {len(processed_records)} subjects"
-        print(
-            f"\n{Fore.GREEN}SUCCESS: {key_metric}. Solar Fire import file "
-            f"created successfully.\n"
-        )
-    except IOError as e:
-        logging.error(f"Failed to write to output file {output_path}: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

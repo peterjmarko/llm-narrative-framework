@@ -232,6 +232,16 @@ def main():
                 chart_data['ZoneAbbrev'] = ""
                 
                 subject_data = { "Index": int(row['Index']), "idADB": id_adb_key, **chart_data }
+
+                # Ensure all floating point numbers are formatted as strings with consistent
+                # precision, and all other types are converted to strings to match the
+                # gold standard's object dtype for all columns.
+                for key, value in subject_data.items():
+                    if isinstance(value, float):
+                        subject_data[key] = f"{value:.14f}".rstrip('0').rstrip('.')
+                    else:
+                        subject_data[key] = str(value if value is not None else "")
+                
                 all_subjects.append(subject_data)
 
     except FileNotFoundError:
@@ -242,16 +252,17 @@ def main():
         sys.exit(1)
 
     # --- Final Validation and Output ---
-    if missing_subjects_log:
-        reports_dir = Path(get_path('data/reports'))
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        report_path = reports_dir / 'missing_sf_subjects.csv'
-        
-        with open(report_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=['Index', 'idADB', 'Name', 'Reason'])
-            writer.writeheader()
+    reports_dir = Path(get_path('data/reports'))
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    report_path = reports_dir / 'missing_sf_subjects.csv'
+    
+    with open(report_path, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['Index', 'idADB', 'Name', 'Reason'])
+        writer.writeheader()
+        if missing_subjects_log:
             writer.writerows(missing_subjects_log)
 
+    if missing_subjects_log:
         logging.error(f"Found {len(missing_subjects_log)} missing subjects during processing.")
         logging.warning(f"A diagnostic report has been created at: {report_path}")
         logging.warning("The master subject DB has NOT been created. Please resolve the discrepancies and run again.\n")

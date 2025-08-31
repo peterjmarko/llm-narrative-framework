@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/select_gold_standard_subjects.py
+# Filename: scripts/select_assembly_logic_subjects.py
 
 """
-Selects an optimal, minimal set of subjects for the gold standard test.
+Selects an optimal, minimal set of subjects for the assembly logic test.
 
 This utility script uses a greedy algorithm to create the smallest possible
-"gold standard" subject set that provides the maximum achievable coverage of all
+"assembly logic" subject set that provides the maximum achievable coverage of all
 delineation components.
 
 It works by iteratively selecting the subject who adds the most new, previously
@@ -39,6 +39,7 @@ import argparse
 import csv
 import logging
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -54,9 +55,9 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 def main():
-    """Main function to select the gold standard subjects."""
+    """Main function to select the assembly logic test subjects."""
     parser = argparse.ArgumentParser(
-        description="Select an optimal set of subjects for gold standard testing."
+        description="Select an optimal set of subjects for assembly logic testing."
     )
     parser.add_argument(
         "--coverage-map",
@@ -73,20 +74,22 @@ def main():
         default="data/processed/subject_db.csv",
         help="Path to the full master subject database.",
     )
-    parser.add_argument(
-        "-o",
-        "--output-file",
-        default="data/foundational_assets/subject_db.gold_standard.csv",
-        help="Path to write the final gold standard subject database.",
-    )
-    parser.add_argument(
-        "--report-file",
-        default="data/reports/gold_standard_coverage_report.txt",
-        help="Path to write the final coverage report.",
-    )
     args = parser.parse_args()
 
-    print(f"\n{Fore.YELLOW}--- Selecting Gold Standard Subjects ---{Fore.RESET}")
+    print(f"\n{Fore.YELLOW}--- Selecting Assembly Logic Subjects ---{Fore.RESET}")
+    
+    # --- Setup the sandbox environment ---
+    sandbox_dir = Path("temp_assembly_logic_validation")
+    print(f"\nCreating clean sandbox at: {sandbox_dir.resolve()}")
+    if sandbox_dir.exists():
+        shutil.rmtree(sandbox_dir)
+    
+    # Define output paths within the sandbox, mirroring the project structure
+    output_path = sandbox_dir / "data/processed/subject_db.assembly_logic.csv"
+    report_path = sandbox_dir / "data/reports/assembly_logic_coverage_report.txt"
+    
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
 
     # --- Load all necessary input files ---
     print("\nLoading input files...")
@@ -208,23 +211,28 @@ def main():
 
     # --- Generate the final output files ---
     print("\nWriting final output files...")
-    output_path = Path(args.output_file)
-    report_path = Path(args.report_file)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write the gold standard subject database
-    gold_standard_subjects = [
+    # Write the assembly logic subject database
+    assembly_logic_subjects = [
         full_subject_db[id] for id in selected_subject_ids
     ]
+
+    # --- Prepare data for output ---
+    # 1. Sort by Index to ensure a consistent, comparable order.
+    assembly_logic_subjects.sort(key=lambda x: int(x['Index']))
+    
+    # 2. Blank out the ZoneAbbrev field to match the format of the comparison file.
+    for subject in assembly_logic_subjects:
+        subject['ZoneAbbrev'] = ''
+
     try:
         with open(output_path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=gold_standard_subjects[0].keys())
+            writer = csv.DictWriter(f, fieldnames=assembly_logic_subjects[0].keys())
             writer.writeheader()
-            writer.writerows(gold_standard_subjects)
-        print(f" - {Fore.CYAN}Gold standard subject DB saved to: {output_path}{Fore.RESET}")
+            writer.writerows(assembly_logic_subjects)
+        print(f" - {Fore.CYAN}Assembly logic subject DB saved to: {output_path}{Fore.RESET}")
     except (IOError, IndexError) as e:
-        logging.error(f"Failed to write gold standard subject DB: {e}")
+        logging.error(f"Failed to write assembly logic subject DB: {e}")
         sys.exit(1)
 
     # Write the coverage report
@@ -232,7 +240,7 @@ def main():
     impossible_keys = all_possible_keys - all_achievable_keys
     try:
         with open(report_path, "w", encoding="utf-8") as f:
-            f.write("--- Gold Standard Coverage Report ---\n\n")
+            f.write("--- Assembly Logic Coverage Report ---\n\n")
             f.write(f"Total Subjects Selected: {len(selected_subject_ids)}\n\n")
             f.write(f"--- COVERAGE OF ACHIEVABLE KEYS ---\n")
             f.write(f"Total Achievable Keys: {len(all_achievable_keys)}\n")
@@ -260,7 +268,7 @@ def main():
         sys.exit(1)
 
     print(
-        f"\n{Fore.GREEN}SUCCESS: Gold standard subject selection complete."
+        f"\n{Fore.GREEN}SUCCESS: Assembly logic subject selection complete."
         f"{Fore.RESET}\n"
     )
 
@@ -268,4 +276,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/select_gold_standard_subjects.py ===
+# === End of scripts/select_assembly_logic_subjects.py ===
