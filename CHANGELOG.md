@@ -1,5 +1,29 @@
 # Changelog
 
+## 6.8.10 (2025-08-30)
+
+### Bump
+
+- **version 6.8.9 → 6.8.10**
+
+### Refactor
+
+- **complete sandbox refactoring and fix assembly logic**
+  This commit completes the full sandbox refactoring of the data
+  preparation pipeline and fixes a critical bug in the final assembly
+  script.
+  
+  - Refactored the final script, `generate_personalities_db.py`, to be
+    fully sandbox-aware.
+  - Fixed a critical bug in the assembly algorithm where incorrect key
+    formatting resulted in empty personality descriptions.
+  - Updated the unit test for `generate_personalities_db.py` to align
+    with the corrected key generation logic.
+  - Finalized the Layer 3 integration test harness, which now performs a
+    complete, error-free, end-to-end run of the entire pipeline.
+  - Added the remaining static assets to the test harness to ensure a
+    self-contained test environment.
+
 ## 6.8.9 (2025-08-30)
 
 ### Bump
