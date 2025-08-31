@@ -28,9 +28,14 @@ This test suite validates the script's critical offline logic, focusing on:
     the LLM worker.
 """
 
+import csv
+import shutil
 from pathlib import Path
+from unittest.mock import patch
+
 import pytest
-from src.neutralize_delineations import parse_llm_response, group_delineations
+from src import neutralize_delineations
+from src.neutralize_delineations import group_delineations, parse_llm_response
 
 
 @pytest.fixture
@@ -99,5 +104,44 @@ def test_group_delineations():
     
     # Verify that an irrelevant key was ignored
     assert "Some Other Key" not in str(groups)
+
+
+def test_bypass_llm_functionality(mock_delineation_file, tmp_path):
+    """
+    Tests that the --bypass-llm flag correctly writes original content to output.
+    """
+    output_dir = tmp_path / "output_dels"
+    
+    test_args = [
+        "neutralize_delineations.py",
+        "-i", str(mock_delineation_file),
+        "-o", str(output_dir),
+        "--bypass-llm",
+    ]
+
+    with patch("sys.argv", test_args):
+        # The script should exit cleanly with sys.exit(0)
+        with pytest.raises(SystemExit) as e:
+            neutralize_delineations.main()
+        assert e.type == SystemExit
+        assert e.value.code == 0
+
+    # Verify that the correct output files were created
+    quadrants_file = output_dir / "balances_quadrants.csv"
+    points_file = output_dir / "points_in_signs.csv"
+    
+    assert quadrants_file.exists()
+    assert points_file.exists()
+
+    # Verify the content of the files is the original, non-neutralized text
+    with open(quadrants_file, 'r') as f:
+        reader = csv.reader(f)
+        row = next(reader)
+        assert row == ["Quadrant 1 Strong", "You are independent."]
+        
+    with open(points_file, 'r') as f:
+        reader = csv.reader(f)
+        row = next(reader)
+        assert row == ["Sun in Aries", "You are a pioneer. This is a continuation line."]
 
 # === End of tests/test_neutralize_delineations.py ===

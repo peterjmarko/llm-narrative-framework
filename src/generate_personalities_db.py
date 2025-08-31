@@ -118,9 +118,9 @@ def calculate_classifications(placements: dict, point_weights: dict, thresholds:
     
     classifications = []
     for point, lon in placements.items():
-        if point_weights.get(point, 0) > 0:
-            sign = get_sign(lon)
-            classifications.append(f"{point} in {sign}")
+        # All 12 points get a "Point in Sign" delineation, regardless of their weight.
+        sign = get_sign(lon)
+        classifications.append(f"{point} in {sign}")
 
     def get_category_scores(use_all_points=True):
         points_to_consider = points_for_balances if use_all_points else points_for_quad_hemi
@@ -149,16 +149,17 @@ def calculate_classifications(placements: dict, point_weights: dict, thresholds:
         strong_thresh = avg_score * thresholds[category]["strong_ratio"]
         for division, score in scores.items():
             # Correctly format the key to match the delineation library's structure.
-            # e.g., "Element Strong Fire" instead of "Element Fire Strong"
-            if category == "Signs":
-                base_key = division
-            else:
-                base_key = f"{category.rstrip('s')}"
-
             if weak_thresh > 0 and score < weak_thresh:
-                classifications.append(f"{base_key} Weak {division}")
+                if category == "Signs":
+                    classifications.append(f"{division} Weak")
+                else:
+                    classifications.append(f"{category.rstrip('s')} Weak {division}")
+            
             if score >= strong_thresh:
-                classifications.append(f"{base_key} Strong {division}")
+                if category == "Signs":
+                    classifications.append(f"{division} Strong")
+                else:
+                    classifications.append(f"{category.rstrip('s')} Strong {division}")
     return classifications
 
 def main():
@@ -232,8 +233,13 @@ def main():
             
             with open(subject_db_path, 'r', encoding='utf-8') as infile:
                 reader = csv.DictReader(infile)
+                # Define the 12 points to ensure Uranus, Neptune, and Pluto are always included.
+                points_to_process = [
+                    "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", 
+                    "Uranus", "Neptune", "Pluto", "Ascendant", "Midheaven"
+                ]
                 for row in reader:
-                    placements = {p: float(row[p]) for p in point_weights if row.get(p)}
+                    placements = {p: float(row[p]) for p in points_to_process if row.get(p)}
                     classifications = calculate_classifications(placements, point_weights, thresholds)
                     desc_parts = [delineations.get(c, "") for c in classifications]
                     full_desc = " ".join(part for part in desc_parts if part).strip()

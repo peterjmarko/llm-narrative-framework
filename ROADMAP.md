@@ -12,8 +12,8 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Update and complete the test suites for all existing Python scripts and PowerShell wrappers.
 - [ ] **Add Filtering for Northern Hemisphere**
   - [ ] Eliminate subjects with 'S' in their Latitude. Southern Hemisphere births introduce unnecessary noise to the dataset (because it's likely that signs for them are offset by 180 degrees). 
-- [ ] **Add the Option of Bypassing the Filtering of Subjects by Eminence/OCEAN Scores**
-  - [ ] 'Final candidates' become the same as 'eligible candidates'. This simplifies replication and strengthens the codebase. Needs validation by creating a new study.
+- [ ] **Add the Option to Bypass Eminence/OCEAN Scoring**
+  - [ ] Implement a configuration flag to allow 'final candidates' to be the same as 'eligible candidates'. This makes the LLM-based sample selection optional, allowing for validation studies that are more robust to the criticism of using an opaque selection method.
 - [ ] **Develop `new_study.ps1` Orchestrator**
   - [ ] Implement the `new_study.ps1` workflow to automate multi-experiment studies based on a factor matrix in `config.ini`.
 - [ ] **Test the New Study Orchestrator**
@@ -21,6 +21,9 @@ This phase focuses on achieving a fully validated and stable codebase before the
 
 ### Final Validation and Data Generation
 
+- [ ] **Perform and Report Correction for Multiple Comparisons**
+  - [ ] Apply a Bonferroni or FDR (False Discovery Rate) correction to the final ANOVA results.
+  - [ ] Add a footnote or supplementary note to the article reporting the corrected p-values to demonstrate statistical rigor.
 - [ ] **Execute Full End-to-End Study**
   - [ ] Run the complete data preparation pipeline (`prepare_data.ps1`) to generate a fresh, final dataset from live sources.
   - [ ] Conduct the full experimental study, varying all three core factors (model name, group size, mapping strategy) to produce the final results.

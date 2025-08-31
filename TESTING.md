@@ -255,7 +255,7 @@ Module                              Cov. (%)        Status & Justification
                                                     validated. Unit tests cover the core data integration logic,
                                                     including Base58 decoding, file merging, and data flattening.
 
-`src/neutralize_delineations.py`    `19%`           COMPLETE. Unit tests cover the critical offline logic for parsing
+`src/neutralize_delineations.py`    `26%`           COMPLETE. Unit tests cover the critical offline logic for parsing
                                                     the esoteric input file format and correctly grouping items into
                                                     LLM tasks. The live LLM calls are validated via integration testing.
 

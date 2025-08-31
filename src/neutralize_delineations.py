@@ -226,11 +226,31 @@ def main():
     parser.add_argument("--force", action="store_true", help="Force re-processing of all groups.")
     parser.add_argument("--fast", action="store_true", help="Use bundled API calls for faster initial processing.")
     parser.add_argument("--debug-task", type=str, default=None, help="Debug a specific task (e.g., 'Sun in Aries', 'Quadrants'). Prints prompt/response and exits.")
+    parser.add_argument("--bypass-llm", action="store_true", help="Bypass LLM and write original text to output files for testing.")
     args = parser.parse_args()
     
     # --- File Handling and Backup ---
     input_path, output_dir = Path(args.input_file), Path(args.output_dir)
     if not input_path.exists(): logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}"); sys.exit(1)
+
+    # --- LLM Bypass Workflow (for testing) ---
+    if args.bypass_llm:
+        print(f"\n{Fore.YELLOW}--- LLM Bypass Mode Activated ---")
+        print("Writing original delineation text directly to output files...")
+        
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        output_dir.mkdir(parents=True)
+
+        all_delineations = parse_llm_response(input_path)
+        grouped_delineations = group_delineations(all_delineations, points_list)
+        
+        for filename, data in grouped_delineations.items():
+            if data:
+                save_group_to_csv(output_dir / filename, data)
+        
+        print(f"\n{Fore.GREEN}SUCCESS: Original delineations successfully written to '{output_dir}'.{Fore.RESET}\n")
+        sys.exit(0)
 
     # --- Intelligent Startup Logic (Stale Check) ---
     if not args.force and output_dir.exists() and input_path.exists():
