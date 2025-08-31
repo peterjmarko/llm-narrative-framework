@@ -1,5 +1,35 @@
 # Changelog
 
+## 6.9.0 (2025-08-31)
+
+### Bump
+
+- **version 6.8.10 → 6.9.0**
+
+### Features
+
+- **add gold standard selection tools and fix assembly bugs**
+  This commit introduces a new workflow for gold standard verification and
+  fixes several critical bugs discovered during its development.
+  
+  - Adds two new utility scripts (`generate_coverage_map.py` and
+    `select_gold_standard_subjects.py`) that algorithmically select a
+    minimal set of subjects for 100% coverage of all achievable
+    delineation keys.
+  - Adds a `--bypass-llm` flag to `neutralize_delineations.py` and a
+    corresponding unit test to support the new verification process.
+  
+  - Fixes a critical bug in `generate_personalities_db.py` where Uranus,
+    Neptune, and Pluto were incorrectly excluded from "Point in Sign"
+    calculations.
+  - Fixes a long-standing bug that generated incorrect keys for "Sign
+    Strong" classifications.
+  
+  - Updates `article_main_text.md` to clarify limitations around
+    blinding and data sourcing.
+  - Updates `ROADMAP.md` with new tasks for statistical correction and
+    making sample selection optional.
+
 ## 6.8.10 (2025-08-30)
 
 ### Bump
