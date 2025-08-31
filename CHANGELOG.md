@@ -1,5 +1,32 @@
 # Changelog
 
+## 6.10.0 (2025-08-31)
+
+### Bump
+
+- **version 6.9.0 → 6.10.0**
+
+### Features
+
+- **add utility scripts for assembly logic verification**
+  This commit introduces the full suite of utility scripts to generate and
+  validate the data for the assembly logic verification test.
+  
+  - Adds four new scripts to:
+    1. Algorithmically select an optimal subject set.
+    2. Prepare a Solar Fire import file for the selected subjects.
+    3. Validate the round-trip data integrity after manual SF processing.
+    4. Extract the final ground-truth text from raw Solar Fire reports.
+  
+  - Refactors this entire workflow to operate within a temporary,
+    git-ignored sandbox (`temp_assembly_logic_validation/`).
+  - Renames all "gold standard" scripts and artifacts to the more precise
+    "assembly logic" convention.
+  - Decouples core logic from the CLI in `prepare_sf_import.py` to enable
+    reuse (DRY).
+  - Fixes a bug in `create_subject_db.py` to ensure it always creates
+    the `reports` directory for consistency.
+
 ## 6.9.0 (2025-08-31)
 
 ### Bump
