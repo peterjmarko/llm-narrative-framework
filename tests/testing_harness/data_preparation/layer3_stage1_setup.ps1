@@ -20,6 +20,14 @@ New-Item -ItemType Directory -Path $SandboxDir -Force | Out-Null
     New-Item -Path (Join-Path $SandboxDir $_) -ItemType Directory -Force | Out-Null
 }
 
+# Create a minimal config.ini file in the sandbox for the test
+$configContent = @"
+[Study]
+# This is a minimal config file for integration testing.
+num_replications = 1
+"@
+Set-Content -Path (Join-Path $SandboxDir "config.ini") -Value $configContent
+
 Write-Host ""
 Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
 Write-Host "--- Stage 1: Automated Setup ---" -ForegroundColor Cyan

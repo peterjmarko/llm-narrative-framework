@@ -32,7 +32,9 @@ on three key areas:
 """
 
 from collections import deque
+from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -76,6 +78,44 @@ def test_calculate_average_variance():
     # Case 2: Insufficient data
     df_small = df.head(1)
     assert calculate_average_variance(df_small) == 0.0
+
+
+@pytest.fixture
+def mock_sandbox_with_bypass_config(tmp_path: Path) -> Path:
+    """Creates a mock sandbox with a config.ini for bypass mode testing."""
+    (tmp_path / "data" / "foundational_assets").mkdir(parents=True, exist_ok=True)
+    
+    config_content = (
+        "[DataGeneration]\n"
+        "bypass_llm_scoring = true\n"
+    )
+    (tmp_path / "config.ini").write_text(config_content)
+    
+    # Create a dummy eminence scores file, as it's required to run
+    eminence_content = "idADB,EminenceScore\n101,90.0\n"
+    (tmp_path / "data" / "foundational_assets" / "eminence_scores.csv").write_text(eminence_content)
+    return tmp_path
+
+
+def test_ocean_scores_warns_in_bypass_mode(mock_sandbox_with_bypass_config):
+    """
+    Tests that the script warns the user and exits if bypass is active
+    and the user declines to proceed.
+    """
+    sandbox_path = mock_sandbox_with_bypass_config
+    
+    # Mock user input to be 'n' and simulate an interactive terminal
+    from src import generate_ocean_scores
+    with patch("builtins.input", return_value="n"), \
+         patch("sys.stdout.isatty", return_value=True):
+        test_args = [
+            "generate_ocean_scores.py",
+            "--sandbox-path", str(sandbox_path),
+        ]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit) as e:
+                generate_ocean_scores.main()
+            assert e.value.code == 0 # Should be a graceful exit
 
 
 def test_perform_pre_flight_check(mocker, tmp_path):

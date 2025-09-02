@@ -97,6 +97,17 @@ def test_load_processed_ids(tmp_path):
 
 
 @pytest.fixture
+def mock_sandbox_with_bypass_config(mock_main_sandbox: Path) -> Path:
+    """Creates a mock config.ini with bypass_llm_scoring set to true."""
+    config_content = (
+        "[DataGeneration]\n"
+        "bypass_llm_scoring = true\n"
+    )
+    (mock_main_sandbox / "config.ini").write_text(config_content)
+    return mock_main_sandbox
+
+
+@pytest.fixture
 def mock_main_sandbox(tmp_path: Path) -> Path:
     """Creates a temporary sandbox with mock input files for the main orchestrator test."""
     # Define paths relative to the sandbox root
@@ -162,5 +173,25 @@ def test_main_orchestrator_loop(mocker, mock_main_sandbox):
         content = f.read()
         assert "101,Test A,1950,85.0" in content
         assert "102,Test B,1951,88.0" in content
+
+
+def test_eminence_scores_warns_in_bypass_mode(mock_sandbox_with_bypass_config):
+    """
+    Tests that the script warns the user and exits if bypass is active
+    and the user declines to proceed.
+    """
+    sandbox_path = mock_sandbox_with_bypass_config
+    
+    # Mock user input to be 'n' and simulate an interactive terminal
+    with patch("builtins.input", return_value="n"), \
+         patch("sys.stdout.isatty", return_value=True):
+        test_args = [
+            "generate_eminence_scores.py",
+            "--sandbox-path", str(sandbox_path),
+        ]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit) as e:
+                main()
+            assert e.value.code == 0 # Should be a graceful exit
 
 # === End of tests/data_preparation/test_generate_eminence_scores.py ===

@@ -122,6 +122,29 @@ function Format-Banner {
     Write-Host ""
 }
 
+function Get-ConfigValue {
+    param(
+        [string]$FilePath,
+        [string]$Section,
+        [string]$Key,
+        [string]$DefaultValue
+    )
+    # This is a simple INI parser. It doesn't handle complex cases but is fine for our needs.
+    if (-not (Test-Path $FilePath)) { return $DefaultValue }
+    $config = @{}
+    Get-Content $FilePath | ForEach-Object {
+        if ($_ -match '^\s*\[(.+)\]\s*$') {
+            $currentSection = $matches[1]
+            $config[$currentSection] = @{}
+        } elseif ($_ -match '^\s*([^#;].*?)\s*=\s*(.*)') {
+            if ($currentSection) {
+                $config[$currentSection][$matches[1].Trim()] = $matches[2].Trim()
+            }
+        }
+    }
+    return $config[$Section][$Key] | ForEach-Object { $_ -if $_ -ne $null } | Select-Object -DefaultIfEmpty $DefaultValue
+}
+
 function Show-PipelineStatus {
     param([array]$Steps)
 
@@ -158,6 +181,8 @@ function Show-PipelineStatus {
 # --- Main Script Logic ---
 $ScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $exitCode = 0
+$configFile = Join-Path $ScriptRoot "config.ini"
+$bypassScoring = ([bool](Get-ConfigValue -FilePath $configFile -Section "DataGeneration" -Key "bypass_llm_scoring" -DefaultValue "false"))
 
 try {
     # Auto-detect execution environment
@@ -192,6 +217,14 @@ try {
     foreach ($step in $PipelineSteps) {
         $stepCounter++
         $stepName = $step.Name
+
+        # --- Bypass Logic ---
+        if ($bypassScoring -and ($stepName -in "Generate Eminence Scores", "Generate OCEAN Scores")) {
+            Format-Banner "Step ${stepCounter}/${totalSteps}: ${stepName} (SKIPPED)" $C_YELLOW
+            Write-Host "Bypass mode is active. Skipping LLM-based scoring."
+            continue
+        }
+
         # Build path relative to the script's current location
         $outputFile = Join-Path $ScriptRoot $step.OutputFile
 

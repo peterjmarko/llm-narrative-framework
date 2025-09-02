@@ -37,6 +37,18 @@ from src import select_final_candidates
 
 
 @pytest.fixture
+def mock_sandbox_with_bypass_config(mock_input_files) -> Path:
+    """Creates a mock config.ini with bypass_llm_scoring set to true."""
+    sandbox_path = mock_input_files["sandbox_path"]
+    config_content = (
+        "[DataGeneration]\n"
+        "bypass_llm_scoring = true\n"
+    )
+    (sandbox_path / "config.ini").write_text(config_content)
+    return sandbox_path
+
+
+@pytest.fixture
 def mock_input_files(tmp_path: Path) -> dict:
     """
     Creates mock input files in a sandboxed directory structure and returns
@@ -107,5 +119,34 @@ def test_select_final_candidates_logic(mock_input_files):
     
     # 4. Verify the final 'Index' is sequential from 1 to 3.
     assert output_df["Index"].tolist() == [1, 2, 3]
+
+
+def test_select_final_candidates_bypass_mode(mock_sandbox_with_bypass_config, mock_input_files):
+    """
+    Tests that the script correctly bypasses the scoring filter when the
+    config flag is set.
+    """
+    sandbox_path = mock_sandbox_with_bypass_config
+    output_path = mock_input_files["output_path"]
+    
+    # In bypass mode, eminence/ocean scores should NOT exist, but the script should succeed.
+    (sandbox_path / "data" / "foundational_assets" / "eminence_scores.csv").unlink()
+    (sandbox_path / "data" / "foundational_assets" / "ocean_scores.csv").unlink()
+
+    test_args = [
+        "select_final_candidates.py",
+        "--sandbox-path", str(sandbox_path),
+        "--force",
+    ]
+    with patch("sys.argv", test_args):
+        select_final_candidates.main()
+
+    assert output_path.exists()
+    
+    # In bypass mode, the output should match the eligible candidates input.
+    output_df = pd.read_csv(output_path, sep='\t')
+    assert len(output_df) == 4
+    # The script adds a placeholder score for sorting, so we check its value.
+    assert (output_df["EminenceScore"] == 0).all()
 
 # === End of tests/data_preparation/test_select_final_candidates.py ===
