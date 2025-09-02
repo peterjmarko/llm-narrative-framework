@@ -1,5 +1,20 @@
 # Changelog
 
+## 6.11.1 (2025-09-01)
+
+### Bump
+
+- **version 6.11.0 → 6.11.1**
+
+### Refactor
+
+- **reorganize test suite for modularity and add PDM shortcut**
+  - Created new subdirectories (`tests/data_preparation/` and `tests/testing_harness/data_preparation/`) to group all tests related to the data preparation pipeline.
+  - Moved all relevant Python unit tests and PowerShell-based integration tests (Layer 3) into these new directories.
+  - Corrected all relative paths in the moved scripts (`test_assembly_algorithm.py`, `layer3_stage2_test_workflow.ps1`) to ensure they function correctly from their new locations.
+  - Added a new `test-prep` PDM script to `pyproject.toml` to allow for running all data preparation unit tests with a single command.
+  - Updated documentation (`TESTING.md`, etc.) to reflect the new test structure and PDM command.
+
 ## 6.11.0 (2025-09-01)
 
 ### Bump
