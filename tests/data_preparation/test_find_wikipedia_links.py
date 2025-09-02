@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_find_wikipedia_links.py
+# Filename: tests/data_preparation/test_find_wikipedia_links.py
 
 """
 Unit tests for the Wikipedia link-finding script (src/find_wikipedia_links.py).
@@ -284,4 +284,4 @@ def test_load_processed_ids(tmp_path):
     assert max_idx == 5
     assert timeouts == 2
 
-# === End of tests/test_find_wikipedia_links.py ===
+# === End of tests/data_preparation/test_find_wikipedia_links.py ===

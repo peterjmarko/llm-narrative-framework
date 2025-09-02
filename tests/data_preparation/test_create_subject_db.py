@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_create_subject_db.py
+# Filename: tests/data_preparation/test_create_subject_db.py
 
 """
 Unit tests for the subject database creation script (src/create_subject_db.py).
@@ -116,4 +116,4 @@ def test_create_subject_db_logic(mock_input_files):
     assert monroe_record["Moon"] == 216.89
     assert monroe_record["Ascendant"] == 230.12
 
-# === End of tests/test_create_subject_db.py ===
+# === End of tests/data_preparation/test_create_subject_db.py ===

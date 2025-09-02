@@ -71,6 +71,7 @@ data/temp_manual_test/
 .coverage
 /temp_assembly_logic_validation/
 /temp_test_environment/
+/tests/temp_test_environment/
 
 # --- IDE & OS Specific Files ---
 # macOS specific files

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_generate_eminence_scores.py
+# Filename: tests/data_preparation/test_generate_eminence_scores.py
 
 """
 Unit tests for the eminence score generation script (src/generate_eminence_scores.py).
@@ -163,4 +163,4 @@ def test_main_orchestrator_loop(mocker, mock_main_sandbox):
         assert "101,Test A,1950,85.0" in content
         assert "102,Test B,1951,88.0" in content
 
-# === End of tests/test_generate_eminence_scores.py ===
+# === End of tests/data_preparation/test_generate_eminence_scores.py ===

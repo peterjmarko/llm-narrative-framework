@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_select_eligible_candidates.py
+# Filename: tests/data_preparation/test_select_eligible_candidates.py
 
 """
 Unit tests for the eligible candidate selection script (src/select_eligible_candidates.py).
@@ -132,4 +132,4 @@ def test_select_eligible_candidates_resumes_correctly(mock_sandbox):
         final_content = f.read()
     assert final_content == output_content
 
-# === End of tests/test_select_eligible_candidates.py ===
+# === End of tests/data_preparation/test_select_eligible_candidates.py ===

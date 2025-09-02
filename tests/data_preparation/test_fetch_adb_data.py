@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_fetch_adb_data.py
+# Filename: tests/data_preparation/test_fetch_adb_data.py
 
 """
 Unit tests for the Astro-Databank fetching script (src/fetch_adb_data.py).
@@ -193,4 +193,4 @@ def test_login_to_adb_failure():
     with pytest.raises(SystemExit):
         login_to_adb(mock_session, "user", "pass")
 
-# === End of tests/test_fetch_adb_data.py ===
+# === End of tests/data_preparation/test_fetch_adb_data.py ===

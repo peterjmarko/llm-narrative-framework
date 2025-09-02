@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_select_final_candidates.py
+# Filename: tests/data_preparation/test_select_final_candidates.py
 
 """
 Unit tests for the final candidate selection script (src/select_final_candidates.py).
@@ -108,4 +108,4 @@ def test_select_final_candidates_logic(mock_input_files):
     # 4. Verify the final 'Index' is sequential from 1 to 3.
     assert output_df["Index"].tolist() == [1, 2, 3]
 
-# === End of tests/test_select_final_candidates.py ===
+# === End of tests/data_preparation/test_select_final_candidates.py ===

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_validate_wikipedia_pages.py
+# Filename: tests/data_preparation/test_validate_wikipedia_pages.py
 
 """
 Unit tests for the Wikipedia page validation script (src/validate_wikipedia_pages.py).
@@ -279,4 +279,4 @@ def test_load_and_filter_input(tmp_path):
     to_process, _, _, _, _, _ = load_and_filter_input(input_file, report_file, force=True)
     assert len(to_process) == 4
 
-# === End of tests/test_validate_wikipedia_pages.py ===
+# === End of tests/data_preparation/test_validate_wikipedia_pages.py ===

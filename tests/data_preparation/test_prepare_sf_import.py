@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_prepare_sf_import.py
+# Filename: tests/data_preparation/test_prepare_sf_import.py
 
 """
 Unit tests for the Solar Fire import preparation script (src/prepare_sf_import.py).
@@ -88,4 +88,4 @@ def test_prepare_sf_import_logic(mock_input_file):
     expected_line2 = '"Marilyn Monroe","1 June 1926","09:30","2n","+08:00","Los Angeles","United States","34N03","118W15"\n'
     assert lines[1] == expected_line2
 
-# === End of tests/test_prepare_sf_import.py ===
+# === End of tests/data_preparation/test_prepare_sf_import.py ===

@@ -86,6 +86,7 @@ fix-stu = "powershell -ExecutionPolicy Bypass -File ./fix_study.ps1"
 mig-stu = "powershell -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 
 # Testing shortcuts
+test-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
 test-ps-exp = "pwsh ./tests/new_experiment.Tests.ps1"
 test-ps-aud = "pwsh ./tests/audit_experiment.Tests.ps1"
 test-ps-fix = "pwsh ./tests/fix_experiment.Tests.ps1"

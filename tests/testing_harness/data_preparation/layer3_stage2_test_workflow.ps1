@@ -7,7 +7,7 @@ param(
     [switch]$Interactive
 )
 
-$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
 $relativeSandboxDir = (Resolve-Path $SandboxDir -Relative).TrimStart('.\')
 $ErrorActionPreference = "Stop"

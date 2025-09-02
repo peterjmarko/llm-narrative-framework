@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_generate_personalities_db.py
+# Filename: tests/data_preparation/test_generate_personalities_db.py
 
 """
 Unit tests for the final database generation script (src/generate_personalities_db.py).
@@ -107,4 +107,4 @@ def test_generate_personalities_db_logic(mock_input_files):
     # Stable has Moon in Taurus -> triggers only that delineation
     assert stable_desc == "Is grounded."
 
-# === End of tests/test_generate_personalities_db.py ===
+# === End of tests/data_preparation/test_generate_personalities_db.py ===

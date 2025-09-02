@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_assembly_algorithm.py
+# Filename: tests/data_preparation/test_assembly_algorithm.py
 
 """
 Verifies the integrity of the personality description assembly algorithm.
@@ -69,7 +69,7 @@ def assembly_test_environment() -> Path:
     Identifies the existing assembly logic sandbox, copies all necessary source
     files into it, and ensures it's clean for the test run.
     """
-    project_root = Path(__file__).resolve().parents[1]
+    project_root = Path(__file__).resolve().parents[2]
     sandbox_path = project_root / "temp_assembly_logic_validation"
 
     # Ensure the primary sandbox directory exists.
@@ -134,7 +134,7 @@ def run_script(script_path: str, sandbox_path: Path, *args):
     runs from the project root so all relative paths are correct.
     This helper will print the script's output for debugging purposes.
     """
-    project_root = Path(__file__).resolve().parents[1]
+    project_root = Path(__file__).resolve().parents[2]
     command = [
         "pdm",
         "run",
@@ -172,7 +172,7 @@ def test_assembly_algorithm_matches_ground_truth(assembly_test_environment, test
     Example: pdm run pytest tests/test_assembly_algorithm.py --test-record-number=15
     """
     sandbox_path = assembly_test_environment
-    project_root = Path(__file__).resolve().parents[1]
+    project_root = Path(__file__).resolve().parents[2]
 
     # --- Step 1: Generate the "passthrough" delineations in the correct sandbox ---
     neutralize_script = str(project_root / "src/neutralize_delineations.py")
@@ -304,4 +304,4 @@ def test_assembly_algorithm_matches_ground_truth(assembly_test_environment, test
         # Re-raise the original exception to make the test fail
         raise
 
-# === End of tests/test_assembly_algorithm.py ===
+# === End of tests/data_preparation/test_assembly_algorithm.py ===

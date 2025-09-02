@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_neutralize_delineations.py
+# Filename: tests/data_preparation/test_neutralize_delineations.py
 
 """
 Unit tests for the delineation neutralization script (src/neutralize_delineations.py).
@@ -158,4 +158,4 @@ You are a pioneer.
         row = next(reader)
         assert row == ["Sun in Aries", "You are a pioneer."]
 
-# === End of tests/test_neutralize_delineations.py ===
+# === End of tests/data_preparation/test_neutralize_delineations.py ===

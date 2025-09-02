@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_generate_ocean_scores.py
+# Filename: tests/data_preparation/test_generate_ocean_scores.py
 
 """
 Unit tests for the OCEAN score generation script (src/generate_ocean_scores.py).
@@ -123,4 +123,4 @@ def test_perform_pre_flight_check(mocker, tmp_path):
     status, _ = perform_pre_flight_check(output_path, mock_args, df_cutoff, 0.5, initial_checks)
     assert status == "EXIT"
 
-# === End of tests/test_generate_ocean_scores.py ===
+# === End of tests/data_preparation/test_generate_ocean_scores.py ===
