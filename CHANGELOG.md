@@ -1,5 +1,21 @@
 # Changelog
 
+## 6.13.0 (2025-09-02)
+
+### Bump
+
+- **version 6.12.0 → 6.13.0**
+
+### Features
+
+- **add option to bypass LLM-based scoring**
+  - Adds a `bypass_llm_scoring` flag to `config.ini` to serve as a methodological control for the data preparation pipeline.
+  - Modifies the scoring scripts (`generate_eminence_scores.py`, `generate_ocean_scores.py`) to be bypass-aware, warning the user if they are run while the bypass is active.
+  - Updates `select_final_candidates.py` with a conditional logic path to use the full eligible candidate list when the bypass is active.
+  - Makes the main `prepare_data.ps1` orchestrator bypass-aware, allowing it to skip the two scoring scripts for a more efficient workflow.
+  - Adds a `config.ini` creation step to the Layer 3 integration test setup to support this new functionality.
+  - Adds new unit tests for all three affected Python scripts to validate the bypass feature.
+
 ## 6.12.0 (2025-09-02)
 
 ### Bump
