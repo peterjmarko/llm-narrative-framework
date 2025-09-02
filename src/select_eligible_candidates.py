@@ -170,6 +170,8 @@ def main():
     df['Year'] = df['Year'].astype(int)
     df = df[df['Year'].between(1900, 1999)]
     df = df[df['Time'].astype(str).str.match(r"^\d{1,2}:\d{2}$", na=False)]
+    # Filter for Northern Hemisphere births only
+    df = df[df['Latitude'].str.contains('N', na=False)]
     df['FullName'] = df['LastName'].fillna('') + ", " + df['FirstName'].fillna('')
     df['NormalizedName'] = normalize_name_for_deduplication(df['FullName'])
     df['BirthDate'] = df['Year'].astype(str) + '-' + df['Month'].astype(str) + '-' + df['Day'].astype(str)

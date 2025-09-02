@@ -26,9 +26,9 @@ The primary goal is to determine if a fully automated pipeline can serve as a se
 
 The framework supports two research paths. For **direct replication**, this study used a static dataset from the Astro-Databank (ADB), which is included in the project's public repository. For **conceptual replication**, the framework includes an automated tool to acquire current data from the live ADB.
 
-The final study sample was derived from an initial query of over 10,000 famous individuals with high-quality birth data (Rodden Rating 'AA' or 'A') and a recorded death date. This raw data was processed through a fully automated, multi-stage pipeline designed for efficiency and reproducibility.
+The final study sample was derived from a two-stage filtering process designed to create a high-quality cohort. First, an initial query of the Astro-Databank (ADB) selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**.
 
-First, a validation script audited each candidate against their English Wikipedia page, a methodological control for ensuring a consistent biographical source for the LLM. To guarantee reproducibility, the results of this one-time audit were archived and used as a static master filter in the next step. A second script then performed a rigorous pre-filtering, retaining only candidates who had passed validation, had a validly formatted birth time, a birth year within 1900-1999, and were not duplicates. This produced a clean cohort of "eligible candidates."
+This initial set was then subjected to a second, more rigorous automated filtering pass. This pass applied several additional data quality rules, retaining only individuals who: had passed an automated validation against their English Wikipedia page; were classified as a `Person` and not a `Research` entry; had a birth year between 1900-1999 to minimize cohort-specific confounds (Ryder, 1965), a step which excluded only 0.6% of the raw dataset; had a validly formatted birth time; were not duplicates; and were born in the Northern Hemisphere, which excluded approximately 5% of the remaining records. This final filter was applied to control for the potential confounding variable of a 180-degree zodiacal shift for Southern Hemisphere births, a well-documented open question in astrology (Lewis, 1994). This multi-step process produced a clean cohort of "eligible candidates."
 
 This eligible cohort was then subjected to a two-stage scoring process to determine the final sample. First, **OpenAI's GPT-5** generated a static eminence score—defined as lasting historical impact—for each candidate, creating a rank-ordered list of all viable subjects. Second, a separate script processed these subjects in descending order of eminence, querying **Anthropic's Claude 4 Sonnet** for Big Five (OCEAN) personality scores. This script's primary function was to establish a data-driven cutoff for the final sample size. It employed a robust "M of N" stopping rule, halting automatically when the average variance of personality scores in new windows of subjects showed a sustained decline relative to a fixed benchmark derived from the top 500 most eminent individuals. The script is designed for resilience; its pre-flight check re-analyzes all existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention. This process yielded the final sample of 6,000 subjects used in the study, ensuring the population was both eminent and psychologically diverse. The use of publicly available data of deceased historical individuals obviated privacy concerns.
 
@@ -197,6 +197,8 @@ Jeffreys, H. (1961). *Theory of Probability* (3rd ed.). Oxford University Press.
 
 Kosinski, M. (2023). Theory of mind may have spontaneously emerged in large language models. *Proceedings of the National Academy of Sciences*, *120*(9), e2218926120. https://doi.org/10.1073/pnas.2218926120
 
+Lewis, J. R. (1994). Southern Hemisphere. In *The Astrology Encyclopedia* (p. 484). Visible Ink Press.
+
 Marko, P. J. (2018). Boomers and the lunar defect. *The Astrological Journal, 60*(1), 35-39.
 
 McRitchie, K. (2022). How to think about the astrology research program: An essay considering emergent effects. *Journal of Scientific Exploration*, *36*(4), 706-716. https://doi.org/10.31275/20222641
@@ -204,6 +206,8 @@ McRitchie, K. (2022). How to think about the astrology research program: An essa
 Open Science Collaboration. (2015). Estimating the reproducibility of psychological science. *Science*, *349*(6251), aac4716.
 
 OpenRouter.ai. (n.d.). [Online API service]. Retrieved from https://openrouter.ai/
+
+Ryder, N. B. (1965). The Cohort as a Concept in the Study of Social Change. *American Sociological Review*, *30*(6), 843-861.
 
 Solar Fire. (n.d.). [Software]. Astrolabe Inc. Retrieved from https://alabe.com/solarfireV9.html
 

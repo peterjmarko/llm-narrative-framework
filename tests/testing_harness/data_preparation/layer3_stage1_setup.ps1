@@ -2,7 +2,7 @@
 # --- Layer 3: Data Pipeline Integration Testing ---
 # --- Step 1: Automated Setup ---
 
-$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $TestEnvRoot = Join-Path $ProjectRoot "temp_test_environment"
 $SandboxDir = Join-Path $TestEnvRoot "layer3_sandbox"
 

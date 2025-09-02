@@ -48,14 +48,15 @@ def mock_sandbox(tmp_path: Path) -> Path:
 
     # Create dummy raw export file (TSV format)
     raw_content = (
-        "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tLink\n"
-        "1\t101\tSmith\tJohn\tM\t1\t1\t1950\t12:00\thttp://a.com\n"   # Valid
-        "2\t102\tDoe\tJane\tF\t1\t1\t1899\t12:00\thttp://b.com\n"     # Invalid (Year too early)
-        "3\t103\tLee\tBruce\tM\t27\t11\t1940\t07:12\thttp://c.com\n"   # Valid
-        "4\t104\tKing\tMartin\tM\t15\t1\t1929\t12:00\thttp://d.com\n"   # Invalid (Status FAIL)
-        "5\t105\tCurie\tMarie\tF\t4\t7\t1934\t1200\thttp://e.com\n"    # Invalid (Bad time format)
-        "6\t101\tSmith\tJohn\tM\t1\t1\t1950\t12:00\thttp://f.com\n"   # Duplicate
-        "7\t201\tResearch: Event\t\t\t1\t1\t1960\t12:00\thttp://g.com\n" # Research Entry
+        "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tLatitude\tLink\n"
+        "1\t101\tSmith\tJohn\tM\t1\t1\t1950\t12:00\t40N43\thttp://a.com\n"   # Valid (Northern)
+        "2\t102\tDoe\tJane\tF\t1\t1\t1899\t12:00\t34N03\thttp://b.com\n"     # Invalid (Year too early)
+        "3\t103\tLee\tBruce\tM\t27\t11\t1940\t07:12\t37N47\thttp://c.com\n"   # Valid (Northern)
+        "4\t104\tKing\tMartin\tM\t15\t1\t1929\t12:00\t33N45\thttp://d.com\n"   # Invalid (Status FAIL)
+        "5\t105\tCurie\tMarie\tF\t4\t7\t1934\t1200\t52N14\thttp://e.com\n"    # Invalid (Bad time format)
+        "6\t101\tSmith\tJohn\tM\t1\t1\t1950\t12:00\t40N43\thttp://f.com\n"   # Duplicate
+        "7\t106\tPele\t\tM\t23\t10\t1940\t03:00\t22S54\thttp://h.com\n"   # Invalid (Southern)
+        "8\t201\tResearch: Event\t\t\t1\t1\t1960\t12:00\t48N51\thttp://g.com\n" # Research Entry
     )
     raw_export_path.write_text(raw_content)
 
@@ -67,6 +68,7 @@ def mock_sandbox(tmp_path: Path) -> Path:
         "103,OK,Person\n"
         "104,FAIL,Person\n"
         "105,OK,Person\n"
+        "106,OK,Person\n"
         "201,VALID,Research\n"
     )
     validation_report_path.write_text(validation_content)

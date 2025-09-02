@@ -56,6 +56,14 @@ modify the `CUSTOM_DEPTH_MAP` dictionary within the script.
 
 # === Start of utilities/list_project_files.py ===
 
+# ANSI color codes for better terminal output
+class Colors:
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+
 import pathlib
 import sys
 import os # Keep os for os.stat if needed, though pathlib usually suffices
@@ -271,7 +279,8 @@ def main():
     dynamic_filename = f"{base_name}_depth_{depth_suffix}{extension}"
     # --- MODIFICATION END ---
 
-    print(f"Determined project root: {project_root}")
+    print(f"\n{Colors.YELLOW}--- Starting Project Structure Analysis ---{Colors.RESET}")
+    print(f"1. Determined project root: {project_root}")
 
     # Define the dedicated output directory for reports
     report_output_dir = project_root / "output" / REPORT_SUBDIR
@@ -280,13 +289,13 @@ def main():
     try:
         report_output_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        print(f"Error: Could not create output directory '{report_output_dir}': {e}")
+        print(f"{Colors.RED}Error: Could not create output directory '{report_output_dir}': {e}{Colors.RESET}")
         sys.exit(1)
         
     # MODIFIED: Use the new dynamic filename instead of the static constant
     output_file_path = report_output_dir / dynamic_filename
 
-    print(f"Output will be saved to: {output_file_path}")
+    print(f"2. Output will be saved to: {output_file_path}")
 
     # --- MODIFIED FOR DEPTH CONTROL ---
     all_items_to_process = []
@@ -321,7 +330,7 @@ def main():
         prompt = (
             f"\nWarning: Found {len(all_items_to_process)} files and directories to inspect. "
             "This operation could take some time.\n"
-            "Do you want to proceed? (y/n): "
+            "Do you want to proceed? (Y/N): "
         )
         try:
             response = input(prompt)
@@ -352,10 +361,12 @@ def main():
             outfile.write("\n\n" + "="*70 + "\n")
             outfile.write("Report generation complete.\n")
 
-        print(f"Successfully wrote project structure report to: {output_file_path}")
+        print(f"\n{Colors.YELLOW}--- Analysis Complete ---{Colors.RESET}")
+        print(f"{Colors.CYAN} - Report saved to: {output_file_path.relative_to(project_root)}{Colors.RESET}")
+        print(f"{Colors.GREEN}SUCCESS: Project structure report generated successfully.{Colors.RESET}\n")
 
     except IOError as e:
-        print(f"Error: Could not write to output file: {output_file_path}\nDetails: {e}")
+        print(f"{Colors.RED}Error: Could not write to output file: {output_file_path}\nDetails: {e}{Colors.RESET}")
         sys.exit(1)
     except Exception as e_main:
         print(f"An unexpected error occurred: {e_main}")

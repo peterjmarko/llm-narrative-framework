@@ -82,6 +82,12 @@ python -m pdm add new-package-name
 python -m pdm add -G dev new-dev-package-name
 ```
 
+## Getting Acquainted: The Interactive Guided Tour
+
+For new contributors, the best way to understand the data preparation pipeline is to use the **Interactive Guided Tour**. This is a step-by-step walkthrough of the entire data processing workflow and a highly recommended first step for any developer looking to work on these scripts.
+
+Detailed instructions for running the tour are available in the **[🧪 Testing Guide (TESTING.md)](TESTING.md)** under the "Layer 3: Data Pipeline Integration Testing" section.
+
 ## Developer Utilities (`scripts/` folder)
 
 The `scripts/` directory contains helper utilities for development, maintenance, and building documentation. You generally do not need to run these directly, as many are called by PDM script shortcuts (e.g., `pdm run build-docs`, `pdm run release`).

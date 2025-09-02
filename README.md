@@ -55,6 +55,8 @@ This project is extensively documented to support different use cases. The resou
 
 -   **For Developers (Contributing):** To contribute to the project, please see the **[🤝 Developer's Guide (CONTRIBUTING.md)](CONTRIBUTING.md)** for development setup and contribution workflows.
 
+-   **To Understand the Validation Strategy:** For a detailed overview of the project's multi-layered testing strategy and validation procedures, see the **[🧪 Testing Guide (TESTING.md)](TESTING.md)**.
+
 -   **To see what's planned and track known issues**, view the **[🗺️ Project Roadmap (ROADMAP.md)](ROADMAP.md)**.
 
 ## ⚖️ Licensing

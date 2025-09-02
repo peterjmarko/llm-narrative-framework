@@ -19,6 +19,8 @@ The Astro-Databank (ADB) is a live research database. To directly replicate the 
 **Path 2: Conceptual Replication (Creating a New Dataset)**
 For new research, the framework provides a fully automated pipeline to generate a fresh dataset from live sources. The instructions below describe how to use the provided scripts to create new data assets.
 
+> **Note on Learning the Pipeline:** For researchers who wish to understand the automated pipeline in detail, an interactive **Guided Tour** is available. This step-by-step walkthrough is an excellent way to learn how the data processing scripts work together. Full instructions for running the tour can be found in the project's **[🧪 Testing Guide (TESTING.md)](TESTING.md)**.
+
 ### Stage 1: Data Sourcing, Link Finding & Validation (Automated)
 
 #### a. Fetching Raw Data (`fetch_adb_data.py`)

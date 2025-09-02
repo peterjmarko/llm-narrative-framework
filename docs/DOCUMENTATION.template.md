@@ -67,25 +67,40 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 # Get a read-only status report of the pipeline's progress
 .\prepare_data.ps1 -ReportOnly
 ```
+> **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING.md)](../TESTING.md)** for details on running the Layer 3 Interactive Mode.
+
 The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.
 
 #### Individual Script Details
 
 The `prepare_data.ps1` script orchestrates a sequence of individual Python scripts followed by a manual processing step. The following is a detailed breakdown of this underlying workflow.
 
-**Stage 1: Data Sourcing and Initial Processing (Automated)**
+**Stage 1: Data Sourcing and Filtering (Automated)**
 
-1.  **Fetching (`fetch_adb_data.py`):** This is the primary entry point. The script logs into the ADB website, queries its internal API, and fetches a complete dataset of over 10,000 subjects. It performs two crucial transformations at the source:
-    *   **Identifier Standardization:** It replaces the unstable, temporary record number (`ARN`) with a file-specific sequential `Index`, and renames the permanent Astro-Databank ID (`ADBNo`) to `idADB`.
-    *   **Timezone Calculation:** It immediately processes the raw timezone code from the API into the final `ZoneAbbr` and `ZoneTimeOffset` values required by downstream software.
-    *   **Output:** `data/sources/adb_raw_export.txt`, a clean, complete source file.
+The initial stage of the pipeline is a two-step process designed to create a high-quality cohort of subjects. It combines source-level querying with post-processing filters.
+
+1.  **Source-Level Filtering (`fetch_adb_data.py`):** This is the primary entry point. The script logs into the ADB website and queries its internal API using a specific set of pre-filters to ensure data quality and relevance. The query only includes subjects who meet all of the following criteria:
+
+    -   **High-Quality Birth Data:** The record must have a Rodden Rating of 'A' or 'AA', indicating the birth time is from a reliable source.
+    -   **Deceased Individuals:** The record must have a recorded death date. This is an ethical control to avoid processing data for living individuals.
+    -   **Eminence:** The subject must belong to the specific nested category of **Notable > Famous > Top 5% of Profession** within the ADB, ensuring the sample consists of well-known public figures.
+
+2.  **Post-Processing and Final Filtering (`select_eligible_candidates.py`):** After the initial dataset is fetched, this script performs a second, more detailed filtering pass. It integrates the raw data with the Wikipedia validation report and applies the following additional criteria in order:
+
+    -   **Wikipedia Validation Status:** Only records with a `Status` of `OK` are kept, indicating that a valid English Wikipedia page was found where the subject's name and death date were confirmed.
+    -   **Entry Type:** Only records with an `EntryType` of `Person` are kept, filtering out non-person records such as `Research` entries for events or unnamed individuals.
+    -   **Birth Year Range:** The subject's birth year must be between 1900 and 1999, inclusive. This filter defines a single historical cohort to control for era-specific confounds and excludes a small number of post-1999 births, which represent only 0.6% of the raw dataset.
+    -   **Valid Time Format:** The birth time must be present and in a valid `HH:MM` format.
+    -   **Deduplication:** Duplicate entries are removed based on a combination of the subject's normalized name and their full birth date.
+    -   **Hemisphere:** The subject's `Latitude` must contain the character 'N', ensuring only Northern Hemisphere births are included. This filter removes a small number of records (~5%) to control for the potential confounding variable of a 180-degree zodiacal shift for Southern Hemisphere births, which could introduce unnecessary noise to the dataset.
+    
+    The final output of this stage is the `adb_eligible_candidates.txt` file.
 
 **Stage 2: Link Finding, Validation, and Scoring (Automated)**
 This stage identifies the correct Wikipedia page for each subject, validates its content, and scores the candidates to ensure only high-quality subjects proceed.
 
-2.  **Link Finding (`find_wikipedia_links.py`):** This script takes the raw ADB export and finds the best-guess English Wikipedia URL for each subject. It scrapes the ADB page and uses a Wikipedia search as a fallback. The output is an intermediate file, `adb_wiki_links.csv`.
-3.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name, and confirms their death date. The final output is the detailed `adb_validation_report.csv`.
-4.  **Eligibility Selection (`select_eligible_candidates.py`):** Performs all initial data quality checks (e.g., valid birth year, 'OK' status, uniqueness), producing a clean list of all subjects potentially viable for the study.
+3.  **Link Finding (`find_wikipedia_links.py`):** This script takes the raw ADB export and finds the best-guess English Wikipedia URL for each subject. It scrapes the ADB page and uses a Wikipedia search as a fallback. The output is an intermediate file, `adb_wiki_links.csv`.
+4.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name, and confirms their death date. The final output is the detailed `adb_validation_report.csv`.
 5.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
 6.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** A fully automated, resilient script that determines the final dataset size. It processes subjects by eminence and stops when diversity (variance) shows a sustained drop. Its robust pre-flight check re-analyzes existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention. The output also includes `BirthYear`.
 

@@ -41,27 +41,29 @@ This is a standalone, push-button `pytest` script that provides a permanent, hig
 
 This section provides a unified, step-by-step guide to the project's validation process, from developing a single script to performing a full end-to-end integration test of the data preparation pipeline.
 
-### The Five Layers of Validation
+### The Seven Layers of Validation
 
 The framework is validated using a multi-layered strategy to ensure correctness at all levels:
 
 1.  **Layer 1: Unit Testing:** Validating a single Python script in isolation.
 2.  **Layer 2: Data Pipeline Orchestration Testing:** Validating the `prepare_data.ps1` orchestrator's logic using mock scripts.
 3.  **Layer 3: Data Pipeline Integration Testing:** Validating the full `prepare_data.ps1` pipeline with a controlled seed dataset.
-4.  **Layer 4: Main Workflow Integration Testing:** Validating the core `new -> audit -> fix` experiment lifecycle.
-5.  **Layer 5: Migration Workflow Integration Testing:** Validating the `migrate_experiment.ps1` workflow.
+4.  **Layer 4: Main Workflow Integration Testing:** Validating the core `new -> audit -> fix` experiment lifecycle for a single experiment.
+5.  **Layer 5: Migration Workflow Integration Testing:** Validating the `migrate_experiment.ps1` workflow for a single experiment.
+6.  **Layer 6: Post-Hoc Study Evaluation:** Validating the `compile_study.ps1` workflow for creating a study from pre-existing, independent experiments.
+7.  **Layer 7: New Study Generation and Lifecycle:** Validating the entire `new_study.ps1` lifecycle (`create -> audit -> break -> fix`) for a study generated from scratch.
 
 ---
 
 ### Layer 1: Unit & Integration Testing (A Single Python Script)
 
-This is the iterative, three-stage workflow for developing or modifying any individual Python script. It follows a robust `Refactor -> Unit Test -> Integration Test` pattern to ensure quality at every step.
+This is the iterative, three-stage workflow for developing or modifying any individual Python script. It follows a robust `Modify -> Unit Test -> Integration Test` pattern to ensure quality at every step.
 
-#### Stage 1: Refactor
+#### Stage 1: Modify
 Make the necessary code changes to the target Python script (e.g., `src/data_preparation/my_script.py`).
 
 #### Stage 2: Unit Test
-After refactoring, run the script's dedicated unit test suite to verify its internal logic and catch any regressions.
+After modifying the code, run the script's dedicated unit test suite to verify its internal logic and catch any regressions.
 ```powershell
 # Run the specific test file with code coverage
 pdm run cov-file <script_name>
@@ -137,10 +139,17 @@ This script fully automates the test workflow. It calls the main `prepare_data.p
 .\tests\testing_harness\data_preparation\layer3_stage2_test_workflow.ps1
 ```
 
-#### Stage 3: Automated Cleanup
-After inspecting the artifacts, run this script to delete the Layer 3 test sandbox.
+#### Stage 3: Interactive Cleanup
+After inspecting the artifacts, run this script to delete the Layer 3 test sandbox. The script will prompt for confirmation before deleting any files.
+
 ```powershell
+# Run the cleanup script interactively
 .\tests\testing_harness\data_preparation\layer3_stage3_cleanup.ps1
+```
+
+To bypass the confirmation prompt for use in automated workflows, use the `-Force` flag:
+```powershell
+.\tests\testing_harness\data_preparation\layer3_stage3_cleanup.ps1 -Force
 ```
 
 ### Layer 4: Main Workflow Integration Testing
@@ -233,13 +242,13 @@ Module                              Cov. (%)        Status & Justification
 ----------------------------------- --------------- -----------------------------------------------------------------
 **Sourcing**
 
-`src/fetch_adb_data.py`             `37%`           COMPLETE. Unit tests cover critical offline logic. Live network
+`src/fetch_adb_data.py`             `33%`           COMPLETE. Unit tests cover critical offline logic. Live network
                                                     code is validated via integration testing.
 
 `src/find_wikipedia_links.py`       `38%`           COMPLETE. Unit tests cover key logic, including HTML parsing
                                                     and mocked API calls. Orchestration is validated via integration.
 
-`src/validate_wikipedia_pages.py`   `38%`           COMPLETE. Manual validation is complete. Unit tests cover all
+`src/validate_wikipedia_pages.py`   `39%`           COMPLETE. Manual validation is complete. Unit tests cover all
                                                     critical validation logic.
 
 `src/select_eligible_candidates.py` `72%`           COMPLETE. Unit tests cover all core filtering and resumability
@@ -247,30 +256,30 @@ Module                              Cov. (%)        Status & Justification
 
 **Scoring**
 
-`src/generate_eminence_scores.py`   `55%`           COMPLETE. Unit tests cover the critical offline logic,
+`src/generate_eminence_scores.py`   `54%`           COMPLETE. Unit tests cover the critical offline logic,
                                                     including LLM response parsing, resumability, and a mocked
                                                     orchestrator loop. Live LLM calls are validated via integration.
 
-`src/generate_ocean_scores.py`      `17%`           COMPLETE. Unit tests cover the critical offline logic,
+`src/generate_ocean_scores.py`      `16%`           COMPLETE. Unit tests cover the critical offline logic,
                                                     including LLM response parsing, variance calculation, and the
                                                     data-driven cutoff logic. Live LLM calls are validated via
                                                     integration testing.
 
-`src/select_final_candidates.py`    `65%`           COMPLETE. Unit tests cover the entire data transformation
+`src/select_final_candidates.py`    `66%`           COMPLETE. Unit tests cover the entire data transformation
                                                     workflow, including filtering, mapping, and sorting.
 
 **Generation**
 
-`src/prepare_sf_import.py`          `58%`           COMPLETE. Unit tests cover the core data transformation and CQD
+`src/prepare_sf_import.py`          `62%`           COMPLETE. Unit tests cover the core data transformation and CQD
                                                     formatting logic.
 
-`src/create_subject_db.py`          `50%`           COMPLETE. Unit tests cover the core data integration logic,
+`src/create_subject_db.py`          `57%`           COMPLETE. Unit tests cover the core data integration logic,
                                                     including Base58 decoding, file merging, and data flattening.
 
 `src/neutralize_delineations.py`    `26%`           COMPLETE. Unit tests cover critical offline logic. The live
                                                     LLM calls are validated via integration testing.
 
-`src/generate_personalities_db.py`  `75%`           COMPLETE. Unit test suite is complete. A separate, high-level
+`src/generate_personalities_db.py`  `70%`           COMPLETE. Unit test suite is complete. A separate, high-level
                                                     `pytest` now provides a permanent, bit-for-bit validation of the
                                                     core assembly algorithm against a Solar Fire ground truth.
 

@@ -54,9 +54,10 @@ test = {cmd = "python tests/run_all_tests.py {args}", help = "Run all tests (Pyt
 # --- THE DEFINITIVE COVERAGE SCRIPTS ---
 # We disable the pytest-cov plugin with `-p no:cov` to prevent it from
 # interfering with our manual `coverage run` invocation.
-cov = {cmd = "coverage erase && coverage run -m pytest -p no:cov && coverage report", help="Run all tests with coverage analysis."}
-cov-file = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/test_{args}.py && coverage report src/{args}.py", help="Run coverage for a specific file by its base name (e.g., find_wikipedia_links)."}
-cov-html = {cmd = "coverage erase && coverage run -m pytest -p no:cov && coverage html", help="Run all tests and generate an HTML coverage report."}
+cov = {shell = "coverage erase && coverage run -m pytest -p no:cov && coverage report", help="Run all tests with coverage analysis."}
+cov-prep = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/data_preparation/ && coverage report", help="Run coverage for the data preparation test suite."}
+cov-file = {shell = "coverage erase && coverage run -m pytest -p no:cov {args} && coverage report", help="Run coverage for a specific test file by its full path (e.g., tests/data_preparation/test_select_eligible_candidates.py)."}
+cov-html = {shell = "coverage erase && coverage run -m pytest -p no:cov && coverage html", help="Run all tests and generate an HTML coverage report."}
 cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
 # ------------------------------------
 

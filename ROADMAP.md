@@ -8,16 +8,20 @@ This document outlines planned development tasks and tracks known issues for the
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
-- [ ] **Complete Test Coverage for Existing Framework**
-  - [ ] Update and complete the test suites for all existing Python scripts and PowerShell wrappers.
-- [ ] **Add Filtering for Northern Hemisphere**
-  - [ ] Eliminate subjects with 'S' in their Latitude. Southern Hemisphere births introduce unnecessary noise to the dataset (because it's likely that signs for them are offset by 180 degrees). 
 - [ ] **Add the Option to Bypass Eminence/OCEAN Scoring**
   - [ ] Implement a configuration flag to allow 'final candidates' to be the same as 'eligible candidates'. This makes the LLM-based sample selection optional, allowing for validation studies that are more robust to the criticism of using an opaque selection method.
+- [ ] **Re-validate Integration Tests After Filter Changes**
+  - [ ] Perform a full run of the Layer 4 and Layer 5 integration tests to ensure that the changes to the data filtering logic (Northern Hemisphere and eminence/OCEAN scoring) have not introduced any downstream regressions.
 - [ ] **Develop `new_study.ps1` Orchestrator**
   - [ ] Implement the `new_study.ps1` workflow to automate multi-experiment studies based on a factor matrix in `config.ini`.
 - [ ] **Test the New Study Orchestrator**
   - [ ] Create and execute a scripted integration test for the `new_study.ps1` script to ensure it correctly manages the study lifecycle.
+- [ ] **Enhance Layer 4 Test Harness with a Guided Tour**
+  - [ ] Add an `-Interactive` flag to the Layer 4 test workflow to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` experiment lifecycle, similar to the existing tour for the data pipeline.
+- [ ] **Complete Test Coverage for Existing Framework**
+  - [ ] Implement Layer 6 Test Harness (Post-Hoc Study Evaluation) to validate the `compile_study.ps1` workflow.
+  - [ ] Implement Layer 7 Test Harness (New Study Lifecycle) to validate the `new_study.ps1`, `audit_study.ps1`, and `fix_study.ps1` workflows.
+  - [ ] Update and complete unit test suites for any remaining Python scripts with low coverage.
 
 ### Final Validation and Data Generation
 

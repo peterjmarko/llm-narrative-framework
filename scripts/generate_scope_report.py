@@ -53,6 +53,7 @@ class Colors:
     RED = '\033[91m'
     GREEN = '\033[92m'
     YELLOW = '\033[93m'
+    CYAN = '\033[96m'
     RESET = '\033[0m'
 
 # --- Helper Functions ---
@@ -267,7 +268,8 @@ def main(quiet=False):
             f.write("\n".join(report_content))
         if not quiet:
             print(f"\n{Colors.YELLOW}--- Analysis Complete ---{Colors.RESET}")
-            print(f"{Colors.GREEN}Successfully generated report: {REPORT_FILENAME.relative_to(PROJECT_ROOT)}{Colors.RESET}\n")
+            print(f"{Colors.CYAN} - Report saved to: {REPORT_FILENAME.relative_to(PROJECT_ROOT)}{Colors.RESET}")
+            print(f"{Colors.GREEN}SUCCESS: Project scope report generated successfully.{Colors.RESET}\n")
     except IOError as e:
         if not quiet:
             print(f"\n{Colors.RED}Error: Could not write report to {REPORT_FILENAME}. Details: {e}{Colors.RESET}")
