@@ -1,5 +1,19 @@
 # Changelog
 
+## 6.11.0 (2025-09-01)
+
+### Bump
+
+- **version 6.10.0 → 6.11.0**
+
+### Features
+
+- **add assembly logic verification workflow and fix algorithm bugs**
+  - Introduces a full suite of utility scripts (`select_*`, `prepare_*`, `extract_*`, etc.) to generate all artifacts for validating the personality assembly algorithm.
+  - Adds a new, flexible `pytest` script (`test_assembly_algorithm.py`) that provides push-button validation of the core assembly logic against a Solar Fire-generated ground truth. The test can be run on the full subject set or a single record via the `--test-record-number` flag.
+  - The verification process revealed and fixed several critical bugs in `generate_personalities_db.py`, including the logic for Quadrant/Hemisphere calculations, key formatting, and assembly order.
+  - The ground truth extraction script (`extract_assembly_logic_text.py`) was also made more robust to correctly handle various report formats.
+
 ## 6.10.0 (2025-08-31)
 
 ### Bump
