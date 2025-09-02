@@ -1,5 +1,24 @@
 # Changelog
 
+## 6.12.0 (2025-09-02)
+
+### Bump
+
+- **version 6.11.1 → 6.12.0**
+
+### Features
+
+- **add Northern Hemisphere filter and update documentation**
+  - Adds a new filter to `select_eligible_candidates.py` to include only subjects with a Northern Hemisphere latitude ('N'), controlling for a potential zodiacal shift confound.
+  - Updates the corresponding unit test to validate this new logic.
+  - Corrects relative paths in the Layer 3 integration test scripts to function from their new, refactored locations.
+  - Makes the Layer 3 cleanup script interactive, adding a confirmation prompt before deletion and a `-Force` override for automation.
+  - Adds a new `cov-prep` PDM script to run a consolidated coverage report on the data preparation test suite.
+  - Standardizes the console output for `generate_scope_report.py` and `list_project_files.py`.
+  - Consolidates all data filtering criteria into `DOCUMENTATION.md` to create a single source of truth.
+  - Adds methodological citations for filtering choices to the main article.
+  - Updates the project `ROADMAP.md` with new tasks and priorities.
+
 ## 6.11.1 (2025-09-01)
 
 ### Bump
