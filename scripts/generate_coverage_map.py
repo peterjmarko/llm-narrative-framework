@@ -100,11 +100,11 @@ def main():
     # --- Process each subject and generate the map ---
     print(f"Processing {len(subjects):,} subjects to generate coverage map...")
     coverage_map = []
-    # All 12 points are needed for 'Point in Sign', even if their weight is zero for balances.
-    points_to_check = [
-        "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", 
-        "Uranus", "Neptune", "Pluto", "Ascendant", "Midheaven"
-    ]
+    from config_loader import APP_CONFIG, get_config_value
+    points_str = get_config_value(
+        APP_CONFIG, "DataGeneration", "points_for_neutralization"
+    )
+    points_to_check = [p.strip() for p in points_str.split(',')]
 
     for i, subject in enumerate(
         tqdm(subjects, desc="Mapping Delineations", ncols=80)
@@ -116,7 +116,7 @@ def main():
             continue
 
         triggered_keys = calculate_classifications(
-            placements, point_weights, thresholds
+            placements, point_weights, thresholds, points_to_check
         )
         coverage_map.append(
             {

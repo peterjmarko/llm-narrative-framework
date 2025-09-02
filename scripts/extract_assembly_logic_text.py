@@ -36,6 +36,7 @@ for our automated `pytest` verification.
 import argparse
 import csv
 import logging
+import shutil
 import sys
 from pathlib import Path
 
@@ -57,6 +58,9 @@ def extract_subject_info(content):
     year_match = re.search(r"\b(\d{4})\b", content)
     birth_year = year_match.group(1) if year_match else "Unknown"
     return name, birth_year
+
+
+# This function is not used and contains flawed logic. It is being removed.
 
 
 import shutil
@@ -108,30 +112,95 @@ def main():
             logging.warning(f"Could not find '{name}' in the assembly logic subject DB. Skipping.")
             continue
 
-        # --- Extract relevant sections using a simple line-by-line parser ---
-        lines = content.splitlines()
-        desc_parts = []
-        capturing = False
+        # --- Structured Parsing and Re-assembly based on explicit rules ---
         
-        headers_to_capture = [
-            "BALANCE OF SIGNS", "BALANCE OF ELEMENTS", "BALANCE OF MODES",
-            "BALANCE OF QUADRANTS", "BALANCE OF HEMISPHERES", "CHART POINTS"
+        # Rule 3 & 4: Define the final assembly order and the data structure
+        ASSEMBLY_ORDER = [
+            "BALANCE OF ELEMENTS", "BALANCE OF MODES", "BALANCE OF QUADRANTS",
+            "BALANCE OF HEMISPHERES", "BALANCE OF SIGNS"
         ]
-        headers_to_stop_at = ["LUNAR PHASE", "CHART DETAILS", "BACKGROUND INFORMATION"]
+        POINT_ORDER = [
+            "THE SUN", "THE MOON", "MERCURY", "VENUS", "MARS", "JUPITER",
+            "SATURN", "URANUS", "NEPTUNE", "PLUTO", "THE ASCENDANT", "THE MIDHEAVEN"
+        ]
+        DISCARD_PATTERNS = [
+            "SOLAR FIRE INTERPRETATIONS REPORT", "CHART DETAILS", 
+            "BALANCE OF HOUSES"
+        ]
+        dels = {key: [] for key in ASSEMBLY_ORDER}
+        dels["CHART POINTS IN SIGNS"] = {key: "" for key in POINT_ORDER}
 
-        for line in lines:
-            stripped_line = line.strip()
+        lines = content.splitlines()
+        current_main_section = None
 
-            if any(header in stripped_line for header in headers_to_stop_at + headers_to_capture):
-                capturing = stripped_line in headers_to_capture
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            # Rule 1 & 2: Identify and set the current main section
+            if line in DISCARD_PATTERNS or line.startswith("LUNAR PHASE:") or " IN THE " in line and "HOUSE" in line:
+                current_main_section = None
+                i += 1
+                continue
+            elif line in ["BACKGROUND INFORMATION", "CHART POINTS"]:
+                # Ignore these headers, continue processing subsections
+                i += 1
+                continue
+            elif line in ASSEMBLY_ORDER or line in POINT_ORDER:
+                current_main_section = line
+                i += 1
+                continue
+            
+            # If we are in a section, process its content
+            if current_main_section:
+                # For balances, the text follows a sub-header with STRONG/WEAK
+                if current_main_section in ASSEMBLY_ORDER and ("STRONG" in line or "WEAK" in line):
+                    text_parts = []
+                    i += 1 # Move past the sub-header
+                    while i < len(lines):
+                        next_line = lines[i].strip()
+                        if not next_line or (next_line.isupper() and len(next_line) > 0 and not next_line.startswith(" ")):
+                            i -= 1 # Rewind to process next header
+                            break
+                        text_parts.append(next_line)
+                        i += 1
+                    if text_parts:
+                        dels[current_main_section].append(" ".join(text_parts))
+                
+                # For points, the sub-header contains the planet name followed by "IN"
+                elif current_main_section in POINT_ORDER and f"{current_main_section} IN " in line:
+                    text_parts = []
+                    i += 1 # Move past the sub-header
+                    while i < len(lines):
+                        next_line = lines[i].strip()
+                        # Rule 2: Stop if we hit a House delineation or any new header
+                        if not next_line or " IN THE " in next_line and "HOUSE" in next_line or (next_line.isupper() and len(next_line) > 0 and not next_line.startswith(" ")):
+                            i -= 1 # Rewind
+                            break
+                        text_parts.append(next_line)
+                        i += 1
+                    if text_parts:
+                        dels["CHART POINTS IN SIGNS"][current_main_section] = " ".join(text_parts)
+                    # We only process the first sub-section (in Sign), then reset
+                    current_main_section = None
+                
+            i += 1
 
-            elif capturing and stripped_line:
-                # Ignore irrelevant lines within the sections
-                if stripped_line.startswith("Scores:") or stripped_line.isupper():
-                    continue
-                desc_parts.append(stripped_line)
-
-        full_desc = " ".join(desc_parts).strip()
+        # Rule 4: Assemble the final description in the correct order
+        final_text_parts = []
+        for category in ASSEMBLY_ORDER:
+            final_text_parts.extend(dels.get(category, []))
+        
+        point_dels = dels.get("CHART POINTS IN SIGNS", {})
+        for point in POINT_ORDER:
+            if point_dels.get(point):
+                final_text_parts.append(point_dels[point])
+        
+        # Standardize joining: join all parts, normalize characters,
+        # and then normalize all internal whitespace to a single space.
+        raw_desc = " ".join(final_text_parts)
+        normalized_desc = raw_desc.replace("’", "'") # Normalize apostrophes
+        full_desc = " ".join(normalized_desc.split()).strip()
         subject_info = subject_info_map[name]
         final_records.append(
             {
@@ -146,26 +215,40 @@ def main():
     # Sort the final records by Index to ensure a consistent order
     final_records.sort(key=lambda x: int(x["Index"]))
 
-    # --- Write the final output file ---
+    # --- Write the final output file to the sandbox ---
     try:
         with open(output_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(
                 f,
                 fieldnames=["Index", "idADB", "Name", "BirthYear", "DescriptionText"],
                 delimiter="\t",
+                quoting=csv.QUOTE_ALL,
             )
             writer.writeheader()
             writer.writerows(final_records)
-        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
-        print(f"{Fore.CYAN} - Assembly logic database saved to: {output_path}{Fore.RESET}")
-        key_metric = f"Processed {len(final_records)} subjects"
-        print(
-            f"\n{Fore.GREEN}SUCCESS: {key_metric}. Assembly logic database "
-            f"created successfully.{Fore.RESET}\n"
-        )
     except IOError as e:
-        logging.error(f"Failed to write output file: {e}")
+        logging.error(f"Failed to write temporary output file: {e}")
         sys.exit(1)
+
+    # --- Final Step: Copy all assets to their permanent location ---
+    print("\nCopying final assets to permanent test asset directory...")
+    asset_dir = Path("data/foundational_assets/assembly_logic")
+    if asset_dir.exists():
+        shutil.rmtree(asset_dir)
+    asset_dir.mkdir(parents=True)
+    
+    # Define source and destination paths
+    shutil.copy(subject_db_path, asset_dir / "subject_db.assembly_logic.csv")
+    shutil.copy(output_path, asset_dir / "personalities_db.assembly_logic.txt")
+    print(f"Final assets successfully copied to '{asset_dir}'.")
+
+    print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+    print(f"{Fore.CYAN} - Assembly logic database saved to: {output_path}{Fore.RESET}")
+    key_metric = f"Processed {len(final_records)} subjects"
+    print(
+        f"\n{Fore.GREEN}SUCCESS: {key_metric}. Assembly logic database "
+        f"created successfully.{Fore.RESET}\n"
+    )
 
 
 if __name__ == "__main__":

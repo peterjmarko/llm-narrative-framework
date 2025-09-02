@@ -64,8 +64,8 @@ init(autoreset=True)
 SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 ELEMENTS_MAP = {"Fire": SIGNS[0::4], "Earth": SIGNS[1::4], "Air": SIGNS[2::4], "Water": SIGNS[3::4]}
 MODES_MAP = {"Cardinal": SIGNS[0::3], "Fixed": SIGNS[1::3], "Mutable": SIGNS[2::3]}
-QUADRANTS_MAP = {"1": SIGNS[0:3], "2": SIGNS[3:6], "3": SIGNS[6:9], "4": SIGNS[9:12]}
-HEMISPHERES_MAP = {"Eastern": SIGNS[9:12] + SIGNS[0:3], "Western": SIGNS[3:9], "Northern": SIGNS[0:6], "Southern": SIGNS[6:12]}
+# The static QUADRANTS_MAP and HEMISPHERES_MAP have been removed as they are 
+# replaced by a dynamic calculation based on the chart's angles.
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
@@ -97,12 +97,32 @@ def load_thresholds(file_path: Path) -> dict:
     return thresholds
 
 def load_delineations(delineations_dir: Path) -> dict:
+    """Loads delineations from a specific, required set of CSV files."""
     delineations = {}
+    required_files = [
+        "balances_elements.csv",
+        "balances_modes.csv",
+        "balances_hemispheres.csv",
+        "balances_quadrants.csv",
+        "balances_signs.csv",
+        "points_in_signs.csv",
+    ]
+
     if not delineations_dir.exists():
         logging.error(f"Delineations directory not found: {delineations_dir}")
         sys.exit(1)
-    for f in delineations_dir.glob("*.csv"):
-        with open(f, 'r', encoding='utf-8') as infile:
+
+    for filename in required_files:
+        filepath = delineations_dir / filename
+        if not filepath.exists():
+            # This is a critical error in the assembly logic test.
+            if os.environ.get("PROJECT_SANDBOX_PATH"):
+                 logging.error(f"FATAL: Required delineation file '{filename}' not found in sandbox.")
+                 sys.exit(1)
+            logging.warning(f"Delineation file not found, skipping: {filepath}")
+            continue
+
+        with open(filepath, "r", encoding="utf-8") as infile:
             reader = csv.reader(infile)
             for row in reader:
                 if len(row) == 2:
@@ -112,55 +132,83 @@ def load_delineations(delineations_dir: Path) -> dict:
 def get_sign(longitude):
     return SIGNS[math.floor(longitude / 30)]
 
-def calculate_classifications(placements: dict, point_weights: dict, thresholds: dict) -> list:
-    points_for_balances = list(point_weights.keys())
-    points_for_quad_hemi = [p for p in points_for_balances if p not in ['Ascendant', 'Midheaven']]
+def calculate_classifications(placements: dict, point_weights: dict, thresholds: dict, points_to_process: list) -> list:
     
     classifications = []
-    for point, lon in placements.items():
-        # All 12 points get a "Point in Sign" delineation, regardless of their weight.
-        sign = get_sign(lon)
-        classifications.append(f"{point} in {sign}")
+    
+    # --- Elements, Modes, and Signs (Zodiac-based) ---
+    sign_scores = {sign: 0 for sign in SIGNS}
+    for point in points_to_process:
+        if point in placements:
+            sign_scores[get_sign(placements[point])] += point_weights.get(point, 0)
 
-    def get_category_scores(use_all_points=True):
-        points_to_consider = points_for_balances if use_all_points else points_for_quad_hemi
-        scores = {sign: 0 for sign in SIGNS}
-        for point, lon in placements.items():
-            if point in points_to_consider:
-                scores[get_sign(lon)] += point_weights.get(point, 0)
-        return scores
+    # --- Quadrants and Hemispheres (Angle-based) ---
+    def is_between(longitude, start_angle, end_angle):
+        # Handles the circular nature of the zodiac (e.g., 350 to 20 degrees)
+        if start_angle < end_angle:
+            return start_angle <= longitude < end_angle
+        return longitude >= start_angle or longitude < end_angle
 
-    sign_scores_all = get_category_scores(True)
-    sign_scores_no_angles = get_category_scores(False)
+    asc = placements.get('Ascendant', 0)
+    mc = placements.get('Midheaven', 0)
+    ic = (mc + 180) % 360
+    dsc = (asc + 180) % 360
 
+    quadrant_scores = {"1": 0, "2": 0, "3": 0, "4": 0}
+    # Per astrological rules, Quadrant/Hemisphere balances exclude the angles themselves.
+    points_for_angles = [p for p in points_to_process if p not in ['Ascendant', 'Midheaven']]
+    
+    for point in points_for_angles:
+        if point in placements:
+            lon = placements[point]
+            weight = point_weights.get(point, 0)
+            if is_between(lon, asc, ic): quadrant_scores["1"] += weight
+            elif is_between(lon, ic, dsc): quadrant_scores["2"] += weight
+            elif is_between(lon, dsc, mc): quadrant_scores["3"] += weight
+            elif is_between(lon, mc, asc): quadrant_scores["4"] += weight
+    
+    hemisphere_scores = {
+        "Eastern": quadrant_scores["4"] + quadrant_scores["1"],
+        "Northern": quadrant_scores["1"] + quadrant_scores["2"],
+        "Western": quadrant_scores["2"] + quadrant_scores["3"],
+        "Southern": quadrant_scores["3"] + quadrant_scores["4"]
+    }
+
+    # --- Combine all scores for final classification ---
     category_scores = {
-        "Signs": sign_scores_all,
-        "Elements": {k: sum(sign_scores_all[s] for s in v) for k, v in ELEMENTS_MAP.items()},
-        "Modes": {k: sum(sign_scores_all[s] for s in v) for k, v in MODES_MAP.items()},
-        "Quadrants": {k: sum(sign_scores_no_angles[s] for s in v) for k, v in QUADRANTS_MAP.items()},
-        "Hemispheres": {k: sum(sign_scores_no_angles[s] for s in v) for k, v in HEMISPHERES_MAP.items()}
+        "Elements": {k: sum(sign_scores[s] for s in v) for k, v in ELEMENTS_MAP.items()},
+        "Modes": {k: sum(sign_scores[s] for s in v) for k, v in MODES_MAP.items()},
+        "Quadrants": quadrant_scores,
+        "Hemispheres": hemisphere_scores,
+        "Signs": sign_scores
     }
 
     for category, scores in category_scores.items():
         total_score = sum(scores.values())
         if total_score == 0: continue
+        
         avg_score = total_score / len(scores)
         weak_thresh = avg_score * thresholds[category]["weak_ratio"]
         strong_thresh = avg_score * thresholds[category]["strong_ratio"]
+        
+        # Iterate through the dictionary items in their natural order
         for division, score in scores.items():
-            # Correctly format the key to match the delineation library's structure.
-            if weak_thresh > 0 and score < weak_thresh:
-                if category == "Signs":
-                    classifications.append(f"{division} Weak")
-                else:
-                    classifications.append(f"{category.rstrip('s')} Weak {division}")
-            
             if score >= strong_thresh:
-                if category == "Signs":
-                    classifications.append(f"{division} Strong")
-                else:
-                    classifications.append(f"{category.rstrip('s')} Strong {division}")
+                key = f"{division} Strong" if category == "Signs" else f"{category.rstrip('s')} {division} Strong"
+                classifications.append(key)
+            elif weak_thresh > 0 and score < weak_thresh:
+                key = f"{division} Weak" if category == "Signs" else f"{category.rstrip('s')} {division} Weak"
+                classifications.append(key)
+
+    # --- Append Point in Sign classifications at the end ---
+    for point in points_to_process:
+        if point in placements:
+            sign = get_sign(placements[point])
+            classifications.append(f"{point} in {sign}")
+
     return classifications
+
+from config_loader import APP_CONFIG, get_config_value
 
 def main():
     parser = argparse.ArgumentParser(description="Generate final personalities DB.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -170,6 +218,7 @@ def main():
         help="Path to the sandbox directory for testing.",
     )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
+    parser.add_argument("--test-record-number", type=int, help="Run for a single record number for focused testing.")
     args = parser.parse_args()
 
     if args.sandbox_path:
@@ -225,24 +274,58 @@ def main():
     thresholds = load_thresholds(thresholds_path)
     delineations = load_delineations(delineations_dir)
 
+    # This debug checkpoint is no longer needed and has been removed.
+
     print(f"Processing subjects from {subject_db_path.name}...")
     try:
         with open(output_path, 'w', encoding='utf-8', newline='') as outfile:
-            writer = csv.writer(outfile, delimiter='\t')
+            writer = csv.writer(outfile, delimiter='\t', quoting=csv.QUOTE_ALL)
             writer.writerow(['Index', 'idADB', 'Name', 'BirthYear', 'DescriptionText'])
             
             with open(subject_db_path, 'r', encoding='utf-8') as infile:
                 reader = csv.DictReader(infile)
-                # Define the 12 points to ensure Uranus, Neptune, and Pluto are always included.
-                points_to_process = [
-                    "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", 
-                    "Uranus", "Neptune", "Pluto", "Ascendant", "Midheaven"
-                ]
-                for row in reader:
+                # Load the list of points to process from the config file.
+                points_str = get_config_value(
+                    APP_CONFIG, "DataGeneration", "points_for_neutralization"
+                )
+                points_to_process = [p.strip() for p in points_str.split(',')]
+                
+                # If a test record number is specified, filter the reader
+                all_rows = list(reader)
+                if args.test_record_number is not None:
+                    # Find the specific row by its 1-based record number in the sorted list
+                    if 1 <= args.test_record_number <= len(all_rows):
+                         # Map the 1-based record number to the 0-based list index
+                        row_to_process = all_rows[args.test_record_number - 1]
+                        rows_to_process = [row_to_process]
+                    else:
+                        rows_to_process = []
+                else:
+                    rows_to_process = all_rows
+
+                for row in rows_to_process:
                     placements = {p: float(row[p]) for p in points_to_process if row.get(p)}
-                    classifications = calculate_classifications(placements, point_weights, thresholds)
+                    classifications = calculate_classifications(placements, point_weights, thresholds, points_to_process)
                     desc_parts = [delineations.get(c, "") for c in classifications]
-                    full_desc = " ".join(part for part in desc_parts if part).strip()
+
+                    # --- UNIFIED DEBUG CHECKPOINT ---
+                    # In test mode, always print the details for the selected subject.
+                    if args.test_record_number is not None:
+                        print(f"\n--- DEBUG: Processing Subject: {row['Name']} ---")
+                        print("--- DEBUG: Key Generation & Text Snippet Assembly ---")
+                        print("Classifications generated and their corresponding text snippets:")
+                        for i, key in enumerate(classifications):
+                            part = desc_parts[i]
+                            snippet = (part[:70] + '..') if len(part) > 70 else part
+                            print(f"  {i+1:2d}. Key: {repr(key):<28} -> Snippet: '{snippet}'")
+                        print("-----------------------------------------------------------------")
+                        sys.stdout.flush()
+
+                    # Standardize joining: join all parts, normalize characters,
+                    # and then normalize all internal whitespace to a single space.
+                    raw_desc = " ".join(part for part in desc_parts if part)
+                    normalized_desc = raw_desc.replace("’", "'") # Normalize apostrophes
+                    full_desc = " ".join(normalized_desc.split()).strip()
                     
                     # Extract year correctly, handling different date formats
                     year_match = re.search(r'\b(\d{4})\b', row['Date'])

@@ -39,4 +39,24 @@ if src_path not in sys.path:
 #     with tempfile.TemporaryDirectory() as tmpdir:
 #         yield tmpdir
 
+
+import pytest
+
+
+def pytest_addoption(parser):
+    """Adds the --test-record-number command-line option to pytest."""
+    parser.addoption(
+        "--test-record-number",
+        action="store",
+        type=int,
+        default=None,
+        help="Specify a single record number (e.g., 1-18) to test for assembly logic.",
+    )
+
+
+@pytest.fixture
+def test_record_number(request):
+    """A fixture to retrieve the value of the --test-record-number option."""
+    return request.config.getoption("--test-record-number")
+
 # === End of tests/conftest.py ===

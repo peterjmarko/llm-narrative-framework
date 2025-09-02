@@ -392,8 +392,8 @@ A need for stimulation and activity in professional life.
                 
                 $neutralizeArgs = @(
                     (Join-Path $ProjectRoot "src/neutralize_delineations.py"),
-                    "-i", (Join-Path $SandboxDir $sfDelineations),
-                    "-o", (Join-Path $SandboxDir $neutralizedDir)
+                    "--sandbox-path",
+                    $SandboxDir
                 )
                 if ($i -eq 1) { $neutralizeArgs += "--force" }
 

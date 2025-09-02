@@ -64,8 +64,13 @@ def mock_input_files(tmp_path: Path) -> dict:
     thresholds_path.write_text("Category,WeakRatio,StrongRatio\nSigns,0.1,1.01\nElements,0.1,1.01\nModes,0.1,1.01\nQuadrants,0.1,1.01\nHemispheres,0.1,1.01")
     
     # Delineation files
-    (delineations_dir / "points.csv").write_text('"Sun in Aries","Is a pioneer."\n"Moon in Taurus","Is grounded."')
-    (delineations_dir / "balances.csv").write_text('"Element Strong Fire","Has a fiery nature."')
+    (delineations_dir / "points_in_signs.csv").write_text('"Sun in Aries","Is a pioneer."\n"Moon in Taurus","Is grounded."')
+    (delineations_dir / "balances_elements.csv").write_text('"Element Fire Strong","Has a fiery nature."')
+    # Create the other required (but empty for this test) delineation files
+    (delineations_dir / "balances_modes.csv").touch()
+    (delineations_dir / "balances_hemispheres.csv").touch()
+    (delineations_dir / "balances_quadrants.csv").touch()
+    (delineations_dir / "balances_signs.csv").touch()
 
     return {"sandbox_path": tmp_path, "output_path": output_path}
 

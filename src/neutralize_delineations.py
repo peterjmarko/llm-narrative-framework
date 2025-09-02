@@ -102,14 +102,14 @@ def get_points_in_signs_delineations(all_dels: Dict[str, str], points: List[str]
 def group_delineations(all_dels: Dict[str, str], points: List[str]) -> Dict[str, Dict[str, str]]:
     """Groups filtered delineations into their target output files."""
     signs = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    sign_strong_keys = {f"{sign} Strong" for sign in signs}
+    sign_balance_keys = {f"{sign} {balance}" for sign in signs for balance in ["Strong", "Weak"]}
 
     groups = {
         "balances_quadrants.csv": {k: v for k, v in all_dels.items() if k.startswith("Quadrant") and is_balance_delineation(k)},
         "balances_hemispheres.csv": {k: v for k, v in all_dels.items() if k.startswith("Hemisphere") and is_balance_delineation(k)},
         "balances_elements.csv": {k: v for k, v in all_dels.items() if k.startswith("Element") and is_balance_delineation(k)},
         "balances_modes.csv": {k: v for k, v in all_dels.items() if k.startswith("Mode") and is_balance_delineation(k)},
-        "balances_signs.csv": {k: v for k, v in all_dels.items() if k in sign_strong_keys},
+        "balances_signs.csv": {k: v for k, v in all_dels.items() if k in sign_balance_keys},
         "points_in_signs.csv": get_points_in_signs_delineations(all_dels, points),
     }
     return groups
@@ -215,8 +215,7 @@ def main():
     points_list = [p.strip() for p in points_to_process.split(',')]
     
     parser = argparse.ArgumentParser(description="Neutralize raw astrological delineations using an LLM.")
-    parser.add_argument("-i", "--input-file", default="data/foundational_assets/sf_delineations_library.txt")
-    parser.add_argument("-o", "--output-dir", default="data/foundational_assets/neutralized_delineations")
+    parser.add_argument("--sandbox-path", type=str, help="Path to the sandbox directory for testing.")
     parser.add_argument("--model", default=default_model)
     parser.add_argument("--force", action="store_true", help="Force re-processing of all groups.")
     parser.add_argument("--fast", action="store_true", help="Use bundled API calls for faster initial processing.")
@@ -224,18 +223,29 @@ def main():
     parser.add_argument("--bypass-llm", action="store_true", help="Bypass LLM and write original text to output files for testing.")
     args = parser.parse_args()
     
-    # --- File Handling and Backup ---
-    input_path, output_dir = Path(args.input_file), Path(args.output_dir)
-    if not input_path.exists(): logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}"); sys.exit(1)
+    if args.sandbox_path:
+        os.environ["PROJECT_SANDBOX_PATH"] = args.sandbox_path
+    
+    from config_loader import get_path
+
+    # --- File Handling Paths ---
+    input_path = Path(get_path("data/foundational_assets/sf_delineations_library.txt"))
+    output_dir = Path(get_path("data/foundational_assets/neutralized_delineations"))
 
     # --- LLM Bypass Workflow (for testing) ---
+    # This block MUST come before any other file operations to prevent the --force
+    # flag from deleting the test directory before this can run.
     if args.bypass_llm:
         print(f"\n{Fore.YELLOW}--- LLM Bypass Mode Activated ---")
         print("Writing original delineation text directly to output files...")
         
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
-        output_dir.mkdir(parents=True)
+        if not input_path.exists():
+            logging.error(f"{Fore.RED}FATAL: Input file not found for bypass: {input_path}")
+            sys.exit(1)
+        
+        # The pytest fixture is responsible for creating a clean directory.
+        # This script just ensures it exists before writing to it.
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         all_delineations = parse_llm_response(input_path)
         grouped_delineations = group_delineations(all_delineations, points_list)
@@ -247,6 +257,11 @@ def main():
         print(f"\n{Fore.GREEN}SUCCESS: Original delineations successfully written to '{output_dir}'.{Fore.RESET}\n")
         sys.exit(0)
 
+    # --- Regular Workflow File Check ---
+    if not input_path.exists():
+        logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}")
+        sys.exit(1)
+
     # --- Intelligent Startup Logic (Stale Check) ---
     if not args.force and output_dir.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_dir):
@@ -255,7 +270,8 @@ def main():
             args.force = True
 
     # --- Handle --force flag with interactive confirmation ---
-    if args.force and output_dir.exists():
+    # In a bypass run, the directory is managed by the test fixture and must not be deleted.
+    if args.force and output_dir.exists() and not args.bypass_llm:
         # Only prompt if running in an interactive terminal
         if sys.stdout.isatty():
             print(f"\n{Fore.YELLOW}WARNING: You have used --force to overwrite all neutralized delineations.{Fore.RESET}")
@@ -265,7 +281,7 @@ def main():
                 print("\nOperation cancelled by user.\n"); sys.exit(0)
         
         try:
-            backup_dir = Path("data/backup"); backup_dir.mkdir(parents=True, exist_ok=True)
+            backup_dir = Path(get_path("data/backup")); backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_name = f"{output_dir.name}_{timestamp}.zip"
             shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)

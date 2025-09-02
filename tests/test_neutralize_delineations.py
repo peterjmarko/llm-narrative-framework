@@ -41,7 +41,9 @@ from src.neutralize_delineations import group_delineations, parse_llm_response
 @pytest.fixture
 def mock_delineation_file(tmp_path: Path) -> Path:
     """Creates a temporary delineation library file for testing."""
-    delineation_path = tmp_path / "delineations.txt"
+    assets_dir = tmp_path / "data/foundational_assets"
+    assets_dir.mkdir(parents=True)
+    delineation_path = assets_dir / "sf_delineations_library.txt"
     content = """
 ; This is a comment and should be ignored.
 *Title
@@ -106,16 +108,27 @@ def test_group_delineations():
     assert "Some Other Key" not in str(groups)
 
 
-def test_bypass_llm_functionality(mock_delineation_file, tmp_path):
+def test_bypass_llm_functionality(tmp_path):
     """
     Tests that the --bypass-llm flag correctly writes original content to output.
     """
-    output_dir = tmp_path / "output_dels"
+    sandbox_path = tmp_path
     
+    # Create the mock input file inside the sandbox
+    assets_dir = sandbox_path / "data/foundational_assets"
+    assets_dir.mkdir(parents=True)
+    delineation_path = assets_dir / "sf_delineations_library.txt"
+    content = """
+*Quadrant 1 Strong
+You are independent.
+*Sun in Aries
+You are a pioneer.
+"""
+    delineation_path.write_text(content)
+
     test_args = [
         "neutralize_delineations.py",
-        "-i", str(mock_delineation_file),
-        "-o", str(output_dir),
+        "--sandbox-path", str(sandbox_path),
         "--bypass-llm",
     ]
 
@@ -127,6 +140,7 @@ def test_bypass_llm_functionality(mock_delineation_file, tmp_path):
         assert e.value.code == 0
 
     # Verify that the correct output files were created
+    output_dir = sandbox_path / "data/foundational_assets/neutralized_delineations"
     quadrants_file = output_dir / "balances_quadrants.csv"
     points_file = output_dir / "points_in_signs.csv"
     
@@ -142,6 +156,6 @@ def test_bypass_llm_functionality(mock_delineation_file, tmp_path):
     with open(points_file, 'r') as f:
         reader = csv.reader(f)
         row = next(reader)
-        assert row == ["Sun in Aries", "You are a pioneer. This is a continuation line."]
+        assert row == ["Sun in Aries", "You are a pioneer."]
 
 # === End of tests/test_neutralize_delineations.py ===
