@@ -21,8 +21,8 @@
 
 <#
 .SYNOPSIS
-    Orchestrates the entire data preparation pipeline, from raw data fetching
-    to final database generation.
+    Orchestrates the entire data preparation pipeline, from "Data Sourcing"
+    to final "Profile Generation".
 
 .DESCRIPTION
     This script is a master controller for the multi-stage data preparation
@@ -30,14 +30,15 @@
     interrupt-safe, and user-friendly.
 
     Key Features:
+    - Manages all four stages of the pipeline: Data Sourcing, Candidate
+      Qualification, LLM-based Candidate Selection, and Profile Generation.
+    - Is aware of the 'bypass_candidate_selection' flag in config.ini and will
+      efficiently skip the two LLM-based scoring steps when it is active.
     - Automatically checks the state of the pipeline and resumes from the first
       incomplete step.
-    - Pauses with clear instructions when a manual user action (e.g., using
-      Solar Fire) is required.
+    - Pauses with clear instructions when a manual user action is required.
     - Provides a clear summary report of which data files exist or are missing.
-    - Can be run in a read-only "report-only" mode to check the pipeline's status
-      without making any changes.
-    - Supports a '--force' flag for non-interactive, automated execution.
+    - Can be run in a read-only "report-only" mode to check the pipeline's status.
 
 .PARAMETER ReportOnly
     If specified, the script will only display the current status of the data
@@ -182,7 +183,7 @@ function Show-PipelineStatus {
 $ScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $exitCode = 0
 $configFile = Join-Path $ScriptRoot "config.ini"
-$bypassScoring = ([bool](Get-ConfigValue -FilePath $configFile -Section "DataGeneration" -Key "bypass_llm_scoring" -DefaultValue "false"))
+$bypassScoring = ([bool](Get-ConfigValue -FilePath $configFile -Section "DataGeneration" -Key "bypass_candidate_selection" -DefaultValue "false"))
 
 try {
     # Auto-detect execution environment

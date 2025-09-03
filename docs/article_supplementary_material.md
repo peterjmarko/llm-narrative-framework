@@ -5,88 +5,92 @@ author: "Peter J. Marko"
 date: "[Date]"
 ---
 
-This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers seeking to perform a **direct replication of the original study's findings**.
+This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers who wish to replicate or extend the original study's findings.
 
-This guide covers the complete end-to-end workflow, from initial setup and data preparation to running the main experiments and producing the final statistical analysis.
+This guide defines the three primary replication paths (Direct, Methodological, and Conceptual) and provides a complete walkthrough of the end-to-end workflow, from initial setup and data preparation to running the main experiments and producing the final statistical analysis.
 
 ## The Data Preparation Pipeline
 
-This guide supports two distinct research paths.
+This guide supports three distinct research paths.
 
-**Path 1: Direct Replication (Validating Original Findings)**
-The Astro-Databank (ADB) is a live research database. To directly replicate the original study, it is essential to use the static data files included in this repository (e.g., `adb_raw_export.txt`, `adb_validation_report.csv`). This ensures the pipeline starts with the identical data used for the original analysis, providing a stable baseline for comparison.
+**Path 1: Direct Replication (Computational Reproducibility)**
+To ensure computational reproducibility of the original findings, researchers should use the static data files and randomization seeds included in this repository. This path validates that the framework produces the same statistical results.
 
-**Path 2: Conceptual Replication (Creating a New Dataset)**
-For new research, the framework provides a fully automated pipeline to generate a fresh dataset from live sources. The instructions below describe how to use the provided scripts to create new data assets.
+**Path 2: Methodological Replication (Testing Robustness)**
+To test the robustness of the findings, researchers can use the framework's automated tools to generate a fresh dataset from the live Astro-Databank (ADB). The instructions below detail this workflow, which is organized into four main stages.
+
+**Path 3: Conceptual Replication (Extending the Research)**
+To extend the research, researchers can modify the framework itself, for example, by using a different LLM for the matching task or altering the analysis scripts.
 
 > **Note on Learning the Pipeline:** For researchers who wish to understand the automated pipeline in detail, an interactive **Guided Tour** is available. This step-by-step walkthrough is an excellent way to learn how the data processing scripts work together. Full instructions for running the tour can be found in the project's **[🧪 Testing Guide (TESTING.md)](TESTING.md)**.
 
-### Stage 1: Data Sourcing, Link Finding & Validation (Automated)
+### Stage 1: Data Sourcing
 
-#### a. Fetching Raw Data (`fetch_adb_data.py`)
-This script automates the scraping of the Astro-Databank website.
+This stage uses `fetch_adb_data.py` to create the initial raw dataset by scraping the Astro-Databank website with a specific set of pre-filters.
 
-**Prerequisites:**
-1.  A registered account at `astro.com`.
-2.  Credentials in the `.env` file: `ADB_USERNAME` and `ADB_PASSWORD`.
-
-**Execution:**
+**Prerequisites:** An account at `astro.com` and credentials in the `.env` file.
 ```bash
 # Fetch a new dataset from the live ADB
 pdm run fetch-adb
 ```
 This produces `data/sources/adb_raw_export.txt`.
 
-#### b. Finding Wikipedia Links (`find_wikipedia_links.py`)
-This script takes the raw export and finds the best-guess Wikipedia URL for each subject, creating the intermediate `data/processed/adb_wiki_links.csv` file.
+### Stage 2: Candidate Qualification
+
+This stage performs a rigorous, deterministic filtering pass to create a high-quality cohort of "eligible candidates."
+
+#### a. Finding Wikipedia Links (`find_wikipedia_links.py`)
+This script takes the raw export and finds the best-guess Wikipedia URL for each subject.
 ```bash
 # Find Wikipedia links for all raw records
 pdm run find-links
 ```
 
-#### c. Validating Wikipedia Pages (`validate_wikipedia_pages.py`)
-This script takes the list of found links, validates the content of each page, and produces the final `data/reports/adb_validation_report.csv` and a human-readable summary.
-
-**A Note on Reproducibility:** Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. For direct replication, the study's pipeline relies on the static report (`adb_validation_report.csv`) included in the repository.
+#### b. Validating Wikipedia Pages (`validate_wikipedia_pages.py`)
+This script validates the content of each page and produces the final `adb_validation_report.csv`.
 ```bash
 # Validate the content of each found Wikipedia page
 pdm run validate-pages
 ```
 
-### Stage 2: Pre-filtering & Scoring (Automated)
-
-#### a. Selecting Eligible Candidates (`select_eligible_candidates.py`)
-This script performs all initial data quality checks (valid birth year, 'OK' status, uniqueness), ensuring that expensive LLM scoring is only performed on high-quality candidates.
+#### c. Selecting Eligible Candidates (`select_eligible_candidates.py`)
+This script integrates the raw data with the validation report and applies a series of strict data quality rules (e.g., birth year, Northern Hemisphere, valid time format).
 ```bash
 # Create the list of eligible candidates
 pdm run select-eligible
 ```
 
-#### b. Eminence Scoring (`generate_eminence_scores.py`)
-This script processes the eligible candidates list and uses an LLM to assign a calibrated eminence score to each, creating the rank-ordered `eminence_scores.csv`.
+### Stage 3: LLM-based Candidate Selection (Optional)
+
+This is a second, optional filtering pass that uses LLMs to score the "eligible candidates" to determine the final, smaller subject pool. This entire stage can be skipped by setting `bypass_candidate_selection = true` in `config.ini`.
+
+#### a. Eminence Scoring (`generate_eminence_scores.py`)
+This script processes the eligible candidates list and uses an LLM to assign a calibrated eminence score to each.
 ```bash
 # Generate eminence scores for all eligible candidates
 pdm run gen-eminence
 ```
 
-#### c. OCEAN Scoring & Dynamic Cutoff (`generate_ocean_scores.py`)
-This script is a fully automated, resilient process that determines the final subject pool size. It processes subjects by eminence and stops when diversity (variance) shows a sustained drop. Its robust pre-flight check re-analyzes all existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention.
+#### b. OCEAN Scoring & Dynamic Cutoff (`generate_ocean_scores.py`)
+This script determines the final subject pool size by processing subjects by eminence and stopping when personality diversity (measured by variance) shows a sustained drop.
 ```bash
 # Generate OCEAN scores to determine the final cutoff
 pdm run gen-ocean
 ```
 
-### Stage 3: Final Subject Selection (Automated)
-
-#### a. Selecting Final Candidates (`select_final_candidates.py`)
-This script performs the final transformation. It filters the eligible list by the OCEAN set, resolves country codes, and sorts the result by eminence.
+#### c. Selecting Final Candidates (`select_final_candidates.py`)
+This script performs the final selection. In its default mode, it filters the eligible list by the OCEAN set. In bypass mode, it uses the entire eligible list.
 ```bash
 # Create the final, transformed list of subjects
 pdm run select-final
 ```
 
-#### b. Formatting for Import (`prepare_sf_import.py`)
-This script formats the final candidates list for import into Solar Fire, encoding the unique `idADB` of each subject into the `ZoneAbbr` field for data integrity.
+### Stage 4: Profile Generation
+
+This is the final stage, which assembles the personality profiles for the selected candidates.
+
+#### a. Formatting for Import (`prepare_sf_import.py`)
+This script formats the final candidates list for import into Solar Fire.
 ```bash
 # Prepare the final list for the manual import step
 pdm run prep-sf-import
@@ -214,11 +218,11 @@ Each 14-line block contains the following for one person:
 
 The entire file consists of `N * 14` lines, where `N` is the final number of subjects.
 
-## Final Database Generation
+### Stage 4: Profile Generation
 
-The final stage of the pipeline assembles the `personalities_db.txt` file. This is a fully automated, three-step process.
+This is the final stage, which assembles the personality profiles for the selected candidates. It involves both automated scripts and a one-time manual process using the Solar Fire software.
 
-### Step 1: Exporting the Delineations Library (One-Time Task)
+#### a. Manual Solar Fire Processing
 
 The personality descriptions are assembled from a library of pre-written text components. This library must first be exported from Solar Fire.
 
@@ -228,7 +232,7 @@ The personality descriptions are assembled from a library of pre-written text co
     2.  In the 'Interpretations Editor', go to `File > Decompile...` and save the file. This creates `standard.def` in the `Documents/Solar Fire User Files/Interpretations` directory.
     3.  Copy this file to `data/foundational_assets/sf_delineations_library.txt`.
 
-### Step 2: Automated Delineation Neutralization (`neutralize_delineations.py`)
+#### b. Automated Profile Assembly
 
 This script uses a powerful hybrid strategy to rewrite the esoteric library into neutral, psychological text. The recommended workflow is a two-step process:
 
@@ -245,18 +249,14 @@ This script uses a powerful hybrid strategy to rewrite the esoteric library into
     ```
 The script's output is the collection of `.csv` files in the `data/foundational_assets/neutralized_delineations/` directory.
 
-### Step 3: Automated Database Generation (`create_subject_db.py`, `generate_personalities_db.py`)
-
-Once all foundational assets are in place, the final assembly is handled by two scripts.
-
-#### a. Integrating Chart Data (`create_subject_db.py`)
+#### c. Integrating Chart Data (`create_subject_db.py`)
 This script bridges the manual software step. It reads the `sf_chart_export.csv` file, decodes the `idADB` from the `ZoneAbbr` field, and merges the chart data with the final subject list to produce the clean `data/processed/subject_db.csv`.
 ```bash
 # Integrate the manual chart data export
 pdm run create-subject-db
 ```
 
-#### b. Assembling the Final Database (`generate_personalities_db.py`)
+#### d. Assembling the Final Database (`generate_personalities_db.py`)
 This script performs the final assembly. It loads the clean `subject_db.csv`, the configuration files (`point_weights.csv`, `balance_thresholds.csv`), and the entire neutralized delineation library. For each person, it calculates their divisional classifications according to a deterministic algorithm and assembles the final description by looking up the corresponding text components. **The entire assembly algorithm has been rigorously validated against a ground-truth dataset generated by the source Solar Fire software to ensure its output is bit-for-bit identical.**
 ```bash
 # Generate the final personalities database

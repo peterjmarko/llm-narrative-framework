@@ -20,29 +20,32 @@
 # Filename: src/select_final_candidates.py
 
 """
-Selects and transforms the final set of candidates for the experiment.
+Performs the final step of the LLM-based Candidate Selection stage.
 
-This script takes the full list of eligible candidates and performs the final
-selection and transformation steps:
-1.  Filters the list to match the definitive set of subjects determined by the
-    OCEAN scoring process.
-2.  Resolves the 'CountryState' abbreviation into a full 'Country' name using
-    the `country_codes.csv` mapping file.
-3.  Sorts the final list by eminence score to ensure a consistent order for
-    downstream processing.
+This script can operate in two modes based on the `bypass_candidate_selection`
+flag in `config.ini`:
+
+-   **Default Mode:** Filters the "eligible candidates" list, retaining only
+    subjects present in the `ocean_scores.csv` file. This produces the final,
+    LLM-selected subject pool.
+-   **Bypass Mode:** Uses the entire "eligible candidates" list as the final
+    subject pool, skipping the LLM-based selection.
+
+In both modes, it then performs final transformations: resolving country codes,
+merging eminence scores for sorting, and re-indexing the final list.
 
 Inputs:
   - `data/intermediate/adb_eligible_candidates.txt`: The full list of subjects
-    who have passed all initial data quality checks.
-  - `data/foundational_assets/ocean_scores.csv`: The definitive subject set.
-  - `data/foundational_assets/eminence_scores.csv`: Used for sorting.
+    from the "Candidate Qualification" stage.
+  - `data/foundational_assets/ocean_scores.csv`: (Default Mode) The definitive
+    subject set determined by OCEAN scoring.
+  - `data/foundational_assets/eminence_scores.csv`: (Default Mode) Used for sorting.
   - `data/foundational_assets/country_codes.csv`: The mapping file for country
     abbreviations.
 
 Output:
   - `data/intermediate/adb_final_candidates.txt`: The final, sorted list
-    of subjects, now including a resolved 'Country' column, ready for the
-    next pipeline step.
+    of subjects, ready for the "Profile Generation" stage.
 """
 
 import argparse
@@ -97,12 +100,12 @@ def main():
         if sandbox_config_path.exists():
             sandbox_config = configparser.ConfigParser()
             sandbox_config.read(sandbox_config_path)
-            bypass_scoring = sandbox_config.get("DataGeneration", "bypass_llm_scoring", fallback="false").lower() == 'true'
+            bypass_candidate_selection = sandbox_config.get("DataGeneration", "bypass_candidate_selection", fallback="false").lower() == 'true'
         else:
-            bypass_scoring = False
+            bypass_candidate_selection = False
     else:
-        bypass_scoring = get_config_value(APP_CONFIG, "DataGeneration", "bypass_llm_scoring", "false").lower() == 'true'
-    if bypass_scoring:
+        bypass_candidate_selection = get_config_value(APP_CONFIG, "DataGeneration", "bypass_candidate_selection", "false").lower() == 'true'
+    if bypass_candidate_selection:
         input_files = [eligible_path, country_codes_path]
     else:
         ocean_path = Path(get_path("data/foundational_assets/ocean_scores.csv"))
@@ -152,7 +155,7 @@ def main():
         logging.info(f"Loaded {len(eligible_df):,} records from {eligible_path.name}.")
         logging.info(f"Loaded {len(country_codes_df):,} mappings from {country_codes_path.name}.")
         
-        if not bypass_scoring:
+        if not bypass_candidate_selection:
             eminence_df = pd.read_csv(eminence_path)
             ocean_df = pd.read_csv(ocean_path)
             logging.info(f"Loaded {len(eminence_df):,} records from {eminence_path.name}.")
@@ -163,7 +166,7 @@ def main():
 
     print(f"\n{Fore.YELLOW}--- Selecting and Transforming Final Candidates ---")
 
-    if bypass_scoring:
+    if bypass_candidate_selection:
         logging.info("Bypass mode is active: using all eligible candidates as the final set.")
         final_df = eligible_df.copy()
         # Add a placeholder eminence score for sorting if it doesn't exist
@@ -186,7 +189,7 @@ def main():
     
     # Step 3: Merge with eminence scores and sort
     final_df["idADB"] = final_df["idADB"].astype(str)
-    if not bypass_scoring:
+    if not bypass_candidate_selection:
         eminence_df["idADB"] = eminence_df["idADB"].astype(str)
         final_df = pd.merge(final_df, eminence_df[["idADB", "EminenceScore"]], on="idADB", how="left")
     final_df.sort_values(by="EminenceScore", ascending=False, inplace=True)
@@ -206,7 +209,7 @@ def main():
     ]
     
     # In bypass mode, include EminenceScore in the final output
-    if bypass_scoring:
+    if bypass_candidate_selection:
         final_column_order.append('EminenceScore')
     
     final_df = final_df[final_column_order]
