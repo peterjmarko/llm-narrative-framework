@@ -2,48 +2,49 @@ graph TD
     classDef manualStyle fill:#f8cecc,stroke:#b85450,stroke-width:2px
     classDef sourceStyle fill:#cce5ff,stroke:#333,stroke-width:2px
     classDef finalProductStyle fill:#d5e8d4,stroke:#82b366,stroke-width:2px,font-weight:bold
+    classDef scriptStyle fill:#e6e6fa,stroke:#333,stroke-width:1px
 
     subgraph "Start"
         StartDB(("Live Astro-Databank<br/>Website"))
     end
 
-    subgraph "Stage 1: Sourcing, Link Finding & Validation"
-        StartDB --> A[Fetch Raw Data<br>src/fetch_adb_data.py]
-        A --> B[Find Wikipedia Links<br>src/find_wikipedia_links.py]
-        B --> B2[Validate Wikipedia Pages<br>src/validate_wikipedia_pages.py];
+    subgraph "Stage 1: Data Sourcing"
+        A["Fetch Raw Data<br>src/fetch_adb_data.py"]
     end
 
-    subgraph "Stage 2: Pre-filtering & Scoring"
-        B2 --> C[Select Eligible Candidates<br>src/select_eligible_candidates.py];
-        C --> D["Generate Eminence Scores<br>src/generate_eminence_scores.py<br/>(Uses LLM)"];
-        D --> E["Generate OCEAN Scores<br>src/generate_ocean_scores.py<br/>(Uses LLM)"];
+    subgraph "Stage 2: Candidate Qualification"
+        B["Find Wikipedia Links<br>src/find_wikipedia_links.py"]
+        B2["Validate Wikipedia Pages<br>src/validate_wikipedia_pages.py"]
+        C["Select Eligible Candidates<br>src/select_eligible_candidates.py"]
     end
 
-    subgraph "Stage 3: Final Selection"
-        E --> F[Select Final Candidates<br>src/select_final_candidates.py];
+    subgraph "Stage 3: LLM-based Candidate Selection"
+        D["Generate Eminence Scores<br>src/generate_eminence_scores.py<br>(Uses LLM)"]
+        E["Generate OCEAN Scores<br>src/generate_ocean_scores.py<br>(Uses LLM)"]
+        F["Select Final Candidates<br>src/select_final_candidates.py"]
     end
 
-    subgraph "Stage 4: Manual Chart Calculation"
-        F --> G[Prepare for SF Import<br>src/prepare_sf_import.py];
-        G --> H((Use Solar Fire Software));
-    end
-    
-    subgraph "Stage 5: Automated Neutralization"
-        I["Neutralize Delineations<br>src/neutralize_delineations.py<br/>(Uses LLM)"]
-    end
-
-    subgraph "Stage 6: Final Database Generation"
-        H --> J[Create Subject DB<br>src/create_subject_db.py];
-        I --> J
-        J --> K[Generate Personalities DB<br>src/generate_personalities_db.py];
-        I --> K
+    subgraph "Stage 4: Profile Generation"
+        G["Prepare for SF Import<br>src/prepare_sf_import.py"]
+        H((Use Solar Fire Software))
+        I["Neutralize Delineations<br>src/neutralize_delineations.py<br>(Uses LLM)"]
+        J["Create Subject DB<br>src/create_subject_db.py"]
+        K["Generate Personalities DB<br>src/generate_personalities_db.py"]
     end
     
     subgraph "End"
-        K --> FinalDB(("personalities_db.txt"))
+        FinalDB(("personalities_db.txt"))
     end
 
-    class H manualStyle;
-    class StartDB sourceStyle;
-    class FinalDB finalProductStyle;
+    %% --- Main Workflow Connections ---
+    StartDB --> A --> B --> B2 --> C --> D --> E --> F --> G --> H --> J --> K --> FinalDB
     
+    %% --- Parallel Feed-in for Stage 4 ---
+    I --> J
+    I --> K
+
+    %% --- Styling ---
+    class A,B,B2,C,D,E,F,G,I,J,K scriptStyle
+    class H manualStyle
+    class StartDB sourceStyle
+    class FinalDB finalProductStyle

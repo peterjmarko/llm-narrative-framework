@@ -87,7 +87,7 @@ def mock_sandbox_with_bypass_config(tmp_path: Path) -> Path:
     
     config_content = (
         "[DataGeneration]\n"
-        "bypass_llm_scoring = true\n"
+        "bypass_candidate_selection = true\n"
     )
     (tmp_path / "config.ini").write_text(config_content)
     

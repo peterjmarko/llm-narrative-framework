@@ -1,4 +1,6 @@
-# --- Python Build & Cache ---
+# ==============================================================================
+# --- Python Environment & Cache ---
+# ==============================================================================
 # Virtual environment folders
 .venv/
 venv/
@@ -10,31 +12,111 @@ __pycache__/
 *.pyo
 *.pyd
 
-# --- Project Generated Files & Outputs ---
-# All generated data, reports, and archives
-/output/
-/main_archive/
-/src/archive/
-/tests/archive/
 
-# Ignore generated document and image files
-# The .template.md is the source of truth and is tracked by Git.
+# ==============================================================================
+# --- Dependency Management ---
+# ==============================================================================
+# PDM-specific cache and configuration
+.pdm-python
+.python-version
+
+# Node.js dependencies for documentation tools
+node_modules/
+/node_modules.coverage.*
+
+# Setuptools build artifacts
+*.egg-info/
+
+
+# ==============================================================================
+# --- IDE / Editor / OS Specific ---
+# ==============================================================================
+# IDE configuration folders
+.idea/
+.vscode/
+
+# macOS specific files
+.DS_Store
+
+# Windows specific files
+Thumbs.db
+
+
+# ==============================================================================
+# --- Secrets ---
+# ==============================================================================
+# Ignore the .env file, which should contain sensitive API keys.
+# A .env.example file should be created and committed instead.
+.env
+
+
+# ==============================================================================
+# --- Project Outputs ---
+# ==============================================================================
+# All generated experiment data, reports, and archives
+/output/
+/archive/
+/main_archive/
+
+
+# ==============================================================================
+# --- Documentation Artifacts ---
+# ==============================================================================
+# Ignore generated final documentation and intermediate images.
+# The .template.md files are the source of truth and are tracked by Git.
 docs/DOCUMENTATION.md
 docs/images/
-*.docx
 docs/**/*.pdf
+docs/word_docs/
+*.docx
 !docs/custom_reference.docx # Explicitly allow the custom reference document
-/linter_backups/    # Ignore linter backups
-/project_scope_report.md    # Ignore generated project reports
 
-# Backup files
-*.bak
 
-# Intermediate and temporary files used by the pipeline
+# ==============================================================================
+# --- Data Pipeline Artifacts ---
+# ==============================================================================
+# Intermediate and generated files from the data preparation pipeline
+/data/intermediate/
+/data/processed/
+/data/backup/
+/data/reports/
+/data/temp/
+/data/temp_manual_test/
+
+# Generated foundational assets that should not be committed
+/data/foundational_assets/sf_chart_export.csv
+/data/foundational_assets/eminence_scores.csv
+/data/foundational_assets/ocean_scores.csv
+
+# Temporary worker directories used by the pipeline
 /src/temp/
+/src/archive/
 /src/temp_neutralize_worker/
-~$README.*
-~$CONTRIBUTING.*
+/src/temp_ocean_worker/
+
+
+# ==============================================================================
+# --- Testing Artifacts ---
+# ==============================================================================
+# Ignore pytest cache, coverage reports, and temporary test environments
+.pytest_cache/
+.coverage
+/tests/archive/
+/tests/temp_test_environment/
+/temp_test_environment/
+/temp_assembly_logic_validation/
+
+
+# ==============================================================================
+# --- General Project & Tooling Temp Files ---
+# ==============================================================================
+# Linter backups and generated project reports
+/linter_backups/
+/project_scope_report.md
+
+# General backup files and temporary office files
+*.bak
+~$*
 
 # Temporary files for PowerShell streaming
 temp_*.log
@@ -42,59 +124,5 @@ temp_*.log
 # Temporary file for crafting conventional commit messages (see CONTRIBUTING.md)
 commit.txt
 
-# Intermediate and generated files from the data preparation pipeline
-/data/intermediate/
-/data/processed/
-/data/foundational_assets/sf_chart_export.csv
-/data/foundational_assets/eminence_scores.csv
-/data/foundational_assets/ocean_scores.csv
-
-# Generated reports, backup and temporary files
-/archive/
-/data/backup/
-/data/reports/
-/data/temp/
-/linter_backups/
-
-# Temporary files for manual testing
-data/temp_manual_test/
-
-
-# --- Secrets ---
-# Ignore the .env file, which should contain sensitive API keys.
-# A .env.example file should be created and committed instead.
-.env
-
-# --- Testing & Coverage ---
-# Ignore pytest cache and coverage reports.
-.pytest_cache/
-.coverage
-/temp_assembly_logic_validation/
-/temp_test_environment/
-/tests/temp_test_environment/
-
-# --- IDE & OS Specific Files ---
-# macOS specific files
-.DS_Store
-
-# Windows specific files
-Thumbs.db
-
-# IDE configuration folders
-.idea/
-.vscode/
-
-# --- Dependency Management Build Artifacts ---
-# Ignore setuptools build artifacts
-*.egg-info/
-
-# Ignore PDM-specific cache and configuration files
-.pdm-python
-.python-version
-
-# Ignore 'npm install' artifacts
-/node_modules.coverage.*
-node_modules/
-
-# --- Debugging Artifacts ---
+# General debugging directory
 /debug/

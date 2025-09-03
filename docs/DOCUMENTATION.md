@@ -154,12 +154,12 @@ These diagrams show the sequence of data artifacts (files) created and transform
 
 <div align="center">
   <p>Data Prep Flow 1: Data Sourcing and Candidate Qualification.</p>
-  <img src="images/flow_prep_1_sourcing.png" width="70%">
+  <img src="images/flow_prep_1_qualification.png" width="70%">
 </div>
 
 <div align="center">
   <p>Data Prep Flow 2: LLM-based Candidate Selection.</p>
-  <img src="images/flow_prep_2_scoring.png" width="80%">
+  <img src="images/flow_prep_2_selection.png" width="80%">
 </div>
 
 <div align="center">

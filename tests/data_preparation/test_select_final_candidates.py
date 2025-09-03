@@ -38,11 +38,11 @@ from src import select_final_candidates
 
 @pytest.fixture
 def mock_sandbox_with_bypass_config(mock_input_files) -> Path:
-    """Creates a mock config.ini with bypass_llm_scoring set to true."""
+    """Creates a mock config.ini with bypass_candidate_selection set to true."""
     sandbox_path = mock_input_files["sandbox_path"]
     config_content = (
         "[DataGeneration]\n"
-        "bypass_llm_scoring = true\n"
+        "bypass_candidate_selection = true\n"
     )
     (sandbox_path / "config.ini").write_text(config_content)
     return sandbox_path

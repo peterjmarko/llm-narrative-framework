@@ -143,9 +143,9 @@ This diagram shows the high-level, multi-stage workflow for the entire data prep
 
 These diagrams show the sequence of data artifacts (files) created and transformed by the pipeline scripts at each major stage.
 
-{{grouped_figure:docs/diagrams/flow_prep_1_sourcing.mmd | scale=2.5 | width=70% | caption=Data Prep Flow 1: Data Sourcing and Candidate Qualification.}}
+{{grouped_figure:docs/diagrams/flow_prep_1_qualification.mmd | scale=2.5 | width=70% | caption=Data Prep Flow 1: Data Sourcing and Candidate Qualification.}}
 
-{{grouped_figure:docs/diagrams/flow_prep_2_scoring.mmd | scale=2.5 | width=80% | caption=Data Prep Flow 2: LLM-based Candidate Selection.}}
+{{grouped_figure:docs/diagrams/flow_prep_2_selection.mmd | scale=2.5 | width=80% | caption=Data Prep Flow 2: LLM-based Candidate Selection.}}
 
 {{grouped_figure:docs/diagrams/flow_prep_3_generation.mmd | scale=2.5 | width=100% | caption=Data Prep Flow 3: Profile Generation.}}
 

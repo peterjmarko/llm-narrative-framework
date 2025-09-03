@@ -1,3 +1,6 @@
+---
+title: Data Preparation Code Architecture
+---
 graph TD
     classDef scriptStyle fill:#fff2cc,stroke:#d6b656,stroke-width:2px
     classDef utilStyle fill:#e6e6fa,stroke:#333,stroke-width:2px
@@ -8,16 +11,25 @@ graph TD
     end
 
     subgraph "Main Data Preparation Pipeline"
-        A[src/fetch_adb_data.py]
-        B[src/find_wikipedia_links.py]
-        B2[src/validate_wikipedia_pages.py]
-        C[src/select_eligible_candidates.py]
-        D["src/generate_eminence_scores.py<br/>(Uses LLM)"]
-        E["src/generate_ocean_scores.py<br/>(Uses LLM)"]
-        F[src/select_final_candidates.py]
-        G[src/prepare_sf_import.py]
-        H[src/create_subject_db.py]
-        I[src/generate_personalities_db.py]
+        subgraph "Stage 1: Data Sourcing"
+            A[src/fetch_adb_data.py]
+        end
+        subgraph "Stage 2: Candidate Qualification"
+            B[src/find_wikipedia_links.py]
+            B2[src/validate_wikipedia_pages.py]
+            C[src/select_eligible_candidates.py]
+        end
+        subgraph "Stage 3: LLM-based Candidate Selection"
+            D["src/generate_eminence_scores.py<br/>(Uses LLM)"]
+            E["src/generate_ocean_scores.py<br/>(Uses LLM)"]
+            F[src/select_final_candidates.py]
+        end
+        subgraph "Stage 4: Profile Generation"
+            G[src/prepare_sf_import.py]
+            J["src/neutralize_delineations.py<br/>(Uses LLM)"]
+            H[src/create_subject_db.py]
+            I[src/generate_personalities_db.py]
+        end
     end
     
     P --> A
@@ -28,23 +40,28 @@ graph TD
     P --> E
     P --> F
     P --> G
+    P --> J
     P --> H
     P --> I
 
-    %% Invisible links to force vertical stacking
-    A ~~~ B ~~~ B2 ~~~ C ~~~ D ~~~ E ~~~ F ~~~ G ~~~ H ~~~ I
-    
-    subgraph Delineation Processing
-        J["src/neutralize_delineations.py<br/>(Uses LLM)"]
-    end
-
-    J --> I
-    J --> H
+    %% Invisible links to force vertical waterfall layout
+    A ~~~ B
+    B ~~~ B2
+    B2 ~~~ C
+    C ~~~ D
+    D ~~~ E
+    E ~~~ F
+    F ~~~ G
+    G ~~~ J
+    J ~~~ H
+    H ~~~ I
 
     subgraph Shared Utilities
         K(src/id_encoder.py)
     end
 
+    J --> I
+    J --> H
     G -.-> K
     H -.-> K
 

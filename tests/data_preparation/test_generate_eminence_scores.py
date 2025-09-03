@@ -98,10 +98,10 @@ def test_load_processed_ids(tmp_path):
 
 @pytest.fixture
 def mock_sandbox_with_bypass_config(mock_main_sandbox: Path) -> Path:
-    """Creates a mock config.ini with bypass_llm_scoring set to true."""
+    """Creates a mock config.ini with bypass_candidate_selection set to true."""
     config_content = (
         "[DataGeneration]\n"
-        "bypass_llm_scoring = true\n"
+        "bypass_candidate_selection = true\n"
     )
     (mock_main_sandbox / "config.ini").write_text(config_content)
     return mock_main_sandbox

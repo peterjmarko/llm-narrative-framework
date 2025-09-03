@@ -1,29 +1,44 @@
 graph TD
-    subgraph "Setup"
-        A[Start] --> B[Fetch Raw Data from ADB]
+    classDef manualStyle fill:#f8cecc,stroke:#b85450,stroke-width:2px
+    classDef sourceStyle fill:#cce5ff,stroke:#333,stroke-width:2px
+    classDef finalProductStyle fill:#d5e8d4,stroke:#82b366,stroke-width:2px,font-weight:bold
+
+    Start((Start<br>Live Astro-Databank Website))
+
+    subgraph "Stage 1: Data Sourcing"
+        A[Fetch Raw Data]
     end
 
-    subgraph "Filtering & Selection"
-        B --> C{Find Wikipedia Link}
-        C -- Found --> D{Validate Page Content}
-        D -- Valid --> E{Apply Data Quality Rules}
-        E -- Eligible --> F[Score Candidates for Eminence & OCEAN]
-        F --> G{Apply Statistical Diversity Cutoff}
-        G -- In Final Set --> H[Final Candidate Set Ready]
+    subgraph "Stage 2: Candidate Qualification"
+        B[Find & Validate Wikipedia Pages]
+        C[Apply Deterministic Quality Rules]
+    end
+
+    subgraph "Stage 3: LLM-based Candidate Selection"
+        D[Score Candidates for Eminence & Diversity]
+        E[Apply Statistical Cutoff & Select Final Set]
+    end
+
+    subgraph "Stage 4: Profile Generation"
+        F[Prepare for Manual Processing]
+        G((Manual Chart Calculation<br>using Solar Fire))
+        H[Neutralize Delineation Texts]
+        I[Assemble Final Personality Profiles]
     end
     
-    subgraph "Generation"
-        H --> I{{Perform Manual Chart Calculation}}
-        I --> J[Neutralize Esoteric Text Library]
-        H & J --> K[Assemble Final Database from Candidates & Text]
-    end
+    End((End<br>personalities_db.txt))
 
-    subgraph "Finalization"
-        K --> L[Write personalities_db.txt]
-        L --> Z[End]
-    end
+    Start --> A
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> I
+    H --> I
+    I --> End
 
-    C -- Not Found --> X[Discard Record]
-    D -- Invalid --> X
-    E -- Ineligible --> X
-    G -- Not in Set --> X
+    class G manualStyle
+    class Start sourceStyle
+    class End finalProductStyle
