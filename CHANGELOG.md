@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.13.1 (2025-09-02)
+
+### Bump
+
+- **version 6.13.0 → 6.13.1**
+
+### Refactor
+
+- **standardize data preparation terminology and refactor bypass flag**
+  - Renames the `bypass_llm_scoring` flag to the more precise `bypass_candidate_selection` to avoid ambiguity with the main experiment's similarity scoring.
+  - Updates all relevant scripts (`config.ini`, `prepare_data.ps1`, `generate_eminence_scores.py`, `generate_ocean_scores.py`, `select_final_candidates.py`) and their docstrings to use the new flag and terminology.
+  - Restructures all high-level documentation (`DOCUMENTATION.md`, `TESTING.md`, `article_main_text.md`, etc.) to use a clear, four-stage model for the data preparation pipeline: `Data Sourcing`, `Candidate Qualification`, `LLM-based Candidate Selection`, and `Profile Generation`.
+
 ## 6.13.0 (2025-09-02)
 
 ### Bump
