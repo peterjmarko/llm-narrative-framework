@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.13.2 (2025-09-03)
+
+### Bump
+
+- **version 6.13.1 → 6.13.2**
+
+### Refactor
+
+- **standardize terminology and refactor bypass flag**
+  Standardizes the terminology for the data preparation pipeline into a clear, four-stage model: Data Sourcing, Candidate Qualification, LLM-based Candidate Selection, and Profile Generation.
+  
+  Refactors the ambiguous `bypass_llm_scoring` flag to the more precise `bypass_candidate_selection`. Updates all relevant scripts, unit tests, diagrams, and high-level documentation to use the new terminology and flag. Improves the layout of key diagrams to a "waterfall" structure for better readability. Also restructures and updates the .gitignore file.
+
 ## 6.13.1 (2025-09-02)
 
 ### Bump
