@@ -39,8 +39,9 @@
     - Pauses with clear instructions when a manual user action is required.
     - Provides a clear summary report of which data files exist or are missing.
     - Can be run in a read-only "report-only" mode to check the pipeline's status.
-    - Supports an "interactive" mode that pauses for user confirmation before
-      executing each step, perfect for learning the pipeline.
+    - Supports a highly polished "interactive" mode that provides a step-by-step
+      guided tour of the entire pipeline, complete with detailed explanations
+      and color-coded feedback, making it an excellent learning tool.
 
 .PARAMETER ReportOnly
     If specified, the script will only display the current status of the data

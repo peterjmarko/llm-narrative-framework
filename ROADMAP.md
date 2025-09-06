@@ -2,6 +2,11 @@
 
 This document outlines planned development tasks and tracks known issues for the project. The framework is designed to support two key research activities: the **direct replication** of the original study's findings by using the static data files included in the repository, and the **conceptual replication** of the methodology by generating new data from live sources. All development tasks are categorized by work stream below.
 
+## Completed Milestones
+
+- [x] **Data Preparation Pipeline Fully Tested**
+  - All four layers of testing (Core Algorithm, Unit, Orchestration, and Integration) for the data preparation pipeline are complete and passing, ensuring a robust and reliable data foundation for the main experiments.
+
 ## Tasks Prior to Publication
 
 ### Code Development and Testing

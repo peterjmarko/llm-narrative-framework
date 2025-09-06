@@ -209,7 +209,7 @@ The cleanup script will delete the test study directory and restore the project.
 
 ### Data Preparation Pipeline
 
-The following table details the testing status for each script in the data preparation pipeline.
+**Milestone Complete:** All four layers of testing for the data preparation pipeline (Core Algorithm, Unit, Orchestration, and Integration) are complete and passing. The status of individual components is detailed below.
 
 --------------------------------------------------------------------------------------------------------------------
 Module                              Cov. (%)        Status & Justification

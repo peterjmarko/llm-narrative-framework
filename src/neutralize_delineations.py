@@ -534,11 +534,18 @@ def main():
         print(f"  - Skipped:   {skipped_count} tasks (already exist)")
         print(f"  - Failed:    {failed_count} tasks")
         
+        from config_loader import PROJECT_ROOT
+        display_path = os.path.relpath(output_dir, PROJECT_ROOT)
+
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Neutralized delineations saved to: {display_path}{Fore.RESET}")
+
         if failed_count > 0:
-            print(f"\n{Fore.RED}Neutralization process finished with {failed_count} failure(s).{Fore.RESET}")
-            print(f"{Fore.YELLOW}Re-run the script to automatically process the failed tasks.{Fore.RESET}\n")
+            key_metric = f"Finished with {failed_count} failure(s)"
+            print(f"\n{Fore.RED}FAILURE: {key_metric}. Re-run the script to automatically retry.{Fore.RESET}\n")
         else:
-            print(f"\n{Fore.GREEN}Neutralization process finished successfully.{Fore.RESET}\n")
+            key_metric = f"Processed {processed_count} task(s)"
+            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Neutralization completed successfully.{Fore.RESET}\n")
 
 def debug_and_exit(prompt, worker_result, pbar, temp_dir):
     """Prints debug info and halts the script."""
