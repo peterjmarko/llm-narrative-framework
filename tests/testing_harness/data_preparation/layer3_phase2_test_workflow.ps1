@@ -3,337 +3,304 @@
 # --- Step 2: Execute the Test Workflow ---
 
 param(
+    [Parameter(Mandatory=$true)]
+    [hashtable]$TestProfile,
+
     [Parameter(Mandatory=$false)]
     [switch]$Interactive
 )
 
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
-$relativeSandboxDir = (Resolve-Path $SandboxDir -Relative).TrimStart('.\')
 $ErrorActionPreference = "Stop"
 
-function Invoke-PipelineStep {
-    param(
-        [string]$ScriptName,
-        [string]$Description,
-        [string[]]$InputFiles,
-        [string[]]$OutputFiles,
-        [scriptblock]$Action
-    )
+# --- Define ANSI Color Codes ---
+$C_RESET = "`e[0m"
+$C_CYAN = "`e[96m"
+
+# --- Helper Functions ---
+function Format-Banner {
+    param([string]$Message, [string]$Color = $C_CYAN)
+    $line = '#' * 80; $bookend = "###"; $contentWidth = $line.Length - ($bookend.Length * 2)
+    $paddingNeeded = $contentWidth - $Message.Length - 2; $leftPad = [Math]::Floor($paddingNeeded / 2); $rightPad = [Math]::Ceiling($paddingNeeded / 2)
+    $centeredMsg = "$bookend $(' ' * $leftPad)$Message$(' ' * $rightPad) $bookend"
+    Write-Host "`n$Color$line"; Write-Host "$Color$centeredMsg"; Write-Host "$Color$line$C_RESET`n"
+}
+
+# Add base58 decode function using Python module
+function ConvertFrom-Base58 {
+    param([string]$EncodedString)
     
-    if ($Interactive) {
-        $script:stepCounter = if ($script:stepCounter) { $script:stepCounter + 1 } else { 1 }
-        $stepHeader = ">>> Step $($script:stepCounter): $ScriptName <<<"
-        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
-        Write-Host $stepHeader -ForegroundColor Blue
-        Write-Host $Description -ForegroundColor Blue
-        Write-Host "`n  INPUTS:"
-        $InputFiles | ForEach-Object {
-            if ($_ -match "[\\/]") {
-                Write-Host "    - $(Join-Path $relativeSandboxDir $_)"
-            } else {
-                Write-Host "    - $_"
-            }
-        }
-        Write-Host "`n  OUTPUTS:"
-        $OutputFiles | ForEach-Object {
-            if ($_ -match "[\\/]") {
-                Write-Host "    - $(Join-Path $relativeSandboxDir $_)"
-            } else {
-                Write-Host "    - $_"
-            }
-        }
-        Write-Host "" # Add a blank line for spacing
-        Read-Host -Prompt "Press Enter to execute this step (Ctrl+C to exit)..."
+    $pythonScript = @"
+import sys
+sys.path.append('$($ProjectRoot.Replace('\', '/'))/src')
+from id_encoder import from_base58
+print(from_base58('$EncodedString'))
+"@
+    
+    try {
+        $result = python -c $pythonScript
+        return [int]$result
     }
-
-    & $Action
-
-    if ($Interactive) {
-        Write-Host "" # Add a blank line for spacing
-        Read-Host -Prompt "Step complete. Inspect the output files, then press Enter to continue (Ctrl+C to exit)..."
+    catch {
+        throw "Failed to decode base58 '$EncodedString': $($_.Exception.Message)"
     }
 }
 
-if (-not (Test-Path $SandboxDir)) { throw "FATAL: Test sandbox not found. Please run Stage 1 first." }
-
-Write-Host ""
-Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
-Write-Host "--- Stage 2: Execute the Test Workflow ---" -ForegroundColor Cyan
+if (-not (Test-Path $SandboxDir)) { throw "FATAL: Test sandbox not found. Please run Phase 1 first." }
 
 try {
+    $AllSubjects = $TestProfile.Subjects
+    # Define the subset of subjects expected to pass initial filtering and selection
+    $FinalSubjects = $TestProfile.Subjects | Where-Object { $_.Name -in @("Ernst (1900) Busch", "Paul McCartney", "Jonathan Cainer") }
 
+    # --- 1. Harness Setup from Profile ---
+    Write-Host "`n--- HARNESS: Configuring sandbox from test profile '$($TestProfile.Name)'... ---" -ForegroundColor Yellow
+    
+    # 1a. Create test-specific config using proper INI parsing
+    $mainConfigPath = Join-Path $ProjectRoot "config.ini"
+    $sandboxConfigPath = Join-Path $SandboxDir "config.ini"
+    if (-not (Test-Path $mainConfigPath)) { throw "FATAL: Main 'config.ini' not found." }
+    
+    # Read the main config
+    $configLines = Get-Content $mainConfigPath
+    $modifiedLines = @()
+    $currentSection = ""
+    
+    foreach ($line in $configLines) {
+        if ($line -match '^\s*\[(.+)\]\s*$') {
+            $currentSection = $matches[1]
+            $modifiedLines += $line
+        } elseif ($line -match '^\s*([^#;=]+)\s*=\s*(.*)' -and $currentSection -eq "DataGeneration") {
+            $keyName = $matches[1].Trim()
+            $originalValue = $matches[2].Trim()
+            
+            if ($TestProfile.ConfigOverrides.ContainsKey($keyName)) {
+                $newValue = $TestProfile.ConfigOverrides[$keyName]
+                $modifiedLines += "$keyName = $newValue"
+                Write-Host "  -> Override: [$currentSection] $keyName = $newValue (was: $originalValue)" -ForegroundColor Cyan
+            } else {
+                $modifiedLines += $line
+            }
+        } else {
+            $modifiedLines += $line
+        }
+    }
+    
+    Set-Content -Path $sandboxConfigPath -Value $modifiedLines
+    Write-Host "  -> Created controlled 'config.ini' in sandbox."
+
+    # Simple validation function for data continuity
+    function Test-StepContinuity {
+        param($StepName, $FilePath, $IDColumn = 0, $Delimiter = "`t", $SubjectsToCheck = $null)
+        
+        if (-not $SubjectsToCheck) { $SubjectsToCheck = $TestProfile.Subjects }
+        
+        if (-not (Test-Path $FilePath)) {
+            throw "FAIL [${StepName}]: File not found: ${FilePath}"
+        }
+        
+        # SF Import and SF Export files have no header, don't skip first line
+        if ($StepName -eq "SF Import" -or $StepName -eq "SF Export") {
+            $data = Get-Content $FilePath
+        } else {
+            $data = Get-Content $FilePath | Select-Object -Skip 1
+        }
+        if (-not $data) {
+            throw "FAIL [${StepName}]: File is empty or contains only header: ${FilePath}"
+        }
+        
+        $actualIDs = $data | ForEach-Object { 
+            $cols = $_.Split($Delimiter)
+            if ($cols.Length -gt $IDColumn -and $cols[$IDColumn]) {
+                $fieldValue = $cols[$IDColumn].Trim('"').Trim()
+                
+                # For SF Export, only extract valid base58 IDs
+                if ($StepName -eq "SF Export") {
+                    # Try to decode as base58 - if it works, it's probably an ID
+                    try {
+                        $decoded = ConvertFrom-Base58 $fieldValue
+                        # If decode succeeds and produces a reasonable ID (positive integer), include it
+                        if ($decoded -gt 0) {
+                            $fieldValue
+                        }
+                    }
+                    catch {
+                        # Not a valid base58 value, skip it
+                    }
+                } else {
+                    $fieldValue
+                }
+            }
+        } | Where-Object { $_ -and $_ -ne "" }
+        
+        if (-not $actualIDs) {
+            throw "FAIL [${StepName}]: No valid IDs found in column ${IDColumn}: ${FilePath}"
+        }
+
+        if ($actualIDs.Count -ne $SubjectsToCheck.Count) {
+            throw "FAIL [${StepName}]: Expected $($SubjectsToCheck.Count) subjects, but found $($actualIDs.Count) in ${FilePath}"
+        }
+        
+        foreach ($subject in $SubjectsToCheck) {
+            $found = $false
+            
+            # For SF Import and SF Export files, decode base58 values and compare
+            if ($StepName -eq "SF Import" -or $StepName -eq "SF Export") {
+                foreach ($id in $actualIDs) {
+                    try {
+                        $decodedId = ConvertFrom-Base58 $id
+                        if ($decodedId -eq [int]$subject.idADB) {
+                            $found = $true
+                            break
+                        }
+                    }
+                    catch {
+                        # Ignore decode failures for non-ID values in the file
+                    }
+                }
+            }
+            else {
+                # Standard ID comparison for other files
+                $found = $subject.idADB -in $actualIDs
+            }
+            
+            if (-not $found) {
+                throw "FAIL [${StepName}]: Missing subject $($subject.idADB) ($($subject.Name))"
+            }
+        }
+        Write-Host "  -> ✓ ${StepName}: All subjects present" -ForegroundColor Green
+    }
+
+
+    # --- Execute Pipeline (Part 1) ---
+    $prepareDataScript = Join-Path $ProjectRoot "prepare_data.ps1"
+    Write-Host "`n--- EXECUTING PIPELINE (Part 1): Running pipeline to generate files needed for simulation... ---" -ForegroundColor Cyan
+    
+    # Create targeted ADB data for test subjects
+    Format-Banner "BEGIN STAGE: 1. DATA SOURCING"
+    
+    # Manually print the header for the pre-populated step for a clean log flow
+    $stepHeader = ">>> Step 1/13: Fetch Raw ADB Data <<<"
+    Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader -ForegroundColor Blue; Write-Host "Fetches the initial raw dataset from the live Astro-Databank." -ForegroundColor Blue
+    
+    Write-Host "`n  -> Performing targeted fetch for $($TestProfile.Subjects.Count) subjects..."
     $fetchScript = Join-Path $ProjectRoot "src/fetch_adb_data.py"
     $outputFile = "data/sources/adb_raw_export.txt"
-
-    # --- 1. Targeted Live Fetch ---
-    Invoke-PipelineStep `
-        -ScriptName "fetch_adb_data.py (Targeted Fetch)" `
-        -Description "Performs a targeted live fetch from Astro-Databank to create the initial seed dataset." `
-        -InputFiles @("Live Astro-Databank Website") `
-        -OutputFiles @($outputFile) `
-        -Action {
-            Write-Host "`n--- Performing targeted live fetch for 7 test subjects... ---" -ForegroundColor Yellow
-            
-            New-Item -Path (Split-Path $outputFile) -ItemType Directory -Force | Out-Null
+    New-Item -Path (Join-Path $SandboxDir (Split-Path $outputFile)) -ItemType Directory -Force | Out-Null
     "Index`tidADB`tLastName`tFirstName`tGender`tDay`tMonth`tYear`tTime`tZoneAbbr`tZoneTimeOffset`tCity`tCountryState`tLongitude`tLatitude`tRating`tBio`tCategories`tLink" | Set-Content -Path (Join-Path $SandboxDir $outputFile) -Encoding UTF8
-    
-    $subjects = @(
-        # Control Group (Known Good)
-        @{ Name = "Ernst (1900) Busch";          idADB = "52735";  Date = "1900-01-22" },
-        @{ Name = "Paul McCartney";              idADB = "9129";   Date = "1942-06-18" },
-        @{ Name = "Jonathan Cainer";             idADB = "42399";  Date = "1957-12-18" },
-        # Failure Group (Targeted Failures)
-        @{ Name = "Philip, Duke of Edinburgh";   idADB = "215";    Date = "1921-06-10" }, # Name Mismatch
-        @{ Name = "Suicide: Gunshot 14259";      idADB = "14259";  Date = "1967-11-19" }, # Research Entry
-        @{ Name = "Jonathan Renna";              idADB = "94360";  Date = "1979-04-28" }, # No Wikipedia Link Found
-        @{ Name = "Romário Marques";             idADB = "101097"; Date = "1989-07-20" }  # Non-English Link (Simulated)
-    )
 
-    foreach ($subject in $subjects) {
-        Write-Host "  -> Fetching data for $($subject.Name)..."
-        $tempOutputFile = Join-Path $SandboxDir "temp_fetch_output.txt"
+    $isFirstFetch = $true
+    foreach ($subject in $TestProfile.Subjects) {
+        Write-Host "    - Fetching data for: $($subject.Name)"
+        $tempFile = Join-Path $SandboxDir "temp_fetch.txt"
         
-        # Run the fetch script. It may not create the output file if no subjects are found.
-        pdm run python $fetchScript --sandbox-path $SandboxDir --start-date $subject.Date --end-date $subject.Date -o $tempOutputFile --force
+        # Build arguments dynamically. Only use --force on the first run.
+        $fetchArgs = @(
+            "run", "python", $fetchScript,
+            "--sandbox-path", $SandboxDir,
+            "--start-date", $subject.Date,
+            "--end-date", $subject.Date,
+            "-o", $tempFile
+        )
+        if ($isFirstFetch) {
+            $fetchArgs += "--force"
+            $isFirstFetch = $false
+        }
         
-        # Only process the temp file if the fetch script successfully created it.
-        if (Test-Path $tempOutputFile) {
-            $fetchedContent = Get-Content $tempOutputFile | Select-Object -Skip 1
-            if ($fetchedContent) {
-                Add-Content -Path (Join-Path $SandboxDir $outputFile) -Value $fetchedContent
-            }
-            Remove-Item $tempOutputFile
-        } else {
-            # This is an expected outcome for subjects that cannot be found.
-            Write-Host "  -> NOTE: No data fetched for this subject (temp file not created)." -ForegroundColor Gray
+        & pdm @fetchArgs
+        
+        if (Test-Path $tempFile) { 
+            Get-Content $tempFile | Select-Object -Skip 1 | Add-Content -Path (Join-Path $SandboxDir $outputFile)
+            Remove-Item $tempFile | Out-Null
         }
     }
 
-    # CRITICAL: Filter the aggregated data to only our test subjects before proceeding.
-    Write-Host "`n--- Filtering aggregated data to target subjects... ---" -ForegroundColor Yellow
-    $targetIDs = $subjects.idADB
-    
+    # Re-index the combined data to maintain sequential indexing
+    $targetIDs = $TestProfile.Subjects.idADB
     $fullOutputFile = Join-Path $SandboxDir $outputFile
     $header = Get-Content $fullOutputFile | Select-Object -First 1
-    $dataRows = Get-Content $fullOutputFile | Select-Object -Skip 1
-    
-    # Filter rows where the second column (idADB) is one of our target IDs.
-    $filteredData = $dataRows | Where-Object { $targetIDs -contains ($_.Split("`t"))[1] }
-
-    # Re-index the final filtered data to be sequential.
-    $reIndexedData = for ($i = 0; $i -lt $filteredData.Length; $i++) {
-        $line = $filteredData[$i]
-        $columns = $line.Split("`t")
-        $columns[0] = $i + 1
-        $columns -join "`t"
+    $dataRows = Get-Content $fullOutputFile | Where-Object { $targetIDs -contains ($_.Split("`t"))[1] }
+    $reIndexedData = for ($i = 0; $i -lt $dataRows.Length; $i++) { 
+        $cols = $dataRows[$i].Split("`t")
+        $cols[0] = $i + 1
+        $cols -join "`t" 
     }
-    
-    # Construct the final content as a single array of strings for robust file writing.
-    $finalContent = @($header) + $reIndexedData
-    Set-Content -Path $fullOutputFile -Value $finalContent
+    @($header) + $reIndexedData | Set-Content -Path $fullOutputFile
+    $relativeOutputPath = (Resolve-Path $fullOutputFile -Relative).TrimStart(".\")
+    Write-Host "`n  -> Assembled and saved initial seed data to '$relativeOutputPath'." -ForegroundColor Cyan
+    Test-StepContinuity "Raw ADB Data" (Join-Path $SandboxDir "data/sources/adb_raw_export.txt") 1 "`t" $AllSubjects
+    Write-Host "  -> Note: Pipeline Step 1 will be skipped since test data already exists." -ForegroundColor DarkGray
 
-    $displayPath = (Join-Path $PWD $fullOutputFile).Replace("$ProjectRoot" + [System.IO.Path]::DirectorySeparatorChar, "")
-    $finalRecordCount = $reIndexedData.Length
-
-    Write-Host "`n--- Final Output ---" -ForegroundColor Yellow
-    Write-Host " - Raw data export saved to: $displayPath" -ForegroundColor Cyan
-    $keyMetric = "Created initial dataset with $finalRecordCount subjects"
-    Write-Host "`nSUCCESS: $keyMetric. Initial data fetch completed successfully. ✨`n" -ForegroundColor Green
+        # Create minimal scoring files for bypass mode if needed
+    if ($TestProfile.ConfigOverrides["bypass_candidate_selection"] -eq "true") {
+        $eminenceFile = Join-Path $destAssetDir "eminence_scores.csv"
+        $oceanFile = Join-Path $destAssetDir "ocean_scores.csv"
+        if (-not (Test-Path $eminenceFile)) {
+            "idADB,EminenceScore" | Set-Content -Path $eminenceFile
         }
+        if (-not (Test-Path $oceanFile)) {
+            "idADB" | Set-Content -Path $oceanFile
+        }
+        Write-Host "  -> Created minimal scoring files for bypass mode."
+    }
 
-    # --- 2. Run the Automated Pipeline Scripts Sequentially ---
-    Write-Host "`n--- Running automated data pipeline scripts... ---" -ForegroundColor Yellow
+    # --- 2. Execute Pipeline (Part 1) ---
+    $prepareDataScript = Join-Path $ProjectRoot "prepare_data.ps1"
+    Write-Host "`n--- EXECUTING PIPELINE (Part 1): Running pipeline to generate files needed for simulation... ---" -ForegroundColor Cyan
+    $env:PROJECT_SANDBOX_PATH = $SandboxDir
+
+    # Set UTF-8 encoding to handle Unicode characters in Python output
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $env:PYTHONIOENCODING = "utf-8"
+
+    # Capture the output, but do not display it live. We will control the messaging.
+    $rawOutput = & $prepareDataScript -Force -NoFinalReport -SilentHalt 2>&1
+    $pipelinePart1ExitCode = $LASTEXITCODE
     
-    # --- HARNESS INTERVENTION: Provide static data files... ---
-    Write-Host "`n--- HARNESS INTERVENTION: Providing static data files... ---" -ForegroundColor Magenta
-    $sourceAssetDir = Join-Path $ProjectRoot "data/foundational_assets"
+    Remove-Item Env:PROJECT_SANDBOX_PATH -ErrorAction SilentlyContinue
+
+    # Check if this is an expected manual step halt or an actual failure
+    # Manual halt occurs when we reach the Solar Fire step and the SF import file exists
+    $sfImportFile = Join-Path $SandboxDir "data/intermediate/sf_data_import.txt"
+    $isExpectedManualHalt = $pipelinePart1ExitCode -eq 1 -and (Test-Path $sfImportFile)
+
+    if ($pipelinePart1ExitCode -eq 0) {
+        Write-Host "`n--- Pipeline completed successfully. Test finished. ---" -ForegroundColor Green
+        return
+    } elseif ($pipelinePart1ExitCode -ne 0 -and -not $isExpectedManualHalt) {
+        throw "Pipeline Part 1 failed with exit code $pipelinePart1ExitCode. Check output above for details."
+    } elseif ($isExpectedManualHalt) {
+        # Manually print the headers for the simulated steps for a clean log flow.
+        $stepHeader9 = ">>> Step 9/13: Solar Fire Processing <<<"; $stepHeader10 = ">>> Step 10/13: Delineation Export <<<"; $stepHeader11 = ">>> Step 11/13: Neutralize Delineations <<<"
+        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader9 -ForegroundColor Blue; Write-Host "Simulating the manual Solar Fire import, calculation, and chart export process." -ForegroundColor Blue
+        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader10 -ForegroundColor Blue; Write-Host "Simulating the one-time Solar Fire delineation library export." -ForegroundColor Blue
+        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader11 -ForegroundColor Blue; Write-Host "Using pre-neutralized text from test assets." -ForegroundColor Blue
+        
+        Write-Host "`n--- Proceeding with simulation... ---"
+        
+        # Validate each completed step in Part 1
+        Test-StepContinuity "Wikipedia Links" (Join-Path $SandboxDir "data/processed/adb_wiki_links.csv") 1 "," $AllSubjects
+        Test-StepContinuity "Page Validation" (Join-Path $SandboxDir "data/reports/adb_validation_report.csv") 1 "," $AllSubjects
+        Test-StepContinuity "Eligible Candidates" (Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt") 1 "`t" $FinalSubjects
+        Test-StepContinuity "Eminence Scores" (Join-Path $SandboxDir "data/foundational_assets/eminence_scores.csv") 1 "," $FinalSubjects
+        Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
+        Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
+        Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
+    }
+    # --- 3. Harness Interventions & Manual Step Simulation ---
+    if ($TestProfile.InterventionScript) { & $TestProfile.InterventionScript -SandboxDir $SandboxDir }
+    Write-Host "`n--- HARNESS: Simulating manual Solar Fire export... ---" -ForegroundColor Magenta
+    $idMap = @{}; Get-Content (Join-Path $SandboxDir "data/intermediate/sf_data_import.txt") | ForEach-Object { $f = $_.Split(',') | ForEach-Object { $_.Trim('"') }; if ($f.Length -ge 4) { $idMap[$f[0]] = $f[3] } }
     $destAssetDir = Join-Path $SandboxDir "data/foundational_assets"
-    New-Item -Path $destAssetDir -ItemType Directory -Force | Out-Null
-    Copy-Item -Path (Join-Path $sourceAssetDir "country_codes.csv") -Destination $destAssetDir
-    Write-Host "  -> Copied 'country_codes.csv' into the sandbox."
-    # The category map is created by the fetch script, but the link finder also needs it.
-    # We must copy the master version into the sandbox to ensure it's available.
-    Copy-Item -Path (Join-Path $sourceAssetDir "adb_category_map.csv") -Destination $destAssetDir
-    Write-Host "  -> Copied 'adb_category_map.csv' into the sandbox."
-    Copy-Item -Path (Join-Path $sourceAssetDir "point_weights.csv") -Destination $destAssetDir
-    Write-Host "  -> Copied 'point_weights.csv' into the sandbox."
-    Copy-Item -Path (Join-Path $sourceAssetDir "balance_thresholds.csv") -Destination $destAssetDir
-    Write-Host "  -> Copied 'balance_thresholds.csv' into the sandbox."
-
-    $scriptsToRun = @(
-        "src/find_wikipedia_links.py",
-        "src/validate_wikipedia_pages.py",
-        "src/select_eligible_candidates.py",
-        "src/generate_eminence_scores.py",
-        "src/generate_ocean_scores.py",
-        "src/select_final_candidates.py",
-        "src/prepare_sf_import.py"
-    )
-    # Define file paths relative to the project root for clarity
-    $adbRaw = "data/sources/adb_raw_export.txt"
-    $wikiLinks = "data/processed/adb_wiki_links.csv"
-    $validationReport = "data/reports/adb_validation_report.csv"
-    $eligibleCandidates = "data/intermediate/adb_eligible_candidates.txt"
-    $eminenceScores = "data/foundational_assets/eminence_scores.csv"
-    $oceanScores = "data/foundational_assets/ocean_scores.csv"
-    $finalCandidates = "data/intermediate/adb_final_candidates.txt"
-    $sfImport = "data/intermediate/sf_data_import.txt"
-
-    # Sequentially call each script
-    Invoke-PipelineStep `
-        -ScriptName "find_wikipedia_links.py" `
-        -Description "Finds a best-guess Wikipedia URL for each subject." `
-        -InputFiles @($adbRaw) `
-        -OutputFiles @($wikiLinks) `
-        -Action {
-            pdm run python (Join-Path $ProjectRoot "src/find_wikipedia_links.py") --sandbox-path $SandboxDir --force
-        }
-
-    Invoke-PipelineStep `
-        -ScriptName "validate_wikipedia_pages.py" `
-        -Description "Validates each Wikipedia page for content and language. Includes a harness intervention to inject known failures." `
-        -InputFiles @($wikiLinks) `
-        -OutputFiles @($validationReport) `
-        -Action {
-            # --- HARNESS INTERVENTION: Injecting validation failures... ---
-            Write-Host "`n--- HARNESS INTERVENTION: Injecting validation failures... ---" -ForegroundColor Magenta
-            $hirohitoID = "215"; $marquesID = "101097"; $rennaID = "94360"
-            $modifiedLinks = (Get-Content (Join-Path $SandboxDir $wikiLinks)) | ForEach-Object {
-                if ($_ -match ",$($hirohitoID),") { $_ } 
-                elseif ($_ -match ",$($marquesID),") { $_ -replace "https://en.wikipedia.org/wiki/Rom%C3%A1rio", "https://fr.wikipedia.org/wiki/Rom%C3%A1rio" } 
-                elseif ($_ -match ",$($rennaID),") { $_ -replace 'http[^,]*', '' } 
-                else { $_ }
-            }
-            Set-Content -Path (Join-Path $SandboxDir $wikiLinks) -Value $modifiedLinks
-            Write-Host "  -> Injected Non-English URL and No Link Found failures."
-            pdm run python (Join-Path $ProjectRoot "src/validate_wikipedia_pages.py") --sandbox-path $SandboxDir --force
-        }
-
-    Invoke-PipelineStep `
-        -ScriptName "select_eligible_candidates.py" `
-        -Description "Performs initial data quality checks to create a pool of eligible candidates." `
-        -InputFiles @($adbRaw, $validationReport) `
-        -OutputFiles @($eligibleCandidates) `
-        -Action {
-            pdm run python (Join-Path $ProjectRoot "src/select_eligible_candidates.py") --sandbox-path $SandboxDir --force
-        }
-
-    Invoke-PipelineStep `
-        -ScriptName "generate_eminence_scores.py" `
-        -Description "Generates a calibrated eminence score for each eligible candidate." `
-        -InputFiles @($eligibleCandidates) `
-        -OutputFiles @($eminenceScores) `
-        -Action {
-            pdm run python (Join-Path $ProjectRoot "src/generate_eminence_scores.py") --sandbox-path $SandboxDir --force
-        }
-
-    Invoke-PipelineStep `
-        -ScriptName "generate_ocean_scores.py" `
-        -Description "Generates OCEAN scores and determines the final dataset size." `
-        -InputFiles @($eminenceScores) `
-        -OutputFiles @($oceanScores) `
-        -Action {
-            pdm run python (Join-Path $ProjectRoot "src/generate_ocean_scores.py") --sandbox-path $SandboxDir --force
-        }
-
-    Invoke-PipelineStep `
-        -ScriptName "select_final_candidates.py" `
-        -Description "Filters, transforms, and sorts the final subject set." `
-        -InputFiles @($eligibleCandidates, $oceanScores, $eminenceScores) `
-        -OutputFiles @($finalCandidates) `
-        -Action {
-            pdm run python (Join-Path $ProjectRoot "src/select_final_candidates.py") --sandbox-path $SandboxDir --force
-        }
-
-    Invoke-PipelineStep `
-        -ScriptName "prepare_sf_import.py" `
-        -Description "Formats the final subject list for import into Solar Fire." `
-        -InputFiles @($finalCandidates) `
-        -OutputFiles @($sfImport) `
-        -Action {
-            pdm run python (Join-Path $ProjectRoot "src/prepare_sf_import.py") --sandbox-path $SandboxDir --force
-        }
-
-    # Checkpoint removed for cleaner logs. The next script's success implies this one worked.
-    
-    # --- 3. Dynamic Simulation of Manual Steps ---
-    Write-Host "`n--- Simulating Manual Solar Fire Export Steps... ---" -ForegroundColor Cyan
-    $importFile = Join-Path $SandboxDir "data/intermediate/sf_data_import.txt"
-    if (-not (Test-Path $importFile)) { throw "The pipeline did not generate the required '$importFile'." }
-    
-    # Read the real subject data from the import file to map names to Base58 IDs.
-    # The file is a custom CQD format without a header.
-    $idMap = @{}
-    Get-Content $importFile | ForEach-Object {
-        # Split by comma, then trim quotes from each field.
-        $fields = $_.Split(',') | ForEach-Object { $_.Trim('"') }
-        if ($fields.Length -ge 4) {
-            $fullName = $fields[0]
-            $idBase58 = $fields[3]
-            $idMap[$fullName] = $idBase58
-        }
-    }
-
-    # Dynamically build the chart export content by injecting the pipeline-generated IDs
-    # into the static data template. This correctly simulates Solar Fire preserving the ID
-    # in the ZoneAbbr field (the 4th column).
-    $chartExportTemplate = @"
-"Ernst (1900) Busch","22 Jan 1900","0:15","GgE","-1:00","Kiel","Germany","54N20","010E08"
-"Body Name","Body Abbr","Longitude"
-"Moon","Mon",189.002773188323
-"Sun","Sun",301.513598193159
-"Mercury","Mer",289.248528421009
-"Venus","Ven",332.342534743509
-"Mars","Mar",300.14360125414
-"Jupiter","Jup",244.946087801883
-"Saturn","Sat",270.067157735933
-"Uranus","Ura",251.194346406787
-"Neptune","Nep",84.700115342572
-"Pluto","Plu",74.9347017635718
-"Ascendant","Asc",200.157701309649
-"Midheaven","MC",117.655107001904
-"Paul McCartney","18 Jun 1942","14:00","3iQ","-2:00","Liverpool","United Kingdom","53N25","002W55"
-"Body Name","Body Abbr","Longitude"
-"Moon","Mon",137.438858568153
-"Sun","Sun",86.6089647184063
-"Mercury","Mer",78.3619044521025
-"Venus","Ven",48.9928134036616
-"Mars","Mar",122.680126156477
-"Jupiter","Jup",91.8328603367092
-"Saturn","Sat",65.2086841766147
-"Uranus","Ura",61.9683695784129
-"Neptune","Nep",177.119163816018
-"Pluto","Plu",124.270643292912
-"Ascendant","Asc",175.307794560545
-"Midheaven","MC",83.7374557581678
-"Jonathan Cainer","18 Dec 1957","8:00","Dc2","+0:00","London","United Kingdom","51N30","000W10"
-"Body Name","Body Abbr","Longitude"
-"Moon","Mon",229.370851563549
-"Sun","Sun",266.145556757779
-"Mercury","Mer",281.20483470234
-"Venus","Ven",308.785844073593
-"Mars","Mar",236.738903155823
-"Jupiter","Jup",206.650855079643
-"Saturn","Sat",257.858299542065
-"Uranus","Ura",131.237454535687
-"Neptune","Nep",214.121770736189
-"Pluto","Plu",152.279804607712
-"Ascendant","Asc",264.205084618065
-"Midheaven","MC",208.52161206082
-"@
-    
-    # Replace the placeholder ZoneAbbr values with the actual Base58 IDs.
-    $finalContent = $chartExportTemplate -replace '"GgE"', "`"$($idMap['Ernst (1900) Busch'])`""
-    $finalContent = $finalContent -replace '"3iQ"', "`"$($idMap['Paul McCartney'])`""
-    $finalContent = $finalContent -replace '"Dc2"', "`"$($idMap['Jonathan Cainer'])`""
-
-    $assetDir = Join-Path $SandboxDir "data/foundational_assets"
-    $finalContent | Set-Content -Path (Join-Path $assetDir "sf_chart_export.csv") -Encoding UTF8
-    Write-Host "  -> Dynamically generated 'sf_chart_export.csv'."
-
-    # Write the minimal static delineations library
-    $delineationsContent = @"
+    $chartExportContent = (@"
+"Ernst (1900) Busch","22 Jan 1900","0:15","ID_BUSCH","-1:00","Kiel","Germany","54N20","010E08"; "Body Name","Body Abbr","Longitude";"Moon","Mon",189.002;"Sun","Sun",301.513;"Mercury","Mer",289.248;"Venus","Ven",332.342;"Mars","Mar",300.143;"Jupiter","Jup",244.946;"Saturn","Sat",270.067;"Uranus","Ura",251.194;"Neptune","Nep",84.700;"Pluto","Plu",74.934;"Ascendant","Asc",200.157;"Midheaven","MC",117.655
+"Paul McCartney","18 Jun 1942","14:00","ID_MCCARTNEY","-2:00","Liverpool","United Kingdom","53N25","002W55"; "Body Name","Body Abbr","Longitude";"Moon","Mon",137.438;"Sun","Sun",86.608;"Mercury","Mer",78.361;"Venus","Ven",48.992;"Mars","Mar",122.680;"Jupiter","Jup",91.832;"Saturn","Sat",65.208;"Uranus","Ura",61.968;"Neptune","Nep",177.119;"Pluto","Plu",124.270;"Ascendant","Asc",175.307;"Midheaven","MC",83.737
+"Jonathan Cainer","18 Dec 1957","8:00","ID_CAINER","+0:00","London","United Kingdom","51N30","000W10"; "Body Name","Body Abbr","Longitude";"Moon","Mon",229.370;"Sun","Sun",266.145;"Mercury","Mer",281.204;"Venus","Ven",308.785;"Mars","Mar",236.738;"Jupiter","Jup",206.650;"Saturn","Sat",257.858;"Uranus","Ura",131.237;"Neptune","Nep",214.121;"Pluto","Plu",152.279;"Ascendant","Asc",264.205;"Midheaven","MC",208.521
+"@ -replace ";", "`r`n").Trim()
+    foreach ($key in $idMap.Keys) { $chartExportContent = $chartExportContent -replace "ID_$($key.Split(' ')[-1].ToUpper())", $idMap[$key] }
+    $chartExportContent | Set-Content -Path (Join-Path $destAssetDir "sf_chart_export.csv") -Encoding UTF8
+    @"
 *Quadrant Strong 1st
 A focus on self-awareness and personal identity.
 *Hemisphere Strong East
@@ -341,112 +308,64 @@ A self-motivated and independent nature.
 *Aries Strong
 Assertive and pioneering.
 *Element Strong Water
-Compassionate and caring with a strong intuitional nature. Values personal relationships, often taking on a caretaker role.
+Compassionate and caring with a strong intuitional nature.
 *Mode Strong Cardinal
-Enjoys challenge and action, and becomes frustrated with no recourse for change.
+Enjoys challenge and action.
 *Sun in Capricorn
-Serious and responsible, with a strong awareness of the 'right way of doing things'.
+Serious and responsible.
 *Moon in Leo
-A love for being the center of attention, particularly in the lives of loved ones.
+A love for being the center of attention.
 *Mercury in Sagittarius
 A search for knowledge to expand the worldview.
 *Venus in Sagittarius
-A desire to share adventure with a partner, from ideas to physical activities.
+A desire to share adventure with a partner.
 *Mars in Aquarius
-A drive to fight for just causes. Unpredictable, with group leadership potential.
+A drive to fight for just causes.
 *Jupiter in Pisces
-An intuitive search for truth. A champion of the underdog.
+An intuitive search for truth.
 *Saturn in Sagittarius
-A potential commitment to higher education and a strict moral code.
+A potential commitment to higher education.
 *Uranus in Leo
 A seeking of freedom for individual expression.
 *Neptune in Libra
-An ability to view human relationships from a spiritual, holistic viewpoint.
+An ability to view relationships holistically.
 *Pluto in Leo
 An ability to use power both positively and negatively.
 *Ascendant in Virgo
-A cautious approach, preferring to wait for comfort before pursuing a purpose.
+A cautious approach to life.
 *Midheaven in Gemini
-A need for stimulation and activity in professional life.
-"@
-    $delineationsContent | Set-Content -Path (Join-Path $assetDir "sf_delineations_library.txt") -Encoding UTF8
-    Write-Host "  -> Wrote minimal 'sf_delineations_library.txt'."
+A need for stimulation in professional life.
+"@ | Set-Content -Path (Join-Path $destAssetDir "sf_delineations_library.txt") -Encoding UTF8
+    Write-Host "  -> Placed simulated SF files into sandbox."
+    Test-StepContinuity "SF Export" (Join-Path $destAssetDir "sf_chart_export.csv") 3 "," $FinalSubjects
 
-    # --- 4. Run Final Pipeline Scripts ---
-    # Define final set of paths
-    $sfChartExport = "data/foundational_assets/sf_chart_export.csv"
-    $sfDelineations = "data/foundational_assets/sf_delineations_library.txt"
-    $neutralizedDir = "data/foundational_assets/neutralized_delineations"
-    $subjectDb = "data/processed/subject_db.csv"
-    $personalitiesDb = "personalities_db.txt"
-
-    Invoke-PipelineStep `
-        -ScriptName "neutralize_delineations.py" `
-        -Description "Rewrites esoteric texts into neutral psychological descriptions using an LLM. Includes a retry mechanism." `
-        -InputFiles @($sfDelineations) `
-        -OutputFiles @("$($neutralizedDir)/*.csv") `
-        -Action {
-            $neutralizeSuccess = $false
-            for ($i = 1; $i -le 3; $i++) {
-                if ($Interactive) { Write-Host "`n--- Neutralization Attempt $i of 3 ---" -ForegroundColor Magenta }
-                
-                $neutralizeArgs = @(
-                    (Join-Path $ProjectRoot "src/neutralize_delineations.py"),
-                    "--sandbox-path",
-                    $SandboxDir
-                )
-                if ($i -eq 1) { $neutralizeArgs += "--force" }
-
-                pdm run python @neutralizeArgs 2>&1 | Tee-Object -Variable neutralizeOutput
-                
-                if (($neutralizeOutput | Out-String) -notmatch "failure\(s\)") {
-                    $neutralizeSuccess = $true
-                    if ($Interactive) { Write-Host "`nNeutralization successful on attempt $i." -ForegroundColor Green }
-                    break
-                } else {
-                    if ($Interactive) { Write-Host "`nNeutralization failed on attempt $i. Retrying..." -ForegroundColor Yellow }
-                }
-            }
-            if (-not $neutralizeSuccess) { throw "FATAL: Delineation neutralization failed after 3 attempts. Halting test." }
-        }
-
-    Invoke-PipelineStep `
-        -ScriptName "create_subject_db.py" `
-        -Description "Integrates chart data with the final subject list to create a master database." `
-        -InputFiles @($sfChartExport, $finalCandidates) `
-        -OutputFiles @($subjectDb) `
-        -Action {
-            pdm run python (Join-Path $ProjectRoot "src/create_subject_db.py") --sandbox-path $SandboxDir --force
-        }
-
-    Invoke-PipelineStep `
-        -ScriptName "generate_personalities_db.py" `
-        -Description "Assembles the final personalities database from the subject data and neutralized text library." `
-        -InputFiles @($subjectDb, "$($neutralizedDir)/*.csv") `
-        -OutputFiles @($personalitiesDb) `
-        -Action {
-            pdm run python (Join-Path $ProjectRoot "src/generate_personalities_db.py") --sandbox-path $SandboxDir --force
-        }
+    # --- 4. Execute Pipeline (Part 2): Resume and complete ---
+    Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming pipeline with simulated manual files... ---" -ForegroundColor Cyan
+    $env:PROJECT_SANDBOX_PATH = $SandboxDir
     
+    # The pipeline should automatically resume from where it left off
+    # Use a hashtable for splatting to correctly handle switch parameters
+    $resumeArgs = @{ NoFinalReport = $true; Resumed = $true }
+    if ($Interactive) { 
+        $resumeArgs.Interactive = $true 
+    }
+
+    # Capture and filter the output to suppress the final "success" banner
+    $rawOutputP2 = & $prepareDataScript @resumeArgs 2>&1
+    $pipelineOutputP2 = $rawOutputP2 | Where-Object { $_ -notmatch "Data Preparation Pipeline Completed Successfully" }
+    $pipelineOutputP2 | ForEach-Object { Write-Host $_ }
+    
+    Remove-Item Env:PROJECT_SANDBOX_PATH -ErrorAction SilentlyContinue
+
     # --- 5. Final Verification ---
-    Write-Host "`n--- Verifying final output... ---" -ForegroundColor Cyan
-    $finalDbPath = Join-Path $SandboxDir "personalities_db.txt"
-    if (-not (Test-Path $finalDbPath)) {
-        throw "FAIL: The final 'personalities_db.txt' file was not created."
-    }
-    
-    # We expect 3 subjects + 1 header line = 4 lines total.
+    Write-Host "`n--- VERIFYING: Checking final output... ---" -ForegroundColor Cyan
+    $finalDbPath = Join-Path $SandboxDir "data/processed/personalities_db.txt"
+    if (-not (Test-Path $finalDbPath)) { throw "FAIL: The final 'personalities_db.txt' file was not created." }
+    Test-StepContinuity "Final Database" $finalDbPath 1 -SubjectsToCheck $FinalSubjects
     $lineCount = (Get-Content $finalDbPath).Length
-    if ($lineCount -ne 4) { 
-        throw "FAIL: The final 'personalities_db.txt' has the wrong number of lines (Expected 4, Found $lineCount)."
-    }
-    
-    Write-Host "`nPASS: The final personalities_db.txt was created successfully." -ForegroundColor Green
-    Write-Host "`nSUCCESS: The live data pipeline integration test completed successfully." -ForegroundColor Green
-    Write-Host "Inspect the artifacts, then run Stage 3 to clean up."
-    Write-Host ""
+    if ($lineCount -ne $TestProfile.ExpectedFinalLineCount) { throw "FAIL: Expected $($TestProfile.ExpectedFinalLineCount) lines, but found $lineCount." }
+    Write-Host "`nPASS: The final 'personalities_db.txt' was created with the correct number of lines for this profile." -ForegroundColor Green
 }
 catch {
-    Write-Host "`nERROR: Layer 3 test workflow failed.`n$($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+    throw "Layer 3 test workflow failed.`n$($_.Exception.Message)"
 }

@@ -539,6 +539,7 @@ def main():
     parser.add_argument("--benchmark-population-size", type=int, default=default_benchmark_pop, help="Number of top subjects to use for benchmark variance.")
     parser.add_argument("--cutoff-start-point", type=int, default=default_cutoff_start, help="Minimum subjects to process before cutoff logic is active.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
+    parser.add_argument("--no-summary", action="store_true", help="Suppress the final summary report output.")
     args = parser.parse_args()
 
     # If a sandbox path is provided, set the environment variable.
@@ -822,11 +823,12 @@ def main():
             truncate_and_archive_scores(output_path, final_count)
 
         # Always generate reports. They will reflect the final state of the CSV file.
-        generate_summary_report(
-            output_path, stop_reason, total_processed_count, final_count,
-            benchmark_variance, last_variance_checks, args.variance_analysis_window,
-            args.benchmark_population_size, args.variance_check_window, args.variance_trigger_count,
-        )
+        if not args.no_summary:
+            generate_summary_report(
+                output_path, stop_reason, total_processed_count, final_count,
+                benchmark_variance, last_variance_checks, args.variance_analysis_window,
+                args.benchmark_population_size, args.variance_check_window, args.variance_trigger_count,
+            )
         generate_missing_scores_report(
             missing_report_path, llm_missed_subjects, subjects_to_process, all_scores_df
         )

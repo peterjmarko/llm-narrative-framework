@@ -8,8 +8,6 @@ This document outlines planned development tasks and tracks known issues for the
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
-- [ ] **Add the Option to Bypass Eminence/OCEAN Scoring**
-  - [ ] Implement a configuration flag to allow 'final candidates' to be the same as 'eligible candidates'. This makes the LLM-based sample selection optional, allowing for validation studies that are more robust to the criticism of using an opaque selection method.
 - [ ] **Re-validate Integration Tests After Filter Changes**
   - [ ] Perform a full run of the Layer 4 and Layer 5 integration tests to ensure that the changes to the data filtering logic (Northern Hemisphere and eminence/OCEAN scoring) have not introduced any downstream regressions.
 - [ ] **Develop `new_study.ps1` Orchestrator**

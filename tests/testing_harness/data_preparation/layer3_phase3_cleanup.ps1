@@ -3,8 +3,8 @@
 # --- Step 3: Automated Cleanup ---
 
 param(
-    [Parameter(Mandatory=$false)]
-    [switch]$Force
+    [Parameter(Mandatory=$true)]
+    [string]$ProfileName
 )
 
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
@@ -13,26 +13,62 @@ $SandboxDir = Join-Path $SandboxParentDir "layer3_sandbox"
 
 Write-Host ""
 Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
-Write-Host "--- Stage 3: Automated Cleanup ---" -ForegroundColor Cyan
+Write-Host "--- Phase 3: Automated Cleanup ---" -ForegroundColor Cyan
 Write-Host ""
 
 if (Test-Path $SandboxDir) {
-    if (-not $Force) {
-        $confirmation = Read-Host -Prompt "This will permanently delete the Layer 3 test sandbox. Are you sure? (Y/N)"
-        if ($confirmation -ne 'y') {
-            Write-Host "`nOperation cancelled by user." -ForegroundColor Yellow
-            exit 0
+    # --- Create a backup before cleaning up ---
+    try {
+        $backupDir = Join-Path $ProjectRoot "data/backup"
+        New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+        
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $backupFileName = "layer3_sandbox_backup_{0}_{1}.zip" -f $ProfileName, $timestamp
+        $backupPath = Join-Path $backupDir $backupFileName
+        
+        Write-Host "Creating backup of test artifacts..."
+        Compress-Archive -Path $SandboxDir -DestinationPath $backupPath -Force
+        Write-Host "  -> Backup saved to: $((Resolve-Path $backupPath -Relative).TrimStart(".\"))" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Warning "Could not create sandbox backup. Manual cleanup may be required."
+        Write-Warning $_.Exception.Message
+    }
+
+    Write-Host "Removing Layer 3 sandbox directory..."
+    try {
+        Remove-Item -Path $SandboxDir -Recurse -Force -ErrorAction Stop
+        Write-Host "  -> Done." -ForegroundColor Green
+    }
+    catch {
+        Write-Warning "Could not fully remove sandbox (files may be in use by another process)."
+        Write-Host "Attempting partial cleanup..." -ForegroundColor Yellow
+        
+        # Try to remove what we can, suppressing progress output
+        Get-ChildItem $SandboxDir -Recurse -ErrorAction SilentlyContinue | 
+            Remove-Item -Force -Recurse -ErrorAction SilentlyContinue | Out-Null
+            
+        if (Test-Path $SandboxDir) {
+            Write-Host "  -> Partial cleanup completed. Some files may remain." -ForegroundColor Yellow
+            Write-Host "     Close any IDEs/editors and try again, or manually delete:" -ForegroundColor Yellow
+            Write-Host "     $SandboxDir" -ForegroundColor Yellow
+        } else {
+            Write-Host "  -> Done (after retry)." -ForegroundColor Green
         }
     }
-    Write-Host "Removing Layer 3 sandbox directory..."
-    Remove-Item -Path $SandboxDir -Recurse -Force
-    Write-Host "  -> Done."
 
     # Bonus: If this was the last test sandbox, remove the parent temp dir.
-    if (-not (Get-ChildItem -Path $SandboxParentDir)) {
-        Write-Host "Parent 'temp_test_environment' is now empty. Removing it as well."
-        Remove-Item -Path $SandboxParentDir -Recurse -Force
-        Write-Host "  -> Done."
+    if (Test-Path $SandboxParentDir) {
+        try {
+            if (-not (Get-ChildItem -Path $SandboxParentDir -ErrorAction SilentlyContinue)) {
+                Write-Host "Parent 'temp_test_environment' is now empty. Removing it as well."
+                Remove-Item -Path $SandboxParentDir -Recurse -Force -ErrorAction Stop
+                Write-Host "  -> Done." -ForegroundColor Green
+            }
+        }
+        catch {
+            Write-Host "  -> Could not remove parent directory (files in use)." -ForegroundColor Yellow
+        }
     }
 } else {
     Write-Host "Layer 3 sandbox directory not found. Nothing to remove."

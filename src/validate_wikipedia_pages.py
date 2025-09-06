@@ -553,6 +553,7 @@ def main():
     parser.add_argument("--force", action="store_true", help="Force reprocessing of all records.")
     parser.add_argument("--report-only", action="store_true", help="Generate the summary report for an existing validation CSV and exit.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
+    parser.add_argument("--quiet", action="store_true", help="Suppress progress bar output for non-interactive runs.")
     args = parser.parse_args()
 
     # If a sandbox path is provided, set the environment variable.
@@ -638,7 +639,7 @@ def main():
         if output_file.tell() == 0:
             writer.writeheader()
 
-        with tqdm(total=len(records_to_process), desc="Validating pages", ncols=120, smoothing=0.01) as pbar:
+        with tqdm(total=len(records_to_process), desc="Validating pages", ncols=120, smoothing=0.01, disable=args.quiet) as pbar:
             tasks = [(max_index_before + i + 1, rec) for i, rec in enumerate(records_to_process)]
             futures = {executor.submit(worker_task_with_timeout, rec, pbar, index) for index, rec in tasks}
             

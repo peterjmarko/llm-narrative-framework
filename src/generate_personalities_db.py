@@ -219,6 +219,7 @@ def main():
     )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
     parser.add_argument("--test-record-number", type=int, help="Run for a single record number for focused testing.")
+    parser.add_argument("-o", "--output", help="Path to the output personalities database file.")
     args = parser.parse_args()
 
     if args.sandbox_path:
@@ -226,7 +227,7 @@ def main():
 
     subject_db_path = Path(get_path("data/processed/subject_db.csv"))
     delineations_dir = Path(get_path("data/foundational_assets/neutralized_delineations"))
-    output_path = Path(get_path("personalities_db.txt"))
+    output_path = Path(get_path("data/processed/personalities_db.txt"))
 
     # Define all configuration and data input files for the stale check
     point_weights_path = Path(get_path("data/foundational_assets/point_weights.csv"))
@@ -279,7 +280,12 @@ def main():
     print(f"Processing subjects from {subject_db_path.name}...")
     try:
         with open(output_path, 'w', encoding='utf-8', newline='') as outfile:
-            writer = csv.writer(outfile, delimiter='\t', quoting=csv.QUOTE_ALL)
+            writer = csv.writer(
+                outfile,
+                delimiter='\t',
+                quoting=csv.QUOTE_MINIMAL,
+                quotechar='|' # An unlikely character
+            )
             writer.writerow(['Index', 'idADB', 'Name', 'BirthYear', 'DescriptionText'])
             
             with open(subject_db_path, 'r', encoding='utf-8') as infile:

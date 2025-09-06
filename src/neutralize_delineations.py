@@ -206,6 +206,24 @@ def get_processed_keys_from_csv(filepath: Path) -> set:
     return processed_keys
 
 
+def get_task_group(task: Dict) -> str:
+    """Determines the display group for a given processing task."""
+    task_type = task.get('type', '')
+    task_name = task.get('name', '')
+
+    if 'balance' in task_type:
+        return "Balance Delineations"
+    
+    if 'point' in task_type:
+        # Extracts 'Sun' from 'Sun in Aries' or 'Sun in Signs'
+        point = task_name.split(' in ')[0]
+        if point in ["Sun", "Moon"]:
+            return f"The {point} in Signs"
+        return f"{point} in Signs"
+
+    return "Miscellaneous Tasks"
+
+
 def main():
     """Main function to orchestrate the neutralization process."""
     # --- Config and Arguments ---
@@ -224,7 +242,13 @@ def main():
     args = parser.parse_args()
     
     if args.sandbox_path:
+        # If the sandbox argument is explicitly given, set the env var.
         os.environ["PROJECT_SANDBOX_PATH"] = args.sandbox_path
+    else:
+        # For a normal run, guarantee we are not using a sandbox path
+        # by unsetting any lingering environment variable from a previous test run.
+        if "PROJECT_SANDBOX_PATH" in os.environ:
+            del os.environ["PROJECT_SANDBOX_PATH"]
     
     from config_loader import get_path
 
@@ -240,7 +264,7 @@ def main():
         print("Writing original delineation text directly to output files...")
         
         if not input_path.exists():
-            logging.error(f"{Fore.RED}FATAL: Input file not found for bypass: {input_path}")
+            logging.error(f"\n{Fore.RED}FATAL: Input file not found for bypass: {input_path}\n")
             sys.exit(1)
         
         # The pytest fixture is responsible for creating a clean directory.
@@ -259,7 +283,7 @@ def main():
 
     # --- Regular Workflow File Check ---
     if not input_path.exists():
-        logging.error(f"{Fore.RED}FATAL: Input file not found: {input_path}")
+        logging.error(f"\n{Fore.RED}FATAL: Input file not found: {input_path}\n")
         sys.exit(1)
 
     # --- Intelligent Startup Logic (Stale Check) ---
@@ -269,17 +293,14 @@ def main():
             print("Automatically re-running full neutralization process...")
             args.force = True
 
-    # --- Handle --force flag with interactive confirmation ---
-    # In a bypass run, the directory is managed by the test fixture and must not be deleted.
+    # --- Handle --force flag ---
     if args.force and output_dir.exists() and not args.bypass_llm:
-        # Only prompt if running in an interactive terminal
+        # If running interactively, provide a clear warning about the destructive action.
+        # The --force flag serves as confirmation, so we do not prompt.
         if sys.stdout.isatty():
-            print(f"\n{Fore.YELLOW}WARNING: You have used --force to overwrite all neutralized delineations.{Fore.RESET}")
-            print(f"{Fore.YELLOW}This process incurs API costs and can take 10 minutes or more to complete.{Fore.RESET}")
-            confirm = input("Backups will be created. Are you sure? (Y/N): ").lower().strip()
-            if confirm != "y":
-                print("\nOperation cancelled by user.\n"); sys.exit(0)
-        
+            print(f"\n{Fore.YELLOW}WARNING: The --force flag is active. This will overwrite all neutralized delineations.")
+            print(f"This process incurs API costs and can take 10+ minutes to complete.{Fore.RESET}")
+
         try:
             backup_dir = Path(get_path("data/backup")); backup_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -338,6 +359,37 @@ def main():
             if key not in processed_keys:
                 tasks_to_run.append({'type': 'point_in_sign', 'name': key, 'data': {key: text}})
 
+    # --- Report on file status before processing ---
+    all_output_files = list(grouped_delineations.keys())
+    existing_files, generating_files = [], []
+
+    for filename in all_output_files:
+        filepath = output_dir / filename
+        if not filepath.exists():
+            if grouped_delineations.get(filename): # Only list if there's data for it
+                generating_files.append(filename)
+            continue
+
+        if filename == "points_in_signs.csv":
+            processed_count = len(get_processed_keys_from_csv(filepath))
+            total_count = len(points_in_signs_master_order)
+            if processed_count < total_count:
+                generating_files.append(f"{filename} (Incomplete: {processed_count}/{total_count}, will append)")
+            else:
+                existing_files.append(f"{filename} (Complete)")
+        else:
+            existing_files.append(filename)
+
+    if existing_files:
+        print(f"\n{Fore.CYAN}Found {len(existing_files)} existing/complete file(s) that will be skipped:{Fore.RESET}")
+        for f in sorted(existing_files):
+            print(f"  - {f}")
+    
+    if generating_files and tasks_to_run:
+        print(f"\n{Fore.CYAN}Will generate/update the following file(s):{Fore.RESET}")
+        for f in sorted(generating_files):
+            print(f"  - {f}")
+
     processed_count, failed_count = 0, 0
     resorting_needed = False
     
@@ -369,8 +421,16 @@ def main():
     try:
         if is_interactive:
             with tqdm(total=len(tasks_to_run), desc="Processing Tasks", ncols=100) as pbar:
+                current_header_group = None
                 for task in tasks_to_run:
-                    task_msg = f"Neutralizing {task['name']}..."
+                    task_group = get_task_group(task)
+                    if task_group != current_header_group:
+                        if current_header_group is not None:
+                            tqdm.write("") # Add separation
+                        tqdm.write(f"{Fore.CYAN}--- {task_group} ---{Fore.RESET}")
+                        current_header_group = task_group
+
+                    task_msg = f"  - Neutralizing {task['name']}..."
                     tqdm.write(task_msg)
                     
                     block = "\n".join([f"*{k}\n{v}" for k, v in task['data'].items()])
@@ -408,8 +468,16 @@ def main():
                     pbar.update(1)
                     time.sleep(0.1)
         else:  # Non-interactive mode (e.g., piped output)
+            current_header_group = None
             for i, task in enumerate(tasks_to_run):
-                print(f"[{i + 1}/{len(tasks_to_run)}] Neutralizing {task['name']}...")
+                task_group = get_task_group(task)
+                if task_group != current_header_group:
+                    if current_header_group is not None:
+                        print("") # Add separation
+                    print(f"{Fore.CYAN}--- {task_group} ---{Fore.RESET}")
+                    current_header_group = task_group
+                
+                print(f"  - [{i + 1}/{len(tasks_to_run)}] Neutralizing {task['name']}...")
                 
                 block = "\n".join([f"*{k}\n{v}" for k, v in task['data'].items()])
                 prompt = NEUTRALIZE_PROMPT_TEMPLATE.format(delineation_block=block)

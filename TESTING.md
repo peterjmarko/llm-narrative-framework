@@ -71,20 +71,15 @@ pdm run cov-file <script_name>
 If the unit tests fail, fix the script before proceeding to the next stage.
 
 #### Stage 3: Integration Test
-Once unit tests pass, perform an integration test to validate that the script functions correctly within the live pipeline. For data preparation scripts, this is done using the Layer 3 test harness.
+Once unit tests pass, perform an integration test to validate that the script functions correctly within the live pipeline. This is done using the Layer 3 test harness, which provides a controlled environment.
 
-1.  **Add a Checkpoint:** Temporarily modify `tests/testing_harness/data_preparation/layer3_stage2_test_workflow.ps1`. Add an `exit 0` command immediately after the line that calls the script you just modified.
-2.  **Run the Test:** Execute the Layer 3 test from the project root.
+1.  **Add a Checkpoint:** Temporarily modify the main pipeline orchestrator, `prepare_data.ps1`. Add an `exit 0` command immediately after the line that calls the script you just modified. This will halt the pipeline at the desired point.
+2.  **Run the Test:** Execute the default Layer 3 test profile from the project root.
     ```powershell
-    # Run setup, then the workflow.
-    .\tests\testing_harness\data_preparation\layer3_stage1_setup.ps1
-    .\tests\testing_harness\data_preparation\layer3_stage2_test_workflow.ps1
+    pdm run test-l3-default
     ```
-3.  **Verify:** The test should run successfully up to your checkpoint and exit gracefully. Manually inspect the artifacts created in the `temp_test_environment/layer3_sandbox/` to confirm your script produced the correct output.
-4.  **Clean Up:** Once verified, remove the temporary `exit 0` from the workflow script and run the cleanup script.
-    ```powershell
-    .\tests\testing_harness\data_preparation\layer3_stage3_cleanup.ps1
-    ```
+3.  **Verify:** The test should run successfully up to your checkpoint and exit gracefully. The test harness will automatically create a backup of the sandbox (`temp_test_environment/layer3_sandbox/`) in `data/backup/`. Inspect the artifacts in this sandbox to confirm your script produced the correct output.
+4.  **Clean Up:** Once verified, simply remove the temporary `exit 0` from `prepare_data.ps1`. The test harness handles all other cleanup automatically.
 
 ---
 
@@ -114,43 +109,32 @@ After inspecting the artifacts, run this script to delete the test directory.
 
 ### Layer 3: Data Pipeline Integration Testing (`prepare_data.ps1`)
 
-This procedure validates the real data preparation pipeline with a controlled seed dataset, covering all four stages from Data Sourcing to Profile Generation. It can be run in two modes:
+This procedure validates the real data preparation pipeline using a robust, profile-driven test harness. The harness uses a controlled seed dataset from `tests/assets/` to ensure complete test isolation. It tests the main `prepare_data.ps1` orchestrator as the System Under Test, covering all four pipeline stages from Data Sourcing to Profile Generation.
 
-*   **Automated Mode (Default):** A fully automated test that verifies the end-to-end data flow of the pipeline.
-*   **Interactive Mode (Guided Tour):** A step-by-step guided tour of the pipeline. The script will pause before executing each Python script, explain what it is about to do, and wait for you to press Enter. This is an excellent way for new contributors to learn how the data pipeline works.
+The test is managed by a single master script, `run_layer3_test.ps1`, which can be executed with different profiles to simulate various scenarios. All test runs are fully automated, including setup and cleanup. Upon completion, the test sandbox is automatically archived as a timestamped `.zip` file in `data/backup/` for post-mortem analysis.
 
-To run the interactive guided tour, use the `-Interactive` flag:
-```powershell
-# In the project root, run setup, then the workflow with the -Interactive flag.
-.\tests\testing_harness\data_preparation\layer3_stage1_setup.ps1
-.\tests\testing_harness\data_preparation\layer3_stage2_test_workflow.ps1 -Interactive
+#### How to Run Layer 3 Tests
+All Layer 3 tests are run via PDM scripts from the project root.
 
-**Prerequisites:** A configured `.env` file in the project root with a valid API key (for the eminence and OCEAN scoring steps).
+*   **Default Profile (`default`):**
+    This is the standard test case. It runs the full pipeline with LLM-based candidate selection active and injects controlled validation failures to test the script's resilience.
+    ```powershell
+    pdm run test-l3-default
+    ```
 
-#### Stage 1: Automated Setup
-Run this script to create the sandboxed test environment with all required scripts and minimal seed data.
-```powershell
-.\tests\testing_harness\data_preparation\layer3_stage1_setup.ps1
-```
+*   **Bypass Profile (`bypass`):**
+    This profile tests the pipeline with the `bypass_candidate_selection` flag enabled, ensuring the LLM-scoring stages are correctly skipped.
+    ```powershell
+    pdm run test-l3-bypass
+    ```
 
-#### Stage 2: Execute the Test Workflow
-This script fully automates the test workflow. It calls the main `prepare_data.ps1` orchestrator with a `-Force` flag, which ensures the process is **non-interactive** and forces the script to **re-validate every step** rather than skipping them if an output file already exists. The pipeline will still intelligently bypass the manual and neutralization steps, as their pre-made outputs are provided by the setup script.
-```powershell
-.\tests\testing_harness\data_preparation\layer3_stage2_test_workflow.ps1
-```
+*   **Interactive Mode (Guided Tour):**
+    This profile provides a step-by-step guided tour of the pipeline. The script will pause before executing each Python script, explain what it is about to do, and wait for you to press Enter. This is an excellent way for new contributors to learn how the data pipeline works.
+    ```powershell
+    pdm run test-l3-interactive
+    ```
 
-#### Stage 3: Interactive Cleanup
-After inspecting the artifacts, run this script to delete the Layer 3 test sandbox. The script will prompt for confirmation before deleting any files.
-
-```powershell
-# Run the cleanup script interactively
-.\tests\testing_harness\data_preparation\layer3_stage3_cleanup.ps1
-```
-
-To bypass the confirmation prompt for use in automated workflows, use the `-Force` flag:
-```powershell
-.\tests\testing_harness\data_preparation\layer3_stage3_cleanup.ps1 -Force
-```
+**Prerequisites:** A configured `.env` file in the project root with a valid API key (for the eminence and OCEAN scoring steps in the `default` and `interactive` profiles).
 
 ### Layer 4: Main Workflow Integration Testing
 
@@ -278,10 +262,10 @@ Module                              Cov. (%)        Status & Justification
 `src/generate_personalities_db.py`  `70%`           COMPLETE. Unit test suite is complete. A separate `pytest`
                                                     provides bit-for-bit validation of the assembly algorithm.
 
-`prepare_data.ps1`                  `N/A`           COMPLETE. The script's core orchestration and state machine
-                                                    logic have been fully validated by the Layer 2 mock script test
-                                                    harness. End-to-end integration testing (Layer 3) is also
-                                                    complete and passing.
+`prepare_data.ps1`                  `N/A`           COMPLETE. As the primary orchestrator, this script is the
+                                                    System Under Test for the Layer 3 integration test. Its state
+                                                    machine, resumability, and interactive logic are fully validated
+                                                    by the new profile-driven test harness.
 --------------------------------------------------------------------------------------------------------------------
 
 ### Main Experiment & Analysis Pipeline

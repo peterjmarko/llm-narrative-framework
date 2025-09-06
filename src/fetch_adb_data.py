@@ -429,7 +429,7 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
                     total_hits = current_total
                     if total_hits == 0: raise ValueError("Search successful but returned 0 results.")
                     print("") # Add blank line before progress bar
-                    pbar = tqdm(total=total_hits, desc="Scraping records", ncols=120)
+                    pbar = tqdm(total=total_hits, desc="Scraping records", ncols=100)
                 
                 if not page_results: break
                 

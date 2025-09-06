@@ -382,6 +382,7 @@ def main():
     parser.add_argument("--model", default=default_model, help="Name of the LLM to use for scoring. Default is from config.ini.")
     parser.add_argument("--batch-size", type=int, default=default_batch_size, help="Number of subjects per API call. Default is from config.ini.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
+    parser.add_argument("--no-summary", action="store_true", help="Suppress the final summary report output.")
     args = parser.parse_args()
 
     # If a sandbox path is provided, set the environment variable.
@@ -557,7 +558,8 @@ def main():
     finally:
         print(f"\n{Fore.YELLOW}--- Finalizing ---{Fore.RESET}")
         sort_and_reindex_scores(output_path)
-        generate_scores_summary(output_path, total_subjects_in_source)
+        if not args.no_summary:
+            generate_scores_summary(output_path, total_subjects_in_source)
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
         

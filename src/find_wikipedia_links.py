@@ -502,6 +502,7 @@ def main():
     parser.add_argument("-w", "--workers", type=int, default=MAX_WORKERS, help="Number of parallel worker threads.")
     parser.add_argument("--force", action="store_true", help="Force reprocessing of all records, overwriting the existing output file.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output, including warnings.")
+    parser.add_argument("--quiet", action="store_true", help="Suppress progress bar output for non-interactive runs.")
     args = parser.parse_args()
 
     # If a sandbox path is provided, set the environment variable.
@@ -522,6 +523,57 @@ def main():
 
     if not input_path.exists():
         logging.error(f"Input file not found: {input_path}"); sys.exit(1)
+
+    # Validate input file content
+    try:
+        if os.path.getsize(input_path) == 0:
+            logging.error(f"Input file is empty: {input_path}")
+            logging.error("This usually indicates that ADB data fetching failed.")
+            logging.error("Please check the ADB data source and try again.")
+            sys.exit(1)
+        
+        with open(input_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        if len(lines) < 2:  # Header + at least one data row
+            logging.error(f"Input file has insufficient data: {input_path}")
+            logging.error(f"Found {len(lines)} lines, expected at least 2 (header + data)")
+            logging.error("This usually indicates that ADB data fetching failed or returned no results.")
+            sys.exit(1)
+        
+        # Validate header structure
+        header = lines[0].strip().split('\t')
+        expected_min_columns = 19  # Based on the parts[18] access in worker_task
+        
+        if len(header) < expected_min_columns:
+            logging.error(f"Input file has malformed header: {input_path}")
+            logging.error(f"Expected at least {expected_min_columns} columns, found {len(header)}")
+            logging.error("This usually indicates that ADB data fetching failed or returned malformed data.")
+            sys.exit(1)
+        
+        # Validate data rows
+        valid_rows = 0
+        for i, line in enumerate(lines[1:], 2):  # Start from line 2
+            if line.strip():  # Skip empty lines
+                columns = line.strip().split('\t')
+                if len(columns) >= expected_min_columns:
+                    valid_rows += 1
+                else:
+                    logging.warning(f"Skipping malformed row {i}: expected {expected_min_columns} columns, found {len(columns)}")
+        
+        if valid_rows == 0:
+            logging.error(f"No valid data rows found in: {input_path}")
+            logging.error("All rows appear to be malformed or empty.")
+            logging.error("This usually indicates that ADB data fetching failed.")
+            sys.exit(1)
+        
+        print(f"Validated input file: {valid_rows} valid rows found")
+        
+    except Exception as e:
+        logging.error(f"Failed to read or validate input file: {input_path}")
+        logging.error(f"Error details: {e}")
+        logging.error("This usually indicates that ADB data fetching failed or returned corrupted data.")
+        sys.exit(1)
 
     def backup_and_overwrite(file_path: Path):
         """Creates a backup of the file and then deletes the original."""
@@ -628,7 +680,7 @@ def main():
         if is_new_file:
             writer.writeheader()
 
-        with tqdm(total=len(lines_to_process), desc="Finding links", ncols=120, smoothing=0.01) as pbar:
+        with tqdm(total=len(lines_to_process), desc="Finding links", ncols=120, smoothing=0.01, disable=args.quiet) as pbar:
             tasks = [(max_index_before + i + 1, line) for i, line in enumerate(lines_to_process)]
             futures = {executor.submit(worker_task_with_timeout, line, pbar, index) for index, line in tasks}
             

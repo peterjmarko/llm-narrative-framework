@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "llm-personality-matching"
-version = "6.13.2"
+version = "6.14.0"
 description = "A reproducible pipeline for LLM personality matching experiments."
 authors = [
     {name = "Peter Marko", email = "peter.j.marko@gmail.com"},
@@ -87,21 +87,26 @@ fix-stu = "powershell -ExecutionPolicy Bypass -File ./fix_study.ps1"
 mig-stu = "powershell -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 
 # Testing shortcuts
-test-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
-test-ps-exp = "pwsh ./tests/new_experiment.Tests.ps1"
-test-ps-aud = "pwsh ./tests/audit_experiment.Tests.ps1"
-test-ps-fix = "pwsh ./tests/fix_experiment.Tests.ps1"
-test-ps-mig = "pwsh ./tests/migrate_experiment.Tests.ps1"
-test-ps-pro = "pwsh ./tests/process_study.Tests.ps1"
-test-ps-stu = "pwsh ./tests/new_study.Tests.ps1"
-test-ps-ast = "pwsh ./tests/audit_study.Tests.ps1"
-test-ps-fst = "pwsh ./tests/fix_study.Tests.ps1"
-test-ps-mst = "pwsh ./tests/migrate_study.Tests.ps1"
+test-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+test-l3-default = "pwsh ./tests/testing_harness/data_preparation/run_layer3_pipeline_test.ps1 -Profile default"
+test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/run_layer3_pipeline_test.ps1 -Profile bypass"
+test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/run_layer3_pipeline_test.ps1 -Profile default -Interactive"
+#
+test-ps-new-exp = "pwsh ./tests/new_experiment.Tests.ps1"
+test-ps-audit-exp = "pwsh ./tests/audit_experiment.Tests.ps1"
+test-ps-fix-exp = "pwsh ./tests/fix_experiment.Tests.ps1"
+test-ps-migr-exp = "pwsh ./tests/migrate_experiment.Tests.ps1"
+test-ps-comp-study = "pwsh ./tests/compile_study.Tests.ps1"
+#
+test-ps-new-study = "pwsh ./tests/new_study.Tests.ps1"
+test-ps-audit-study = "pwsh ./tests/audit_study.Tests.ps1"
+test-ps-fix-study = "pwsh ./tests/fix_study.Tests.ps1"
+test-ps-migr-study = "pwsh ./tests/migrate_study.Tests.ps1"
 test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "6.13.2"
+version = "6.14.0"
 version_files = [
     "pyproject.toml:version"
 ]

@@ -23,8 +23,9 @@
 Unit tests for the Wikipedia link-finding script (src/find_wikipedia_links.py).
 
 This test suite covers the script's core logic, including the identification of
-research entries, parsing of HTML content for disambiguation pages, and handling
-of mocked API calls to Wikipedia.
+research entries, parsing of HTML content for disambiguation pages, handling
+of mocked API calls to Wikipedia, and comprehensive input file validation to
+ensure graceful handling of malformed or corrupted ADB data.
 """
 
 import json
@@ -283,5 +284,178 @@ def test_load_processed_ids(tmp_path):
     assert links == 2
     assert max_idx == 5
     assert timeouts == 2
+
+class TestInputFileValidation:
+    """Tests for input file validation logic in the main function."""
+    
+    def test_empty_input_file(self, tmp_path, mocker, capsys):
+        """Tests that an empty input file causes graceful exit with error message."""
+        # Create empty input file
+        empty_file = tmp_path / "adb_raw_export.txt"
+        empty_file.write_text("")
+        
+        # Mock sys.argv to avoid argparse issues
+        mocker.patch('sys.argv', ['find_wikipedia_links.py'])
+        
+        # Mock the config_loader to point to our test file
+        mocker.patch('config_loader.get_path', return_value=str(empty_file))
+        
+        # Mock sys.exit to actually raise SystemExit so execution stops
+        def mock_exit(code):
+            raise SystemExit(code)
+        mocker.patch('sys.exit', side_effect=mock_exit)
+        
+        # Run main function and expect SystemExit
+        with pytest.raises(SystemExit) as exc_info:
+            find_wikipedia_links.main()
+        
+        # Verify it exited with error code 1
+        assert exc_info.value.code == 1
+        
+        # Check error message was logged
+        captured = capsys.readouterr()
+        assert "Input file is empty" in captured.out
+        assert "ADB data fetching failed" in captured.out
+    
+    def test_header_only_file(self, tmp_path, mocker, capsys):
+        """Tests that a file with only header causes graceful exit."""
+        # Create file with only header
+        header_only_file = tmp_path / "adb_raw_export.txt"
+        header_only_file.write_text("Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tZoneAbbr\tZoneTimeOffset\tCity\tCountryState\tLongitude\tLatitude\tRating\tBio\tCategories\tLink\n")
+        
+        mocker.patch('sys.argv', ['find_wikipedia_links.py'])
+        mocker.patch('config_loader.get_path', return_value=str(header_only_file))
+        
+        def mock_exit(code):
+            raise SystemExit(code)
+        mocker.patch('sys.exit', side_effect=mock_exit)
+        
+        with pytest.raises(SystemExit) as exc_info:
+            find_wikipedia_links.main()
+        
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "insufficient data" in captured.out
+        assert "Found 1 lines, expected at least 2" in captured.out
+    
+    def test_malformed_header(self, tmp_path, mocker, capsys):
+        """Tests that a file with insufficient columns in header fails validation."""
+        # Create file with insufficient columns in header
+        malformed_file = tmp_path / "adb_raw_export.txt"
+        malformed_file.write_text("Index\tidADB\tLastName\n1\t123\tDoe\n")
+        
+        mocker.patch('sys.argv', ['find_wikipedia_links.py'])
+        mocker.patch('config_loader.get_path', return_value=str(malformed_file))
+        
+        def mock_exit(code):
+            raise SystemExit(code)
+        mocker.patch('sys.exit', side_effect=mock_exit)
+        
+        with pytest.raises(SystemExit) as exc_info:
+            find_wikipedia_links.main()
+        
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "malformed header" in captured.out
+        assert "Expected at least 19 columns, found 3" in captured.out
+    
+    def test_all_malformed_data_rows(self, tmp_path, mocker, capsys):
+        """Tests that a file with all malformed data rows fails validation."""
+        # Create file with proper header but all malformed data rows
+        malformed_data_file = tmp_path / "adb_raw_export.txt"
+        content = "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tZoneAbbr\tZoneTimeOffset\tCity\tCountryState\tLongitude\tLatitude\tRating\tBio\tCategories\tLink\n"
+        content += "1\t123\tDoe\n"  # Too few columns
+        content += "2\t124\n"       # Too few columns
+        malformed_data_file.write_text(content)
+        
+        mocker.patch('sys.argv', ['find_wikipedia_links.py'])
+        mocker.patch('config_loader.get_path', return_value=str(malformed_data_file))
+        
+        def mock_exit(code):
+            raise SystemExit(code)
+        mocker.patch('sys.exit', side_effect=mock_exit)
+        
+        with pytest.raises(SystemExit) as exc_info:
+            find_wikipedia_links.main()
+        
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "No valid data rows found" in captured.out
+        assert "All rows appear to be malformed" in captured.out
+    
+    def test_mixed_valid_invalid_rows(self, tmp_path, mocker, capsys):
+        """Tests that a file with some valid rows passes validation and warns about invalid ones."""
+        # Create file with mixed valid and invalid rows
+        mixed_file = tmp_path / "adb_raw_export.txt"
+        content = "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tZoneAbbr\tZoneTimeOffset\tCity\tCountryState\tLongitude\tLatitude\tRating\tBio\tCategories\tLink\n"
+        # Valid row with 19 columns
+        content += "1\t123\tDoe\tJohn\tM\t1\t1\t1990\t12:00\tEST\t-5:00\tNew York\tUSA\t40.7\t-74.0\tA\tBio\tCat\thttps://example.com\n"
+        # Invalid row with too few columns  
+        content += "2\t124\tSmith\n"
+        # Another valid row
+        content += "3\t125\tJones\tMary\tF\t2\t2\t1991\t13:00\tPST\t-8:00\tLA\tUSA\t34.0\t-118.0\tB\tBio2\tCat2\thttps://example2.com\n"
+        mixed_file.write_text(content)
+        
+        # Mock the output path to avoid file operations in test
+        output_file = tmp_path / "output.csv"
+        
+        # Mock all the dependencies that would be called after validation passes
+        mocker.patch('sys.argv', ['find_wikipedia_links.py', '--verbose'])  # Enable verbose to see warnings
+        mocker.patch('config_loader.get_path', side_effect=lambda x: str(mixed_file) if 'adb_raw_export' in x else str(output_file))
+        
+        # Mock research categories to avoid JSON decode errors
+        mock_categories = {
+            "categories": {"prefixes": [], "patterns": [], "exact_matches": []},
+            "auto_detected": {"entries": []}
+        }
+        mocker.patch('src.find_wikipedia_links.load_research_categories', return_value=mock_categories)
+        mocker.patch('src.find_wikipedia_links.load_processed_ids', return_value=(set(), set(), 0, 0, 0))
+        
+        # Mock network calls to prevent actual HTTP requests
+        mocker.patch('src.find_wikipedia_links.get_initial_wiki_url_from_adb', return_value=None)
+        mocker.patch('src.find_wikipedia_links.search_wikipedia', return_value=[])
+        
+        # Don't expect SystemExit since validation passes with 2 valid rows
+        find_wikipedia_links.main()
+        
+        captured = capsys.readouterr()
+        # Should show validation success
+        assert "Validated input file: 2 valid rows found" in captured.out
+        # Should warn about malformed row (now visible with --verbose)
+        assert "Skipping malformed row 3" in captured.out
+        # Should complete successfully 
+        assert "SUCCESS:" in captured.out
+    
+    def test_file_read_error(self, tmp_path, mocker, capsys):
+        """Tests handling of file read errors during validation."""
+        # Create a file 
+        error_file = tmp_path / "adb_raw_export.txt"
+        error_file.write_text("test")
+        
+        mocker.patch('sys.argv', ['find_wikipedia_links.py'])
+        mocker.patch('config_loader.get_path', return_value=str(error_file))
+        
+        # Mock os.path.getsize to pass the empty file check, then make open fail
+        mocker.patch('os.path.getsize', return_value=100)  # Non-zero size
+        
+        # Only mock the specific open call for the input file, not all open calls
+        original_open = __builtins__['open']
+        def selective_open(*args, **kwargs):
+            if args and str(args[0]) == str(error_file):
+                raise IOError("Permission denied")
+            return original_open(*args, **kwargs)
+        mocker.patch('builtins.open', side_effect=selective_open)
+        
+        def mock_exit(code):
+            raise SystemExit(code)
+        mocker.patch('sys.exit', side_effect=mock_exit)
+        
+        with pytest.raises(SystemExit) as exc_info:
+            find_wikipedia_links.main()
+        
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Failed to read or validate input file" in captured.out
+        assert "Permission denied" in captured.out
 
 # === End of tests/data_preparation/test_find_wikipedia_links.py ===

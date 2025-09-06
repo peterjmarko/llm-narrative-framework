@@ -1,5 +1,24 @@
 # Changelog
 
+## 6.14.0 (2025-09-06)
+
+### Bump
+
+- **version 6.13.2 → 6.14.0**
+
+### Features
+
+- **add profile-driven architecture and automated workflows**
+  Refactors the Layer 3 data pipeline test from a monolithic set of scripts into a robust, profile-driven architecture orchestrated by a new master runner. This fixes a critical testing anti-pattern and resolves numerous bugs related to test isolation, configuration, and execution flow.
+  
+  - **Introduces Master Runner & Profiles**: A new `run_layer3_pipeline_test.ps1` script is now the single entry point, using "Test Profiles" to define scenarios, centralize test-specific data, configuration overrides, and fault-injection logic.
+  
+  - **Enforces Complete Test Isolation**: All static and foundational assets are now sourced exclusively from a new `tests/assets/` directory, fully decoupling the test suite from the main project's generated files.
+  
+  - **Adds Automated Archiving & Diagnostics**: The cleanup phase now automatically creates a timestamped ZIP archive of the sandbox for post-mortem analysis. The setup phase integrates diagnostics to identify file-locking processes on failure.
+  
+  - **Implements Strict Asset Validation**: The setup script now uses a manifest to validate all test assets against precise rules (e.g., line counts), preventing tests from running with corrupted data.
+
 ## 6.13.2 (2025-09-03)
 
 ### Bump

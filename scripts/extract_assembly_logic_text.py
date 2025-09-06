@@ -36,14 +36,18 @@ for our automated `pytest` verification.
 import argparse
 import csv
 import logging
-import shutil
 import sys
 from pathlib import Path
 
 from colorama import Fore
 from tqdm import tqdm
 
-# No src imports are needed for this simple script.
+# Add project root to Python path to find src module
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+
+# Import the base58 decoder
+from src.id_encoder import from_base58
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -60,9 +64,6 @@ def extract_subject_info(content):
     return name, birth_year
 
 
-# This function is not used and contains flawed logic. It is being removed.
-
-
 import shutil
 
 def main():
@@ -70,152 +71,116 @@ def main():
     parser = argparse.ArgumentParser(
         description="Extract and assemble assembly logic delineations."
     )
-    # This script now operates entirely within the sandbox and needs no arguments.
+    parser.add_argument(
+        "--create-test-fixtures", 
+        action="store_true",
+        help="Create test fixture files from SF reports for test subjects"
+    )
     args = parser.parse_args()
 
-    print(f"\n{Fore.YELLOW}--- Assembling Assembly Logic Delineations ---{Fore.RESET}")
-
-    sandbox_dir = Path("temp_assembly_logic_validation")
-    if not sandbox_dir.exists():
-        logging.error(f"Sandbox directory not found at '{sandbox_dir}'. Please run the previous scripts first.")
-        sys.exit(1)
-
-    # Define paths inside the sandbox
-    raw_reports_dir = sandbox_dir / "data/intermediate/assembly_logic_raw_reports"
-    subject_db_path = sandbox_dir / "data/processed/subject_db.assembly_logic.csv"
-    output_path = sandbox_dir / "personalities_db.assembly_logic.txt"
+    # Test fixtures mode
+    if args.create_test_fixtures:
+        print(f"\n{Fore.YELLOW}--- Creating Test Fixtures ---{Fore.RESET}")
+        sandbox_dir = Path("temp_test_environment/layer3_sandbox")
+        if not sandbox_dir.exists():
+            logging.error(f"Test sandbox not found: {sandbox_dir}")
+            sys.exit(1)
+        raw_reports_dir = sandbox_dir / "data/sf_reports_test_subjects"
+        subject_db_path = None  # No subject DB in test mode
+        output_path = sandbox_dir / "test_fixtures/expected_personalities_db.txt"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        # Original mode
+        print(f"\n{Fore.YELLOW}--- Assembling Assembly Logic Delineations ---{Fore.RESET}")
+        sandbox_dir = Path("temp_assembly_logic_validation")
+        if not sandbox_dir.exists():
+            logging.error(f"Sandbox directory not found at '{sandbox_dir}'. Please run the previous scripts first.")
+            sys.exit(1)
+        raw_reports_dir = sandbox_dir / "data/intermediate/assembly_logic_raw_reports"
+        subject_db_path = sandbox_dir / "data/processed/subject_db.assembly_logic.csv"
+        output_path = sandbox_dir / "personalities_db.assembly_logic.txt"
     if not raw_reports_dir.exists():
         logging.error(f"Raw reports directory not found: {raw_reports_dir}")
         sys.exit(1)
 
-    # --- Load subject DB to get the correct Index and idADB for each subject ---
-    try:
-        with open(subject_db_path, "r", encoding="utf-8") as f:
-            subject_info_map = {
-                row["Name"]: {"Index": row["Index"], "idADB": row["idADB"]}
-                for row in csv.DictReader(f)
-            }
-    except FileNotFoundError:
-        logging.error(f"Assembly logic subject DB not found at: {subject_db_path}")
-        sys.exit(1)
+    # --- Load subject DB (only in original mode) ---
+    if subject_db_path:
+        try:
+            with open(subject_db_path, "r", encoding="utf-8") as f:
+                subject_info_map = {
+                    row["Name"]: {"Index": row["Index"], "idADB": row["idADB"]}
+                    for row in csv.DictReader(f)
+                }
+        except FileNotFoundError:
+            logging.error(f"Assembly logic subject DB not found at: {subject_db_path}")
+            sys.exit(1)
+    else:
+        subject_info_map = None
 
     report_files = list(raw_reports_dir.glob("*.txt"))
     print(f"Processing {len(report_files)} raw report files from '{raw_reports_dir}'...")
     final_records = []
-    for report_file in tqdm(
-        sorted(report_files), desc="Extracting Text", ncols=80
-    ):
+    for i, report_file in enumerate(tqdm(sorted(report_files), desc="Extracting Text", ncols=80), 1):
         content = report_file.read_text(encoding="utf-8", errors="ignore")
         name, birth_year = extract_subject_info(content)
 
-        if name not in subject_info_map:
-            logging.warning(f"Could not find '{name}' in the assembly logic subject DB. Skipping.")
-            continue
+        # Handle subject info differently based on mode
+        if subject_info_map:  # Original mode
+            if name not in subject_info_map:
+                logging.warning(f"Could not find '{name}' in the assembly logic subject DB. Skipping.")
+                continue
+            subject_info = subject_info_map[name]
+        else:  # Test fixtures mode - extract TimeZoneAbbr and decode to idADB
+            # Extract 3-character timezone code from chart details line
+            timezone_match = re.search(r'(\w{3})\s+[+-]\d+:\d+', content)
+            
+            if timezone_match:
+                timezone_abbr = timezone_match.group(1)
+                # Decode TimeZoneAbbr using base58 to get idADB
+                decoded_idadb = str(from_base58(timezone_abbr))
+            else:
+                decoded_idadb = f"TEST{i:03d}"
+            
+            subject_info = {"Index": str(i), "idADB": decoded_idadb}
 
-        # --- Structured Parsing and Re-assembly based on explicit rules ---
-        
-        # Rule 3 & 4: Define the final assembly order and the data structure
-        ASSEMBLY_ORDER = [
-            "BALANCE OF ELEMENTS", "BALANCE OF MODES", "BALANCE OF QUADRANTS",
-            "BALANCE OF HEMISPHERES", "BALANCE OF SIGNS"
-        ]
-        POINT_ORDER = [
-            "THE SUN", "THE MOON", "MERCURY", "VENUS", "MARS", "JUPITER",
-            "SATURN", "URANUS", "NEPTUNE", "PLUTO", "THE ASCENDANT", "THE MIDHEAVEN"
-        ]
-        DISCARD_PATTERNS = [
-            "SOLAR FIRE INTERPRETATIONS REPORT", "CHART DETAILS", 
-            "BALANCE OF HOUSES"
-        ]
-        dels = {key: [] for key in ASSEMBLY_ORDER}
-        dels["CHART POINTS IN SIGNS"] = {key: "" for key in POINT_ORDER}
-
+        # --- Extract relevant sections using a simple line-by-line parser ---
         lines = content.splitlines()
-        current_main_section = None
-
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-            
-            # Rule 1 & 2: Identify and set the current main section
-            if line in DISCARD_PATTERNS or line.startswith("LUNAR PHASE:") or " IN THE " in line and "HOUSE" in line:
-                current_main_section = None
-                i += 1
-                continue
-            elif line in ["BACKGROUND INFORMATION", "CHART POINTS"]:
-                # Ignore these headers, continue processing subsections
-                i += 1
-                continue
-            elif line in ASSEMBLY_ORDER or line in POINT_ORDER:
-                current_main_section = line
-                i += 1
-                continue
-            
-            # If we are in a section, process its content
-            if current_main_section:
-                # For balances, the text follows a sub-header with STRONG/WEAK
-                if current_main_section in ASSEMBLY_ORDER and ("STRONG" in line or "WEAK" in line):
-                    text_parts = []
-                    i += 1 # Move past the sub-header
-                    while i < len(lines):
-                        next_line = lines[i].strip()
-                        if not next_line or (next_line.isupper() and len(next_line) > 0 and not next_line.startswith(" ")):
-                            i -= 1 # Rewind to process next header
-                            break
-                        text_parts.append(next_line)
-                        i += 1
-                    if text_parts:
-                        dels[current_main_section].append(" ".join(text_parts))
-                
-                # For points, the sub-header contains the planet name followed by "IN"
-                elif current_main_section in POINT_ORDER and f"{current_main_section} IN " in line:
-                    text_parts = []
-                    i += 1 # Move past the sub-header
-                    while i < len(lines):
-                        next_line = lines[i].strip()
-                        # Rule 2: Stop if we hit a House delineation or any new header
-                        if not next_line or " IN THE " in next_line and "HOUSE" in next_line or (next_line.isupper() and len(next_line) > 0 and not next_line.startswith(" ")):
-                            i -= 1 # Rewind
-                            break
-                        text_parts.append(next_line)
-                        i += 1
-                    if text_parts:
-                        dels["CHART POINTS IN SIGNS"][current_main_section] = " ".join(text_parts)
-                    # We only process the first sub-section (in Sign), then reset
-                    current_main_section = None
-                
-            i += 1
-
-        # Rule 4: Assemble the final description in the correct order
-        final_text_parts = []
-        for category in ASSEMBLY_ORDER:
-            final_text_parts.extend(dels.get(category, []))
+        desc_parts = []
+        capturing = False
         
-        point_dels = dels.get("CHART POINTS IN SIGNS", {})
-        for point in POINT_ORDER:
-            if point_dels.get(point):
-                final_text_parts.append(point_dels[point])
+        headers_to_capture = [
+            "BALANCE OF SIGNS", "BALANCE OF ELEMENTS", "BALANCE OF MODES",
+            "BALANCE OF QUADRANTS", "BALANCE OF HEMISPHERES", "CHART POINTS"
+        ]
+        headers_to_stop_at = ["LUNAR PHASE", "CHART DETAILS", "BACKGROUND INFORMATION"]
+
+        for line in lines:
+            stripped_line = line.strip()
+
+            if any(header in stripped_line for header in headers_to_stop_at + headers_to_capture):
+                capturing = stripped_line in headers_to_capture
+
+            elif capturing and stripped_line:
+                # Ignore irrelevant lines within the sections
+                if stripped_line.startswith("Scores:") or stripped_line.isupper():
+                    continue
+                desc_parts.append(stripped_line)
+
+        full_desc = " ".join(desc_parts).strip()
         
-        # Standardize joining: join all parts, normalize characters,
-        # and then normalize all internal whitespace to a single space.
-        raw_desc = " ".join(final_text_parts)
-        normalized_desc = raw_desc.replace("’", "'") # Normalize apostrophes
-        full_desc = " ".join(normalized_desc.split()).strip()
-        subject_info = subject_info_map[name]
-        final_records.append(
-            {
-                "Index": subject_info["Index"],
-                "idADB": subject_info["idADB"],
-                "Name": name,
-                "BirthYear": birth_year,
-                "DescriptionText": full_desc,
-            }
-        )
+        full_desc = " ".join(desc_parts).strip()
+        final_records.append({
+            "Index": subject_info["Index"],
+            "idADB": subject_info["idADB"],
+            "Name": name,
+            "BirthYear": birth_year,
+            "DescriptionText": full_desc,
+        })
         
     # Sort the final records by Index to ensure a consistent order
     final_records.sort(key=lambda x: int(x["Index"]))
 
-    # --- Write the final output file to the sandbox ---
+    # --- Write the final output file ---
     try:
         with open(output_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(
@@ -226,29 +191,16 @@ def main():
             )
             writer.writeheader()
             writer.writerows(final_records)
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Assembly logic database saved to: {output_path}{Fore.RESET}")
+        key_metric = f"Processed {len(final_records)} subjects"
+        print(
+            f"\n{Fore.GREEN}SUCCESS: {key_metric}. Assembly logic database "
+            f"created successfully.{Fore.RESET}\n"
+        )
     except IOError as e:
-        logging.error(f"Failed to write temporary output file: {e}")
+        logging.error(f"Failed to write output file: {e}")
         sys.exit(1)
-
-    # --- Final Step: Copy all assets to their permanent location ---
-    print("\nCopying final assets to permanent test asset directory...")
-    asset_dir = Path("data/foundational_assets/assembly_logic")
-    if asset_dir.exists():
-        shutil.rmtree(asset_dir)
-    asset_dir.mkdir(parents=True)
-    
-    # Define source and destination paths
-    shutil.copy(subject_db_path, asset_dir / "subject_db.assembly_logic.csv")
-    shutil.copy(output_path, asset_dir / "personalities_db.assembly_logic.txt")
-    print(f"Final assets successfully copied to '{asset_dir}'.")
-
-    print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
-    print(f"{Fore.CYAN} - Assembly logic database saved to: {output_path}{Fore.RESET}")
-    key_metric = f"Processed {len(final_records)} subjects"
-    print(
-        f"\n{Fore.GREEN}SUCCESS: {key_metric}. Assembly logic database "
-        f"created successfully.{Fore.RESET}\n"
-    )
 
 
 if __name__ == "__main__":
