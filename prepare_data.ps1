@@ -236,13 +236,21 @@ try {
         }
 
         if ($bypassScoring -and ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores")) {
-            Write-Host "${C_YELLOW}Bypass mode is active. Skipping step: $($step.Name)${C_RESET}"; continue
+            # Only announce the bypass skip in a normal run, not a resumed test run.
+            if (-not $Resumed.IsPresent) {
+                $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
+                Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
+                Write-Host $stepHeader -ForegroundColor Blue
+                Write-Host $step.Description -ForegroundColor Blue
+                Write-Host "`n${C_YELLOW}Bypass mode is active. Skipping step.${C_RESET}"
+            }
+            continue
         }
         $outputFile = Join-Path $WorkingDirectory $step.Output
         if (Test-Path $outputFile) {
-            # In resumed sandbox mode, we want silent skipping.
-            # Otherwise, inform the user why a step is being skipped.
-            if (-not ($SandboxMode -and $Resumed.IsPresent)) {
+            # In a resumed test run, skip silently to make the log appear continuous.
+            # In a normal run, provide a simple message.
+            if (-not $Resumed.IsPresent) {
                 Write-Host "Output exists for step '$($step.Name)'. Skipping." -ForegroundColor Yellow
             }
             continue

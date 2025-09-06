@@ -85,25 +85,15 @@ Once unit tests pass, perform an integration test to validate that the script fu
 
 ### Layer 2: Data Pipeline Orchestration Testing (`prepare_data.ps1` with Mocks)
 
-This procedure validates the state machine logic of the `prepare_data.ps1` orchestrator by using mock scripts. It follows a clean `Setup -> Test -> Cleanup` pattern.
+This procedure validates the state machine logic of the `prepare_data.ps1` orchestrator in isolation, using fast, lightweight mock scripts. It verifies that the script correctly sequences automated steps, pauses for manual steps, and resumes properly. The test is fully automated, self-contained, and runs in milliseconds.
 
-#### Step 1: Automated Setup
-Run this script to create the test environment with all necessary mock scripts.
-```powershell
-.\tests\testing_harness\layer2_step1_setup.ps1
-```
+The test script is "self-healing": it programmatically parses the real `prepare_data.ps1` to determine the correct sequence of steps and required output files, ensuring the test never becomes outdated as the pipeline evolves.
 
-#### Step 2: Execute the Test Workflow
-This script fully automates the multi-stage test, including simulating the manual steps, and verifies the final output.
+**To run the test:**
 ```powershell
-.\tests\testing_harness\layer2_step2_test_workflow.ps1
+pdm run test-l2
 ```
-
-#### Step 3: Automated Cleanup
-After inspecting the artifacts, run this script to delete the test directory.
-```powershell
-.\tests\testing_harness\layer2_step3_cleanup.ps1
-```
+The script handles all setup, execution of the test scenarios (including simulating manual steps), and cleanup automatically.
 
 ---
 

@@ -7,7 +7,17 @@ param(
     [string]$ProfileName
 )
 
-$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
+function Get-ProjectRoot {
+    param($StartPath)
+    $currentDir = $StartPath
+    while ($currentDir -ne $null -and $currentDir -ne "") {
+        if (Test-Path (Join-Path $currentDir "pyproject.toml")) { return $currentDir }
+        $currentDir = Split-Path -Parent -Path $currentDir
+    }
+    throw "FATAL: Could not find project root (pyproject.toml) by searching up from '$StartPath'."
+}
+
+$ProjectRoot = Get-ProjectRoot -StartPath $PSScriptRoot
 $SandboxParentDir = Join-Path $ProjectRoot "temp_test_environment"
 $SandboxDir = Join-Path $SandboxParentDir "layer3_sandbox"
 

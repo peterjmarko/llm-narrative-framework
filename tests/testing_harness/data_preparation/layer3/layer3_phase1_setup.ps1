@@ -2,7 +2,17 @@
 # --- Layer 3: Data Pipeline Integration Testing ---
 # --- Step 1: Automated Setup ---
 
-$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
+function Get-ProjectRoot {
+    param($StartPath)
+    $currentDir = $StartPath
+    while ($currentDir -ne $null -and $currentDir -ne "") {
+        if (Test-Path (Join-Path $currentDir "pyproject.toml")) { return $currentDir }
+        $currentDir = Split-Path -Parent -Path $currentDir
+    }
+    throw "FATAL: Could not find project root (pyproject.toml) by searching up from '$StartPath'."
+}
+
+$ProjectRoot = Get-ProjectRoot -StartPath $PSScriptRoot
 $TestEnvRoot = Join-Path $ProjectRoot "temp_test_environment"
 $SandboxDir = Join-Path $TestEnvRoot "layer3_sandbox"
 
@@ -166,5 +176,4 @@ Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor
 Write-Host "--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green
-Write-Host "Your next action is Phase 2: Execute the Test Workflow." -ForegroundColor Yellow
 Write-Host ""

@@ -10,9 +10,21 @@ param(
     [switch]$Interactive
 )
 
-$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
-$SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
 $ErrorActionPreference = "Stop"
+
+# --- Helper Functions ---
+function Get-ProjectRoot {
+    param($StartPath)
+    $currentDir = $StartPath
+    while ($currentDir -ne $null -and $currentDir -ne "") {
+        if (Test-Path (Join-Path $currentDir "pyproject.toml")) { return $currentDir }
+        $currentDir = Split-Path -Parent -Path $currentDir
+    }
+    throw "FATAL: Could not find project root (pyproject.toml) by searching up from '$StartPath'."
+}
+
+$ProjectRoot = Get-ProjectRoot -StartPath $PSScriptRoot
+$SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
 
 # --- Define ANSI Color Codes ---
 $C_RESET = "`e[0m"
@@ -232,15 +244,17 @@ try {
     Test-StepContinuity "Raw ADB Data" (Join-Path $SandboxDir "data/sources/adb_raw_export.txt") 1 "`t" $AllSubjects
     Write-Host "  -> Note: Pipeline Step 1 will be skipped since test data already exists." -ForegroundColor DarkGray
 
-        # Create minimal scoring files for bypass mode if needed
+    # Create minimal scoring files for bypass mode if needed so the pipeline doesn't fail
     if ($TestProfile.ConfigOverrides["bypass_candidate_selection"] -eq "true") {
+        $destAssetDir = Join-Path $SandboxDir "data/foundational_assets"
         $eminenceFile = Join-Path $destAssetDir "eminence_scores.csv"
         $oceanFile = Join-Path $destAssetDir "ocean_scores.csv"
         if (-not (Test-Path $eminenceFile)) {
             "idADB,EminenceScore" | Set-Content -Path $eminenceFile
         }
         if (-not (Test-Path $oceanFile)) {
-            "idADB" | Set-Content -Path $oceanFile
+            # The python script doesn't need the columns in bypass mode, but a valid header prevents potential issues
+            "idADB,OCEAN_C,OCEAN_O,OCEAN_E,OCEAN_A,OCEAN_N,Finalist" | Set-Content -Path $oceanFile
         }
         Write-Host "  -> Created minimal scoring files for bypass mode."
     }
@@ -283,8 +297,10 @@ try {
         Test-StepContinuity "Wikipedia Links" (Join-Path $SandboxDir "data/processed/adb_wiki_links.csv") 1 "," $AllSubjects
         Test-StepContinuity "Page Validation" (Join-Path $SandboxDir "data/reports/adb_validation_report.csv") 1 "," $AllSubjects
         Test-StepContinuity "Eligible Candidates" (Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt") 1 "`t" $FinalSubjects
-        Test-StepContinuity "Eminence Scores" (Join-Path $SandboxDir "data/foundational_assets/eminence_scores.csv") 1 "," $FinalSubjects
-        Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
+        if ($TestProfile.ConfigOverrides["bypass_candidate_selection"] -ne "true") {
+            Test-StepContinuity "Eminence Scores" (Join-Path $SandboxDir "data/foundational_assets/eminence_scores.csv") 1 "," $FinalSubjects
+            Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
+        }
         Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
         Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
     }
