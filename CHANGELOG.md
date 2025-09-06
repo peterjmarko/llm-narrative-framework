@@ -1,5 +1,31 @@
 # Changelog
 
+## 6.15.0 (2025-09-06)
+
+### Bump
+
+- **version 6.14.0 → 6.15.0**
+
+### Features
+
+- **overhaul Layer 2 and refactor Layer 3 test harness**
+  This commit hardens the entire data preparation test suite by overhauling the Layer 2 test and refactoring the Layer 3 harness for improved robustness, clarity, and organization.
+  
+  **Layer 2 Overhaul:**
+  - The three outdated `layer2_step*.ps1` scripts are deleted and replaced with a single, modern `run_layer2_test.ps1` orchestrator.
+  - The new test is "self-healing": it programmatically parses the real `prepare_data.ps1` to dynamically build its mock environment, ensuring it remains in sync with the production script.
+  - The entire test is now automated via `pdm run test-l2`.
+  
+  **Layer 3 Refactoring & Fixes:**
+  - All Layer 3 scripts are moved into a dedicated `layer3/` subdirectory for better organization.
+  - A robust `Get-ProjectRoot` function is implemented across all harness scripts, making the test suite immune to file relocations.
+  - The `bypass` test profile is corrected to use the same full subject list as the `default` profile, ensuring a true A/B comparison.
+  - `run_layer3_test.ps1` is refactored to use a common subject list (`$commonSubjects`), eliminating code duplication.
+  - `prepare_data.ps1` now silently skips steps during automated test runs, providing a clean log that is identical in both `default` and `bypass` modes.
+  
+  **Documentation:**
+  - `TESTING.md` is updated to reflect the new PDM-based commands and simplified workflows for running the overhauled Layer 2 and Layer 3 tests.
+
 ## 6.14.0 (2025-09-06)
 
 ### Bump
