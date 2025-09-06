@@ -1,5 +1,36 @@
 # Changelog
 
+## 6.15.1 (2025-09-06)
+
+### Bump
+
+- **version 6.15.0 → 6.15.1**
+
+### Fixes
+
+- **resolve unit test failure and enhance interactive UI**
+  This series of changes addressed several test failures and significantly enhanced the usability and clarity of the interactive testing mode (`test-l3-interactive`).
+  
+  **1. Core Bug Fixes (Test Failures):**
+  *   **`generate_personalities_db.py` Output Path:** The script was updated to save its output to the `data/` directory instead of `data/processed/`.
+  *   **Test Corrections:** The corresponding unit and integration tests (`test_generate_personalities_db.py`, `test_assembly_algorithm.py`, and the Layer 3 test harness) were all updated to look for the `personalities_db.txt` file in the correct `data/` directory, resolving the initial failures.
+  
+  **2. Developer Experience Improvements:**
+  *   **PDM Shortcut:** A PDM shortcut, `test-assembly`, was created in `pyproject.toml` to simplify running the core algorithm integration test.
+  *   **Documentation:** `TESTING.md` was updated to use this new, simpler shortcut.
+  
+  **3. Interactive Mode Enhancements:**
+  *   **Consistent Pausing:** The Layer 3 test harness was fixed to correctly pause for user input at Step 1, making the "guided tour" experience consistent from the start.
+  *   **Contextual Summaries:** A new utility script (`scripts/get_docstring_summary.py`) was created to extract richer, multi-paragraph summaries from Python scripts. This was integrated into the pipeline orchestrator and the test harness to provide a more detailed explanation for each step in interactive mode.
+  *   **Forced Color Output:** Enabled forced color code generation in all Python scripts (`colorama.init(strip=False)`). This resolves an issue where colors were stripped when the test harness captured script output, ensuring a consistently colored UI throughout the interactive pipeline tour.
+  *   **Improved Readability and UI:**
+      *   **Color-Coding:** Log messages and final status reports were consistently color-coded (magenta, yellow, green, red, cyan) across all Python scripts and the PowerShell test harness for better clarity.
+      *   **Robust Prompts:** The `Read-Host` prompts were modified to include leading and trailing newlines, ensuring a clean exit with `Ctrl+C`.
+      *   **Concise Logging:** Redundant words like "Successfully" were trimmed from certain log messages in `fetch_adb_data.py` for better readability.
+  
+  **4. Enhanced Reporting:**
+  *   **Expanded Scope Reporting:** The `generate_scope_report.py` script was updated to include test harn
+
 ## 6.15.0 (2025-09-06)
 
 ### Bump
