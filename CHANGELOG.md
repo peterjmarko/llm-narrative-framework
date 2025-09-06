@@ -1,5 +1,23 @@
 # Changelog
 
+## 7.0.0 (2025-09-06)
+
+### Bump
+
+- **version 6.15.1 → 7.0.0**
+
+### Features
+
+- **complete data preparation pipeline testing**
+  This marks a major milestone in the project's maturity by completing the multi-layered testing strategy for the entire data preparation pipeline. All four layers are now fully validated and passing:
+  
+  - Core Algorithm Validation (`test-assembly`)
+  - Layer 1: Unit Testing (`test-data-prep`)
+  - Layer 2: Orchestration Testing (`test-l2`)
+  - Layer 3: Integration Testing (default, bypass, and interactive modes)
+  
+  BREAKING CHANGE: The completion and validation of the full data preparation testing suite represents a major step in the project's stability and reliability. This milestone justifies a major version bump to v7.0.0.
+
 ## 6.15.1 (2025-09-06)
 
 ### Bump
