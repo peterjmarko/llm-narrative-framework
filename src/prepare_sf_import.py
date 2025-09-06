@@ -56,7 +56,7 @@ from config_loader import get_path  # noqa: E402
 from id_encoder import to_base58  # noqa: E402
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -124,7 +124,7 @@ def format_for_solar_fire(input_data, output_path):
         return len(processed_records)
     except IOError as e:
         logging.error(f"Failed to write to output file {output_path}: {e}")
-        return None
+        return 0
 
 
 def main():
@@ -205,15 +205,20 @@ def main():
 
         num_processed = format_for_solar_fire(input_data, output_path)
 
-        if num_processed:
-            print(f"\n{Fore.YELLOW}--- Final Output ---")
-            print(f"{Fore.CYAN} - Solar Fire import file saved to: {display_output_path}")
-            key_metric = f"Final Count: {num_processed} subjects"
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Solar Fire import file saved to: {display_output_path}{Fore.RESET}")
+
+        key_metric = f"Final Count: {num_processed} subjects"
+
+        if num_processed > 0:
             print(
                 f"\n{Fore.GREEN}SUCCESS: {key_metric}. Solar Fire import file "
-                f"created successfully.\n"
+                f"created successfully.{Fore.RESET}\n"
             )
         else:
+            print(
+                f"\n{Fore.RED}FAILURE: {key_metric}. No records were processed.{Fore.RESET}\n"
+            )
             sys.exit(1)
 
     except Exception as e:

@@ -70,7 +70,7 @@ except ImportError:
 from colorama import Fore, init
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Constants ---
 OCEAN_FIELDNAMES = ["Index", "idADB", "Name", "BirthYear", "Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
@@ -540,6 +540,7 @@ def main():
     parser.add_argument("--cutoff-start-point", type=int, default=default_cutoff_start, help="Minimum subjects to process before cutoff logic is active.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
     parser.add_argument("--no-summary", action="store_true", help="Suppress the final summary report output.")
+    parser.add_argument("--no-api-warning", action="store_true", help="Suppress the API cost warning.")
     args = parser.parse_args()
 
     # If a sandbox path is provided, set the environment variable.
@@ -661,7 +662,7 @@ def main():
     bypass_candidate_selection = get_config_value(APP_CONFIG, "DataGeneration", "bypass_candidate_selection", "false").lower() == 'true'
 
     # Display a non-interactive warning if the script is proceeding automatically
-    if total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
+    if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
         
         if bypass_candidate_selection:
@@ -851,8 +852,13 @@ def main():
             print(f"{Fore.CYAN} - Missing scores report saved to: {display_missing_path}{Fore.RESET}")
             print(f"{Fore.CYAN} - Summary report saved to: {display_summary_path}{Fore.RESET}")
 
-            key_metric = f"Final Count: {len(final_df):,} subjects"
-            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. OCEAN score generation completed as designed. ✨{Fore.RESET}\n")
+            final_count = len(final_df)
+            key_metric = f"Final Count: {final_count:,} subjects"
+            
+            if final_count == 0:
+                print(f"\n{Fore.RED}FAILURE: {key_metric}. No OCEAN scores were generated.{Fore.RESET}\n")
+            else:
+                print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. OCEAN score generation completed as designed. ✨{Fore.RESET}\n")
 
 def generate_missing_scores_report(
     filepath: Path,

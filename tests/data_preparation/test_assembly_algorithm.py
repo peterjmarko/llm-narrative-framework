@@ -102,7 +102,7 @@ def assembly_test_environment() -> Path:
         shutil.copy(src, dest)
 
     # Clean up the main output file from any previous test run.
-    output_to_delete = sandbox_path / "personalities_db.txt"
+    output_to_delete = sandbox_path / "data/personalities_db.txt"
     if output_to_delete.exists():
         output_to_delete.unlink()
 
@@ -188,7 +188,7 @@ def test_assembly_algorithm_matches_ground_truth(assembly_test_environment, test
         run_script(generate_db_script, sandbox_path, "--force")
 
     # --- Step 3: Compare the output against the ground truth ---
-    generated_path = sandbox_path / "personalities_db.txt"
+    generated_path = sandbox_path / "data/personalities_db.txt"
     ground_truth_path = (
         project_root
         / "data/foundational_assets/assembly_logic/personalities_db.assembly_logic.txt"

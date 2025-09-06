@@ -88,6 +88,7 @@ mig-stu = "powershell -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 
 # Testing shortcuts
 test-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+test-assembly = {cmd = "pytest tests/data_preparation/test_assembly_algorithm.py", help = "Run the core assembly algorithm integration test."}
 test-l2 = "pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"
 test-l3-default = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"
 test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"

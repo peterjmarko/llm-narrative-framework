@@ -53,7 +53,7 @@ def mock_input_files(tmp_path: Path) -> dict:
     subject_db_path = processed_dir / "subject_db.csv"
     point_weights_path = foundational_dir / "point_weights.csv"
     thresholds_path = foundational_dir / "balance_thresholds.csv"
-    output_path = tmp_path / "personalities_db.txt"
+    output_path = tmp_path / "data" / "personalities_db.txt"
 
     subject_db_path.write_text(
         "Index,idADB,Name,Date,Sun,Moon,Ascendant,Midheaven\n"

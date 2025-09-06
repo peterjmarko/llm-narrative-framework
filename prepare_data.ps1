@@ -158,6 +158,18 @@ function Get-ConfigValue {
     }
 }
 
+function Get-ScriptDocstringSummary {
+    param([string]$ScriptPath)
+    try {
+        $helperScript = Join-Path $ProjectRoot "scripts/get_docstring_summary.py"
+        $summary = & python $helperScript $ScriptPath 2>$null
+        return $summary.Trim()
+    }
+    catch {
+        return "" # Return empty string on any error
+    }
+}
+
 function Show-PipelineStatus {
     param([array]$Steps, [string]$BaseDirectory = ".")
     Format-Banner "Data Preparation Pipeline Status" $C_CYAN
@@ -263,11 +275,28 @@ try {
         Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
         Write-Host $stepHeader -ForegroundColor Blue
         Write-Host $step.Description -ForegroundColor Blue
+
+        # In interactive mode, fetch and display the detailed script summary
+        if ($Interactive -and $step.Script) {
+            $summary = Get-ScriptDocstringSummary -ScriptPath (Join-Path $ProjectRoot $step.Script)
+            if ($summary) {
+                Write-Host "`n${C_MAGENTA}Script Summary: $summary${C_RESET}"
+            }
+        }
+
         if ($SandboxMode) {
             Write-Host "`n  BASE DIRECTORY: $WorkingDirectory" -ForegroundColor DarkGray
         }
-        Write-Host "`n  INPUTS:"; $step.Inputs | ForEach-Object { Write-Host "    - $_" }; Write-Host "`n  OUTPUT:"; Write-Host "    - $($step.Output)`n"
-        if ($Interactive) { Read-Host -Prompt "Press Enter to execute this step (Ctrl+C to exit)..." }
+        Write-Host "`n  INPUTS:"; $Step.Inputs | ForEach-Object { Write-Host "    - $_" }; Write-Host "`n  OUTPUT:"; Write-Host "    - $($Step.Output)`n"
+
+        # Display step-specific warnings before the prompt
+        if ($Step.Name -eq "Fetch Raw ADB Data") {
+            Write-Host "${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take a significant amount of time to complete.${C_RESET}"
+        } elseif ($Step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
+            Write-Host "${C_YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.${C_RESET}"
+        }
+
+        if ($Interactive) { Read-Host -Prompt "`n${C_YELLOW}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n" }
 
         $scriptPath = Join-Path $ProjectRoot $step.Script
         $arguments = "run", "python", $scriptPath, "--force"
@@ -282,7 +311,7 @@ try {
                 $arguments += "--quiet"
             }
             if ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
-                $arguments += "--no-summary"
+                $arguments += "--no-summary", "--no-api-warning"
             }
         }
         
@@ -303,7 +332,7 @@ try {
             Write-Host "Script failed with exit code $exitCode" -ForegroundColor Red
             throw "Script '$($step.Script)' failed with exit code $exitCode. Halting pipeline." 
         }
-        if ($Interactive) { Write-Host ""; Read-Host -Prompt "Step complete. Inspect the output, then press Enter to continue..." }
+        if ($Interactive) { Write-Host ""; Read-Host -Prompt "`n${C_YELLOW}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n" }
     }
     Format-Banner "Data Preparation Pipeline Completed Successfully" $C_GREEN
 }

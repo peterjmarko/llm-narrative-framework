@@ -423,8 +423,8 @@ class TestInputFileValidation:
         assert "Validated input file: 2 valid rows found" in captured.out
         # Should warn about malformed row (now visible with --verbose)
         assert "Skipping malformed row 3" in captured.out
-        # Should complete successfully 
-        assert "SUCCESS:" in captured.out
+        # Should now report a failure because the mocked network calls find 0 links.
+        assert "FAILURE:" in captured.out
     
     def test_file_read_error(self, tmp_path, mocker, capsys):
         """Tests handling of file read errors during validation."""

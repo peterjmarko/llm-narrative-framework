@@ -55,7 +55,7 @@ from config_loader import get_path  # noqa: E402
 from id_encoder import from_base58  # noqa: E402
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -274,7 +274,7 @@ def main():
     except (ValueError, NameError):  # Handle if project_root fails to be found
         display_output_path = output_path
 
-    print(f"{Fore.CYAN}Writing {len(all_subjects)} records to {display_output_path}...{Fore.RESET}")
+    print(f"Writing {len(all_subjects)} records to {display_output_path}...")
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
@@ -282,13 +282,23 @@ def main():
             writer.writeheader()
             writer.writerows(all_subjects)
 
-        print(f"\n{Fore.YELLOW}--- Final Output ---")
-        print(f"{Fore.CYAN} - Master subject database saved to: {display_output_path}")
-        key_metric = f"Final Count: {len(all_subjects)} subjects"
-        print(
-            f"\n{Fore.GREEN}SUCCESS: {key_metric}. Master subject database "
-            f"created successfully.\n"
-        )
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Master subject database saved to: {display_output_path}{Fore.RESET}")
+        
+        final_count = len(all_subjects)
+        key_metric = f"Final Count: {final_count:,} subjects"
+        
+        if final_count > 0:
+            print(
+                f"\n{Fore.GREEN}SUCCESS: {key_metric}. Master subject database "
+                f"created successfully.{Fore.RESET}\n"
+            )
+        else:
+            print(
+                f"\n{Fore.RED}FAILURE: {key_metric}. No records were processed.{Fore.RESET}\n"
+            )
+            # No sys.exit(1) here as an empty file can be a valid outcome.
+
     except IOError as e:
         logging.error(f"Failed to write to output file: {e}\n")
         sys.exit(1)

@@ -176,19 +176,27 @@ def main(quiet=False):
             file_count += 1
             rel_path = path.relative_to(PROJECT_ROOT).as_posix()
             
-            # Categorize files
-            if path.suffix == ".md":
-                words = count_words(path)
-                documents.append((f"`{rel_path}`", words))
-            elif path.suffix in [".py", ".ps1"]:
+            # Categorize files. The order is important: specific types first, then fall back to location-based data files.
+            rel_parts = path.relative_to(PROJECT_ROOT).parts
+
+            if path.suffix in [".py", ".ps1"]:
                 lines = count_non_empty_lines(path)
                 scripts.append((f"`{rel_path}`", lines))
+            elif path.suffix == ".md":
+                words = count_words(path)
+                documents.append((f"`{rel_path}`", words))
             elif path.parent.name == "diagrams" and path.suffix == ".mmd":
                 lines = count_non_empty_lines(path)
                 diagrams.append((f"`{rel_path}`", lines))
-            elif "data" in path.parts and path.name != "README.md":
-                size_kb = get_file_size_kb(path)
-                data_files.append((f"`{rel_path}`", size_kb))
+            else:
+                # A file is considered a "data file" if it's under 'data/' or 'tests/assets/'
+                is_data_file = (
+                    len(rel_parts) > 1 and
+                    (rel_parts[0] == 'data' or rel_parts[0:2] == ('tests', 'assets'))
+                )
+                if is_data_file and path.name != "README.md":
+                    size_kb = get_file_size_kb(path)
+                    data_files.append((f"`{rel_path}`", size_kb))
 
     if not quiet:
         print(f"   ...found and processed {file_count} files (excluded {excluded_dirs_count} directories).")

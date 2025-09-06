@@ -71,7 +71,7 @@ from tqdm import tqdm
 from urllib3.util.retry import Retry
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Globals & Constants ---
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -384,17 +384,28 @@ def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int
     else:
         # Get final counts for the success message
         try:
-            df = pd.read_csv(output_path)
-            valid_count = len(df[df['Status'].isin(['OK', 'VALID'])])
-            total_count = len(df)
-            key_metric = f"{valid_count:,} of {total_count:,} records are valid"
+            with open(output_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+            
+            total_count = len(rows)
+            valid_count = sum(1 for row in rows if row.get('Status') in ['OK', 'VALID'])
         except Exception:
-            key_metric = f"{total_subjects:,} records processed"
+            # Fallback if we can't read/parse the file
+            total_count = total_subjects
+            valid_count = -1 # Sentinel value
 
         print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
         print(f"{Fore.CYAN} - Detailed report saved to: {display_output_path}{Fore.RESET}")
         print(f"{Fore.CYAN} - Summary report saved to: {display_summary_path}{Fore.RESET}")
-        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Validation completed successfully.{Fore.RESET}\n")
+
+        # Determine success or failure for coloring
+        if total_count > 0 and valid_count == 0:
+            key_metric = f"Processed {total_count:,} records but found 0 valid subjects"
+            print(f"\n{Fore.RED}FAILURE: {key_metric}. Please review the validation summary.{Fore.RESET}\n")
+        else:
+            key_metric = f"{total_count:,} records processed"
+            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Validation completed successfully.{Fore.RESET}\n")
 
 def generate_summary_report(report_path: Path):
     """Reads the detailed CSV report and generates a summary text file."""

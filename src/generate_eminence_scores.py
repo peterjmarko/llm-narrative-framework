@@ -61,7 +61,7 @@ from typing import List, Dict, Tuple
 from colorama import Fore, init
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Prompt Template ---
 EMINENCE_PROMPT_TEMPLATE = """
@@ -263,34 +263,29 @@ def save_scores_to_csv(filepath: Path, scores: List[Tuple[str, str, str, str]], 
     except IOError as e:
         logging.error(f"Failed to write scores to {filepath}: {e}")
 
-def sort_and_reindex_scores(filepath: Path):
-    """Sorts the scores file by EminenceScore (desc) and re-applies the Index."""
+def sort_and_reindex_scores(filepath: Path) -> bool:
+    """
+    Sorts the scores file by EminenceScore (desc) and re-applies the Index.
+    Returns True on success, False on failure.
+    """
     if not filepath.exists() or filepath.stat().st_size == 0:
-        return
+        return True  # Nothing to do is considered a success
 
     try:
-        # Using pandas is the most robust way to handle large CSV sorting
         import pandas as pd
         df = pd.read_csv(filepath)
-
-        # Ensure EminenceScore is numeric for correct sorting
         df['EminenceScore'] = pd.to_numeric(df['EminenceScore'], errors='coerce')
         df.dropna(subset=['EminenceScore'], inplace=True)
-        
-        # Sort by score descending, then by name ascending as a tie-breaker
         df.sort_values(by=['EminenceScore', 'Name'], ascending=[False, True], inplace=True)
-        
-        # Re-index the 'Index' column from 1 to N
         df['Index'] = range(1, len(df) + 1)
-        
-        # Save the sorted file, overwriting the original
         df.to_csv(filepath, index=False, float_format='%.2f')
-        print(f"Successfully sorted and re-indexed '{filepath.name}'.")
-
+        return True
     except ImportError:
         logging.warning("Pandas not installed. Skipping sorting. Install with 'pdm add pandas'.")
+        return True # Not a fatal error, but we didn't sort. Treat as success for reporting.
     except Exception as e:
         logging.error(f"Could not sort scores file: {e}")
+        return False
 
 def generate_scores_summary(filepath: Path, total_subjects_overall: int):
     """Generates a summary report from the final scores file."""
@@ -359,7 +354,10 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         print(f"{Fore.CYAN} - Summary report saved to: {display_summary_path}{Fore.RESET}")
 
         key_metric = f"Scored {total_scored:,} of {total_subjects_overall:,} subjects"
-        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Eminence scoring completed successfully. ✨{Fore.RESET}\n")
+        if total_scored == 0 and total_subjects_overall > 0:
+            print(f"\n{Fore.RED}FAILURE: {key_metric}. No scores were generated. Please check for errors.{Fore.RESET}\n")
+        else:
+            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Eminence scoring completed successfully. ✨{Fore.RESET}\n")
 
     except ImportError:
         logging.warning("Pandas not installed. Skipping summary report. Install with 'pdm add pandas'.")
@@ -383,6 +381,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=default_batch_size, help="Number of subjects per API call. Default is from config.ini.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
     parser.add_argument("--no-summary", action="store_true", help="Suppress the final summary report output.")
+    parser.add_argument("--no-api-warning", action="store_true", help="Suppress the API cost warning.")
     args = parser.parse_args()
 
     # If a sandbox path is provided, set the environment variable.
@@ -471,7 +470,7 @@ def main():
     total_subjects_in_source = len(processed_ids) + total_to_process
 
     # Display a non-interactive warning if the script is proceeding automatically
-    if total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
+    if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
          print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
 
     print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
@@ -557,9 +556,29 @@ def main():
         print(f"\n\n{Fore.YELLOW}Process interrupted by user. Exiting gracefully.{Fore.RESET}")
     finally:
         print(f"\n{Fore.YELLOW}--- Finalizing ---{Fore.RESET}")
-        sort_and_reindex_scores(output_path)
+        sort_success = sort_and_reindex_scores(output_path)
+        
         if not args.no_summary:
             generate_scores_summary(output_path, total_subjects_in_source)
+        else:
+            # When --no-summary is used, print a simple final report.
+            from config_loader import PROJECT_ROOT
+            display_path = os.path.relpath(output_path, PROJECT_ROOT)
+            total_scored = len(processed_ids) + processed_count
+
+            print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+            if sort_success:
+                print(f"{Fore.CYAN} - Eminence scores saved to: {display_path}{Fore.RESET}")
+            
+            if not sort_success:
+                print(f"\n{Fore.RED}FAILURE: Sorting and re-indexing failed. The file may be in an inconsistent state.{Fore.RESET}\n")
+            elif total_scored == 0 and total_subjects_in_source > 0:
+                key_metric = f"Scored 0 of {total_subjects_in_source:,} subjects"
+                print(f"\n{Fore.RED}FAILURE: {key_metric}. No scores were generated.{Fore.RESET}\n")
+            else:
+                key_metric = f"Scored {total_scored:,} of {total_subjects_in_source:,} subjects"
+                print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Eminence scoring completed successfully. ✨{Fore.RESET}\n")
+
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
         

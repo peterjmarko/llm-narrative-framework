@@ -28,13 +28,13 @@ This is a standalone, push-button `pytest` script that provides a permanent, hig
 -   **Run the full assembly logic test:**
     This test runs automatically as part of the main `pdm run test` suite. To run it in isolation:
     ```bash
-    pdm run pytest tests/test_assembly_algorithm.py
+    pdm run test-assembly
     ```
 -   **Run the test for a single, specific record:**
     The test harness includes a flexible command-line option to target a single record for focused debugging.
     ```bash
     # Test the 3rd record in the ground-truth set
-    pdm run pytest tests/test_assembly_algorithm.py --test-record-number=3
+    pdm run test-assembly -- --test-record-number=3
     ```
 
 > **Note:** The integration test procedures below (Layers 3 and higher) create a temporary `temp_test_environment` directory at the project root to run in a safe, isolated sandbox. These tests are non-destructive and will not modify your main project files.

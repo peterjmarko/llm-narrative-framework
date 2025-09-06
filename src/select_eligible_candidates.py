@@ -20,7 +20,7 @@
 # Filename: src/select_eligible_candidates.py
 
 """
-Selects eligible candidates for LL-M scoring from the raw ADB data export.
+Selects eligible candidates for LLM scoring from the raw ADB data export.
 
 This script serves as a key filtering stage in the data preparation pipeline. It
 takes the raw data dump and the validation report to produce a clean list of all
@@ -55,7 +55,7 @@ import pandas as pd
 from colorama import Fore, init
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -80,27 +80,31 @@ def finalize_and_report(output_path: Path, new_count: int, was_interrupted: bool
     """Generates the final summary and prints the status message."""
     from config_loader import PROJECT_ROOT
     display_path = os.path.relpath(output_path, PROJECT_ROOT)
+    
+    total_eligible = 0
     try:
+        # Get the final count directly from the output file for accuracy
         total_eligible = len(pd.read_csv(output_path, sep='\t'))
-        summary_msg = f"Found {new_count:,} new eligible candidates. Total now saved: {total_eligible:,}."
     except (FileNotFoundError, pd.errors.EmptyDataError):
-        summary_msg = f"Saved {new_count:,} eligible candidates to new file."
+        # If the file doesn't exist or is empty, the count is what we just processed
+        total_eligible = new_count if not was_interrupted else 0
 
     if was_interrupted:
+        summary_msg = f"Found {new_count:,} new eligible candidates. Total now saved: {total_eligible:,}."
         print(f"\n{Fore.YELLOW}WARNING: Processing interrupted by user.")
         print(summary_msg)
         print(f"{Fore.CYAN}Partial results saved to: {display_path} ✨{Fore.RESET}\n")
         os._exit(1)
     else:
-        try:
-            total_eligible = len(pd.read_csv(output_path, sep='\t'))
-            key_metric = f"Found {total_eligible:,} eligible candidates"
-        except (FileNotFoundError, pd.errors.EmptyDataError):
-            key_metric = f"Found {new_count:,} eligible candidates"
-
         print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
         print(f"{Fore.CYAN} - Eligible candidates saved to: {display_path}{Fore.RESET}")
-        print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Selection completed successfully. ✨{Fore.RESET}\n")
+        
+        if total_eligible == 0:
+            key_metric = "Found 0 eligible candidates"
+            print(f"\n{Fore.RED}FAILURE: {key_metric}. Please check the filtering criteria or input data.{Fore.RESET}\n")
+        else:
+            key_metric = f"Found {total_eligible:,} eligible candidates"
+            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Selection completed successfully. ✨{Fore.RESET}\n")
 
 
 def normalize_name_for_deduplication(series: pd.Series) -> pd.Series:

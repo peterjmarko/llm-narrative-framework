@@ -72,7 +72,7 @@ from tqdm import tqdm
 from urllib3.util.retry import Retry
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Globals & Constants ---
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -492,9 +492,13 @@ def finalize_and_report(output_path: Path, fieldnames: list, all_lines: list, wa
             
             print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
             print(f"{Fore.CYAN} - Wikipedia links saved to: {display_path}{Fore.RESET}")
-            
-            key_metric = f"Found {found_links:,} links for {total_subjects:,} subjects"
-            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Link finding completed successfully. ✨{Fore.RESET}\n")
+
+            if found_links == 0 and processed_count > 0:
+                key_metric = f"Processed {processed_count:,} subjects but found 0 links"
+                print(f"\n{Fore.RED}FAILURE: {key_metric}. Please check the search logic or input data.{Fore.RESET}\n")
+            else:
+                key_metric = f"Found {found_links:,} links for {total_subjects:,} subjects"
+                print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Link finding completed successfully. ✨{Fore.RESET}\n")
 
 def main():
     parser = argparse.ArgumentParser(description="Find Wikipedia links for subjects in the raw ADB export.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)

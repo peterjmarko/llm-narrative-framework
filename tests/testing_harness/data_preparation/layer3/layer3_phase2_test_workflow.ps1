@@ -29,6 +29,9 @@ $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
 # --- Define ANSI Color Codes ---
 $C_RESET = "`e[0m"
 $C_CYAN = "`e[96m"
+$C_MAGENTA = "`e[95m"
+$C_YELLOW = "`e[93m"
+$C_GREEN = "`e[92m"
 
 # --- Helper Functions ---
 function Format-Banner {
@@ -196,6 +199,28 @@ try {
     $stepHeader = ">>> Step 1/13: Fetch Raw ADB Data <<<"
     Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader -ForegroundColor Blue; Write-Host "Fetches the initial raw dataset from the live Astro-Databank." -ForegroundColor Blue
     
+    # Replicate the standard step info block for consistency in interactive mode
+    if ($Interactive) {
+        $summaryHelper = Join-Path $ProjectRoot "scripts/get_docstring_summary.py"
+        $fetchScriptPath = Join-Path $ProjectRoot "src/fetch_adb_data.py"
+        $summary = & python $summaryHelper $fetchScriptPath 2>$null
+        if ($summary) {
+            Write-Host "`n${C_MAGENTA}Script Summary: $($summary.Trim())${C_RESET}"
+            Write-Host "${C_MAGENTA}Test Harness Note: This script will be run in a loop to create a small, targeted seed dataset for the test subjects.${C_RESET}"
+        }
+    }
+
+    Write-Host "`n  BASE DIRECTORY: $SandboxDir" -ForegroundColor DarkGray
+    Write-Host "`n  INPUTS:"
+    Write-Host "    - Live Astro-Databank Website"
+    Write-Host "`n  OUTPUT:"
+    Write-Host "    - data/sources/adb_raw_export.txt`n"
+
+    if ($Interactive) {
+        Write-Host "${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website.${C_RESET}"
+        Read-Host -Prompt "`n${C_YELLOW}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n"
+    }
+
     Write-Host "`n  -> Performing targeted fetch for $($TestProfile.Subjects.Count) subjects..."
     $fetchScript = Join-Path $ProjectRoot "src/fetch_adb_data.py"
     $outputFile = "data/sources/adb_raw_export.txt"
@@ -213,7 +238,8 @@ try {
             "--sandbox-path", $SandboxDir,
             "--start-date", $subject.Date,
             "--end-date", $subject.Date,
-            "-o", $tempFile
+            "-o", $tempFile,
+            "--no-network-warning"
         )
         if ($isFirstFetch) {
             $fetchArgs += "--force"
@@ -241,7 +267,18 @@ try {
     @($header) + $reIndexedData | Set-Content -Path $fullOutputFile
     $relativeOutputPath = (Resolve-Path $fullOutputFile -Relative).TrimStart(".\")
     Write-Host "`n  -> Assembled and saved initial seed data to '$relativeOutputPath'." -ForegroundColor Cyan
+
+    # Validate the result and print an overall success message.
+    # Test-StepContinuity will throw an exception (red text) if validation fails.
     Test-StepContinuity "Raw ADB Data" (Join-Path $SandboxDir "data/sources/adb_raw_export.txt") 1 "`t" $AllSubjects
+    
+    $finalFile = Join-Path $SandboxDir "data/sources/adb_raw_export.txt"
+    $finalCount = (Get-Content $finalFile | Select-Object -Skip 1).Length
+    $totalSubjects = $AllSubjects.Count
+    Write-Host "`n${C_GREEN}SUCCESS: Successfully fetched and assembled data for ${finalCount}/${totalSubjects} subjects.${C_RESET}"
+    
+    if ($Interactive) { Read-Host -Prompt "`n${C_YELLOW}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n" }
+    
     Write-Host "  -> Note: Pipeline Step 1 will be skipped since test data already exists." -ForegroundColor DarkGray
 
     # Create minimal scoring files for bypass mode if needed so the pipeline doesn't fail
@@ -269,7 +306,15 @@ try {
     $env:PYTHONIOENCODING = "utf-8"
 
     # Capture the output, but do not display it live. We will control the messaging.
-    $rawOutput = & $prepareDataScript -Force -NoFinalReport -SilentHalt 2>&1
+    $pipelinePart1Args = @{
+        Force = $true
+        NoFinalReport = $true
+        SilentHalt = $true
+    }
+    if ($Interactive) {
+        $pipelinePart1Args.Interactive = $true
+    }
+    $rawOutput = & $prepareDataScript @pipelinePart1Args 2>&1
     $pipelinePart1ExitCode = $LASTEXITCODE
     
     Remove-Item Env:PROJECT_SANDBOX_PATH -ErrorAction SilentlyContinue
@@ -353,7 +398,19 @@ A cautious approach to life.
 A need for stimulation in professional life.
 "@ | Set-Content -Path (Join-Path $destAssetDir "sf_delineations_library.txt") -Encoding UTF8
     Write-Host "  -> Placed simulated SF files into sandbox."
-    Test-StepContinuity "SF Export" (Join-Path $destAssetDir "sf_chart_export.csv") 3 "," $FinalSubjects
+    # --- Validate and report success for each simulated step ---
+    $chartExportPath = Join-Path $destAssetDir "sf_chart_export.csv"
+    $delineationsLibPath = Join-Path $destAssetDir "sf_delineations_library.txt"
+
+    Test-StepContinuity "SF Export" $chartExportPath 3 "," $FinalSubjects
+    if (-not (Test-Path $delineationsLibPath)) {
+        throw "FAIL [Simulation]: Delineations library file not found: ${delineationsLibPath}"
+    }
+
+    Write-Host "`n--- Final Output (Simulation) ---" -ForegroundColor Yellow
+    Write-Host " - Simulated chart export saved to: $((Resolve-Path $chartExportPath -Relative).TrimStart('.\'))" -ForegroundColor Cyan
+    Write-Host " - Simulated delineations library saved to: $((Resolve-Path $delineationsLibPath -Relative).TrimStart('.\'))" -ForegroundColor Cyan
+    Write-Host "`n${C_GREEN}SUCCESS: All simulated manual files created successfully.${C_RESET}"
 
     # --- 4. Execute Pipeline (Part 2): Resume and complete ---
     Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming pipeline with simulated manual files... ---" -ForegroundColor Cyan
@@ -375,7 +432,7 @@ A need for stimulation in professional life.
 
     # --- 5. Final Verification ---
     Write-Host "`n--- VERIFYING: Checking final output... ---" -ForegroundColor Cyan
-    $finalDbPath = Join-Path $SandboxDir "data/processed/personalities_db.txt"
+    $finalDbPath = Join-Path $SandboxDir "data/personalities_db.txt"
     if (-not (Test-Path $finalDbPath)) { throw "FAIL: The final 'personalities_db.txt' file was not created." }
     Test-StepContinuity "Final Database" $finalDbPath 1 -SubjectsToCheck $FinalSubjects
     $lineCount = (Get-Content $finalDbPath).Length

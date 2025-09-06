@@ -62,7 +62,7 @@ from colorama import Fore, init
 from tqdm import tqdm
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -232,7 +232,7 @@ def scrape_search_page_data(session):
             writer.writerow(['ID', 'CategoryName']) # Write the header
             writer.writerows(sorted_categories)     # Write the sorted data rows
         
-        logging.info(f"{Fore.CYAN}Successfully saved/updated category map at '{display_path}'.{Fore.RESET}")
+        logging.info(f"{Fore.CYAN}Saved/updated category map at '{display_path}'.{Fore.RESET}")
     except (IOError, csv.Error) as e:
         logging.warning(f"Could not save category map to '{output_path}': {e}")
 
@@ -481,7 +481,7 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
         print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Data fetching completed successfully. ✨{Fore.RESET}\n")
     else:
         print(f"\nData fetching complete. ✨")
-        print(f"Successfully fetched {processed_count:,} out of {total_hits:,} total records ({percentage:.0f}%).")
+        print(f"{Fore.GREEN}Successfully fetched {processed_count:,} out of {total_hits:,} total records ({percentage:.0f}%).{Fore.RESET}")
         print(f"Output saved to: {display_path}\n")
 
 def main():
@@ -492,6 +492,7 @@ def main():
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file without a prompt.")
     parser.add_argument("--start-date", type=str, help="Start date for search filter (YYYY-MM-DD). For testing.")
     parser.add_argument("--end-date", type=str, help="End date for search filter (YYYY-MM-DD). For testing.")
+    parser.add_argument("--no-network-warning", action="store_true", help="Suppress the network connection warning.")
     args = parser.parse_args()
 
     # If a sandbox path is provided, set the environment variable.
@@ -515,6 +516,9 @@ def main():
 
     output_path = Path(args.output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not args.no_network_warning:
+        print(f"\n{Fore.YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take a significant amount of time to complete.{Fore.RESET}")
     
     def backup_and_overwrite(file_path: Path):
         """Creates a backup of the file before overwriting."""

@@ -58,7 +58,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from config_loader import get_path  # noqa: E402
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Constants based on the supplementary material ---
 SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
@@ -227,7 +227,7 @@ def main():
 
     subject_db_path = Path(get_path("data/processed/subject_db.csv"))
     delineations_dir = Path(get_path("data/foundational_assets/neutralized_delineations"))
-    output_path = Path(get_path("data/processed/personalities_db.txt"))
+    output_path = Path(get_path("data/personalities_db.txt"))
 
     # Define all configuration and data input files for the stale check
     point_weights_path = Path(get_path("data/foundational_assets/point_weights.csv"))
@@ -279,6 +279,7 @@ def main():
 
     print(f"Processing subjects from {subject_db_path.name}...")
     try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8', newline='') as outfile:
             writer = csv.writer(
                 outfile,

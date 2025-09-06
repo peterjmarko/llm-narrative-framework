@@ -64,7 +64,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from config_loader import APP_CONFIG, get_config_value, get_path  # noqa: E402
 
 # Initialize colorama
-init(autoreset=True)
+init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -227,13 +227,19 @@ def main():
     except ValueError:
         display_path = output_path # Fallback to absolute if not within project
 
-    print(f"\n{Fore.YELLOW}--- Final Output ---")
-    print(f"{Fore.CYAN} - Final candidates list saved to: {display_path}")
-    key_metric = f"Final Count: {len(final_df)} subjects"
-    print(
-        f"\n{Fore.GREEN}SUCCESS: {key_metric}. Final candidate selection "
-        f"completed successfully.\n"
-    )
+    print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+    print(f"{Fore.CYAN} - Final candidates list saved to: {display_path}{Fore.RESET}")
+    
+    final_count = len(final_df)
+    key_metric = f"Final Count: {final_count:,} subjects"
+
+    if final_count == 0:
+        print(f"\n{Fore.RED}FAILURE: {key_metric}. No final candidates were selected.{Fore.RESET}\n")
+    else:
+        print(
+            f"\n{Fore.GREEN}SUCCESS: {key_metric}. Final candidate selection "
+            f"completed successfully.{Fore.RESET}\n"
+        )
 
 
 if __name__ == "__main__":
