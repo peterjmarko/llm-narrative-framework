@@ -1,5 +1,33 @@
 # Changelog
 
+## 8.0.0 (2025-09-07)
+
+### Bump
+
+- **version 7.0.1 → 8.0.0**
+
+### Features
+
+- **decouple candidate selection and overhaul data prep tests**
+  This release completes a major refactoring of the LLM-based candidate selection logic and a significant overhaul of the data preparation pipeline's test harnesses. The final subject pool is now determined by a more flexible, post-hoc analysis in `select_final_candidates.py` instead of during the data generation step.
+  
+  - **METHODOLOGICAL SHIFT: Decoupled Candidate Selection:**
+    - The complex, stateful variance-based cutoff logic was removed from `generate_ocean_scores.py`. Its sole responsibility is now to generate OCEAN scores for all eligible candidates.
+    - This cutoff logic was moved into `select_final_candidates.py`, which now performs a post-hoc analysis to determine the final cohort size. This makes the selection process more flexible and transparent.
+  
+  - **Test Harness Overhaul:**
+    - Completed a full overhaul of the Layer 2 and 3 data preparation integration tests, making them non-interactive, stateless, and reliable, with clean, context-aware logging.
+    - The test suite commands in `pyproject.toml` were reorganized for clarity.
+  
+  - **Robustness & UX Fixes:**
+    - Fixed a critical bug where `prepare_data.ps1` would use the wrong working directory, causing errors in test runs.
+    - The pipeline now correctly detects and resumes from `[INCOMPLETE]` steps by parsing summary files, not just checking for file existence.
+    - Implemented `tqdm` progress bars for LLM scoring scripts for a clean, user-friendly experience.
+    - Fixed `UnboundLocalError` crashes in scoring scripts by correcting the module import order.
+    - The eminence scoring script now correctly halts the pipeline if it fails to retrieve all scores, preventing data corruption.
+  
+  BREAKING CHANGE:
+
 ## 7.0.1 (2025-09-07)
 
 ### Bump
