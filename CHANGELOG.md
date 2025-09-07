@@ -1,5 +1,32 @@
 # Changelog
 
+## 7.0.1 (2025-09-07)
+
+### Bump
+
+- **version 7.0.0 → 7.0.1**
+
+### Refactor
+
+- **standardize file backup utility and fix orchestration tests**
+  This major refactoring introduces a standardized file backup-and-remove utility, significantly improving code maintainability and consistency across the data preparation pipeline.
+  
+  The Layer 2 orchestration test harness has been completely overhauled to be fully automated, non-interactive, and provide clean, context-aware logging.
+  
+  - **Standardized Backup/Overwrite Logic:**
+    - A new shared module, `src/utils/file_utils.py`, was created to centralize file operations.
+    - All data preparation scripts were refactored to use a single `backup_and_remove` function, ensuring consistent behavior for the `--force` flag.
+  
+  - **Layer 2 Test Overhaul:**
+    - Resolved an infinite loop caused by a conflict between the `-Force` and resume logic.
+    - Cleaned up test logs by suppressing unnecessary banners, completion messages, and user-facing warnings.
+    - Introduced a `-TestMode` switch in `prepare_data.ps1` to ensure non-interactive execution during tests.
+  
+  - **Other Fixes & Improvements:**
+    - Updated PDM shortcuts to use `pwsh` to fix ANSI color rendering.
+    - Enabled unbuffered output (`python -u`) for real-time progress display.
+    - Removed a duplicated function definition in `prepare_data.ps1`.
+
 ## 7.0.0 (2025-09-06)
 
 ### Bump
