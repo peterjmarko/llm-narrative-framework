@@ -31,7 +31,7 @@ The experiment is built upon a custom database of 6,000 famous historical indivi
 To create a uniquely challenging test, we employed a multi-step, deterministic process to generate the textual stimuli, organized into four main stages:
 
 1.  **Data Sourcing & Candidate Qualification:** A `Raw Subject Database` of over 10,000 famous individuals was derived from the Astro-Databank (ADB) and subjected to a rigorous, deterministic filtering pass to create a high-quality cohort of "eligible candidates."
-2.  **LLM-based Candidate Selection:** This eligible cohort was then processed by two LLM-driven scripts (`generate_eminence_scores.py`, `generate_ocean_scores.py`) that scored subjects for historical eminence and personality diversity, respectively. A data-driven cutoff based on score variance determined the final subject pool.
+2.  **LLM-based Candidate Selection:** This eligible cohort was then processed by two LLM-driven scripts (`generate_eminence_scores.py`, `generate_ocean_scores.py`) that scored every subject for historical eminence and personality diversity. The final selection is then performed by a third script (`select_final_candidates.py`), which applies a data-driven cutoff based on score variance to determine the final subject pool.
 3.  **Manual Data Processing:** The final subject list was processed by a commercial astrology program (Solar Fire) to calculate the precise celestial positions for each person.
 4.  **Profile Generation:** A custom Python script (`generate_personalities_db.py`) then processed this celestial data. Using a `Neutralized Component Library` of pre-written sentences, the script deterministically assembled a unique personality narrative for each individual based on a validated algorithm.
     - The script's algorithm loads its core logic—point weights and balance thresholds—from external data files (`point_weights.csv`, `balance_thresholds.csv`). It uses these to calculate weighted scores for various astrological factors (elements, modes, quadrants, etc.) and classify them as 'strong' or 'weak' based on their prominence.
@@ -64,9 +64,13 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 # Run the entire data preparation pipeline interactively
 .\prepare_data.ps1
 
+# Force a full re-run, deleting all existing data
+.\prepare_data.ps1 -Force
+
 # Get a read-only status report of the pipeline's progress
 .\prepare_data.ps1 -ReportOnly
 ```
+> **Warning on Using `-Force`**: The `-Force` flag triggers a full, destructive re-run of the entire pipeline. It backs up and deletes all existing data, re-downloads the full raw dataset, and re-runs all expensive LLM scoring steps. This process is very time-consuming and will incur API costs.
 > **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING.md)](../TESTING.md)** for details on running the Layer 3 Interactive Mode.
 
 The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.
@@ -108,8 +112,8 @@ This stage performs a rigorous, deterministic filtering pass on the raw data to 
 This stage is a second, optional filtering pass that uses LLMs to score the "eligible candidates" to determine the final, smaller subject pool. This entire stage can be skipped by setting `bypass_candidate_selection = true` in `config.ini`.
 
 1.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
-2.  **OCEAN Scoring & Cutoff (`generate_ocean_scores.py`):** A fully automated, resilient script that determines the final dataset size. It processes subjects by eminence and stops when diversity (variance) shows a sustained drop. Its robust pre-flight check re-analyzes existing data on startup, ensuring that interrupted runs can be safely resumed or correctly finalized without user intervention.
-3.  **Final Selection (`select_final_candidates.py`):** Performs the final filtering. It takes the eligible candidates list, selects only those present in the definitive `ocean_scores.csv` set, resolves country codes, and sorts the final list by eminence.
+2.  **OCEAN Scoring (`generate_ocean_scores.py`):** A fully automated, resilient script that generates OCEAN personality scores for every subject in the eminence-ranked list.
+3.  **Final Selection & Cutoff (`select_final_candidates.py`):** Performs the final filtering and selection. It takes the complete OCEAN scores list and applies a data-driven cutoff based on score variance to determine the final, psychologically diverse cohort. It then resolves country codes and sorts the final list by eminence.
 
 ##### Stage 4: Profile Generation
 
@@ -163,9 +167,9 @@ These diagrams illustrate the internal decision-making logic and control flow of
 
 {{grouped_figure:docs/diagrams/logic_prep_eminence_scoring.mmd | scale=2.5 | width=60% | caption=Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=60% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN scores and determining the final dataset size. A robust pre-flight check re-analyzes all existing data to ensure correct resumption or finalization after interruptions.}}
+{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=60% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN personality scores for all eligible subjects. A robust pre-flight check ensures that interrupted runs can be safely resumed.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_final_candidates.mmd | scale=2.5 | width=100% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for filtering, transforming, and sorting the final subject set.}}
+{{grouped_figure:docs/diagrams/logic_prep_final_candidates.mmd | scale=2.5 | width=100% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for applying the variance-based cutoff to the full OCEAN dataset, then transforming and sorting the final subject pool.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_neutralization.mmd | scale=2.5 | width=60% | caption=Logic for Delineation Neutralization (`neutralize_delineations.py`): The hybrid algorithm for rewriting texts. Fast mode bundles tasks for speed, while the robust default mode processes each item individually to guarantee completion.}}
 

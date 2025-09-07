@@ -18,7 +18,7 @@ function Get-ProjectRoot {
 # --- Define Paths ---
 $PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ProjectRoot = Get-ProjectRoot -StartPath $PSScriptRoot
-$TestDir = Join-Path $ProjectRoot "temp_l2_mock_test"
+$TestDir = Join-Path $ProjectRoot "temp_test_environment/layer2_mock_sandbox"
 $OrchestratorSource = Join-Path $ProjectRoot "prepare_data.ps1"
 function Test-OrchestratorState {
     param($StepName, [switch]$ShouldExist, [string[]]$Files)

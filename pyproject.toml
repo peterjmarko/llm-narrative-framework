@@ -86,25 +86,35 @@ aud-stu = "pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"
 fix-stu = "pwsh -ExecutionPolicy Bypass -File ./fix_study.ps1"
 mig-stu = "pwsh -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 
-# Testing shortcuts
-test-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+# --- Python Unit Tests ---
+test-py-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+test-py-exp = {cmd = "pytest tests/experiment_pipeline/", help = "Run all experiment pipeline unit tests."}
 test-assembly = {cmd = "pytest tests/data_preparation/test_assembly_algorithm.py", help = "Run the core assembly algorithm integration test."}
+
+# --- Integration Tests (All Layers) ---
 test-l2 = "pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"
 test-l3-default = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"
 test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"
 test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"
-#
-test-ps-new-exp = "pwsh ./tests/new_experiment.Tests.ps1"
-test-ps-audit-exp = "pwsh ./tests/audit_experiment.Tests.ps1"
-test-ps-fix-exp = "pwsh ./tests/fix_experiment.Tests.ps1"
-test-ps-migr-exp = "pwsh ./tests/migrate_experiment.Tests.ps1"
+test-l4 = "pwsh -File ./tests/testing_harness/experiment_pipeline/layer4/run_layer4_test.ps1"
+test-l5 = "pwsh -File ./tests/testing_harness/experiment_pipeline/layer5/run_layer5_test.ps1"
+
+# --- PowerShell Pester Tests (By Suite) ---
+# Experiment Lifecycle
+test-ps-new-exp = "pwsh ./tests/experiment_pipeline/new_experiment.Tests.ps1"
+test-ps-audit-exp = "pwsh ./tests/experiment_pipeline/audit_experiment.Tests.ps1"
+test-ps-fix-exp = "pwsh ./tests/experiment_pipeline/fix_experiment.Tests.ps1"
+test-ps-migr-exp = "pwsh ./tests/experiment_pipeline/migrate_experiment.Tests.ps1"
+test-ps-exp = {composite = ["test-ps-new-exp", "test-ps-audit-exp", "test-ps-fix-exp", "test-ps-migr-exp"], help = "Run all PowerShell tests for the experiment lifecycle."}
+# Study Lifecycle
 test-ps-comp-study = "pwsh ./tests/compile_study.Tests.ps1"
-#
 test-ps-new-study = "pwsh ./tests/new_study.Tests.ps1"
 test-ps-audit-study = "pwsh ./tests/audit_study.Tests.ps1"
 test-ps-fix-study = "pwsh ./tests/fix_study.Tests.ps1"
 test-ps-migr-study = "pwsh ./tests/migrate_study.Tests.ps1"
+# Composite Runners
 test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
+test-exp-all = {composite = ["test-py-exp", "test-ps-exp"], help = "Run all Python and PowerShell tests for the experiment lifecycle."}
 
 [tool.commitizen]
 name = "cz_conventional_commits"

@@ -92,6 +92,10 @@ param(
     [switch]$TestMode
 )
 
+# --- Pre-flight Cleanup ---
+# Unset any lingering sandbox path from a previous test run to ensure correct context detection.
+Remove-Item -Path "Env:PROJECT_SANDBOX_PATH" -ErrorAction SilentlyContinue
+
 # --- Define ANSI Color Codes ---
 $C_RESET = "`e[0m"
 $C_GREEN = "`e[92m"
@@ -174,6 +178,53 @@ function Get-ScriptDocstringSummary {
     }
 }
 
+function Get-StepStatus {
+    param([hashtable]$Step, [string]$BaseDirectory)
+    $outputFile = Join-Path $BaseDirectory $Step.Output
+    
+    switch ($Step.Name) {
+        "Generate Eminence Scores" {
+            $summaryFile = Join-Path $BaseDirectory "data/foundational_assets/eminence_scores_summary.txt"
+            if (-not (Test-Path $summaryFile)) {
+                if (Test-Path $outputFile) { return "Incomplete" } else { return "Missing" }
+            }
+            try {
+                $content = Get-Content $summaryFile -Raw
+                $scored = ($content | Select-String -Pattern "Total Scored:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
+                $total = ($content | Select-String -Pattern "Total in Source:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
+                if ($scored -eq $total) { return "Complete" }
+            } catch {
+                # Fallback in case of parsing error
+            }
+            return "Incomplete"
+        }
+        "Generate OCEAN Scores" {
+            $summaryFile = Join-Path $BaseDirectory "data/foundational_assets/ocean_scores_summary.txt"
+            if (-not (Test-Path $summaryFile)) {
+                if (Test-Path $outputFile) { return "Incomplete" } else { return "Missing" }
+            }
+            if ((Get-Content $summaryFile -Raw) -match "Stop Reason:") { return "Complete" }
+            return "Incomplete"
+        }
+        "Neutralize Delineations" {
+            # This step's "Output" is one of its files, but it represents the whole directory.
+            $delineationDir = Split-Path (Join-Path $BaseDirectory $Step.Output) -Parent
+            if (-not (Test-Path $delineationDir)) { return "Missing" }
+            $expectedFiles = @(
+                "balances_elements.csv", "balances_modes.csv", "balances_hemispheres.csv",
+                "balances_quadrants.csv", "balances_signs.csv", "points_in_signs.csv"
+            )
+            foreach ($file in $expectedFiles) {
+                if (-not (Test-Path (Join-Path $delineationDir $file))) { return "Incomplete" }
+            }
+            return "Complete"
+        }
+        default {
+            if (Test-Path $outputFile) { return "Complete" } else { return "Missing" }
+        }
+    }
+}
+
 function Backup-And-Remove {
     param([string]$ItemPath)
     if (-not (Test-Path $ItemPath)) { return }
@@ -209,14 +260,18 @@ function Show-PipelineStatus {
     $nameWidth = 40; $statusWidth = 12
     Write-Host ("{0,-$nameWidth} {1}" -f "Step", "Status"); Write-Host ("-" * $nameWidth + " " + "-" * $statusWidth)
     $filesExist = $false
+    $stepNumber = 0
     foreach ($step in $Steps) {
-        $outputFile = Join-Path $BaseDirectory $step.Output
-        if (Test-Path $outputFile) {
-            $status = "$($C_GREEN)[EXISTS]$($C_RESET)"; $filesExist = $true
-        } else {
-            $status = if ($step.Type -eq 'Manual') { "${C_YELLOW}[PENDING]${C_RESET}" } else { "${C_RED}[MISSING]${C_RESET}" }
+        $stepNumber++
+        $stepStatus = Get-StepStatus -Step $step -BaseDirectory $BaseDirectory
+        
+        switch ($stepStatus) {
+            "Complete"   { $status = "$($C_GREEN)[COMPLETE]$($C_RESET)"; $filesExist = $true }
+            "Incomplete" { $status = "$($C_YELLOW)[INCOMPLETE]$($C_RESET)"; $filesExist = $true }
+            default      { $status = if ($step.Type -eq 'Manual') { "$($C_YELLOW)[PENDING]$($C_RESET)" } else { "$($C_RED)[MISSING]$($C_RESET)" } }
         }
-        Write-Host ("{0,-$nameWidth} {1}" -f $step.Name, $status)
+        $stepNameFormatted = "$($stepNumber). $($step.Name)"
+        Write-Host ("{0,-$nameWidth} {1}" -f $stepNameFormatted, $status)
     }
     Write-Host ""; return $filesExist
 }
@@ -256,16 +311,15 @@ try {
     $runCompletedSuccessfully = $false
     if (-not (Get-Command pdm -ErrorAction SilentlyContinue)) { throw "PDM not found. Please ensure PDM is installed and in your PATH." }
 
-    # Define the condition for a true "force overwrite" run.
-    # This is an interactive forced run, NOT an automated test run.
-    $isForceOverwriteMode = $Force.IsPresent -and -not $TestMode.IsPresent
+    # An "interactive force overwrite" is when a user, not a test script, forces a re-run.
+    $isInteractiveForceOverwrite = $Force.IsPresent -and -not $TestMode.IsPresent
 
-    # --- Pre-run Cleanup for --force flag ---
-    if ($isForceOverwriteMode) {
+    # --- Pre-run Cleanup for an INTERACTIVE force flag ---
+    if ($isInteractiveForceOverwrite) {
         Write-Host "`n${C_YELLOW}WARNING: The -Force flag is active."
         Write-Host "This will back up and delete all existing data artifacts to re-run the entire pipeline from scratch.${C_RESET}"
         $confirm = Read-Host "Are you sure you want to proceed? (Y/N)"
-        if ($confirm.Trim().ToLower() -ne 'y') { throw "Operation cancelled by user." }
+        if ($confirm.Trim().ToLower() -ne 'y') { throw "USER_CANCELLED: Operation cancelled by user." }
 
         Write-Host "`n${C_YELLOW}Backing up and removing existing data files...${C_RESET}`n"
         
@@ -299,7 +353,7 @@ try {
         Write-Host "${C_YELLOW}WARNING: One or more data files already exist."
         Write-Host "The pipeline will resume from the first incomplete step."
         $confirm = Read-Host "Do you wish to proceed? (Y/N)"
-        if ($confirm.Trim().ToLower() -ne 'y') { throw "Operation cancelled by user." }
+        if ($confirm.Trim().ToLower() -ne 'y') { throw "USER_CANCELLED: Operation cancelled by user." }
     }
 
     # Determine the first step of each stage for clean banner logging
@@ -315,12 +369,16 @@ try {
         if ($bypassScoring -and ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores")) {
             if (-not $Resumed.IsPresent) {
                 $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
-                Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader -ForegroundColor Blue
-                Write-Host $step.Description -ForegroundColor Blue; Write-Host "`n${C_YELLOW}Bypass mode is active. Skipping step.${C_RESET}"
+                Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+                Write-Host "$C_BLUE$stepHeader$C_RESET"
+                Write-Host "$C_BLUE$($step.Description)$C_RESET"
+                Write-Host "`n${C_YELLOW}Bypass mode is active. Skipping step.${C_RESET}"
             }
             $isSkipped = $true
         }
-        if ((Test-Path $outputFile) -and -not $isForceOverwriteMode) {
+
+        # Skip if the step is complete AND we are not in force-overwrite mode.
+        if ((Get-StepStatus -Step $step -BaseDirectory $WorkingDirectory) -eq "Complete" -and -not $isInteractiveForceOverwrite) {
             if (-not $Resumed.IsPresent) {
                 Write-Host "Output exists for step '$($step.Name)'. Skipping." -ForegroundColor Yellow
             }
@@ -336,8 +394,8 @@ try {
         
         # Print the detailed step header.
         $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
-        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
-        Write-Host $stepHeader -ForegroundColor Blue
+        Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+        Write-Host "$C_BLUE$stepHeader$C_RESET"
         
         $description = $step.Description
         if ($TestMode.IsPresent -and $step.Type -eq 'Manual') {
@@ -347,7 +405,7 @@ try {
                 $description = "Simulating the one-time Solar Fire delineation library export."
             }
         }
-        Write-Host $description -ForegroundColor Blue
+        Write-Host "$C_BLUE$description$C_RESET"
         
         # For manual steps, halt the pipeline. The behavior differs for tests vs. users.
         if ($step.Type -eq 'Manual') {
@@ -371,16 +429,18 @@ try {
         }
 
         if ($SandboxMode) {
-            Write-Host "`n  BASE DIRECTORY: $WorkingDirectory" -ForegroundColor DarkGray
+            Write-Host "`n${C_GRAY}  BASE DIRECTORY: $WorkingDirectory${C_RESET}"
         }
         Write-Host "`n  INPUTS:"; $Step.Inputs | ForEach-Object { Write-Host "    - $_" }; Write-Host "`n  OUTPUT:"; Write-Host "    - $($Step.Output)`n"
 
         # Display step-specific warnings before the prompt, but not in test mode.
         if (-not $TestMode.IsPresent) {
             if ($Step.Name -eq "Fetch Raw ADB Data") {
-                Write-Host "${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take a significant amount of time to complete.${C_RESET}"
-            } elseif ($Step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
-                Write-Host "${C_YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.${C_RESET}"
+                Write-Host "${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take about 1 minute to complete.${C_RESET}"
+            } elseif ($Step.Name -eq "Generate Eminence Scores") {
+                Write-Host "${C_YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (2 minutes or more for each set of 1,000 records).${C_RESET}"
+            } elseif ($Step.Name -eq "Generate OCEAN Scores") {
+                Write-Host "${C_YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (15 minutes or more for each set of 1,000 records).${C_RESET}"
             }
         }
 
@@ -404,17 +464,30 @@ try {
                 $arguments += "--quiet"
             }
             if ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
-                $arguments += "--no-summary", "--no-api-warning"
+                $arguments += "--no-summary" # Only suppress summary in test mode
             }
         }
         
+        # Suppress redundant warnings from Python scripts in ALL modes
+        if ($step.Name -eq "Fetch Raw ADB Data") {
+            $arguments += "--no-network-warning"
+        }
+        if ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
+            $arguments += "--no-api-warning"
+        }
+
         # For the final step, explicitly pass the correct output path in all modes
         if ($step.Name -eq "Generate Personalities DB") {
             $arguments += "-o", $outputFile
         }
 
-        $scriptOutput = & pdm @arguments 2>&1
-        $exitCode = $LASTEXITCODE
+        # Execute the python script within the correct working directory
+        # Execute the python script within the correct working directory
+        $pdmArgs = $arguments -join " "
+        $scriptBlock = [scriptblock]::Create("pdm $pdmArgs")
+        
+        $process = Start-Process -FilePath "pwsh" -ArgumentList "-NoProfile", "-Command", "$scriptBlock" -WorkingDirectory $WorkingDirectory -PassThru -Wait -NoNewWindow
+        $exitCode = $process.ExitCode
         
         if ($scriptOutput) {
             # Pass through the Python script's own output, preserving its color codes.
@@ -441,9 +514,24 @@ catch {
         $errorMessage = $_
     }
 
+    $isCancellation = $errorMessage -match "USER_CANCELLED"
+    if ($isCancellation) {
+        $exitCode = 0
+    } else {
+        $exitCode = 1
+    }
+
     if (-not $SilentHalt.IsPresent) {
-        Format-Banner "PIPELINE HALTED" $C_RED
-        Write-Host "${C_RED}REASON: $errorMessage${C_RESET}"
+        $bannerColor = if ($isCancellation) { $C_YELLOW } else { $C_RED }
+        $messageColor = $bannerColor
+
+        # For cancellations, clean up the message for a more user-friendly display
+        if ($isCancellation) {
+            $errorMessage = $errorMessage -replace "USER_CANCELLED: ", ""
+        }
+
+        Format-Banner "PIPELINE HALTED" $bannerColor
+        Write-Host "${messageColor}REASON: $errorMessage${C_RESET}"
 
         if ($errorMessage -match "The pipeline is paused") {
             Write-Host "`n${C_YELLOW}NEXT STEPS:${C_RESET}"
@@ -452,7 +540,6 @@ catch {
             Write-Host "   The pipeline will automatically resume from where it stopped."
         }
     }
-    $exitCode = 1
 }
 finally {
     # Only show the "Completed" banner and final status report if the entire pipeline finished successfully.

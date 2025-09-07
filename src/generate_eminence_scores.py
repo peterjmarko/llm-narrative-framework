@@ -59,6 +59,18 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 
 from colorama import Fore, init
+from tqdm import tqdm
+
+# --- Pre-emptive Path Correction ---
+# Ensure the `src` directory is in the Python path for reliable module imports.
+# This must be done before any local imports.
+try:
+    from config_loader import APP_CONFIG
+except ImportError:
+    # If the script is run directly, the src directory might not be in the path
+    current_script_dir = Path(__file__).parent
+    src_dir = current_script_dir.parent
+    sys.path.insert(0, str(src_dir))
 
 # Initialize colorama
 init(autoreset=True, strip=False)
@@ -102,16 +114,7 @@ List of Individuals to Rate:
 """
 
 # --- Config Loader ---
-try:
-    from config_loader import APP_CONFIG, get_config_value
-except ImportError:
-    current_script_dir = Path(__file__).parent
-    sys.path.insert(0, str(current_script_dir))
-    try:
-        from config_loader import APP_CONFIG, get_config_value
-    except ImportError as e:
-        print(f"FATAL: Could not import from config_loader.py. Error: {e}")
-        sys.exit(1)
+from config_loader import APP_CONFIG, get_config_value
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
@@ -314,7 +317,9 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
 
         completion_pct = (total_scored / total_subjects_overall) * 100 if total_subjects_overall > 0 else 0
         status_line = f"Completion: {total_scored}/{total_subjects_overall} ({completion_pct:.2f}%)"
-        if completion_pct > 99.5:
+        
+        # The SUCCESS keyword is the trigger for the orchestrator to mark the step as complete.
+        if total_scored == total_subjects_overall:
             report.append(f"\n{Fore.GREEN}SUCCESS - {status_line}")
         elif completion_pct >= 95.0:
             report.append(f"\n{Fore.YELLOW}WARNING - {status_line}")
@@ -378,7 +383,6 @@ def main():
     # Load bypass_candidate_selection AFTER sandbox is established
     # If we have a sandbox path, read the config directly from there
     if args.sandbox_path:
-        import configparser
         sandbox_config_path = Path(args.sandbox_path) / "config.ini"
         if sandbox_config_path.exists():
             sandbox_config = configparser.ConfigParser()
@@ -454,7 +458,7 @@ def main():
 
     # Display a non-interactive warning if the script is proceeding automatically
     if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
-         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
+         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (1.5 minutes or more for each set of 1,000 records).{Fore.RESET}")
 
     print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
     print(f"Found {len(processed_ids):,} existing scores.")
@@ -477,61 +481,51 @@ def main():
     current_index = len(processed_ids) + 1
 
     try:
-        for i in range(0, total_to_process, args.batch_size):
-            batch = all_subjects[i:i + args.batch_size]
-            batch_num = (i // args.batch_size) + 1
-            total_batches = (total_to_process + args.batch_size - 1) // args.batch_size
+        total_batches = (total_to_process + args.batch_size - 1) // args.batch_size
+        with tqdm(total=total_to_process, desc="Processing Batches", unit="subject", ncols=80) as pbar:
+            for i in range(0, total_to_process, args.batch_size):
+                batch = all_subjects[i:i + args.batch_size]
+                batch_num = (i // args.batch_size) + 1
+                pbar.set_description(f"Processing Batch {batch_num}/{total_batches}")
 
-            print(f"\n{Fore.CYAN}--- Processing Batch {batch_num} of {total_batches} ---{Fore.RESET}")
-            subject_list_str = "\n".join([f'"{b["FirstName"]} {b["LastName"]}" ({b["Year"]}), ID {b["idADB"]}' for b in batch])
-            prompt_text = EMINENCE_PROMPT_TEMPLATE.format(subject_list=subject_list_str)
-            temp_query_file.write_text(prompt_text, encoding='utf-8')
+                subject_list_str = "\n".join([f'"{b["FirstName"]} {b["LastName"]}" ({b["Year"]}), ID {b["idADB"]}' for b in batch])
+                prompt_text = EMINENCE_PROMPT_TEMPLATE.format(subject_list=subject_list_str)
+                temp_query_file.write_text(prompt_text, encoding='utf-8')
 
-            worker_cmd = [
-                sys.executable, str(script_dir / "llm_prompter.py"),
-                f"eminence_batch_{batch_num}", "--input_query_file", str(temp_query_file),
-                "--output_response_file", str(temp_response_file), "--output_error_file", str(temp_error_file),
-                "--config_path", str(temp_config_file), "--quiet"
-            ]
-            subprocess.run(worker_cmd, check=False)
+                worker_cmd = [
+                    sys.executable, str(script_dir / "llm_prompter.py"),
+                    f"eminence_batch_{batch_num}", "--input_query_file", str(temp_query_file),
+                    "--output_response_file", str(temp_response_file), "--output_error_file", str(temp_error_file),
+                    "--config_path", str(temp_config_file), "--quiet"
+                ]
+                subprocess.run(worker_cmd, check=False)
 
-            if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
-                error_msg = temp_error_file.read_text(encoding='utf-8')
-                logging.error(f"Worker failed for batch {batch_num}. Error: {error_msg.strip()}")
-                consecutive_failures += 1
-                if "401" in error_msg or "403" in error_msg or "Unauthorized" in error_msg or "Forbidden" in error_msg:
-                    logging.critical("Halting due to a fatal API authentication/authorization error.")
-                    break
-                if consecutive_failures >= max_consecutive_failures:
-                    logging.critical(f"Halting after {max_consecutive_failures} consecutive batch failures.")
-                    break
-                temp_error_file.unlink()
-                continue
-            
-            if not temp_response_file.exists():
-                logging.error(f"Worker did not produce a response file for batch {batch_num}.")
-                consecutive_failures += 1
-                continue
-            
-            consecutive_failures = 0
-            response_text = temp_response_file.read_text(encoding='utf-8')
-            parsed_scores = parse_batch_response(response_text)
+                if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
+                    error_msg = temp_error_file.read_text(encoding='utf-8').strip()
+                    tqdm.write(f"{Fore.RED}Worker failed for batch {batch_num}. Error: {error_msg}")
+                    consecutive_failures += 1
+                    if "401" in error_msg or "403" in error_msg:
+                        tqdm.write(f"{Fore.RED}Halting due to a fatal API authentication error.")
+                        break
+                    if consecutive_failures >= max_consecutive_failures:
+                        tqdm.write(f"{Fore.RED}Halting after {max_consecutive_failures} consecutive failures.")
+                        break
+                    continue
+                
+                consecutive_failures = 0
+                response_text = temp_response_file.read_text(encoding='utf-8')
+                parsed_scores = parse_batch_response(response_text)
 
-            if len(parsed_scores) != len(batch):
-                logging.warning(f"LLM did not return the correct number of scores for batch {batch_num}. Expected: {len(batch)}, Got: {len(parsed_scores)}. Saving what was returned.")
-            if not parsed_scores:
-                logging.error(f"Failed to parse any scores from the LLM response for batch {batch_num}.")
-                continue
+                if len(parsed_scores) != len(batch):
+                    tqdm.write(f"{Fore.YELLOW}Warning: Mismatch in scores for batch {batch_num}. Expected: {len(batch)}, Got: {len(parsed_scores)}.")
+                if not parsed_scores:
+                    tqdm.write(f"{Fore.RED}Error: Failed to parse any scores for batch {batch_num}.")
+                    continue
 
-            save_scores_to_csv(output_path, parsed_scores, current_index)
-            processed_count += len(parsed_scores)
-            current_index += len(parsed_scores)
-            
-            print(f"Successfully processed and saved {len(parsed_scores)} scores for batch {batch_num}.")
-            session_progress = f"Session: {processed_count}/{total_to_process}"
-            overall_progress = f"Overall: {len(processed_ids) + processed_count}/{total_subjects_in_source}"
-            print(f"{session_progress} | {overall_progress}")
-            time.sleep(1)
+                save_scores_to_csv(output_path, parsed_scores, current_index)
+                processed_count += len(parsed_scores)
+                current_index += len(parsed_scores)
+                pbar.update(len(batch))
         
         run_completed_successfully = True
     except KeyboardInterrupt:
@@ -565,6 +559,38 @@ def main():
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
         
+        # --- Final Reconciliation and Reporting ---
+        # Determine which subjects were missed by the LLM.
+        final_processed_ids = load_processed_ids(output_path)
+        all_eligible_ids = {s['idADB'] for s in all_subjects} | processed_ids
+        missing_ids = all_eligible_ids - final_processed_ids
+        
+        if missing_ids:
+            missing_report_path = output_path.parent.parent / "reports" / "missing_eminence_scores.txt"
+            missing_report_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(missing_report_path, 'w', encoding='utf-8') as f:
+                f.write("Subjects missed by LLM during eminence scoring:\n")
+                for subject_id in sorted(missing_ids):
+                    f.write(f"{subject_id}\n")
+            tqdm.write(f"{Fore.YELLOW}Wrote report of {len(missing_ids)} missing subjects to '{missing_report_path}'.")
+
+        # --- Final Reconciliation and Reporting ---
+        final_processed_ids = load_processed_ids(output_path)
+        all_eligible_ids = {s['idADB'] for s in all_subjects} | processed_ids
+        missing_ids = all_eligible_ids - final_processed_ids
+        
+        if missing_ids:
+            missing_report_path = output_path.parent.parent / "reports" / "missing_eminence_scores.txt"
+            missing_report_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(missing_report_path, 'w', encoding='utf-8') as f:
+                f.write("Subjects missed by LLM during eminence scoring:\n")
+                for subject_id in sorted(list(missing_ids)):
+                    f.write(f"{subject_id}\n")
+            
+            logging.error(f"Failed to retrieve scores for {len(missing_ids)} subject(s). See '{missing_report_path}' for details.")
+            logging.error("The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.")
+            sys.exit(1)
+
         if was_interrupted:
             logging.warning("Eminence score generation terminated by user. Re-run to continue. ✨\n")
         elif not run_completed_successfully:

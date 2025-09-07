@@ -58,6 +58,7 @@ from pathlib import Path
 
 import pandas as pd
 from colorama import Fore, init
+from collections import deque
 
 # Ensure the src directory is in the Python path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -69,6 +70,17 @@ init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+def calculate_average_variance(df: pd.DataFrame) -> float:
+    """Calculates the average variance across the five OCEAN trait columns."""
+    ocean_cols = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
+    df = df.copy()
+    for col in ocean_cols:
+        if col not in df.columns: return 0.0
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+    df.dropna(subset=ocean_cols, inplace=True)
+    if len(df) < 2: return 0.0
+    return df[ocean_cols].var().mean()
 
 
 def main():
@@ -165,12 +177,48 @@ def main():
         if 'EminenceScore' not in final_df.columns:
             final_df['EminenceScore'] = 0
     else:
-        # Step 1: Filter by OCEAN set
+        # Step 1: Apply variance-based cutoff to the OCEAN scores to determine the final cohort size
+        logging.info("Applying variance-based cutoff to determine final subject count...")
+        
+        # Load cutoff parameters from config
+        benchmark_pop_size = get_config_value(APP_CONFIG, 'DataGeneration', 'benchmark_population_size', 500, int)
+        cutoff_start_point = get_config_value(APP_CONFIG, 'DataGeneration', 'cutoff_start_point', 600, int)
+        analysis_window = get_config_value(APP_CONFIG, 'DataGeneration', 'variance_analysis_window', 100, int)
+        check_window = get_config_value(APP_CONFIG, 'DataGeneration', 'variance_check_window', 5, int)
+        trigger_count = get_config_value(APP_CONFIG, 'DataGeneration', 'variance_trigger_count', 4, int)
+        cutoff_pct = get_config_value(APP_CONFIG, 'DataGeneration', 'variance_cutoff_percentage', 0.40, float)
+        
+        final_count = len(ocean_df) # Default to all subjects
+        
+        if len(ocean_df) >= cutoff_start_point:
+            benchmark_variance = calculate_average_variance(ocean_df.head(benchmark_pop_size))
+            logging.info(f"Benchmark variance from top {benchmark_pop_size} subjects: {benchmark_variance:.4f}")
+            
+            last_checks = deque(maxlen=check_window)
+            
+            for i in range(cutoff_start_point, len(ocean_df), analysis_window):
+                window_df = ocean_df.iloc[i - analysis_window : i]
+                if len(window_df) < analysis_window: continue
+
+                v_avg = calculate_average_variance(window_df)
+                is_met = v_avg < (cutoff_pct * benchmark_variance)
+                last_checks.append(is_met)
+                
+                if sum(last_checks) >= trigger_count:
+                    final_count = i - analysis_window
+                    logging.info(f"{Fore.YELLOW}Cutoff condition met. Final subject count set to {final_count}.")
+                    break
+        else:
+            logging.info("Not enough subjects to apply variance cutoff. Using all available subjects.")
+
+        ocean_df = ocean_df.head(final_count)
+        
+        # Step 2: Filter the main eligible list by the now-finalized OCEAN set
         ocean_subject_ids = set(ocean_df["idADB"])
         final_df = eligible_df[eligible_df["idADB"].isin(ocean_subject_ids)].copy()
-        logging.info(f"Filtered to {len(final_df):,} candidates present in the OCEAN scores file.")
+        logging.info(f"Filtered to {len(final_df):,} final candidates based on OCEAN scores.")
 
-    # Step 2: Resolve Country Codes
+    # Step 3: Resolve Country Codes
     country_map = dict(zip(country_codes_df["Abbreviation"], country_codes_df["Country"]))
     final_df["Country"] = final_df["CountryState"].map(country_map)
     unmapped_count = final_df["Country"].isna().sum()
@@ -183,7 +231,10 @@ def main():
     final_df["idADB"] = final_df["idADB"].astype(str)
     if not bypass_candidate_selection:
         eminence_df["idADB"] = eminence_df["idADB"].astype(str)
-        final_df = pd.merge(final_df, eminence_df[["idADB", "EminenceScore"]], on="idADB", how="left")
+        # Ensure we only merge scores for the subjects who made the final cut
+        final_ids = set(final_df['idADB'])
+        eminence_scores_to_merge = eminence_df[eminence_df['idADB'].isin(final_ids)]
+        final_df = pd.merge(final_df, eminence_scores_to_merge[["idADB", "EminenceScore"]], on="idADB", how="left")
     final_df.sort_values(by="EminenceScore", ascending=False, inplace=True)
     logging.info("Sorted final candidates by eminence score.")
 

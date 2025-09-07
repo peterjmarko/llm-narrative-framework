@@ -31,7 +31,7 @@ graph TD
     gen_ocean --> ocean_scores
     
     eligible_candidates --> select_final
-    eminence_scores --> select_final
-    ocean_scores --> select_final
+    ocean_scores -- "Input (for cutoff)" --> select_final
+    eminence_scores -- "Input (for sorting)" --> select_final
 
     select_final --> final_candidates

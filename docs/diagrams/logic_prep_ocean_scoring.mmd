@@ -1,26 +1,24 @@
-graph LR
+graph TD
     subgraph "Logic for generate_ocean_scores.py"
-        A[Start] --> B{"Load eligible candidates,<br>OCEAN scores & eminence scores"}
-
-        subgraph "Pre-flight Check / Startup"
-            B --> C{"if --force,<br>skip preflight check"}
-            C -- Yes --> D["Calculate benchmark variance"] --> G(Start Main Loop)
-            C -- No --> E{"Perform pre-flight check"}
-            E -- Continue --> G
-            E -- Exit --> Z[End]
+        A[Start] --> B{Load eminence scores};
+        B --> C{Load existing OCEAN scores};
+        C --> D{Filter out already processed subjects};
+        D --> E{Any subjects to process?};
+        E -- No --> K[Generate Final Report];
+        E -- Yes --> F[Start Batch Processing Loop];
+        
+        subgraph "Batch Loop"
+            F --> G[Construct prompt for batch];
+            G --> H[Call LLM worker];
+            H --> I[Parse response];
+            I --> J[Append new scores to CSV];
+            J --> F;
         end
-
-        subgraph "Main Loop"
-            G --> H{"Loop through remaining subjects<br>in batches"}
-            H -- Next Batch --> I[Construct prompt for batch]
-            I --> J[Call LLM worker]
-            J --> K[Parse response]
-            K --> L[Append scores to CSV]
-            L --> M{"Crosses a variance<br>check boundary?"}
-            M -- No --> H
-            M -- Yes --> N{"Perform Cutoff Check"}
-            N -- Yes (Cutoff Met) --> O["Truncate/Archive & Exit"] --> Z
-            N -- No --> H
-            H -- End of Batches --> P["Finalize normally"] --> Z
-        end
+        
+        F -- Loop Complete --> K;
+        
+        K --> L{Reconcile: All subjects scored?};
+        L -- No --> M[Halt with Error and Missing Report];
+        L -- Yes --> N[End];
+        M --> N;
     end

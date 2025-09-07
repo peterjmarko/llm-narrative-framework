@@ -15,7 +15,7 @@ This document provides a high-level overview of the project. Its purpose is to i
 # (e.g., move them to output/studies/My_First_Study/)
 
 # 4. Process and analyze the entire study
-./process_study.ps1 -StudyDirectory output/studies/My_First_Study
+./compile_study.ps1 -StudyDirectory output/studies/My_First_Study
 
 # 5. View the final, publication-ready analysis
 Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
@@ -39,7 +39,7 @@ This framework was designed with three core principles in mind:
 
 ## 🔧 Requirements
 
--   Python 3.8+
+-   Python 3.11+
 -   PDM package manager
 -   PowerShell (Core) for Windows, Linux, or macOS
 
@@ -51,7 +51,7 @@ This project is extensively documented to support different use cases. The resou
 
 -   **For a Deep Dive (Full Details):** To understand the system's architecture, run new experiments, or explore the complete methodology, see the **[📖 Framework Manual (DOCUMENTATION.md)](docs/DOCUMENTATION.md)**.
 
--   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/README_DATA.md)](data/README.md)**.
+-   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/README_DATA.md)](data/README_DATA.md)**.
 
 -   **For Developers (Contributing):** To contribute to the project, please see the **[🤝 Developer's Guide (CONTRIBUTING.md)](CONTRIBUTING.md)** for development setup and contribution workflows.
 

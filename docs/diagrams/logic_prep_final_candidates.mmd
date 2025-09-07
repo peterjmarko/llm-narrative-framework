@@ -3,31 +3,40 @@ flowchart TD
     classDef startEnd fill:#e6e6fa,stroke:#333,stroke-width:2px
     classDef process fill:#e0ffff,stroke:#333,stroke-width:2px
     classDef fileIO fill:#f0fff0,stroke:#333,stroke-width:2px
+    classDef decision fill:#ffe4e1,stroke:#b22222,stroke-width:2px
 
-    subgraph col1 ["Finalization"]
-        G{"Sort final list by<br/>eminence score descending"}
-        H["Write final list to<br/>adb_final_candidates.txt"]
-        I[End]
-        G --> H --> I
+    subgraph "Finalization"
+        J["Sort final list by<br/>eminence score"]
+        K["Write final list to<br/>adb_final_candidates.txt"]
+        L[End]
+        J --> K --> L
     end
 
-    subgraph col2 ["Filtering & Transformation"]
-        C{"Create set of final subject IDs<br/>from OCEAN scores file"}
-        D{"Filter eligible candidates list<br/>by final ID set"}
-        E{"Resolve 'CountryState' code<br/>to full 'Country' name"}
-        F{"Join with eminence scores"}
-        F_cont((To Finalization))
-        C --> D --> E --> F --> F_cont
+    subgraph "Transformation"
+        H["Resolve 'CountryState' code<br/>to full 'Country' name"]
+        I["Join with eminence scores"]
+        I --> J
     end
     
-    subgraph col3 ["Setup"]
+    subgraph "Filtering"
+        C["Calculate benchmark variance<br/>from top N subjects"]
+        D["Loop through remaining subjects<br/>in sliding windows"]
+        E{Cutoff condition met?}
+        E -- Yes --> F["Set final cohort size<br/>and truncate OCEAN data"]
+        E -- No --> D
+        D -- Loop Complete --> G["Use all subjects if<br/>cutoff never met"]
+        F --> H
+        G --> H
+    end
+
+    subgraph "Setup"
         A[Start]
-        B{"Load all required data:<br/>- Eligible Candidates<br/>- OCEAN Scores<br/>- Eminence Scores<br/>- Country Codes"}
-        B_cont(("To Filtering &<br/>Transformation"))
-        A --> B --> B_cont
+        B["Load all required data:<br/>- Eligible Candidates<br/>- All OCEAN Scores<br/>- All Eminence Scores<br/>- Country Codes"]
+        B --> C
     end
     
     %% Apply Styles
-    class A,I startEnd
-    class C,D,E,F,G,B_cont,F_cont process
-    class B,H fileIO
+    class A,L startEnd
+    class C,D,F,G,H,I,J process
+    class B,K fileIO
+    class E decision

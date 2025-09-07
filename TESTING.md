@@ -2,24 +2,9 @@
 
 This document outlines the testing philosophy, procedures, and coverage strategy for the framework. It serves as a guide for developers and a record of the project's quality assurance standards.
 
-## How to Run Automated Tests
-
-The project uses `pytest` for Python unit tests. All automated tests are managed via PDM.
-
--   **Run all Python unit tests:**
-    ```bash
-    pdm run test
-    ```
--   **Run unit tests with a console coverage report:**
-    ```bash
-    pdm run cov
-    ```
--   **Run coverage for a specific file by its base name:**
-    ```bash
-    pdm run cov-file validate_wikipedia_pages
-    ```
-
 ## A Guide to Manual & Integration Testing
+
+This section provides a unified, step-by-step guide to the project's validation process. It begins with a standalone test for the **Core Algorithm Validation** to ensure the deterministic profile generation is bit-for-bit accurate. It then details the framework's multi-layered testing strategy, which is broken down into **seven distinct layers**, covering everything from individual script unit tests to full end-to-end integration tests of the entire data and experiment pipelines.
 
 ### Core Algorithm Validation (Profile Generation)
 
@@ -37,15 +22,11 @@ This is a standalone, push-button `pytest` script that provides a permanent, hig
     pdm run test-assembly -- --test-record-number=3
     ```
 
-> **Note:** The integration test procedures below (Layers 3 and higher) create a temporary `temp_test_environment` directory at the project root to run in a safe, isolated sandbox. These tests are non-destructive and will not modify your main project files.
-
-This section provides a unified, step-by-step guide to the project's validation process, from developing a single script to performing a full end-to-end integration test of the data preparation pipeline.
-
 ### The Seven Layers of Validation
 
 The framework is validated using a multi-layered strategy to ensure correctness at all levels:
 
-1.  **Layer 1: Unit Testing:** Validating a single Python script in isolation.
+1.  **Layer 1: Unit Testing:** Validating the internal logic of individual Python scripts—or logical groups of scripts—through their dedicated unit tests.
 2.  **Layer 2: Data Pipeline Orchestration Testing:** Validating the `prepare_data.ps1` orchestrator's logic using mock scripts.
 3.  **Layer 3: Data Pipeline Integration Testing:** Validating the full data preparation pipeline (`Data Sourcing` -> `Candidate Qualification` -> `LLM-based Candidate Selection` -> `Profile Generation`) with a controlled seed dataset.
 4.  **Layer 4: Main Workflow Integration Testing:** Validating the core `new -> audit -> fix` experiment lifecycle for a single experiment.
@@ -55,33 +36,60 @@ The framework is validated using a multi-layered strategy to ensure correctness 
 
 ---
 
-### Layer 1: Unit & Integration Testing (A Single Python Script)
+### General Developer Workflow
 
-This is the iterative, three-stage workflow for developing or modifying any individual Python script. It follows a robust `Modify -> Unit Test -> Integration Test` pattern to ensure quality at every step.
+For developing or modifying any individual script, we follow a robust `Modify -> Unit Test -> Integration Test` pattern. This workflow demonstrates how the different testing layers are used together in practice, ensuring quality from the component level to the fully integrated pipeline.
 
-#### Stage 1: Modify
-Make the necessary code changes to the target Python script (e.g., `src/data_preparation/my_script.py`).
+**Stage 1: Modify**
+Make the necessary code changes to the target Python script (e.g., `src/generate_eminence_scores.py` or `src/analyze_llm_performance.py`).
 
-#### Stage 2: Unit Test
+**Stage 2: Unit Test (Layer 1)**
 After modifying the code, run the script's dedicated unit test suite to verify its internal logic and catch any regressions.
 ```powershell
-# Run the specific test file with code coverage
-pdm run cov-file <script_name>
+# Run coverage for the specific test file
+pdm run cov-file tests/data_preparation/test_generate_eminence_scores.py
 ```
 If the unit tests fail, fix the script before proceeding to the next stage.
 
-#### Stage 3: Integration Test
-Once unit tests pass, perform an integration test to validate that the script functions correctly within the live pipeline. This is done using the Layer 3 test harness, which provides a controlled environment.
+**Stage 3: Integration Test**
+Once unit tests pass, perform an integration test to validate that the script functions correctly within its live pipeline. The specific procedure depends on which pipeline the script belongs to.
 
-1.  **Add a Checkpoint:** Temporarily modify the main pipeline orchestrator, `prepare_data.ps1`. Add an `exit 0` command immediately after the line that calls the script you just modified. This will halt the pipeline at the desired point.
-2.  **Run the Test:** Execute the default Layer 3 test profile from the project root.
-    ```powershell
-    pdm run test-l3-default
-    ```
-3.  **Verify:** The test should run successfully up to your checkpoint and exit gracefully. The test harness will automatically create a backup of the sandbox (`temp_test_environment/layer3_sandbox/`) in `data/backup/`. Inspect the artifacts in this sandbox to confirm your script produced the correct output.
-4.  **Clean Up:** Once verified, simply remove the temporary `exit 0` from `prepare_data.ps1`. The test harness handles all other cleanup automatically.
+*   **For a Data Preparation Script:**
+    This validation uses the **Layer 3 Integration Test**.
+    1.  **Add Checkpoint:** Temporarily modify the main pipeline orchestrator, `prepare_data.ps1`. Add an `exit 0` command immediately after the line that calls the script you modified.
+    2.  **Run Test:** Execute the default Layer 3 test profile from the project root (`pdm run test-l3-default`).
+    3.  **Verify & Clean Up:** The test will run up to your checkpoint. Inspect the artifacts in `temp_test_environment/layer3_sandbox/` to confirm the correct output. Once verified, simply remove the `exit 0` from `prepare_data.ps1`.
+
+*   **For a Main Experiment Script:**
+    This validation uses the **Layer 4 Integration Test**.
+    1.  **Add Checkpoint:** Modify the script's primary Python orchestrator (e.g., `src/replication_manager.py`). Import `sys` and add `sys.exit(0)` immediately after the call to your modified script.
+    2.  **Run Test:** Execute the full Layer 4 workflow (`layer4_step1_setup.ps1`, `layer4_step2_test_workflow.ps1`).
+    3.  **Verify & Clean Up:** The test will run the experiment up to your checkpoint. Inspect the artifacts in `temp_test_environment/output/test_experiments/` to confirm correctness. Once verified, remove the `sys.exit(0)` from the orchestrator and run the Layer 4 cleanup script.
+
+**A Note on Other Testing Layers**
+While the workflow above is typical for single-script development, the other layers serve distinct, higher-level validation purposes:
+-   **Layer 2** is used to validate the state-machine logic of the `prepare_data.ps1` orchestrator itself, using mock scripts.
+-   **Layers 5, 6, and 7** are used to validate the complete, end-to-end workflows for migration, study compilation, and new study generation after all individual components have been tested.
 
 ---
+
+### Layer 1: Python Unit Testing
+
+This layer focuses on validating the internal logic of the Python scripts. The project uses `pytest` for unit tests, which are managed via PDM.
+
+#### Running Automated Tests
+-   **Run all Python unit tests:**
+    ```bash
+    pdm run test
+    ```
+-   **Run unit tests with a console coverage report:**
+    ```bash
+    pdm run cov
+    ```
+-   **Run coverage for a specific test file by its full path:**
+    ```bash
+    pdm run cov-file tests/data_preparation/test_validate_wikipedia_pages.py
+    ```
 
 ### Layer 2: Data Pipeline Orchestration Testing (`prepare_data.ps1` with Mocks)
 
@@ -96,6 +104,8 @@ pdm run test-l2
 The script handles all setup, execution of the test scenarios (including simulating manual steps), and cleanup automatically.
 
 ---
+
+> **Note:** The integration test procedures below (Layers 3 and higher) create a temporary `temp_test_environment` directory at the project root to run in a safe, isolated sandbox. These tests are non-destructive and will not modify your main project files.
 
 ### Layer 3: Data Pipeline Integration Testing (`prepare_data.ps1`)
 

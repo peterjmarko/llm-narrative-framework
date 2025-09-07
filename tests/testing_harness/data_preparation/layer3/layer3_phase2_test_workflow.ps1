@@ -206,7 +206,7 @@ try {
         $summary = & python $summaryHelper $fetchScriptPath 2>$null
         if ($summary) {
             Write-Host "`n${C_MAGENTA}Script Summary: $($summary.Trim())${C_RESET}"
-            Write-Host "${C_MAGENTA}Test Harness Note: This script will be run in a loop to create a small, targeted seed dataset for the test subjects.${C_RESET}"
+            Write-Host "${C_MAGENTA}Test Harness Note: This script will be run 7 times in a loop to create a small, targeted seed dataset for the test subjects.${C_RESET}"
         }
     }
 
@@ -310,49 +310,39 @@ try {
         Force = $true
         NoFinalReport = $true
         SilentHalt = $true
+        TestMode = $true
     }
     if ($Interactive) {
         $pipelinePart1Args.Interactive = $true
     }
-    $rawOutput = & $prepareDataScript @pipelinePart1Args 2>&1
+    # Explicitly set the working directory for the orchestrator and pipe output to unbuffer it
+    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @pipelinePart1Args 2>&1 | ForEach-Object { Write-Host $_ }
     $pipelinePart1ExitCode = $LASTEXITCODE
     
     Remove-Item Env:PROJECT_SANDBOX_PATH -ErrorAction SilentlyContinue
 
-    # Check if this is an expected manual step halt or an actual failure
-    # Manual halt occurs when we reach the Solar Fire step and the SF import file exists
+    # --- 3. Validate Pipeline Part 1 and Perform Interventions ---
     $sfImportFile = Join-Path $SandboxDir "data/intermediate/sf_data_import.txt"
-    $isExpectedManualHalt = $pipelinePart1ExitCode -eq 1 -and (Test-Path $sfImportFile)
-
-    if ($pipelinePart1ExitCode -eq 0) {
-        Write-Host "`n--- Pipeline completed successfully. Test finished. ---" -ForegroundColor Green
-        return
-    } elseif ($pipelinePart1ExitCode -ne 0 -and -not $isExpectedManualHalt) {
-        throw "Pipeline Part 1 failed with exit code $pipelinePart1ExitCode. Check output above for details."
-    } elseif ($isExpectedManualHalt) {
-        # Manually print the headers for the simulated steps for a clean log flow.
-        $stepHeader9 = ">>> Step 9/13: Solar Fire Processing <<<"; $stepHeader10 = ">>> Step 10/13: Delineation Export <<<"; $stepHeader11 = ">>> Step 11/13: Neutralize Delineations <<<"
-        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader9 -ForegroundColor Blue; Write-Host "Simulating the manual Solar Fire import, calculation, and chart export process." -ForegroundColor Blue
-        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader10 -ForegroundColor Blue; Write-Host "Simulating the one-time Solar Fire delineation library export." -ForegroundColor Blue
-        Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader11 -ForegroundColor Blue; Write-Host "Using pre-neutralized text from test assets." -ForegroundColor Blue
-        
-        Write-Host "`n--- Proceeding with simulation... ---"
-        
-        # Validate each completed step in Part 1
-        Test-StepContinuity "Wikipedia Links" (Join-Path $SandboxDir "data/processed/adb_wiki_links.csv") 1 "," $AllSubjects
-        Test-StepContinuity "Page Validation" (Join-Path $SandboxDir "data/reports/adb_validation_report.csv") 1 "," $AllSubjects
-        Test-StepContinuity "Eligible Candidates" (Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt") 1 "`t" $FinalSubjects
-        if ($TestProfile.ConfigOverrides["bypass_candidate_selection"] -ne "true") {
-            Test-StepContinuity "Eminence Scores" (Join-Path $SandboxDir "data/foundational_assets/eminence_scores.csv") 1 "," $FinalSubjects
-            Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
-        }
-        Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
-        Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
+    if ($pipelinePart1ExitCode -ne 1 -or -not (Test-Path $sfImportFile)) {
+        throw "Pipeline Part 1 was expected to halt for Solar Fire Processing but did not."
     }
-    # --- 3. Harness Interventions & Manual Step Simulation ---
-    if ($TestProfile.InterventionScript) { & $TestProfile.InterventionScript -SandboxDir $SandboxDir }
-    Write-Host "`n--- HARNESS: Simulating manual Solar Fire export... ---" -ForegroundColor Magenta
-    $idMap = @{}; Get-Content (Join-Path $SandboxDir "data/intermediate/sf_data_import.txt") | ForEach-Object { $f = $_.Split(',') | ForEach-Object { $_.Trim('"') }; if ($f.Length -ge 4) { $idMap[$f[0]] = $f[3] } }
+    Write-Host "`n--- VALIDATING: Checking output from Pipeline Part 1... ---" -ForegroundColor Cyan
+    Test-StepContinuity "Wikipedia Links" (Join-Path $SandboxDir "data/processed/adb_wiki_links.csv") 1 "," $AllSubjects
+    Test-StepContinuity "Page Validation" (Join-Path $SandboxDir "data/reports/adb_validation_report.csv") 1 "," $AllSubjects
+    Test-StepContinuity "Eligible Candidates" (Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt") 1 "`t" $FinalSubjects
+    if ($TestProfile.ConfigOverrides["bypass_candidate_selection"] -ne "true") {
+        Test-StepContinuity "Eminence Scores" (Join-Path $SandboxDir "data/foundational_assets/eminence_scores.csv") 1 "," $FinalSubjects
+        Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
+    }
+    Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
+    Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
+    if ($TestProfile.InterventionScript) {
+        & $TestProfile.InterventionScript -SandboxDir $SandboxDir
+    }
+
+    # --- 4. Simulate First Manual Step & Resume ---
+    Write-Host "`n--- SIMULATING: Solar Fire Processing... ---" -ForegroundColor Magenta
+    $idMap = @{}; Get-Content $sfImportFile | ForEach-Object { $f = $_.Split(',') | ForEach-Object { $_.Trim('"') }; if ($f.Length -ge 4) { $idMap[$f[0]] = $f[3] } }
     $destAssetDir = Join-Path $SandboxDir "data/foundational_assets"
     $chartExportContent = (@"
 "Ernst (1900) Busch","22 Jan 1900","0:15","ID_BUSCH","-1:00","Kiel","Germany","54N20","010E08"; "Body Name","Body Abbr","Longitude";"Moon","Mon",189.002;"Sun","Sun",301.513;"Mercury","Mer",289.248;"Venus","Ven",332.342;"Mars","Mar",300.143;"Jupiter","Jup",244.946;"Saturn","Sat",270.067;"Uranus","Ura",251.194;"Neptune","Nep",84.700;"Pluto","Plu",74.934;"Ascendant","Asc",200.157;"Midheaven","MC",117.655
@@ -360,7 +350,18 @@ try {
 "Jonathan Cainer","18 Dec 1957","8:00","ID_CAINER","+0:00","London","United Kingdom","51N30","000W10"; "Body Name","Body Abbr","Longitude";"Moon","Mon",229.370;"Sun","Sun",266.145;"Mercury","Mer",281.204;"Venus","Ven",308.785;"Mars","Mar",236.738;"Jupiter","Jup",206.650;"Saturn","Sat",257.858;"Uranus","Ura",131.237;"Neptune","Nep",214.121;"Pluto","Plu",152.279;"Ascendant","Asc",264.205;"Midheaven","MC",208.521
 "@ -replace ";", "`r`n").Trim()
     foreach ($key in $idMap.Keys) { $chartExportContent = $chartExportContent -replace "ID_$($key.Split(' ')[-1].ToUpper())", $idMap[$key] }
-    $chartExportContent | Set-Content -Path (Join-Path $destAssetDir "sf_chart_export.csv") -Encoding UTF8
+    $chartExportPath = Join-Path $destAssetDir "sf_chart_export.csv"
+    $chartExportContent | Set-Content -Path $chartExportPath -Encoding UTF8
+    Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming... ---" -ForegroundColor Cyan
+    $resumeArgs = @{ Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true }
+    if ($Interactive) { $resumeArgs.Interactive = $true }
+    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @resumeArgs 2>&1 | ForEach-Object { Write-Host $_ }
+    $pipelinePart2ExitCode = $LASTEXITCODE
+
+    # --- 5. Simulate Second Manual Step & Resume ---
+    $delineationLibPath = Join-Path $destAssetDir "sf_delineations_library.txt"
+    if ($pipelinePart2ExitCode -ne 1 -or (Test-Path $delineationLibPath)) { throw "Pipeline Part 2 was expected to halt for Delineation Export but did not." }
+    Write-Host "`n--- SIMULATING: Delineation Export... ---" -ForegroundColor Magenta
     @"
 *Quadrant Strong 1st
 A focus on self-awareness and personal identity.
@@ -396,41 +397,19 @@ An ability to use power both positively and negatively.
 A cautious approach to life.
 *Midheaven in Gemini
 A need for stimulation in professional life.
-"@ | Set-Content -Path (Join-Path $destAssetDir "sf_delineations_library.txt") -Encoding UTF8
-    Write-Host "  -> Placed simulated SF files into sandbox."
-    # --- Validate and report success for each simulated step ---
-    $chartExportPath = Join-Path $destAssetDir "sf_chart_export.csv"
-    $delineationsLibPath = Join-Path $destAssetDir "sf_delineations_library.txt"
+"@ | Set-Content -Path $delineationLibPath -Encoding UTF8
 
-    Test-StepContinuity "SF Export" $chartExportPath 3 "," $FinalSubjects
-    if (-not (Test-Path $delineationsLibPath)) {
-        throw "FAIL [Simulation]: Delineations library file not found: ${delineationsLibPath}"
-    }
+    Write-Host "`n--- SIMULATING: Neutralize Delineations... ---" -ForegroundColor Magenta
+    Write-Host "  -> This step uses pre-neutralized text from the test assets." -ForegroundColor DarkGray
 
-    Write-Host "`n--- Final Output (Simulation) ---" -ForegroundColor Yellow
-    Write-Host " - Simulated chart export saved to: $((Resolve-Path $chartExportPath -Relative).TrimStart('.\'))" -ForegroundColor Cyan
-    Write-Host " - Simulated delineations library saved to: $((Resolve-Path $delineationsLibPath -Relative).TrimStart('.\'))" -ForegroundColor Cyan
-    Write-Host "`n${C_GREEN}SUCCESS: All simulated manual files created successfully.${C_RESET}"
+    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming to completion... ---" -ForegroundColor Cyan
+    $resumeArgsP3 = @{ NoFinalReport = $true; Resumed = $true; TestMode = $true }
+    if ($Interactive) { $resumeArgsP3.Interactive = $true }
+    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @resumeArgsP3 2>&1 | ForEach-Object { Write-Host $_ }
+    $pipelineP3ExitCode = $LASTEXITCODE
+    if ($pipelineP3ExitCode -ne 0) { throw "Pipeline Part 3 failed with exit code $pipelineP3ExitCode." }
 
-    # --- 4. Execute Pipeline (Part 2): Resume and complete ---
-    Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming pipeline with simulated manual files... ---" -ForegroundColor Cyan
-    $env:PROJECT_SANDBOX_PATH = $SandboxDir
-    
-    # The pipeline should automatically resume from where it left off
-    # Use a hashtable for splatting to correctly handle switch parameters
-    $resumeArgs = @{ NoFinalReport = $true; Resumed = $true }
-    if ($Interactive) { 
-        $resumeArgs.Interactive = $true 
-    }
-
-    # Capture and filter the output to suppress the final "success" banner
-    $rawOutputP2 = & $prepareDataScript @resumeArgs 2>&1
-    $pipelineOutputP2 = $rawOutputP2 | Where-Object { $_ -notmatch "Data Preparation Pipeline Completed Successfully" }
-    $pipelineOutputP2 | ForEach-Object { Write-Host $_ }
-    
-    Remove-Item Env:PROJECT_SANDBOX_PATH -ErrorAction SilentlyContinue
-
-    # --- 5. Final Verification ---
+    # --- 6. Final Verification ---
     Write-Host "`n--- VERIFYING: Checking final output... ---" -ForegroundColor Cyan
     $finalDbPath = Join-Path $SandboxDir "data/personalities_db.txt"
     if (-not (Test-Path $finalDbPath)) { throw "FAIL: The final 'personalities_db.txt' file was not created." }

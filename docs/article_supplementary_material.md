@@ -9,6 +9,24 @@ This document is the **Replication Guide** that provides supplementary material 
 
 This guide defines the three primary replication paths (Direct, Methodological, and Conceptual) and provides a complete walkthrough of the end-to-end workflow, from initial setup and data preparation to running the main experiments and producing the final statistical analysis.
 
+### Models Used in the Original Study
+
+For a direct or methodological replication, it is crucial to use the exact models and versions from the original study. All models were accessed via the **OpenRouter API**.
+
+*   **Eminence Scoring (LLM A):**
+    *   **Model:** OpenAI's GPT-5
+    *   **API Identifier:** `openai/gpt-5-chat`
+*   **OCEAN Scoring (LLM B):**
+    *   **Model:** Anthropic's Claude 4 Sonnet
+    *   **API Identifier:** `anthropic/claude-4-sonnet`
+*   **Neutralization (LLM C):**
+    *   **Model:** Google's Gemini 2.5 Pro
+    *   **API Identifier:** `google/gemini-2.5-pro`
+*   **Evaluation (LLM D):**
+    *   **Model:** Google's Gemini 1.5 Flash
+    *   **API Identifier:** `google/gemini-1.5-flash-001`
+    *   **Access Dates:** June 10, 2025 – July 21, 2025
+
 ## The Data Preparation Pipeline
 
 This guide supports three distinct research paths.
@@ -71,15 +89,15 @@ This script processes the eligible candidates list and uses an LLM to assign a c
 pdm run gen-eminence
 ```
 
-#### b. OCEAN Scoring & Dynamic Cutoff (`generate_ocean_scores.py`)
-This script determines the final subject pool size by processing subjects by eminence and stopping when personality diversity (measured by variance) shows a sustained drop.
+#### b. OCEAN Scoring (`generate_ocean_scores.py`)
+This script generates OCEAN personality scores for every subject in the eminence-ranked list.
 ```bash
-# Generate OCEAN scores to determine the final cutoff
+# Generate OCEAN scores for all eminent candidates
 pdm run gen-ocean
 ```
 
-#### c. Selecting Final Candidates (`select_final_candidates.py`)
-This script performs the final selection. In its default mode, it filters the eligible list by the OCEAN set. In bypass mode, it uses the entire eligible list.
+#### c. Selecting Final Candidates & Applying Cutoff (`select_final_candidates.py`)
+This script performs the final selection. It takes the complete list of OCEAN scores and applies a data-driven cutoff based on score variance to determine the final, psychologically diverse cohort. In bypass mode, it uses the entire eligible list without applying a cutoff.
 ```bash
 # Create the final, transformed list of subjects
 pdm run select-final

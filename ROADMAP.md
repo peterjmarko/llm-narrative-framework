@@ -18,6 +18,17 @@ List of completed tasks since v7.0.0.
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
+- [ ] **Update Test Suites for New Candidate Selection Logic**
+  - The logic for determining the final subject pool was moved from `generate_ocean_scores.py` to `select_final_candidates.py`. The following test updates are required to reflect this change:
+  - [ ] **Layer 1:** Simplify the `test_generate_ocean_scores.py` unit test, as the script is now much simpler.
+  - [ ] **Layer 1:** Expand the `test_select_final_candidates.py` unit test to cover the new, critical variance-based cutoff logic.
+  - [ ] **Layer 3:** Update the integration test with a larger, pre-generated seed file for `ocean_scores.csv` that is sufficient to trigger the cutoff logic and validate the new behavior.
+  - [ ] **Layers 4-7:** Review and update all higher-level integration tests to remove any hard-coded assumptions about the final subject count, as it is now data-driven.
+- [ ] **Standardize Layer 4 & 5 Integration Tests**
+  - [ ] Create a new directory structure: `tests/testing_harness/experiment_pipeline/layer4/` and `layer5/`.
+  - [ ] Create a master `run_layer4_test.ps1` script that orchestrates the setup, execution, and cleanup steps.
+  - [ ] Create a master `run_layer5_test.ps1` script that does the same for the migration workflow.
+  - [ ] Update `pyproject.toml` with new, simplified PDM commands (`test-l4`, `test-l5`) that use these master scripts.
 - [ ] **Re-validate Integration Tests After Filter Changes**
   - [ ] Perform a full run of the Layer 4 and Layer 5 integration tests to ensure that the changes to the data filtering logic (Northern Hemisphere and eminence/OCEAN scoring) have not introduced any downstream regressions.
 - [ ] **Develop `new_study.ps1` Orchestrator**
@@ -95,6 +106,9 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Move tests for developer utility scripts from `tests/` to a self-contained `scripts/tests/` directory.
   - [ ] Systematically update all import statements and script paths across the entire project to reflect the new structure.
 
+- [ ] **Implement Shared Progress Bar Utility**
+  - [ ] Create a new utility in `src/utils/` to provide a standardized, shared `tqdm` progress bar.
+  - [ ] Refactor `generate_eminence_scores.py` and `generate_ocean_scores.py` to use this shared utility for a consistent user experience during long-running LLM calls.
 - [ ] **Improve Experiment Execution and Reproducibility**
   - [ ] Refactor inter-script communication for robustness. Modify core Python scripts (`experiment_manager.py`, etc.) to send all human-readable logs to `stderr` and use `stdout` exclusively for machine-readable output (e.g., the final experiment path). Update PowerShell wrappers to correctly handle these separate streams.
   - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.

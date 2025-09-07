@@ -68,12 +68,21 @@ except ImportError:
     sys.exit(1)
 
 from colorama import Fore, init
+from tqdm import tqdm
+
+# --- Pre-emptive Path Correction ---
+# This must be done before any local imports to ensure modules are found.
+try:
+    from config_loader import APP_CONFIG
+except ImportError:
+    current_script_dir = Path(__file__).parent
+    src_dir = current_script_dir.parent
+    sys.path.insert(0, str(src_dir))
 
 # Initialize colorama
 init(autoreset=True, strip=False)
 
 # Ensure the src directory is in the Python path for nested imports
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 from utils.file_utils import backup_and_remove  # noqa: E402
 
 # --- Constants ---
@@ -118,16 +127,7 @@ List of Individuals to Rate:
 """
 
 # --- Config Loader ---
-try:
-    from config_loader import APP_CONFIG, get_config_value
-except ImportError:
-    current_script_dir = Path(__file__).parent
-    sys.path.insert(0, str(current_script_dir))
-    try:
-        from config_loader import APP_CONFIG, get_config_value
-    except ImportError as e:
-        print(f"FATAL: Could not import from config_loader.py. Error: {e}")
-        sys.exit(1)
+from config_loader import APP_CONFIG, get_config_value
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
@@ -222,69 +222,8 @@ def save_scores_to_csv(filepath: Path, scores: List[Dict]):
     except IOError as e:
         logging.error(f"Failed to write scores to {filepath}: {e}")
 
-def calculate_average_variance(df: pd.DataFrame) -> float:
-    """Calculates the average variance across the five OCEAN trait columns."""
-    # Create an explicit copy to avoid SettingWithCopyWarning on slices.
-    df = df.copy()
-    ocean_cols = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
-    # Ensure columns exist and are numeric
-    for col in ocean_cols:
-        if col not in df.columns:
-            return 0.0
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    df.dropna(subset=ocean_cols, inplace=True)
-    if len(df) < 2:
-        return 0.0 # Variance is undefined for less than 2 samples
-    
-    variances = df[ocean_cols].var()
-    return variances.mean()
-
-
-def truncate_and_archive_scores(filepath: Path, num_records_to_keep: int):
-    """
-    Truncates the main scores file to the specified number of records,
-    and archives the discarded records to a separate file.
-    """
-    if not filepath.exists() or filepath.stat().st_size == 0:
-        logging.warning(f"Cannot truncate file that does not exist: {filepath}")
-        return
-    try:
-        df = pd.read_csv(filepath)
-        if num_records_to_keep >= len(df):
-            logging.info(f"No truncation needed. File has {len(df)} records, asked to keep {num_records_to_keep}.")
-            return
-
-        # 1. Archive discarded data
-        discarded_df = df.iloc[num_records_to_keep:]
-        archive_path = filepath.parent.parent / "intermediate" / f"{filepath.stem}_discarded.csv"
-        archive_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        file_is_new = not archive_path.exists() or archive_path.stat().st_size == 0
-        discarded_df.to_csv(archive_path, mode='a', header=file_is_new, index=False, columns=OCEAN_FIELDNAMES)
-        logging.warning(f"Archived {len(discarded_df)} discarded records to '{archive_path}'.")
-
-        # 2. Truncate the main file
-        df_truncated = df.head(num_records_to_keep).copy()
-        df_truncated['Index'] = range(1, len(df_truncated) + 1)
-        df_truncated.to_csv(filepath, index=False, columns=OCEAN_FIELDNAMES)
-        logging.info(f"Successfully truncated '{filepath.name}' to the top {num_records_to_keep} records.")
-
-    except Exception as e:
-        logging.error(f"Failed to truncate and archive scores: {e}")
-
 import re
-def generate_summary_report(
-    filepath: Path,
-    stop_reason: str,
-    total_processed: int,
-    final_count: int,
-    benchmark_variance: float,
-    last_checks: deque,
-    variance_analysis_window: int,
-    benchmark_population_size: int,
-    variance_check_window: int,
-    variance_trigger_count: int,
-):
+def generate_summary_report(filepath: Path, total_subjects_overall: int):
     """Generates a summary report from the final scores file."""
     if not filepath.exists() or filepath.stat().st_size == 0:
         print("\n--- Summary Report ---")
@@ -347,27 +286,14 @@ def generate_summary_report(
         stats_string, table_width = format_stats_table(stats_formatted)
         divider = "=" * table_width
         title = "OCEAN Scores Generation Summary".center(table_width)
+        
+        total_scored = len(df)
 
         report = [divider, title, divider]
-        report.append(f"Stop Reason:      {stop_reason}")
-        report.append(f"Total Processed:  {total_processed:,}")
-
-        if final_count < total_processed:
-            report.append(f"Final Count:      {final_count:,} (rounded down from {total_processed:,})")
-        else:
-            report.append(f"Final Count:      {final_count:,}")
+        report.append(f"Total Scored:     {total_scored:,}")
+        report.append(f"Total in Source:  {total_subjects_overall:,}")
         
-        # --- Cutoff Analysis Section ---
-        if benchmark_variance > 0:
-            report.append("\n--- Cutoff Analysis (based on Average Variance) ---")
-            report.append(f"Rule: Stop if >= {variance_trigger_count} of last {variance_check_window} windows are below threshold.")
-            report.append(f"Benchmark Variance (Top {benchmark_population_size}): {benchmark_variance:.4f}")
-            for check_point, v_avg, is_met, pct in last_checks:
-                start = check_point - variance_analysis_window
-                status = "Met" if is_met else "Not Met"
-                report.append(f"  - Window (Entries {start+1}-{check_point}): Avg Var: {v_avg:.4f}, Cutoff: {status} ({pct:.2f}%)")
-
-        report.append("\n\n--- Descriptive Statistics for Final Dataset ---")
+        report.append("\n--- Descriptive Statistics ---")
         report.append(stats_string)
 
         # --- Quintile Analysis ---
@@ -407,21 +333,18 @@ def generate_summary_report(
                 report.append(q_table_string)
 
         report.append("\n" + divider)
-
-        # --- Cutoff State for Resumption ---
-        report.append("\n--- Cutoff State (for script resumption) ---")
-        if benchmark_variance > 0:
-            report.append(f"BenchmarkVariance: {benchmark_variance:.4f}")
-            # Format for safe and clean serialization
-            formatted_checks_for_file = [
-                (cp, round(v_avg, 4), is_met, round(pct, 2))
-                for cp, v_avg, is_met, pct in last_checks
-            ]
-            report.append(f"LastChecks_SERIALIZED: {json.dumps(formatted_checks_for_file)}")
-        else:
-            report.append(f"BenchmarkVariance: Not yet established (requires {benchmark_population_size} subjects).")
-            report.append("LastChecks_SERIALIZED: []")
         
+        completion_pct = (total_scored / total_subjects_overall) * 100 if total_subjects_overall > 0 else 0
+        status_line = f"Completion: {total_scored}/{total_subjects_overall} ({completion_pct:.2f}%)"
+        
+        # The SUCCESS keyword is the trigger for the orchestrator to mark the step as complete.
+        if total_scored == total_subjects_overall:
+            report.append(f"\n{Fore.GREEN}SUCCESS - {status_line}")
+        elif completion_pct >= 95.0:
+            report.append(f"\n{Fore.YELLOW}WARNING - {status_line}")
+        else:
+            report.append(f"\n{Fore.RED}ERROR - {status_line} - Significantly incomplete.")
+
         summary_content = "\n".join(report)
         summary_path.write_text(summary_content, encoding='utf-8')
         print(f"\n{summary_content}\n")
@@ -429,76 +352,7 @@ def generate_summary_report(
     except Exception as e:
         logging.error(f"Could not generate summary report: {e}")
 
-def load_cutoff_state(summary_path: Path, maxlen: int) -> (float, deque):
-    """Loads benchmark variance and last checks from the summary report."""
-    benchmark_variance = 0.0
-    last_checks = deque(maxlen=maxlen)
-
-    if not summary_path.exists():
-        return benchmark_variance, last_checks
-
-    try:
-        content = summary_path.read_text(encoding='utf-8')
-        
-        bv_match = re.search(r"BenchmarkVariance: (\d+\.\d+)", content)
-        if bv_match:
-            benchmark_variance = float(bv_match.group(1))
-
-        # Use a non-greedy match that handles newlines
-        lc_match = re.search(r"LastChecks_SERIALIZED: (\[.*\])", content)
-        if lc_match:
-            # Safely parse the list from the dedicated JSON string
-            last_checks_list = json.loads(lc_match.group(1))
-            last_checks.extend(last_checks_list)
-            
-    except Exception as e:
-        logging.warning(f"Could not parse cutoff state from {summary_path}: {e}")
-
-    return benchmark_variance, last_checks
-
-def perform_pre_flight_check(output_path, args, all_scores_df, benchmark_variance, initial_checks):
-    """
-    Analyzes the current data to decide if the run should continue or stop.
-    It returns the authoritative, up-to-date variance check state for resumption.
-    """
-    if len(all_scores_df) < args.cutoff_start_point or benchmark_variance == 0:
-        return "CONTINUE", initial_checks
-
-    # Recalculate the true state of variance checks from all existing data.
-    recalculated_checks = deque(maxlen=args.variance_check_window)
-    start = args.cutoff_start_point
-    end = len(all_scores_df)
-
-    for check_point in range(start, end + 1, args.variance_analysis_window):
-        window_df = all_scores_df.iloc[check_point - args.variance_analysis_window : check_point]
-        if len(window_df) < args.variance_analysis_window:
-            continue
-        
-        v_avg = calculate_average_variance(window_df)
-        is_met = v_avg < (args.variance_cutoff_percentage * benchmark_variance)
-        percentage = (v_avg / benchmark_variance) * 100 if benchmark_variance > 0 else 0.0
-        recalculated_checks.append((check_point, v_avg, bool(is_met), percentage))
-
-    met_count = sum(1 for check in recalculated_checks if check[2])
-    if met_count < args.variance_trigger_count:
-        logging.info(f"{Fore.GREEN}Pre-flight check: Cutoff condition not met ({met_count}/{args.variance_trigger_count}). Resuming run...")
-        return "CONTINUE", recalculated_checks
-
-    # --- Cutoff condition IS met based on existing data ---
-    logging.warning(f"Pre-flight check: Cutoff condition is met based on existing data ({met_count}/{args.variance_trigger_count}).")
-    logging.warning("No new subjects will be processed. Finalizing with current data.")
-    
-    last_check_checkpoint = recalculated_checks[-1][0]
-    cutoff_start_point = last_check_checkpoint - args.variance_analysis_window
-    final_rounded_count = (cutoff_start_point // args.variance_analysis_window) * args.variance_analysis_window
-
-    truncate_and_archive_scores(output_path, final_rounded_count)
-    generate_summary_report(
-        output_path, "Finalized by pre-flight check (cutoff met).", len(all_scores_df), final_rounded_count,
-        benchmark_variance, recalculated_checks, args.variance_analysis_window,
-        args.benchmark_population_size, args.variance_check_window, args.variance_trigger_count
-    )
-    return "EXIT", None
+# Removed load_cutoff_state and perform_pre_flight_check functions as they are no longer needed.
 
 def main():
     """Main function to orchestrate the OCEAN score generation."""
@@ -524,12 +378,6 @@ def main():
     parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("--model", default=default_model, help="Name of the LLM to use for scoring.")
     parser.add_argument("--batch-size", type=int, default=default_batch_size, help="Number of subjects per API call.")
-    parser.add_argument("--variance-cutoff-percentage", type=float, default=default_cutoff_pct, help="Stop when window variance is <% of benchmark variance.")
-    parser.add_argument("--variance-check-window", type=int, default=default_check_win, help="Number of recent windows to consider for cutoff (N).")
-    parser.add_argument("--variance-trigger-count", type=int, default=default_trigger_count, help="Number of windows that must be below threshold to stop (M).")
-    parser.add_argument("--variance-analysis-window", type=int, default=default_analysis_win, help="Fixed number of new subjects for each variance check.")
-    parser.add_argument("--benchmark-population-size", type=int, default=default_benchmark_pop, help="Number of top subjects to use for benchmark variance.")
-    parser.add_argument("--cutoff-start-point", type=int, default=default_cutoff_start, help="Minimum subjects to process before cutoff logic is active.")
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
     parser.add_argument("--no-summary", action="store_true", help="Suppress the final summary report output.")
     parser.add_argument("--no-api-warning", action="store_true", help="Suppress the API cost warning.")
@@ -544,7 +392,6 @@ def main():
 
     # Load bypass_candidate_selection AFTER sandbox is established
     if args.sandbox_path:
-        import configparser
         sandbox_config_path = Path(args.sandbox_path) / "config.ini"
         if sandbox_config_path.exists():
             sandbox_config = configparser.ConfigParser()
@@ -607,17 +454,7 @@ def main():
     if output_path.exists() and output_path.stat().st_size > 0:
         all_scores_df = pd.read_csv(output_path)
 
-    # --- Pre-flight Check ---
-    summary_path = output_path.parent.parent / "reports" / f"{output_path.stem}_summary.txt"
-    benchmark_variance, initial_checks = load_cutoff_state(summary_path, args.variance_check_window)
-    
-    if not args.force:
-        status, last_variance_checks = perform_pre_flight_check(output_path, args, all_scores_df, benchmark_variance, initial_checks)
-        if status == "EXIT":
-            sys.exit(0)
-    else:
-        # If forcing, we don't need the pre-flight check's result, just an initialized deque
-        last_variance_checks = initial_checks
+    # Pre-flight check is no longer needed with the simplified design.
     
     # If resuming, check if there's anything to do
     # --- Main Logic Branching ---
@@ -679,154 +516,95 @@ def main():
     was_interrupted = False
     
     try:
-        for i in range(0, total_to_process, args.batch_size):
-            batch = subjects_to_process[i:i + args.batch_size]
-            # Calculate batch numbers relative to the current run for accurate progress
-            session_batch_num = (i // args.batch_size) + 1
-            total_session_batches = (total_to_process + args.batch_size - 1) // args.batch_size
-            
-            print(f"\n{Fore.CYAN}--- Processing Session Batch {session_batch_num} of {total_session_batches} (max) ---{Fore.RESET}")
+        total_batches = (total_to_process + args.batch_size - 1) // args.batch_size
+        with tqdm(total=total_to_process, desc="Processing Batches", unit="subject", ncols=80) as pbar:
+            for i in range(0, total_to_process, args.batch_size):
+                batch = subjects_to_process[i:i + args.batch_size]
+                batch_num = (i // args.batch_size) + 1
+                pbar.set_description(f"Processing Batch {batch_num}/{total_batches}")
 
-            # 1. Construct prompt
-            subject_list_str = "\n".join([f'{s["Name"]} ({s["BirthYear"]}), ID {s["idADB"]}' for s in batch])
-            prompt_text = OCEAN_PROMPT_TEMPLATE.format(subject_list=subject_list_str)
-            temp_query_file.write_text(prompt_text, encoding='utf-8')
+                # 1. Construct prompt
+                subject_list_str = "\n".join([f'{s["Name"]} ({s["BirthYear"]}), ID {s["idADB"]}' for s in batch])
+                prompt_text = OCEAN_PROMPT_TEMPLATE.format(subject_list=subject_list_str)
+                temp_query_file.write_text(prompt_text, encoding='utf-8')
 
-            # 2. Call LLM worker
-            worker_cmd = [
-                sys.executable, str(script_dir / "llm_prompter.py"), f"ocean_batch_{session_batch_num}",
-                "--input_query_file", str(temp_query_file), "--output_response_file", str(temp_response_file),
-                "--output_error_file", str(temp_error_file), "--config_path", str(temp_config_file)
-            ]
-            if log_level > logging.DEBUG: worker_cmd.append("--quiet")
-            subprocess.run(worker_cmd, check=False)
+                # 2. Call LLM worker (always in quiet mode for this script)
+                worker_cmd = [
+                    sys.executable, str(script_dir / "llm_prompter.py"), f"ocean_batch_{batch_num}",
+                    "--input_query_file", str(temp_query_file), "--output_response_file", str(temp_response_file),
+                    "--output_error_file", str(temp_error_file), "--config_path", str(temp_config_file), "--quiet"
+                ]
+                subprocess.run(worker_cmd, check=False)
 
-            # 3. Process response
-            if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
-                error_msg = temp_error_file.read_text().strip()
-                logging.error(f"Worker failed for batch {session_batch_num}. Error: {error_msg}")
-                consecutive_failures += 1
-                if consecutive_failures >= max_consecutive_failures:
-                    logging.critical(f"Halting after {max_consecutive_failures} consecutive batch failures.")
-                    stop_reason = "Halted due to consecutive API errors."
-                    break
-                temp_error_file.unlink()
-                continue
-            
-            consecutive_failures = 0
-            
-            if not temp_response_file.exists():
-                logging.error(f"Worker did not produce response file for batch {session_batch_num}.")
-                continue
-            
-            response_text = temp_response_file.read_text(encoding='utf-8')
-            parsed_scores = parse_batch_response(response_text)
-
-            if not parsed_scores:
-                logging.error(f"Failed to parse any scores from response for batch {session_batch_num}.")
-                continue
-            
-            # Create a lookup map to add BirthYear back to the results
-            id_to_birth_year = {str(s["idADB"]): s["BirthYear"] for s in batch}
-            
-            start_index = len(all_scores_df) + 1
-            for idx, score_dict in enumerate(parsed_scores):
-                score_dict["Index"] = start_index + idx
-                # Add the BirthYear from our lookup map
-                score_dict["BirthYear"] = id_to_birth_year.get(str(score_dict["idADB"]), "")
-
-            save_scores_to_csv(output_path, parsed_scores)
-            
-            # Reconcile sent vs received to find missed subjects
-            sent_ids = {str(s['idADB']) for s in batch}
-            received_ids = {str(p['idADB']) for p in parsed_scores}
-            missed_ids = sent_ids - received_ids
-            if missed_ids:
-                missed_in_batch = [s for s in batch if str(s['idADB']) in missed_ids]
-                llm_missed_subjects.extend(missed_in_batch)
-                logging.warning(f"LLM did not return scores for {len(missed_in_batch)} subjects in this batch.")
-
-            # 4. Variance Cutoff Logic
-            batch_df = pd.DataFrame(parsed_scores)
-            
-            previous_total = len(all_scores_df)
-            all_scores_df = pd.concat([all_scores_df, batch_df], ignore_index=True)
-            new_total = len(all_scores_df)
-            
-            print(f"Successfully processed and saved {len(parsed_scores)} scores. Total overall: {new_total:,}")
-            
-            # Check if we crossed a boundary for statistical analysis
-            if (new_total // args.variance_analysis_window) > (previous_total // args.variance_analysis_window):
+                # 3. Process response
+                if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
+                    error_msg = temp_error_file.read_text().strip()
+                    tqdm.write(f"{Fore.RED}Worker failed for batch {batch_num}. Error: {error_msg}")
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_consecutive_failures:
+                        tqdm.write(f"{Fore.RED}Halting after {max_consecutive_failures} consecutive batch failures.")
+                        stop_reason = "Halted due to consecutive API errors."
+                        break
+                    continue
                 
-                # Establish the benchmark variance once enough subjects are collected
-                if benchmark_variance == 0 and new_total >= args.benchmark_population_size:
-                    benchmark_df = all_scores_df.iloc[:args.benchmark_population_size]
-                    benchmark_variance = calculate_average_variance(benchmark_df)
-                    logging.info(f"{Fore.GREEN}Benchmark variance established from top {args.benchmark_population_size} subjects: {benchmark_variance:.4f}")
+                consecutive_failures = 0
+                response_text = temp_response_file.read_text(encoding='utf-8')
+                parsed_scores = parse_batch_response(response_text)
 
-                # If benchmark is set, perform the cutoff check
-                if benchmark_variance > 0:
-                    check_point = (new_total // args.variance_analysis_window) * args.variance_analysis_window
-                    
-                    if check_point < args.cutoff_start_point:
-                        logging.info(f"{Fore.CYAN}Cutoff checks will begin after {args.cutoff_start_point} subjects are processed.")
-                    else:
-                        latest_window_df = all_scores_df.iloc[check_point - args.variance_analysis_window : check_point]
-                        V_avg_latest_window = calculate_average_variance(latest_window_df)
-                        
-                        percentage = (V_avg_latest_window / benchmark_variance) * 100 if benchmark_variance > 0 else 0.0
-                        logging.info(f"Variance Check: Benchmark Avg={benchmark_variance:.4f}, Latest {len(latest_window_df)} entries Avg={V_avg_latest_window:.4f} ({percentage:.2f}%)")
+                if not parsed_scores:
+                    tqdm.write(f"{Fore.RED}Failed to parse any scores from response for batch {session_batch_num}.")
+                    continue
+                
+                # Reconcile and save
+                id_to_birth_year = {str(s["idADB"]): s["BirthYear"] for s in batch}
+                start_index = len(all_scores_df) + 1
+                for idx, score_dict in enumerate(parsed_scores):
+                    score_dict["Index"] = start_index + idx
+                    score_dict["BirthYear"] = id_to_birth_year.get(str(score_dict["idADB"]), "")
+                save_scores_to_csv(output_path, parsed_scores)
+                
+                sent_ids = {str(s['idADB']) for s in batch}
+                received_ids = {str(p['idADB']) for p in parsed_scores}
+                missed_ids = sent_ids - received_ids
+                if missed_ids:
+                    missed_in_batch = [s for s in batch if str(s['idADB']) in missed_ids]
+                    llm_missed_subjects.extend(missed_in_batch)
+                    tqdm.write(f"{Fore.YELLOW}Warning: LLM did not return scores for {len(missed_in_batch)} subjects in batch {batch_num}.")
 
-                        is_met = V_avg_latest_window < (args.variance_cutoff_percentage * benchmark_variance)
-                        # Convert numpy.bool_ to standard Python bool for JSON serialization
-                        last_variance_checks.append((check_point, V_avg_latest_window, bool(is_met), percentage))
-                        
-                        met_count = sum(1 for check in last_variance_checks if check[2])
-                        # Report against the configured check window size for clarity
-                        logging.warning(f"Cutoff Status: {met_count}/{args.variance_trigger_count} of last {args.variance_check_window} windows have met the threshold ({len(last_variance_checks)} currently tracked).")
-
-                        if met_count >= args.variance_trigger_count:
-                            stop_reason = f"Cutoff met ({met_count} of last {len(last_variance_checks)} windows below threshold)."
-                            
-                            # Set cutoff to the beginning of the window that triggered this final check.
-                            cutoff_start_subject_count = check_point - args.variance_analysis_window
-                            
-                            logging.warning(f"{Fore.RED}STOPPING: {stop_reason}")
-                            break # Exit main loop
-            
-            time.sleep(1)
+                # Update master dataframe and progress bar
+                batch_df = pd.DataFrame(parsed_scores)
+                all_scores_df = pd.concat([all_scores_df, batch_df], ignore_index=True)
+                pbar.update(len(batch))
 
     except KeyboardInterrupt:
         was_interrupted = True
         stop_reason = "Process interrupted by user."
-        print(f"\n\n{Fore.YELLOW}{stop_reason} Exiting gracefully.{Fore.RESET}")
+        tqdm.write(f"\n\n{Fore.YELLOW}{stop_reason} Exiting gracefully.{Fore.RESET}")
     finally:
         # --- Finalization ---
-        print("\n--- Finalizing ---")
+        tqdm.write(f"\n--- Finalizing ---")
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
 
-        total_processed_count = len(all_scores_df)
-        final_count = total_processed_count  # Default to preserving all data
-
-        # Only truncate the file if the specific "Cutoff met" reason was given
-        if stop_reason.startswith("Cutoff met"):
-            # The cutoff point is the start of the window that triggered the final check
-            final_raw_count = cutoff_start_subject_count
-            # Round down to the nearest full window size for a clean dataset
-            final_count = (final_raw_count // args.variance_analysis_window) * args.variance_analysis_window
-            truncate_and_archive_scores(output_path, final_count)
+        total_possible_subjects = len(load_subjects_to_process(input_path, set())) + len(processed_ids)
 
         # Always generate reports. They will reflect the final state of the CSV file.
         if not args.no_summary:
-            generate_summary_report(
-                output_path, stop_reason, total_processed_count, final_count,
-                benchmark_variance, last_variance_checks, args.variance_analysis_window,
-                args.benchmark_population_size, args.variance_check_window, args.variance_trigger_count,
-            )
+            generate_summary_report(output_path, total_possible_subjects)
+        # Reconcile final data to ensure completeness before exiting.
+        final_processed_ids = set(all_scores_df['idADB'].astype(str)) if not all_scores_df.empty else set()
+        initial_ids = {str(s['idADB']) for s in subjects_to_process} | processed_ids
+        missing_ids = initial_ids - final_processed_ids
+
         generate_missing_scores_report(
             missing_report_path, llm_missed_subjects, subjects_to_process, all_scores_df
         )
+
+        # If any subjects were not processed (either missed by LLM or unattempted due to error), halt.
+        if missing_ids:
+            logging.error(f"Failed to retrieve scores for {len(missing_ids)} subject(s). See '{missing_report_path}' for details.")
+            logging.error("The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.")
+            sys.exit(1)
 
         # Print final status message based on the exit condition
         if was_interrupted:
