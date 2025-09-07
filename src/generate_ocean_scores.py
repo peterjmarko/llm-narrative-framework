@@ -72,6 +72,10 @@ from colorama import Fore, init
 # Initialize colorama
 init(autoreset=True, strip=False)
 
+# Ensure the src directory is in the Python path for nested imports
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from utils.file_utils import backup_and_remove  # noqa: E402
+
 # --- Constants ---
 OCEAN_FIELDNAMES = ["Index", "idADB", "Name", "BirthYear", "Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
 
@@ -134,22 +138,10 @@ def backup_and_overwrite_related_files(output_path: Path):
     summary_path = output_path.parent.parent / "reports" / f"{output_path.stem}_summary.txt"
     missing_report_path = output_path.parent.parent / "reports" / "missing_ocean_scores.txt"
     files_to_back_up = [output_path, summary_path, missing_report_path]
-
-    backup_dir = Path('data/backup')
-    backup_dir.mkdir(parents=True, exist_ok=True)
     
     print() # Add a blank line for better spacing
     for p in files_to_back_up:
-        if p.exists():
-            try:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = backup_dir / f"{p.stem}.{timestamp}{p.suffix}.bak"
-                shutil.copy2(p, backup_path)
-                print(f"{Fore.CYAN}Created backup for {p.name} at: {backup_path}{Fore.RESET}")
-                p.unlink()
-            except (IOError, OSError) as e:
-                logging.error(f"{Fore.RED}Failed to back up or remove {p.name}: {e}")
-                sys.exit(1)
+        backup_and_remove(p)
 
 def load_processed_ids(filepath: Path) -> Set[str]:
     """Reads an existing output file to find which idADBs have been processed."""
@@ -590,11 +582,12 @@ def main():
     if not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
-            print("Automatically re-running full scoring process...")
+            print("Automatically re-running full scoring process...{Fore.RESET}")
             backup_and_overwrite_related_files(output_path)
             args.force = True
 
     if args.force and any(p.exists() for p in [output_path, summary_path, missing_report_path]):
+        print(f"\n{Fore.YELLOW}--force flag detected. Backing up and removing existing output files...{Fore.RESET}")
         backup_and_overwrite_related_files(output_path)
 
     # --- Load Data and Determine Scope ---
@@ -645,6 +638,7 @@ def main():
         print(f"{Fore.YELLOW}If you decide to go ahead with recreating OCEAN scores, a backup of the existing file will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
+            print(f"{Fore.YELLOW}Backing up and removing existing output files...{Fore.RESET}")
             backup_and_overwrite_related_files(output_path)
             args.force = True
             # Re-load after backup to ensure we process everything

@@ -62,6 +62,7 @@ from colorama import Fore, init
 # Ensure the src directory is in the Python path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from config_loader import APP_CONFIG, get_config_value, get_path  # noqa: E402
+from utils.file_utils import backup_and_remove  # noqa: E402
 
 # Initialize colorama
 init(autoreset=True, strip=False)
@@ -136,16 +137,7 @@ def main():
 
     # Perform the backup and overwrite if a re-run has been triggered (either by --force or by the prompts)
     if args.force and output_path.exists():
-        try:
-            backup_dir = Path("data/backup")
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = (backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak")
-            shutil.copy2(output_path, backup_path)
-            print(f"{Fore.CYAN}Created backup of existing file at: {backup_path}{Fore.RESET}")
-        except (IOError, OSError) as e:
-            logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-            sys.exit(1)
+        backup_and_remove(output_path)
 
     print(f"\n{Fore.YELLOW}--- Loading Files ---")
 

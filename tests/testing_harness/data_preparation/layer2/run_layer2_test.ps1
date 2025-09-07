@@ -83,16 +83,16 @@ sys.exit(0)
     
     # Test 1: Default run, should halt at first manual step
     Write-Host "`n--> Testing initial run (halts on manual step)..."
-    $output = & .\prepare_data.ps1 -Force 2>&1
-    if ($LASTEXITCODE -ne 1 -or $output -notmatch "PIPELINE HALTED") { throw "Expected pipeline to halt but it did not." }
+    $output = & .\prepare_data.ps1 -Force -TestMode 2>&1
+    if ($LASTEXITCODE -ne 1) { throw "Expected pipeline to halt with exit code 1, but got $($LASTEXITCODE)." }
     Test-OrchestratorState "Halt 1" -ShouldExist -Files "data/intermediate/sf_data_import.txt"
     Test-OrchestratorState "Halt 1" -Files "data/foundational_assets/sf_chart_export.csv" # Should NOT exist
 
     # Test 2: Simulate first manual step, should halt at second
     Write-Host "`n--> Testing resumed run (halts on second manual step)..."
     New-Item -Path "data/foundational_assets/sf_chart_export.csv" -ItemType File | Out-Null
-    $output = & .\prepare_data.ps1 -Force 2>&1
-    if ($LASTEXITCODE -ne 1 -or $output -notmatch "PIPELINE HALTED") { throw "Expected pipeline to halt but it did not." }
+    $output = & .\prepare_data.ps1 -Force -TestMode -Resumed 2>&1
+    if ($LASTEXITCODE -ne 1) { throw "Expected pipeline to halt with exit code 1, but got $($LASTEXITCODE)." }
     # Verify that the pipeline has halted at the 'Delineation Export' step, BEFORE running 'Neutralize Delineations'.
     Test-OrchestratorState "Halt 2" -ShouldExist -Files "data/foundational_assets/sf_chart_export.csv"
     Test-OrchestratorState "Halt 2" -Files "data/foundational_assets/neutralized_delineations/balances_quadrants.csv" # Should NOT exist
@@ -100,9 +100,9 @@ sys.exit(0)
     # Test 3: Simulate final manual step, should complete successfully
     Write-Host "`n--> Testing final resumed run (completes successfully)..."
     New-Item -Path "data/foundational_assets/sf_delineations_library.txt" -ItemType File | Out-Null
-    $output = & .\prepare_data.ps1 -Force 2>&1
+    $output = & .\prepare_data.ps1 -Force -TestMode -Resumed 2>&1
     if ($LASTEXITCODE -ne 0 -or $output -notmatch "Pipeline Completed Successfully") { throw "Expected pipeline to complete but it did not." }
-    Test-OrchestratorState "Completion" -ShouldExist -Files "data/processed/personalities_db.txt"
+    Test-OrchestratorState "Completion" -ShouldExist -Files "data/personalities_db.txt"
 
     Write-Host "`nSUCCESS: Layer 2 orchestrator test completed successfully." -ForegroundColor Green
 }

@@ -86,7 +86,10 @@ param(
     [switch]$Resumed,
 
     [Parameter(Mandatory=$false)]
-    [switch]$SilentHalt
+    [switch]$SilentHalt,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$TestMode
 )
 
 # --- Define ANSI Color Codes ---
@@ -118,7 +121,7 @@ $PipelineSteps = @(
     @{ Stage="4. Profile Generation";    Name="Delineation Export";    Inputs=@("Solar Fire Software"); Output="data/foundational_assets/sf_delineations_library.txt"; Type="Manual"; Description="The pipeline is paused. Please perform the one-time Solar Fire delineation library export." },
     @{ Stage="4. Profile Generation";    Name="Neutralize Delineations";    Script="src/neutralize_delineations.py";    Inputs=@("data/foundational_assets/sf_delineations_library.txt"); Output="data/foundational_assets/neutralized_delineations/balances_quadrants.csv"; Type="Automated"; Description="Rewrites esoteric texts into neutral psychological descriptions using an LLM." },
     @{ Stage="4. Profile Generation";    Name="Create Subject Database";    Script="src/create_subject_db.py";          Inputs=@("data/foundational_assets/sf_chart_export.csv", "data/intermediate/adb_final_candidates.txt"); Output="data/processed/subject_db.csv";                  Type="Automated"; Description="Integrates chart data with the final subject list to create a master database." },
-    @{ Stage="4. Profile Generation";    Name="Generate Personalities DB";  Script="src/generate_personalities_db.py";  Inputs=@("data/processed/subject_db.csv", "data/foundational_assets/neutralized_delineations/"); Output="data/processed/personalities_db.txt";            Type="Automated"; Description="Assembles the final personalities database from subject data and the neutralized text library." }
+    @{ Stage="4. Profile Generation";    Name="Generate Personalities DB";  Script="src/generate_personalities_db.py";  Inputs=@("data/processed/subject_db.csv", "data/foundational_assets/neutralized_delineations/"); Output="data/personalities_db.txt";            Type="Automated"; Description="Assembles the final personalities database from subject data and the neutralized text library." }
 )
 
 # --- Helper Functions ---
@@ -171,6 +174,35 @@ function Get-ScriptDocstringSummary {
     }
 }
 
+function Backup-And-Remove {
+    param([string]$ItemPath)
+    if (-not (Test-Path $ItemPath)) { return }
+
+    try {
+        $item = Get-Item $ItemPath
+        $backupDir = Join-Path $ProjectRoot "data/backup"
+        New-Item -ItemType Directory -Path $backupDir -ErrorAction SilentlyContinue | Out-Null
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+
+        if ($item.PSIsContainer) {
+            $backupName = "$($item.Name)_$timestamp.zip"
+            $backupPath = Join-Path $backupDir $backupName
+            Compress-Archive -Path $item.FullName -DestinationPath $backupPath -ErrorAction Stop
+            Write-Host "Backed up directory '$($item.Name)' to '$($backupPath)'" -ForegroundColor Cyan
+            Remove-Item -Recurse -Force -Path $item.FullName
+        } else {
+            $backupName = "$($item.BaseName).$timestamp$($item.Extension).bak"
+            $backupPath = Join-Path $backupDir $backupName
+            Copy-Item -Path $item.FullName -Destination $backupPath
+            Write-Host "Backed up file '$($item.Name)' to '$($backupPath)'" -ForegroundColor Cyan
+            Remove-Item -Path $item.FullName
+        }
+    } catch {
+        Write-Host "ERROR: Failed to back up and remove '$($item.Name)'. Reason: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+}
+
 function Show-PipelineStatus {
     param([array]$Steps, [string]$BaseDirectory = ".")
     Format-Banner "Data Preparation Pipeline Status" $C_CYAN
@@ -195,7 +227,11 @@ $WorkingDirectory = $ProjectRoot
 $SandboxMode = $false
 
 # Check if we're running in a sandbox environment
-if ($env:PROJECT_SANDBOX_PATH -and (Test-Path $env:PROJECT_SANDBOX_PATH)) {
+if ($TestMode.IsPresent) {
+    $SandboxMode = $true
+    $WorkingDirectory = Get-Location # Layer 2 tests operate in a temp current dir
+}
+elseif ($env:PROJECT_SANDBOX_PATH -and (Test-Path $env:PROJECT_SANDBOX_PATH)) {
     Write-Host "${C_YELLOW}Sandbox mode detected. Operating in: $env:PROJECT_SANDBOX_PATH${C_RESET}"
     $WorkingDirectory = $env:PROJECT_SANDBOX_PATH
     $SandboxMode = $true
@@ -217,7 +253,38 @@ if ($SandboxMode) {
 }
 
 try {
+    $runCompletedSuccessfully = $false
     if (-not (Get-Command pdm -ErrorAction SilentlyContinue)) { throw "PDM not found. Please ensure PDM is installed and in your PATH." }
+
+    # Define the condition for a true "force overwrite" run.
+    # This is an interactive forced run, NOT an automated test run.
+    $isForceOverwriteMode = $Force.IsPresent -and -not $TestMode.IsPresent
+
+    # --- Pre-run Cleanup for --force flag ---
+    if ($isForceOverwriteMode) {
+        Write-Host "`n${C_YELLOW}WARNING: The -Force flag is active."
+        Write-Host "This will back up and delete all existing data artifacts to re-run the entire pipeline from scratch.${C_RESET}"
+        $confirm = Read-Host "Are you sure you want to proceed? (Y/N)"
+        if ($confirm.Trim().ToLower() -ne 'y') { throw "Operation cancelled by user." }
+
+        Write-Host "`n${C_YELLOW}Backing up and removing existing data files...${C_RESET}`n"
+        
+        # Special handling for neutralization directory, which contains multiple files
+        $neutralizationStep = $PipelineSteps | Where-Object { $_.Name -eq "Neutralize Delineations" }
+        if ($neutralizationStep) {
+            $repFile = Join-Path $WorkingDirectory $neutralizationStep.Output
+            $outputDir = Split-Path $repFile -Parent
+            Backup-And-Remove -ItemPath $outputDir
+        }
+        
+        # Handle all other individual files
+        foreach ($step in $PipelineSteps) {
+            if ($step.Name -ne "Neutralize Delineations") {
+                Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $step.Output)
+            }
+        }
+        Write-Host "" # Add a blank line for spacing
+    }
 
     $anyFileExists = $false
     if (-not $SandboxMode) {
@@ -235,47 +302,65 @@ try {
         if ($confirm.Trim().ToLower() -ne 'y') { throw "Operation cancelled by user." }
     }
 
-    $totalSteps = $PipelineSteps.Count; $stepCounter = 0; $lastStage = ""
+    # Determine the first step of each stage for clean banner logging
+    $firstStepNamesOfStages = ($PipelineSteps | Group-Object Stage | ForEach-Object { $_.Group[0].Name }) -as [string[]]
+
+    $totalSteps = $PipelineSteps.Count; $stepCounter = 0
     foreach ($step in $PipelineSteps) {
         $stepCounter++
-        
         $outputFile = Join-Path $WorkingDirectory $step.Output
-        if ($step.Stage -ne $lastStage) {
-            $lastStage = $step.Stage
-            # Don't print the banner for a new stage if its very first step's output already exists.
-            if (-not (Test-Path $outputFile)) {
-                Format-Banner "BEGIN STAGE: $($lastStage.ToUpper())" $C_CYAN
-            }
-        }
-
+        
+        # --- Determine if the step should be skipped ---
+        $isSkipped = $false
         if ($bypassScoring -and ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores")) {
-            # Only announce the bypass skip in a normal run, not a resumed test run.
             if (-not $Resumed.IsPresent) {
                 $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
-                Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
-                Write-Host $stepHeader -ForegroundColor Blue
-                Write-Host $step.Description -ForegroundColor Blue
-                Write-Host "`n${C_YELLOW}Bypass mode is active. Skipping step.${C_RESET}"
+                Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader -ForegroundColor Blue
+                Write-Host $step.Description -ForegroundColor Blue; Write-Host "`n${C_YELLOW}Bypass mode is active. Skipping step.${C_RESET}"
             }
-            continue
+            $isSkipped = $true
         }
-        $outputFile = Join-Path $WorkingDirectory $step.Output
-        if (Test-Path $outputFile) {
-            # In a resumed test run, skip silently to make the log appear continuous.
-            # In a normal run, provide a simple message.
+        if ((Test-Path $outputFile) -and -not $isForceOverwriteMode) {
             if (-not $Resumed.IsPresent) {
                 Write-Host "Output exists for step '$($step.Name)'. Skipping." -ForegroundColor Yellow
             }
-            continue
+            $isSkipped = $true
         }
-
-        # For manual steps, halt the pipeline *before* printing the header.
-        if ($step.Type -eq 'Manual') { throw $step.Description }
-
+        if ($isSkipped) { continue }
+        
+        # --- If we reach here, the step will be executed. ---
+        # Print the stage banner only if this is the very first step of the stage.
+        if ($step.Name -in $firstStepNamesOfStages) {
+            Format-Banner "BEGIN STAGE: $($step.Stage.ToUpper())" $C_CYAN
+        }
+        
+        # Print the detailed step header.
         $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
         Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
         Write-Host $stepHeader -ForegroundColor Blue
-        Write-Host $step.Description -ForegroundColor Blue
+        
+        $description = $step.Description
+        if ($TestMode.IsPresent -and $step.Type -eq 'Manual') {
+            if ($step.Name -eq "Solar Fire Processing") {
+                $description = "Simulating the manual Solar Fire import, calculation, and chart export process."
+            } elseif ($step.Name -eq "Delineation Export") {
+                $description = "Simulating the one-time Solar Fire delineation library export."
+            }
+        }
+        Write-Host $description -ForegroundColor Blue
+        
+        # For manual steps, halt the pipeline. The behavior differs for tests vs. users.
+        if ($step.Type -eq 'Manual') {
+            if ($TestMode.IsPresent) {
+                # In test mode, set the exit code and break the loop.
+                # The 'finally' block will handle the actual exit.
+                $exitCode = 1
+                break
+            } else {
+                # For an interactive user, throw an error to display the guided 'HALTED' message.
+                throw $step.Description
+            }
+        }
 
         # In interactive mode, fetch and display the detailed script summary
         if ($Interactive -and $step.Script) {
@@ -290,17 +375,24 @@ try {
         }
         Write-Host "`n  INPUTS:"; $Step.Inputs | ForEach-Object { Write-Host "    - $_" }; Write-Host "`n  OUTPUT:"; Write-Host "    - $($Step.Output)`n"
 
-        # Display step-specific warnings before the prompt
-        if ($Step.Name -eq "Fetch Raw ADB Data") {
-            Write-Host "${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take a significant amount of time to complete.${C_RESET}"
-        } elseif ($Step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
-            Write-Host "${C_YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.${C_RESET}"
+        # Display step-specific warnings before the prompt, but not in test mode.
+        if (-not $TestMode.IsPresent) {
+            if ($Step.Name -eq "Fetch Raw ADB Data") {
+                Write-Host "${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take a significant amount of time to complete.${C_RESET}"
+            } elseif ($Step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
+                Write-Host "${C_YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.${C_RESET}"
+            }
         }
 
         if ($Interactive) { Read-Host -Prompt "`n${C_YELLOW}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n" }
 
         $scriptPath = Join-Path $ProjectRoot $step.Script
-        $arguments = "run", "python", $scriptPath, "--force"
+        # Use python -u for unbuffered output to see progress bars in real-time
+        $arguments = "run", "python", "-u", $scriptPath
+        if ($Force.IsPresent) {
+            $arguments += "--force"
+        }
+
         if ($SandboxMode) {
             $arguments += "--sandbox-path", $WorkingDirectory
             # For neutralization step, bypass LLM in test mode
@@ -335,7 +427,11 @@ try {
         }
         if ($Interactive) { Write-Host ""; Read-Host -Prompt "`n${C_YELLOW}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n" }
     }
-    Format-Banner "Data Preparation Pipeline Completed Successfully" $C_GREEN
+    
+    # The run is only successful if the loop finishes and the exit code is still 0.
+    if ($exitCode -eq 0) {
+        $runCompletedSuccessfully = $true
+    }
 }
 catch {
     $errorMessage = ""
@@ -359,8 +455,12 @@ catch {
     $exitCode = 1
 }
 finally {
-    if (-not $NoFinalReport.IsPresent) {
-        Write-Host "`n${C_GRAY}--- Final Pipeline Status ---${C_RESET}"; Show-PipelineStatus -Steps $PipelineSteps -BaseDirectory $WorkingDirectory | Out-Null
+    # Only show the "Completed" banner and final status report if the entire pipeline finished successfully.
+    if ($runCompletedSuccessfully) {
+        Format-Banner "Data Preparation Pipeline Completed Successfully" $C_GREEN
+        if (-not $NoFinalReport.IsPresent) {
+            Write-Host "`n${C_YELLOW}--- Final Pipeline Status ---${C_RESET}"; Show-PipelineStatus -Steps $PipelineSteps -BaseDirectory $WorkingDirectory | Out-Null
+        }
     }
     exit $exitCode
 }

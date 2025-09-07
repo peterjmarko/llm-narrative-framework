@@ -70,6 +70,10 @@ from thefuzz import fuzz
 from tqdm import tqdm
 from urllib3.util.retry import Retry
 
+# Ensure the src directory is in the Python path for nested imports
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from utils.file_utils import backup_and_remove  # noqa: E402
+
 # Initialize colorama
 init(autoreset=True, strip=False)
 
@@ -590,34 +594,19 @@ def main():
         generate_summary_report(output_path)
         sys.exit(0)
 
-    def backup_and_overwrite(file_path: Path):
-        """Creates a backup of the file and then deletes the original."""
-        try:
-            backup_dir = Path(get_path('data/backup'))
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
-            shutil.copy2(file_path, backup_path)
-            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
-            print(f"{Fore.CYAN}Backed up existing report to: {display_backup_path}")
-            file_path.unlink()
-        except (IOError, OSError) as e:
-            logging.error(f"Failed to create backup or remove file: {e}")
-            sys.exit(1)
-            
     # --- Intelligent Startup Logic ---
     # Check for stale data first. If the input is newer, we must force a re-run.
     if not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the report. Stale data detected.")
-            print("Automatically forcing a re-run...")
+            print("Automatically forcing a re-run...{Fore.RESET}")
             args.force = True
 
     # If --force is active (either from the command line or stale data),
     # back up and delete the old report before loading the state.
     if args.force and output_path.exists():
         print(f"{Fore.YELLOW}\n--force is active. Backing up and removing existing report to ensure a clean run.{Fore.RESET}")
-        backup_and_overwrite(output_path)
+        backup_and_remove(output_path)
     
     # Now, load the current state. This will be a fresh start if --force was used.
     records_to_process, timed_out_ids, max_index_before, valid_before, processed_before, total_subjects = load_and_filter_input(input_path, output_path, args.force)

@@ -4,8 +4,13 @@ This document outlines planned development tasks and tracks known issues for the
 
 ## Completed Milestones
 
+List of completed tasks since v7.0.0.
+
+- [x] **Standardized File Backup/Removal Logic**
+  - A new shared utility module (`src/utils/file_utils.py`) was created to centralize file operations.
+  - All data preparation scripts were refactored to use a single `backup_and_remove` function, ensuring consistent, predictable behavior for the `--force` flag and stale data checks.
 - [x] **Data Preparation Pipeline Fully Tested**
-  - All four layers of testing (Core Algorithm, Unit, Orchestration, and Integration) for the data preparation pipeline are complete and passing, ensuring a robust and reliable data foundation for the main experiments.
+  - All four layers of testing (Core Algorithm, Unit, Orchestration, and Integration) for the data preparation pipeline are complete and passing. This includes a complete overhaul of the Layer 2 (Orchestration) test harness, which is now fully automated, non-interactive, and provides clean, context-aware logging, ensuring a robust and reliable data foundation for the main experiments.
 
 ## Tasks Prior to Publication
 
@@ -106,6 +111,10 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Improve Migration Workflow**
   - [ ] Optimize the `migrate` command to skip re-running API calls for replications that are already valid.
   - [ ] Clean up `migrate_experiment.ps1` log files by removing PowerShell transcript headers and footers.
+
+- [ ] **Refactor Data Pipeline Test Harness for Simplicity**
+  - [ ] Modify the main `prepare_data.ps1` orchestrator to include a `-TestMode` flag. This will consolidate the complex test setup logic (e.g., the targeted fetching for Step 1) directly into the production script, eliminating code duplication.
+  - [ ] Simplify the Layer 3 test harness scripts (`layer3_phase*.ps1`) to become simple wrappers that call `prepare_data.ps1` with the appropriate test-mode flags. This change will make the testing UI easier to maintain and ensure a consistent user experience between live runs and test runs.
 
 - [ ] **Enhance Interactive Test Harness with Step-Back Functionality**
   - [ ] Allow developers to step backward and forward through the guided tour for easier debugging and learning.

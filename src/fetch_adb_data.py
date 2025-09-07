@@ -501,7 +501,8 @@ def main():
         os.environ['PROJECT_SANDBOX_PATH'] = os.path.abspath(args.sandbox_path)
 
     # Now that the environment is set, we can safely load modules that depend on it.
-    from config_loader import load_env_vars
+    from config_loader import load_env_vars, PROJECT_ROOT
+    from utils.file_utils import backup_and_remove
     load_env_vars()
 
     start_date, end_date = None, None
@@ -520,30 +521,16 @@ def main():
     if not args.no_network_warning:
         print(f"\n{Fore.YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take a significant amount of time to complete.{Fore.RESET}")
     
-    def backup_and_overwrite(file_path: Path):
-        """Creates a backup of the file before overwriting."""
-        from config_loader import get_path
-        try:
-            backup_dir = Path(get_path('data/backup'))
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
-            shutil.copy2(file_path, backup_path)
-            logging.info(f"Created backup of existing file at: {backup_path}")
-        except (IOError, OSError) as e:
-            logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-            sys.exit(1)
-
     if output_path.exists():
         if args.force:
-            print(f"\n{Fore.YELLOW}--force flag detected. Overwriting existing output file...")
-            backup_and_overwrite(output_path)
+            print(f"\n{Fore.YELLOW}--force flag detected. Backing up and removing existing output file...{Fore.RESET}")
+            backup_and_remove(output_path)
         else:
             print(f"\n{Fore.YELLOW}WARNING: The exported data at '{output_path}' already exists.")
-            print(f"{Fore.YELLOW}If you decide to go ahead with fetching the data again, a backup of the the existing file will be created first.{Fore.RESET}")
+            print(f"{Fore.YELLOW}If you decide to go ahead with fetching the data again, a backup of the existing file will be created first.{Fore.RESET}")
             confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
             if confirm == 'y':
-                backup_and_overwrite(output_path)
+                backup_and_remove(output_path)
             else:
                 print(f"\n{Fore.YELLOW}Operation cancelled by user. No files were changed.{Fore.RESET}")
                 # Summarize the existing file before exiting

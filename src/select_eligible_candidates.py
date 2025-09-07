@@ -57,24 +57,15 @@ from colorama import Fore, init
 # Initialize colorama
 init(autoreset=True, strip=False)
 
+# Ensure the src directory is in the Python path for nested imports
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from utils.file_utils import backup_and_remove  # noqa: E402
+
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-def backup_and_overwrite(file_path: Path):
-    """Creates a backup of the file before overwriting."""
-    from config_loader import get_path, PROJECT_ROOT
-    try:
-        backup_dir = Path(get_path('data/backup'))
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
-        shutil.copy2(file_path, backup_path)
-        display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
-        print(f"\n{Fore.CYAN}Created backup of existing file at: {display_backup_path}{Fore.RESET}")
-    except (IOError, OSError) as e:
-        logging.error(f"{Fore.RED}Failed to create backup file: {e}")
-        sys.exit(1)
+# Removed the local backup_and_overwrite function in favor of the shared utility.
 
 def finalize_and_report(output_path: Path, new_count: int, was_interrupted: bool = False):
     """Generates the final summary and prints the status message."""
@@ -146,8 +137,8 @@ def main():
         validation_stale = os.path.exists(validation_path) and os.path.getmtime(validation_path) > output_mtime
         if input_stale or validation_stale:
             print(f"{Fore.YELLOW}\nInput file(s) are newer than the existing output. Stale data detected.")
-            print("Automatically re-running full selection process...")
-            backup_and_overwrite(output_path)
+            print("Automatically re-running full selection process...{Fore.RESET}")
+            backup_and_remove(output_path)
             args.force = True
 
     try:
@@ -201,7 +192,8 @@ def main():
         print(f"{Fore.YELLOW}If you decide to go ahead with updating the list of candidates, a backup of the the existing file will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
-            backup_and_overwrite(output_path)
+            print(f"{Fore.YELLOW}Backing up and removing existing output file...{Fore.RESET}")
+            backup_and_remove(output_path)
             args.force = True
         else:
             print(f"\n{Fore.YELLOW}Operation cancelled by user.\n")

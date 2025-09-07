@@ -117,24 +117,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format=f"{Fore.YELLOW}%(levelname)s:{Fore.RESET} %(message)s")
 
 
-def backup_and_overwrite(file_path: Path):
-    """Creates a backup of a file before deleting the original to allow a fresh start."""
-    from config_loader import get_path, PROJECT_ROOT
-    try:
-        backup_dir = Path(get_path('data/backup'))
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = backup_dir / f"{file_path.name}.{timestamp}.bak"
-        shutil.copy2(file_path, backup_path)
-        display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
-        print(f"\n{Fore.CYAN}Created backup of existing file at: {display_backup_path}{Fore.RESET}")
-        file_path.unlink()
-        display_path = os.path.relpath(file_path, PROJECT_ROOT)
-        print(f"\n{Fore.YELLOW}--- Starting Fresh Run ---{Fore.RESET}")
-        print(f"Removed existing file: {display_path}")
-    except (IOError, OSError) as e:
-        logging.error(f"{Fore.RED}Failed to create backup or remove file: {e}")
-        sys.exit(1)
+from utils.file_utils import backup_and_remove
 
 def load_processed_ids(filepath: Path) -> set:
     """
@@ -427,7 +410,7 @@ def main():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
             print("Automatically re-running full selection process...")
-            backup_and_overwrite(output_path)
+            backup_and_remove(output_path)
             args.force = True
 
     # --- Load Data and Determine Scope ---
@@ -453,7 +436,7 @@ def main():
         print(f"{Fore.YELLOW}If you decide to go ahead with recreating the eminence scores, a backup of the existing file will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
-            backup_and_overwrite(output_path)
+            backup_and_remove(output_path)
             args.force = True
             processed_ids = load_processed_ids(output_path)
             all_subjects = load_subjects_to_process(input_path, processed_ids)
@@ -462,7 +445,7 @@ def main():
             sys.exit(0)
     
     if args.force and output_path.exists():
-        backup_and_overwrite(output_path)
+        backup_and_remove(output_path)
         processed_ids = load_processed_ids(output_path)
         all_subjects = load_subjects_to_process(input_path, processed_ids)
 

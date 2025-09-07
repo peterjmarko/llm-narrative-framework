@@ -65,11 +65,16 @@ from urllib.parse import unquote, urljoin
 
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from colorama import Fore, init
 from requests.adapters import HTTPAdapter
 from thefuzz import fuzz
 from tqdm import tqdm
 from urllib3.util.retry import Retry
+
+# Ensure the src directory is in the Python path for nested imports
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from utils.file_utils import backup_and_remove  # noqa: E402
 
 # Initialize colorama
 init(autoreset=True, strip=False)
@@ -579,36 +584,20 @@ def main():
         logging.error("This usually indicates that ADB data fetching failed or returned corrupted data.")
         sys.exit(1)
 
-    def backup_and_overwrite(file_path: Path):
-        """Creates a backup of the file and then deletes the original."""
-        from config_loader import PROJECT_ROOT
-        try:
-            backup_dir = Path(get_path('data/backup'))
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"{file_path.stem}.{timestamp}{file_path.suffix}.bak"
-            shutil.copy2(file_path, backup_path)
-            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
-            print(f"{Fore.CYAN}Backed up existing file to: {display_backup_path}")
-            file_path.unlink()
-        except (IOError, OSError) as e:
-            logging.error(f"Failed to create backup or remove file: {e}")
-            sys.exit(1)
-
     with open(input_path, 'r', encoding='utf-8') as f:
         all_lines = f.readlines()[1:]
 
     # Handle --force flag first for non-interactive overwrite
     if args.force and output_path.exists():
-        print(f"{Fore.YELLOW}Forcing overwrite of existing output file...")
-        backup_and_overwrite(output_path)
+        print(f"{Fore.YELLOW}Forcing overwrite of existing output file...{Fore.RESET}")
+        backup_and_remove(output_path)
     
     # Automatically re-run if the raw input is newer than the links file
     elif not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}Input file '{input_path.name}' is newer than the existing links file.")
-            print("Stale data detected. Automatically re-running link finding...")
-            backup_and_overwrite(output_path)
+            print("Stale data detected. Automatically re-running link finding...{Fore.RESET}")
+            backup_and_remove(output_path)
             # Set force=True for the loader to ensure a full re-run
             args.force = True
     
@@ -647,8 +636,8 @@ def main():
         print(f"{Fore.YELLOW}If you decide to go ahead with finding links again, a backup of the existing file will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
-            print(f"{Fore.YELLOW}Forcing overwrite of existing output file...")
-            backup_and_overwrite(output_path)
+            print(f"{Fore.YELLOW}Forcing overwrite of existing output file...{Fore.RESET}")
+            backup_and_remove(output_path)
             # Re-initialize state for a full run
             processed_ids, links_found_before, max_index_before, timeouts_before = set(), 0, 0, 0
             lines_to_process = all_lines

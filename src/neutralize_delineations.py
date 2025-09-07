@@ -56,9 +56,11 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 # --- Config Loader ---
 try:
     from config_loader import APP_CONFIG, get_config_value
+    from utils.file_utils import backup_and_remove
 except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
     from config_loader import APP_CONFIG, get_config_value
+    from utils.file_utils import backup_and_remove
 
 
 # --- Prompt Template ---
@@ -301,15 +303,7 @@ def main():
             print(f"\n{Fore.YELLOW}WARNING: The --force flag is active. This will overwrite all neutralized delineations.")
             print(f"This process incurs API costs and can take 10+ minutes to complete.{Fore.RESET}")
 
-        try:
-            backup_dir = Path(get_path("data/backup")); backup_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_name = f"{output_dir.name}_{timestamp}.zip"
-            shutil.make_archive(str(backup_dir / backup_name.replace('.zip','')), 'zip', output_dir)
-            print(f"{Fore.CYAN}Successfully created backup at: {backup_dir / backup_name}{Fore.RESET}")
-            shutil.rmtree(output_dir)
-        except Exception as e:
-            logging.error(f"{Fore.RED}Failed to back up or remove directory: {e}"); sys.exit(1)
+        backup_and_remove(output_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     
