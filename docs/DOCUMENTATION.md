@@ -15,6 +15,69 @@ This document is the **Framework Manual** for the project. It provides a compreh
 
 This manual is intended for developers, contributors, and researchers who wish to understand the system's architecture or use the framework for several types of scientific validation, including **direct, methodological, and conceptual replication, as well as for new research**.
 
+- [Research Question](#research-question)
+- [A Note on Stimulus Generation and Experimental Design](#a-note-on-stimulus-generation-and-experimental-design)
+- [Data Preparation Pipeline](#data-preparation-pipeline)
+    - [The Automated Workflow](#the-automated-workflow)
+    - [Individual Script Details](#individual-script-details)
+      - [Stage 1: Data Sourcing](#stage-1-data-sourcing)
+      - [Stage 2: Candidate Qualification](#stage-2-candidate-qualification)
+      - [Stage 3: LLM-based Candidate Selection (Optional)](#stage-3-llm-based-candidate-selection-optional)
+      - [Stage 4: Profile Generation](#stage-4-profile-generation)
+  - [Data Preparation: Architecture](#data-preparation-architecture)
+  - [Data Preparation: Workflow](#data-preparation-workflow)
+  - [Data Preparation: Data Flow](#data-preparation-data-flow)
+  - [Data Preparation: Logic](#data-preparation-logic)
+- [Main Experiment & Analysis Pipeline](#main-experiment-analysis-pipeline)
+  - [Key Features](#key-features)
+  - [Visual Architecture of the Main Pipeline](#visual-architecture-of-the-main-pipeline)
+    - [Code Architecture Diagram](#code-architecture-diagram)
+    - [Workflow Diagrams](#workflow-diagrams)
+    - [Workflow 1: Create a New Experiment](#workflow-1-create-a-new-experiment)
+    - [Workflow 2: Audit an Experiment](#workflow-2-audit-an-experiment)
+      - [Interpreting the Audit Report](#interpreting-the-audit-report)
+    - [Workflow 3: Fixing or Updating an Experiment](#workflow-3-fixing-or-updating-an-experiment)
+    - [Workflow 4: Migrate Old Experiment Data](#workflow-4-migrate-old-experiment-data)
+    - [Workflow 5: Compile a Study](#workflow-5-compile-a-study)
+    - [Workflow 6: (Planned) Create a New Study](#workflow-6-planned-create-a-new-study)
+    - [Workflow 7: Audit a Study](#workflow-7-audit-a-study)
+    - [Workflow 8: Fix a Study](#workflow-8-fix-a-study)
+    - [Workflow 9: Migrate a Study](#workflow-9-migrate-a-study)
+    - [Data Flow Diagram](#data-flow-diagram)
+    - [Logic Flowcharts](#logic-flowcharts)
+- [Experimental Hierarchy](#experimental-hierarchy)
+- [Directory Structure](#directory-structure)
+- [Setup and Installation](#setup-and-installation)
+- [Configuration (`config.ini`)](#configuration-configini)
+    - [Model Selection Philosophy and Future Work](#model-selection-philosophy-and-future-work)
+  - [Analysis Settings (`[Analysis]`)](#analysis-settings-analysis)
+- [Known Issues and Future Work](#known-issues-and-future-work)
+- [Choosing the Right Workflow: Separation of Concerns](#choosing-the-right-workflow-separation-of-concerns)
+  - [For a Single Experiment](#for-a-single-experiment)
+  - [For an Entire Study](#for-an-entire-study)
+- [Core Workflows](#core-workflows)
+  - [Creating a New Experiment (`new_experiment.ps1`)](#creating-a-new-experiment-new_experimentps1)
+  - [Auditing an Experiment (`audit_experiment.ps1`)](#auditing-an-experiment-audit_experimentps1)
+  - [Fixing or Updating an Experiment (`fix_experiment.ps1`)](#fixing-or-updating-an-experiment-fix_experimentps1)
+  - [Migrating Old Experiment Data (`migrate_experiment.ps1`)](#migrating-old-experiment-data-migrate_experimentps1)
+  - [Auditing a Study (`audit_study.ps1`)](#auditing-a-study-audit_studyps1)
+  - [Fixing a Study (`fix_study.ps1`)](#fixing-a-study-fix_studyps1)
+  - [Migrating a Study (`migrate_study.ps1`)](#migrating-a-study-migrate_studyps1)
+  - [Compiling a Study (`compile_study.ps1`)](#compiling-a-study-compile_studyps1)
+- [Standardized Output](#standardized-output)
+  - [Replication Report Format](#replication-report-format)
+  - [Study Analysis Log Format](#study-analysis-log-format)
+- [Key Data Formats](#key-data-formats)
+  - [Primary Data Source](#primary-data-source)
+  - [Manual Process I/O](#manual-process-io)
+  - [Core Integrated & Final Databases](#core-integrated-final-databases)
+  - [Algorithm Configuration & Text Libraries](#algorithm-configuration-text-libraries)
+  - [Intermediate Data Artifacts](#intermediate-data-artifacts)
+- [Testing](#testing)
+  - [Automated CI Checks](#automated-ci-checks)
+  - [Running the Test Suite](#running-the-test-suite)
+  - [Code Coverage](#code-coverage)
+
 <div align="center">
   <p>Project Architecture: A high-level overview of the project's main functional components and their relationships.</p>
   <img src="images/arch_project_overview.png" width="75%">
@@ -39,6 +102,10 @@ To create a uniquely challenging test, we employed a multi-step, deterministic p
 4.  **Profile Generation:** A custom Python script (`generate_personalities_db.py`) then processed this celestial data. Using a `Neutralized Component Library` of pre-written sentences, the script deterministically assembled a unique personality narrative for each individual based on a validated algorithm.
     - The script's algorithm loads its core logic—point weights and balance thresholds—from external data files (`point_weights.csv`, `balance_thresholds.csv`). It uses these to calculate weighted scores for various astrological factors (elements, modes, quadrants, etc.) and classify them as 'strong' or 'weak' based on their prominence.
     - These classifications, along with simple placements, serve as keys to look up and combine the corresponding neutralized descriptions from the component library. **The script's algorithm has been rigorously validated against a ground-truth dataset generated by the source Solar Fire software, ensuring its output is bit-for-bit identical.**
+
+<div align="center">
+  <img src="images/flow_stimulus_generation.png" width="100%" caption="Figure SX: The four-stage process for generating the experimental stimuli.">
+</div>
 
 The result is a clean dataset of personality profiles where the connection to an individual's biographical profile is systematic but non-obvious.
 
@@ -101,12 +168,14 @@ This stage performs a rigorous, deterministic filtering pass on the raw data to 
 2.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name, and confirms their death date. The final output is the detailed `adb_validation_report.csv`.
 3.  **Final Filtering (`select_eligible_candidates.py`):** This script integrates the raw data with the Wikipedia validation report and applies the following additional criteria in order:
 
-    -   **Wikipedia Validation Status:** Only records with a `Status` of `OK` are kept, indicating that a valid English Wikipedia page was found where the subject's name and death date were confirmed.
-    -   **Entry Type:** Only records with an `EntryType` of `Person` are kept, filtering out non-person records such as `Research` entries for events or unnamed individuals.
-    -   **Birth Year Range:** The subject's birth year must be between 1900 and 1999, inclusive, to control for cohort-specific confounds by ensuring a relatively homogenous historical period.
-    -   **Hemisphere:** The subject's `Latitude` must contain the character 'N', ensuring only Northern Hemisphere births are included. This filter removes a small number of records (~5%) to control for the potential confounding variable of a 180-degree zodiacal shift for Southern Hemisphere births, which could introduce unnecessary noise to the dataset.
-    -   **Valid Time Format:** The birth time must be present and in a valid `HH:MM` format.
-    -   **Deduplication:** Duplicate entries are removed based on a combination of the subject's normalized name and their full birth date.
+| Criteria | Rule | Purpose |
+| :--- | :--- | :--- |
+| **Wikipedia Validation** | `Status` must be `OK` | Ensures a valid English Wikipedia page was found where the name and death date were confirmed. |
+| **Entry Type** | `EntryType` must be `Person` | Filters out non-person records (e.g., events, research entries). |
+| **Birth Year Range** | Must be between 1900-1999 | Controls for cohort-specific confounds by ensuring a homogenous historical period. |
+| **Hemisphere** | `Latitude` must contain 'N' | Controls for the potential confound of a zodiacal shift for Southern Hemisphere births. |
+| **Valid Time Format** | Birth time must be present and `HH:MM` | Ensures data is complete for precise calculations. |
+| **Deduplication** | Unique Name + Birth Date | Removes duplicate entries from the source database. |
     
     The final output of this stage is the `adb_eligible_candidates.txt` file.
 
@@ -297,11 +366,13 @@ The audit script is the primary diagnostic tool for identifying issues in a fail
 **Repairable Issues (Single Error)**
 If a replication run has **exactly one** identifiable problem, it is considered safe to repair in-place. The `Status` column will show a specific, targeted error code:
 
-*   **`INVALID_NAME`**: The run directory name is malformed.
-*   **`CONFIG_ISSUE`**: The `config.ini.archived` file is missing or has inconsistent parameters.
-*   **`QUERY_ISSUE`**: Core query files or manifests are missing.
-*   **`RESPONSE_ISSUE`**: One or more LLM response files are missing.
-*   **`ANALYSIS_ISSUE`**: All core data is present, but derivative analysis files or reports are missing/outdated.
+| Status Code | Description | Recommended Action |
+| :--- | :--- | :--- |
+| **`INVALID_NAME`** | The run directory name is malformed. | Run `fix_experiment.ps1` to repair. |
+| **`CONFIG_ISSUE`** | The `config.ini.archived` is missing or inconsistent. | Run `fix_experiment.ps1` to repair. |
+| **`QUERY_ISSUE`** | Core query files or manifests are missing. | Run `fix_experiment.ps1` to repair. |
+| **`RESPONSE_ISSUE`** | One or more LLM response files are missing. | Run `fix_experiment.ps1` to repair. |
+| **`ANALYSIS_ISSUE`** | Core data is present, but analysis files are missing/outdated. | Run `fix_experiment.ps1` to repair. |
 
 Any of these single-error states will result in an overall audit recommendation to run **`fix_experiment.ps1`**.
 
@@ -468,23 +539,19 @@ pdm run test
 
 The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results for guaranteed reproducibility.
 
-### Display Name Settings
-
--   **`[ModelDisplayNames]`**: Maps a model's API identifier to a friendly, human-readable name for plots and reports (e.g., `meta-llama/llama-3-70b-instruct = Llama 3 70B Instruct`).
--   **`[FactorDisplayNames]`**: Maps factor names to plot labels (e.g., `mapping_strategy = Mapping Strategy`).
--   **`[MetricDisplayNames]`**: Maps metric names to plot titles (e.g., `mean_mrr = Mean Reciprocal Rank (MRR)`).
-
-### Experiment Settings (`[Study]`)
-
--   **`num_replications`**: The number of times the experiment will be repeated (e.g., `30`).
--   **`mapping_strategy`**: A key experimental variable. Can be `correct` or `random`.
-
-### LLM Settings (`[LLM]`)
-
--   **`model_name`**: The API identifier for the LLM to be tested (e.g., from a provider like OpenRouter: `google/gemini-flash-1.5`).
--   **`temperature`**: Controls the randomness of the model's output. A lower value (e.g., `0.2`) makes the output more deterministic and focused, while a higher value (e.g., `0.8`) encourages more creative responses.
--   **`max_tokens`**: The maximum number of tokens the model is allowed to generate in its response. This acts as a safeguard against overly long or runaway outputs.
--   **`max_parallel_sessions`**: The maximum number of concurrent API calls to make. Increasing this can speed up experiments but may encounter API rate limits.
+| Section | Parameter | Description | Example Value |
+| :--- | :--- | :--- | :--- |
+| **`[Study]`** | `num_replications` | The number of times the experiment will be repeated (`r`). | `2` |
+| | `num_trials` | The number of trials for each replication (`m`). | `3` |
+| | `group_size` | The number of subjects in each group (`k`). | `4` |
+| | `mapping_strategy` | A key experimental variable; can be `correct` or `random`. | `correct` |
+| **`[LLM]`** | `model_name` | The API identifier for the LLM to be tested for the main experiment. | `google/gemini-flash-1.5` |
+| | `temperature` | Controls the randomness of the model's output (0-2). | `1` |
+| | `max_parallel_sessions` | The number of concurrent API calls to make. | `10` |
+| **`[Analysis]`** | `min_valid_response_threshold` | Minimum average valid responses for an experiment to be included in the final analysis. | `25` |
+| **`[DataGeneration]`** | `bypass_candidate_selection` | If `true`, skips LLM-based scoring and uses all eligible candidates. | `false` |
+| | `cutoff_search_start_point` | The cohort size at which to start searching for the variance curve plateau. | `3500` |
+| | `smoothing_window_size` | The window size for the moving average used to smooth the variance curve. | `800` |
 
 #### Model Selection Philosophy and Future Work
 The selection of models for this study was guided by a balance of performance, cost, speed, and technical compatibility with the automated framework. Several top-tier models were not included for one of the following reasons:

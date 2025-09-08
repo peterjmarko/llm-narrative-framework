@@ -77,6 +77,7 @@ try:
     import matplotlib.pyplot as plt
     import networkx as nx
     import pingouin as pg
+    from pingouin import multicomp
 except ImportError:
     logging.error("ERROR: Plotting libraries not found. Run: pip install seaborn matplotlib networkx pingouin")
     sys.exit(1)
@@ -260,6 +261,45 @@ def create_and_save_plot(df, metric_key, display_metric_name, factor, p_value, o
 
         plt.close(fig)
 
+def create_and_save_interaction_plot(df, metric_key, display_metric_name, factors, p_value, output_dir, factor_display_map, project_root):
+    """Creates and saves a line plot to visualize an interaction effect."""
+    fig = plt.figure(figsize=(12, 8))
+    ax = plt.gca()
+    
+    hue_factor, x_factor = factors[0], factors[1]
+    
+    sns.pointplot(data=df, x=x_factor, y=metric_key, hue=hue_factor, ax=ax, errorbar='se', capsize=0.1)
+    
+    p_value_str = format_p_value(p_value)
+    hue_display = factor_display_map.get(hue_factor, hue_factor.capitalize())
+    x_display = factor_display_map.get(x_factor, x_factor.capitalize())
+    
+    title = f'Interaction Effect on: {display_metric_name}\n({hue_display} * {x_display}, ANOVA {p_value_str})'
+    
+    ax.set_title(title, fontsize=16)
+    ax.set_xlabel(f'Factor: {x_display}', fontsize=12)
+    ax.set_ylabel(f'Mean {display_metric_name}', fontsize=12)
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    plt.tight_layout()
+    
+    plot_filename = f"interaction_plot_{factors[0]}_x_{factors[1]}_{metric_key}.png"
+    
+    # 1. Save to the anova results directory
+    boxplot_subdir = os.path.join(output_dir, 'boxplots') # Save in the main boxplots dir
+    full_plot_path = os.path.join(boxplot_subdir, plot_filename)
+    plt.savefig(full_plot_path)
+    logging.info(f"-> Interaction plot saved successfully to: {full_plot_path}")
+    
+    # 2. Copy the plot to the docs/images/boxplots directory
+    docs_images_dir = os.path.join(project_root, 'docs', 'images', 'boxplots')
+    os.makedirs(docs_images_dir, exist_ok=True)
+    dest_plot_path = os.path.join(docs_images_dir, plot_filename)
+    shutil.copy2(full_plot_path, dest_plot_path)
+    logging.info(f"-> Copied plot to: {dest_plot_path}")
+
+    plt.close(fig)
+
 def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized_to_display_map, metric_display_map, factor_display_map, project_root):
     """Performs a full statistical analysis for a single metric."""
     display_metric_name = metric_display_map.get(metric_key, metric_key)
@@ -311,7 +351,15 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
         ss_total = anova_table['sum_sq'].sum()
         anova_table['eta_sq'] = anova_table['sum_sq'] / ss_total
         
+        # Correct for multiple comparisons using Benjamini-Hochberg FDR
+        p_values = anova_table['PR(>F)'].dropna()
+        if not p_values.empty:
+            rejected, p_corrected = multicomp(p_values.tolist(), method='fdr_bh')
+            p_corr_series = pd.Series(p_corrected, index=p_values.index)
+            anova_table['p-corr'] = p_corr_series
+
         logging.info(f"\n--- ANOVA Summary for {display_metric_name} ---")
+        logging.info("NOTE: 'p-corr' column shows p-values corrected for multiple comparisons using the Benjamini-Hochberg FDR method.")
         logging.info(f"\n{anova_table.to_string(float_format='%.6f')}")
 
         # --- Bayesian Analysis for 'mapping_strategy' ---
@@ -390,11 +438,23 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
             logging.info("\nConclusion: No factors had a statistically significant effect on this metric.")
             
         logging.info("\n--- Generating Performance Plots ---")
+        logging.info("\n--- Generating Performance Plots ---")
+        # Plot main effects
         for factor in active_factors:
             key = f"C({factor})"
             p_val = anova_table.loc[key, 'PR(>F)'] if key in anova_table.index else float('nan')
             create_and_save_plot(df, metric_key, display_metric_name, factor, p_val, output_dir, factor_display_map, project_root)
             
+        # Plot significant interaction effects (for 2-way ANOVA)
+        if len(active_factors) == 2:
+            interaction_term = f"C({active_factors[0]}):C({active_factors[1]})"
+            if interaction_term in anova_table.index:
+                p_val = anova_table.loc[interaction_term, 'PR(>F)']
+                if p_val < 0.05:
+                    logging.info(f"\n--- Generating Interaction Plot for '{interaction_term}' ---")
+                    # Assuming the first factor is the hue and the second is the x-axis
+                    create_and_save_interaction_plot(df, metric_key, display_metric_name, active_factors, p_val, output_dir, factor_display_map, project_root)
+
     except Exception as e:
         logging.error(f"\nERROR: Could not perform analysis for metric '{display_metric_name}'. Reason: {e}")
 
@@ -515,7 +575,9 @@ def main():
     logging.info("3.  **Post-Hoc Testing:** When a factor has a significant effect (p < 0.05), a post-hoc")
     logging.info("    test (Tukey HSD or Games-Howell) is performed to identify which specific groups")
     logging.info("    (e.g., which models) are statistically different from one another.")
-    logging.info("4.  **Performance Grouping:** For the 'model' factor, post-hoc results are summarized into")
+    logging.info("4.  **Multiple Comparisons Correction:** A Benjamini-Hochberg (FDR) correction is applied to")
+    logging.info("    the ANOVA p-values to control the false discovery rate across all factors tested.")
+    logging.info("5.  **Performance Grouping:** For the 'model' factor, post-hoc results are summarized into")
     logging.info("    distinct performance tiers, where models in the same group are not statistically")
     logging.info("    different from each other.")
     logging.info("\nThe report is structured by metric. Each section includes descriptive statistics, the ANOVA")

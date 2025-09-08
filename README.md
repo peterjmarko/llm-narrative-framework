@@ -23,6 +23,8 @@ Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
 
 ## ✨ Key Features
 
+{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=85% | caption=Project Architecture: A high-level overview of the main functional components.}}
+
 -   **Automated Batch Execution**: Run hundreds of replications with intelligent self-healing to resume interrupted experiments.
 -   **Parallel LLM Sessions**: Maximizes throughput by running multiple LLM API calls concurrently, significantly speeding up data collection.
 -   **Guaranteed Reproducibility**: Automatically archives the `config.ini` file with every run, permanently linking results to the exact parameters that generated them.

@@ -114,8 +114,8 @@ def main():
     print(f"\n{Fore.YELLOW}--- Starting Cutoff Parameter Sensitivity Analysis ---")
 
     # --- Parameters to Test ---
-    start_points = [500, 750, 1000, 1250, 1500]
-    smoothing_windows = [100, 200, 300, 400, 500, 600, 700, 800]
+    start_points = [250, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4250, 4500, 4750, 5000]
+    smoothing_windows = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
     slope_threshold = get_config_value(APP_CONFIG, "DataGeneration", "slope_threshold", -0.00001, float)
 
     # --- Load Data ---
@@ -182,16 +182,90 @@ def main():
     results_df = pd.DataFrame(results)
     results_df.sort_values(by="Error", ascending=True, inplace=True)
     
-    print(f"\n\n{Fore.YELLOW}--- Parameter Analysis Results ---")
+    print(f"\n\n{Fore.YELLOW}--- Parameter Analysis Results (Full Grid Search) ---")
     print("The best parameters are those with the lowest 'Error' value.")
     print("This means the algorithm's result was closest to the geometrically ideal cutoff point.\n")
     print_centered_table(results_df)
+
+    # Save the results to a CSV file
+    report_path = Path(get_path("data/reports/cutoff_parameter_analysis_results.csv"))
+    try:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        results_df.to_csv(report_path, index=False)
+        print(f"\nAnalysis results saved to '{report_path}'.")
+    except Exception as e:
+        print(f"\n{Fore.RED}Error saving results to file: {e}")
     
     print(f"\n{Fore.YELLOW}--- Recommendation ---")
-    best_params = results_df.iloc[0]
-    print("Based on this analysis, the recommended parameters for config.ini are:")
-    print(f"{Fore.CYAN}  cutoff_search_start_point = {best_params['Start Point']}{Fore.RESET}")
-    print(f"{Fore.CYAN}  smoothing_window_size = {best_params['Smoothing Window']}{Fore.RESET}")
+    
+    # --- Stability-Based Algorithm: Find the most robust high-performer ---
+    error_threshold = 50
+    best_cluster_df = results_df[results_df['Error'] < error_threshold].copy()
+
+    if not best_cluster_df.empty:
+        # Get the unique values for start points and windows that were tested
+        unique_starts = sorted(results_df['Start Point'].unique())
+        unique_windows = sorted(results_df['Smoothing Window'].unique())
+
+        stability_scores = []
+        for index, row in best_cluster_df.iterrows():
+            current_start = row['Start Point']
+            current_window = row['Smoothing Window']
+            
+            # Find indices of neighbors in the parameter grid
+            start_idx = unique_starts.index(current_start)
+            window_idx = unique_windows.index(current_window)
+            
+            neighbor_errors = []
+            
+            # Check neighbor in each cardinal direction of the grid
+            if start_idx > 0: # Neighbor Up
+                neighbor_row = results_df[(results_df['Start Point'] == unique_starts[start_idx - 1]) & (results_df['Smoothing Window'] == current_window)]
+                if not neighbor_row.empty: neighbor_errors.append(neighbor_row['Error'].iloc[0])
+            if start_idx < len(unique_starts) - 1: # Neighbor Down
+                neighbor_row = results_df[(results_df['Start Point'] == unique_starts[start_idx + 1]) & (results_df['Smoothing Window'] == current_window)]
+                if not neighbor_row.empty: neighbor_errors.append(neighbor_row['Error'].iloc[0])
+            if window_idx > 0: # Neighbor Left
+                neighbor_row = results_df[(results_df['Start Point'] == current_start) & (results_df['Smoothing Window'] == unique_windows[window_idx - 1])]
+                if not neighbor_row.empty: neighbor_errors.append(neighbor_row['Error'].iloc[0])
+            if window_idx < len(unique_windows) - 1: # Neighbor Right
+                neighbor_row = results_df[(results_df['Start Point'] == current_start) & (results_df['Smoothing Window'] == unique_windows[window_idx + 1])]
+                if not neighbor_row.empty: neighbor_errors.append(neighbor_row['Error'].iloc[0])
+
+            # The stability score is the average error of its neighbors.
+            stability_score = np.mean(neighbor_errors) if neighbor_errors else np.inf
+            stability_scores.append(stability_score)
+
+        best_cluster_df['Stability'] = stability_scores
+        
+        # Sort by stability, then by original error as a tie-breaker.
+        best_cluster_df.sort_values(by=['Stability', 'Error'], ascending=[True, True], inplace=True)
+        
+        print(f"\n\n{Fore.YELLOW}--- Stability Analysis (Top Performers with Error < {error_threshold}) ---")
+        print("Showing the most stable results, sorted by neighbor error ('Stability') then self error.\n")
+        
+        # Format for printing
+        display_df = best_cluster_df.copy()
+        display_df['Stability'] = display_df['Stability'].map('{:.2f}'.format)
+        print_centered_table(display_df)
+
+        recommended_params = best_cluster_df.iloc[0]
+        recommended_start = int(recommended_params['Start Point'])
+        recommended_window = int(recommended_params['Smoothing Window'])
+
+        print("\nThe most robust parameters (center of the most stable, high-performing cluster) are:")
+        print(f"{Fore.CYAN}  cutoff_search_start_point = {recommended_start}{Fore.RESET}")
+        print(f"{Fore.CYAN}  smoothing_window_size = {recommended_window}{Fore.RESET}")
+        print("\nThese values are recommended as they are high-performing and surrounded by other")
+        print("high-performing parameters, indicating a stable and reliable choice.")
+
+    else:
+        # Fallback to the single best result if no cluster is found
+        best_params = results_df.iloc[0]
+        print("No high-performing cluster found. Recommending the single best result:")
+        print(f"{Fore.CYAN}  cutoff_search_start_point = {best_params['Start Point']}{Fore.RESET}")
+        print(f"{Fore.CYAN}  smoothing_window_size = {best_params['Smoothing Window']}{Fore.RESET}")
+
     print() # Add blank line
 
 

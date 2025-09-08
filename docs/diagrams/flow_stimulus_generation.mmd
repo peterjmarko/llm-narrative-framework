@@ -1,0 +1,30 @@
+graph TD
+    subgraph "Stage 1: Qualification"
+        A[Raw Subject Database] --> B(Deterministic Filtering) --> C[Eligible Candidates];
+    end
+
+    subgraph "Stage 2: Selection"
+        C --> D(LLM Eminence & OCEAN Scoring);
+        D --> E(Data-Driven Cutoff);
+        E --> F[Final Subject Pool];
+    end
+
+    subgraph "Stage 3: Manual Processing"
+        F --> G(Solar Fire Calculation) --> H[Celestial Data Export];
+    end
+
+    subgraph "Stage 4: Profile Generation"
+        H --> I(Deterministic Assembly);
+        I --> J[Final Personality Profiles];
+    end
+
+    style A fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
+    style C fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
+    style F fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
+    style H fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
+    style J fill:#D5E8D4,stroke:#82B366,stroke-width:2px
+    style B fill:#FFE6CC,stroke:#D79B00,stroke-width:2px
+    style D fill:#FFE6CC,stroke:#D79B00,stroke-width:2px
+    style E fill:#FFE6CC,stroke:#D79B00,stroke-width:2px
+    style G fill:#E1D5E7,stroke:#9673A6,stroke-width:2px
+    style I fill:#FFE6CC,stroke:#D79B00,stroke-width:2px

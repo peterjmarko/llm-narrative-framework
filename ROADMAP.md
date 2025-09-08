@@ -35,7 +35,7 @@ This document outlines planned development tasks and tracks known issues for the
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
 - [ ] **Update Test Suites for New Candidate Selection Logic**
-  - The logic for determining the final subject pool was moved from `generate_ocean_scores.py` to `select_final_candidates.py`. The following test updates are required to reflect this change:
+  The logic for determining the final subject pool was moved from `generate_ocean_scores.py` to `select_final_candidates.py`. The following test updates are required to reflect this change:
   - [ ] **Layer 1:** Simplify the `test_generate_ocean_scores.py` unit test, as the script is now much simpler.
   - [ ] **Layer 1:** Expand the `test_select_final_candidates.py` unit test to cover the new, critical variance-based cutoff logic.
   - [ ] **Layer 3:** Update the integration test with a larger, pre-generated seed file for `ocean_scores.csv` that is sufficient to trigger the cutoff logic and validate the new behavior.
@@ -60,9 +60,9 @@ This phase focuses on achieving a fully validated and stable codebase before the
 
 ### Final Validation and Data Generation
 
-- [ ] **Perform and Report Correction for Multiple Comparisons**
-  - [ ] Apply a Bonferroni or FDR (False Discovery Rate) correction to the final ANOVA results.
-  - [ ] Add a footnote or supplementary note to the article reporting the corrected p-values to demonstrate statistical rigor.
+- [x] **Perform and Report Correction for Multiple Comparisons**
+  - [x] Apply a Bonferroni or FDR (False Discovery Rate) correction to the final ANOVA results.
+  - [x] Add a footnote or supplementary note to the article reporting the corrected p-values to demonstrate statistical rigor.
 - [ ] **Execute Full End-to-End Study**
   - [ ] Run the complete data preparation pipeline (`prepare_data.ps1`) to generate a fresh, final dataset from live sources.
   - [ ] Conduct the full experimental study, varying all three core factors (model name, group size, mapping strategy) to produce the final results.
@@ -73,7 +73,18 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Update All Documents with Final Results**
   - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
   - [ ] Update all tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
-  - [ ] Perform a final review of all documents to ensure they are clean, consistent, and easy for an external researcher to understand.
+  - [ ] Replace the text placeholder in `article_main_text.md` with the final, generated interaction plot (`interaction_plot_mean_rank.png`).
+- [x] **Add Supporting Figures to Replication Guide**
+  - [x] Embed existing data flow diagrams at the start of the data preparation section.
+  - [x] Create and embed screenshots for the Solar Fire one-time setup process:
+    - [x] `sf_setup_1_displayed_points.png` (Displayed Points dialog)
+    - [x] `sf_setup_2_import_format.png` (Import Format dialog)
+    - [x] `sf_setup_3_export_format.png` (Export Format dialog)
+  - [x] Create and embed screenshots for the Solar Fire import/export workflow:
+    - [x] `sf_workflow_1_clear_charts.png` (Clear Charts dialog)
+    - [x] `sf_workflow_2_import_dialog.png` (Import dialog)
+    - [x] `sf_workflow_3_export_dialog.png` (Export dialog)
+- [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
 
 ## Online Presence & Final Review
 

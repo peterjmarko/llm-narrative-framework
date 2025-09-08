@@ -1,0 +1,11 @@
+graph TD
+    A["Raw ADB Query<br>(N = 10,619)"] --> B{"Stage 1: Deterministic Filtering<br>(Wikipedia Validation, Year Range, Hemisphere, etc.)"};
+    B --> C["Eligible Candidates<br>(N = 7,234)"];
+    C --> D{"Stage 2: LLM-based Selection<br>(Smoothed Slope Analysis of OCEAN Score Variance)"};
+    D --> E["Final Study Sample<br>(N = 4,954)"];
+
+    style A fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
+    style C fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
+    style E fill:#D5E8D4,stroke:#82B366,stroke-width:2px
+    style B fill:#FFE6CC,stroke:#D79B00,stroke-width:2px
+    style D fill:#FFE6CC,stroke:#D79B00,stroke-width:2px

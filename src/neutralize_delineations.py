@@ -408,7 +408,7 @@ def main():
         print(f"\n{Fore.GREEN}All delineation files are already up to date. Nothing to do. ✨{Fore.RESET}\n")
         sys.exit(0)
         
-    print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
+    print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs and could take an hour or more to complete.{Fore.RESET}")
 
     is_interactive = sys.stdout.isatty()
 

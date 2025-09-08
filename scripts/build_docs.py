@@ -23,13 +23,16 @@
 Builds all project documentation from source templates and diagrams.
 
 This script is the central engine for generating the project's documentation.
-It takes `docs/DOCUMENTATION.template.md` as its primary input, processes
-custom placeholders, renders diagrams, and outputs the final `DOCUMENTATION.md`
-and `.docx` files.
+It processes `.template.md` files, handling custom placeholders, rendering
+diagrams, and outputting final `.md` and `.docx` files for each template.
 
 Key Features:
 -   **Template Processing**: Parses `{{diagram:...}}`, `{{grouped_figure:...}}`,
-    and `{{include:...}}` placeholders within template files.
+    `{{include:...}}`, and `{{toc}}` placeholders within template files.
+
+-   **Automated Table of Contents**: Automatically generates and injects a
+    Table of Contents wherever a `{{toc}}` placeholder is found, ensuring it
+    is always synchronized with the document's headers.
 
 -   **Diagram Rendering**:
     -   Renders Mermaid (`.mmd`) diagrams to PNG using the local `mmdc` CLI.
@@ -48,10 +51,10 @@ Key Features:
     read-only verification to ensure documentation is up-to-date without
     modifying files, ideal for CI/CD pipelines.
 
--   **Dual-Syntax Generation**: To ensure compatibility with different renderers,
-    it generates two versions of the documentation content in memory:
-    1.  For `.md` viewers (GitHub, VS Code): Uses HTML tags for figures.
-    2.  For `.docx` conversion: Uses Pandoc-native figure syntax.
+-   **Dual-Syntax Generation**: Uses the `.template.md` file as a single source to generate
+    two different outputs for maximum compatibility:
+    1.  **For `.md` viewers**: An `.md` file with HTML figures for web rendering.
+    2.  **For `.docx` conversion**: In-memory content with Pandoc-native figure syntax for correct rendering in Word.
 
 -   **Resilient DOCX Conversion**: When converting to `.docx` via Pandoc, it
     includes a retry loop that waits for locked files (e.g., open in Word)
@@ -79,6 +82,7 @@ import sys
 import argparse
 import time
 import pathlib
+import unicodedata
 
 # Add the script's own directory ('src') to the Python path.
 # This ensures that sibling modules (like docx_postprocessor) can be imported
@@ -167,22 +171,28 @@ def render_text_diagram(source_path, output_path, project_root, font_size=36):
     image.save(output_path, "PNG")
     return True
 
-def check_diagrams_are_up_to_date(project_root):
+def check_diagrams_are_up_to_date(project_root, template_files):
     """
     Performs a read-only check to see if diagram images are up-to-date.
     Returns True if all diagrams are current, False otherwise.
     """
-    template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
-    try:
-        with open(template_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-    except FileNotFoundError:
-        print(f"{Colors.RED}ERROR: Template file not found at {template_path}{Colors.RESET}")
-        return False
+    content_to_scan = ""
+    for file_rel_path in template_files:
+        full_path = os.path.join(project_root, file_rel_path)
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content_to_scan += f.read() + "\n"
+        except FileNotFoundError:
+            print(f"    - {Colors.YELLOW}WARNING: Template file for diagram check not found: {full_path}{Colors.RESET}")
 
     all_up_to_date = True
-    for placeholder in re.finditer(r'\{\{diagram:(.*?)(?:\|(.*?))?\}\}', content):
-        diagram_source_rel_path = placeholder.group(1).strip()
+    # Regex to find any placeholder that points to a source file for a diagram/image.
+    placeholder_regex = r'\{\{(?:diagram|grouped_figure):(.+?)(?:\||\})'
+    for match in re.finditer(placeholder_regex, content_to_scan):
+        # The source path is the first part of the spec, before any '|'
+        diagram_spec = match.group(1).strip()
+        diagram_source_rel_path = diagram_spec.split('|')[0].strip()
+
         base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
         image_rel_path = os.path.join('docs', 'images', f"{base_name}.png")
         
@@ -206,10 +216,29 @@ def check_diagrams_are_up_to_date(project_root):
     
     return all_up_to_date
 
+def generate_toc(content):
+    """Generates a Markdown Table of Contents from the headers in the content."""
+    toc = []
+    headers = re.findall(r'^(##+)\s+(.*)', content, re.MULTILINE)
+    
+    for level_str, title in headers:
+        level = len(level_str) - 1 # h2 is level 1, h3 is level 2, etc.
+        indent = "  " * (level - 1)
+        
+        # Create a URL-friendly anchor link
+        slug = title.lower()
+        slug = unicodedata.normalize('NFKD', slug).encode('ascii', 'ignore').decode('ascii')
+        slug = re.sub(r'[^\w\s-]', '', slug).strip()
+        slug = re.sub(r'[\s]+', '-', slug)
+        
+        toc.append(f"{indent}- [{title}](#{slug})")
+        
+    return "\n".join(toc)
+
 def process_markdown_content(content, project_root, flavor='viewer'):
     """
     Processes a string of markdown content, replacing custom placeholders for
-    diagrams, figures, includes, and page breaks.
+    diagrams, figures, includes, page breaks, and table of contents.
     """
     # --- Helper for diagram-related paths ---
     def _get_diagram_paths(diagram_source_rel_path):
@@ -322,15 +351,18 @@ def process_markdown_content(content, project_root, flavor='viewer'):
 
     content = re.sub(r'\{\{pagebreak\}\}', replace_pagebreak_placeholder, content)
 
+    # --- Process {{toc}} placeholder ---
+    if '{{toc}}' in content:
+        toc_content = generate_toc(content)
+        content = content.replace('{{toc}}', toc_content, 1)
+
     return content
 
-def build_readme_content(project_root, flavor='viewer'):
+def build_doc_content(project_root, template_path_str, flavor='viewer'):
     """
-    Builds the full DOCUMENTATION.md content by processing the template.
-    This is a convenience wrapper around process_markdown_content.
+    Builds the content for a specific doc by processing its template.
     """
-    template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
-    with open(template_path, 'r', encoding='utf-8') as f:
+    with open(template_path_str, 'r', encoding='utf-8') as f:
         content = f.read()
     return process_markdown_content(content, project_root, flavor)
 
@@ -346,11 +378,14 @@ def render_all_diagrams(project_root, force_render=False, template_files=None):
     
     content_to_scan = ""
     for file_rel_path in template_files:
+        # Resolve the full path to handle files in the root vs. subdirectories correctly.
+        full_path = os.path.join(project_root, file_rel_path)
         try:
-            with open(os.path.join(project_root, file_rel_path), 'r', encoding='utf-8') as f:
+            with open(full_path, 'r', encoding='utf-8') as f:
                 content_to_scan += f.read() + "\n"
         except FileNotFoundError:
-            print(f"    - {Colors.YELLOW}WARNING: Template file for diagram scan not found: {file_rel_path}{Colors.RESET}")
+            # Print the full path that was attempted for clear debugging.
+            print(f"    - {Colors.YELLOW}WARNING: Template file for diagram scan not found: {full_path}{Colors.RESET}")
 
     content = content_to_scan
     images_dir = os.path.join(project_root, 'docs', 'images')
@@ -446,7 +481,9 @@ def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path=Non
 
     logical_source_name = os.path.basename(source_md_path) if source_md_path else os.path.basename(output_docx_path).replace('.docx', '.md')
     output_filename = os.path.basename(output_docx_path)
-    resource_path = os.path.dirname(source_md_path) if source_md_path else os.path.join(project_root, 'docs')
+    # The resource path should ALWAYS be the 'docs' directory, as that's where
+    # all processed images are centralized, regardless of where the source .md is.
+    resource_path = os.path.join(project_root, 'docs')
 
     print(f"    - Converting '{Colors.CYAN}{logical_source_name}{Colors.RESET}' to DOCX...")
     
@@ -516,28 +553,27 @@ def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path=Non
             return False
 
 
-def is_documentation_md_up_to_date(project_root):
-    """Checks if DOCUMENTATION.md is newer than its template and all included diagram images."""
-    readme_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
-    template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
-    
-    if not os.path.exists(readme_path) or not os.path.exists(template_path):
+def is_doc_up_to_date(project_root, final_md_path_str, template_path_str):
+    """Checks if a final .md file is newer than its template and all its generated diagram images."""
+    if not os.path.exists(final_md_path_str) or not os.path.exists(template_path_str):
         return False
     
     try:
-        readme_mtime = os.path.getmtime(readme_path)
-        if os.path.getmtime(template_path) > readme_mtime:
+        final_mtime = os.path.getmtime(final_md_path_str)
+        if os.path.getmtime(template_path_str) > final_mtime:
             return False
 
-        with open(template_path, 'r', encoding='utf-8') as f:
+        with open(template_path_str, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        diagram_regex = r'\{\{(?:diagram|grouped_figure):(.+?)\}\}'
-        for match in re.finditer(diagram_regex, content, re.DOTALL):
-            diagram_info = match.group(1).split('|')[0].strip()
-            base_name = os.path.splitext(os.path.basename(diagram_info))[0]
+        # Regex to find any placeholder that points to a source file for a diagram/image.
+        placeholder_regex = r'\{\{(?:diagram|grouped_figure):(.+?)(?:\||\})'
+        for match in re.finditer(placeholder_regex, content):
+            source_file_rel_path = match.group(1).strip()
+            base_name = os.path.splitext(os.path.basename(source_file_rel_path))[0]
             image_path = os.path.join(project_root, 'docs', 'images', f"{base_name}.png")
-            if os.path.exists(image_path) and os.path.getmtime(image_path) > readme_mtime:
+            
+            if os.path.exists(image_path) and os.path.getmtime(image_path) > final_mtime:
                 return False
         
         return True
@@ -560,24 +596,40 @@ def main():
     
     if args.check:
         print(f"{Colors.BOLD}{Colors.CYAN}--- Checking if documentation is up-to-date... ---{Colors.RESET}")
-        
-        diagrams_ok = check_diagrams_are_up_to_date(project_root)
-        
-        readme_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
-        expected_viewer_content = build_readme_content(project_root, flavor='viewer')
-        try:
-            with open(readme_path, 'r', encoding='utf-8') as f:
-                current_content = f.read()
-        except FileNotFoundError:
-            print(f"    - {Colors.RED}MISSING:{Colors.RESET} docs/DOCUMENTATION.md")
-            diagrams_ok = False
-            current_content = ""
 
-        content_ok = (current_content == expected_viewer_content)
-        if not content_ok and os.path.exists(readme_path):
-            print(f"    - {Colors.RED}OUTDATED:{Colors.RESET} docs/DOCUMENTATION.md content does not match template.")
+        docs_to_check = [
+            ('docs/DOCUMENTATION.template.md', 'docs/DOCUMENTATION.md'),
+            ('docs/article_supplementary_material.template.md', 'docs/article_supplementary_material.md')
+        ]
+        
+        # 1. Check diagrams from all templates
+        all_template_paths = [item[0] for item in docs_to_check]
+        diagrams_ok = check_diagrams_are_up_to_date(project_root, all_template_paths)
 
-        if diagrams_ok and content_ok:
+        # 2. Check content of final markdown files
+        all_content_ok = True
+        for template_rel_path, final_rel_path in docs_to_check:
+            template_path = os.path.join(project_root, template_rel_path)
+            final_path = os.path.join(project_root, final_rel_path)
+            
+            if not os.path.exists(template_path):
+                continue
+
+            expected_content = build_doc_content(project_root, template_path, flavor='viewer')
+            
+            try:
+                with open(final_path, 'r', encoding='utf-8') as f:
+                    current_content = f.read()
+            except FileNotFoundError:
+                print(f"    - {Colors.RED}MISSING:{Colors.RESET} {final_rel_path}")
+                all_content_ok = False
+                continue
+
+            if current_content != expected_content:
+                print(f"    - {Colors.RED}OUTDATED:{Colors.RESET} {final_rel_path} content does not match template.")
+                all_content_ok = False
+
+        if diagrams_ok and all_content_ok:
             print(f"{Colors.GREEN}Documentation is up-to-date.{Colors.RESET}")
             sys.exit(0)
         else:
@@ -587,53 +639,52 @@ def main():
     # Define which files have placeholders that might contain diagrams
     files_with_diagrams = [
         'docs/DOCUMENTATION.template.md',
-        'docs/article_main_text.md'
+        'docs/article_main_text.md',
+        'docs/article_supplementary_material.template.md' # Now a template in docs/
     ]
     if not render_all_diagrams(project_root, force_render=do_force_diagrams, template_files=files_with_diagrams):
         sys.exit(1)
 
-    print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Markdown for Viewers ---{Colors.RESET}")
-    readme_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
-    if not do_force_documents and is_documentation_md_up_to_date(project_root):
+    print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Final Markdown Files from Templates ---{Colors.RESET}")
+    
+    # --- 1. Build DOCUMENTATION.md ---
+    doc_template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
+    doc_final_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
+    if not do_force_documents and is_doc_up_to_date(project_root, doc_final_path, doc_template_path):
         print(f"    - Skipping {Colors.CYAN}DOCUMENTATION.md{Colors.RESET} build (up-to-date).")
     else:
-        viewer_content = build_readme_content(project_root, flavor='viewer')
-        with open(readme_path, 'w', encoding='utf-8') as f:
+        viewer_content = build_doc_content(project_root, doc_template_path, flavor='viewer')
+        with open(doc_final_path, 'w', encoding='utf-8') as f:
             f.write(viewer_content)
-        print(f"{Colors.GREEN}Successfully built DOCUMENTATION.md!{Colors.RESET}")
+        print(f"    - {Colors.GREEN}Successfully built DOCUMENTATION.md!{Colors.RESET}")
 
-    print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Content for DOCX Conversion ---{Colors.RESET}")
+    # --- 2. Build article_supplementary_material.md ---
+    supp_template_path = os.path.join(project_root, 'docs/article_supplementary_material.template.md')
+    supp_final_path = os.path.join(project_root, 'docs/article_supplementary_material.md')
+    if not do_force_documents and is_doc_up_to_date(project_root, supp_final_path, supp_template_path):
+         print(f"    - Skipping {Colors.CYAN}article_supplementary_material.md{Colors.RESET} build (up-to-date).")
+    else:
+        viewer_content = build_doc_content(project_root, supp_template_path, flavor='viewer')
+        with open(supp_final_path, 'w', encoding='utf-8') as f:
+            f.write(viewer_content)
+        print(f"    - {Colors.GREEN}Successfully built article_supplementary_material.md!{Colors.RESET}")
+
+    print(f"\n{Colors.BOLD}{Colors.CYAN}--- Converting all Markdown files to DOCX ---{Colors.RESET}")
     try:
         import pypandoc
         word_docs_dir = os.path.join(project_root, 'docs', 'word_docs')
         os.makedirs(word_docs_dir, exist_ok=True)
         
-        pandoc_content = build_readme_content(project_root, flavor='pandoc')
-        
-        # --- 1. Convert the main documentation (from in-memory content) ---
-        readme_docx_path = os.path.join(word_docs_dir, 'DOCUMENTATION.docx')
-        
-        should_build_main_doc = False
-        if do_force_documents or not os.path.exists(readme_docx_path):
-            should_build_main_doc = True
-        elif os.path.getmtime(readme_docx_path) < os.path.getmtime(readme_path):
-            should_build_main_doc = True
-
-        if should_build_main_doc:
-            if not convert_to_docx(pypandoc, readme_docx_path, project_root, source_md_content=pandoc_content):
-                sys.exit(1)
-        else:
-            print(f"    - Skipping DOCX conversion for {Colors.CYAN}DOCUMENTATION.docx{Colors.RESET} (up-to-date).")
-
-        # --- 2. Dynamically find and convert all other markdown files ---
-        print(f"\n{Colors.BOLD}{Colors.CYAN}--- Converting all other Markdown files to DOCX ---{Colors.RESET}")
-        
+        # List of final markdown files that were built from templates.
+        # These need special handling for DOCX conversion to use pandoc-flavored placeholders.
         files_needing_placeholders = {
-            os.path.join(project_root, 'docs', 'article_main_text.md'),
-            os.path.join(project_root, 'docs', 'article_supplementary_material.md'),
-            os.path.join(project_root, 'docs', 'article_cover_letter.md')
+            str(pathlib.Path(doc_final_path).resolve()),
+            str(pathlib.Path(supp_final_path).resolve()),
         }
         
+        # The logic has been simplified. We no longer need to process placeholders
+        # during the DOCX conversion step, as all templates have already been built.
+        # We just convert all final .md files.
         exclude_dirs = {'.git', '.venv', 'node_modules', 'docs/word_docs'}
         
         # Use a set comprehension to automatically handle duplicates
@@ -662,14 +713,26 @@ def main():
                 print(f"    - Skipping DOCX conversion for {Colors.CYAN}{output_filename}{Colors.RESET} (up-to-date).")
                 continue
             
-            # Determine if placeholders need processing for this specific file
-            process_placeholders = str(source_path) in files_needing_placeholders
+            # Determine if placeholders need processing by comparing resolved, absolute paths.
+            resolved_path_str = str(source_path.resolve())
+            process_placeholders = resolved_path_str in files_needing_placeholders
             content_to_convert = None
             path_to_convert = str(source_path)
             
             if process_placeholders:
-                with open(source_path, 'r', encoding='utf-8') as f:
-                    content_to_convert = process_markdown_content(f.read(), project_root, flavor='pandoc')
+                # To correctly generate pandoc-flavored markdown, we must read from the original template,
+                # not the already-processed markdown file.
+                template_path = pathlib.Path(str(source_path).replace('.md', '.template.md'))
+                if not template_path.exists():
+                    print(f"      {Colors.YELLOW}WARNING: Could not find template for {source_path.name}. DOCX figures may not render correctly.{Colors.RESET}")
+                    # Fallback to old behavior
+                    with open(source_path, 'r', encoding='utf-8') as f:
+                        content_to_convert = process_markdown_content(f.read(), project_root, flavor='pandoc')
+                else:
+                    # Correct behavior: process the template file with 'pandoc' flavor.
+                    with open(template_path, 'r', encoding='utf-8') as f:
+                        content_to_convert = process_markdown_content(f.read(), project_root, flavor='pandoc')
+
                 path_to_convert = None # Pass content instead of path
             
             if not convert_to_docx(pypandoc, output_path, project_root, 
@@ -677,7 +740,7 @@ def main():
                                    source_md_content=content_to_convert):
                 sys.exit(1)
         
-        print(f"\n{Colors.GREEN}{Colors.BOLD}All documents built successfully.{Colors.RESET}")
+        print(f"\n{Colors.GREEN}{Colors.BOLD}All documents built successfully.\n{Colors.RESET}")
 
     except ImportError:
         print(f"{Colors.YELLOW}--- DEPENDENCY WARNING: 'pypandoc' not found. Skipping DOCX generation. ---{Colors.RESET}")

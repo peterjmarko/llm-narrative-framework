@@ -9,25 +9,76 @@ This document is the **Replication Guide** that provides supplementary material 
 
 This guide defines the three primary replication paths (Direct, Methodological, and Conceptual) and provides a complete walkthrough of the end-to-end workflow, from initial setup and data preparation to running the main experiments and producing the final statistical analysis.
 
+  - [Models Used in the Original Study](#models-used-in-the-original-study)
+- [The Data Preparation Pipeline](#the-data-preparation-pipeline)
+  - [Stage 1: Data Sourcing](#stage-1-data-sourcing)
+  - [Stage 2: Candidate Qualification](#stage-2-candidate-qualification)
+    - [a. Finding Wikipedia Links (`find_wikipedia_links.py`)](#a-finding-wikipedia-links-find_wikipedia_linkspy)
+    - [b. Validating Wikipedia Pages (`validate_wikipedia_pages.py`)](#b-validating-wikipedia-pages-validate_wikipedia_pagespy)
+    - [c. Selecting Eligible Candidates (`select_eligible_candidates.py`)](#c-selecting-eligible-candidates-select_eligible_candidatespy)
+  - [Stage 3: LLM-based Candidate Selection (Optional)](#stage-3-llm-based-candidate-selection-optional)
+    - [a. Eminence Scoring (`generate_eminence_scores.py`)](#a-eminence-scoring-generate_eminence_scorespy)
+    - [b. OCEAN Scoring (`generate_ocean_scores.py`)](#b-ocean-scoring-generate_ocean_scorespy)
+    - [c. Selecting Final Candidates & Applying Cutoff (`select_final_candidates.py`)](#c-selecting-final-candidates-applying-cutoff-select_final_candidatespy)
+      - [d. A Note on Determining the Optimal Cutoff Parameters](#d-a-note-on-determining-the-optimal-cutoff-parameters)
+  - [Stage 4: Profile Generation](#stage-4-profile-generation)
+    - [a. Formatting for Import (`prepare_sf_import.py`)](#a-formatting-for-import-prepare_sf_importpy)
+- [Importing to and Exporting from Solar Fire](#importing-to-and-exporting-from-solar-fire)
+  - [One-Time Software Setup](#one-time-software-setup)
+    - [1. Configure Chart Points](#1-configure-chart-points)
+    - [2. Configure Preferences](#2-configure-preferences)
+    - [3. Define Data Formats](#3-define-data-formats)
+  - [Import/Export Workflow](#importexport-workflow)
+    - [Pre-flight Check: Clearing Existing Chart Data (For Re-runs)](#pre-flight-check-clearing-existing-chart-data-for-re-runs)
+    - [Step 1: Import Birth Data](#step-1-import-birth-data)
+    - [Step 2: Calculate All Charts](#step-2-calculate-all-charts)
+    - [Step 3: Export Chart Data](#step-3-export-chart-data)
+  - [Stage 4: Profile Generation](#stage-4-profile-generation)
+    - [a. Manual Solar Fire Processing](#a-manual-solar-fire-processing)
+    - [b. Automated Profile Assembly](#b-automated-profile-assembly)
+    - [c. Integrating Chart Data (`create_subject_db.py`)](#c-integrating-chart-data-create_subject_dbpy)
+    - [d. Assembling the Final Database (`generate_personalities_db.py`)](#d-assembling-the-final-database-generate_personalities_dbpy)
+- [Prerequisites](#prerequisites)
+- [Setup and Installation](#setup-and-installation)
+- [Configuration (`config.ini`)](#configuration-configini)
+- [The Main Experiment & Analysis Pipeline](#the-main-experiment-analysis-pipeline)
+  - [Step 1: Running a New Experiment](#step-1-running-a-new-experiment)
+  - [Step 2: Auditing and Fixing an Experiment](#step-2-auditing-and-fixing-an-experiment)
+  - [Step 3: Evaluating a Full Study](#step-3-evaluating-a-full-study)
+  - [Step 4: Scaling Up: The Study-Level Workflow](#step-4-scaling-up-the-study-level-workflow)
+- [Related Files](#related-files)
+
 ### Models Used in the Original Study
 
 For a direct or methodological replication, it is crucial to use the exact models and versions from the original study. All models were accessed via the **OpenRouter API**.
 
-*   **Eminence Scoring (LLM A):**
-    *   **Model:** OpenAI's GPT-5
-    *   **API Identifier:** `openai/gpt-5-chat`
-*   **OCEAN Scoring (LLM B):**
-    *   **Model:** Anthropic's Claude 4 Sonnet
-    *   **API Identifier:** `anthropic/claude-4-sonnet`
-*   **Neutralization (LLM C):**
-    *   **Model:** Google's Gemini 2.5 Pro
-    *   **API Identifier:** `google/gemini-2.5-pro`
-*   **Evaluation (LLM D):**
-    *   **Model:** Google's Gemini 1.5 Flash
-    *   **API Identifier:** `google/gemini-1.5-flash-001`
-    *   **Access Dates:** June 10, 2025 – July 21, 2025
+| Purpose | Model Name | API Identifier |
+| :--- | :--- | :--- |
+| Eminence Scoring (LLM A) | OpenAI's GPT-5 | `openai/gpt-5-chat` |
+| OCEAN Scoring (LLM B) | Anthropic's Claude 4 Sonnet | `anthropic/claude-4-sonnet` |
+| Neutralization (LLM C) | Google's Gemini 2.5 Pro | `google/gemini-2.5-pro` |
+| Evaluation (LLM D) | Google's Gemini 1.5 Flash | `google/gemini-1.5-flash-001` |
+
+*Access Dates for Evaluation LLM: June 10, 2025 – July 21, 2025*
 
 ## The Data Preparation Pipeline
+
+The data preparation pipeline is a fully automated, multi-stage workflow that transforms the raw data from the Astro-Databank into the final `personalities_db.txt` file used in the experiments. The overall flow of data artifacts is shown below.
+
+<div align="center">
+  <p>Figure S1: Data Prep Flow 1 - Data Sourcing and Candidate Qualification.</p>
+  <img src="images/flow_prep_1_qualification.png" width="70%">
+</div>
+
+<div align="center">
+  <p>Figure S2: Data Prep Flow 2 - LLM-based Candidate Selection.</p>
+  <img src="images/flow_prep_2_selection.png" width="80%">
+</div>
+
+<div align="center">
+  <p>Figure S3: Data Prep Flow 3 - Profile Generation.</p>
+  <img src="images/flow_prep_3_generation.png" width="100%">
+</div>
 
 This guide supports three distinct research paths.
 
@@ -103,6 +154,26 @@ This script performs the final selection. It takes the complete list of OCEAN sc
 pdm run select-final
 ```
 
+##### d. A Note on Determining the Optimal Cutoff Parameters
+To ensure the parameters for the final candidate selection algorithm were chosen objectively and were optimally tuned to the specific shape of the dataset's variance curve, a **systematic sensitivity analysis** was performed using the dedicated `scripts/analyze_cutoff_parameters.py` utility. The search space for the parameters was iteratively expanded to ensure a true global optimum was found.
+
+The script performed a grid search over a wide range of values for `cutoff_search_start_point` and `smoothing_window_size`. To avoid overfitting to a single "best" result, a sophisticated **stability-based recommendation algorithm** was used. This algorithm first identifies a cluster of high-performing parameter sets (those with a low error between the predicted and ideal cutoffs) and then calculates a "stability score" for each based on the average error of its neighbors in the parameter grid. The final recommendation is the parameter set with the best stability score, representing the center of the most stable, high-performing region.
+
+The final, expanded analysis revealed several key insights:
+*   **The Variance Curve Shape:** The cumulative variance curve has a distinct shape: a long, steep decline followed by a wide, shallow plateau containing long-wavelength, low-amplitude noise.
+*   **Justification for the Final Parameters:** A high `cutoff_search_start_point` (3500) was essential to force the analysis to begin *on the plateau*, isolating the region of interest. A large `smoothing_window_size` (800) was necessary to average out the long, shallow waves on the plateau, allowing the slope-based algorithm to detect the true global trend.
+
+Based on this comprehensive, data-driven analysis, the following optimal parameters were chosen and set in `config.ini`:
+*   `cutoff_search_start_point = 3500`
+*   `smoothing_window_size = 800`
+
+The plot of this analysis (see Figure S1) provides a clear visual justification for these choices. It shows how the algorithm, using these parameters, correctly identifies the start of the curve's final plateau, resulting in a final cutoff of 4,954 subjects.
+
+<div align="center">
+  <p>Figure S1: Variance Curve Analysis for Optimal Cohort Selection. The plot shows the raw cumulative variance, the smoothed curve (800-pt moving average), the search start point (3500), and the final data-driven cutoff (4954).</p>
+  <img src="images/variance_curve_analysis.png" >
+</div>
+
 ### Stage 4: Profile Generation
 
 This is the final stage, which assembles the personality profiles for the selected candidates.
@@ -139,6 +210,11 @@ You must define which astrological points are included in the calculations.
     2.  Edit this file to include exactly these 12 points: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, and Midheaven.
     3.  Save the file and ensure it is selected as the active set.
 
+<div align="center">
+  <p>Figure SX: The Solar Fire "Displayed Points" dialog configured with the 12 required chart points.</p>
+  <img src="images/sf_setup_1_displayed_points.png" width="60%">
+</div>
+
 #### 2. Configure Preferences
 
 Ensure the core calculation settings match the study's methodology.
@@ -163,6 +239,11 @@ You must define the data structure for both importing and exporting. Solar Fire 
     4.  Configure **'Fields in each record'** to contain exactly these 9 fields in this specific order: Name/Description, Date (String), Time (String), Zone Abbreviation, Zone Time (String), Place Name, Country/State Name, Latitude (String), Longitude (String).
     5.  Save the format as `CQD Import`.
 
+<div align="center">
+  <p>Figure SX: The Solar Fire "Edit ASCII Formats" dialog configured for the CQD Import format.</p>
+  <img src="images/sf_setup_2_import_format.png" width="80%">
+</div>
+
 **b. Define Export Format**
 *   **Menu:** `Chart > Export Charts as Text...`
 *   **Action:**
@@ -170,6 +251,11 @@ You must define the data structure for both importing and exporting. Solar Fire 
     2.  **This list is separate from the import list.** You must create another **new format definition**.
     3.  Repeat the exact same configuration as the import format, set it to `Comma Quote Delimited`, and add the same 9 fields in the same order.
     4.  Save the format as `CQD Export`. This ensures both workflows use an identical data structure.
+
+<div align="center">
+  <p>Figure SX: The Solar Fire "Export Chart Data" format dialog configured for the CQD Export format.</p>
+  <img src="images/sf_setup_3_export_format.png" width="80%">
+</div>
 
 ### Import/Export Workflow
 
@@ -180,11 +266,16 @@ If you are re-running the import process, you must first clear the existing char
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
-    1.  In the 'Chart Database' dialog, select your charts file (e.g., `adb_famous.sfcht`).
+    1.  In the 'Chart Database' dialog, select your charts file (e.g., `adb_candidates.sfcht`).
     2.  Click the **'All'** button to highlight every chart in the file.
     3.  Click the **'Delete...'** button, then select **'Selected Charts...'**.
     4.  A dialog will ask: "Do you wish to confirm the deletion of each chart individually?". Click **'No'** to delete all charts at once.
     5.  Click **'Cancel'** to close the 'Chart Database' dialog. The file is now empty and ready for a fresh import.
+
+<div align="center">
+  <p>Figure SX: The Solar Fire "Chart Database" dialog with all charts selected for deletion.</p>
+  <img src="images/sf_workflow_1_clear_charts.png" width="70%">
+</div>
 
 #### Step 1: Import Birth Data
 
@@ -192,16 +283,21 @@ If you are re-running the import process, you must first clear the existing char
 *   **Action:**
     1.  If a "Confirm" dialog appears immediately, click **'OK'**.
     2.  On the **'Import From' tab**, select `ASCII files` and choose `data/intermediate/sf_data_import.txt`.
-    3.  On the **'Save To' tab**, ensure your `adb_famous.sfcht` file is selected.
+    3.  On the **'Save To' tab**, ensure your `adb_candidates.sfcht` file is selected.
     4.  On the **'Options' tab**, select your `CQD Import` format.
     5.  Click the **'Convert'** button.
     6.  Once the import completes, click the **'Quit'** button to close the dialog.
+
+<div align="center">
+  <p>Figure SX: The Solar Fire "Chart Import/Export" dialog configured to import the prepared data.</p>
+  <img src="images/sf_workflow_2_import_dialog.png" width="85%">
+</div>
 
 #### Step 2: Calculate All Charts
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
-    1.  Select the charts file you just created (e.g., `adb_famous.sfcht`).
+    1.  Select the charts file you just created (e.g., `adb_candidates.sfcht`).
     2.  Click the **'All'** button to select all charts in the file.
     3.  Click the **'Open...'** button. This will calculate all charts and add them to the "Calculated Charts" list. The processing time will vary depending on the number of subjects (typically a few minutes for each set of 1,000 charts).
 
@@ -216,23 +312,22 @@ If you are re-running the import process, you must first clear the existing char
     3.  Under 'Select types of points', ensure **'Chart Points'** is selected.
     4.  For the ASCII format, select your custom `CQD Export` format.
     5.  Set 'Field Delimiters' to `Comma Quote (CQD)` and 'Destination' to `Export to File`.
-    6.  Browse to the `data/foundational_assets/` directory and set the filename to `sf_chart_export.csv`.
+    6.  Browse to the `data/foundational_assets/` directory, set the filename to `sf_chart_export.csv`, and click **Save**. Note: 'Save as type' cannot be set in this dialog.
     7.  **Warning:** Solar Fire will overwrite this file without confirmation. Click **'Export'**.
     8.  Once the export completes successfully, click the **'Quit'** button to close the dialog.
 
-The format of the exported file is as follows:
+<div align="center">
+  <p>Figure SX: The Solar Fire "Export Chart Data" dialog configured for the final chart data export.</p>
+  <img src="images/sf_workflow_3_export_dialog.png" width="75%">
+</div>
 
-```
-"<First_name Last_name>","<D MMMM YYYY>","<H:MM>","<Encoded_idADB>","<±H:MM>","<Place>","<State>","<DDvMM>","<DDDhMM>"
-"Body Name","Body Abbr","Longitude"
-...
-```
+The exported file consists of a repeating 14-line block for each subject. The structure of this block is detailed below:
 
-Each 14-line block contains the following for one person:
-
-*   **Line 1:** Name, date of birth, time of birth, the **Base58-encoded `idADB`** in the time zone field, time zone UTC offset, place, state, latitude with vertical (N/S) direction, longitude with horizontal (E/W) direction.
-*   **Line 2:** Header for the remaining lines.
-*   **Lines 3-14:** Chart point's name, point's abbreviation, point's zodiacal longitude (0.00-359.99 degrees)
+| Line(s) | Content/Fields | Description |
+| :--- | :--- | :--- |
+| 1 | `Name`, `Date`, `Time`, `ZoneAbbr`, `ZoneOffset`, `Place`, `State`, `Lat`, `Lon` | The subject's core birth data. The `idADB` is critically encoded into the `ZoneAbbr` field. |
+| 2 | `"Body Name","Body Abbr","Longitude"` | The literal header line for the planetary data that follows. |
+| 3-14 | `Point Name`, `Point Abbr`, `Zodiacal Longitude` | The data for each of the 12 chart points (Sun, Moon, ..., Midheaven). |
 
 The entire file consists of `N * 14` lines, where `N` is the final number of subjects.
 
@@ -247,8 +342,8 @@ The personality descriptions are assembled from a library of pre-written text co
 *   **Menu:** `Interps > Interpretation Files > Natal`
 *   **Action:**
     1.  Select `Standard.int` and click **'Edit'**.
-    2.  In the 'Interpretations Editor', go to `File > Decompile...` and save the file. This creates `standard.def` in the `Documents/Solar Fire User Files/Interpretations` directory.
-    3.  Copy this file to `data/foundational_assets/sf_delineations_library.txt`.
+    2.  In the 'Interpretations Editor', go to `File > Decompile...` and save the file. This creates `Standard.def` in the `Documents/Solar Fire User Files/Interpretations` directory.
+    3.  Copy this file to the `data/foundational_assets/` folder and rename it to `sf_delineations_library.txt`. Note: Filename extensions must be displayed for this rename.
 
 #### b. Automated Profile Assembly
 
@@ -413,167 +508,12 @@ Once you are familiar with managing individual experiments, the framework provid
 
 *   `country_codes.csv`
 
-    This file provides a mapping from the two- or three-letter country/state abbreviations used in the Astro-Databank to their full, standardized names.
+    This file provides a mapping from the country/state abbreviations used in the Astro-Databank to their full, standardized names. A sample is shown below. The complete file can be found at `data/foundational_assets/country_codes.csv`.
 
-    ```
-    "Abbreviation","Country"
-    "AB (CAN)","Canada"
-    "AK (US)","United States"
-    "AL (US)","United States"
-    "ALB","Albania"
-    "ALG","Algeria"
-    "AM","Armenia"
-    "AR (US)","United States"
-    "ARG","Argentina"
-    "ATG","Antigua and Barbuda"
-    "AUS","Austria"
-    "AUSTL","Australia"
-    "AZ (US)","United States"
-    "AZE","Azerbaijan"
-    "BC (CAN)","Canada"
-    "BEL","Belgium"
-    "BIH","Bosnia and Herzegovina"
-    "BLZ","Belize"
-    "BRAS","Brazil"
-    "BRU","Brunei"
-    "BULG","Bulgaria"
-    "BURMA","Myanmar"
-    "BY","Belarus"
-    "CA (US)","United States"
-    "CHILE","Chile"
-    "CHINA","China"
-    "CO (US)","United States"
-    "COL","Colombia"
-    "CR","Costa Rica"
-    "CT (US)","United States"
-    "CUBA","Cuba"
-    "CZ","Czech Republic"
-    "DC (US)","United States"
-    "DE (US)","United States"
-    "DEN","Denmark"
-    "DR","Dominican Republic"
-    "EGYPT","Egypt"
-    "ENG (UK)","United Kingdom"
-    "ETH","Ethiopia"
-    "FIN","Finland"
-    "FL (US)","United States"
-    "FR","France"
-    "FRGU","French Guiana (France)"
-    "FRPO","French Polynesia (France)"
-    "GA (US)","United States"
-    "GER","Germany"
-    "GHANA","Ghana"
-    "GRC","Greece"
-    "GUAD","Guadeloupe (France)"
-    "GUAT","Guatemala"
-    "GUY","Guyana"
-    "HI (US)","United States"
-    "HK","Hong Kong (China)"
-    "HRV","Croatia"
-    "HUN","Hungary"
-    "IA (US)","United States"
-    "ID (US)","United States"
-    "IL (US)","United States"
-    "IMAN (UK)","Isle of Man (Crown Dependency)"
-    "IN (US)","United States"
-    "INDIA","India"
-    "IRAN","Iran"
-    "IRE","Ireland"
-    "ISRL","Israel"
-    "ITALY","Italy"
-    "JAPAN","Japan"
-    "KOREA","South Korea"
-    "KS (US)","United States"
-    "KY (US)","United States"
-    "LA (US)","United States"
-    "LEB","Lebanon"
-    "LT","Lithuania"
-    "LUX","Luxembourg"
-    "MA (US)","United States"
-    "MADA","Madagascar"
-    "MART","Martinique (France)"
-    "MB (CAN)","Canada"
-    "MD (US)","United States"
-    "ME (US)","United States"
-    "MEX","Mexico"
-    "MI (US)","United States"
-    "MLYS","Malaysia"
-    "MN (US)","United States"
-    "MNE","Montenegro"
-    "MO (US)","United States"
-    "MONACO","Monaco"
-    "MOR","Morocco"
-    "MS (US)","United States"
-    "MT (US)","United States"
-    "NB (CAN)","Canada"
-    "NC (US)","United States"
-    "ND (US)","United States"
-    "NE (US)","United States"
-    "NETH","Netherlands"
-    "NF (CAN)","Canada"
-    "NH (US)","United States"
-    "NIC","Nicaragua"
-    "NIRE (UK)","United Kingdom"
-    "NJ (US)","United States"
-    "NM (US)","United States"
-    "NOR","Norway"
-    "NS (CAN)","Canada"
-    "NV (US)","United States"
-    "NY (US)","United States"
-    "NZ","New Zealand"
-    "OH (US)","United States"
-    "OK (US)","United States"
-    "ON (CAN)","Canada"
-    "OR (US)","United States"
-    "PA (US)","United States"
-    "PAK","Pakistan"
-    "PAN","Panama"
-    "PAPUA","Papua New Guinea"
-    "PAR","Paraguay"
-    "PERU","Peru"
-    "PHIL","Philippines"
-    "POL","Poland"
-    "PORT","Portugal"
-    "PR (US)","Puerto Rico (U.S. territory)"
-    "QU (CAN)","Canada"
-    "REU","Réunion (France)"
-    "RI (US)","United States"
-    "ROM","Romania"
-    "RU","Russia"
-    "S LEONE","Sierra Leone"
-    "SAFR","South Africa"
-    "SAUDI","Saudi Arabia"
-    "SC (US)","United States"
-    "SCOT (UK)","United Kingdom"
-    "SD (US)","United States"
-    "SEN","Senegal"
-    "SI","Slovenia"
-    "SK (CAN)","Canada"
-    "SPAIN","Spain"
-    "STVI","Saint Vincent and the Grenadines"
-    "SVK","Slovakia"
-    "SWED","Sweden"
-    "SWTZ","Switzerland"
-    "SYRIA","Syria"
-    "THAI","Thailand"
-    "TN (US)","United States"
-    "TONGA","Tonga"
-    "TUN","Tunisia"
-    "TUR","Turkiye"
-    "TX (US)","United States"
-    "UA","Ukraine"
-    "UR","Uruguay"
-    "UT (US)","United States"
-    "VA (US)","United States"
-    "VEN","Venezuela"
-    "VIET","Vietnam"
-    "VT (US)","United States"
-    "WA (US)","United States"
-    "WALES (UK)","United Kingdom"
-    "WI (US)","United States"
-    "WV (US)","United States"
-    "WY (US)","United States"
-    "YEMEN","Yemen"
-    "ZAIRE","Democratic Republic of the Congo"
-    "ZIM","Zimbabwe"
-    ```
+| Abbreviation | Country |
+| :--- | :--- |
+| `AB (CAN)` | Canada |
+| `AK (US)` | United States |
+| `ENG (UK)` | United Kingdom |
+| `FR` | France |
+| `GER` | Germany |

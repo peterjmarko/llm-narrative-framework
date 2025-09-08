@@ -10,18 +10,14 @@ This guide provides comprehensive setup instructions for developers. Following t
 
 Before cloning the project, ensure these essential tools are installed on your system.
 
-*   **Python**: Version 3.8 or higher. Download from [python.org](https://www.python.org/downloads/).
-*   **Git**: For version control. Download from [git-scm.com](https://git-scm.com/downloads).
-*   **Node.js and npm**: Required for building documentation. Download the **LTS** version from [nodejs.org](https://nodejs.org/en/download/).
-*   **Pandoc**: A universal document converter. Download from [pandoc.org](https://pandoc.org/installing.html).
-*   **PDM**: The Python dependency manager. Install it once globally with pip:
-    ```bash
-    pip install --user pdm
-    ```
-*   **Commitizen**: A tool for standardized commits and automated changelogs. Install it once globally with pip:
-    ```bash
-    pip install --user commitizen
-    ```
+| Tool | Purpose | Installation |
+| :--- | :--- | :--- |
+| **Python** | Core Language | Version 3.11+ from [python.org](https://www.python.org/downloads/) |
+| **Git** | Version Control | Download from [git-scm.com](https://git-scm.com/downloads) |
+| **Node.js** | Documentation Build | **LTS** version from [nodejs.org](https://nodejs.org/en/download/) |
+| **Pandoc** | Document Conversion | Download from [pandoc.org](https://pandoc.org/installing.html) |
+| **PDM** | Dependency Manager | `pip install --user pdm` |
+| **Commitizen** | Commit Standardization | `pip install --user commitizen` |
 
 ### Step 2: Clone and Set Up the Project
 
@@ -92,15 +88,15 @@ Detailed instructions for running the tour are available in the **[🧪 Testing 
 
 The `scripts/` directory contains helper utilities for development, maintenance, and building documentation. You generally do not need to run these directly, as many are called by PDM script shortcuts (e.g., `pdm run build-docs`, `pdm run release`).
 
-*   `build_docs.py`: Orchestrates the entire documentation build process.
-*   `changelog_hook.py`: A pre-commit hook for `commitizen` to ensure changelog entries are correctly formatted.
-*   `convert_py_to_txt.py`: Converts Python scripts into plain text files for embedding as diagrams in documentation.
-*   `docx_postprocessor.py`: A helper for `build_docs.py` that inserts page breaks into generated DOCX files.
-*   `finalize_release.py`: Automates the version bumping and changelog generation process.
-*   `generate_scope_report.py`: Generates a high-level summary of the project's file structure.
-*   `lint_docstrings.py`: Scans the codebase to enforce docstring standards.
-*   `lint_file_headers.py`: Scans the codebase to enforce file header and footer standards.
-*   `list_project_files.py`: Lists project files, typically for debugging or reporting.
+| Script | Description |
+| :--- | :--- |
+| `build_docs.py` | Orchestrates the entire documentation build process. |
+| `changelog_hook.py` | A pre-commit hook for `commitizen` to ensure changelog entries are correctly formatted. |
+| `docx_postprocessor.py` | A helper for `build_docs.py` that inserts page breaks into generated DOCX files. |
+| `finalize_release.py` | Automates the version bumping and changelog generation process. |
+| `generate_scope_report.py` | Generates a high-level summary of the project's file structure. |
+| `lint_docstrings.py` | Scans the codebase to enforce docstring standards. |
+| `lint_file_headers.py` | Scans the codebase to enforce file header and footer standards. |
 
 ## Code Quality and Style
 
@@ -187,24 +183,13 @@ The test suite is divided into two parts, one for the Python source code and one
     pdm run test
     ````
 
-*   **PowerShell Tests**: Due to specific environmental challenges with traditional PowerShell testing frameworks (like Pester's advanced features), a custom, bare-bones testing harness is used for the orchestration scripts. This ensures maximum compatibility and reliability.
+*   **PowerShell Tests**: The PowerShell orchestration scripts are tested using a custom, lightweight integration testing harness, not a traditional framework like Pester. This decision was made to ensure maximum reliability and compatibility across different environments, as Pester's advanced mocking and assertion features can introduce complexities that are not necessary for testing these simple wrapper scripts.
 
-    -   To test the study processing script (`process_study.ps1`):
-        ````bash
-        pdm run test-ps-stu
-        ````
-    -   To test the study audit script (`audit_study.ps1`):
-        ````bash
-        pdm run test-ps-aud-stu
-        ````
-    -   To test the data migration script (`migrate_experiment.ps1`):
-        ````bash
-        pdm run test-ps-mig
-        ````
-    -   To test the main experiment runner (`new_experiment.ps1`):
-        ````bash
-        pdm run test-ps-exp
-        ````
+| Command | Workflow Tested |
+| :--- | :--- |
+| `pdm run test-ps-exp` | Single Experiment Lifecycle (`new`, `audit`, `fix`, `migrate`) |
+| `pdm run test-ps-stu` | Study Processing (`compile_study.ps1`) |
+| `pdm run test-ps-aud-stu`| Study Auditing (`audit_study.ps1`) |
 
 #### How to Write a New Test (Best Practices)
 

@@ -2,6 +2,8 @@
 
 This document outlines the testing philosophy, procedures, and coverage strategy for the framework. It serves as a guide for developers and a record of the project's quality assurance standards.
 
+{{toc}}
+
 ## A Guide to Manual & Integration Testing
 
 This section provides a unified, step-by-step guide to the project's validation process. It begins with a standalone test for the **Core Algorithm Validation** to ensure the deterministic profile generation is bit-for-bit accurate. It then details the framework's multi-layered testing strategy, which is broken down into **seven distinct layers**, covering everything from individual script unit tests to full end-to-end integration tests of the entire data and experiment pipelines.
@@ -26,13 +28,15 @@ This is a standalone, push-button `pytest` script that provides a permanent, hig
 
 The framework is validated using a multi-layered strategy to ensure correctness at all levels:
 
-1.  **Layer 1: Unit Testing:** Validating the internal logic of individual Python scripts—or logical groups of scripts—through their dedicated unit tests.
-2.  **Layer 2: Data Pipeline Orchestration Testing:** Validating the `prepare_data.ps1` orchestrator's logic using mock scripts.
-3.  **Layer 3: Data Pipeline Integration Testing:** Validating the full data preparation pipeline (`Data Sourcing` -> `Candidate Qualification` -> `LLM-based Candidate Selection` -> `Profile Generation`) with a controlled seed dataset.
-4.  **Layer 4: Main Workflow Integration Testing:** Validating the core `new -> audit -> fix` experiment lifecycle for a single experiment.
-5.  **Layer 5: Migration Workflow Integration Testing:** Validating the `migrate_experiment.ps1` workflow for a single experiment.
-6.  **Layer 6: Post-Hoc Study Evaluation:** Validating the `compile_study.ps1` workflow for creating a study from pre-existing, independent experiments.
-7.  **Layer 7: New Study Generation and Lifecycle:** Validating the entire `new_study.ps1` lifecycle (`create -> audit -> break -> fix`) for a study generated from scratch.
+| Layer | Name | Scope | Purpose |
+| :--- | :--- | :--- | :--- |
+| **1** | Unit Testing | Individual Python Scripts | Validates the internal logic of each script in isolation. |
+| **2** | Orchestration Testing | Data Pipeline (`prepare_data.ps1`) | Validates the orchestrator's state machine logic using mock scripts. |
+| **3** | Integration Testing | Data Pipeline (End-to-End) | Validates the full, live data preparation pipeline with a seed dataset. |
+| **4** | Integration Testing | Main Experiment Workflow | Validates the core `new -> audit -> fix` lifecycle for a single experiment. |
+| **5** | Integration Testing | Migration Workflow | Validates the `migrate_experiment.ps1` workflow on a corrupted experiment. |
+| **6** | Integration Testing | Post-Hoc Study Evaluation | Validates the `compile_study.ps1` workflow on pre-existing experiments. |
+| **7** | Integration Testing | New Study Lifecycle | Validates the full `new_study.ps1` lifecycle from creation to repair. |
 
 ---
 
@@ -78,18 +82,29 @@ While the workflow above is typical for single-script development, the other lay
 This layer focuses on validating the internal logic of the Python scripts. The project uses `pytest` for unit tests, which are managed via PDM.
 
 #### Running Automated Tests
--   **Run all Python unit tests:**
-    ```bash
-    pdm run test
-    ```
--   **Run unit tests with a console coverage report:**
-    ```bash
-    pdm run cov
-    ```
--   **Run coverage for a specific test file by its full path:**
-    ```bash
-    pdm run cov-file tests/data_preparation/test_validate_wikipedia_pages.py
-    ```
+The project includes a suite of PDM scripts for running tests, defined in `pyproject.toml`. The most common commands are summarized below for quick reference.
+
+| Command | Description |
+| :--- | :--- |
+| **`pdm run test`** | **Primary Entry Point:** Runs all Python and PowerShell tests. |
+| **Code Coverage** | |
+| `pdm run cov` | Runs all tests with a console coverage report. |
+| `pdm run cov-html` | Runs all tests and generates a detailed HTML coverage report. |
+| `pdm run cov-file [path]` | Runs coverage for a single, specific test file. |
+| **Python Unit Tests** | |
+| `pdm run test-py-data-prep` | Runs all unit tests for the data preparation pipeline scripts. |
+| `pdm run test-py-exp` | Runs all unit tests for the main experiment pipeline scripts. |
+| `pdm run test-assembly` | Runs the standalone validation for the core profile assembly algorithm. |
+| **PowerShell Pester Tests** | |
+| `pdm run test-ps-all` | Runs all PowerShell Pester tests for all workflows. |
+| `pdm run test-ps-exp` | Runs all PowerShell tests for the single-experiment lifecycle. |
+| **Integration Tests (Layers)** | |
+| `pdm run test-l2` | Runs the **Layer 2** Orchestration test for `prepare_data.ps1`. |
+| `pdm run test-l3-default` | Runs the **Layer 3** Integration test for the data pipeline (default profile). |
+| `pdm run test-l3-bypass` | Runs the Layer 3 test with `bypass_candidate_selection` enabled. |
+| `pdm run test-l3-interactive` | Runs the Layer 3 test in interactive "guided tour" mode. |
+| `pdm run test-l4` | Runs the **Layer 4** Integration test for the main experiment lifecycle. |
+| `pdm run test-l5` | Runs the **Layer 5** Integration test for the migration workflow. |
 
 ### Layer 2: Data Pipeline Orchestration Testing (`prepare_data.ps1` with Mocks)
 

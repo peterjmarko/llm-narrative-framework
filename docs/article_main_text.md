@@ -5,7 +5,7 @@ date: "[Date]"
 abstract: |
   **Background:** Psychology has struggled to empirically validate complex, holistic systems that produce narrative-based claims. This methodological gap highlights the need for new, more rigorous, and transparent research paradigms.
   **Objective:** This paper introduces and validates a novel, fully automated, and open-source framework for testing for weak signals in complex narratives. Using astrology as a challenging case study, we demonstrate a reproducible method for assessing the construct validity of a symbolic system against biographical data.
-  **Methods:** A library of astrological descriptions was programmatically neutralized by a Large Language Model (LLM) to remove all esoteric terminology. A cohort of historically eminent individuals was sourced from a public database and subjected to a rigorous, multi-stage filtering process. This "eligible" cohort was then rank-ordered by an LLM-generated eminence score, and the final subject pool was determined by a data-driven cutoff based on the variance of their LLM-generated OCEAN scores. An independent LLM was then used as an impartial arbiter to perform a series of matching tasks, pairing biographies from a final pool of 6,000 individuals with their corresponding personality descriptions. All code, data, and materials are publicly available.
+  **Methods:** A library of astrological descriptions was programmatically neutralized by a Large Language Model (LLM) to remove all esoteric terminology. A cohort of 10,619 historically eminent individuals was sourced from a public database and subjected to a rigorous, multi-stage filtering process, yielding 7,234 "eligible" candidates. This cohort was then rank-ordered by an LLM-generated eminence score, and the final subject pool was determined by a data-driven cutoff based on the variance of their LLM-generated OCEAN scores. An independent LLM was then used as an impartial arbiter to perform a series of matching tasks, pairing biographies from a final pool of 4,954 individuals with their corresponding personality descriptions. All code, data, and materials are publicly available.
   **Results:** A two-way ANOVA revealed a statistically significant main effect for the matching condition, with the LLM's performance being higher for "correct" pairings than for "random" pairings (*F*(1, 348) = 6.27, *p* = .013, η² = .015), indicating the detection of a weak but non-random signal. A complementary Bayesian analysis provided anecdotal evidence for the same conclusion (BF₁₀ ≈ 1.61).
   **Conclusion:** This study's primary contribution is a new, open-science paradigm for psychological research. By demonstrating its utility on a difficult and controversial topic, we provide a robust, computationally reproducible, and scalable framework for future investigations into complex narrative systems.
 ---
@@ -26,7 +26,9 @@ The primary goal is to determine if a fully automated pipeline can serve as a se
 
 The framework is designed to support three distinct research paths. For **direct replication**, researchers can use the static data files and randomization seeds included in the project's public repository to ensure computational reproducibility of the original findings. For **methodological replication**, the framework's automated tools can be used to generate a fresh dataset from the live Astro-Databank (ADB) to test the robustness of the findings. Finally, for **conceptual replication**, researchers can modify the framework itself (e.g., by using a different LLM or analysis script) to extend the research.
 
-The final study sample was derived from a multi-stage data preparation pipeline. The first stage, **Data Sourcing**, involved an initial query of the Astro-Databank (ADB) which selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**.
+The final study sample was derived from a multi-stage data preparation pipeline, as illustrated in Figure 1. The first stage, **Data Sourcing**, involved an initial query of the Astro-Databank (ADB) which selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**.
+
+{{grouped_figure:docs/diagrams/flow_sample_derivation.mmd | scale=2.5 | width=60% | caption=Figure 1: Flowchart of the sample derivation process, showing the number of subjects retained at each stage of the data preparation pipeline.}}
 
 The second stage, **Candidate Qualification**, subjected this initial set to a more rigorous automated filtering pass. This pass applied several additional data quality rules, retaining only individuals who: had passed an automated validation against their English Wikipedia page; were classified as a `Person` and not a `Research` entry; had a birth year between 1900-1999 to minimize cohort-specific confounds (Ryder, 1965), a step which excluded only 0.6% of the raw dataset; had a validly formatted birth time; were not duplicates; and were born in the Northern Hemisphere, which excluded approximately 5% of the remaining records. This final filter was applied to control for the potential confounding variable of a 180-degree zodiacal shift for Southern Hemisphere births, a well-documented open question in astrology (Lewis, 1994). This multi-step process produced a clean cohort of "eligible candidates."
 
@@ -51,16 +53,20 @@ The lines marked with an asterisk (e.g., `*Moon in Aries`) are the unique identi
 
 ##### Profile Assembly
 
-For each of the 6,000 individuals in the study database, a foundational set of astrological placements was exported from Solar Fire. This structured data included the factors necessary to generate two reports: the "Balances" (Planetary Dominance) report, covering signs, elements, modes (qualities), quadrants, and hemispheres; and the "Chart Points" report, covering the sign placements of the 12 key chart points (Sun through Pluto, Ascendant, and Midheaven). The specific weighting and threshold settings used for the "Balances" report are detailed in the **Supplementary Materials** available in the project's online repository. This foundational set of factors was chosen deliberately to test for a primary, non-interactive signal while minimizing the confounding variables that could arise from more complex astrological techniques, such as planetary aspects or midpoints.
+For each of the 4,954 individuals in the final study database, a foundational set of astrological placements was exported from Solar Fire. This structured data included the factors necessary to generate two reports: the "Balances" (Planetary Dominance) report, covering signs, elements, modes (qualities), quadrants, and hemispheres; and the "Chart Points" report, covering the sign placements of the 12 key chart points (Sun through Pluto, Ascendant, and Midheaven). The specific weighting and threshold settings used for the "Balances" report are detailed in the **Supplementary Materials** available in the project's online repository. This foundational set of factors was chosen deliberately to test for a primary, non-interactive signal while minimizing the confounding variables that could arise from more complex astrological techniques, such as planetary aspects or midpoints.
 
 Each individual's complete personality profile was then programmatically assembled. Their specific set of astrological placements was used as a key to look up and concatenate the corresponding pre-neutralized description components from the validated master database. **The assembly algorithm itself was rigorously validated: using the original, non-neutralized delineations, it produced an output that was bit-for-bit identical to a ground-truth dataset generated by the source expert system.** This process resulted in a unique, composite personality profile for each individual, expressed in neutral language, which formed the basis of the stimuli used in the matching task.
 
 #### Experimental Design and Procedure
 
-The study employed a 2 x 6 factorial design. The independent variables were:
+The study employed a 2 x 6 factorial design, as detailed in Table 2.
 
-*   **`mapping_strategy`**: A between-groups factor with two levels: `correct` (descriptions were correctly paired with biographical profiles) and `random` (descriptions were randomly shuffled and paired).
-*   **`k` (Group Size)**: A within-groups factor representing the number of subjects to be matched in a given trial, with six levels: 4, 7, 10, 15, 20, and 30.
+*Table 2: Experimental Design*
+
+| Factor | Type | Levels |
+| :--- | :--- | :--- |
+| **`mapping_strategy`** | Between-Groups | 2 (`correct`, `random`) |
+| **`k` (Group Size)** | Within-Groups | 6 (`4`, `7`, `10`, `15`, `20`, `30`) |
 
 The core matching task was executed by **LLM D (Google's Gemini 1.5 Flash)**. For each trial, the LLM was provided with a group of `k` neutralized personality descriptions and a corresponding group of `k` names, with the presentation order of both lists randomly shuffled to control for any potential effects of item position on the LLM's evaluation. It was then tasked with independently sourcing the biographical information for each individual before performing the matching and producing a similarity score matrix based on a structured prompt.
 
@@ -84,13 +90,15 @@ In accordance with the principles of open science and computational reproducibil
 
 ### Results
 
-The analysis revealed statistically significant main effects for both `mapping_strategy` and `k` on the most critical performance metrics. The interaction effect (`mapping_strategy * k`) was found to be not statistically significant for the primary lift metrics (e.g., for MRR Lift, *F*(5, 348) = 1.13, *p* = .345). However, a significant interaction was observed for the raw performance metric `Mean Rank of Correct ID` (*F*(5, 348) = 2.72, *p* = .020), indicating that the magnitude of the difference in raw rank between the correct and random conditions varies with group size. Given our focus on chance-corrected lift metrics, the main effects are of primary interest.
+The analysis revealed statistically significant main effects for both `mapping_strategy` and `k` on the most critical performance metrics. The interaction effect (`mapping_strategy * k`) was found to be not statistically significant for the primary lift metrics (e.g., for MRR Lift, *F*(5, 348) = 1.13, *p* = .345). However, a significant interaction was observed for the raw performance metric `Mean Rank of Correct ID` (*F*(5, 348) = 2.72, *p* = .020), indicating that the magnitude of the difference in raw rank between the correct and random conditions varies with group size. Given our focus on chance-corrected lift metrics, the main effects are of primary interest. Figure 4 illustrates the interaction.
+
+*[Placeholder for Figure 4: Interaction plot for `Mean Rank of Correct ID`. This figure will be generated automatically by the final study analysis.]*
 
 #### Main Effect of `mapping_strategy`
 
 A statistically significant main effect of `mapping_strategy` was found for all key performance metrics, consistently showing that the LLM performed better in the `correct` condition than in the `random` condition. As detailed in Table 2, the effect sizes (η²) were small, confirming the subtle nature of the signal. The confidence intervals for η², while wide, do not include zero for the primary MRR Lift metric, reinforcing the statistical significance of the finding.
 
-*Table 2: ANOVA Results for the Main Effect of `mapping_strategy`*
+*Table 3: ANOVA Results for the Main Effect of `mapping_strategy`*
 
 | Dependent Variable | *F*(1, 348) | *p*-value | η² | 95% CI for η² |
 | :--- | :---: | :---: | :---: | :---: |
@@ -101,15 +109,15 @@ A statistically significant main effect of `mapping_strategy` was found for all 
 
 To provide a different perspective on this small effect, a Bayesian analysis was also conducted on the primary metric, MRR Lift. The resulting Bayes Factor (BF₁₀ ≈ 1.61) indicates that the experimental results are approximately 1.6 times more likely under the astrological hypothesis (that a signal exists) than under the null hypothesis. In line with conventional standards (Jeffreys, 1961), this provides "anecdotal" evidence for the astrological hypothesis, a nuance that complements the significant but borderline p-value from the frequentist analysis.
 
-*Figure 1* illustrates the difference in performance lift between the two mapping strategies, showing a small but consistent advantage for the `correct` condition.
+*Figure 2* illustrates the difference in performance lift between the two mapping strategies, showing a small but consistent advantage for the `correct` condition.
 
-{{grouped_figure:docs/images/boxplots/boxplot_mapping_strategy_mean_mrr_lift.png | caption=Figure 1: Comparison of MRR Lift (vs. Chance) between Correct and Random mapping strategies.}}
+{{grouped_figure:docs/images/boxplots/boxplot_mapping_strategy_mean_mrr_lift.png | caption=Figure 2: Comparison of MRR Lift (vs. Chance) between Correct and Random mapping strategies.}}
 
 #### Main Effect of Group Size (`k`)
 
 As hypothesized, `k` had a strong, statistically significant main effect on all lift metrics (*p* < .001 for all). Post-hoc tests confirmed that performance lift systematically decreased as `k` increased. This result is an expected property of matching tests; as the number of choices increases, the signal-to-noise ratio decreases, making the correct match harder to detect.
 
-{{grouped_figure:docs/images/boxplots/boxplot_k_mean_mrr_lift.png | caption=Figure 2: Comparison of MRR Lift (vs. Chance) across different group sizes (k).}}
+{{grouped_figure:docs/images/boxplots/boxplot_k_mean_mrr_lift.png | caption=Figure 3: Comparison of MRR Lift (vs. Chance) across different group sizes (k).}}
 
 #### Analysis of Presentation Order Bias
 
