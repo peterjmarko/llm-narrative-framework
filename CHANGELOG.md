@@ -1,5 +1,20 @@
 # Changelog
 
+## 9.1.0 (2025-09-08)
+
+### Bump
+
+- **version 9.0.0 → 9.1.0**
+
+### Features
+
+- **Finalize documentation build system and enhance analysis scripts**
+  This release represents a major push to finalize the project's documentation and build system, enhancing clarity, reproducibility, and professional presentation.
+  
+  The core of this effort was a complete architectural refactoring of the documentation build process. The system now uses a robust template-based architecture, where `.template.md` files are compiled into final `.md` and `.docx` documents. This new system supports automatically generated Tables of Contents and correctly handles the embedding of both Mermaid diagrams and static images. As part of this, the replication guide was renamed to `article_supplementary_material.template.md` to integrate it into this new workflow.
+  
+  In parallel, all key project documentsthe Framework Manual, Replication Guide, Testing Guide, and main articlewere systematically reviewed and improved with new tables and figures. The parameter analysis utility was also finalized, and the statistical rigor of the main analysis pipeline was improved with the addition of multiple comparison correction and automated generation of interaction plots.
+
 ## 9.0.0 (2025-09-07)
 
 ### Bump
