@@ -4,13 +4,29 @@ This document outlines planned development tasks and tracks known issues for the
 
 ## Completed Milestones
 
-List of completed tasks since v7.0.0.
+- [x] **Redesigned Final Candidate Selection Algorithm:**
+  - The original heuristic-based algorithm was replaced with a robust, multi-stage, data-driven approach involving smoothed slope analysis of the cumulative personality variance curve to find a scientifically optimal cohort size.
+  - A new standalone analysis script (`scripts/analyze_cutoff_parameters.py`) was created to perform a systematic sensitivity analysis, providing a data-driven recommendation for the optimal algorithm parameters.
+  - A `--plot` flag was added to `select_final_candidates.py` to generate a diagnostic plot of the variance curve analysis, making the algorithm's decision-making process fully transparent.
+
+- [x] **Hardened Data Preparation Pipeline:**
+  - The `prepare_data.ps1` orchestrator was made significantly more intelligent. It now parses summary file content to robustly resume partially completed steps (e.g., Eminence and OCEAN scoring).
+  - Both scoring scripts (`generate_eminence_scores.py`, `generate_ocean_scores.py`) now automatically regenerate their summary reports if run when data is complete, replacing confusing interactive prompts.
+  - Added duplicate prevention logic to both scoring scripts to filter out redundant records returned by the LLM, ensuring data integrity.
+  - The pipeline status report now has a more granular `[INCOMPLETE]` state for partially finished scoring runs.
+
+- [x] **Improved User Experience and Reporting:**
+  - Implemented `tqdm` progress bars in all long-running data preparation scripts for clean, real-time feedback.
+  - The "PIPELINE HALTED" banner now uses a more readable dark orange color for non-error halts.
+  - Standardized all summary report locations to `data/reports/`.
+  - The `generate_eminence_scores.py` script now creates a `missing_eminence_scores.txt` report to easily identify data gaps.
 
 - [x] **Standardized File Backup/Removal Logic**
   - A new shared utility module (`src/utils/file_utils.py`) was created to centralize file operations.
-  - All data preparation scripts were refactored to use a single `backup_and_remove` function, ensuring consistent, predictable behavior for the `--force` flag and stale data checks.
+  - All data preparation scripts were refactored to use a single `backup_and_remove` function, ensuring consistent behavior.
+
 - [x] **Data Preparation Pipeline Fully Tested**
-  - All four layers of testing (Core Algorithm, Unit, Orchestration, and Integration) for the data preparation pipeline are complete and passing. This includes a complete overhaul of the Layer 2 (Orchestration) test harness, which is now fully automated, non-interactive, and provides clean, context-aware logging, ensuring a robust and reliable data foundation for the main experiments.
+  - All layers of testing for the data preparation pipeline are complete and passing, including a fully automated Layer 2 (Orchestration) test harness, ensuring a robust and reliable data foundation for the main experiments.
 
 ## Tasks Prior to Publication
 

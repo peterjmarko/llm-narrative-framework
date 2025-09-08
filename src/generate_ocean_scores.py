@@ -381,6 +381,7 @@ def main():
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file, starting from scratch.")
     parser.add_argument("--no-summary", action="store_true", help="Suppress the final summary report output.")
     parser.add_argument("--no-api-warning", action="store_true", help="Suppress the API cost warning.")
+    parser.add_argument("--regenerate-summary", action="store_true", help="Regenerate the summary report from existing data without making API calls.")
     args = parser.parse_args()
 
     # If a sandbox path is provided, set the environment variable.
@@ -424,6 +425,23 @@ def main():
     temp_config_file = temp_dir / "temp_config.ini"
 
     print(f"\n{Fore.YELLOW}--- Starting OCEAN Score Generation ---{Fore.RESET}")
+    
+    # --- Handle Summary Regeneration Mode ---
+    if args.regenerate_summary:
+        print("\nRegenerating summary report from existing data...")
+        if not output_path.exists():
+            logging.error(f"Cannot regenerate summary: The output file '{output_path}' does not exist.")
+            sys.exit(1)
+        
+        try:
+            total_subjects_overall = len(pd.read_csv(input_path))
+        except (FileNotFoundError, pd.errors.EmptyDataError):
+            logging.warning(f"Could not read input file '{input_path}' to get total count. Using count from output file.")
+            total_subjects_overall = len(pd.read_csv(output_path))
+            
+        generate_summary_report(output_path, total_subjects_overall)
+        print(f"\n{Fore.GREEN}Summary regeneration complete.{Fore.RESET}\n")
+        sys.exit(0)
 
     # --- Intelligent Startup Logic (Stale Check) ---
     if not args.force and output_path.exists() and input_path.exists():
@@ -470,24 +488,12 @@ def main():
 
     # If not bypassing, check if the file is already up-to-date.
     elif not subjects_to_process and not args.force:
-        print(f"\n{Fore.YELLOW}WARNING: The scores file at '{output_path}' is already up to date. ✨")
-        print(f"{Fore.YELLOW}The update process incurs API costs and can take some time to complete.")
-        print(f"{Fore.YELLOW}If you decide to go ahead with recreating OCEAN scores, a backup of the existing file will be created first.{Fore.RESET}")
-        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
-        if confirm == 'y':
-            print(f"{Fore.YELLOW}Backing up and removing existing output files...{Fore.RESET}")
-            backup_and_overwrite_related_files(output_path)
-            args.force = True
-            # Re-load after backup to ensure we process everything
-            processed_ids = load_processed_ids(output_path)
-            subjects_to_process = load_subjects_to_process(input_path, processed_ids)
-            # CRITICAL FIX: Reset the in-memory DataFrame after deleting the file
-            all_scores_df = pd.DataFrame()
-        else:
-            print(f"\n{Fore.YELLOW}Operation cancelled by user.\n")
-            sys.exit(0)
+        print(f"\n{Fore.YELLOW}Scores file at '{output_path.name}' is already up to date. ✨")
+        print("Regenerating summary report...")
+        total_possible_subjects = len(processed_ids)
+        generate_summary_report(output_path, total_possible_subjects)
+        sys.exit(0)
 
-    # Correctly calculate the total to process *after* the interactive prompt has run
     total_to_process = len(subjects_to_process)
     total_possible_subjects = len(processed_ids) + total_to_process
     bypass_candidate_selection = get_config_value(APP_CONFIG, "DataGeneration", "bypass_candidate_selection", "false").lower() == 'true'
@@ -555,7 +561,24 @@ def main():
                     tqdm.write(f"{Fore.RED}Failed to parse any scores from response for batch {session_batch_num}.")
                     continue
                 
-                # Reconcile and save
+                # --- Validate and Enrich Response ---
+                # 1. Ensure we only process scores for subjects that were actually requested in this batch.
+                sent_ids = {str(s['idADB']) for s in batch}
+                parsed_scores = [p for p in parsed_scores if str(p.get('idADB')) in sent_ids]
+
+                # 2. Filter out any duplicates that may have already been processed in this run.
+                existing_ids_in_run = set(all_scores_df['idADB'].astype(str))
+                original_count = len(parsed_scores)
+                parsed_scores = [s for s in parsed_scores if str(s.get('idADB')) not in existing_ids_in_run]
+                
+                if len(parsed_scores) < original_count:
+                    num_dupes = original_count - len(parsed_scores)
+                    tqdm.write(f"{Fore.YELLOW}Warning: Skipped {num_dupes} duplicate subject(s) already processed in this run.")
+
+                if not parsed_scores:
+                    tqdm.write(f"{Fore.RED}Error: No valid scores remained after validation for batch {batch_num}.")
+                    continue
+
                 id_to_birth_year = {str(s["idADB"]): s["BirthYear"] for s in batch}
                 start_index = len(all_scores_df) + 1
                 for idx, score_dict in enumerate(parsed_scores):
@@ -586,7 +609,11 @@ def main():
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
 
-        total_possible_subjects = len(load_subjects_to_process(input_path, set())) + len(processed_ids)
+        # Correctly calculate the total number of subjects from the single source of truth.
+        try:
+            total_possible_subjects = len(pd.read_csv(input_path))
+        except Exception:
+            total_possible_subjects = len(subjects_to_process) + len(processed_ids) # Fallback
 
         # Always generate reports. They will reflect the final state of the CSV file.
         if not args.no_summary:

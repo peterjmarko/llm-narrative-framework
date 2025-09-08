@@ -57,8 +57,10 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 from colorama import Fore, init
-from collections import deque
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 # Ensure the src directory is in the Python path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -83,6 +85,34 @@ def calculate_average_variance(df: pd.DataFrame) -> float:
     return df[ocean_cols].var().mean()
 
 
+def generate_variance_plot(x_values, raw_variances, smoothed_variances, cutoff_point, search_start, output_path):
+    """Generates and saves a diagnostic plot of the variance curve analysis."""
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.figure(figsize=(12, 7))
+
+    plt.plot(x_values, raw_variances, color='lightblue', alpha=0.7, label='Raw Cumulative Variance')
+    plt.plot(x_values, smoothed_variances, color='blue', linewidth=2, label=f'Smoothed Variance ({get_config_value(APP_CONFIG, "DataGeneration", "smoothing_window_size", 100, int)}-pt MA)')
+    
+    plt.axvline(x=search_start, color='green', linestyle=':', linewidth=2, label=f'Search Start ({search_start})')
+    plt.axvline(x=cutoff_point, color='red', linestyle='--', linewidth=2, label=f'Final Cutoff ({cutoff_point})')
+
+    plt.title('Cumulative Personality Variance vs. Cohort Size', fontsize=16)
+    plt.xlabel('Number of Subjects (Sorted by Eminence)', fontsize=12)
+    plt.ylabel('Average Cumulative Variance', fontsize=12)
+    plt.legend()
+    plt.xlim(0, len(x_values) + 100)
+    plt.tight_layout()
+
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        logging.info(f"Diagnostic plot saved to '{output_path}'.")
+        plt.show()
+    except Exception as e:
+        logging.error(f"Failed to save or show plot: {e}")
+    finally:
+        plt.close()
+
 def main():
     """Main function to orchestrate the final candidate selection."""
     parser = argparse.ArgumentParser(
@@ -95,6 +125,7 @@ def main():
         help="Path to the sandbox directory for testing.",
     )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
+    parser.add_argument("--plot", action="store_true", help="Generate a diagnostic plot of the variance curve analysis.")
     args = parser.parse_args()
 
     if args.sandbox_path:
@@ -177,46 +208,69 @@ def main():
         if 'EminenceScore' not in final_df.columns:
             final_df['EminenceScore'] = 0
     else:
-        # Step 1: Apply variance-based cutoff to the OCEAN scores to determine the final cohort size
-        logging.info("Applying variance-based cutoff to determine final subject count...")
-        
-        # Load cutoff parameters from config
-        benchmark_pop_size = get_config_value(APP_CONFIG, 'DataGeneration', 'benchmark_population_size', 500, int)
-        cutoff_start_point = get_config_value(APP_CONFIG, 'DataGeneration', 'cutoff_start_point', 600, int)
-        analysis_window = get_config_value(APP_CONFIG, 'DataGeneration', 'variance_analysis_window', 100, int)
-        check_window = get_config_value(APP_CONFIG, 'DataGeneration', 'variance_check_window', 5, int)
-        trigger_count = get_config_value(APP_CONFIG, 'DataGeneration', 'variance_trigger_count', 4, int)
-        cutoff_pct = get_config_value(APP_CONFIG, 'DataGeneration', 'variance_cutoff_percentage', 0.40, float)
-        
-        final_count = len(ocean_df) # Default to all subjects
-        
-        if len(ocean_df) >= cutoff_start_point:
-            benchmark_variance = calculate_average_variance(ocean_df.head(benchmark_pop_size))
-            logging.info(f"Benchmark variance from top {benchmark_pop_size} subjects: {benchmark_variance:.4f}")
-            
-            last_checks = deque(maxlen=check_window)
-            
-            for i in range(cutoff_start_point, len(ocean_df), analysis_window):
-                window_df = ocean_df.iloc[i - analysis_window : i]
-                if len(window_df) < analysis_window: continue
+        # Step 1: Find the optimal cohort size using slope analysis of the variance curve
+        logging.info("Applying slope analysis to determine final subject count...")
 
-                v_avg = calculate_average_variance(window_df)
-                is_met = v_avg < (cutoff_pct * benchmark_variance)
-                last_checks.append(is_met)
-                
-                if sum(last_checks) >= trigger_count:
-                    final_count = i - analysis_window
-                    logging.info(f"{Fore.YELLOW}Cutoff condition met. Final subject count set to {final_count}.")
-                    break
+        # Load analysis parameters from config
+        min_pop_size = get_config_value(APP_CONFIG, "DataGeneration", "min_population_size", 100, int)
+        search_start_point = get_config_value(APP_CONFIG, "DataGeneration", "cutoff_search_start_point", 500, int)
+        slope_threshold = get_config_value(APP_CONFIG, "DataGeneration", "slope_threshold", -0.00001, float)
+        smoothing_window = get_config_value(APP_CONFIG, "DataGeneration", "smoothing_window_size", 100, int)
+
+        final_count = len(ocean_df)  # Default to all subjects
+
+        if len(ocean_df) < search_start_point:
+            logging.warning(
+                f"Not enough subjects ({len(ocean_df)}) to perform analysis beyond start point of {search_start_point}. "
+                "Using all available subjects."
+            )
         else:
-            logging.info("Not enough subjects to apply variance cutoff. Using all available subjects.")
+            # Calculate the full cumulative average variance curve.
+            x_values = np.array(range(2, len(ocean_df) + 1))
+            variances = np.array([
+                calculate_average_variance(ocean_df.head(i))
+                for i in tqdm(x_values, desc="Calculating Variance Curve", ncols=100)
+            ])
+            
+            # Smooth the variance curve to remove local noise and reveal the global trend.
+            smoothed_variances = pd.Series(variances).rolling(window=smoothing_window, center=True).mean().bfill().ffill().to_numpy()
+
+            # Calculate the gradient (slope) of the SMOOTHED curve.
+            gradient = np.gradient(smoothed_variances, x_values)
+
+            # Find the index corresponding to the search start point.
+            start_index = np.where(x_values >= search_start_point)[0][0]
+
+            # Find the first point *after* the start index where the slope flattens.
+            cutoff_index = -1
+            for i in range(start_index, len(gradient)):
+                if gradient[i] > slope_threshold:
+                    cutoff_index = i
+                    break
+            
+            if cutoff_index != -1:
+                final_count = x_values[cutoff_index]
+                logging.info(
+                    f"{Fore.YELLOW}Plateau detected. Optimal subject count set to {final_count}."
+                )
+            else:
+                logging.warning(
+                    "Could not find a plateau in the variance curve. Using all available subjects."
+                )
+            
+            # Generate the diagnostic plot if requested.
+            if args.plot:
+                plot_path = Path(get_path("data/reports/variance_curve_analysis.png"))
+                generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, plot_path)
 
         ocean_df = ocean_df.head(final_count)
-        
+
         # Step 2: Filter the main eligible list by the now-finalized OCEAN set
         ocean_subject_ids = set(ocean_df["idADB"])
         final_df = eligible_df[eligible_df["idADB"].isin(ocean_subject_ids)].copy()
-        logging.info(f"Filtered to {len(final_df):,} final candidates based on OCEAN scores.")
+        logging.info(
+            f"Filtered to {len(final_df):,} final candidates based on optimal cohort size."
+        )
 
     # Step 3: Resolve Country Codes
     country_map = dict(zip(country_codes_df["Abbreviation"], country_codes_df["Country"]))

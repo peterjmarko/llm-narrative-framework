@@ -280,7 +280,8 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         print("Output file is empty. No summary to generate.")
         return
 
-    summary_path = filepath.parent / f"{filepath.stem}_summary.txt"
+    summary_path = filepath.parent.parent / "reports" / f"{filepath.stem}_summary.txt"
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         import pandas as pd
         df = pd.read_csv(filepath)
@@ -435,18 +436,12 @@ def main():
     # If not bypassing, check if the file is already up-to-date.
     elif not all_subjects and not args.force:
         display_path = os.path.relpath(output_path, PROJECT_ROOT)
-        print(f"\n{Fore.YELLOW}WARNING: The scores file at '{display_path}' is already up to date. ✨")
-        print(f"{Fore.YELLOW}The update process incurs API costs and can take some time to complete.")
-        print(f"{Fore.YELLOW}If you decide to go ahead with recreating the eminence scores, a backup of the existing file will be created first.{Fore.RESET}")
-        confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
-        if confirm == 'y':
-            backup_and_remove(output_path)
-            args.force = True
-            processed_ids = load_processed_ids(output_path)
-            all_subjects = load_subjects_to_process(input_path, processed_ids)
-        else:
-            print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n")
-            sys.exit(0)
+        print(f"\n{Fore.YELLOW}Scores file at '{display_path}' is already up to date. ✨")
+        print("Regenerating summary report...")
+        total_subjects_in_source = len(processed_ids)
+        if not args.no_summary:
+            generate_scores_summary(output_path, total_subjects_in_source)
+        sys.exit(0)
     
     if args.force and output_path.exists():
         backup_and_remove(output_path)
@@ -514,9 +509,22 @@ def main():
                 
                 consecutive_failures = 0
                 response_text = temp_response_file.read_text(encoding='utf-8')
-                parsed_scores = parse_batch_response(response_text)
+                raw_parsed_scores = parse_batch_response(response_text)
+                
+                # Filter out any duplicates returned by the LLM that have already been processed in this session.
+                # `processed_ids` covers previous runs, this handles duplicates within the current run.
+                batch_ids_seen = {score[0] for score in raw_parsed_scores}
+                parsed_scores = []
+                current_processed_ids = load_processed_ids(output_path)
+                for score in raw_parsed_scores:
+                    if score[0] not in current_processed_ids:
+                        parsed_scores.append(score)
 
-                if len(parsed_scores) != len(batch):
+                if len(parsed_scores) < len(raw_parsed_scores):
+                    num_dupes = len(raw_parsed_scores) - len(parsed_scores)
+                    tqdm.write(f"{Fore.YELLOW}Warning: Skipped {num_dupes} duplicate subject(s) returned by the LLM in batch {batch_num}.")
+
+                if len(parsed_scores) != len(batch_ids_seen):
                     tqdm.write(f"{Fore.YELLOW}Warning: Mismatch in scores for batch {batch_num}. Expected: {len(batch)}, Got: {len(parsed_scores)}.")
                 if not parsed_scores:
                     tqdm.write(f"{Fore.RED}Error: Failed to parse any scores for batch {batch_num}.")

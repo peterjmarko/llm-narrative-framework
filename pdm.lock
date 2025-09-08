@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:e155963f3d93f089ca3e2469db7d25e43704e789bfcdf2c102db745c66867a5c"
+content_hash = "sha256:f29fc798a8c27b2419ade0d5a554113b7814c228299f8f1e60c2b1669ec70507"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
@@ -651,6 +651,21 @@ files = [
     {file = "kiwisolver-1.4.9-pp311-pypy311_pp73-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:464415881e4801295659462c49461a24fb107c140de781d55518c4b80cb6790f"},
     {file = "kiwisolver-1.4.9-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:fb940820c63a9590d31d88b815e7a3aa5915cad3ce735ab45f0c730b39547de1"},
     {file = "kiwisolver-1.4.9.tar.gz", hash = "sha256:c3b22c26c6fd6811b0ae8363b95ca8ce4ea3c202d3d0975b2914310ceb1bcc4d"},
+]
+
+[[package]]
+name = "kneed"
+version = "0.8.5"
+requires_python = ">=3.5"
+summary = "Knee-point detection in Python"
+groups = ["default"]
+dependencies = [
+    "numpy>=1.14.2",
+    "scipy>=1.0.0",
+]
+files = [
+    {file = "kneed-0.8.5-py3-none-any.whl", hash = "sha256:2f3fbd4e9bd808e65052841448702c41ea64d5fc78735cbfc97ab25f08bd9815"},
+    {file = "kneed-0.8.5.tar.gz", hash = "sha256:a4847ac4f1d04852fea278d5de7aa8bfdc3beb7fbca4a182fec0f0efee43f4b1"},
 ]
 
 [[package]]

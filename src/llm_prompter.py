@@ -166,11 +166,20 @@ def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endp
 
             response = requests.post(api_endpoint, headers=headers, json=payload, timeout=timeout_seconds)
             response.raise_for_status()
-            result_container["data"] = response.json()
-            logging.info(f"  Query {query_identifier}: API call successful.")
+            
+            # Attempt to parse JSON with robust error handling for malformed responses
+            try:
+                result_container["data"] = response.json()
+                logging.info(f"  Query {query_identifier}: API call successful.")
+            except requests.exceptions.JSONDecodeError as json_exc:
+                error_details = (f"Failed to decode JSON from LLM response. Error: {json_exc}. "
+                                 f"Raw response text received:\n---\n{response.text.strip()}\n---")
+                # Store the CLEAN error message and set status, do not store an exception
+                result_container["error"] = error_details
+                result_container["status"] = "error"
 
         except Exception as e:
-            # Capture any exception to be re-raised in the main thread
+            # Capture any other exception to be re-raised in the main thread
             result_container["exception"] = e
         finally:
             # Always record the duration
@@ -201,20 +210,13 @@ def call_openrouter_api(query_text: str, model_name: str, api_key: str, api_endp
 
     # Handle exceptions that occurred in the worker thread
     if result_container["exception"]:
-        exc = result_container["exception"]
-        duration = result_container['duration']
-        # Log the specific error for detailed debugging in the console/log file
-        if isinstance(exc, requests.exceptions.Timeout):
-            logging.error(f"  Query {query_identifier}: API request timed out after {duration:.2f}s (timeout_setting={timeout_seconds}s).")
-        elif isinstance(exc, requests.exceptions.HTTPError):
-            logging.error(f"  Query {query_identifier}: API request failed with HTTP error: {exc}")
-            if exc.response is not None: logging.error(f"  Response content: {exc.response.text}")
-        else:
-            logging.exception(f"  Query {query_identifier}: An unexpected error occurred in the API worker thread: {exc}")
-        
-        # Re-raise the original exception so the caller (main) can handle it specifically
-        # (e.g., by writing the correct error file content)
-        raise exc
+        # Re-raise exceptions for critical errors like timeouts or HTTP failures
+        raise result_container["exception"]
+    
+    if result_container.get("status") == "error":
+        # For handled errors like JSONDecode, the error message is in the 'error' key
+        # Return it so the main function can write it to the error file
+        return result_container["error"], result_container["duration"]
 
     # Return successful data
     return result_container["data"], result_container["duration"]
@@ -404,7 +406,7 @@ def main():
             # All other mock outcomes result in `raw_llm_response_json` being None, leading to a generic failure.
         else:
             # ---- REAL API CALL ----
-            raw_llm_response_json, _ = call_openrouter_api(
+            api_result, _ = call_openrouter_api(
                 query_text=query_text_content, model_name=model_name_cfg,
                 api_key=api_key, api_endpoint=api_endpoint_cfg,
                 referer=referer_header_cfg, timeout_seconds=api_timeout_cfg,
@@ -414,6 +416,15 @@ def main():
             )
 
         # ---- Process the result (real or mocked) ----
+        # Check if the result is a string, which indicates a handled error message
+        if isinstance(api_result, str):
+            logging.error(f"  LLM Prompter: LLM call failed for '{os.path.basename(input_query_file_abs)}'.")
+            with open(output_error_file_abs, 'w', encoding='utf-8') as f_err:
+                f_err.write(api_result)
+            sys.exit(1)
+
+        raw_llm_response_json = api_result
+
         if raw_llm_response_json:
             # If an output path is provided, save the full JSON response there.
             if args.output_json_file:

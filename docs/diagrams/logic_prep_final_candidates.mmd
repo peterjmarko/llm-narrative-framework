@@ -1,42 +1,34 @@
 flowchart TD
-    %% Style Definitions
-    classDef startEnd fill:#e6e6fa,stroke:#333,stroke-width:2px
-    classDef process fill:#e0ffff,stroke:#333,stroke-width:2px
-    classDef fileIO fill:#f0fff0,stroke:#333,stroke-width:2px
-    classDef decision fill:#ffe4e1,stroke:#b22222,stroke-width:2px
+    subgraph "Setup"
+        A[Start] --> B{"Load all required data:<br>- Eligible Candidates<br>- All OCEAN Scores<br>- All Eminence Scores<br>- Country Codes"};
+    end
 
-    subgraph "Finalization"
-        J["Sort final list by<br/>eminence score"]
-        K["Write final list to<br/>adb_final_candidates.txt"]
-        L[End]
-        J --> K --> L
+    subgraph "Filtering (Smoothed Slope Analysis)"
+        B --> C["Calculate Cumulative<br>Personality Variance Curve"];
+        C --> D["Smooth Curve<br>(Moving Average)"];
+        D --> E{"Find Plateau via<br>Slope Analysis"};
+        E --> F[Set Final Cohort Size];
     end
 
     subgraph "Transformation"
-        H["Resolve 'CountryState' code<br/>to full 'Country' name"]
-        I["Join with eminence scores"]
-        I --> J
+        F --> G["Resolve 'CountryState' code<br>to full 'Country' name"];
+        G --> H[Join with eminence scores];
     end
     
-    subgraph "Filtering"
-        C["Calculate benchmark variance<br/>from top N subjects"]
-        D["Loop through remaining subjects<br/>in sliding windows"]
-        E{Cutoff condition met?}
-        E -- Yes --> F["Set final cohort size<br/>and truncate OCEAN data"]
-        E -- No --> D
-        D -- Loop Complete --> G["Use all subjects if<br/>cutoff never met"]
-        F --> H
-        G --> H
+    subgraph "Finalization"
+        H --> I["Sort final list by<br>eminence score"];
+        I --> J["Write final list to<br>adb_final_candidates.txt"];
+        J --> K[End];
     end
 
-    subgraph "Setup"
-        A[Start]
-        B["Load all required data:<br/>- Eligible Candidates<br/>- All OCEAN Scores<br/>- All Eminence Scores<br/>- Country Codes"]
-        B --> C
-    end
-    
-    %% Apply Styles
-    class A,L startEnd
-    class C,D,F,G,H,I,J process
-    class B,K fileIO
-    class E decision
+    style A fill:#D5E8D4,stroke:#82B366,stroke-width:2px
+    style K fill:#F8CECC,stroke:#B85450,stroke-width:2px
+    style B fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
+    style C fill:#FFE6CC,stroke:#D79B00,stroke-width:2px
+    style D fill:#FFE6CC,stroke:#D79B00,stroke-width:2px
+    style E fill:#FFE6CC,stroke:#D79B00,stroke-width:2px
+    style F fill:#FFE6CC,stroke:#D79B00,stroke-width:2px
+    style G fill:#E1D5E7,stroke:#9673A6,stroke-width:2px
+    style H fill:#E1D5E7,stroke:#9673A6,stroke-width:2px
+    style I fill:#FFF2CC,stroke:#D6B656,stroke-width:2px
+    style J fill:#FFF2CC,stroke:#D6B656,stroke-width:2px

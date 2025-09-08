@@ -89,7 +89,10 @@ param(
     [switch]$SilentHalt,
 
     [Parameter(Mandatory=$false)]
-    [switch]$TestMode
+    [switch]$TestMode,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$Plot
 )
 
 # --- Pre-flight Cleanup ---
@@ -100,6 +103,7 @@ Remove-Item -Path "Env:PROJECT_SANDBOX_PATH" -ErrorAction SilentlyContinue
 $C_RESET = "`e[0m"
 $C_GREEN = "`e[92m"
 $C_YELLOW = "`e[93m"
+$C_ORANGE = "`e[38;5;208m" # A specific orange from the 256-color palette
 $C_RED = "`e[91m"
 $C_CYAN = "`e[96m"
 $C_GRAY = "`e[90m"
@@ -184,7 +188,7 @@ function Get-StepStatus {
     
     switch ($Step.Name) {
         "Generate Eminence Scores" {
-            $summaryFile = Join-Path $BaseDirectory "data/foundational_assets/eminence_scores_summary.txt"
+            $summaryFile = Join-Path $BaseDirectory "data/reports/eminence_scores_summary.txt"
             if (-not (Test-Path $summaryFile)) {
                 if (Test-Path $outputFile) { return "Incomplete" } else { return "Missing" }
             }
@@ -199,11 +203,18 @@ function Get-StepStatus {
             return "Incomplete"
         }
         "Generate OCEAN Scores" {
-            $summaryFile = Join-Path $BaseDirectory "data/foundational_assets/ocean_scores_summary.txt"
+            $summaryFile = Join-Path $BaseDirectory "data/reports/ocean_scores_summary.txt"
             if (-not (Test-Path $summaryFile)) {
                 if (Test-Path $outputFile) { return "Incomplete" } else { return "Missing" }
             }
-            if ((Get-Content $summaryFile -Raw) -match "Stop Reason:") { return "Complete" }
+            try {
+                $content = Get-Content $summaryFile -Raw
+                $scored = ($content | Select-String -Pattern "Total Scored:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
+                $total = ($content | Select-String -Pattern "Total in Source:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
+                if ($scored -eq $total) { return "Complete" }
+            } catch {
+                # Fallback in case of parsing error
+            }
             return "Incomplete"
         }
         "Neutralize Delineations" {
@@ -452,6 +463,10 @@ try {
         if ($Force.IsPresent) {
             $arguments += "--force"
         }
+        # Pass the --plot flag ONLY to the script that uses it.
+        if ($step.Name -eq "Select Final Candidates" -and $Plot.IsPresent) {
+            $arguments += "--plot"
+        }
 
         if ($SandboxMode) {
             $arguments += "--sandbox-path", $WorkingDirectory
@@ -515,6 +530,8 @@ catch {
     }
 
     $isCancellation = $errorMessage -match "USER_CANCELLED"
+    $isManualPause = $errorMessage -match "The pipeline is paused"
+
     if ($isCancellation) {
         $exitCode = 0
     } else {
@@ -522,10 +539,11 @@ catch {
     }
 
     if (-not $SilentHalt.IsPresent) {
-        $bannerColor = if ($isCancellation) { $C_YELLOW } else { $C_RED }
+        # A user cancellation or a planned manual pause are warnings (orange), not errors (red).
+        $bannerColor = if ($isCancellation -or $isManualPause) { $C_ORANGE } else { $C_RED }
         $messageColor = $bannerColor
 
-        # For cancellations, clean up the message for a more user-friendly display
+        # For cancellations, clean up the message for a more user-friendly display.
         if ($isCancellation) {
             $errorMessage = $errorMessage -replace "USER_CANCELLED: ", ""
         }
@@ -533,11 +551,12 @@ catch {
         Format-Banner "PIPELINE HALTED" $bannerColor
         Write-Host "${messageColor}REASON: $errorMessage${C_RESET}"
 
-        if ($errorMessage -match "The pipeline is paused") {
+        if ($isManualPause) {
             Write-Host "`n${C_YELLOW}NEXT STEPS:${C_RESET}"
             Write-Host "1. Complete the manual step described in the message above."
             Write-Host "2. Once the required output file is in place, re-run this script."
             Write-Host "   The pipeline will automatically resume from where it stopped."
+            Write-Host ""
         }
     }
 }

@@ -116,7 +116,7 @@ This stage is a second, optional filtering pass that uses LLMs to score the "eli
 
 1.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
 2.  **OCEAN Scoring (`generate_ocean_scores.py`):** A fully automated, resilient script that generates OCEAN personality scores for every subject in the eminence-ranked list.
-3.  **Final Selection & Cutoff (`select_final_candidates.py`):** Performs the final filtering and selection. It takes the complete OCEAN scores list and applies a data-driven cutoff based on score variance to determine the final, psychologically diverse cohort. It then resolves country codes and sorts the final list by eminence.
+3.  **Final Selection & Cutoff (`select_final_candidates.py`):** Performs the final filtering and selection. It takes the complete OCEAN scores list and applies a sophisticated, data-driven algorithm to determine the optimal cohort size. The script first calculates the cumulative personality variance curve for the entire cohort, smooths this curve using a moving average to eliminate local noise, and then performs a slope analysis to find the "plateau"—the point of diminishing returns where adding more subjects no longer meaningfully contributes to the psychological diversity of the pool. It then resolves country codes and sorts the final list by eminence.
 
 ##### Stage 4: Profile Generation
 
@@ -206,7 +206,7 @@ These diagrams illustrate the internal decision-making logic and control flow of
 </div>
 
 <div align="center">
-  <p>Logic for Final Selection (`select_final_candidates.py`): The algorithm for applying the variance-based cutoff to the full OCEAN dataset, then transforming and sorting the final subject pool.</p>
+  <p>Logic for Final Selection (`select_final_candidates.py`): The algorithm for finding the optimal cohort size by performing a slope analysis on a smoothed cumulative personality variance curve.</p>
   <img src="images/logic_prep_final_candidates.png" width="100%">
 </div>
 

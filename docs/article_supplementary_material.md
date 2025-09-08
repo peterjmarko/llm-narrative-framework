@@ -97,7 +97,7 @@ pdm run gen-ocean
 ```
 
 #### c. Selecting Final Candidates & Applying Cutoff (`select_final_candidates.py`)
-This script performs the final selection. It takes the complete list of OCEAN scores and applies a data-driven cutoff based on score variance to determine the final, psychologically diverse cohort. In bypass mode, it uses the entire eligible list without applying a cutoff.
+This script performs the final selection. It takes the complete list of OCEAN scores and applies a sophisticated, data-driven algorithm to determine the optimal cohort size. The script calculates the cumulative personality variance curve, smooths it using a moving average, and then performs a slope analysis to identify the curve's "plateau"—the point of diminishing returns where adding more subjects ceases to contribute meaningfully to the psychological diversity of the pool. In bypass mode, it uses the entire eligible list.
 ```bash
 # Create the final, transformed list of subjects
 pdm run select-final
