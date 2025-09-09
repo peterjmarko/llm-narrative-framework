@@ -1,5 +1,18 @@
 # Changelog
 
+## 9.1.1 (2025-09-08)
+
+### Bump
+
+- **version 9.1.0 → 9.1.1**
+
+### Fixes
+
+- **overhaul test suite and fix latent bugs**
+  We have completed a comprehensive overhaul and expansion of the unit test suites for the entire data preparation pipeline. This initiative successfully identified and fixed numerous latent bugs, resolved persistent test failures caused by issues like test pollution and incorrect mocks, and dramatically increased code coverage across all modules.
+  
+  The result is a more robust, reliable, and maintainable data preparation workflow.
+
 ## 9.1.0 (2025-09-08)
 
 ### Bump
