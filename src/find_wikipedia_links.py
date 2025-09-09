@@ -75,6 +75,7 @@ from urllib3.util.retry import Retry
 # Ensure the src directory is in the Python path for nested imports
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from utils.file_utils import backup_and_remove  # noqa: E402
+from config_loader import get_path  # noqa: E402
 
 # Initialize colorama
 init(autoreset=True, strip=False)
@@ -135,7 +136,6 @@ class CustomFormatter(logging.Formatter):
 
 def load_research_categories() -> Dict:
     """Loads research categories from the configuration file."""
-    from config_loader import get_path
     global RESEARCH_CATEGORIES_CACHE
     if RESEARCH_CATEGORIES_CACHE is not None:
         return RESEARCH_CATEGORIES_CACHE
@@ -601,7 +601,10 @@ def main():
             # Set force=True for the loader to ensure a full re-run
             args.force = True
     
-    processed_ids, timed_out_ids, links_found_before, max_index_before, timeouts_before = load_processed_ids(output_path)
+    # Reload the state from the cleaned file to get an accurate starting point.
+    # Crucially, the timeout count is now correctly reset to 0 for the retry run.
+    processed_ids, timed_out_ids, links_found_before, max_index_before, _ = load_processed_ids(output_path)
+    timeouts_before = 0
 
     # If records timed out previously, they need to be retried.
     if timed_out_ids:
@@ -621,7 +624,7 @@ def main():
 
         # Reload the state from the cleaned file to get an accurate starting point.
         # Crucially, the timeout count is now correctly reset to 0 for the retry run.
-        processed_ids, timed_out_ids, links_found_before, max_index_before = load_processed_ids(output_path)
+        processed_ids, timed_out_ids, links_found_before, max_index_before, _ = load_processed_ids(output_path)
         timeouts_before = 0
 
     lines_to_process = [

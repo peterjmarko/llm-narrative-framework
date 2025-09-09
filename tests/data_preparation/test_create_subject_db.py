@@ -28,12 +28,13 @@ and asserts that the script correctly decodes the Base58 ID, merges the files,
 and flattens the celestial data into the final, correct database format.
 """
 
+import os
 from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
-from src import create_subject_db
+from src.create_subject_db import main
 
 
 @pytest.fixture
@@ -95,7 +96,7 @@ def test_create_subject_db_logic(mock_input_files):
     ]
 
     with patch("sys.argv", test_args):
-        create_subject_db.main()
+        main()
 
     assert output_path.exists()
     output_df = pd.read_csv(output_path)
@@ -115,5 +116,77 @@ def test_create_subject_db_logic(mock_input_files):
     assert monroe_record["Name"] == "Marilyn Monroe"
     assert monroe_record["Moon"] == 216.89
     assert monroe_record["Ascendant"] == 230.12
+
+
+
+class TestMainWorkflow:
+    """Tests the main orchestration logic of the script."""
+
+    def test_main_handles_user_cancellation(self, mock_input_files):
+        """Tests that the script exits if the user cancels an up-to-date run."""
+        output_path = mock_input_files["output_path"]
+        output_path.touch()
+
+        with patch("builtins.input", return_value="n"):
+            test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"])]
+            with patch("sys.argv", test_args):
+                with pytest.raises(SystemExit) as e:
+                    main()
+                assert e.value.code == 0
+
+    def test_main_handles_stale_file(self, mock_input_files, mocker):
+        """Tests that a stale input file triggers an automatic re-run."""
+        sandbox_path = mock_input_files["sandbox_path"]
+        chart_export_path = sandbox_path / "data/foundational_assets/sf_chart_export.csv"
+        output_path = mock_input_files["output_path"]
+        output_path.touch()
+
+        # Make an input file newer than the output
+        os.utime(chart_export_path, (output_path.stat().st_mtime + 1, output_path.stat().st_mtime + 1))
+        
+        mock_backup = mocker.patch('src.create_subject_db.backup_and_remove')
+
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path)]
+        with patch("sys.argv", test_args):
+            main()
+        
+        mock_backup.assert_called_once_with(output_path)
+
+    def test_main_exits_if_input_missing(self, mock_input_files, mocker, caplog):
+        """Tests graceful exit if an input file is missing."""
+        sandbox_path = mock_input_files["sandbox_path"]
+        (sandbox_path / "data/intermediate/adb_final_candidates.txt").unlink()
+
+        mocker.patch('sys.exit', side_effect=SystemExit)
+
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path)]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit):
+                main()
+        
+        assert "Filtered list not found" in caplog.text
+
+    def test_main_creates_missing_subject_report(self, mock_input_files, mocker, caplog):
+        """Tests that a report is generated for subjects missing from the chart export."""
+        sandbox_path = mock_input_files["sandbox_path"]
+        # Add a candidate who is NOT in the chart export
+        candidates_path = sandbox_path / "data/intermediate/adb_final_candidates.txt"
+        with open(candidates_path, "a", encoding="utf-8") as f:
+            f.write("3\t999\tMissing\tPerson\n")
+
+        mocker.patch('sys.exit', side_effect=SystemExit)
+
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit):
+                main()
+        
+        missing_report_path = sandbox_path / "data/reports/missing_sf_subjects.csv"
+        assert missing_report_path.exists()
+        content = missing_report_path.read_text()
+        assert "999" in content
+        assert "Person Missing" in content
+        
+        assert "A diagnostic report has been created" in caplog.text
 
 # === End of tests/data_preparation/test_create_subject_db.py ===

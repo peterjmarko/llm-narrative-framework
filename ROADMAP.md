@@ -2,32 +2,6 @@
 
 This document outlines planned development tasks and tracks known issues for the project. The framework is designed to support two key research activities: the **direct replication** of the original study's findings by using the static data files included in the repository, and the **conceptual replication** of the methodology by generating new data from live sources. All development tasks are categorized by work stream below.
 
-## Completed Milestones
-
-- [x] **Redesigned Final Candidate Selection Algorithm:**
-  - The original heuristic-based algorithm was replaced with a robust, multi-stage, data-driven approach involving smoothed slope analysis of the cumulative personality variance curve to find a scientifically optimal cohort size.
-  - A new standalone analysis script (`scripts/analyze_cutoff_parameters.py`) was created to perform a systematic sensitivity analysis, providing a data-driven recommendation for the optimal algorithm parameters.
-  - A `--plot` flag was added to `select_final_candidates.py` to generate a diagnostic plot of the variance curve analysis, making the algorithm's decision-making process fully transparent.
-
-- [x] **Hardened Data Preparation Pipeline:**
-  - The `prepare_data.ps1` orchestrator was made significantly more intelligent. It now parses summary file content to robustly resume partially completed steps (e.g., Eminence and OCEAN scoring).
-  - Both scoring scripts (`generate_eminence_scores.py`, `generate_ocean_scores.py`) now automatically regenerate their summary reports if run when data is complete, replacing confusing interactive prompts.
-  - Added duplicate prevention logic to both scoring scripts to filter out redundant records returned by the LLM, ensuring data integrity.
-  - The pipeline status report now has a more granular `[INCOMPLETE]` state for partially finished scoring runs.
-
-- [x] **Improved User Experience and Reporting:**
-  - Implemented `tqdm` progress bars in all long-running data preparation scripts for clean, real-time feedback.
-  - The "PIPELINE HALTED" banner now uses a more readable dark orange color for non-error halts.
-  - Standardized all summary report locations to `data/reports/`.
-  - The `generate_eminence_scores.py` script now creates a `missing_eminence_scores.txt` report to easily identify data gaps.
-
-- [x] **Standardized File Backup/Removal Logic**
-  - A new shared utility module (`src/utils/file_utils.py`) was created to centralize file operations.
-  - All data preparation scripts were refactored to use a single `backup_and_remove` function, ensuring consistent behavior.
-
-- [x] **Data Preparation Pipeline Fully Tested**
-  - All layers of testing for the data preparation pipeline are complete and passing, including a fully automated Layer 2 (Orchestration) test harness, ensuring a robust and reliable data foundation for the main experiments.
-
 ## Tasks Prior to Publication
 
 ### Code Development and Testing
@@ -60,9 +34,9 @@ This phase focuses on achieving a fully validated and stable codebase before the
 
 ### Final Validation and Data Generation
 
-- [x] **Perform and Report Correction for Multiple Comparisons**
+- [ ] **Perform and Report Correction for Multiple Comparisons**
   - [x] Apply a Bonferroni or FDR (False Discovery Rate) correction to the final ANOVA results.
-  - [x] Add a footnote or supplementary note to the article reporting the corrected p-values to demonstrate statistical rigor.
+  - [ ] Add a footnote or supplementary note to the article reporting the corrected p-values to demonstrate statistical rigor.
 - [ ] **Execute Full End-to-End Study**
   - [ ] Run the complete data preparation pipeline (`prepare_data.ps1`) to generate a fresh, final dataset from live sources.
   - [ ] Conduct the full experimental study, varying all three core factors (model name, group size, mapping strategy) to produce the final results.
@@ -74,17 +48,9 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
   - [ ] Update all tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
   - [ ] Replace the text placeholder in `article_main_text.md` with the final, generated interaction plot (`interaction_plot_mean_rank.png`).
-- [x] **Add Supporting Figures to Replication Guide**
-  - [x] Embed existing data flow diagrams at the start of the data preparation section.
-  - [x] Create and embed screenshots for the Solar Fire one-time setup process:
-    - [x] `sf_setup_1_displayed_points.png` (Displayed Points dialog)
-    - [x] `sf_setup_2_import_format.png` (Import Format dialog)
-    - [x] `sf_setup_3_export_format.png` (Export Format dialog)
-  - [x] Create and embed screenshots for the Solar Fire import/export workflow:
-    - [x] `sf_workflow_1_clear_charts.png` (Clear Charts dialog)
-    - [x] `sf_workflow_2_import_dialog.png` (Import dialog)
-    - [x] `sf_workflow_3_export_dialog.png` (Export dialog)
 - [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
+  - [ ] Check all tables and diagrams
+  - [ ] Check counts and dates 
 
 ## Online Presence & Final Review
 

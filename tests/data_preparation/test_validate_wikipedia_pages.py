@@ -27,19 +27,28 @@ matching, robust death date detection from various HTML patterns, and the
 handling of disambiguation pages.
 """
 
-from unittest.mock import MagicMock
+import os
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from bs4 import BeautifulSoup
 from tqdm import tqdm
+
+# Import the entire module so we can patch objects within it
+from src import validate_wikipedia_pages
 from src.validate_wikipedia_pages import (
+    fetch_page_content,
     find_matching_disambiguation_link,
+    follow_all_redirects,
+    generate_summary_report,
     is_disambiguation_page,
     load_and_filter_input,
     process_wikipedia_page,
     validate_death_date,
     validate_name,
     worker_task,
+    worker_task_with_timeout,
 )
 
 
@@ -116,7 +125,7 @@ def test_validate_death_date(html_snippet, expected_result):
     # Negative case
     ('<body>A normal article page.</body>', False),
 ])
-def test_is_disambiguation_page_validation(html_content, expected):
+def test_is_disambiguation_page(html_content, expected):
     """Tests the detection of disambiguation pages."""
     soup = BeautifulSoup(html_content, 'html.parser')
     assert is_disambiguation_page(soup) == expected
@@ -278,5 +287,240 @@ def test_load_and_filter_input(tmp_path):
     # Case 3: --force flag should ignore the report and process all records
     to_process, _, _, _, _, _ = load_and_filter_input(input_file, report_file, force=True)
     assert len(to_process) == 4
+
+
+def test_follow_all_redirects_handles_canonical_link(mocker):
+    """Tests that the redirect follower correctly handles canonical links."""
+    start_url = "http://example.com/pageA"
+    canonical_url = "http://example.com/pageB"
+
+    # Soup for the first page with a canonical link
+    soup_a_html = f'<html><head><link rel="canonical" href="{canonical_url}" /></head></html>'
+    soup_a = BeautifulSoup(soup_a_html, 'html.parser')
+
+    # Soup for the final canonical page
+    soup_b_html = '<html><head></head><body>Final Page</body></html>'
+    soup_b = BeautifulSoup(soup_b_html, 'html.parser')
+
+    # Mock fetch_page_content to return the two different soups
+    mock_fetch = mocker.patch('src.validate_wikipedia_pages.fetch_page_content', side_effect=[soup_a, soup_b])
+
+    final_url, final_soup = follow_all_redirects(start_url)
+
+    assert final_url == canonical_url
+    assert "Final Page" in final_soup.get_text()
+    assert mock_fetch.call_count == 2
+
+
+@patch('threading.Thread')
+@patch('src.validate_wikipedia_pages.worker_task')
+def test_worker_task_with_timeout_handles_hung_worker(mock_worker_task, mock_thread_class, mocker):
+    """
+    Tests that the timeout wrapper correctly handles a worker task that hangs
+    and generates a timeout record.
+    """
+    mock_thread_instance = MagicMock()
+    mock_thread_instance.is_alive.return_value = True  # Simulate a hung thread
+    mock_thread_class.return_value = mock_thread_instance
+
+    row = {'idADB': '101', 'ADB_Name': 'Hung Worker'}
+
+    result = worker_task_with_timeout(row, MagicMock(), 1)
+
+    assert result['Status'] == 'FAIL'
+    assert result['Notes'] == 'Processing timeout'
+    mock_thread_instance.join.assert_called_once_with(timeout=60)
+
+
+def test_fetch_page_content_handles_meta_refresh(mocker):
+    """Tests that fetch_page_content correctly follows meta-refresh redirects."""
+    start_url = "http://example.com/redirect"
+    final_url = "http://example.com/final"
+
+    # HTML for the redirect page and the final page
+    redirect_html = f'<html><head><meta http-equiv="refresh" content="0; url={final_url}"></head></html>'
+    final_html = '<html><body>Final Destination</body></html>'
+
+    # Mock the session's get method to return different responses
+    mock_response_redirect = MagicMock()
+    mock_response_redirect.raise_for_status.return_value = None
+    mock_response_redirect.text = redirect_html
+    mock_response_redirect.url = start_url
+
+    mock_response_final = MagicMock()
+    mock_response_final.raise_for_status.return_value = None
+    mock_response_final.text = final_html
+    mock_response_final.url = final_url
+
+    mock_session_get = mocker.patch('src.validate_wikipedia_pages.SESSION.get', side_effect=[mock_response_redirect, mock_response_final])
+
+    soup = fetch_page_content(start_url)
+
+    assert "Final Destination" in soup.get_text()
+    assert mock_session_get.call_count == 2
+
+
+class TestMainWorkflow:
+    """Tests the main orchestration logic of the script."""
+
+    @pytest.fixture
+    def mock_sandbox(self, tmp_path: Path):
+        """Creates a comprehensive sandbox for testing the main function."""
+        # Create directories
+        (tmp_path / "data" / "processed").mkdir(parents=True)
+        (tmp_path / "data" / "reports").mkdir(parents=True)
+
+        # Create input file
+        input_path = tmp_path / "data/processed/adb_wiki_links.csv"
+        input_content = (
+            "idADB,ADB_Name,BirthYear,Entry_Type,Wikipedia_URL,Notes\n"
+            "101,Doe, John,1990,Person,http://a.com,\n"
+            "102,Smith, Jane,1991,Person,http://b.com,\n"
+        )
+        input_path.write_text(input_content)
+        return tmp_path
+
+    @patch('src.validate_wikipedia_pages.generate_summary_report')
+    @patch('src.validate_wikipedia_pages.worker_task_with_timeout')
+    def test_main_full_run(self, mock_worker, mock_summary, mock_sandbox, capsys):
+        """Tests a full, successful run from scratch."""
+        mock_worker.return_value = {'Status': 'OK', 'idADB': '101'}
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--force"]
+        with patch("sys.argv", test_args):
+            validate_wikipedia_pages.main()
+
+        captured = capsys.readouterr()
+        assert "SUCCESS:" in captured.out
+        assert mock_worker.call_count == 2
+
+    def test_main_report_only(self, mock_sandbox, mocker, capsys):
+        """Tests that the --report-only flag works correctly."""
+        # Mock sys.exit to raise an exception that pytest can catch.
+        def mock_exit(code=0):
+            raise SystemExit(code)
+
+        mocker.patch('sys.exit', side_effect=mock_exit)
+        mock_generate_summary = mocker.patch('src.validate_wikipedia_pages.generate_summary_report')
+
+        # Create a dummy report file for the function to read
+        (mock_sandbox / "data/reports/adb_validation_report.csv").touch()
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--report-only"]
+        with patch("sys.argv", test_args):
+            # The script should exit gracefully after generating the report
+            with pytest.raises(SystemExit) as e:
+                validate_wikipedia_pages.main()
+            assert e.value.code == 0
+
+        mock_generate_summary.assert_called_once()
+        captured = capsys.readouterr()
+        assert "Generating Summary Report Only" in captured.out
+
+    @patch('src.validate_wikipedia_pages.finalize_and_report')
+    @patch('src.validate_wikipedia_pages.worker_task_with_timeout')
+    def test_main_handles_keyboard_interrupt(self, mock_worker, mock_finalize, mock_sandbox):
+        """Tests graceful shutdown on KeyboardInterrupt."""
+        mock_worker.side_effect = KeyboardInterrupt
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--quiet"]
+        with patch("sys.argv", test_args):
+            validate_wikipedia_pages.main()
+
+        mock_finalize.assert_called_once()
+        # was_interrupted is the 4th positional argument
+        assert mock_finalize.call_args[0][3] is True
+
+    def test_main_handles_stale_report(self, mock_sandbox, mocker):
+        """Tests that a stale report file triggers an automatic re-run."""
+        input_path = mock_sandbox / "data/processed/adb_wiki_links.csv"
+        report_path = mock_sandbox / "data/reports/adb_validation_report.csv"
+        report_path.touch()
+
+        # Make the input file newer than the report
+        os.utime(input_path, (report_path.stat().st_mtime + 1, report_path.stat().st_mtime + 1))
+
+        mock_backup = mocker.patch('src.validate_wikipedia_pages.backup_and_remove')
+        mocker.patch('src.validate_wikipedia_pages.worker_task_with_timeout')
+        mocker.patch('src.validate_wikipedia_pages.generate_summary_report')
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
+        with patch("sys.argv", test_args):
+            validate_wikipedia_pages.main()
+
+        # The backup function is a reliable indicator of a forced re-run
+        mock_backup.assert_called_once_with(report_path)
+
+    def test_main_exits_if_input_not_found(self, mock_sandbox, mocker, caplog):
+        """Tests that the script exits gracefully if the input file is missing."""
+        input_path = mock_sandbox / "data/processed/adb_wiki_links.csv"
+        input_path.unlink()  # Ensure the file does not exist
+
+        mocker.patch('sys.exit', side_effect=SystemExit)
+        mocker.patch('logging.basicConfig') # Prevent Tqdm handler from overriding caplog
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit):
+                validate_wikipedia_pages.main()
+
+        assert "Input file not found" in caplog.text
+
+
+class TestSummaryReport:
+    """Tests the summary report generation logic."""
+
+    @pytest.fixture
+    def mock_report_csv(self, tmp_path: Path):
+        """Creates a mock validation report CSV with diverse data."""
+        report_dir = tmp_path / "data" / "reports"
+        report_dir.mkdir(parents=True)
+        report_path = report_dir / "adb_validation_report.csv"
+
+        report_content = (
+            "Index,idADB,Entry_Type,Status,Notes\n"
+            "1,101,Person,OK,\n"
+            "2,102,Research,VALID,\n"
+            "3,103,Person,FAIL,Processing timeout\n"
+            "4,104,Person,FAIL,Non-English URL with no fallback\n"
+            "5,105,Person,FAIL,No Wikipedia URL found\n"
+            "6,106,Person,FAIL,Failed to fetch Wikipedia page\n"
+            "7,107,Person,FAIL,Disambiguation page, no link found\n"
+            "8,108,Person,FAIL,Name mismatch (Score: 80)\n"
+            "9,109,Person,FAIL,Death date not found\n"
+            "10,110,Person,FAIL,Some other error\n"
+        )
+        report_path.write_text(report_content)
+        return report_path
+
+    def test_generate_summary_report_full(self, mock_report_csv, capsys, mocker):
+        """Tests that the summary report is generated correctly with varied data."""
+        # Mock PROJECT_ROOT from the config_loader module where it's imported
+        mocker.patch('src.config_loader.PROJECT_ROOT', mock_report_csv.parents[2])
+
+        generate_summary_report(mock_report_csv)
+
+        summary_path = mock_report_csv.with_name("adb_validation_summary.txt")
+        assert summary_path.exists()
+
+        summary_content = summary_path.read_text()
+
+        # Check overall stats
+        assert "Total Records in Report:                     10" in summary_content
+        assert "Valid Records:                                2" in summary_content
+        assert "Failed Records:                               8" in summary_content
+
+        # Check specific failure breakdown lines
+        assert "1. No Wikipedia Link Found:                   1" in summary_content
+        assert "2. Could Not Fetch Page:                      1" in summary_content
+        assert "5. Name Mismatch:                             1" in summary_content
+        assert "6. Death Date Not Found:                      1" in summary_content
+        assert "7. Processing Timeout:                        1" in summary_content
+        assert "8. Other Errors:                              1" in summary_content
+
+        # Check console output as well
+        captured = capsys.readouterr()
+        assert "Astro-Databank Validation Summary" in captured.out
+        assert "Total Records in Report:                     10" in captured.out
 
 # === End of tests/data_preparation/test_validate_wikipedia_pages.py ===

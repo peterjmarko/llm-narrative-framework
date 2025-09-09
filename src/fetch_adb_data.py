@@ -501,7 +501,7 @@ def main():
         os.environ['PROJECT_SANDBOX_PATH'] = os.path.abspath(args.sandbox_path)
 
     # Now that the environment is set, we can safely load modules that depend on it.
-    from config_loader import load_env_vars, PROJECT_ROOT
+    from config_loader import get_path, load_env_vars, PROJECT_ROOT
     from utils.file_utils import backup_and_remove
     load_env_vars()
 
@@ -515,7 +515,8 @@ def main():
         logging.error(f"{Fore.RED}Invalid date format. Please use YYYY-MM-DD.")
         sys.exit(1)
 
-    output_path = Path(args.output_file)
+    # Use get_path to respect the sandbox
+    output_path = Path(get_path(args.output_file))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not args.no_network_warning:

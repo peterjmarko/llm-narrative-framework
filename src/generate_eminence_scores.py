@@ -401,7 +401,9 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     # --- Temp files for worker ---
-    temp_dir = script_dir / "temp_eminence_worker"
+    # Use the sandbox path for the temp directory if it's active.
+    base_temp_path = Path(args.sandbox_path) if args.sandbox_path else script_dir
+    temp_dir = base_temp_path / "temp_eminence_worker"
     temp_dir.mkdir(exist_ok=True)
     temp_query_file = temp_dir / "query.txt"
     temp_response_file = temp_dir / "response.txt"
@@ -415,8 +417,11 @@ def main():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
             print("Automatically re-running full selection process...")
-            backup_and_remove(output_path)
             args.force = True
+
+    # --- Handle --force flag ---
+    if args.force and output_path.exists():
+        backup_and_remove(output_path)
 
     # --- Load Data and Determine Scope ---
     processed_ids = load_processed_ids(output_path)
@@ -443,8 +448,8 @@ def main():
             generate_scores_summary(output_path, total_subjects_in_source)
         sys.exit(0)
     
-    if args.force and output_path.exists():
-        backup_and_remove(output_path)
+    # Reload subjects if force was used, as the file state has changed
+    if args.force:
         processed_ids = load_processed_ids(output_path)
         all_subjects = load_subjects_to_process(input_path, processed_ids)
 

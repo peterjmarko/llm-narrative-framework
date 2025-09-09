@@ -241,41 +241,56 @@ Module                              Cov. (%)        Status & Justification
 ----------------------------------- --------------- -----------------------------------------------------------------
 **Stage 1: Data Sourcing**
 
-`src/fetch_adb_data.py`             `33%`           COMPLETE. Unit tests cover critical offline logic. Live network
-                                                    code is validated via integration testing.
+`src/fetch_adb_data.py`             `84%`           COMPLETE. Unit tests cover all critical offline logic (data
+                                                    parsing, timezone conversion) and use mocks to validate the main
+                                                    workflow, including login, scraping, and pagination.
 
 **Stage 2: Candidate Qualification**
 
-`src/find_wikipedia_links.py`       `38%`           COMPLETE. Unit tests cover key logic, including HTML parsing
-                                                    and mocked API calls. Orchestration is validated via integration.
+`src/find_wikipedia_links.py`       `77%`           COMPLETE. Comprehensive unit tests validate the main workflow,
+                                                    all helper functions, and critical error handling for input
+                                                    validation, worker timeouts, and mocked API calls.
 
-`src/validate_wikipedia_pages.py`   `39%`           COMPLETE. Unit tests cover all critical validation logic.
+`src/validate_wikipedia_pages.py`   `82%`           COMPLETE. Comprehensive unit tests validate the main workflow,
+                                                    all helper functions, and critical error handling for input
+                                                    validation, network resiliency, and report generation.
 
-`src/select_eligible_candidates.py` `72%`           COMPLETE. Unit tests cover all core filtering and resumability
-                                                    logic.
+`src/select_eligible_candidates.py` `84%`           COMPLETE. Comprehensive unit tests validate all core filtering,
+                                                    deduplication, and resumability logic, including error
+                                                    handling for stale and missing input files.
 
-**Stage 3: LLM-based Candidate Selection**
+**Stage 3: LLM-based Selection**
 
-`src/generate_eminence_scores.py`   `54%`           COMPLETE. Unit tests cover critical offline logic. Live LLM
-                                                    calls are validated via integration testing.
+`src/generate_eminence_scores.py`   `75%`           COMPLETE. Comprehensive unit tests validate the main workflow,
+                                                    offline parsing, and critical error handling (stale data,
+                                                    missing inputs, worker failures). Live LLM calls are validated
+                                                    via integration testing.
 
-`src/generate_ocean_scores.py`      `16%`           COMPLETE. Unit tests cover critical offline logic. Live LLM
-                                                    calls are validated via integration testing.
+`src/generate_ocean_scores.py`      `79%`           COMPLETE. Unit tests cover the main processing loop,
+                                                    resumability, error handling, and the offline summary
+                                                    regeneration feature.
 
-`src/select_final_candidates.py`    `66%`           COMPLETE. Unit tests cover the entire data transformation
-                                                    workflow for both default and bypass modes.
+`src/select_final_candidates.py`    `80%`           COMPLETE. Unit tests cover the entire data transformation
+                                                    workflow for both default and bypass modes, including the
+                                                    variance-based cutoff analysis.
 
 **Stage 4: Profile Generation**
 
-`src/prepare_sf_import.py`          `62%`           COMPLETE. Unit tests cover the core data transformation logic.
+`src/prepare_sf_import.py`          `86%`           COMPLETE. Comprehensive unit tests validate the main workflow,
+                                                    core data transformation, and error handling for stale data,
+                                                    missing inputs, and invalid records.
 
-`src/create_subject_db.py`          `57%`           COMPLETE. Unit tests cover the core data integration logic.
+`src/create_subject_db.py`          `76%`           COMPLETE. Comprehensive unit tests validate the main workflow,
+                                                    core data integration, and error handling for stale data,
+                                                    missing inputs, and mismatched subjects.
 
-`src/neutralize_delineations.py`    `26%`           COMPLETE. Unit tests cover critical offline logic. Live LLM
-                                                    calls are validated via integration testing.
+`src/neutralize_delineations.py`    `74%`           COMPLETE. Unit test suite validates the core orchestration
+                                                    logic for default, fast, resume, and bypass modes, as well as
+                                                    error handling.
 
-`src/generate_personalities_db.py`  `70%`           COMPLETE. Unit test suite is complete. A separate `pytest`
-                                                    provides bit-for-bit validation of the assembly algorithm.
+`src/generate_personalities_db.py`  `87%`           COMPLETE. Comprehensive unit tests validate the main workflow,
+                                                    core data assembly algorithm, and error handling for stale
+                                                    data, missing inputs, and single-record debug runs.
 
 `prepare_data.ps1`                  `N/A`           COMPLETE. As the primary orchestrator, this script is the
                                                     System Under Test for the Layer 3 integration test. Its state

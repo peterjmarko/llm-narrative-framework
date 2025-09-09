@@ -23,26 +23,22 @@
 Unit tests for the OCEAN score generation script (src/generate_ocean_scores.py).
 
 This test suite validates the critical offline logic of the script. It focuses
-on three key areas:
+on key areas such as:
 1.  Parsing the structured JSON response from the LLM.
-2.  The core statistical calculation for average variance.
-3.  The complex "pre-flight check" logic that makes the script robustly
-    resumable by re-analyzing existing data to determine if the variance-based
-    cutoff condition has already been met.
+2.  The main processing loop, including batching and resuming.
+3.  Correctly handling the 'bypass_candidate_selection' mode.
+4.  The offline summary regeneration feature and stale file detection.
+5.  Robust error handling for incomplete LLM responses.
 """
 
-from collections import deque
+import json
+import re
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
-from src.generate_ocean_scores import (
-    calculate_average_variance,
-    parse_batch_response,
-    perform_pre_flight_check,
-)
+from src.generate_ocean_scores import parse_batch_response
 
 
 def test_parse_batch_response():
@@ -61,23 +57,9 @@ def test_parse_batch_response():
     assert result[0]['idADB'] == "101"
 
     # Case 2: Malformed JSON
-    assert parse_batch_response("[{'idADB': '101'}]") == [] # Invalid JSON quotes
+    assert parse_batch_response("[{'idADB': '101'}]") == []  # Invalid JSON quotes
     # Case 3: No JSON array
     assert parse_batch_response("Just some text.") == []
-
-
-def test_calculate_average_variance():
-    """Tests the average variance calculation."""
-    # Case 1: Valid data
-    data = {'Openness': [1, 2, 3], 'Conscientiousness': [2, 3, 4], 'Extraversion': [1,1,1], 'Agreeableness': [1,1,1], 'Neuroticism': [1,1,1]}
-    df = pd.DataFrame(data)
-    # Variance of [1,2,3] is 1.0. Variance of [2,3,4] is 1.0. Variance of [1,1,1] is 0.0.
-    # Average variance = (1.0 + 1.0 + 0 + 0 + 0) / 5 = 0.4
-    assert calculate_average_variance(df) == pytest.approx(0.4)
-
-    # Case 2: Insufficient data
-    df_small = df.head(1)
-    assert calculate_average_variance(df_small) == 0.0
 
 
 @pytest.fixture
@@ -85,15 +67,11 @@ def mock_sandbox_with_bypass_config(tmp_path: Path) -> Path:
     """Creates a mock sandbox with a config.ini for bypass mode testing."""
     (tmp_path / "data" / "foundational_assets").mkdir(parents=True, exist_ok=True)
     
-    config_content = (
-        "[DataGeneration]\n"
-        "bypass_candidate_selection = true\n"
+    (tmp_path / "config.ini").write_text(
+        "[DataGeneration]\nbypass_candidate_selection = true\n"
     )
-    (tmp_path / "config.ini").write_text(config_content)
     
-    # Create a dummy eminence scores file, as it's required to run
-    eminence_content = "idADB,EminenceScore\n101,90.0\n"
-    (tmp_path / "data" / "foundational_assets" / "eminence_scores.csv").write_text(eminence_content)
+    (tmp_path / "data" / "foundational_assets" / "eminence_scores.csv").write_text("idADB,EminenceScore\n101,90.0\n")
     return tmp_path
 
 
@@ -104,63 +82,171 @@ def test_ocean_scores_warns_in_bypass_mode(mock_sandbox_with_bypass_config):
     """
     sandbox_path = mock_sandbox_with_bypass_config
     
-    # Mock user input to be 'n' and simulate an interactive terminal
     from src import generate_ocean_scores
     with patch("builtins.input", return_value="n"), \
          patch("sys.stdout.isatty", return_value=True):
-        test_args = [
-            "generate_ocean_scores.py",
-            "--sandbox-path", str(sandbox_path),
-        ]
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path)]
         with patch("sys.argv", test_args):
             with pytest.raises(SystemExit) as e:
                 generate_ocean_scores.main()
-            assert e.value.code == 0 # Should be a graceful exit
+            assert e.value.code == 0
 
 
-def test_perform_pre_flight_check(mocker, tmp_path):
-    """Tests the pre-flight check logic for resuming or finalizing a run."""
-    output_path = tmp_path / "scores.csv"
-    mock_args = SimpleNamespace(
-        cutoff_start_point=100,
-        variance_check_window=3,
-        variance_trigger_count=2,
-        variance_analysis_window=50,
-        variance_cutoff_percentage=0.5,
-        benchmark_population_size=100 # Add dummy values for summary report
+@pytest.fixture
+def mock_sandbox_for_main_tests(tmp_path: Path) -> dict:
+    """Creates a mock sandbox with inputs for testing the main processing loop."""
+    data_dir = tmp_path / "data" / "foundational_assets"
+    reports_dir = tmp_path / "data" / "reports"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir.mkdir(exist_ok=True)
+
+    (tmp_path / "config.ini").write_text("[DataGeneration]\n" "bypass_candidate_selection = false\n")
+    
+    eminence_content = "Index,idADB,Name,BirthYear,EminenceScore\n" + "\n".join(
+        [f"{i},{100+i},Person {i},{1950+i},90.0" for i in range(1, 6)]
     )
-    # Mock the functions that would perform file I/O
-    mocker.patch('src.generate_ocean_scores.truncate_and_archive_scores')
-    mocker.patch('src.generate_ocean_scores.generate_summary_report')
+    (data_dir / "eminence_scores.csv").write_text(eminence_content)
 
-    # Case 1: Not enough data to start checks
-    df_too_small = pd.DataFrame({'idADB': range(99)})
-    status, _ = perform_pre_flight_check(output_path, mock_args, df_too_small, 0.5, deque())
-    assert status == "CONTINUE"
+    return { "sandbox_path": tmp_path, "output_path": data_dir / "ocean_scores.csv",
+             "summary_path": reports_dir / "ocean_scores_summary.txt",
+             "missing_path": reports_dir / "missing_ocean_scores.txt" }
 
-    # Case 2: Enough data, but cutoff condition is NOT met
-    data_normal = {
-        'Openness': [1]*100 + [1,2,3,4,5]*10, # Add variance to the second window
-        'Conscientiousness': [1]*150, 'Extraversion': [1]*150,
-        'Agreeableness': [1]*150, 'Neuroticism': [1]*150
-    }
-    df_normal = pd.DataFrame(data_normal)
-    # Window 1 (0-100) has var=0 (met). Window 2 (50-150) has var > 0 (not met).
-    # Total met_count will be 1, which is less than the trigger count of 2.
-    status, checks = perform_pre_flight_check(output_path, mock_args, df_normal, 0.5, deque())
-    assert status == "CONTINUE"
-    assert len(checks) == 2
-    assert sum(1 for c in checks if c[2]) == 1 # Only one of the two checks should be met
 
-    # Case 3: Cutoff condition IS met
-    # Simulate a history of 3 checks, with 2 of them meeting the threshold
-    initial_checks = deque([
-        (100, 0.1, True, 20.0), # Met
-        (150, 0.8, False, 160.0),# Not Met
-        (200, 0.2, True, 40.0), # Met -> This is the 2nd of 3, so trigger stop
-    ], maxlen=3)
-    df_cutoff = pd.DataFrame({'idADB': range(200)})
-    status, _ = perform_pre_flight_check(output_path, mock_args, df_cutoff, 0.5, initial_checks)
-    assert status == "EXIT"
+class MockLLMWorker:
+    """A mock for subprocess.run that simulates the llm_prompter.py worker."""
+    def __init__(self, ids_to_miss=None):
+        self.ids_to_miss = ids_to_miss or set()
+
+    def run(self, cmd, check, **kwargs):
+        # A more robust parser that handles flags without values (like --quiet)
+        args = {}
+        i = 1
+        while i < len(cmd):
+            if cmd[i].startswith('--'):
+                key = cmd[i].lstrip('-')
+                if i + 1 < len(cmd) and not cmd[i+1].startswith('--'):
+                    args[key] = cmd[i+1]
+                    i += 2
+                else:
+                    args[key] = True  # Handle flag
+                    i += 1
+            else:
+                i += 1  # Skip positional args
+
+        query_file = Path(args['input_query_file'])
+        response_file = Path(args['output_response_file'])
+        
+        query_text = query_file.read_text()
+        requested = re.findall(r'(\w+\s\d+)\s\(\d+\),\sID\s(\d+)', query_text)
+        
+        response_data = []
+        for name, id_adb in requested:
+            if id_adb not in self.ids_to_miss:
+                response_data.append({ "idADB": id_adb, "Name": name, "Openness": 5.0, "Conscientiousness": 5.0,
+                                        "Extraversion": 5.0, "Agreeableness": 5.0, "Neuroticism": 5.0 })
+        response_file.write_text(json.dumps(response_data, indent=2))
+
+
+def test_full_run_success(mock_sandbox_for_main_tests):
+    """Tests a full, successful run from scratch."""
+    paths = mock_sandbox_for_main_tests
+    test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"]), "--batch-size", "2"]
+    
+    mock_worker = MockLLMWorker()
+    with patch("sys.argv", test_args), patch("src.generate_ocean_scores.subprocess.run", side_effect=mock_worker.run):
+        from src import generate_ocean_scores
+        generate_ocean_scores.main()
+
+    assert paths["output_path"].exists()
+    df = pd.read_csv(paths["output_path"])
+    assert len(df) == 5
+    assert "SUCCESS" in paths["summary_path"].read_text()
+    assert "None" in paths["missing_path"].read_text()
+
+
+def test_resume_from_partial_file(mock_sandbox_for_main_tests, capsys):
+    """Tests that the script correctly resumes from a partially completed file."""
+    paths = mock_sandbox_for_main_tests
+    
+    # Pre-populate the output file with 2 of the 5 subjects, ensuring names are quoted
+    # and there is a trailing newline to prevent corruption on append.
+    cols = "Index,idADB,Name,BirthYear,Openness,Conscientiousness,Extraversion,Agreeableness,Neuroticism"
+    content = f"{cols}\n" + "\n".join([f'{i},{100+i},"Person {i}",{1950+i},5,5,5,5,5' for i in range(1, 3)]) + "\n"
+    paths["output_path"].write_text(content)
+
+    test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"]), "--batch-size", "2"]
+    mock_worker = MockLLMWorker()
+    with patch("sys.argv", test_args), patch("src.generate_ocean_scores.subprocess.run", side_effect=mock_worker.run):
+        from src import generate_ocean_scores
+        generate_ocean_scores.main()
+
+    captured = capsys.readouterr()
+    assert "Processing 3 new subjects" in captured.out
+    df = pd.read_csv(paths["output_path"])
+    assert len(df) == 5
+
+
+def test_llm_misses_subjects_halts_execution(mock_sandbox_for_main_tests):
+    """Tests that the script halts with an error if the LLM misses a subject."""
+    paths = mock_sandbox_for_main_tests
+    test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"])]
+
+    # Configure the mock to miss subject '103'
+    mock_worker = MockLLMWorker(ids_to_miss={'103'})
+    with patch("sys.argv", test_args), \
+         patch("src.generate_ocean_scores.subprocess.run", side_effect=mock_worker.run):
+        from src import generate_ocean_scores
+        with pytest.raises(SystemExit) as e:
+            generate_ocean_scores.main()
+        assert e.value.code == 1
+
+    assert "Person 3 (idADB: 103)" in paths["missing_path"].read_text()
+    df = pd.read_csv(paths["output_path"])
+    assert len(df) == 4
+
+
+def test_stale_input_triggers_rerun(mock_sandbox_for_main_tests, capsys):
+    """Tests that a stale output file triggers an automatic re-run."""
+    paths = mock_sandbox_for_main_tests
+    
+    # Run once to create an output file
+    with patch("sys.argv", ["s.py", "--sandbox-path", str(paths["sandbox_path"])]), \
+         patch("src.generate_ocean_scores.subprocess.run", side_effect=MockLLMWorker().run):
+        from src import generate_ocean_scores
+        generate_ocean_scores.main()
+
+    # Make the input file newer
+    (paths["sandbox_path"] / "data/foundational_assets/eminence_scores.csv").touch()
+    
+    with patch("sys.argv", ["s.py", "--sandbox-path", str(paths["sandbox_path"])]), \
+         patch("src.generate_ocean_scores.subprocess.run", side_effect=MockLLMWorker().run):
+        generate_ocean_scores.main()
+    
+    captured = capsys.readouterr()
+    assert "Stale data detected" in captured.out
+
+
+def test_regenerate_summary_mode_runs_offline(tmp_path: Path):
+    """Tests that the --regenerate-summary flag runs without making API calls."""
+    data_dir = tmp_path / "data" / "foundational_assets"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create dummy files for the test
+    (data_dir / "eminence_scores.csv").write_text("idADB\n1\n2")
+    (data_dir / "ocean_scores.csv").write_text("idADB\n1")
+    (tmp_path / "config.ini").write_text("[DataGeneration]\n")
+
+    from src import generate_ocean_scores
+    with patch("src.generate_ocean_scores.subprocess.run") as mock_subprocess, \
+         patch("src.generate_ocean_scores.generate_summary_report") as mock_summary:
+        
+        test_args = [ "script.py", "--sandbox-path", str(tmp_path), "--regenerate-summary" ]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit) as e:
+                generate_ocean_scores.main()
+            assert e.value.code == 0
+    
+    mock_subprocess.assert_not_called()
+    mock_summary.assert_called_once()
 
 # === End of tests/data_preparation/test_generate_ocean_scores.py ===

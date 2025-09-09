@@ -96,7 +96,7 @@ def format_for_solar_fire(input_data, output_path):
         try:
             month_name = calendar.month_name[int(row['Month'])]
             sf_date_str = f"{row['Day']} {month_name} {row['Year']}"
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, IndexError):
             logging.warning(f"Skipping record for {full_name} due to invalid date.")
             continue
 

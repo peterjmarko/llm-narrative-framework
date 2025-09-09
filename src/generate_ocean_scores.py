@@ -558,7 +558,7 @@ def main():
                 parsed_scores = parse_batch_response(response_text)
 
                 if not parsed_scores:
-                    tqdm.write(f"{Fore.RED}Failed to parse any scores from response for batch {session_batch_num}.")
+                    tqdm.write(f"{Fore.RED}Failed to parse any scores from response for batch {batch_num}.")
                     continue
                 
                 # --- Validate and Enrich Response ---
@@ -567,7 +567,7 @@ def main():
                 parsed_scores = [p for p in parsed_scores if str(p.get('idADB')) in sent_ids]
 
                 # 2. Filter out any duplicates that may have already been processed in this run.
-                existing_ids_in_run = set(all_scores_df['idADB'].astype(str))
+                existing_ids_in_run = set(all_scores_df['idADB'].astype(str)) if not all_scores_df.empty else set()
                 original_count = len(parsed_scores)
                 parsed_scores = [s for s in parsed_scores if str(s.get('idADB')) not in existing_ids_in_run]
                 
@@ -619,12 +619,15 @@ def main():
         if not args.no_summary:
             generate_summary_report(output_path, total_possible_subjects)
         # Reconcile final data to ensure completeness before exiting.
-        final_processed_ids = set(all_scores_df['idADB'].astype(str)) if not all_scores_df.empty else set()
+        # Read the final state from the disk for the most accurate check.
+        final_df_from_disk = pd.read_csv(output_path) if output_path.exists() and output_path.stat().st_size > 0 else pd.DataFrame()
+        final_processed_ids = set(final_df_from_disk['idADB'].astype(str)) if not final_df_from_disk.empty else set()
+        
         initial_ids = {str(s['idADB']) for s in subjects_to_process} | processed_ids
         missing_ids = initial_ids - final_processed_ids
 
         generate_missing_scores_report(
-            missing_report_path, llm_missed_subjects, subjects_to_process, all_scores_df
+            missing_report_path, llm_missed_subjects, subjects_to_process, final_df_from_disk
         )
 
         # If any subjects were not processed (either missed by LLM or unattempted due to error), halt.

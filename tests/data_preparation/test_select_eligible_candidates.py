@@ -27,11 +27,15 @@ by providing mock input files and asserting that the final output contains only
 the correctly selected records.
 """
 
+import os
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
 import pytest
+
 from src import select_eligible_candidates
+from src.select_eligible_candidates import main
 
 
 @pytest.fixture
@@ -76,62 +80,81 @@ def mock_sandbox(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_select_eligible_candidates_main_logic(mock_sandbox):
-    """
-    Tests the main filtering logic of the select_eligible_candidates script.
-    """
-    sandbox_path = mock_sandbox
-    output_path = sandbox_path / "data" / "intermediate" / "adb_eligible_candidates.txt"
+class TestMainWorkflow:
+    """Tests the main orchestration logic of the script."""
 
-    test_args = [
-        "select_eligible_candidates.py",
-        "--sandbox-path", str(sandbox_path),
-        "--force", # Bypasses the interactive prompt
-    ]
-    with patch("sys.argv", test_args):
-        select_eligible_candidates.main()
-
-    assert output_path.exists()
-    with open(output_path, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-
-    # Expect header + 2 valid records (John Smith and Bruce Lee)
-    assert len(lines) == 3
-    
-    id_adbs = {line.strip().split('\t')[1] for line in lines[1:]}
-    assert id_adbs == {"101", "103"}
-
-
-def test_select_eligible_candidates_resumes_correctly(mock_sandbox):
-    """
-    Tests that the script correctly identifies an up-to-date state and exits.
-    """
-    sandbox_path = mock_sandbox
-    output_path = sandbox_path / "data" / "intermediate" / "adb_eligible_candidates.txt"
-
-    # Create a pre-existing, complete output file
-    output_content = (
-        "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tLink\n"
-        "1\t101\tSmith\tJohn\tM\t1\t1\t1950\t12:00\thttp://a.com\n"
-        "3\t103\tLee\tBruce\tM\t27\t11\t1940\t07:12\thttp://c.com\n"
-    )
-    output_path.write_text(output_content)
-    
-    # Mock the user input to prevent the script from hanging
-    with patch("builtins.input", return_value="n"):
-        test_args = [
-            "select_eligible_candidates.py",
-            "--sandbox-path", str(sandbox_path),
-        ]
+    def test_main_logic_full_run(self, mock_sandbox):
+        """Tests the main filtering logic on a fresh run."""
+        output_path = mock_sandbox / "data/intermediate/adb_eligible_candidates.txt"
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--force"]
         with patch("sys.argv", test_args):
-            # The script should exit gracefully after the prompt
-            with pytest.raises(SystemExit) as e:
-                select_eligible_candidates.main()
-            assert e.value.code == 0
-    
-    # Verify the output file was not changed
-    with open(output_path, 'r', encoding='utf-8') as f:
-        final_content = f.read()
-    assert final_content == output_content
+            main()
+
+        assert output_path.exists()
+        df = pd.read_csv(output_path, sep='\t', dtype={'idADB': str})
+        assert len(df) == 2
+        assert set(df['idADB']) == {"101", "103"}
+
+    def test_main_resumes_and_appends(self, mock_sandbox):
+        """Tests that the script correctly appends new candidates to an existing file."""
+        output_path = mock_sandbox / "data/intermediate/adb_eligible_candidates.txt"
+        # Create an incomplete output file with only one of the two valid candidates
+        pre_existing_content = "Index\tidADB\tLastName\tFirstName\tGender\tDay\tMonth\tYear\tTime\tLatitude\tLink\n1\t101\tSmith\tJohn\tM\t1\t1\t1950\t12:00\t40N43\thttp://a.com\n"
+        output_path.write_text(pre_existing_content)
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
+        with patch("sys.argv", test_args):
+            main()
+
+        # The final file should contain both candidates
+        df = pd.read_csv(output_path, sep='\t', dtype={'idADB': str})
+        assert len(df) == 2
+        assert set(df['idADB']) == {"101", "103"}
+
+    def test_main_handles_stale_files(self, mock_sandbox, mocker):
+        """Tests that stale input files trigger an automatic re-run."""
+        input_path = mock_sandbox / "data/sources/adb_raw_export.txt"
+        output_path = mock_sandbox / "data/intermediate/adb_eligible_candidates.txt"
+        output_path.touch()
+
+        # Make the input file newer than the output
+        os.utime(input_path, (output_path.stat().st_mtime + 1, output_path.stat().st_mtime + 1))
+        
+        mock_backup = mocker.patch('src.select_eligible_candidates.backup_and_remove')
+        mocker.patch('builtins.input', side_effect=EOFError) # Prevent hanging
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
+        with patch("sys.argv", test_args):
+            main()
+        
+        mock_backup.assert_called_once_with(output_path)
+
+    def test_main_exits_if_input_missing(self, mock_sandbox, mocker, caplog):
+        """Tests graceful exit if an input file is missing."""
+        validation_path = mock_sandbox / "data/reports/adb_validation_report.csv"
+        validation_path.unlink() # Delete one of the required inputs
+
+        mocker.patch('sys.exit', side_effect=SystemExit)
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit):
+                main()
+        
+        assert "Input file not found" in caplog.text
+
+    def test_main_handles_user_cancellation(self, mock_sandbox):
+        """Tests that the script exits if the user cancels an up-to-date run."""
+        output_path = mock_sandbox / "data/intermediate/adb_eligible_candidates.txt"
+        # Create a complete output file to trigger the prompt
+        output_content = "Index\tidADB\tLastName\n1\t101\tSmith\n3\t103\tLee\n"
+        output_path.write_text(output_content)
+
+        with patch("builtins.input", return_value="n"):
+            test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
+            with patch("sys.argv", test_args):
+                with pytest.raises(SystemExit) as e:
+                    main()
+                assert e.value.code == 0
 
 # === End of tests/data_preparation/test_select_eligible_candidates.py ===

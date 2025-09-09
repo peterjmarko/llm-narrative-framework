@@ -85,13 +85,13 @@ def calculate_average_variance(df: pd.DataFrame) -> float:
     return df[ocean_cols].var().mean()
 
 
-def generate_variance_plot(x_values, raw_variances, smoothed_variances, cutoff_point, search_start, output_path):
+def generate_variance_plot(x_values, raw_variances, smoothed_variances, cutoff_point, search_start, smoothing_window_size, output_path):
     """Generates and saves a diagnostic plot of the variance curve analysis."""
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.figure(figsize=(12, 7))
 
     plt.plot(x_values, raw_variances, color='lightblue', alpha=0.7, label='Raw Cumulative Variance')
-    plt.plot(x_values, smoothed_variances, color='blue', linewidth=2, label=f'Smoothed Variance ({get_config_value(APP_CONFIG, "DataGeneration", "smoothing_window_size", 100, int)}-pt MA)')
+    plt.plot(x_values, smoothed_variances, color='blue', linewidth=2, label=f'Smoothed Variance ({smoothing_window_size}-pt MA)')
     
     plt.axvline(x=search_start, color='green', linestyle=':', linewidth=2, label=f'Search Start ({search_start})')
     plt.axvline(x=cutoff_point, color='red', linestyle='--', linewidth=2, label=f'Final Cutoff ({cutoff_point})')
@@ -137,18 +137,17 @@ def main():
     output_path = Path(get_path("data/intermediate/adb_final_candidates.txt"))
     
     # Conditionally define paths for scoring files
-    # Read bypass config after sandbox is established
+    # Read config, prioritizing sandbox if it exists
+    config = APP_CONFIG
     if args.sandbox_path:
         import configparser
         sandbox_config_path = Path(args.sandbox_path) / "config.ini"
         if sandbox_config_path.exists():
-            sandbox_config = configparser.ConfigParser()
-            sandbox_config.read(sandbox_config_path)
-            bypass_candidate_selection = sandbox_config.get("DataGeneration", "bypass_candidate_selection", fallback="false").lower() == 'true'
-        else:
-            bypass_candidate_selection = False
-    else:
-        bypass_candidate_selection = get_config_value(APP_CONFIG, "DataGeneration", "bypass_candidate_selection", "false").lower() == 'true'
+            config = configparser.ConfigParser()
+            config.read(sandbox_config_path)
+
+    bypass_candidate_selection = get_config_value(config, "DataGeneration", "bypass_candidate_selection", "false").lower() == 'true'
+
     if bypass_candidate_selection:
         input_files = [eligible_path, country_codes_path]
     else:
@@ -212,10 +211,10 @@ def main():
         logging.info("Applying slope analysis to determine final subject count...")
 
         # Load analysis parameters from config
-        min_pop_size = get_config_value(APP_CONFIG, "DataGeneration", "min_population_size", 100, int)
-        search_start_point = get_config_value(APP_CONFIG, "DataGeneration", "cutoff_search_start_point", 500, int)
-        slope_threshold = get_config_value(APP_CONFIG, "DataGeneration", "slope_threshold", -0.00001, float)
-        smoothing_window = get_config_value(APP_CONFIG, "DataGeneration", "smoothing_window_size", 100, int)
+        min_pop_size = get_config_value(config, "DataGeneration", "min_population_size", 100, int)
+        search_start_point = get_config_value(config, "DataGeneration", "cutoff_search_start_point", 500, int)
+        slope_threshold = get_config_value(config, "DataGeneration", "slope_threshold", -0.00001, float)
+        smoothing_window = get_config_value(config, "DataGeneration", "smoothing_window_size", 100, int)
 
         final_count = len(ocean_df)  # Default to all subjects
 
@@ -261,7 +260,7 @@ def main():
             # Generate the diagnostic plot if requested.
             if args.plot:
                 plot_path = Path(get_path("data/reports/variance_curve_analysis.png"))
-                generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, plot_path)
+                generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, smoothing_window, plot_path)
 
         ocean_df = ocean_df.head(final_count)
 

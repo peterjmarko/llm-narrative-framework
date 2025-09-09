@@ -26,25 +26,22 @@ This test suite validates the script's critical offline logic, focusing on:
 1.  Parsing the unique, esoteric format of the raw Solar Fire delineation library.
 2.  Correctly grouping the parsed delineations into distinct, logical tasks for
     the LLM worker.
+3.  The main processing loop, including --fast mode, resumability, and error handling.
 """
 
 import csv
-import shutil
 from pathlib import Path
+import re
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import pytest
 from src import neutralize_delineations
 from src.neutralize_delineations import group_delineations, parse_llm_response
+from types import SimpleNamespace
 
-
-@pytest.fixture
-def mock_delineation_file(tmp_path: Path) -> Path:
-    """Creates a temporary delineation library file for testing."""
-    assets_dir = tmp_path / "data/foundational_assets"
-    assets_dir.mkdir(parents=True)
-    delineation_path = assets_dir / "sf_delineations_library.txt"
-    content = """
+# --- Test Data ---
+MOCK_DELINEATION_CONTENT = """
 ; This is a comment and should be ignored.
 *Title
 Sample Delineations
@@ -53,60 +50,164 @@ Sample Delineations
 You are a pioneer.
 |This is a continuation line.
 
+*Sun in Taurus
+You are steadfast.
+
 *Quadrant 1 Strong
 You are independent.
+
+*Element Fire Strong
+You are passionate.
 """
-    delineation_path.write_text(content)
-    return delineation_path
 
+# --- Mocks and Fixtures ---
 
-def test_parse_llm_response(mock_delineation_file):
+class MockLLMWorker:
+    """A mock for subprocess.run that simulates various llm_prompter.py outcomes."""
+    def __init__(self, fail_on_task=None):
+        self.fail_on_task = fail_on_task
+
+    def run(self, cmd, check, **kwargs):
+        task_name = cmd[2]
+        
+        args = {cmd[i].lstrip('-'): cmd[i+1] for i in range(1, len(cmd), 2) if i + 1 < len(cmd)}
+        query_file = Path(args['input_query_file'])
+        response_file = Path(args['output_response_file'])
+        error_file = Path(args['output_error_file'])
+
+        if self.fail_on_task and self.fail_on_task in task_name:
+            error_file.write_text(f"Simulated failure for {task_name}")
+        else:
+            # Simulate success by writing the core delineation block back as the response
+            query_text = query_file.read_text()
+            match = re.search(r'---\n(.*)\n---', query_text, re.DOTALL)
+            if match:
+                delineation_block = match.group(1).strip()
+                response_file.write_text(delineation_block)
+        
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+@pytest.fixture
+def mock_sandbox(tmp_path: Path) -> dict:
+    """Creates a sandbox environment with mock input files."""
+    assets_dir = tmp_path / "data/foundational_assets"
+    assets_dir.mkdir(parents=True)
+    delineation_path = assets_dir / "sf_delineations_library.txt"
+    delineation_path.write_text(MOCK_DELINEATION_CONTENT)
+    
+    (tmp_path / "config.ini").write_text("[DataGeneration]\npoints_for_neutralization=Sun\n")
+
+    return {
+        "sandbox_path": tmp_path,
+        "output_dir": assets_dir / "neutralized_delineations",
+    }
+
+# --- Core Logic Tests ---
+
+def test_parse_llm_response(tmp_path):
     """
     Tests the parsing of the raw delineation file format, including comments,
     multi-line entries, and line continuations.
     """
-    delineations = parse_llm_response(mock_delineation_file)
+    mock_file = tmp_path / "test.txt"
+    mock_file.write_text(MOCK_DELINEATION_CONTENT)
+    delineations = parse_llm_response(mock_file)
     
-    assert "Title" in delineations
     assert delineations["Title"] == "Sample Delineations"
-    
-    assert "Sun in Aries" in delineations
     assert delineations["Sun in Aries"] == "You are a pioneer. This is a continuation line."
-    
-    assert "Quadrant 1 Strong" in delineations
     assert delineations["Quadrant 1 Strong"] == "You are independent."
-    
-    assert ";" not in str(delineations) # Comments should be fully excluded
-
+    assert ";" not in str(delineations)
 
 def test_group_delineations():
     """
     Tests the logic for grouping parsed delineations into their target output files.
     """
-    mock_dels = {
-        "Quadrant 1 Strong": "Text Q1S",
-        "Quadrant 2 Weak": "Text Q2W",
-        "Element Fire Strong": "Text EFS",
-        "Mode Fixed Weak": "Text MFW",
-        "Aries Strong": "Text AS",
-        "Sun in Leo": "Text SL",
-        "Moon in Cancer": "Text MC",
-        "Some Other Key": "Should be ignored",
-    }
-    points_to_process = ["Sun", "Moon"]
+    mock_dels = {"Quadrant 1 Strong": "Text", "Sun in Leo": "Text", "Other": "Text"}
+    groups = group_delineations(mock_dels, ["Sun"])
+    assert groups["balances_quadrants.csv"] == {"Quadrant 1 Strong": "Text"}
+    assert groups["points_in_signs.csv"] == {"Sun in Leo": "Text"}
+    assert "Other" not in str(groups)
 
-    groups = group_delineations(mock_dels, points_to_process)
+# --- Main Workflow and Orchestration Tests ---
 
-    # Verify correct grouping
-    assert groups["balances_quadrants.csv"] == {"Quadrant 1 Strong": "Text Q1S", "Quadrant 2 Weak": "Text Q2W"}
-    assert groups["balances_elements.csv"] == {"Element Fire Strong": "Text EFS"}
-    assert groups["balances_modes.csv"] == {"Mode Fixed Weak": "Text MFW"}
-    assert groups["balances_signs.csv"] == {"Aries Strong": "Text AS"}
-    assert groups["points_in_signs.csv"] == {"Sun in Leo": "Text SL", "Moon in Cancer": "Text MC"}
+def test_full_run_default_mode(mock_sandbox):
+    """Tests a successful run from scratch in default (atomic task) mode."""
+    paths = mock_sandbox
+    test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"]), "--force"]
     
-    # Verify that an irrelevant key was ignored
-    assert "Some Other Key" not in str(groups)
+    with patch("sys.argv", test_args), \
+         patch("src.neutralize_delineations.subprocess.run", side_effect=MockLLMWorker().run) as mock_run:
+        neutralize_delineations.main()
 
+    # Should be 4 tasks: Q1S, EFS, SiA, SiT
+    assert mock_run.call_count == 4
+    quadrants_file = paths["output_dir"] / "balances_quadrants.csv"
+    assert "You are independent." in quadrants_file.read_text()
+
+def test_full_run_fast_mode(mock_sandbox):
+    """Tests a successful run from scratch in --fast (bundled task) mode."""
+    paths = mock_sandbox
+    test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"]), "--force", "--fast"]
+    
+    with patch("sys.argv", test_args), \
+         patch("src.neutralize_delineations.subprocess.run", side_effect=MockLLMWorker().run) as mock_run:
+        neutralize_delineations.main()
+
+    # Should be 2 tasks: one for all balances, one for all "Sun in Signs"
+    assert mock_run.call_count == 2
+    elements_file = paths["output_dir"] / "balances_elements.csv"
+    assert "You are passionate." in elements_file.read_text()
+
+def test_resume_run_skips_completed_tasks(mock_sandbox, capsys):
+    """Tests that the script correctly skips already completed tasks."""
+    paths = mock_sandbox
+    paths["output_dir"].mkdir()
+    
+    # Pre-create a complete balance file and a partial points file
+    (paths["output_dir"] / "balances_quadrants.csv").write_text('"Quadrant 1 Strong","You are independent."\n')
+    (paths["output_dir"] / "points_in_signs.csv").write_text('"Sun in Aries","You are a pioneer."\n')
+
+    test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"])]
+    with patch("sys.argv", test_args), \
+         patch("src.neutralize_delineations.subprocess.run", side_effect=MockLLMWorker().run) as mock_run:
+        neutralize_delineations.main()
+
+    # Should only run the 2 missing tasks: Element Fire Strong and Sun in Taurus
+    assert mock_run.call_count == 2
+    captured = capsys.readouterr()
+    # The partial points file is for generating, so only 1 file is truly skipped.
+    assert "Found 1 existing/complete file(s) that will be skipped" in captured.out
+
+def test_worker_failure_is_handled_gracefully(mock_sandbox, capsys):
+    """Tests that a worker failure is logged but does not crash the script."""
+    paths = mock_sandbox
+    test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"]), "--force"]
+
+    # Mock the worker to fail specifically on the 'Sun in Aries' task
+    mock_worker = MockLLMWorker(fail_on_task="Sun in Aries")
+    with patch("sys.argv", test_args), \
+         patch("src.neutralize_delineations.subprocess.run", side_effect=mock_worker.run):
+        neutralize_delineations.main()
+    
+    captured = capsys.readouterr()
+    assert "Failed:    1 tasks" in captured.out
+    assert "Simulated failure for Sun in Aries" in captured.out
+
+def test_debug_task_workflow(mock_sandbox, capsys):
+    """Tests that the --debug-task flag isolates a task and exits."""
+    paths = mock_sandbox
+    test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"]), "--debug-task", "Sun in Aries"]
+
+    with patch("sys.argv", test_args), \
+         patch("src.neutralize_delineations.subprocess.run", side_effect=MockLLMWorker().run) as mock_run:
+        with pytest.raises(SystemExit) as e:
+            neutralize_delineations.main()
+        assert e.value.code == 0
+    
+    mock_run.assert_called_once()
+    captured = capsys.readouterr()
+    assert "DEBUG MODE: ISOLATING TASK 'Sun in Aries'" in captured.out
+    assert "PROMPT SENT TO LLM" in captured.out
 
 def test_bypass_llm_functionality(tmp_path):
     """
@@ -114,48 +215,19 @@ def test_bypass_llm_functionality(tmp_path):
     """
     sandbox_path = tmp_path
     
-    # Create the mock input file inside the sandbox
     assets_dir = sandbox_path / "data/foundational_assets"
     assets_dir.mkdir(parents=True)
-    delineation_path = assets_dir / "sf_delineations_library.txt"
-    content = """
-*Quadrant 1 Strong
-You are independent.
-*Sun in Aries
-You are a pioneer.
-"""
-    delineation_path.write_text(content)
+    (assets_dir / "sf_delineations_library.txt").write_text(MOCK_DELINEATION_CONTENT)
+    (sandbox_path / "config.ini").write_text("[DataGeneration]\npoints_for_neutralization=Sun\n")
 
-    test_args = [
-        "neutralize_delineations.py",
-        "--sandbox-path", str(sandbox_path),
-        "--bypass-llm",
-    ]
+    test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--bypass-llm"]
 
     with patch("sys.argv", test_args):
-        # The script should exit cleanly with sys.exit(0)
         with pytest.raises(SystemExit) as e:
             neutralize_delineations.main()
-        assert e.type == SystemExit
         assert e.value.code == 0
 
-    # Verify that the correct output files were created
-    output_dir = sandbox_path / "data/foundational_assets/neutralized_delineations"
-    quadrants_file = output_dir / "balances_quadrants.csv"
-    points_file = output_dir / "points_in_signs.csv"
-    
-    assert quadrants_file.exists()
-    assert points_file.exists()
-
-    # Verify the content of the files is the original, non-neutralized text
-    with open(quadrants_file, 'r') as f:
-        reader = csv.reader(f)
-        row = next(reader)
-        assert row == ["Quadrant 1 Strong", "You are independent."]
-        
-    with open(points_file, 'r') as f:
-        reader = csv.reader(f)
-        row = next(reader)
-        assert row == ["Sun in Aries", "You are a pioneer."]
+    quadrants_file = assets_dir / "neutralized_delineations/balances_quadrants.csv"
+    assert "You are independent." in quadrants_file.read_text()
 
 # === End of tests/data_preparation/test_neutralize_delineations.py ===

@@ -344,7 +344,8 @@ def main():
     else:
         for filename, data in grouped_delineations.items():
             if filename != "points_in_signs.csv":
-                if args.force or not (output_dir / filename).exists():
+                # Only create a task if there is data to process
+                if data and (args.force or not (output_dir / filename).exists()):
                     tasks_to_run.append({'type': 'balance', 'name': filename.replace('.csv','').replace('balances_',''), 'filename': filename, 'data': data})
         
         processed_keys = set() if args.force else get_processed_keys_from_csv(points_output_path)
