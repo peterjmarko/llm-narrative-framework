@@ -1,5 +1,40 @@
 # Changelog
 
+## 9.1.3 (2025-09-10)
+
+### Bump
+
+- **version 9.1.2 → 9.1.3**
+
+### Documentation
+
+- **align all documentation with refactored test suite**
+  Performs a comprehensive update to all project documentation to align with the final, refactored state of the test suite and data pipeline.
+  
+  - **Testing Guide (`TESTING.md`):**
+    - Updates the developer workflow to use the new `-StopAfterStep` parameter, replacing the obsolete `exit 0` method.
+    - Simplifies the Layer 4 and 5 test instructions to use the single `pdm run` commands.
+  
+  - **Replication Guide (`article_supplementary_material.template.md`):**
+    - Recommends the `prepare_data.ps1` orchestrator as the primary replication method.
+    - Corrects the name of the final analysis script to `compile_study.ps1`.
+  
+  - **Core Documentation (`DOCUMENTATION.template.md`):**
+    - Updates all data counts to reflect the final, correct numbers (10619 -> 7234 -> 4954).
+    - Enhances the explanation of the `ZoneAbbr` data integrity technique.
+  
+  - **Diagrams:**
+    - Corrects four Mermaid diagrams (`arch_prep_codebase`, `flow_prep_3_generation`, `flow_prep_pipeline`, `logic_prep_eligible_candidates`) to reflect the final data flows and script logic.
+  
+  - **Other Documents:**
+    - Updates `CONTRIBUTING.md` to include `ROADMAP.md` in the contribution workflow.
+    - Updates `article_main_text.md` to direct readers to the supplementary guide for replication instructions.
+    - Standardizes all dates to "September 2025".
+
+### Fixes
+
+- **bump version for test suite and documentation updates**
+
 ## 9.1.2 (2025-09-09)
 
 ### Bump
