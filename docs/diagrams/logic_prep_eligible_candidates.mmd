@@ -1,14 +1,15 @@
 graph TD
     subgraph Logic for select_eligible_candidates.py
         A[Start] --> B{Load raw data and validation report};
-        B --> C{Loop through all raw records};
 
         subgraph "Integrated Filtering"
             C["Filter for Status 'OK' AND Entry Type 'Person'"] --> D["Filter for Birth Year 1900-1999"];
-            D --> E["Filter for Valid Time Format"];
+            D --> Hemi["Filter for Northern Hemisphere"];
+            Hemi --> E["Filter for Valid Time Format"];
             E --> F["Deduplicate by Normalized Name and Birth Date"];
         end
-
+        
+        B --> C;
         F --> I[Write eligible list to adb_eligible_candidates.txt];
         I --> J[End];
     end

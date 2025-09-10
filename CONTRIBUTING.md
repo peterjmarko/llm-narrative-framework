@@ -296,9 +296,10 @@ pdm run python scripts/lint_docstrings.py --deep
 ```
 
 **Step 3: Update High-Level Documentation**
-If your changes affect the project's architecture, workflow, or data structures, update the relevant source files:
+If your changes affect the project's architecture, workflow, data structures, or future plans, update the relevant source files:
 -   `docs/DOCUMENTATION.template.md`
 -   Diagram source files in `docs/diagrams/`
+-   `ROADMAP.md`
 
 **Step 4: Build the Final Documentation**
 After updating any documentation templates or diagrams, you **must** run the build script to generate the final `docs/DOCUMENTATION.md` file.

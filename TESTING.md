@@ -70,9 +70,10 @@ Once unit tests pass, perform an integration test to validate that the script fu
 
 *   **For a Data Preparation Script:**
     This validation uses the **Layer 3 Integration Test**.
-    1.  **Add Checkpoint:** Temporarily modify the main pipeline orchestrator, `prepare_data.ps1`. Add an `exit 0` command immediately after the line that calls the script you modified.
-    2.  **Run Test:** Execute the default Layer 3 test profile from the project root (`pdm run test-l3-default`).
-    3.  **Verify & Clean Up:** The test will run up to your checkpoint. Inspect the artifacts in `temp_test_environment/layer3_sandbox/` to confirm the correct output. Once verified, simply remove the `exit 0` from `prepare_data.ps1`.
+    1.  **Identify Step Number:** Find the step number of the script you modified in the `prepare_data.ps1` orchestrator's `$PipelineSteps` definition.
+    2.  **Add Checkpoint:** Temporarily modify the Layer 3 test harness (`run_layer3_test.ps1`). Add the `-StopAfterStep` parameter to the `test-l3-default` PDM command, targeting the step *before* your modified script. For example, to test Step 5, you would stop after Step 4.
+    3.  **Run Test:** Execute the test profile from the project root (`pdm run test-l3-default`).
+    4.  **Verify & Clean Up:** The test will run up to your checkpoint. You can now manually run your modified script in the sandbox (`temp_test_environment/layer3_sandbox/`) and inspect the output. Once verified, simply remove the `-StopAfterStep` parameter from the test harness.
 
 *   **For a Main Experiment Script:**
     This validation uses the **Layer 4 Integration Test**.

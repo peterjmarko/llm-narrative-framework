@@ -22,7 +22,7 @@ For a direct or methodological replication, it is crucial to use the exact model
 | Neutralization (LLM C) | Google's Gemini 2.5 Pro | `google/gemini-2.5-pro` |
 | Evaluation (LLM D) | Google's Gemini 1.5 Flash | `google/gemini-1.5-flash-001` |
 
-*Access Dates for Evaluation LLM: June 10, 2025 – July 21, 2025*
+*Access Dates for Evaluation LLM: September 2025*
 
 ## The Data Preparation Pipeline
 
@@ -49,64 +49,14 @@ To extend the research, researchers can modify the framework itself, for example
 
 ### Stage 1: Data Sourcing
 
-This stage uses `fetch_adb_data.py` to create the initial raw dataset by scraping the Astro-Databank website with a specific set of pre-filters.
+The entire data preparation workflow is managed by a single, intelligent orchestrator: `prepare_data.ps1`. This script is fully resumable and is the recommended method for generating a new dataset.
 
 **Prerequisites:** An account at `astro.com` and credentials in the `.env` file.
-```bash
-# Fetch a new dataset from the live ADB
-pdm run fetch-adb
+```powershell
+# Run the entire data preparation pipeline
+.\prepare_data.ps1
 ```
-This produces `data/sources/adb_raw_export.txt`.
-
-### Stage 2: Candidate Qualification
-
-This stage performs a rigorous, deterministic filtering pass to create a high-quality cohort of "eligible candidates."
-
-#### a. Finding Wikipedia Links (`find_wikipedia_links.py`)
-This script takes the raw export and finds the best-guess Wikipedia URL for each subject.
-```bash
-# Find Wikipedia links for all raw records
-pdm run find-links
-```
-
-#### b. Validating Wikipedia Pages (`validate_wikipedia_pages.py`)
-This script validates the content of each page and produces the final `adb_validation_report.csv`.
-```bash
-# Validate the content of each found Wikipedia page
-pdm run validate-pages
-```
-
-#### c. Selecting Eligible Candidates (`select_eligible_candidates.py`)
-This script integrates the raw data with the validation report and applies a series of strict data quality rules (e.g., birth year, Northern Hemisphere, valid time format).
-```bash
-# Create the list of eligible candidates
-pdm run select-eligible
-```
-
-### Stage 3: LLM-based Candidate Selection (Optional)
-
-This is a second, optional filtering pass that uses LLMs to score the "eligible candidates" to determine the final, smaller subject pool. This entire stage can be skipped by setting `bypass_candidate_selection = true` in `config.ini`.
-
-#### a. Eminence Scoring (`generate_eminence_scores.py`)
-This script processes the eligible candidates list and uses an LLM to assign a calibrated eminence score to each.
-```bash
-# Generate eminence scores for all eligible candidates
-pdm run gen-eminence
-```
-
-#### b. OCEAN Scoring (`generate_ocean_scores.py`)
-This script generates OCEAN personality scores for every subject in the eminence-ranked list.
-```bash
-# Generate OCEAN scores for all eminent candidates
-pdm run gen-ocean
-```
-
-#### c. Selecting Final Candidates & Applying Cutoff (`select_final_candidates.py`)
-This script performs the final selection. It takes the complete list of OCEAN scores and applies a sophisticated, data-driven algorithm to determine the optimal cohort size. The script calculates the cumulative personality variance curve, smooths it using a moving average, and then performs a slope analysis to identify the curve's "plateau"—the point of diminishing returns where adding more subjects ceases to contribute meaningfully to the psychological diversity of the pool. In bypass mode, it uses the entire eligible list.
-```bash
-# Create the final, transformed list of subjects
-pdm run select-final
-```
+This single command will execute all the necessary steps, from fetching the raw data to generating the final `personalities_db.txt` file. The individual `pdm run` scripts (e.g., `pdm run find-links`) are also available for advanced development and debugging but are not part of the standard replication workflow.
 
 ##### d. A Note on Determining the Optimal Cutoff Parameters
 To ensure the parameters for the final candidate selection algorithm were chosen objectively and were optimally tuned to the specific shape of the dataset's variance curve, a **systematic sensitivity analysis** was performed using the dedicated `scripts/analyze_cutoff_parameters.py` utility. The search space for the parameters was iteratively expanded to ensure a true global optimum was found.
@@ -408,13 +358,13 @@ After running several experiments (e.g., one for `mapping_strategy = correct` an
 **a. Organize the Study**
 Manually create a directory in `output/studies/` (e.g., `output/studies/My_Replication_Study/`) and move your completed experiment folders into it.
 
-**b. Evaluate the Study (`evaluate_study.ps1`)**
+**b. Compile the Study (`compile_study.ps1`)**
 This script orchestrates the final evaluation. It audits all experiments in the study directory, compiles the results into a master `STUDY_results.csv` file, and runs the final statistical analysis (Two-Way ANOVA).
 
 **Execution:**
 ```powershell
-# Compile and evaluate all experiments in the study directory
-.\evaluate_study.ps1 -ExperimentDirectory "output/studies/My_Replication_Study"
+# Compile and analyze all experiments in the study directory
+.\compile_study.ps1 -StudyDirectory "output/studies/My_Replication_Study"
 ```
 
 **Final Artifacts:**
