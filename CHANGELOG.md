@@ -1,5 +1,31 @@
 # Changelog
 
+## 9.1.2 (2025-09-09)
+
+### Bump
+
+- **version 9.1.1 → 9.1.2**
+
+### Refactor
+
+- **Overhaul test suite for controlled execution and accuracy**
+  Performs a comprehensive overhaul of the data preparation pipeline's test suite. This fixes critical bugs in the Layer 2 orchestration test, completely refactors the Layer 3 integration test for deterministic, controlled execution, and improves code and user documentation.
+  
+  ### Layer 2 Orchestration Fixes
+  - **Corrected False Positives:** Modified `run_layer2_test.ps1` to correctly check for `[INCOMPLETE]` statuses and use proper success message matching, ensuring the test fails when steps are not fully complete.
+  - **Enhanced Mock Generation:** Upgraded the mock script generator to create the necessary summary files and directory structures, resolving the root cause of the `[INCOMPLETE]` statuses and subsequent test looping.
+  
+  ### Layer 3 Integration Refactor
+  - **Controlled Execution:** Introduced a `-StopAfterStep` parameter to `prepare_data.ps1`, allowing the test harness to run the pipeline in precise, controlled segments. The Layer 3 workflow is now broken into four distinct runs to manage its complex logic.
+  - **Corrected Test Sequence:** The isolated validation for the cutoff logic now runs in its correct sequence (as Step 7.a) after the pipeline completes Step 6.
+  - **Resolved Logging Bugs:** Fixed a persistent race condition that caused duplicate and out-of-sequence entries in the summary table.
+  - **Fixed Test Environment:** The setup script no longer copies pipeline-generated files into the sandbox, ensuring a clean state for each test run.
+  - **Standardized Asset Structure:** Reorganized the `tests/assets` directory to mirror the project's `data/` structure for consistency.
+  
+  ### Documentation & Code Clarity
+  - **Docstring Enhancements:** Updated docstrings in key scripts (`generate_ocean_scores.py`, `select_final_candidates.py`, `prepare_sf_import.py`) to reflect current logic and explain critical techniques.
+  - **Testing Guide:** Updated `TESTING.md` with details on the new asset structure and clarified the scope of Layer 2 and 3 tests.
+
 ## 9.1.1 (2025-09-08)
 
 ### Bump
