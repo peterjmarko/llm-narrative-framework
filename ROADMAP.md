@@ -10,9 +10,9 @@ This phase focuses on achieving a fully validated and stable codebase before the
 
 - [ ] **Update Test Suites for New Candidate Selection Logic**
   The logic for determining the final subject pool was moved from `generate_ocean_scores.py` to `select_final_candidates.py`. The following test updates are required to reflect this change:
-  - [ ] **Layer 1:** Simplify the `test_generate_ocean_scores.py` unit test, as the script is now much simpler.
-  - [ ] **Layer 1:** Expand the `test_select_final_candidates.py` unit test to cover the new, critical variance-based cutoff logic.
-  - [ ] **Layer 3:** Update the integration test with a larger, pre-generated seed file for `ocean_scores.csv` that is sufficient to trigger the cutoff logic and validate the new behavior.
+  - [x] **Layer 1:** Simplify the `test_generate_ocean_scores.py` unit test, as the script is now much simpler.
+  - [x] **Layer 1:** Expand the `test_select_final_candidates.py` unit test to cover the new, critical variance-based cutoff logic.
+  - [x] **Layer 3:** Update the integration test with a larger, pre-generated seed file for `ocean_scores.csv` that is sufficient to trigger the cutoff logic and validate the new behavior.
   - [ ] **Layers 4-7:** Review and update all higher-level integration tests to remove any hard-coded assumptions about the final subject count, as it is now data-driven.
 - [ ] **Standardize Layer 4 & 5 Integration Tests**
   - [ ] Create a new directory structure: `tests/testing_harness/experiment_pipeline/layer4/` and `layer5/`.

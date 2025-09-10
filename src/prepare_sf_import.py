@@ -32,7 +32,10 @@ Its primary functions are:
     Base58 string (e.g., 102076 -> "2b4L").
 3.  Injects this encoded ID into the `ZoneAbbr` field of the import record.
     This is the key step that allows a unique identifier to pass through the
-    manual Solar Fire processing step, ensuring robust data integrity.
+    manual Solar Fire processing step, ensuring robust data integrity. The
+    `ZoneAbbr` field was specifically chosen as it is a text field that is
+    passed through the software without modification and is not used in any
+    astrological calculations, making it a safe channel for this data.
 4.  Assembles and writes the final 9-field CQD records to `sf_data_import.txt`.
 """
 

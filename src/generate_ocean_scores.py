@@ -20,27 +20,25 @@
 # Filename: src/generate_ocean_scores.py
 
 """
-Generates OCEAN scores and determines the final subject pool size.
+Generates OCEAN personality scores for all eligible candidates.
 
 This script is the second main component in the "LLM-based Candidate Selection"
-stage and acts as the final arbiter of the subject pool size. It reads the
-rank-ordered list from the eminence scores file and queries an LLM for OCEAN
-scores, stopping automatically when personality diversity declines.
+stage. It reads the full, rank-ordered list of eligible candidates from the
+eminence scores file and queries an LLM to generate OCEAN personality scores
+for every subject.
 
 Key Features:
 -   **Bypass Aware**: If the `bypass_candidate_selection` flag is true in the
     `config.ini`, the script will issue a warning and prompt for confirmation
-    before running, as its output will be ignored by the downstream pipeline.
--   **Data-Driven Cutoff**: Stops processing when it detects a sustained drop in
-    the variance of OCEAN scores, ensuring a psychologically diverse cohort.
--   **Robust & Resumable**: A pre-flight check re-analyzes all existing data
-    on startup, allowing it to safely resume interrupted runs or finalize a
-    completed run without reprocessing subjects.
--   **Comprehensive Reporting**: Generates a detailed summary with descriptive
-    statistics and a full breakdown of the cutoff analysis.
+    before running, as its output may be ignored by the downstream pipeline.
+-   **Robust & Resumable**: Safely resumes interrupted runs without
+    reprocessing already-scored subjects.
+-   **Comprehensive Reporting**: Generates a detailed summary report with
+    descriptive statistics for the scored population.
 
-The final count of subjects in its output file, `ocean_scores.csv`, dictates
-the final list and number of subjects for the experiment.
+The output of this script is a complete set of OCEAN scores, which is then
+used by the `select_final_candidates.py` script to determine the optimal
+final cohort size.
 """
 
 import argparse

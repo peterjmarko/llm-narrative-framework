@@ -24,6 +24,16 @@ This is a standalone, push-button `pytest` script that provides a permanent, hig
     pdm run test-assembly -- --test-record-number=3
     ```
 
+### Test Assets (`tests/assets/`)
+
+All integration tests (Layers 3 and higher) rely on a set of static, version-controlled data assets to ensure they run in a predictable and isolated environment, completely decoupled from any user's locally generated data. These assets are organized within the `tests/assets/` directory.
+
+-   **`tests/assets/data/`**: This is the primary directory for test assets. Its structure deliberately mirrors the main project `data/` folder for consistency. It contains a minimal, stable set of foundational files required for the test suite to run, such as `country_codes.csv`, the pre-neutralized delineation library, and sample Solar Fire chart exports. These files are part of the repository and are set up automatically when you clone the project.
+
+-   **`tests/assets/large_seed/`**: This directory is used for an optional, large-scale validation of the candidate selection logic (see the Layer 3 `default` profile for details). Its contents are generated artifacts and are **not** included in the repository. This directory must be populated manually by the developer to enable the specific test that uses it.
+
+This distinction is why the documentation treats them differently. The core test assets in `tests/assets/data/` are small, essential for all tests, and committed to the repository; they are set up automatically with a `git clone`. The `large_seed` assets are large, optional, and intentionally excluded from version control; they require a documented manual setup step to enable the specific advanced test that relies on them.
+
 ### The Seven Layers of Validation
 
 The framework is validated using a multi-layered strategy to ensure correctness at all levels:
@@ -133,6 +143,22 @@ All Layer 3 tests are run via PDM scripts from the project root.
 
 *   **Default Profile (`default`):**
     This is the standard test case. It runs the full pipeline with LLM-based candidate selection active and injects controlled validation failures to test the script's resilience.
+
+    > **Note on Validating Cutoff Logic:**
+    > The `default` profile includes an extra, isolated test to validate the data-driven cutoff logic in `select_final_candidates.py`. This test requires a large, pre-generated dataset that is not included in the repository.
+    >
+    > **To enable this test, you must manually place the following three files in the `tests/assets/large_seed/` directory:**
+    > ```
+    > tests/assets/large_seed/
+    > └── data/
+    >     ├── foundational_assets/
+    >     │   ├── eminence_scores.csv
+    >     │   └── ocean_scores.csv
+    >     └── intermediate/
+    >         └── adb_eligible_candidates.txt
+    > ```
+    > These files can be obtained by running the full data preparation pipeline on a large dataset. If these files are not present, the cutoff logic validation will be skipped, but the rest of the Layer 3 integration test will still run.
+
     ```powershell
     pdm run test-l3-default
     ```
@@ -292,10 +318,11 @@ Module                              Cov. (%)        Status & Justification
                                                     core data assembly algorithm, and error handling for stale
                                                     data, missing inputs, and single-record debug runs.
 
-`prepare_data.ps1`                  `N/A`           COMPLETE. As the primary orchestrator, this script is the
-                                                    System Under Test for the Layer 3 integration test. Its state
-                                                    machine, resumability, and interactive logic are fully validated
-                                                    by the new profile-driven test harness.
+`prepare_data.ps1`                  `N/A`           COMPLETE. As the primary orchestrator, this script is validated
+                                                    at two layers. The **Layer 2** test uses mock scripts to validate
+                                                    its core state machine and halt/resume logic. The **Layer 3**
+                                                    integration test validates the full, live pipeline, including its
+                                                    interactive features, using a profile-driven test harness.
 --------------------------------------------------------------------------------------------------------------------
 
 ### Main Experiment & Analysis Pipeline

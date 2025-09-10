@@ -20,25 +20,27 @@
 # Filename: src/select_final_candidates.py
 
 """
-Performs the final step of the LLM-based Candidate Selection stage.
+Determines the final subject pool size and performs final transformations.
 
-This script can operate in two modes based on the `bypass_candidate_selection`
+This script is the final, decisive step in the "LLM-based Candidate Selection"
+stage. It can operate in two modes based on the `bypass_candidate_selection`
 flag in `config.ini`:
 
--   **Default Mode:** Filters the "eligible candidates" list, retaining only
-    subjects present in the `ocean_scores.csv` file. This produces the final,
-    LLM-selected subject pool.
--   **Bypass Mode:** Uses the entire "eligible candidates" list as the final
-    subject pool, skipping the LLM-based selection.
+-   **Default Mode:** Performs a sophisticated analysis on the full set of
+    OCEAN scores. It calculates a cumulative personality variance curve, finds
+    the "point of diminishing returns" using slope analysis, and determines an
+    optimal, data-driven cohort size. It then filters the list to this size.
+-   **Bypass Mode:** Skips the LLM-based selection and uses the entire
+    "eligible candidates" list as the final subject pool.
 
-In both modes, it then performs final transformations: resolving country codes,
+In both modes, it performs final data transformations: resolving country codes,
 merging eminence scores for sorting, and re-indexing the final list.
 
 Inputs:
   - `data/intermediate/adb_eligible_candidates.txt`: The full list of subjects
     from the "Candidate Qualification" stage.
-  - `data/foundational_assets/ocean_scores.csv`: (Default Mode) The definitive
-    subject set determined by OCEAN scoring.
+  - `data/foundational_assets/ocean_scores.csv`: (Default Mode) The full set of
+    OCEAN scores for all eligible candidates.
   - `data/foundational_assets/eminence_scores.csv`: (Default Mode) Used for sorting.
   - `data/foundational_assets/country_codes.csv`: The mapping file for country
     abbreviations.
@@ -85,7 +87,7 @@ def calculate_average_variance(df: pd.DataFrame) -> float:
     return df[ocean_cols].var().mean()
 
 
-def generate_variance_plot(x_values, raw_variances, smoothed_variances, cutoff_point, search_start, smoothing_window_size, output_path):
+def generate_variance_plot(x_values, raw_variances, smoothed_variances, cutoff_point, search_start, smoothing_window_size, output_path, interactive=True):
     """Generates and saves a diagnostic plot of the variance curve analysis."""
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.figure(figsize=(12, 7))
@@ -107,7 +109,8 @@ def generate_variance_plot(x_values, raw_variances, smoothed_variances, cutoff_p
         output_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(output_path, dpi=150)
         logging.info(f"Diagnostic plot saved to '{output_path}'.")
-        plt.show()
+        if interactive:
+            plt.show()
     except Exception as e:
         logging.error(f"Failed to save or show plot: {e}")
     finally:
@@ -260,7 +263,9 @@ def main():
             # Generate the diagnostic plot if requested.
             if args.plot:
                 plot_path = Path(get_path("data/reports/variance_curve_analysis.png"))
-                generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, smoothing_window, plot_path)
+                # In a sandbox/test run, save the plot but do not show it interactively.
+                is_interactive_mode = not args.sandbox_path
+                generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, smoothing_window, plot_path, interactive=is_interactive_mode)
 
         ocean_df = ocean_df.head(final_count)
 

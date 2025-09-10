@@ -63,15 +63,59 @@ try {
         $scriptName = Split-Path $match.Groups[1].Value -Leaf
         $outputFile = $match.Groups[2].Value
         
-        $mockContent = @"
+        $mockContent = ""
+        if ($scriptName -eq "generate_eminence_scores.py") {
+            $mockContent = @"
 import sys
 from pathlib import Path
-# This mock script simulates the creation of the expected output file.
+# This mock simulates creating the output file AND its summary file.
+output = Path('$outputFile')
+output.parent.mkdir(parents=True, exist_ok=True)
+output.touch()
+summary_file = Path('data/reports/eminence_scores_summary.txt')
+summary_file.parent.mkdir(parents=True, exist_ok=True)
+summary_file.write_text('Total in Source: 100\nTotal Scored: 100')
+sys.exit(0)
+"@
+        } elseif ($scriptName -eq "generate_ocean_scores.py") {
+            $mockContent = @"
+import sys
+from pathlib import Path
+# This mock simulates creating the output file AND its summary file.
+output = Path('$outputFile')
+output.parent.mkdir(parents=True, exist_ok=True)
+output.touch()
+summary_file = Path('data/reports/ocean_scores_summary.txt')
+summary_file.parent.mkdir(parents=True, exist_ok=True)
+summary_file.write_text('Total in Source: 100\nTotal Scored: 100')
+sys.exit(0)
+"@
+        } elseif ($scriptName -eq "neutralize_delineations.py") {
+            $mockContent = @"
+import sys
+from pathlib import Path
+# This mock simulates creating the full directory of neutralized files.
+output_dir = Path('$outputFile').parent
+output_dir.mkdir(parents=True, exist_ok=True)
+expected_files = [
+    "balances_elements.csv", "balances_modes.csv", "balances_hemispheres.csv",
+    "balances_quadrants.csv", "balances_signs.csv", "points_in_signs.csv"
+]
+for f in expected_files:
+    (output_dir / f).touch()
+sys.exit(0)
+"@
+        } else {
+            $mockContent = @"
+import sys
+from pathlib import Path
+# This mock simulates the creation of the expected output file.
 output = Path('$outputFile')
 output.parent.mkdir(parents=True, exist_ok=True)
 output.touch()
 sys.exit(0)
 "@
+        }
         Set-Content -Path (Join-Path $srcDir $scriptName) -Value $mockContent
     }
     Write-Host "  -> Successfully created $($automatedSteps.Count) mock scripts."

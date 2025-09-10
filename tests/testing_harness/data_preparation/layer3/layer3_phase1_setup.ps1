@@ -80,16 +80,11 @@ $sandboxDataDir = Join-Path $SandboxDir "data"
 # - Plus suffix (e.g., "160+"): Minimum line count.
 # - 'h' character (e.g., "12h"): Skips header row for counting.
 $assetManifest = @{
-    "foundational_assets/country_codes.csv" = "160h+";
-    "foundational_assets/adb_category_map.csv" = "806h+";
-    "foundational_assets/point_weights.csv" = "12h";
-    "foundational_assets/balance_thresholds.csv" = "5h";
-    "foundational_assets/neutralized_delineations/balances_elements.csv" = 8;
-    "foundational_assets/neutralized_delineations/balances_hemispheres.csv" = 4;
-    "foundational_assets/neutralized_delineations/balances_modes.csv" = 6;
-    "foundational_assets/neutralized_delineations/balances_quadrants.csv" = 4;
-    "foundational_assets/neutralized_delineations/balances_signs.csv" = 12;
-    "foundational_assets/neutralized_delineations/points_in_signs.csv" = 144;
+    "data/foundational_assets/country_codes.csv" = "160h+";
+    "data/foundational_assets/adb_category_map.csv" = "806h+";
+    "data/foundational_assets/point_weights.csv" = "12h";
+    "data/foundational_assets/balance_thresholds.csv" = "5h";
+
 }
 
 Write-Host "Copying and validating foundational test assets..."
@@ -98,7 +93,9 @@ foreach ($entry in $assetManifest.GetEnumerator()) {
     $validationRule = "$($entry.Value)" # Ensure it's a string
 
     $sourcePath = Join-Path $testsAssetsDir $relativePath
-    $destinationPath = Join-Path $sandboxDataDir $relativePath
+    # The destination path inside the sandbox's 'data' dir should not include the 'data/' prefix from the asset path.
+    $destinationRelativePath = $relativePath -replace '^data[\\/]'
+    $destinationPath = Join-Path $sandboxDataDir $destinationRelativePath
 
     if (-not (Test-Path $sourcePath)) { throw "FATAL: Required test asset not found at '$sourcePath'." }
 
@@ -155,20 +152,12 @@ Set-Content -Path (Join-Path $SandboxDir "config.ini") -Value $configContent
 
 # Copy other test assets from tests/assets into sandbox
 # Copy SF interpretation reports 
-$reportsSource = Join-Path $testsAssetsDir "sf_reports"
+$reportsSource = Join-Path $testsAssetsDir "data/sf_reports"
 $reportsTarget = Join-Path $SandboxDir "data/sf_reports_test_subjects"
 if (Test-Path $reportsSource) {
     New-Item -Path $reportsTarget -ItemType Directory -Force | Out-Null
     Copy-Item "$reportsSource/*" $reportsTarget -Force
     Write-Host "Copied SF interpretation reports from tests/assets."
-}
-
-# Copy SF export file (single CSV with all test subjects)
-$exportsSource = Join-Path $testsAssetsDir "sf_exports/sf_chart_export.csv"
-$exportsTarget = Join-Path $SandboxDir "data/sf_chart_export.csv"
-if (Test-Path $exportsSource) {
-    Copy-Item $exportsSource $exportsTarget -Force
-    Write-Host "Copied SF chart export data from tests/assets."
 }
 
 Write-Host ""

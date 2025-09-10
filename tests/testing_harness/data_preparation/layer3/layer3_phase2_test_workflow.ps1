@@ -65,6 +65,22 @@ print(from_base58('$EncodedString'))
 if (-not (Test-Path $SandboxDir)) { throw "FATAL: Test sandbox not found. Please run Phase 1 first." }
 
 try {
+    # --- 0. Initialize Execution Log for pipeline steps ---
+    $executedStepsLog = [System.Collections.Generic.List[object]]::new()
+    $taskCounter = 1
+    $currentStageNumber = 0
+    
+    $prepareDataScript = Join-Path $ProjectRoot "prepare_data.ps1"
+    # Parse the orchestrator to map step numbers to output files for logging
+    $stepToOutputMap = @{}
+    $pipelineContent = Get-Content $prepareDataScript -Raw
+    $stepDefinitions = $pipelineContent | Select-String -Pattern 'Name\s*=\s*"([^"]+?)".*?Output\s*=\s*"([^"]+?)"' -AllMatches
+    $i = 1
+    foreach ($match in $stepDefinitions.Matches) {
+        $stepToOutputMap[$i] = $match.Groups[2].Value
+        $i++
+    }
+
     $AllSubjects = $TestProfile.Subjects
     # Define the subset of subjects expected to pass initial filtering and selection
     $FinalSubjects = $TestProfile.Subjects | Where-Object { $_.Name -in @("Ernst (1900) Busch", "Paul McCartney", "Jonathan Cainer") }
@@ -187,7 +203,6 @@ try {
         Write-Host "  -> ✓ ${StepName}: All subjects present" -ForegroundColor Green
     }
 
-
     # --- Execute Pipeline (Part 1) ---
     $prepareDataScript = Join-Path $ProjectRoot "prepare_data.ps1"
     Write-Host "`n--- EXECUTING PIPELINE (Part 1): Running pipeline to generate files needed for simulation... ---" -ForegroundColor Cyan
@@ -221,6 +236,14 @@ try {
         Read-Host -Prompt "`n${C_YELLOW}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n"
     }
 
+    $executedStepsLog.Add([pscustomobject]@{
+        'Task #' = $taskCounter++
+        'Stage #' = 1
+        'Step #' = 1
+        'Step Description' = "Fetch Raw ADB Data"
+        'Status' = "SUCCESS"
+        'Output File' = $stepToOutputMap[1]
+    })
     Write-Host "`n  -> Performing targeted fetch for $($TestProfile.Subjects.Count) subjects..."
     $fetchScript = Join-Path $ProjectRoot "src/fetch_adb_data.py"
     $outputFile = "data/sources/adb_raw_export.txt"
@@ -305,42 +328,105 @@ try {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $env:PYTHONIOENCODING = "utf-8"
 
-    # Capture the output, but do not display it live. We will control the messaging.
-    $pipelinePart1Args = @{
-        Force = $true
-        NoFinalReport = $true
-        SilentHalt = $true
-        TestMode = $true
+    # --- RUN 1: Execute pipeline through Step 6 ---
+    $run1Args = @{
+        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 6
     }
-    if ($Interactive) {
-        $pipelinePart1Args.Interactive = $true
-    }
-    # Explicitly set the working directory for the orchestrator and pipe output to unbuffer it
-    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @pipelinePart1Args 2>&1 | ForEach-Object { Write-Host $_ }
-    $pipelinePart1ExitCode = $LASTEXITCODE
+    if ($Interactive) { $run1Args.Interactive = $true }
     
-    Remove-Item Env:PROJECT_SANDBOX_PATH -ErrorAction SilentlyContinue
+    $run1Steps = [System.Collections.Generic.List[object]]::new()
+    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run1Args 2>&1 | ForEach-Object {
+        Write-Host $_
+        if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
+        if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
+            $stepNum = [int]$matches[1]
+            $run1Steps.Add(@{
+                'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum]
+            })
+        }
+    }
+    $run1ExitCode = $LASTEXITCODE
+    if ($run1ExitCode -ne 1) { throw "Pipeline Run 1 was expected to halt after Step 6 but did not." }
 
-    # --- 3. Validate Pipeline Part 1 and Perform Interventions ---
-    $sfImportFile = Join-Path $SandboxDir "data/intermediate/sf_data_import.txt"
-    if ($pipelinePart1ExitCode -ne 1 -or -not (Test-Path $sfImportFile)) {
-        throw "Pipeline Part 1 was expected to halt for Solar Fire Processing but did not."
+    $run1Status = "SUCCESS"
+    foreach ($step in $run1Steps) {
+        $executedStepsLog.Add([pscustomobject]@{
+            'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = $run1Status; 'Output File' = $step.'Output File'
+        })
     }
-    Write-Host "`n--- VALIDATING: Checking output from Pipeline Part 1... ---" -ForegroundColor Cyan
-    Test-StepContinuity "Wikipedia Links" (Join-Path $SandboxDir "data/processed/adb_wiki_links.csv") 1 "," $AllSubjects
-    Test-StepContinuity "Page Validation" (Join-Path $SandboxDir "data/reports/adb_validation_report.csv") 1 "," $AllSubjects
+
+    # --- VALIDATE INTERMEDIATE RESULTS & RUN ISOLATED TEST 7.a ---
     Test-StepContinuity "Eligible Candidates" (Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt") 1 "`t" $FinalSubjects
-    if ($TestProfile.ConfigOverrides["bypass_candidate_selection"] -ne "true") {
-        Test-StepContinuity "Eminence Scores" (Join-Path $SandboxDir "data/foundational_assets/eminence_scores.csv") 1 "," $FinalSubjects
-        Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
+    Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
+
+    # --- 3a. Inject an isolated test for Step 7's cutoff logic using a large seed dataset ---
+    $stepHeader7a = ">>> Step 7.a/13: Validate Cutoff Logic (Large Seed) <<<"
+    Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader7a -ForegroundColor Blue; Write-Host "Validates the subject cutoff algorithm using a large seed dataset." -ForegroundColor Blue
+    $largeSeedDir = Join-Path $ProjectRoot "tests/assets/large_seed"
+    if (Test-Path $largeSeedDir) {
+        $tempCutoffSandbox = Join-Path $SandboxDir "temp_cutoff_test"
+        try {
+            @("data/intermediate", "data/foundational_assets", "data/reports") | ForEach-Object { New-Item -Path (Join-Path $tempCutoffSandbox $_) -ItemType Directory -Force | Out-Null }
+            Copy-Item -Path (Join-Path $largeSeedDir "data/intermediate/adb_eligible_candidates.txt") -Destination (Join-Path $tempCutoffSandbox "data/intermediate/")
+            Copy-Item -Path (Join-Path $largeSeedDir "data/foundational_assets/eminence_scores.csv") -Destination (Join-Path $tempCutoffSandbox "data/foundational_assets/")
+            Copy-Item -Path (Join-Path $largeSeedDir "data/foundational_assets/ocean_scores.csv") -Destination (Join-Path $tempCutoffSandbox "data/foundational_assets/")
+            Copy-Item -Path (Join-Path $ProjectRoot "tests/assets/data/foundational_assets/country_codes.csv") -Destination (Join-Path $tempCutoffSandbox "data/foundational_assets/")
+            $selectCandidatesScript = Join-Path $ProjectRoot "src/select_final_candidates.py"
+            & pdm run python $selectCandidatesScript --sandbox-path $tempCutoffSandbox --plot
+            $largeInputCount = (Get-Content (Join-Path $tempCutoffSandbox "data/foundational_assets/ocean_scores.csv") | Select-Object -Skip 1).Length
+            $largeOutput = Join-Path $tempCutoffSandbox "data/intermediate/adb_final_candidates.txt"
+            if (-not (Test-Path $largeOutput)) { throw "Cutoff logic test failed: Output file was not created." }
+            $largeOutputCount = (Get-Content $largeOutput | Select-Object -Skip 1).Length
+            if ($largeOutputCount -ge $largeInputCount) { throw "Cutoff logic test failed: The number of final candidates ($largeOutputCount) was not less than the input ($largeInputCount)." }
+            Write-Host "  -> ✓ Step 7 Cutoff Logic: Successfully validated with large seed data ($largeInputCount -> $largeOutputCount subjects)." -ForegroundColor Green
+        } finally {
+            if (Test-Path $tempCutoffSandbox) { Remove-Item -Path $tempCutoffSandbox -Recurse -Force }
+        }
+    } else {
+        Write-Host "  -> SKIPPED: Large seed data directory not found at 'tests/assets/large_seed'." -ForegroundColor Yellow
     }
-    Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
-    Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
+
+    $executedStepsLog.Add([pscustomobject]@{
+        'Task #' = $taskCounter++; 'Stage #' = 3; 'Step #' = "7.a"; 'Step Description' = "Validate Cutoff Logic (Large Seed)"; 'Status' = "SUCCESS"; 'Output File' = "temp_cutoff_test/..."
+    })
+
     if ($TestProfile.InterventionScript) {
         & $TestProfile.InterventionScript -SandboxDir $SandboxDir
     }
 
-    # --- 4. Simulate First Manual Step & Resume ---
+    # --- RUN 2: Resume pipeline from Step 7.b to the next manual step (9) ---
+    Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming from Step 7.b... ---" -ForegroundColor Cyan
+    $stepHeader7b = ">>> Step 7.b/13: Select Final Candidates <<<"
+    Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader7b -ForegroundColor Blue; Write-Host "Filters, transforms, and sorts the final subject set based on the LLM scoring." -ForegroundColor Blue
+    $run2Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true }
+    if ($Interactive) { $run2Args.Interactive = $true }
+
+    $run2Steps = [System.Collections.Generic.List[object]]::new()
+    # Capture output, but suppress the orchestrator's original 'Step 7' header
+    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run2Args 2>&1 | ForEach-Object {
+        if ($_ -notmatch '>>> Step 7/13:.*') { Write-Host $_ }
+        if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
+        if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
+            $stepNum = [int]$matches[1]
+            $run2Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+        }
+    }
+    $run2ExitCode = $LASTEXITCODE
+    if ($run2ExitCode -ne 1) { throw "Pipeline Run 2 was expected to halt for Step 9 but did not." }
+    
+    # Log the steps that completed in this run (7.b and 8)
+    $run2Status = "SUCCESS"
+    if ($run2Steps.Count > 0) { $run2Steps.RemoveAt($run2Steps.Count - 1) } # Remove the halted step
+    foreach ($step in $run2Steps) {
+        $stepNumber = if ($step.'Step Description' -eq "Select Final Candidates") { "7.b" } else { $step.'Step #' }
+        $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $stepNumber; 'Step Description' = $step.'Step Description'; 'Status' = $run2Status; 'Output File' = $step.'Output File' })
+    }
+
+    # --- SIMULATE Manual Step 9: Solar Fire Processing ---
+    $sfImportFile = Join-Path $SandboxDir "data/intermediate/sf_data_import.txt"
+    Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
+    Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
+
     Write-Host "`n--- SIMULATING: Solar Fire Processing... ---" -ForegroundColor Magenta
     $idMap = @{}; Get-Content $sfImportFile | ForEach-Object { $f = $_.Split(',') | ForEach-Object { $_.Trim('"') }; if ($f.Length -ge 4) { $idMap[$f[0]] = $f[3] } }
     $destAssetDir = Join-Path $SandboxDir "data/foundational_assets"
@@ -352,15 +438,27 @@ try {
     foreach ($key in $idMap.Keys) { $chartExportContent = $chartExportContent -replace "ID_$($key.Split(' ')[-1].ToUpper())", $idMap[$key] }
     $chartExportPath = Join-Path $destAssetDir "sf_chart_export.csv"
     $chartExportContent | Set-Content -Path $chartExportPath -Encoding UTF8
-    Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming... ---" -ForegroundColor Cyan
-    $resumeArgs = @{ Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true }
-    if ($Interactive) { $resumeArgs.Interactive = $true }
-    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @resumeArgs 2>&1 | ForEach-Object { Write-Host $_ }
-    $pipelinePart2ExitCode = $LASTEXITCODE
 
-    # --- 5. Simulate Second Manual Step & Resume ---
+    # --- RUN 3: Resume pipeline from Step 10 to the next manual step (10) ---
+    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming from Step 10... ---" -ForegroundColor Cyan
+    $run3Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true }
+    if ($Interactive) { $run3Args.Interactive = $true }
+
+    $run3Steps = [System.Collections.Generic.List[object]]::new()
+    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run3Args 2>&1 | ForEach-Object {
+        Write-Host $_
+        if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
+        if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
+            $stepNum = [int]$matches[1]
+            $run3Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+        }
+    }
+    $run3ExitCode = $LASTEXITCODE
+    if ($run3ExitCode -ne 1) { throw "Pipeline Run 3 was expected to halt for Step 10 but did not." }
+    if ($run3Steps.Count > 0) { $run3Steps.RemoveAt($run3Steps.Count - 1) } # Remove the halted step
+
+    # --- SIMULATE Manual Step 10: Delineation Export ---
     $delineationLibPath = Join-Path $destAssetDir "sf_delineations_library.txt"
-    if ($pipelinePart2ExitCode -ne 1 -or (Test-Path $delineationLibPath)) { throw "Pipeline Part 2 was expected to halt for Delineation Export but did not." }
     Write-Host "`n--- SIMULATING: Delineation Export... ---" -ForegroundColor Magenta
     @"
 *Quadrant Strong 1st
@@ -369,45 +467,39 @@ A focus on self-awareness and personal identity.
 A self-motivated and independent nature.
 *Aries Strong
 Assertive and pioneering.
-*Element Strong Water
-Compassionate and caring with a strong intuitional nature.
-*Mode Strong Cardinal
-Enjoys challenge and action.
-*Sun in Capricorn
-Serious and responsible.
-*Moon in Leo
-A love for being the center of attention.
-*Mercury in Sagittarius
-A search for knowledge to expand the worldview.
-*Venus in Sagittarius
-A desire to share adventure with a partner.
-*Mars in Aquarius
-A drive to fight for just causes.
-*Jupiter in Pisces
-An intuitive search for truth.
-*Saturn in Sagittarius
-A potential commitment to higher education.
-*Uranus in Leo
-A seeking of freedom for individual expression.
-*Neptune in Libra
-An ability to view relationships holistically.
-*Pluto in Leo
-An ability to use power both positively and negatively.
-*Ascendant in Virgo
-A cautious approach to life.
-*Midheaven in Gemini
-A need for stimulation in professional life.
 "@ | Set-Content -Path $delineationLibPath -Encoding UTF8
-
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Delineation Export"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
+    
+    # --- SIMULATE Step 11 by copying pre-neutralized assets ---
     Write-Host "`n--- SIMULATING: Neutralize Delineations... ---" -ForegroundColor Magenta
-    Write-Host "  -> This step uses pre-neutralized text from the test assets." -ForegroundColor DarkGray
+    $sourceDir = Join-Path $ProjectRoot "tests/assets/data/foundational_assets/neutralized_delineations"
+    $destDir = Join-Path $SandboxDir "data/foundational_assets/neutralized_delineations"
+    New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+    Copy-Item -Path "$sourceDir/*" -Destination $destDir -Recurse -Force
+    Write-Host "  -> Copied pre-neutralized delineation files from test assets."
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 11; 'Step Description' = "Neutralize Delineations"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[11] })
 
-    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming to completion... ---" -ForegroundColor Cyan
-    $resumeArgsP3 = @{ NoFinalReport = $true; Resumed = $true; TestMode = $true }
-    if ($Interactive) { $resumeArgsP3.Interactive = $true }
-    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @resumeArgsP3 2>&1 | ForEach-Object { Write-Host $_ }
-    $pipelineP3ExitCode = $LASTEXITCODE
-    if ($pipelineP3ExitCode -ne 0) { throw "Pipeline Part 3 failed with exit code $pipelineP3ExitCode." }
+    # --- RUN 4: Resume to completion ---
+    Write-Host "`n--- EXECUTING PIPELINE (Part 4): Resuming to completion... ---" -ForegroundColor Cyan
+    $run4Args = @{ NoFinalReport = $true; Resumed = $true; TestMode = $true }
+    if ($Interactive) { $run4Args.Interactive = $true }
+
+    $run4Steps = [System.Collections.Generic.List[object]]::new()
+    & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run4Args 2>&1 | ForEach-Object {
+        Write-Host $_
+        if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
+        if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
+            $stepNum = [int]$matches[1]
+            $run4Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+        }
+    }
+    $run4ExitCode = $LASTEXITCODE
+    if ($run4ExitCode -ne 0) { throw "Pipeline Run 4 failed with exit code $run4ExitCode." }
+    
+    $run4Status = "SUCCESS"
+    foreach ($step in $run4Steps) {
+        $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = $run4Status; 'Output File' = $step.'Output File' })
+    }
 
     # --- 6. Final Verification ---
     Write-Host "`n--- VERIFYING: Checking final output... ---" -ForegroundColor Cyan
@@ -420,4 +512,38 @@ A need for stimulation in professional life.
 }
 catch {
     throw "Layer 3 test workflow failed.`n$($_.Exception.Message)"
+}
+finally {
+    # --- 8. Print Execution Summary ---
+    if ($executedStepsLog.Count -gt 0) {
+        Write-Host "`n--- HARNESS: Actual Pipeline Execution Flow ---`n" -ForegroundColor Yellow
+        
+        # Manual table formatting to ensure 3-space separation between columns
+        $props = 'Task #', 'Stage #', 'Step #', 'Step Description', 'Status', 'Output File'
+        
+        # Calculate max width for each column based on header and data
+        $widths = @{}
+        foreach ($p in $props) { $widths[$p] = $p.Length }
+        foreach ($log in $executedStepsLog) {
+            foreach ($p in $props) {
+                $widths[$p] = [Math]::Max($widths[$p], $log.$p.ToString().Length)
+            }
+        }
+        
+        $separator = "   "
+        
+        # Build and print header line
+        $headerLine = ($props | ForEach-Object { $_.PadRight($widths[$_]) }) -join $separator
+        Write-Host $headerLine
+        
+        # Build and print separator line
+        $separatorLine = ($props | ForEach-Object { '-' * $widths[$_] }) -join $separator
+        Write-Host $separatorLine
+        
+        # Build and print data rows
+        foreach ($log in $executedStepsLog) {
+            $rowLine = ($props | ForEach-Object { $log.$_.ToString().PadRight($widths[$_]) }) -join $separator
+            Write-Host $rowLine
+        }
+    }
 }

@@ -191,12 +191,12 @@ This stage is a second, optional filtering pass that uses LLMs to score the "eli
 
 This is the final stage, which assembles the personality profiles for the selected candidates. It involves a mix of automated and manual steps.
 
-1.  **Formatting (`prepare_sf_import.py`):** Formats the final subject list for import into the Solar Fire software, encoding each subject's unique ID for data integrity.
+1.  **Formatting (`prepare_sf_import.py`):** Formats the final subject list for import into the Solar Fire software. Critically, it encodes each subject's unique `idADB` into a Base58 string and injects it into the `ZoneAbbr` field. This technique allows a unique identifier to pass through the manual software step, ensuring a perfect data merge later.
 2.  **Manual Processing (Solar Fire):** The formatted file is imported into Solar Fire, which calculates the required celestial data and exports it as `sf_chart_export.csv`.
 3.  **Neutralization (`neutralize_delineations.py`):** This script uses a powerful hybrid strategy to rewrite the esoteric source texts.
     *   **Fast Mode (`--fast`):** For initial runs, this mode bundles tasks into large, high-speed API calls (e.g., all 12 "Sun in Signs" delineations at once). This is highly efficient but may fail on some large tasks.
     *   **Robust/Resume Mode (default):** For resuming or fixing failed runs, this mode processes each of the 149 delineations as a separate, atomic task. This granular approach is slower but guarantees completion by solving potential response truncation issues from the LLM.
-4.  **Integration (`create_subject_db.py`):** Integrates the manually generated chart data with the final subject list, decodes the unique IDs, and produces a clean master database.
+4.  **Integration (`create_subject_db.py`):** Bridges the manual step by reading the Solar Fire chart export, decoding the unique `idADB` from the `ZoneAbbr` field, and merging the chart data with the final subject list to produce a clean master database.
 5.  **Generation (`generate_personalities_db.py`):** Assembles the final `personalities_db.txt` by combining the subject data with the neutralized delineation library according to a deterministic algorithm.
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.

@@ -92,7 +92,10 @@ param(
     [switch]$TestMode,
 
     [Parameter(Mandatory=$false)]
-    [switch]$Plot
+    [switch]$Plot,
+
+    [Parameter(Mandatory=$false)]
+    [int]$StopAfterStep = 0
 )
 
 # --- Pre-flight Cleanup ---
@@ -478,9 +481,6 @@ try {
             if ($step.Name -in "Find Wikipedia Links", "Validate Wikipedia Pages") {
                 $arguments += "--quiet"
             }
-            if ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
-                $arguments += "--no-summary" # Only suppress summary in test mode
-            }
         }
         
         # Suppress redundant warnings from Python scripts in ALL modes
@@ -514,6 +514,13 @@ try {
             throw "Script '$($step.Script)' failed with exit code $exitCode. Halting pipeline." 
         }
         if ($Interactive) { Write-Host ""; Read-Host -Prompt "`n${C_YELLOW}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n" }
+        
+        # If a stop point is specified by the harness, halt with the special exit code.
+        if ($StopAfterStep -gt 0 -and $stepCounter -eq $StopAfterStep) {
+            Write-Host "`n${C_MAGENTA}HARNESS DIRECTIVE: Halting after Step $stepCounter as requested.${C_RESET}"
+            $exitCode = 1
+            break
+        }
     }
     
     # The run is only successful if the loop finishes and the exit code is still 0.
