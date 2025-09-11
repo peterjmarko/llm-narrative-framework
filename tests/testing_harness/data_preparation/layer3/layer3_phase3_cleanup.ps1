@@ -38,7 +38,8 @@ if (Test-Path $SandboxDir) {
         
         Write-Host "Creating backup of test artifacts..."
         Compress-Archive -Path $SandboxDir -DestinationPath $backupPath -Force
-        Write-Host "  -> Backup saved to: $((Resolve-Path $backupPath -Relative).TrimStart(".\"))" -ForegroundColor Cyan
+        $displayPath = (Resolve-Path $backupPath -Relative).TrimStart(".\").Replace('\', '/')
+        Write-Host "  -> Backup saved to: $displayPath" -ForegroundColor Cyan
     }
     catch {
         Write-Warning "Could not create sandbox backup. Manual cleanup may be required."

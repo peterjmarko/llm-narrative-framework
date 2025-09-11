@@ -201,5 +201,6 @@ Write-Host ""
 Write-Host "--- Layer 3: Data Pipeline Integration Testing ---" -ForegroundColor Magenta
 Write-Host "--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green
+$displayPath = (Resolve-Path $SandboxDir -Relative).TrimStart(".\").Replace('\', '/')
+Write-Host "Integration test sandbox created successfully in '$displayPath'." -ForegroundColor Green
 Write-Host ""

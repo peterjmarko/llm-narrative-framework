@@ -193,6 +193,10 @@ def main():
     except ValueError:
         display_chart_path = chart_export_path
         display_candidates_path = final_candidates_path
+    
+    # Standardize path separators for consistent output
+    display_chart_path = str(display_chart_path).replace('\\', '/')
+    display_candidates_path = str(display_candidates_path).replace('\\', '/')
 
     print(f"\nLoading and parsing chart data from {display_chart_path}...")
     chart_data_map = load_chart_data_map(chart_export_path)
@@ -265,6 +269,8 @@ def main():
         display_output_path = output_path.relative_to(project_root)
     except (ValueError, NameError):  # Handle if project_root fails to be found
         display_output_path = output_path
+        
+    display_output_path = str(display_output_path).replace('\\', '/')
 
     print(f"Writing {len(all_subjects)} records to {display_output_path}...")
     try:

@@ -375,8 +375,8 @@ def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int
     
     summary_path = output_path.with_name("adb_validation_summary.txt")
     
-    display_output_path = os.path.relpath(output_path, PROJECT_ROOT)
-    display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT)
+    display_output_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
+    display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT).replace('\\', '/')
 
     if was_interrupted:
         print(f"\n{Fore.YELLOW}WARNING: Validation incomplete.")
@@ -409,7 +409,7 @@ def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int
             print(f"\n{Fore.RED}FAILURE: {key_metric}. Please review the validation summary.{Fore.RESET}\n")
         else:
             key_metric = f"{total_count:,} records processed"
-            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Validation completed successfully.{Fore.RESET}\n")
+            print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Validation completed successfully.{Fore.RESET}")
 
 def generate_summary_report(report_path: Path):
     """Reads the detailed CSV report and generates a summary text file."""
@@ -427,7 +427,7 @@ def generate_summary_report(report_path: Path):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{summary_path.stem}.{timestamp}{summary_path.suffix}.bak"
             shutil.copy2(summary_path, backup_path)
-            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
+            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT).replace('\\', '/')
             print(f"Backed up existing summary to: {display_backup_path}")
         except (IOError, OSError) as e:
             print(f"{Fore.YELLOW}Could not create backup for summary report: {e}")

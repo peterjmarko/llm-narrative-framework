@@ -188,6 +188,10 @@ def main():
     except ValueError:
         display_input_path = input_path
         display_output_path = output_path
+        
+    # Standardize path separators for consistent output
+    display_input_path = str(display_input_path).replace('\\', '/')
+    display_output_path = str(display_output_path).replace('\\', '/')
 
     print("")
     print(f"Reading filtered data from: {display_input_path}")
@@ -201,7 +205,7 @@ def main():
         num_processed = format_for_solar_fire(input_data, output_path)
 
         print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
-        print(f"{Fore.CYAN} - Solar Fire import file saved to: {display_output_path}{Fore.RESET}")
+        print(f"{Fore.CYAN} - Solar Fire import file saved to: {display_output_path.replace('//', '/')}{Fore.RESET}")
 
         key_metric = f"Final Count: {num_processed} subjects"
 

@@ -336,8 +336,19 @@ def main():
         with open(subject_db_path, 'r', encoding='utf-8') as infile:
             num_records = sum(1 for line in infile) - 1 # Subtract header
         
+        from config_loader import PROJECT_ROOT
+
+        # Determine display path (relative to project root if possible)
+        try:
+            display_path = output_path.relative_to(PROJECT_ROOT)
+        except ValueError:
+            display_path = output_path  # Fallback to absolute if not in project
+            
+        # Standardize path separators for consistent output
+        display_path = str(display_path).replace('\\', '/')
+
         print(f"\n{Fore.YELLOW}--- Final Output ---")
-        print(f"{Fore.CYAN} - Personalities database saved to: {output_path}")
+        print(f"{Fore.CYAN} - Personalities database saved to: {display_path}{Fore.RESET}")
         key_metric = f"Final Count: {num_records} subjects"
         print(
             f"\n{Fore.GREEN}SUCCESS: {key_metric}. Personalities database "

@@ -442,17 +442,20 @@ try {
             if ($step.Script) {
                 $summary = Get-ScriptDocstringSummary -ScriptPath (Join-Path $ProjectRoot $step.Script)
                 if ($summary) {
-                    [void]$infoBlock.AppendLine("`n${C_MAGENTA}Script Summary: $summary${C_RESET}")
+                    [void]$infoBlock.AppendLine("`n${C_BLUE}Script Summary: $summary${C_RESET}")
                 }
             }
 
             if ($SandboxMode) {
-                [void]$infoBlock.AppendLine("`n${C_GRAY}  BASE DIRECTORY: $WorkingDirectory${C_RESET}")
+                $normalizedPath = $WorkingDirectory.ToString().Replace('\', '/')
+                [void]$infoBlock.AppendLine("`n${C_GRAY}  BASE DIRECTORY: $normalizedPath${C_RESET}")
             }
+            # Add an explicit color reset to ensure INPUTS/OUTPUT block uses the default terminal color.
+            [void]$infoBlock.Append($C_RESET)
             [void]$infoBlock.AppendLine("`n  INPUTS:")
             $Step.Inputs | ForEach-Object { [void]$infoBlock.AppendLine("    - $_") }
             [void]$infoBlock.AppendLine("`n  OUTPUT:")
-            [void]$infoBlock.AppendLine("    - $($Step.Output)")
+            [void]$infoBlock.Append("    - $($Step.Output)")
 
             if (-not $TestMode.IsPresent) {
                 if ($Step.Name -eq "Fetch Raw ADB Data") {
@@ -478,12 +481,11 @@ try {
                 Remove-Item $waitFile -ErrorAction SilentlyContinue
             } else {
                 # Standard Read-Host for normal operation
-                Read-Host -Prompt "`n${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}" | Out-Null
+                Read-Host -Prompt "${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}" | Out-Null
             }
-            Write-Host "" # Add a newline after the user presses Enter for clean separation
         } else {
             # Non-interactive mode just needs the basic info.
-            Write-Host "`n  INPUTS:"; $Step.Inputs | ForEach-Object { Write-Host "    - $_" }; Write-Host "`n  OUTPUT:"; Write-Host "    - $($Step.Output)`n"
+            Write-Host "`n  INPUTS:"; $Step.Inputs | ForEach-Object { Write-Host "    - $_" }; Write-Host "`n  OUTPUT:"; Write-Host "    - $($Step.Output)"
         }
 
         $scriptPath = Join-Path $ProjectRoot $step.Script
@@ -540,7 +542,7 @@ try {
             throw "Script '$($step.Script)' failed with exit code $exitCode. Halting pipeline." 
         }
         if ($Interactive) { 
-            Write-Host ""
+            Write-Host ""   # This line cannot be removed without breaking the flow!
             if ($env:UNDER_TEST_HARNESS -eq "true") {
                 $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
                 Write-Host "HARNESS_PROMPT:Step complete. Inspect the output, then press Enter to continue...:$waitFile"
@@ -548,7 +550,7 @@ try {
                 while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
                 Remove-Item $waitFile -ErrorAction SilentlyContinue
             } else {
-                Read-Host -Prompt "`n${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n"
+                Read-Host -Prompt "${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET}"
             }
         }
         

@@ -319,6 +319,7 @@ def main():
     final_df.to_csv(output_path, sep="\t", index=False, encoding="utf-8")
 
     # To get a clean project-relative path, find the project root
+    # To get a clean project-relative path, find the project root
     project_root = Path.cwd()
     while not (project_root / ".git").exists() and project_root != project_root.parent:
         project_root = project_root.parent
@@ -327,6 +328,9 @@ def main():
         display_path = output_path.relative_to(project_root)
     except ValueError:
         display_path = output_path # Fallback to absolute if not within project
+    
+    # Standardize path separators for consistent output
+    display_path = str(display_path).replace('\\', '/')
 
     print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
     print(f"{Fore.CYAN} - Final candidates list saved to: {display_path}{Fore.RESET}")

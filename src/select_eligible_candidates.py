@@ -82,7 +82,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 def finalize_and_report(output_path: Path, new_count: int, was_interrupted: bool = False):
     """Generates the final summary and prints the status message."""
     from config_loader import PROJECT_ROOT
-    display_path = os.path.relpath(output_path, PROJECT_ROOT)
+    display_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
     
     total_eligible = 0
     try:
@@ -199,7 +199,7 @@ def main():
 
     # --- Step 4: Decide whether to run ---
     if final_candidates_to_save.empty and not args.force:
-        display_path = os.path.relpath(output_path, PROJECT_ROOT)
+        display_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
         print(f"\n{Fore.YELLOW}WARNING: The candidates file at '{display_path}' is already up to date. ✨")
         print(f"{Fore.YELLOW}If you decide to go ahead with updating the list of candidates, a backup of the the existing file will be created first.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()

@@ -539,6 +539,7 @@ def main():
                     "--output_error_file", str(temp_error_file), "--config_path", str(temp_config_file), "--quiet"
                 ]
                 subprocess.run(worker_cmd, check=False)
+                pbar.refresh()  # Force redraw of the main progress bar
 
                 # 3. Process response
                 if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
@@ -643,9 +644,9 @@ def main():
             final_df = pd.read_csv(output_path) if output_path.exists() and output_path.stat().st_size > 0 else pd.DataFrame()
             
             from config_loader import PROJECT_ROOT
-            display_output_path = os.path.relpath(output_path, PROJECT_ROOT)
-            display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT)
-            display_missing_path = os.path.relpath(missing_report_path, PROJECT_ROOT)
+            display_output_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
+            display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT).replace('\\', '/')
+            display_missing_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
 
             print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
             print(f"{Fore.CYAN} - OCEAN scores saved to: {display_output_path}{Fore.RESET}")

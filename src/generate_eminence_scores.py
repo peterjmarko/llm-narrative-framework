@@ -335,8 +335,8 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         print(f"\n{summary_content_for_console}")
         
         from config_loader import PROJECT_ROOT
-        display_scores_path = os.path.relpath(filepath, PROJECT_ROOT)
-        display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT)
+        display_scores_path = os.path.relpath(filepath, PROJECT_ROOT).replace('\\', '/')
+        display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT).replace('\\', '/')
 
         print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
         print(f"{Fore.CYAN} - Eminence scores saved to: {display_scores_path}{Fore.RESET}")
@@ -499,6 +499,7 @@ def main():
                     "--config_path", str(temp_config_file), "--quiet"
                 ]
                 subprocess.run(worker_cmd, check=False)
+                pbar.refresh()  # Force redraw of the main progress bar
 
                 if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
                     error_msg = temp_error_file.read_text(encoding='utf-8').strip()
@@ -553,7 +554,7 @@ def main():
         else:
             # When --no-summary is used, print a simple final report.
             from config_loader import PROJECT_ROOT
-            display_path = os.path.relpath(output_path, PROJECT_ROOT)
+            display_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
             total_scored = len(processed_ids) + processed_count
 
             print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")

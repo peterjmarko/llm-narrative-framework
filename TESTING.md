@@ -145,10 +145,13 @@ All Layer 3 tests are run via PDM scripts from the project root.
 *   **Default Profile (`default`):**
     This is the standard test case. It runs the full pipeline with LLM-based candidate selection active and injects controlled validation failures to test the script's resilience.
 
-    > **Note on Validating Cutoff Logic:**
-    > The `default` profile includes an extra, isolated test to validate the data-driven cutoff logic in `select_final_candidates.py`. This test requires a large, pre-generated dataset that is not included in the repository.
+    > **Note on Large-Scale Algorithm Validation:**
+    > The `default` profile includes two extra, isolated validation tests (`Step 4.v` and `Step 7.v`) that use a large, pre-generated dataset to validate the core candidate selection algorithms at scale. This test is optional and requires a manual setup.
     >
-    > **To enable this test, you must manually place the following four files in the `tests/assets/large_seed/` directory:**
+    > -   **Step 4.v:** Validates the deterministic filtering logic in `select_eligible_candidates.py`.
+    > -   **Step 7.v:** Validates the data-driven cutoff algorithm in `select_final_candidates.py`.
+    >
+    > **To enable these tests, you must manually place the following four files in the `tests/assets/large_seed/` directory:**
     > ```
     > tests/assets/large_seed/
     > └── data/
@@ -160,7 +163,7 @@ All Layer 3 tests are run via PDM scripts from the project root.
     >     └── sources/
     >         └── adb_raw_export.txt
     > ```
-    > These files can be obtained by running the full data preparation pipeline on a large dataset. If these files are not present, the cutoff logic validation will be skipped, but the rest of the Layer 3 integration test will still run.
+    > These files can be obtained by running the full data preparation pipeline on a large dataset. If these files are not present, the large-scale algorithm validation tests will be skipped, but the rest of the Layer 3 integration test will still run.
 
     ```powershell
     pdm run test-l3-default

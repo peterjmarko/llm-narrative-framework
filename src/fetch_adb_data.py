@@ -169,7 +169,6 @@ def scrape_search_page_data(session):
     """Scrapes security tokens, finds category IDs, and builds a category name map."""
     # This utility function needs to be imported here to be available.
     from config_loader import get_path, PROJECT_ROOT
-    logging.info("Fetching security tokens and category data...")
     page_response = session.get(SEARCH_PAGE_URL, headers={'User-Agent': USER_AGENT}, timeout=REQUEST_TIMEOUT)
     page_response.raise_for_status()
     page_soup = BeautifulSoup(page_response.text, 'html.parser')
@@ -202,13 +201,13 @@ def scrape_search_page_data(session):
             if 'children' in node:
                 build_category_map(node['children'])
     build_category_map(categories_data)
-    logging.info(f"Built a lookup map with {len(category_map)} category translations.")
+    # This line is intentionally left blank to remove the log message.
 
     # --- Save the category map to a CSV file ---
     output_path = Path(get_path('data/foundational_assets/adb_category_map.csv'))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    display_path = os.path.relpath(output_path, PROJECT_ROOT)
+    display_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
 
     if output_path.exists():
         logging.info(f"Category map '{display_path}' already exists. Creating a backup before overwriting.")
@@ -218,7 +217,7 @@ def scrape_search_page_data(session):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{output_path.stem}.{timestamp}{output_path.suffix}.bak"
             shutil.copy2(output_path, backup_path)
-            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT)
+            display_backup_path = os.path.relpath(backup_path, PROJECT_ROOT).replace('\\', '/')
             logging.info(f"  -> Backup created at: {display_backup_path}")
         except (IOError, OSError) as e:
             logging.warning(f"Could not create backup for category map: {e}")
@@ -266,12 +265,10 @@ def scrape_search_page_data(session):
         if node:
             ids_found = find_all_code_ids_in_node(node)
             category_ids.extend(ids_found)
-            logging.info(f"  - Found '{title}' -> IDs: {ids_found}")
         else:
             raise ValueError(f"Could not find required category node for '{title}'. The website structure may have changed.")
     category_ids = sorted(list(set(category_ids)))
         
-    logging.info(f"Using dynamically found category IDs: {category_ids}")
     logging.info("Successfully extracted all required page data.")
     return stat_data, category_ids, category_map
 
@@ -467,7 +464,7 @@ def fetch_all_data(session, output_path, initial_stat_data, category_ids, catego
 
     # Final summary message
     from config_loader import PROJECT_ROOT
-    display_path = os.path.relpath(output_path, PROJECT_ROOT)
+    display_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
     processed_count = len(sorted_results)
     percentage = (processed_count / total_hits) * 100 if total_hits > 0 else 0
     
