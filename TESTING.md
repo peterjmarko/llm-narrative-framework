@@ -148,15 +148,17 @@ All Layer 3 tests are run via PDM scripts from the project root.
     > **Note on Validating Cutoff Logic:**
     > The `default` profile includes an extra, isolated test to validate the data-driven cutoff logic in `select_final_candidates.py`. This test requires a large, pre-generated dataset that is not included in the repository.
     >
-    > **To enable this test, you must manually place the following three files in the `tests/assets/large_seed/` directory:**
+    > **To enable this test, you must manually place the following four files in the `tests/assets/large_seed/` directory:**
     > ```
     > tests/assets/large_seed/
     > └── data/
     >     ├── foundational_assets/
     >     │   ├── eminence_scores.csv
     >     │   └── ocean_scores.csv
-    >     └── intermediate/
-    >         └── adb_eligible_candidates.txt
+    >     ├── reports/
+    >     │   └── adb_validation_report.csv
+    >     └── sources/
+    >         └── adb_raw_export.txt
     > ```
     > These files can be obtained by running the full data preparation pipeline on a large dataset. If these files are not present, the cutoff logic validation will be skipped, but the rest of the Layer 3 integration test will still run.
 

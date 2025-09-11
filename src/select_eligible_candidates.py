@@ -20,26 +20,38 @@
 # Filename: src/select_eligible_candidates.py
 
 """
-Selects eligible candidates for LLM scoring from the raw ADB data export.
+Applies deterministic data quality filters to create a pool of eligible candidates.
 
-This script serves as a key filtering stage in the data preparation pipeline. It
-takes the raw data dump and the validation report to produce a clean list of all
-subjects who are potentially viable for the study. This pre-filtering ensures
-that subsequent, expensive LLM-based scoring is only performed on high-quality,
-valid data.
+This script is the final step in the "Candidate Qualification" stage. It integrates
+the raw data from Astro-Databank with the results of the Wikipedia validation process
+to produce a clean, deduplicated list of subjects who are eligible for the next
+stage of LLM-based scoring.
+
+The script applies a strict, sequential set of deterministic filters to ensure
+the highest data quality for the final study population.
 
 Key Features:
+-   **Integrated Filtering**: Merges the raw ADB data with the Wikipedia
+    validation report, using the report as the source of truth for a subject's
+    final validation status and entry type.
 -   **Sandbox-Aware**: Fully supports sandboxed execution via a `--sandbox-path`
     argument for isolated testing.
--   **Robust Filtering**: Applies a series of deterministic quality checks:
-    -   Excludes non-person "Research" entries.
-    -   Keeps only subjects with a final validation status of 'OK'.
-    -   Filters by birth year (1900-1999).
-    -   Validates the birth time format.
--   **Deduplication**: Uses a normalized name and birth date to identify and
-    remove duplicate entries.
--   **Resumability**: Can be safely re-run, as it will only append newly
-    eligible candidates that are not already present in the output file.
+-   **Comprehensive Data Quality Rules**:
+    1.  **Wikipedia Validation**: Retains only subjects with a validation `Status`
+        of `OK`.
+    2.  **Entry Type**: Retains only subjects with an `Entry_Type` of `Person`,
+        excluding events and research records.
+    3.  **Birth Year**: Filters for birth years between 1900-1999 to ensure a
+        homogenous historical cohort.
+    4.  **Hemisphere**: Filters for Northern Hemisphere births (`Latitude`
+        contains 'N') to control for a potential astrological confound.
+    5.  **Time Format**: Ensures the birth time is present and correctly
+        formatted as `HH:MM`.
+    6.  **Deduplication**: Uses a normalized name and birth date to identify and
+        remove duplicate entries from the source database.
+-   **Resumable and Idempotent**: The script is safe to re-run. It automatically
+    detects stale data and can resume an interrupted run, processing only newly
+    eligible candidates.
 """
 
 import argparse

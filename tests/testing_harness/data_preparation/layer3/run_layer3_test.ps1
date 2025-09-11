@@ -11,6 +11,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# --- Define ANSI Color Codes ---
+$C_RESET = "`e[0m"
+$C_GRAY = "`e[90m"
+$C_MAGENTA = "`e[95m"
+$C_RED = "`e[91m"
+$C_ORANGE = "`e[38;5;208m" # A specific orange from the 256-color palette
+$C_YELLOW = "`e[93m"
+$C_GREEN = "`e[92m"
+$C_CYAN = "`e[96m"
+$C_BLUE = "`e[94m"
+
 function Test-ProfileValid {
     param([hashtable]$Profile)
     $required = @('Name', 'Description', 'Subjects', 'ExpectedFinalLineCount', 'ConfigOverrides')
@@ -66,8 +77,35 @@ Test-ProfileValid -Profile $SelectedProfile
 Write-Host "`n--- Running Layer 3 Test Profile: $($SelectedProfile.Name) ---" -ForegroundColor Magenta
 Write-Host $SelectedProfile.Description -ForegroundColor Yellow
 
+if ($Interactive) {
+    Write-Host ""
+    Write-Host "Welcome to the Layer 3 Interactive Test (Guided Tour)." -ForegroundColor Cyan
+    Write-Host "This test will walk you through the entire data preparation pipeline in a safe, isolated sandbox."
+    Write-Host "It consists of three phases:"
+    Write-Host "  1. Setup:    Creates a temporary sandbox and copies in a small seed dataset."
+    Write-Host "  2. Execute:  Runs the full pipeline, which consists of 15 tasks (13 steps"
+    Write-Host "               plus 2 validation sub-steps), pausing for your inspection before each one."
+    Write-Host "  3. Cleanup:  Archives the test results and removes the sandbox."
+    Write-Host ""
+    [Console]::Write("${C_ORANGE}Press Enter to begin the Setup phase...`n${C_RESET} ")
+    Read-Host | Out-Null
+}
+
 try {
     & "$PSScriptRoot/layer3_phase1_setup.ps1"
+
+    if ($Interactive) {
+        Write-Host "---" -ForegroundColor DarkGray
+        Write-Host "Phase 1 (Setup) is complete. The test sandbox has been created." -ForegroundColor Cyan
+        Write-Host "Next, we will begin Phase 2 (Execution), which will run the main data preparation"
+        Write-Host "orchestrator ('prepare_data.ps1') against the seed data."
+        Write-Host ""
+        Write-Host "You will be prompted to continue before each of the 15 tasks."
+        Write-Host ""
+        [Console]::Write("${C_ORANGE}Press Enter to begin the Execution phase...${C_RESET} ")
+        Read-Host | Out-Null
+    }
+
     # --- Phase 2: Execute ---
     # Pass the entire profile object to the workflow script using a splatting hashtable for robustness.
     $workflowPath = "$PSScriptRoot/layer3_phase2_test_workflow.ps1"

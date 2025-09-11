@@ -349,6 +349,26 @@ The release process is fully automated into a single command. It programmaticall
     *   Amends the release commit to include the detailed changelog.
     *   Force-moves the Git tag to the final, amended commit.
 
+#### Special Release Workflow (for `docs`, `test`, `refactor`, etc.)
+
+If your recent commits do not include any `feat` or `fix` types (e.g., you have only made `docs` or `test` changes), the standard release command will find "nothing to release." In this case, you must first create a special "trigger commit" to initiate the release process.
+
+1.  **Ensure `main` is up-to-date and all work is committed.**
+
+2.  **Create a Release-Triggering Commit**:
+    Run the following command. This creates an empty commit with the `fix` type, which `commitizen` is configured to recognize as a valid trigger for a patch release.
+    ```bash
+    git commit --allow-empty -m "fix(release): bump version for latest updates"
+    ```
+    > **Note:** The pre-commit hooks will run and pass, as this is a valid commit message.
+
+3.  **Run the Automated Release Command**:
+    Now that a valid `fix` commit exists in the history, the standard release command will work as designed.
+    ```bash
+    pdm release
+    ```
+    This will correctly identify the trigger commit, bump the version, generate the full changelog, and finalize the release.
+
 #### How to Undo a Version Bump
 If you run `cz bump` by mistake or realize a commit was missed, you must manually undo the release before trying again. Follow these steps precisely:
 

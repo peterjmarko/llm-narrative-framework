@@ -28,10 +28,14 @@ $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer3_sandbox"
 
 # --- Define ANSI Color Codes ---
 $C_RESET = "`e[0m"
-$C_CYAN = "`e[96m"
-$C_MAGENTA = "`e[95m"
-$C_YELLOW = "`e[93m"
 $C_GREEN = "`e[92m"
+$C_YELLOW = "`e[93m"
+$C_ORANGE = "`e[38;5;208m" # A specific orange from the 256-color palette
+$C_RED = "`e[91m"
+$C_CYAN = "`e[96m"
+$C_GRAY = "`e[90m"
+$C_MAGENTA = "`e[95m"
+$C_BLUE = "`e[94m"
 
 # --- Helper Functions ---
 function Format-Banner {
@@ -221,7 +225,7 @@ try {
         $summary = & python $summaryHelper $fetchScriptPath 2>$null
         if ($summary) {
             Write-Host "`n${C_MAGENTA}Script Summary: $($summary.Trim())${C_RESET}"
-            Write-Host "${C_MAGENTA}Test Harness Note: This script will be run 7 times in a loop to create a small, targeted seed dataset for the test subjects.${C_RESET}"
+            Write-Host "${C_MAGENTA}Test Harness Note: This script will be run 7 times in a loop to create a small, targeted seed dataset. During this process, new records are appended with temporary 'Index' values that will not be sequential (e.g., you will see multiple records with an Index of '1'). This field is corrected and made sequential only after the final fetch operation is complete.${C_RESET}"
         }
     }
 
@@ -232,8 +236,7 @@ try {
     Write-Host "    - data/sources/adb_raw_export.txt`n"
 
     if ($Interactive) {
-        Write-Host "${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website.${C_RESET}"
-        Read-Host -Prompt "`n${C_YELLOW}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n"
+        Read-Host -Prompt "`n${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n"
     }
 
     $executedStepsLog.Add([pscustomobject]@{
@@ -300,7 +303,7 @@ try {
     $totalSubjects = $AllSubjects.Count
     Write-Host "`n${C_GREEN}SUCCESS: Successfully fetched and assembled data for ${finalCount}/${totalSubjects} subjects.${C_RESET}"
     
-    if ($Interactive) { Read-Host -Prompt "`n${C_YELLOW}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n" }
+    if ($Interactive) { Read-Host -Prompt "`n${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n" }
     
     Write-Host "  -> Note: Pipeline Step 1 will be skipped since test data already exists." -ForegroundColor DarkGray
 
@@ -328,15 +331,26 @@ try {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $env:PYTHONIOENCODING = "utf-8"
 
-    # --- RUN 1: Execute pipeline through Step 6 ---
+    # --- RUN 1: Execute pipeline through Step 3 ---
+    $env:UNDER_TEST_HARNESS = "true"
     $run1Args = @{
-        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 6
+        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 3
     }
     if ($Interactive) { $run1Args.Interactive = $true }
-    
+
     $run1Steps = [System.Collections.Generic.List[object]]::new()
     & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run1Args 2>&1 | ForEach-Object {
-        Write-Host $_
+        if ($_ -match '^HARNESS_PROMPT:(.*):(.*)') {
+            # Handle interactive prompt at test harness level with file signaling
+            $promptText = $matches[1]
+            $waitFile = $matches[2]
+            Read-Host -Prompt "`n${C_ORANGE}$promptText${C_RESET}" | Out-Null
+            # Signal back to subprocess that user has responded
+            "" | Set-Content -Path $waitFile
+            Write-Host "" # Add spacing after user input
+        } else {
+            Write-Host $_
+        }
         if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
         if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
             $stepNum = [int]$matches[1]
@@ -346,7 +360,9 @@ try {
         }
     }
     $run1ExitCode = $LASTEXITCODE
-    if ($run1ExitCode -ne 1) { throw "Pipeline Run 1 was expected to halt after Step 6 but did not." }
+    if ($run1ExitCode -ne 1) { throw "Pipeline Run 1 was expected to halt after Step 3 but did not." }
+    # Remove the halted step (Step 3 in this case) from the list of completed steps before logging
+    if ($run1Steps.Count > 0) { $run1Steps.RemoveAt($run1Steps.Count - 1) }
 
     $run1Status = "SUCCESS"
     foreach ($step in $run1Steps) {
@@ -354,41 +370,144 @@ try {
             'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = $run1Status; 'Output File' = $step.'Output File'
         })
     }
-
-    # --- VALIDATE INTERMEDIATE RESULTS & RUN ISOLATED TEST 7.a ---
-    Test-StepContinuity "Eligible Candidates" (Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt") 1 "`t" $FinalSubjects
-    Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
-
-    # --- 3a. Inject an isolated test for Step 7's cutoff logic using a large seed dataset ---
-    $stepHeader7a = ">>> Step 7.a/13: Validate Cutoff Logic (Large Seed) <<<"
-    Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader7a -ForegroundColor Blue; Write-Host "Validates the subject cutoff algorithm using a large seed dataset." -ForegroundColor Blue
+    
+    # --- 3a. Inject isolated algorithm validation tests using large seed data ---
     $largeSeedDir = Join-Path $ProjectRoot "tests/assets/large_seed"
-    if (Test-Path $largeSeedDir) {
-        $tempCutoffSandbox = Join-Path $SandboxDir "temp_cutoff_test"
+    if (Test-Path (Join-Path $largeSeedDir "data/sources/adb_raw_export.txt")) {
+        $tempAlgoSandbox = Join-Path $SandboxDir "temp_algo_validation"
         try {
-            @("data/intermediate", "data/foundational_assets", "data/reports") | ForEach-Object { New-Item -Path (Join-Path $tempCutoffSandbox $_) -ItemType Directory -Force | Out-Null }
-            Copy-Item -Path (Join-Path $largeSeedDir "data/intermediate/adb_eligible_candidates.txt") -Destination (Join-Path $tempCutoffSandbox "data/intermediate/")
-            Copy-Item -Path (Join-Path $largeSeedDir "data/foundational_assets/eminence_scores.csv") -Destination (Join-Path $tempCutoffSandbox "data/foundational_assets/")
-            Copy-Item -Path (Join-Path $largeSeedDir "data/foundational_assets/ocean_scores.csv") -Destination (Join-Path $tempCutoffSandbox "data/foundational_assets/")
-            Copy-Item -Path (Join-Path $ProjectRoot "tests/assets/data/foundational_assets/country_codes.csv") -Destination (Join-Path $tempCutoffSandbox "data/foundational_assets/")
+            # --- STEP 4.a: VALIDATE ELIGIBLE CANDIDATE SELECTION ---
+            $stepHeader4a = ">>> Step 4.a/13: Validate Eligible Candidate Logic (Large Seed) <<<"
+            Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader4a -ForegroundColor Blue; Write-Host "Validates the deterministic filtering logic using a large seed dataset." -ForegroundColor Blue
+            
+            # Create the temporary sandbox for this isolated test first
+            @("data/sources", "data/reports", "data/intermediate") | ForEach-Object { New-Item -Path (Join-Path $tempAlgoSandbox $_) -ItemType Directory -Force | Out-Null }
+
+            Write-Host "`n  BASE DIRECTORY: $((Resolve-Path $tempAlgoSandbox -Relative).TrimStart(".\"))" -ForegroundColor DarkGray
+            Write-Host "`n  INPUTS:"
+            Write-Host "    - tests/assets/large_seed/data/sources/adb_raw_export.txt"
+            Write-Host "    - tests/assets/large_seed/data/reports/adb_validation_report.csv"
+            Write-Host "`n  OUTPUT:"
+            Write-Host "    - data/intermediate/adb_eligible_candidates.txt`n"
+
+            if ($Interactive) {
+                $summary4a = "Script Summary: Validates the filtering logic in `select_eligible_candidates.py`. This test uses a large, pre-generated raw dataset from `tests/assets/large_seed/` to ensure the script correctly filters it down to a smaller set of eligible candidates."
+                Write-Host "`n${C_MAGENTA}$summary4a${C_RESET}"
+                Read-Host -Prompt "`n${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n"
+            }
+            Copy-Item -Path (Join-Path $largeSeedDir "data/sources/adb_raw_export.txt") -Destination (Join-Path $tempAlgoSandbox "data/sources/")
+            Copy-Item -Path (Join-Path $largeSeedDir "data/reports/adb_validation_report.csv") -Destination (Join-Path $tempAlgoSandbox "data/reports/")
+            
+            $eligibleCandidatesScript = Join-Path $ProjectRoot "src/select_eligible_candidates.py"
+            & pdm run python -u $eligibleCandidatesScript --sandbox-path $tempAlgoSandbox
+            
+            $largeInput4a = (Get-Content (Join-Path $tempAlgoSandbox "data/sources/adb_raw_export.txt") | Select-Object -Skip 1).Length
+            $largeOutput4a = Join-Path $tempAlgoSandbox "data/intermediate/adb_eligible_candidates.txt"
+            if (-not (Test-Path $largeOutput4a)) { throw "Eligible candidate logic test failed: Output file was not created." }
+            $largeOutputCount4a = (Get-Content $largeOutput4a | Select-Object -Skip 1).Length
+            if ($largeOutputCount4a -ge $largeInput4a) { throw "Eligible candidate logic test failed: The number of eligible candidates ($largeOutputCount4a) was not less than the input ($largeInput4a)." }
+            Write-Host "  -> ✓ Step 4.a Logic: Successfully validated with large seed data ($largeInput4a -> $largeOutputCount4a subjects)." -ForegroundColor Green
+            $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 2; 'Step #' = "4.a"; 'Step Description' = "Validate Eligible Logic (Large Seed)"; 'Status' = "SUCCESS"; 'Output File' = "temp_algo_validation/..." })
+
+            if ($Interactive) {
+                Write-Host "" # Add a blank line for spacing.
+                Write-Host "${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET} " -NoNewline
+                Read-Host | Out-Null
+            }
+            
+            # --- RUN 2: Resume pipeline from Step 4 through Step 6 ---
+            Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming from Step 4... ---" -ForegroundColor Cyan
+            $run2Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; StopAfterStep = 6 }
+            if ($Interactive) { $run2Args.Interactive = $true }
+
+            $run2Steps = [System.Collections.Generic.List[object]]::new()
+            & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run2Args 2>&1 | ForEach-Object {
+                if ($_ -match '^HARNESS_PROMPT:(.*):(.*)') {
+                    # Handle interactive prompt at test harness level with file signaling
+                    $promptText = $matches[1]
+                    $waitFile = $matches[2]
+                    Read-Host -Prompt "`n${C_ORANGE}$promptText${C_RESET}" | Out-Null
+                    # Signal back to subprocess that user has responded
+                    "" | Set-Content -Path $waitFile
+                    Write-Host "" # Add spacing after user input
+                } else {
+                    Write-Host $_
+                }
+                if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
+                if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
+                    $stepNum = [int]$matches[1]
+                    $run2Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+                }
+            }
+            $run2ExitCode = $LASTEXITCODE
+            if ($run2ExitCode -ne 1) { throw "Pipeline Run 2 was expected to halt after Step 6 but did not." }
+            if ($run2Steps.Count > 0) { $run2Steps.RemoveAt($run2Steps.Count - 1) } # Remove the halted step
+
+            foreach ($step in $run2Steps) {
+                $stepNumber = if ($step.'Step #' -eq 4) { "4.b" } else { $step.'Step #' }
+                $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $stepNumber; 'Step Description' = $step.'Step Description'; 'Status' = "SUCCESS"; 'Output File' = $step.'Output File' })
+            }
+            
+            # --- VALIDATE INTERMEDIATE RESULTS ---
+            Test-StepContinuity "Eligible Candidates" (Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt") 1 "`t" $FinalSubjects
+            Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
+
+            # --- STEP 7.a: VALIDATE FINAL CANDIDATE CUTOFF LOGIC ---
+            $stepHeader7a = ">>> Step 7.a/13: Validate Cutoff Logic (Large Seed) <<<"
+            Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader7a -ForegroundColor Blue; Write-Host "Validates the subject cutoff algorithm using a large seed dataset." -ForegroundColor Blue
+            if ($Interactive) {
+                $summary7a = "Script Summary: Validates the data-driven cutoff algorithm in `select_final_candidates.py`. This test uses the large `adb_eligible_candidates.txt` file generated in the previous step, along with other large seed assets, to ensure the slope-analysis logic is working correctly."
+                Write-Host "`n${C_MAGENTA}$summary7a${C_RESET}"
+                Read-Host -Prompt "`n${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n"
+            }
+            @("data/foundational_assets") | ForEach-Object { New-Item -Path (Join-Path $tempAlgoSandbox $_) -ItemType Directory -Force | Out-Null }
+            Copy-Item -Path (Join-Path $largeSeedDir "data/foundational_assets/eminence_scores.csv") -Destination (Join-Path $tempAlgoSandbox "data/foundational_assets/")
+            Copy-Item -Path (Join-Path $largeSeedDir "data/foundational_assets/ocean_scores.csv") -Destination (Join-Path $tempAlgoSandbox "data/foundational_assets/")
+            Copy-Item -Path (Join-Path $ProjectRoot "tests/assets/data/foundational_assets/country_codes.csv") -Destination (Join-Path $tempAlgoSandbox "data/foundational_assets/")
+
             $selectCandidatesScript = Join-Path $ProjectRoot "src/select_final_candidates.py"
-            & pdm run python $selectCandidatesScript --sandbox-path $tempCutoffSandbox --plot
-            $largeInputCount = (Get-Content (Join-Path $tempCutoffSandbox "data/foundational_assets/ocean_scores.csv") | Select-Object -Skip 1).Length
-            $largeOutput = Join-Path $tempCutoffSandbox "data/intermediate/adb_final_candidates.txt"
-            if (-not (Test-Path $largeOutput)) { throw "Cutoff logic test failed: Output file was not created." }
-            $largeOutputCount = (Get-Content $largeOutput | Select-Object -Skip 1).Length
-            if ($largeOutputCount -ge $largeInputCount) { throw "Cutoff logic test failed: The number of final candidates ($largeOutputCount) was not less than the input ($largeInputCount)." }
-            Write-Host "  -> ✓ Step 7 Cutoff Logic: Successfully validated with large seed data ($largeInputCount -> $largeOutputCount subjects)." -ForegroundColor Green
+            & pdm run python $selectCandidatesScript --sandbox-path $tempAlgoSandbox --plot
+
+            $largeInput7a = (Get-Content (Join-Path $tempAlgoSandbox "data/foundational_assets/ocean_scores.csv") | Select-Object -Skip 1).Length
+            $largeOutput7a = Join-Path $tempAlgoSandbox "data/intermediate/adb_final_candidates.txt"
+            if (-not (Test-Path $largeOutput7a)) { throw "Cutoff logic test failed: Output file was not created." }
+            $largeOutputCount7a = (Get-Content $largeOutput7a | Select-Object -Skip 1).Length
+            if ($largeOutputCount7a -ge $largeInput7a) { throw "Cutoff logic test failed: The number of final candidates ($largeOutputCount7a) was not less than the input ($largeInput7a)." }
+            Write-Host "  -> ✓ Step 7.a Logic: Successfully validated with large seed data ($largeInput7a -> $largeOutputCount7a subjects)." -ForegroundColor Green
+            $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 3; 'Step #' = "7.a"; 'Step Description' = "Validate Cutoff Logic (Large Seed)"; 'Status' = "SUCCESS"; 'Output File' = "temp_algo_validation/..." })
         } finally {
-            if (Test-Path $tempCutoffSandbox) { Remove-Item -Path $tempCutoffSandbox -Recurse -Force }
+            if (Test-Path $tempAlgoSandbox) {
+                # Suppress the progress bar for the cleanup to prevent it from cluttering the main console.
+                $ProgressPreference = 'SilentlyContinue'
+                Remove-Item -Path $tempAlgoSandbox -Recurse -Force
+                $ProgressPreference = 'Continue' # Restore the default preference
+            }
         }
     } else {
-        Write-Host "  -> SKIPPED: Large seed data directory not found at 'tests/assets/large_seed'." -ForegroundColor Yellow
-    }
+        Write-Host "`n  -> SKIPPED: Large seed data for algorithm validation not found at 'tests/assets/large_seed'." -ForegroundColor Yellow
+        
+        # --- RUN 2 (No Seed): Resume pipeline from Step 4.b through Step 6 ---
+        Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming from Step 4.b... ---" -ForegroundColor Cyan
+        $run2Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; StopAfterStep = 6 }
+        if ($Interactive) { $run2Args.Interactive = $true }
 
-    $executedStepsLog.Add([pscustomobject]@{
-        'Task #' = $taskCounter++; 'Stage #' = 3; 'Step #' = "7.a"; 'Step Description' = "Validate Cutoff Logic (Large Seed)"; 'Status' = "SUCCESS"; 'Output File' = "temp_cutoff_test/..."
-    })
+        $run2Steps = [System.Collections.Generic.List[object]]::new()
+        & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run2Args 2>&1 | ForEach-Object {
+            Write-Host $_
+            if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
+            if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
+                $stepNum = [int]$matches[1]
+                $run2Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+            }
+        }
+        $run2ExitCode = $LASTEXITCODE
+        if ($run2ExitCode -ne 1) { throw "Pipeline Run 2 was expected to halt after Step 6 but did not." }
+        if ($run2Steps.Count > 0) { $run2Steps.RemoveAt($run2Steps.Count - 1) } # Remove the halted step
+
+        foreach ($step in $run2Steps) {
+            $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = "SUCCESS"; 'Output File' = $step.'Output File' })
+        }
+    }
 
     if ($TestProfile.InterventionScript) {
         & $TestProfile.InterventionScript -SandboxDir $SandboxDir
@@ -399,12 +518,30 @@ try {
     $stepHeader7b = ">>> Step 7.b/13: Select Final Candidates <<<"
     Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader7b -ForegroundColor Blue; Write-Host "Filters, transforms, and sorts the final subject set based on the LLM scoring." -ForegroundColor Blue
     $run2Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true }
-    if ($Interactive) { $run2Args.Interactive = $true }
+    if ($Interactive) { 
+        $summaryHelper = Join-Path $ProjectRoot "scripts/get_docstring_summary.py"
+        $targetScriptPath = Join-Path $ProjectRoot "src/select_final_candidates.py"
+        $summary = & python $summaryHelper $targetScriptPath 2>$null
+        if ($summary) {
+            Write-Host "`n${C_MAGENTA}Script Summary: $($summary.Trim())${C_RESET}"
+        }
+        $run2Args.Interactive = $true 
+    }
 
     $run2Steps = [System.Collections.Generic.List[object]]::new()
     # Capture output, but suppress the orchestrator's original 'Step 7' header
     & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run2Args 2>&1 | ForEach-Object {
-        if ($_ -notmatch '>>> Step 7/13:.*') { Write-Host $_ }
+        if ($_ -match '^HARNESS_PROMPT:(.*):(.*)') {
+            # Handle interactive prompt at test harness level with file signaling
+            $promptText = $matches[1]
+            $waitFile = $matches[2]
+            Read-Host -Prompt "`n${C_ORANGE}$promptText${C_RESET}" | Out-Null
+            # Signal back to subprocess that user has responded
+            "" | Set-Content -Path $waitFile
+            Write-Host "" # Add spacing after user input
+        } elseif ($_ -notmatch '>>> Step 7/13:.*') { 
+            Write-Host $_ 
+        }
         if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
         if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
             $stepNum = [int]$matches[1]
@@ -414,9 +551,9 @@ try {
     $run2ExitCode = $LASTEXITCODE
     if ($run2ExitCode -ne 1) { throw "Pipeline Run 2 was expected to halt for Step 9 but did not." }
     
-    # Log the steps that completed in this run (7.b and 8)
+    # Log the steps that completed in this run (7.b, 8, and the manual step 9)
     $run2Status = "SUCCESS"
-    if ($run2Steps.Count > 0) { $run2Steps.RemoveAt($run2Steps.Count - 1) } # Remove the halted step
+    # The list contains [7, 8, 9(halted)]. We log them all.
     foreach ($step in $run2Steps) {
         $stepNumber = if ($step.'Step Description' -eq "Select Final Candidates") { "7.b" } else { $step.'Step #' }
         $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $stepNumber; 'Step Description' = $step.'Step Description'; 'Status' = $run2Status; 'Output File' = $step.'Output File' })
@@ -428,6 +565,7 @@ try {
     Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
 
     Write-Host "`n--- SIMULATING: Solar Fire Processing... ---" -ForegroundColor Magenta
+    if ($Interactive) { Read-Host -Prompt "`n${C_YELLOW}Press Enter to simulate this manual step (Ctrl+C to exit)...${C_RESET}`n" }
     $idMap = @{}; Get-Content $sfImportFile | ForEach-Object { $f = $_.Split(',') | ForEach-Object { $_.Trim('"') }; if ($f.Length -ge 4) { $idMap[$f[0]] = $f[3] } }
     $destAssetDir = Join-Path $SandboxDir "data/foundational_assets"
     $chartExportContent = (@"
@@ -446,7 +584,17 @@ try {
 
     $run3Steps = [System.Collections.Generic.List[object]]::new()
     & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run3Args 2>&1 | ForEach-Object {
-        Write-Host $_
+        if ($_ -match '^HARNESS_PROMPT:(.*):(.*)') {
+            # Handle interactive prompt at test harness level with file signaling
+            $promptText = $matches[1]
+            $waitFile = $matches[2]
+            Read-Host -Prompt "`n${C_ORANGE}$promptText${C_RESET}" | Out-Null
+            # Signal back to subprocess that user has responded
+            "" | Set-Content -Path $waitFile
+            Write-Host "" # Add spacing after user input
+        } else {
+            Write-Host $_
+        }
         if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
         if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
             $stepNum = [int]$matches[1]
@@ -486,7 +634,17 @@ Assertive and pioneering.
 
     $run4Steps = [System.Collections.Generic.List[object]]::new()
     & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run4Args 2>&1 | ForEach-Object {
-        Write-Host $_
+        if ($_ -match '^HARNESS_PROMPT:(.*):(.*)') {
+            # Handle interactive prompt at test harness level with file signaling
+            $promptText = $matches[1]
+            $waitFile = $matches[2]
+            Read-Host -Prompt "`n${C_ORANGE}$promptText${C_RESET}" | Out-Null
+            # Signal back to subprocess that user has responded
+            "" | Set-Content -Path $waitFile
+            Write-Host "" # Add spacing after user input
+        } else {
+            Write-Host $_
+        }
         if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
         if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
             $stepNum = [int]$matches[1]
@@ -514,6 +672,9 @@ catch {
     throw "Layer 3 test workflow failed.`n$($_.Exception.Message)"
 }
 finally {
+    # Clean up test environment variable
+    Remove-Item -Path "Env:UNDER_TEST_HARNESS" -ErrorAction SilentlyContinue
+    
     # --- 8. Print Execution Summary ---
     if ($executedStepsLog.Count -gt 0) {
         Write-Host "`n--- HARNESS: Actual Pipeline Execution Flow ---`n" -ForegroundColor Yellow
@@ -545,5 +706,6 @@ finally {
             $rowLine = ($props | ForEach-Object { $log.$_.ToString().PadRight($widths[$_]) }) -join $separator
             Write-Host $rowLine
         }
+    Write-Host ""
     }
 }

@@ -104,13 +104,13 @@ Remove-Item -Path "Env:PROJECT_SANDBOX_PATH" -ErrorAction SilentlyContinue
 
 # --- Define ANSI Color Codes ---
 $C_RESET = "`e[0m"
-$C_GREEN = "`e[92m"
-$C_YELLOW = "`e[93m"
-$C_ORANGE = "`e[38;5;208m" # A specific orange from the 256-color palette
-$C_RED = "`e[91m"
-$C_CYAN = "`e[96m"
 $C_GRAY = "`e[90m"
 $C_MAGENTA = "`e[95m"
+$C_RED = "`e[91m"
+$C_ORANGE = "`e[38;5;208m" # A specific orange from the 256-color palette
+$C_YELLOW = "`e[93m"
+$C_GREEN = "`e[92m"
+$C_CYAN = "`e[96m"
 $C_BLUE = "`e[94m"
 
 # Set UTF-8 encoding for console output to handle Unicode characters
@@ -434,31 +434,57 @@ try {
             }
         }
 
-        # In interactive mode, fetch and display the detailed script summary
-        if ($Interactive -and $step.Script) {
-            $summary = Get-ScriptDocstringSummary -ScriptPath (Join-Path $ProjectRoot $step.Script)
-            if ($summary) {
-                Write-Host "`n${C_MAGENTA}Script Summary: $summary${C_RESET}"
+        if ($Interactive) {
+            # In interactive mode, use the [Console] class to write directly to the console.
+            # This bypasses PowerShell's output streams and solves complex buffering issues when scripts are nested.
+            $infoBlock = New-Object System.Text.StringBuilder
+
+            if ($step.Script) {
+                $summary = Get-ScriptDocstringSummary -ScriptPath (Join-Path $ProjectRoot $step.Script)
+                if ($summary) {
+                    [void]$infoBlock.AppendLine("`n${C_MAGENTA}Script Summary: $summary${C_RESET}")
+                }
             }
-        }
 
-        if ($SandboxMode) {
-            Write-Host "`n${C_GRAY}  BASE DIRECTORY: $WorkingDirectory${C_RESET}"
-        }
-        Write-Host "`n  INPUTS:"; $Step.Inputs | ForEach-Object { Write-Host "    - $_" }; Write-Host "`n  OUTPUT:"; Write-Host "    - $($Step.Output)`n"
-
-        # Display step-specific warnings before the prompt, but not in test mode.
-        if (-not $TestMode.IsPresent) {
-            if ($Step.Name -eq "Fetch Raw ADB Data") {
-                Write-Host "${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take about 1 minute to complete.${C_RESET}"
-            } elseif ($Step.Name -eq "Generate Eminence Scores") {
-                Write-Host "${C_YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (2 minutes or more for each set of 1,000 records).${C_RESET}"
-            } elseif ($Step.Name -eq "Generate OCEAN Scores") {
-                Write-Host "${C_YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (15 minutes or more for each set of 1,000 records).${C_RESET}"
+            if ($SandboxMode) {
+                [void]$infoBlock.AppendLine("`n${C_GRAY}  BASE DIRECTORY: $WorkingDirectory${C_RESET}")
             }
-        }
+            [void]$infoBlock.AppendLine("`n  INPUTS:")
+            $Step.Inputs | ForEach-Object { [void]$infoBlock.AppendLine("    - $_") }
+            [void]$infoBlock.AppendLine("`n  OUTPUT:")
+            [void]$infoBlock.AppendLine("    - $($Step.Output)")
 
-        if ($Interactive) { Read-Host -Prompt "`n${C_YELLOW}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n" }
+            if (-not $TestMode.IsPresent) {
+                if ($Step.Name -eq "Fetch Raw ADB Data") {
+                    [void]$infoBlock.AppendLine("`n${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take about 1 minute to complete.${C_RESET}")
+                } elseif ($Step.Name -eq "Generate Eminence Scores") {
+                    [void]$infoBlock.AppendLine("`n${C_YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (2 minutes or more for each set of 1,000 records).${C_RESET}")
+                } elseif ($Step.Name -eq "Generate OCEAN Scores") {
+                    [void]$infoBlock.AppendLine("`n${C_YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (15 minutes or more for each set of 1,000 records).${C_RESET}")
+                }
+            }
+
+            # Piping to Out-Host forces the multi-line info block to flush immediately,
+            # solving console buffering issues in nested script calls.
+            $infoBlock.ToString() | Out-Host
+
+            # Handle interactive prompt differently when running under test harness
+            if ($env:UNDER_TEST_HARNESS -eq "true") {
+                # Signal to test harness and wait for response
+                $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
+                Write-Host "HARNESS_PROMPT:Press Enter to execute this step (Ctrl+C to exit)...:$waitFile"
+                # Wait for test harness to create the response file
+                while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
+                Remove-Item $waitFile -ErrorAction SilentlyContinue
+            } else {
+                # Standard Read-Host for normal operation
+                Read-Host -Prompt "`n${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}" | Out-Null
+            }
+            Write-Host "" # Add a newline after the user presses Enter for clean separation
+        } else {
+            # Non-interactive mode just needs the basic info.
+            Write-Host "`n  INPUTS:"; $Step.Inputs | ForEach-Object { Write-Host "    - $_" }; Write-Host "`n  OUTPUT:"; Write-Host "    - $($Step.Output)`n"
+        }
 
         $scriptPath = Join-Path $ProjectRoot $step.Script
         # Use python -u for unbuffered output to see progress bars in real-time
@@ -513,7 +539,18 @@ try {
             Write-Host "Script failed with exit code $exitCode" -ForegroundColor Red
             throw "Script '$($step.Script)' failed with exit code $exitCode. Halting pipeline." 
         }
-        if ($Interactive) { Write-Host ""; Read-Host -Prompt "`n${C_YELLOW}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n" }
+        if ($Interactive) { 
+            Write-Host ""
+            if ($env:UNDER_TEST_HARNESS -eq "true") {
+                $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
+                Write-Host "HARNESS_PROMPT:Step complete. Inspect the output, then press Enter to continue...:$waitFile"
+                # Wait for test harness to create the response file
+                while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
+                Remove-Item $waitFile -ErrorAction SilentlyContinue
+            } else {
+                Read-Host -Prompt "`n${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET}`n"
+            }
+        }
         
         # If a stop point is specified by the harness, halt with the special exit code.
         if ($StopAfterStep -gt 0 -and $stepCounter -eq $StopAfterStep) {
