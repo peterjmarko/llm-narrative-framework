@@ -1,5 +1,28 @@
 # Changelog
 
+## 9.2.1 (2025-09-11)
+
+### Bump
+
+- **version 9.2.0 → 9.2.1**
+
+### Refactor
+
+- **Standardize console output and finalize L3 interactive test**
+  This release focuses on a comprehensive polish of the data preparation pipeline's user interface and finalizes the logic and flow of the Layer 3 interactive test harness ("Guided Tour").
+  
+  -   Standardizes all console output across the data preparation scripts and test harness to use forward slashes (`/`) for file paths, ensuring a consistent cross-platform experience.
+  
+  -   Improves the interactive "Guided Tour" by renaming the isolated validation steps to the more intuitive `.v` suffix (e.g., `Step 4.v`), which clarifies that they are not part of the standard sequential flow.
+  
+  -   Fixes the output rendering order in the test harness, ensuring that messages like "Executing Pipeline..." appear before the step headers.
+  
+  -   Adds missing informational blocks (Script Summary, Inputs, etc.) and interactive pauses to all simulated manual and automated steps (`9`, `10`, `11`) for a consistent user experience.
+  
+  -   Tightens up console output by removing extra blank lines around all interactive prompts, resulting in a cleaner and more professional look.
+  
+  -   Updates `TESTING.md` to reflect the new step naming convention.
+
 ## 9.2.0 (2025-09-10)
 
 ### Bump
