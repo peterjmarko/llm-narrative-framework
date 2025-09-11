@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "llm-personality-matching"
-version = "9.1.3"
+version = "9.2.0"
 description = "A reproducible pipeline for LLM personality matching experiments."
 authors = [
     {name = "Peter Marko", email = "peter.j.marko@gmail.com"},
@@ -118,7 +118,7 @@ test-exp-all = {composite = ["test-py-exp", "test-ps-exp"], help = "Run all Pyth
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "9.1.3"
+version = "9.2.0"
 version_files = [
     "pyproject.toml:version"
 ]

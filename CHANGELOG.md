@@ -1,5 +1,26 @@
 # Changelog
 
+## 9.2.0 (2025-09-10)
+
+### Bump
+
+- **version 9.1.3 → 9.2.0**
+
+### Features
+
+- **Improve candidate filtering and stabilize L3 interactive test**
+  Improves the core data filtering logic and completely overhauls the Layer 3 test harness to enhance validation depth, stability, and user experience.
+  
+  -   Enhances the core candidate selection logic in `select_eligible_candidates.py` for more robust and accurate filtering. The corresponding logic diagram has been updated.
+  
+  -   Upgrades the `large_seed` validation in the Layer 3 test to run the improved selection script directly against raw data, providing a more comprehensive end-to-end test of the filtering algorithm.
+  
+  -   Implements a file-based communication system between the test harness and the `prepare_data.ps1` subprocess. This permanently resolves the persistent PowerShell output buffering issue that caused interactive prompts to render out of order, making the "Guided Tour" stable and responsive.
+  
+  -   Adds new introductory pauses and standardized color-coding to the interactive test for better user guidance.
+  
+  -   Ensures Python progress bars are always visible and suppresses stray cleanup progress bars for a cleaner console output.
+
 ## 9.1.3 (2025-09-10)
 
 ### Bump
