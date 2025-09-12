@@ -175,5 +175,3 @@ if __name__ == "__main__":
     main()
 
 # === End of scripts/workflows/assembly_logic/5_validate_assembly_logic_subjects.py ===
-
-

@@ -195,4 +195,3 @@ if __name__ == "__main__":
     main()
 
 # === End of scripts/lint/lint_docstrings.py ===
-

@@ -286,4 +286,3 @@ if __name__ == "__main__":
     main()
 
 # === End of scripts/maintenance/generate_scope_report.py ===
-

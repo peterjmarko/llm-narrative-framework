@@ -155,5 +155,3 @@ if __name__ == "__main__":
     main()
 
 # === End of scripts/workflows/assembly_logic/1_generate_coverage_map.py ===
-
-
