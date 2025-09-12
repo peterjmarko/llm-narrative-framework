@@ -1,5 +1,43 @@
 # Changelog
 
+## 9.3.0 (2025-09-12)
+
+### Bump
+
+- **version 9.2.3 → 9.3.0**
+
+### Features
+
+- **add project cleanup utility and enhance testing architecture**
+  This commit introduces a new project cleanup utility and significantly refactors the testing architecture and developer tooling for better usability, clarity, and maintainability.
+  
+  **New Features:**
+  - A new script, `scripts/clean_project.py`, has been added to safely manage the workspace. It archives temporary files, caches, and backups into a timestamped ZIP file and intelligently prunes old archives, keeping only the most recent one.
+  - A comprehensive test suite (`tests/scripts/test_clean_project.py`) was created to validate the new cleanup utility.
+  
+  **Improvements & Refactoring:**
+  - The project structure reporter (`list_project_files.py`) has been optimized for deep scans. It now uses a much faster "pruning" algorithm for file discovery and provides a more responsive UX with real-time counters and an intelligent progress bar.
+  - The testing philosophy has been refactored into two distinct parts: "Core Algorithm Validation" and "Workflow Validation."
+  - The test directory structure has been reorganized to mirror this new philosophy, with a new `tests/scripts/` directory for utility tests.
+  
+  **Documentation & Chores:**
+  - The `TESTING.md` document was overhauled to reflect the new testing architecture, including three new Mermaid diagrams for clarity. It has been converted to a template and integrated into the `build_docs.py` workflow.
+  - Copyright headers have been updated across all project scripts via the file linter.
+  This commit introduces a new project cleanup utility and significantly refactors the testing architecture and developer tooling for better usability, clarity, and maintainability.
+  
+  **New Features:**
+  - A new script, `scripts/clean_project.py`, has been added to safely manage the workspace. It archives temporary files, caches, and backups into a timestamped ZIP file and intelligently prunes old archives, keeping only the most recent one.
+  - A comprehensive test suite (`tests/scripts/test_clean_project.py`) was created to validate the new cleanup utility.
+  
+  **Improvements & Refactoring:**
+  - The project structure reporter (`list_project_files.py`) has been optimized for deep scans. It now uses a much faster "pruning" algorithm for file discovery and provides a more responsive UX with real-time counters and an intelligent progress bar.
+  - The testing philosophy has been refactored into two distinct parts: "Core Algorithm Validation" and "Workflow Validation."
+  - The test directory structure has been reorganized to mirror this new philosophy, with a new `tests/scripts/` directory for utility tests.
+  
+  **Documentation & Chores:**
+  - The `TESTING.md` document was overhauled to reflect the new testing architecture, including three new Mermaid diagrams for clarity. It has been converted to a template and integrated into the `build_docs.py` workflow.
+  - Copyright headers have been updated across all project scripts via the file linter.
+
 ## 9.2.3 (2025-09-11)
 
 ### Bump
