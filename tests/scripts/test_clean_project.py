@@ -20,87 +20,121 @@
 # Filename: tests/scripts/test_clean_project.py
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pathlib
 import sys
 import os
+import tempfile
+import shutil
+import zipfile
+import io
+from contextlib import redirect_stdout
 
 # Add scripts directory to path to allow import
 scripts_dir = str(pathlib.Path(__file__).resolve().parent.parent.parent / "scripts")
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 
-from clean_project import main as clean_main
+from clean_project import main as clean_main, ARCHIVE_DIR_NAME, STATE_FILE_NAME
 
 class TestCleanProject(unittest.TestCase):
 
-    def test_dry_run_discovery(self):
-        """
-        Tests that the script correctly identifies files for cleanup in a dry run.
-        """
-        # 1. Create a MagicMock to represent our fake project_root path
-        mock_project_root = MagicMock(spec=pathlib.Path)
-        
-        # 2. Define the paths that our mock glob should "find"
-        # These need to be MagicMocks themselves to have methods like `relative_to`
-        mock_pycache = MagicMock(spec=pathlib.Path)
-        mock_pycache.name = "__pycache__"
-        mock_pycache.exists.return_value = True
-        mock_pycache.is_dir.return_value = True
-        mock_pycache.parents = [mock_project_root]
-        mock_pycache.relative_to.return_value = pathlib.Path("__pycache__")
-        
-        mock_venv_pycache = MagicMock(spec=pathlib.Path)
-        mock_venv_pycache.name = "__pycache__"
-        mock_venv_pycache.exists.return_value = True
-        mock_venv_pycache.is_dir.return_value = True
-        mock_venv_pycache.parents = [mock_project_root / '.venv']
-        mock_venv_pycache.relative_to.return_value = pathlib.Path(".venv/__pycache__")
-        
-        mock_htmlcov = MagicMock(spec=pathlib.Path)
-        mock_htmlcov.name = "htmlcov"
-        mock_htmlcov.exists.return_value = True
-        mock_htmlcov.is_dir.return_value = True
-        mock_htmlcov.parents = [mock_project_root]
-        mock_htmlcov.relative_to.return_value = pathlib.Path("htmlcov")
-        
-        mock_temp_dir = MagicMock(spec=pathlib.Path)
-        mock_temp_dir.name = "temp_test_environment"
-        mock_temp_dir.exists.return_value = True
-        mock_temp_dir.is_dir.return_value = True
-        mock_temp_dir.parents = [mock_project_root]
-        mock_temp_dir.relative_to.return_value = pathlib.Path("temp_test_environment")
+    def setUp(self):
+        """Create a temporary directory to act as the project root for each test."""
+        self.test_dir = tempfile.mkdtemp()
+        self.project_root = pathlib.Path(self.test_dir)
 
-        # 3. Configure the side effect for the glob method on our mock_project_root
-        def glob_side_effect(pattern):
-            if pattern == "**/__pycache__":
-                return [mock_pycache, mock_venv_pycache]
-            if pattern == "htmlcov":
-                return [mock_htmlcov]
-            if pattern == "temp_*":
-                return [mock_temp_dir]
-            return []
+    def tearDown(self):
+        """Remove the temporary directory after each test."""
+        shutil.rmtree(self.test_dir)
+
+    def _create_mock_file_structure(self):
+        """Helper to create a standard set of files and folders for testing."""
+        # Create items that SHOULD be cleaned
+        (self.project_root / "src" / "__pycache__").mkdir(parents=True)
+        (self.project_root / "src" / "__pycache__" / "module.pyc").touch()
+        (self.project_root / "htmlcov").mkdir()
+        (self.project_root / "htmlcov" / "index.html").touch()
+        (self.project_root / ".coverage").touch()
+        (self.project_root / "temp_sandbox").mkdir()
+        (self.project_root / "temp_sandbox" / "test_file.txt").touch()
+        # Create items that should NOT be cleaned
+        (self.project_root / ".venv" / "lib").mkdir(parents=True)
+        (self.project_root / "src" / "my_source.py").touch()
+
+    def test_dry_run_identifies_correct_targets(self):
+        """Test that a dry run correctly identifies items to be cleaned."""
+        self._create_mock_file_structure()
         
-        mock_project_root.glob.side_effect = glob_side_effect
-
-        # 4. Patch the now-global project_root variable in the script under test
-        # Note: Use 'clean_project' not 'scripts.clean_project' since that's how it's imported
-        with patch('clean_project.project_root', mock_project_root), \
-            patch('clean_project.get_path_info', return_value=(1024, 1)), \
-            patch('sys.argv', ['clean_project.py']), \
-            patch('builtins.print') as mock_print:
-
-            clean_main()
-
-            # 5. Assertions
-            output = "".join(str(call.args[0]) for call in mock_print.call_args_list if call.args)
+        # Capture stdout to check the report content
+        captured_output = io.StringIO()
+        with redirect_stdout(captured_output), \
+             patch('sys.argv', ['clean_project.py', '--quiet']):
             
-            self.assertIn("__pycache__", output)
-            self.assertIn("htmlcov", output)
-            self.assertIn("temp_test_environment", output)
+            # Pass the temporary directory as the root path for the test
+            clean_main(root_path=self.project_root)
+        
+        output = captured_output.getvalue()
+        
+        self.assertIn("src/__pycache__", output)
+        self.assertIn("htmlcov", output)
+        self.assertIn(".coverage", output)
+        self.assertIn("temp_sandbox", output)
+        self.assertNotIn(".venv", output)
+
+    @patch('builtins.input', return_value='y')
+    def test_execute_archives_and_prunes_correctly(self, mock_input):
+        """Test that --execute creates an archive and correctly prunes the single previous one."""
+        self._create_mock_file_structure()
+        
+        archive_dir = self.project_root / ARCHIVE_DIR_NAME
+        archive_dir.mkdir()
+        
+        # Create a valid "old" zip archive to test pruning (use proper timestamp format)
+        old_archive_path = archive_dir / "cleanup_archive_20240101_120000.zip"
+        with zipfile.ZipFile(old_archive_path, 'w') as zf:
+            zf.writestr("dummy.txt", "data")
+
+        # Set this as the last good archive to prevent self-healing
+        state_file = archive_dir / STATE_FILE_NAME
+        state_file.write_text("cleanup_archive_20240101_120000.zip")
+        
+        with patch('sys.argv', ['clean_project.py', '--execute', '--quiet']):
+            clean_main(root_path=self.project_root)
+
+        self.assertFalse((self.project_root / "src" / "__pycache__").exists())
+        
+        archives = list(archive_dir.glob("*.zip"))
+        self.assertEqual(len(archives), 1, "Should only be one new archive left.")
+        self.assertFalse(old_archive_path.exists(), "Old archive should have been pruned.")
+        
+        state_file = archive_dir / STATE_FILE_NAME
+        self.assertTrue(state_file.exists())
+        self.assertEqual(state_file.read_text().strip(), archives[0].name)
+
+    @patch('builtins.input', return_value='y')
+    @patch('clean_project.main')
+    def test_self_healing_restores_from_corrupted_archive(self, mock_main_relaunch, mock_input):
+        """Test the self-healing mechanism for an interrupted run."""
+        archive_dir = self.project_root / ARCHIVE_DIR_NAME
+        archive_dir.mkdir()
+        
+        state_file = archive_dir / STATE_FILE_NAME
+        state_file.write_text("cleanup_archive_GOOD.zip")
+        (archive_dir / "cleanup_archive_GOOD.zip").touch() # This is a valid, but empty, previous archive.
+        
+        corrupted_archive_path = archive_dir / "cleanup_archive_CORRUPTED.zip"
+        with zipfile.ZipFile(corrupted_archive_path, 'w') as zf:
+            zf.writestr("src/should_be_restored.txt", "data")
+        
+        with patch('sys.argv', ['clean_project.py', '--execute', '--quiet']):
+            with self.assertRaises(SystemExit) as cm:
+                clean_main(root_path=self.project_root)
+            self.assertEqual(cm.exception.code, 0)
             
-            # The key safety check: ensure the item inside .venv was excluded
-            self.assertNotIn(".venv", output)
+        self.assertTrue((self.project_root / "src" / "should_be_restored.txt").exists())
+        self.assertFalse(corrupted_archive_path.exists())
+        mock_main_relaunch.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

@@ -31,19 +31,18 @@ jobs:
         uses: pdm-project/setup-pdm@v4
         with:
           python-version: ${{ matrix.python-version }}
-          enable-cache: true
+          cache: true
 
       # 3. Install all project and development dependencies from the lockfile
       - name: Install dependencies
         run: pdm install -G dev
 
       # 4. Run linting checks.
+      #    This uses the "lint" composite command defined in pyproject.toml.
       #    These are run on the primary 'windows-latest' job only for efficiency.
       - name: Run Linting Checks
         if: matrix.os == 'windows-latest'
-        run: |
-          pdm run check-headers
-          pdm run python scripts/lint_docstrings.py
+        run: pdm run lint
         shell: pwsh
 
       # 5. Check if documentation is up-to-date.

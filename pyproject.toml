@@ -38,44 +38,40 @@ venv.in-project = true
 pythonpath = ["src"]
 
 [tool.pdm.scripts]
-# Development and testing shortcuts. {args} allows passing specific files.
+# ==============================================================================
+# === PRIMARY TEST RUNNERS ===
+# ==============================================================================
 # This is the main entry point for all tests (Python and PowerShell).
 test = {cmd = "python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
-
-# --- Definitive Coverage Workflow ---
-# This is the robust, explicit workflow for subprocess testing. It has 5 steps:
-# 1. Erase old data.
-# 2. Use `coverage run` as the main entry point to start the test session.
-# 3. Your test helper also calls `coverage run` for the subprocess.
-#    (This creates parallel data files thanks to your .coveragerc)
-# 4. `coverage combine` merges all parallel data into one file.
-# 5. `coverage report` or `coverage html` shows the final, correct results.
-
-# --- THE DEFINITIVE COVERAGE SCRIPTS ---
-# We disable the pytest-cov plugin with `-p no:cov` to prevent it from
-# interfering with our manual `coverage run` invocation.
 cov = {shell = "coverage erase && coverage run -m pytest -p no:cov && coverage report", help="Run all tests with coverage analysis."}
-cov-prep = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/data_preparation/ && coverage report", help="Run coverage for the data preparation test suite."}
-cov-file = {shell = "coverage erase && coverage run -m pytest -p no:cov {args} && coverage report", help="Run coverage for a specific test file by its full path (e.g., tests/data_preparation/test_select_eligible_candidates.py)."}
+cov-file = {shell = "coverage erase && coverage run -m pytest -p no:cov {args} && coverage report", help="Run coverage for a specific test file by its full path."}
 cov-html = {shell = "coverage erase && coverage run -m pytest -p no:cov && coverage html", help="Run all tests and generate an HTML coverage report."}
-cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
-# ------------------------------------
 
-clean = {cmd = "python scripts/clean_project.py", help = "Clean up temporary and generated files."}
-gen-scope-report = "python scripts/generate_scope_report.py"
-lint = "pdm run lint-headers && pdm run lint-docstrings"
-lint-headers = {cmd = "python scripts/lint_file_headers.py --fix ./src/*.py ./tests/*.py ./*.ps1 ./scripts/*.py", help = "Fix headers and footers on all project scripts."}
-check-headers = {cmd = "python scripts/lint_file_headers.py ./src/*.py ./tests/*.py ./*.ps1 ./scripts/*.py", help = "Check headers and footers on all project scripts."}
-build-docs = "python scripts/build_docs.py"
+# ==============================================================================
+# === MAINTENANCE, LINTING & REPORTING ===
+# ==============================================================================
+clean = {cmd = "python scripts/maintenance/clean_project.py", help = "Clean up temporary and generated files."}
+gen-scope-report = "python scripts/maintenance/generate_scope_report.py"
+list-files = "python scripts/maintenance/list_project_files.py"
+txt-copy = "python scripts/maintenance/convert_py_to_txt.py"
+lint = {composite = ["check-headers", "lint-docstrings"], help="Run all read-only linting checks."}
+lint-fix = {composite = ["lint-headers-fix", "lint-docstrings"], help="Run all linters and apply automatic fixes."}
+check-headers = {cmd = "python scripts/lint/lint_file_headers.py", help = "Check headers and footers on all project scripts."}
+lint-headers-fix = {cmd = "python scripts/lint/lint_file_headers.py --fix", help = "Fix headers and footers on all project scripts."}
+lint-docstrings = {cmd = "python scripts/lint/lint_docstrings.py {args}", help = "Check all scripts for docstring compliance (--deep for full scan)."}
 
-# --- Developer Workflow ---
+# ==============================================================================
+# === BUILD & RELEASE WORKFLOW ===
+# ==============================================================================
+build-docs = "python scripts/build/build_docs.py"
 commit = {cmd = "cz commit", help = "Create a new commit using the interactive Commitizen prompt."}
-release = {cmd = "python scripts/finalize_release.py", help = "Finalize a new release (bump, changelog, tag)."}
-# ------------------------
+release = {cmd = "python scripts/build/finalize_release.py", help = "Finalize a new release (bump, changelog, tag)."}
 
+# ==============================================================================
+# === CORE PROJECT WORKFLOWS ===
+# ==============================================================================
 # Data preparation workflow shortcuts
 prep-data = "pwsh -ExecutionPolicy Bypass -File ./prepare_data.ps1"
-
 # Main workflow shortcuts
 new-exp = "pwsh -ExecutionPolicy Bypass -File ./new_experiment.ps1"
 aud-exp = "pwsh -ExecutionPolicy Bypass -File ./audit_experiment.ps1"
@@ -87,6 +83,9 @@ aud-stu = "pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"
 fix-stu = "pwsh -ExecutionPolicy Bypass -File ./fix_study.ps1"
 mig-stu = "pwsh -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 
+# ==============================================================================
+# === DETAILED TEST SUITES ===
+# ==============================================================================
 # --- Python Unit Tests ---
 test-py-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
 test-py-exp = {cmd = "pytest tests/experiment_pipeline/", help = "Run all experiment pipeline unit tests."}
