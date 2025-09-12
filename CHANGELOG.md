@@ -1,5 +1,15 @@
 # Changelog
 
+## 9.3.2 (2025-09-12)
+
+### Bump
+
+- **version 9.3.1 → 9.3.2**
+
+### Fixes
+
+- **Apply consistent formatting to all utility scripts**
+
 ## 9.3.1 (2025-09-12)
 
 ### Bump
