@@ -1,5 +1,30 @@
 # Changelog
 
+## 9.3.1 (2025-09-12)
+
+### Bump
+
+- **version 9.3.0 → 9.3.1**
+
+### Refactor
+
+- **Reorganize all utility scripts into functional subdirectories**
+  Restructures the entire `scripts/` directory to improve clarity, maintainability, and developer experience by grouping all utility scripts by their function.
+  
+  Key Changes:
+  - **New Directory Structure:** All utility scripts were moved into function-based subdirectories: `analysis/`, `build/`, `lint/`, `maintenance/`, and `workflows/`.
+  
+  - **Workflow Clarification:** The complex, five-step assembly logic validation workflow was made unambiguous by renaming its scripts with numeric prefixes (e.g., `1_generate_coverage_map.py`).
+  
+  - **Improved Documentation:**
+      - A new top-level guide, `scripts/README_SCRIPTS.md`, was created to serve as a map to the utility categories.
+      - A detailed guide, `scripts/workflows/assembly_logic/README_ASSEMBLY.md`, was created to explain the purpose and sequence of this specific workflow.
+      - All internal file paths, headers, and docstrings were updated to reflect the new locations.
+  
+  - **Configuration Updates:**
+      - `pyproject.toml` was updated and reorganized to point to the new script locations and introduce cleaner composite commands (e.g., `lint`, `lint-fix`).
+      - The CI workflow (`.github/workflows/ci.yml`) was simplified to use the new `lint` command and a deprecated parameter was fixed.
+
 ## 9.3.0 (2025-09-12)
 
 ### Bump
