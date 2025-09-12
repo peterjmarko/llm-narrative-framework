@@ -1,5 +1,33 @@
 # Changelog
 
+## 9.2.2 (2025-09-11)
+
+### Bump
+
+- **version 9.2.1 → 9.2.2**
+
+### Refactor
+
+- **Separate Layer 3 workflow and algorithm validation tests**
+  A major refactoring of the Layer 3 integration test was performed to improve clarity, correctness, and separation of concerns.
+  
+  - **Separated Workflow and Algorithm Validation:**
+    The large-scale algorithm validation logic (formerly steps `4.v` and `7.v`) was moved from the main workflow test into a new, dedicated test harness: `tests/testing_harness/validate_selection_algorithms.ps1`. This resolves a confusing and buggy execution flow where the two different test types were improperly interleaved.
+  
+  - **Introduced New Test Script:**
+    A new PDM script, `test-l3-selection`, was created to run the new standalone algorithm validation harness.
+  
+  - **Fixed `bypass` Mode Validation:**
+    The test harness was corrected to handle the `bypass` profile properly. It now skips validation of intentionally empty score files and instead confirms that the final candidate list is identical to the eligible candidate list, as expected in this mode.
+  
+  - **Fixed `default` Mode Regression:**
+    A bug introduced in a previous step was fixed. The validation for `ocean_scores.csv` was corrected to check the proper column for `idADB` (column index 1), resolving the "Missing subject" error in the `default` test profile.
+  
+  - **Improved Documentation and Naming:**
+    The test script was renamed to `validate_selection_algorithms.ps1` for clarity. The `TESTING.md` file was updated to reflect the new, cleaner separation between the workflow integration test and the large-scale algorithm validation, including adding the new harness to the status table.
+  
+  All Layer 3 tests are now passing, and the testing architecture is more robust and easier to understand.
+
 ## 9.2.1 (2025-09-11)
 
 ### Bump
