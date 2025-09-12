@@ -2,7 +2,7 @@
 #-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
-# Copyright (C) 2025 [Your Name/Institution]
+# Copyright (C) 2025 Peter J. Marko
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -70,6 +70,8 @@ import os # Keep os for os.stat if needed, though pathlib usually suffices
 from datetime import datetime
 import traceback # For detailed error logging if needed
 import argparse
+from tqdm import tqdm
+import time
 
 # --- Configuration ---
 # Define custom scan depths for specific directories.
@@ -82,6 +84,7 @@ import argparse
 # Any folder NOT listed here will use the default --depth from the command line.
 CUSTOM_DEPTH_MAP = {
     "archive": 0,           # Hide contents of 'archive'
+    "main_archive": 0,      # Hide contents of the main archive
     "data": 3,              # Show contents of 'data' down to 3 levels deep, except:
     "data/backup": 0,           # 'backup' (hide)
     "debug": 0,             # Hide contents of 'archive'
@@ -100,6 +103,8 @@ CUSTOM_DEPTH_MAP = {
     "src/archive": 0,                           # 'archive' (hide)
     "src/llm_personality_matching.egg-info": 0, # 'llm_personality_matching.egg-info' (hide)
     "src/temp": 0,                              # 'temp' (hide)
+    "temp_assembly_logic_validation": 0, # Hide contents of temporary validation folders
+    "temp_test_environment": 0,          # Hide contents of temporary test folders
     "test_backups": 0,      # Hide contents of 'test_backups'
     "tests": 3,             # Show contents of 'tests' down to 1 level deep, except:
     "tests/__pycache__": 0,     # '__pycache__' (hide)
@@ -120,7 +125,7 @@ EXCLUDE_EXTENSIONS_SET = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp"} # Add 
 
 OUTPUT_FILENAME = "project_structure_report.txt"
 REPORT_SUBDIR = "project_reports" # Subdirectory within 'output' for these reports
-FILE_COUNT_WARNING_THRESHOLD = 10000 # Warn if the number of items to inspect exceeds this.
+FILE_COUNT_WARNING_THRESHOLD = 50000 # Warn if the number of items to inspect exceeds this (speed: 10,000 items/second)
 # --- End Configuration ---
 
 def get_project_root():
@@ -160,43 +165,75 @@ def should_exclude_path(path_item: pathlib.Path, project_root: pathlib.Path):
     if path_item.suffix.lower() in EXCLUDE_EXTENSIONS_SET:
         return True
 
-    # Check directory exclusion (applies if path_item is a dir or inside an excluded dir)
-    try:
-        # Check if the item itself is an excluded directory name
-        if path_item.is_dir() and path_item.name in EXCLUDE_DIRS_SET:
-            return True
-        # Check if any parent directory part within the project is in EXCLUDE_DIRS_SET
-        # This ensures subdirectories of excluded dirs are also skipped
-        current_path_iter = path_item # Renamed to avoid conflict with outer scope 'current_path'
-        while current_path_iter != project_root and current_path_iter.parent != current_path_iter: # Loop until project_root or filesystem root
-            if current_path_iter.name in EXCLUDE_DIRS_SET:
-                return True
-            # Special check for top-level hidden dirs not explicitly in EXCLUDE_DIRS_SET
-            if current_path_iter.is_dir() and current_path_iter.parent == project_root and current_path_iter.name.startswith(".") and current_path_iter.name not in {".git", ".vscode", ".idea"}: # Allow common dev hidden dirs
-                if current_path_iter.name not in EXCLUDE_DIRS_SET: # If it's like ".pytest_cache" and already excluded, fine.
-                    return True
-            current_path_iter = current_path_iter.parent
-    except ValueError:
-        if path_item.name in EXCLUDE_DIRS_SET or path_item.name in EXCLUDE_FILES_SET:
-            return True
-        return False
-    except Exception:
-        return False
+    # Check if the item itself is an excluded directory name
+    if path_item.is_dir() and path_item.name in EXCLUDE_DIRS_SET:
+        return True
 
     return False
 
 
-def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pathlib.Path, indent_level=0, scan_depth=0):
+def count_reportable_items(current_path: pathlib.Path, project_root: pathlib.Path, args, feedback_counter, scan_depth=0):
+    """
+    Recursively performs a "dry run" to count reportable items, providing
+    real-time feedback on the total number of items discovered.
+    """
+    # First, check if the current directory itself should be excluded.
+    # This prunes entire branches of the file system tree for massive speedup.
+    if should_exclude_path(current_path, project_root):
+        return 0
+
+    count = 0
+    try:
+        items_in_dir = sorted(list(current_path.iterdir()), key=lambda x: (x.is_file(), x.name.lower()))
+    except (PermissionError, FileNotFoundError):
+        feedback_counter['discovered'] += 1
+        # Also update the live counter to show progress.
+        print(f"  -> Discovered {feedback_counter['discovered']:,} items...", end='\r')
+        feedback_counter['last_update'] = time.time()
+        return 1
+
+    for item in items_in_dir:
+        feedback_counter['discovered'] += 1
+        current_time = time.time()
+        if current_time - feedback_counter['last_update'] >= 0.1:
+            print(f"  -> Discovered {feedback_counter['discovered']:,} items...", end='\r')
+            feedback_counter['last_update'] = current_time
+
+        if should_exclude_path(item, project_root):
+            continue
+        
+        count += 1
+
+        if item.is_dir():
+            relative_path_str = str(item.relative_to(project_root).as_posix())
+            effective_depth = scan_depth
+            if relative_path_str in CUSTOM_DEPTH_MAP:
+                custom_rule = CUSTOM_DEPTH_MAP[relative_path_str]
+                if custom_rule == 0:
+                    effective_depth = 0
+                else:
+                    effective_depth = max(scan_depth, custom_rule)
+            
+            if effective_depth == -1:
+                count += count_reportable_items(item, project_root, args, feedback_counter, -1)
+            elif effective_depth > 0:
+                count += count_reportable_items(item, project_root, args, feedback_counter, effective_depth - 1)
+    return count
+
+def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pathlib.Path, args, pbar, indent_level=0, scan_depth=0):
     """
     Recursively generates a file listing for the output file.
-    Respects a global scan_depth and a CUSTOM_DEPTH_MAP for per-folder overrides.
+    Updates a shared progress bar for each item processed.
     """
+    # First, check if the current directory itself should be excluded.
+    if should_exclude_path(current_path, project_root):
+        return
+
     indent = "  " * indent_level
     prefix_dir = "📁 "
     prefix_file = "📄 "
 
     try:
-        # Sort items, directories first, then files, all alphabetically
         items_in_dir = sorted(list(current_path.iterdir()), key=lambda x: (x.is_file(), x.name.lower()))
     except (PermissionError, FileNotFoundError):
         outfile.write(f"{indent}{prefix_dir}{current_path.name}/  (Cannot Access)\n")
@@ -206,171 +243,149 @@ def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pat
         if should_exclude_path(item, project_root):
             continue
 
+        # Update the progress bar only for items that will be processed.
+        pbar.update(1)
+
         if item.is_dir():
             outfile.write(f"{indent}{prefix_dir}{item.name}/\n")
 
-            # --- MODIFIED LOGIC FOR CUSTOM AND GLOBAL DEPTH ---
-            # Determine the effective scan depth for this subdirectory.
             relative_path_str = str(item.relative_to(project_root).as_posix())
-
-            # By default, use the inherited scan_depth from the parent.
             effective_depth = scan_depth
 
-            # Check if a custom rule applies to this specific directory.
             if relative_path_str in CUSTOM_DEPTH_MAP:
-                # A custom rule overrides the inherited depth.
-                effective_depth = CUSTOM_DEPTH_MAP[relative_path_str]
+                custom_rule = CUSTOM_DEPTH_MAP[relative_path_str]
+                if custom_rule == 0:
+                    effective_depth = 0
+                else:
+                    effective_depth = max(scan_depth, custom_rule)
 
-            # Recurse only if the effective depth allows.
-            # -1 means infinite depth.
-            # A positive number means we can still go deeper.
             if effective_depth == -1:
-                # Pass -1 along for infinite recursion in this branch.
-                generate_file_listing(outfile, item, project_root, indent_level + 1, -1)
+                generate_file_listing(outfile, item, project_root, args, pbar, indent_level + 1, -1)
             elif effective_depth > 0:
-                # Decrement the depth for the next level down.
-                generate_file_listing(outfile, item, project_root, indent_level + 1, effective_depth - 1)
-            # If effective_depth is 0, we do not recurse.
+                generate_file_listing(outfile, item, project_root, args, pbar, indent_level + 1, effective_depth - 1)
 
         elif item.is_file():
             outfile.write(f"{indent}{prefix_file}{item.name}\n")
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generates a report of the project's file structure.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    # NEW: Add an optional argument for the target directory
-    parser.add_argument(
-        "target_directory",
-        nargs='?',
-        default=None,
-        help="The path to the project directory to scan. If not provided, auto-detects the project root."
-    )
-    parser.add_argument(
-        "--depth",
-        type=int,
-        default=0,
-        help="Directory scan depth for collecting files. 0 for root dir only, -1 for infinite, N for N levels."
-    )
-    args = parser.parse_args()
-
-    # CORRECTED: Use the argument if provided, otherwise auto-detect
-    if args.target_directory:
-        project_root = pathlib.Path(args.target_directory).resolve()
-    else:
-        project_root = get_project_root()
-
-    if not project_root.exists() or not project_root.is_dir():
-        print(f"Error: Determined project directory not found or invalid: {project_root}")
-        sys.exit(1)
-    
-    # --- MODIFICATION START ---
-    # Create a dynamic filename based on the scan depth to avoid overwriting reports.
-    if args.depth == -1:
-        depth_suffix = "all"
-    else:
-        depth_suffix = str(args.depth)
-
-    # Deconstruct the original filename constant to insert the depth suffix.
-    # e.g., "project_structure_report.txt" becomes "project_structure_report_depth_0.txt"
-    base_name = pathlib.Path(OUTPUT_FILENAME).stem
-    extension = pathlib.Path(OUTPUT_FILENAME).suffix
-    dynamic_filename = f"{base_name}_depth_{depth_suffix}{extension}"
-    # --- MODIFICATION END ---
-
-    print(f"\n{Colors.YELLOW}--- Starting Project Structure Analysis ---{Colors.RESET}")
-    print(f"1. Determined project root: {project_root}")
-
-    # Define the dedicated output directory for reports
-    report_output_dir = project_root / "output" / REPORT_SUBDIR
-    
-    # Ensure the output directory exists, creating it if necessary
     try:
-        report_output_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as e:
-        print(f"{Colors.RED}Error: Could not create output directory '{report_output_dir}': {e}{Colors.RESET}")
-        sys.exit(1)
-        
-    # MODIFIED: Use the new dynamic filename instead of the static constant
-    output_file_path = report_output_dir / dynamic_filename
-
-    print(f"2. Output will be saved to: {output_file_path}")
-
-    # --- MODIFIED FOR DEPTH CONTROL ---
-    all_items_to_process = []
-    if args.depth == -1:
-        print("Scanning with infinite depth... (collecting file list, this may take a moment)")
-        # Convert the rglob generator to a list to allow for len() check
-        all_items_to_process = list(project_root.rglob('*'))
-    else:
-        print(f"Scanning to a maximum depth of {args.depth} level(s)... (collecting file list, this may take a moment)")
-        # Use a queue for a breadth-first search, which is ideal for depth-limiting
-        queue = [(project_root, 0)]
-        visited_dirs = {project_root}
-        
-        while queue:
-            current_dir, current_depth = queue.pop(0)
-            
-            try:
-                for item in current_dir.iterdir():
-                    all_items_to_process.append(item)
-                    
-                    # If it's a directory and we can go deeper, add it to the queue
-                    if item.is_dir() and item not in visited_dirs and current_depth < args.depth:
-                        visited_dirs.add(item)
-                        queue.append((item, current_depth + 1))
-            except (PermissionError, FileNotFoundError):
-                # Silently skip directories we cannot access
-                continue
-    # --- END MODIFICATION ---
-
-    # Warn the user if the number of items to process is large
-    if len(all_items_to_process) >= FILE_COUNT_WARNING_THRESHOLD:
-        prompt = (
-            f"\nWarning: Found {len(all_items_to_process)} files and directories to inspect. "
-            "This operation could take some time.\n"
-            "Do you want to proceed? (Y/N): "
+        parser = argparse.ArgumentParser(
+            description="Generates a report of the project's file structure.",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter
         )
+        parser.add_argument(
+            "target_directory",
+            nargs='?',
+            default=None,
+            help="The path to the project directory to scan. If not provided, auto-detects the project root."
+        )
+        parser.add_argument(
+            "--depth",
+            type=int,
+            default=0,
+            help="Directory scan depth for collecting files. 0 for root dir only, -1 for infinite, N for N levels."
+        )
+        args = parser.parse_args()
+
+        if args.target_directory:
+            project_root = pathlib.Path(args.target_directory).resolve()
+        else:
+            project_root = get_project_root()
+
+        if not project_root.exists() or not project_root.is_dir():
+            print(f"Error: Determined project directory not found or invalid: {project_root}")
+            sys.exit(1)
+        
+        if args.depth == -1:
+            depth_suffix = "all"
+        else:
+            depth_suffix = str(args.depth)
+
+        base_name = pathlib.Path(OUTPUT_FILENAME).stem
+        extension = pathlib.Path(OUTPUT_FILENAME).suffix
+        dynamic_filename = f"{base_name}_depth_{depth_suffix}{extension}"
+
+        print(f"\n{Colors.YELLOW}--- Starting Project Structure Analysis ---{Colors.RESET}")
+        print(f"1. Determined project root: {project_root}")
+
+        report_output_dir = project_root / "output" / REPORT_SUBDIR
         try:
-            response = input(prompt)
-            if response.strip().lower() != 'y':
-                print("Operation cancelled by user.")
+            report_output_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            print(f"{Colors.RED}Error: Could not create output directory '{report_output_dir}': {e}{Colors.RESET}")
+            sys.exit(1)
+            
+        output_file_path = report_output_dir / dynamic_filename
+        print(f"2. Output will be saved to: {output_file_path}")
+
+        if args.depth >= 6:
+            print("3. Discovering files and calculating report size... (expecting to discover about 1.5 million items)")
+        else:
+            print("3. Discovering files and calculating report size...")
+        feedback_counter = {'discovered': 0, 'last_update': time.time()}
+        final_item_count = count_reportable_items(project_root, project_root, args, feedback_counter, scan_depth=args.depth)
+        
+        # Overwrite the last live counter with the final, accurate discovered count to ensure they match.
+        final_discovered_str = f"  -> Discovered {feedback_counter['discovered']:,} items..."
+        # Pad with spaces to ensure the line is cleared of any previous, longer numbers.
+        print(f"{final_discovered_str:<80}", end='\r')
+        print() # Move to the next line for subsequent output.
+        
+        discovered_count = feedback_counter['discovered']
+        excluded_count = discovered_count - final_item_count
+        print(f"4. Discovered {discovered_count:,} total items ({final_item_count:,} will be included and {excluded_count:,} excluded).")
+
+        if feedback_counter['discovered'] >= FILE_COUNT_WARNING_THRESHOLD:
+            prompt = "This operation could take some time. Do you want to proceed? (Y/N): "
+            try:
+                response = input(prompt)
+                if response.strip().lower() != 'y':
+                    print(f"{Colors.YELLOW}Operation cancelled by user.{Colors.RESET}\n")
+                    sys.exit(0)
+            except (KeyboardInterrupt, EOFError):
+                print(f"\n{Colors.YELLOW}Operation cancelled by user.{Colors.RESET}\n")
                 sys.exit(0)
-        except (KeyboardInterrupt, EOFError):
-            print("\nOperation cancelled by user.")
-            sys.exit(0)
-        print("-" * 20) # Visual separator after prompt
+            print("-" * 20)
 
-    try:
-        with open(output_file_path, 'w', encoding='utf-8') as outfile:
-            outfile.write(f"Project Structure & File Report\n")
-            outfile.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            outfile.write(f"Project Root: {project_root.resolve()}\n")
-            outfile.write(f"Report Location: {output_file_path.resolve()}\n")
-            outfile.write(f"Excluded Directory Names: {', '.join(sorted(list(EXCLUDE_DIRS_SET)))}\n")
-            outfile.write(f"Excluded File Names: {', '.join(sorted(list(EXCLUDE_FILES_SET)))}\n")
-            outfile.write(f"Excluded File Extensions: {', '.join(sorted(list(EXCLUDE_EXTENSIONS_SET)))}\n")
-            outfile.write(f"File Collection Scan Depth: {'Infinite (recursive)' if args.depth == -1 else args.depth}\n")
-            outfile.write("="*70 + "\n\n")
+        print("5. Assembling report...")
+        pbar = tqdm(total=final_item_count,
+                    desc="Assembling Report",
+                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}",
+                    ncols=60)
+        try:
+            with open(output_file_path, 'w', encoding='utf-8') as outfile:
+                outfile.write(f"Project Structure & File Report\n")
+                outfile.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                outfile.write(f"Project Root: {project_root.resolve()}\n")
+                outfile.write(f"Report Location: {output_file_path.resolve()}\n")
+                outfile.write(f"Excluded Directory Names: {', '.join(sorted(list(EXCLUDE_DIRS_SET)))}\n")
+                outfile.write(f"Excluded File Names: {', '.join(sorted(list(EXCLUDE_FILES_SET)))}\n")
+                outfile.write(f"Excluded File Extensions: {', '.join(sorted(list(EXCLUDE_EXTENSIONS_SET)))}\n")
+                outfile.write(f"File Collection Scan Depth: {'Infinite (recursive)' if args.depth == -1 else args.depth}\n")
+                outfile.write("="*70 + "\n\n")
+                outfile.write("--- Hierarchical Directory Structure ---\n")
+                outfile.write(f"{project_root.name}/\n")
+                generate_file_listing(outfile, project_root, project_root, args, pbar, indent_level=0, scan_depth=args.depth)
+                outfile.write("\n\n" + "="*70 + "\n")
+                outfile.write("Report generation complete.\n")
 
-            outfile.write("--- Hierarchical Directory Structure ---\n")
-            outfile.write(f"{project_root.name}/\n")
-            generate_file_listing(outfile, project_root, project_root, indent_level=0, scan_depth=args.depth)
-
-            outfile.write("\n\n" + "="*70 + "\n")
-            outfile.write("Report generation complete.\n")
+        except IOError as e:
+            print(f"{Colors.RED}Error: Could not write to output file: {output_file_path}\nDetails: {e}{Colors.RESET}")
+            sys.exit(1)
+        except Exception as e_main:
+            print(f"An unexpected error occurred: {e_main}")
+            traceback.print_exc()
+            sys.exit(1)
+        finally:
+            if pbar:
+                pbar.close()
 
         print(f"\n{Colors.YELLOW}--- Analysis Complete ---{Colors.RESET}")
         print(f"{Colors.CYAN} - Report saved to: {output_file_path.relative_to(project_root)}{Colors.RESET}")
         print(f"{Colors.GREEN}SUCCESS: Project structure report generated successfully.{Colors.RESET}\n")
 
-    except IOError as e:
-        print(f"{Colors.RED}Error: Could not write to output file: {output_file_path}\nDetails: {e}{Colors.RESET}")
-        sys.exit(1)
-    except Exception as e_main:
-        print(f"An unexpected error occurred: {e_main}")
-        traceback.print_exc()
+    except KeyboardInterrupt:
+        print(f"\n{Colors.YELLOW}Operation cancelled by user.{Colors.RESET}\n")
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -1,6 +1,23 @@
 #!/usr/bin/env pwsh
-# --- Layer 5: Migration Workflow Integration Testing ---
-# --- Step 1: Automated Setup ---
+#-*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 Peter J. Marko
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/testing_harness/layer5_step1_setup.ps1
 
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 $TestEnvRoot = Join-Path $ProjectRoot "temp_test_environment"
@@ -74,3 +91,5 @@ Write-Host "  -> Deleted a response file."
 
 Write-Host "`nIntegration test sandbox for Layer 5 created and corrupted successfully."
 Write-Host "Your next action is Step 2: Execute the Test Workflow."
+
+# === End of tests/testing_harness/layer5_step1_setup.ps1 ===

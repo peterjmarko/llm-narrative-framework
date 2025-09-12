@@ -61,6 +61,7 @@ cov-html = {shell = "coverage erase && coverage run -m pytest -p no:cov && cover
 cov-erase = {cmd = "coverage erase", help="Clean up coverage data files."}
 # ------------------------------------
 
+clean = {cmd = "python scripts/clean_project.py", help = "Clean up temporary and generated files."}
 gen-scope-report = "python scripts/generate_scope_report.py"
 lint = "pdm run lint-headers && pdm run lint-docstrings"
 lint-headers = {cmd = "python scripts/lint_file_headers.py --fix ./src/*.py ./tests/*.py ./*.ps1 ./scripts/*.py", help = "Fix headers and footers on all project scripts."}

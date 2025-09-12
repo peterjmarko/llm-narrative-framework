@@ -2,7 +2,7 @@
 #-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
-# Copyright (C) 2025 [Your Name/Institution]
+# Copyright (C) 2025 Peter J. Marko
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -70,7 +70,7 @@ EXCLUDED_FILENAMES = [
 
 LICENSE_BLOCK = """
 # Personality Matching Experiment Framework
-# Copyright (C) 2025 [Your Name/Institution]
+# Copyright (C) 2025 Peter J. Marko
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -197,9 +197,6 @@ def main():
         path_parts = pathlib.Path(f_path).parts
         if 'archive' in path_parts:
             results['SKIPPED'].append(f"{rel_path} (in archive directory)")
-            continue
-        if 'testing_harness' in path_parts:
-            results['SKIPPED'].append(f"{rel_path} (in testing harness)")
             continue
         if os.path.basename(f_path) in EXCLUDED_FILENAMES:
             results['SKIPPED'].append(rel_path)

@@ -1,6 +1,23 @@
 #!/usr/bin/env pwsh
-# --- Layer 5: Migration Workflow Integration Testing ---
-# --- Step 2: Execute the Test Workflow ---
+#-*- coding: utf-8 -*-
+#
+# Personality Matching Experiment Framework
+# Copyright (C) 2025 Peter J. Marko
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Filename: tests/testing_harness/layer5_step2_test_workflow.ps1
 
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer5_sandbox"
@@ -35,3 +52,5 @@ catch {
     Write-Host "`nERROR: Layer 5 test workflow failed.`n$($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
+
+# === End of tests/testing_harness/layer5_step2_test_workflow.ps1 ===

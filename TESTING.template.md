@@ -2,41 +2,7 @@
 
 This document outlines the testing philosophy, procedures, and coverage strategy for the framework. It serves as a guide for developers and a record of the project's quality assurance standards.
 
-- [A Guide to Manual & Integration Testing](#a-guide-to-manual-integration-testing)
-  - [Core Algorithm Validation](#core-algorithm-validation)
-    - [Profile Generation Algorithm](#profile-generation-algorithm)
-    - [Large-Scale Selection Algorithms](#large-scale-selection-algorithms)
-    - [Query Generation & Randomization Integrity Test (Planned)](#query-generation-randomization-integrity-test-planned)
-    - [Statistical Analysis & Reporting Validation (Planned)](#statistical-analysis-reporting-validation-planned)
-  - [Workflow & Pipeline Validation (The 7 Layers)](#workflow-pipeline-validation-the-7-layers)
-    - [Test Assets (`tests/assets/`)](#test-assets-testsassets)
-    - [The Seven Layers of Validation Table](#the-seven-layers-of-validation-table)
-  - [General Developer Workflow](#general-developer-workflow)
-  - [Layer 1: Python Unit Testing](#layer-1-python-unit-testing)
-    - [Running Automated Tests](#running-automated-tests)
-  - [Layer 2: Data Pipeline Orchestration Testing (`prepare_data.ps1` with Mocks)](#layer-2-data-pipeline-orchestration-testing-prepare_dataps1-with-mocks)
-  - [Layer 3: Data Pipeline Integration Testing (`prepare_data.ps1`)](#layer-3-data-pipeline-integration-testing-prepare_dataps1)
-    - [Workflow Integration Testing (`run_layer3_test.ps1`)](#workflow-integration-testing-run_layer3_testps1)
-    - [Large-Scale Algorithm Validation (`validate_selection_algorithms.ps1`)](#large-scale-algorithm-validation-validate_selection_algorithmsps1)
-  - [Layer 4: Main Workflow Integration Testing](#layer-4-main-workflow-integration-testing)
-    - [Step 1: Automated Setup](#step-1-automated-setup)
-    - [Step 2: Execute the Test Workflow](#step-2-execute-the-test-workflow)
-    - [Step 3: Automated Cleanup](#step-3-automated-cleanup)
-  - [Layer 5: Migration Workflow Integration Testing](#layer-5-migration-workflow-integration-testing)
-    - [Step 1: Automated Setup](#step-1-automated-setup)
-    - [Step 2: Execute the Test Workflow](#step-2-execute-the-test-workflow)
-    - [Step 3: Automated Cleanup](#step-3-automated-cleanup)
-  - [Layer 6: Post-Hoc Study Evaluation (Planned)](#layer-6-post-hoc-study-evaluation-planned)
-    - [Step 1: Automated Setup](#step-1-automated-setup)
-    - [Step 2: Execute the Test Workflow](#step-2-execute-the-test-workflow)
-    - [Step 3: Automated Cleanup](#step-3-automated-cleanup)
-  - [Layer 7: New Study Generation and Lifecycle (Planned)](#layer-7-new-study-generation-and-lifecycle-planned)
-    - [Step 1: Automated Setup](#step-1-automated-setup)
-    - [Step 2: Execute the Test Workflow](#step-2-execute-the-test-workflow)
-    - [Step 3: Automated Cleanup](#step-3-automated-cleanup)
-- [Testing Status](#testing-status)
-  - [Data Preparation Pipeline](#data-preparation-pipeline)
-  - [Main Experiment & Analysis Pipeline](#main-experiment-analysis-pipeline)
+{{toc}}
 
 ## A Guide to Manual & Integration Testing
 
@@ -47,9 +13,7 @@ The project's validation strategy is built on a two-part philosophy that separat
 
 This distinction ensures that we can independently verify that our *method is sound* and that our *implementation of that method is robust*.
 
-<div align="center">
-  <img src="images/test_philosophy_overview.png" width="100%" caption="The Two-Part Testing Philosophy: Separating the validation of the core scientific methodology from the software's execution flow.">
-</div>
+{{diagram:docs/diagrams/test_philosophy_overview.mmd | scale=2.5 | width=100% | caption=The Two-Part Testing Philosophy: Separating the validation of the core scientific methodology from the software's execution flow.}}
 
 ### Core Algorithm Validation
 
@@ -98,9 +62,7 @@ This standalone test will provide bit-for-bit verification of the entire data an
 
 This category uses a multi-layered strategy to ensure the correctness of the framework's end-to-end execution flow at all levels, from individual scripts to full data and experiment pipelines.
 
-<div align="center">
-  <img src="images/test_strategy_overview.png" width="100%" caption="The Seven Layers of Workflow Validation: A hierarchical strategy for testing the framework's execution pipelines.">
-</div>
+{{diagram:docs/diagrams/test_strategy_overview.mmd | scale=2.5 | width=100% | caption=The Seven Layers of Workflow Validation: A hierarchical strategy for testing the framework's execution pipelines.}}
 
 #### Test Assets (`tests/assets/`)
 
@@ -201,9 +163,7 @@ The script handles all setup, execution of the test scenarios (including simulat
 > **Note on the Integration Test Sandbox:**
 > The integration test procedures below (Layers 3 and higher) create a temporary `temp_test_environment` directory at the project root to run in a safe, isolated sandbox. These tests are non-destructive and will not modify your main project files.
 
-<div align="center">
-  <img src="images/test_sandbox_architecture.png" width="100%" caption="The Integration Test Sandbox Architecture: All integration tests run in a temporary, isolated environment, ensuring the main project data is never modified.">
-</div>
+{{diagram:docs/diagrams/test_sandbox_architecture.mmd | scale=2.5 | width=100% | caption=The Integration Test Sandbox Architecture: All integration tests run in a temporary, isolated environment, ensuring the main project data is never modified.}}
 
 ### Layer 3: Data Pipeline Integration Testing (`prepare_data.ps1`)
 

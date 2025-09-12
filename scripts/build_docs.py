@@ -2,7 +2,7 @@
 #-*- coding: utf-8 -*-
 #
 # Personality Matching Experiment Framework
-# Copyright (C) 2025 [Your Name/Institution]
+# Copyright (C) 2025 Peter J. Marko
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -599,7 +599,8 @@ def main():
 
         docs_to_check = [
             ('docs/DOCUMENTATION.template.md', 'docs/DOCUMENTATION.md'),
-            ('docs/article_supplementary_material.template.md', 'docs/article_supplementary_material.md')
+            ('docs/article_supplementary_material.template.md', 'docs/article_supplementary_material.md'),
+            ('TESTING.template.md', 'TESTING.md')
         ]
         
         # 1. Check diagrams from all templates
@@ -640,7 +641,8 @@ def main():
     files_with_diagrams = [
         'docs/DOCUMENTATION.template.md',
         'docs/article_main_text.md',
-        'docs/article_supplementary_material.template.md' # Now a template in docs/
+        'docs/article_supplementary_material.template.md', # Now a template in docs/
+        'TESTING.template.md'
     ]
     if not render_all_diagrams(project_root, force_render=do_force_diagrams, template_files=files_with_diagrams):
         sys.exit(1)
@@ -669,6 +671,17 @@ def main():
             f.write(viewer_content)
         print(f"    - {Colors.GREEN}Successfully built article_supplementary_material.md!{Colors.RESET}")
 
+    # --- 3. Build TESTING.md ---
+    test_template_path = os.path.join(project_root, 'TESTING.template.md')
+    test_final_path = os.path.join(project_root, 'TESTING.md')
+    if not do_force_documents and is_doc_up_to_date(project_root, test_final_path, test_template_path):
+         print(f"    - Skipping {Colors.CYAN}TESTING.md{Colors.RESET} build (up-to-date).")
+    else:
+        viewer_content = build_doc_content(project_root, test_template_path, flavor='viewer')
+        with open(test_final_path, 'w', encoding='utf-8') as f:
+            f.write(viewer_content)
+        print(f"    - {Colors.GREEN}Successfully built TESTING.md!{Colors.RESET}")
+
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Converting all Markdown files to DOCX ---{Colors.RESET}")
     try:
         import pypandoc
@@ -680,6 +693,7 @@ def main():
         files_needing_placeholders = {
             str(pathlib.Path(doc_final_path).resolve()),
             str(pathlib.Path(supp_final_path).resolve()),
+            str(pathlib.Path(test_final_path).resolve()),
         }
         
         # The logic has been simplified. We no longer need to process placeholders
