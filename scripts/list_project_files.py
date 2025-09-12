@@ -95,13 +95,13 @@ CUSTOM_DEPTH_MAP = {
     "output/test*": 0,      # Hide contents of 'output/test*' folders
     "scripts": 2,           # Show contents of 'scripts' down to 2 levels deep, except:
     "scripts/__pycache__": 0,   # '__pycache__' (hide)
-    "src": 2,               # Show contents of 'src' down to 2 levels deep, except:
+    "src": 3,               # Show contents of 'src' down to 2 levels deep, except:
     "src/__pycache__": 0,                        # '__pycache__' (hide)
     "src/archive": 0,                           # 'archive' (hide)
     "src/llm_personality_matching.egg-info": 0, # 'llm_personality_matching.egg-info' (hide)
     "src/temp": 0,                              # 'temp' (hide)
     "test_backups": 0,      # Hide contents of 'test_backups'
-    "tests": 1,             # Show contents of 'tests' down to 1 level deep, except:
+    "tests": 3,             # Show contents of 'tests' down to 1 level deep, except:
     "tests/__pycache__": 0,     # '__pycache__' (hide)
     "tests/archive": 0,         # 'archive' (hide)
 }

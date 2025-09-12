@@ -1,0 +1,24 @@
+graph TD
+    subgraph "Overall Testing Philosophy"
+        direction LR
+        A["<b>Core Algorithm Validation</b><br><i>Verifies the scientific and logical integrity of key methodological claims.</i>"]
+        B["<b>Workflow & Pipeline Validation</b><br><i>Verifies the end-to-end execution flow and software plumbing.</i>"]
+    end
+
+    subgraph "Standalone, High-Precision Tests"
+        direction TB
+        C["<b>Profile Generation Algorithm</b><br>Ensures bit-for-bit deterministic accuracy against a ground-truth dataset."]
+        D["<b>Large-Scale Selection Algorithms</b><br>Ensures statistical validity of filtering and cutoff logic on a large, realistic dataset."]
+    end
+    
+    subgraph "The Seven Layers of Validation"
+        direction TB
+        L1["<b>Layer 1:</b> Unit Testing"]
+        L2["<b>Layer 2:</b> Orchestration Testing"]
+        L3["<b>Layer 3:</b> Pipeline Integration"]
+        L4_7["<b>Layers 4-7:</b><br>Full Experiment Lifecycle Workflows"]
+    end
+
+    A --> C
+    A --> D
+    B --> L1 --> L2 --> L3 --> L4_7

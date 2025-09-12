@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/data_preparation/test_assembly_algorithm.py
+# Filename: tests/algorithm_validation/test_profile_generation_algorithm.py
 
 """
 Verifies the integrity of the personality description assembly algorithm.
@@ -304,4 +304,4 @@ def test_assembly_algorithm_matches_ground_truth(assembly_test_environment, test
         # Re-raise the original exception to make the test fail
         raise
 
-# === End of tests/data_preparation/test_assembly_algorithm.py ===
+# === End of tests/algorithm_validation/test_profile_generation_algorithm.py ===

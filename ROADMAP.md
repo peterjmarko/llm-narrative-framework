@@ -31,6 +31,12 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Implement Layer 6 Test Harness (Post-Hoc Study Evaluation) to validate the `compile_study.ps1` workflow.
   - [ ] Implement Layer 7 Test Harness (New Study Lifecycle) to validate the `new_study.ps1`, `audit_study.ps1`, and `fix_study.ps1` workflows.
   - [ ] Update and complete unit test suites for any remaining Python scripts with low coverage.
+- [ ] **Implement Query Generation & Randomization Integrity Test**
+  - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide mathematical proof of the mapping and randomization logic in `query_generator.py`.
+  - [ ] The test will run the script in a loop to generate a large sample of trial manifests for both `correct` and `random` strategies. It will then perform statistical validation to confirm the `random` strategy approximates a uniform distribution and that the `correct` strategy is implemented as designed.
+- [ ] **Implement Statistical Analysis & Reporting Validation Test**
+  - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide bit-for-bit verification of the entire data analysis and aggregation pipeline.
+  - [ ] The test will use a static, pre-generated set of mock LLM response files as input, run the full sequence of analysis and compilation scripts, and compare the final `STUDY_results.csv` and report JSON against a pre-computed, known-good ground truth.
 
 ### Final Validation and Data Generation
 
