@@ -1,5 +1,29 @@
 # Changelog
 
+## 9.2.3 (2025-09-11)
+
+### Bump
+
+- **version 9.2.2 → 9.2.3**
+- **version 9.2.1 → 9.2.2**
+
+### Refactor
+
+- **Refactor testing architecture to separate workflow and algorithm validation**
+  This commit introduces a significant refactoring of the project's testing philosophy and architecture to improve conceptual clarity, structural organization, and correctness.
+  
+  - **Refactored Testing Philosophy:** The testing strategy is now formally structured into a two-part philosophy:
+    1.  **Core Algorithm Validation:** Standalone, high-precision tests that provide scientific proof for the framework's core methodological claims.
+    2.  **Workflow & Pipeline Validation:** The existing 7-layer model, now focused on validating the end-to-end integrity of the software's execution flow.
+  
+  - **Reorganized Test Directory Structure:** To align the file system with the new philosophy, a new `tests/algorithm_validation/` directory was created to consolidate all core algorithm validation scripts. Key tests were moved and renamed into this new location.
+  
+  - **Documentation Overhaul:** The `TESTING.md` file was completely restructured to reflect the new architecture, incorporating three new Mermaid diagrams to visually explain the testing philosophy, the 7-layer model, and the sandbox environment. The `ROADMAP.md` was also updated with new planned algorithm tests.
+  
+  - **Layer 3 Test Harness Improvements:** The Layer 3 integration test was refactored by separating the large-scale algorithm validation into its own harness (`validate_selection_algorithms.ps1`), resolving a buggy execution flow. A regression in the `default` profile was also fixed by correcting the column index for `ocean_scores.csv` validation.
+  
+  - **Configuration Updates:** The `pyproject.toml` file was updated with corrected paths and improved PDM shortcut names (`test-l3-selection`) to reflect all structural changes. All file moves were performed using `git mv` to preserve history.
+
 ## 9.2.2 (2025-09-11)
 
 ### Bump
