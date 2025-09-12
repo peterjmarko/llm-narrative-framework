@@ -94,6 +94,7 @@ test-assembly = {cmd = "pytest tests/data_preparation/test_assembly_algorithm.py
 # --- Integration Tests (All Layers) ---
 test-l2 = "pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"
 test-l3 = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"
+test-l3-algo = "pwsh ./tests/testing_harness/validate_selection_algorithms.ps1"
 test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"
 test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"
 test-l4 = "pwsh -File ./tests/testing_harness/experiment_pipeline/layer4/run_layer4_test.ps1"

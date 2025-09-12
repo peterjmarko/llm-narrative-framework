@@ -137,34 +137,15 @@ The script handles all setup, execution of the test scenarios (including simulat
 
 This procedure validates the real data preparation pipeline using a robust, profile-driven test harness. The harness uses a controlled seed dataset from `tests/assets/` to ensure complete test isolation. It tests the main `prepare_data.ps1` orchestrator as the System Under Test, covering all four pipeline stages from Data Sourcing to Profile Generation.
 
-The test is managed by a single master script, `run_layer3_test.ps1`, which can be executed with different profiles to simulate various scenarios. All test runs are fully automated, including setup and cleanup. Upon completion, the test sandbox is automatically archived as a timestamped `.zip` file in `data/backup/` for post-mortem analysis.
+This layer is split into two distinct types of tests: a lightweight **Workflow Integration Test** that validates the pipeline's plumbing with a small dataset, and a **Large-Scale Algorithm Validation** that validates the scientific integrity of the core filtering and selection logic using a much larger, pre-generated dataset.
 
-#### How to Run Layer 3 Tests
-All Layer 3 tests are run via PDM scripts from the project root.
+#### Workflow Integration Testing (`run_layer3_test.ps1`)
+This procedure validates the real data preparation pipeline using a small, controlled seed dataset from `tests/assets/` to ensure complete test isolation. It tests the main `prepare_data.ps1` orchestrator as the System Under Test, covering all four pipeline stages from Data Sourcing to Profile Generation. All test runs are fully automated, including setup and cleanup. Upon completion, the test sandbox is automatically archived as a timestamped `.zip` file in `data/backup/` for post-mortem analysis.
+
+All workflow tests are run via PDM scripts from the project root:
 
 *   **Default Profile (`default`):**
     This is the standard test case. It runs the full pipeline with LLM-based candidate selection active and injects controlled validation failures to test the script's resilience.
-
-    > **Note on Large-Scale Algorithm Validation:**
-    > The `default` profile includes two extra, isolated validation tests (`Step 4.v` and `Step 7.v`) that use a large, pre-generated dataset to validate the core candidate selection algorithms at scale. This test is optional and requires a manual setup.
-    >
-    > -   **Step 4.v:** Validates the deterministic filtering logic in `select_eligible_candidates.py`.
-    > -   **Step 7.v:** Validates the data-driven cutoff algorithm in `select_final_candidates.py`.
-    >
-    > **To enable these tests, you must manually place the following four files in the `tests/assets/large_seed/` directory:**
-    > ```
-    > tests/assets/large_seed/
-    > └── data/
-    >     ├── foundational_assets/
-    >     │   ├── eminence_scores.csv
-    >     │   └── ocean_scores.csv
-    >     ├── reports/
-    >     │   └── adb_validation_report.csv
-    >     └── sources/
-    >         └── adb_raw_export.txt
-    > ```
-    > These files can be obtained by running the full data preparation pipeline on a large dataset. If these files are not present, the large-scale algorithm validation tests will be skipped, but the rest of the Layer 3 integration test will still run.
-
     ```powershell
     pdm run test-l3-default
     ```
@@ -181,7 +162,31 @@ All Layer 3 tests are run via PDM scripts from the project root.
     pdm run test-l3-interactive
     ```
 
-**Prerequisites:** A configured `.env` file in the project root with a valid API key (for the eminence and OCEAN scoring steps in the `default` and `interactive` profiles).
+**Prerequisites:** A configured `.env` file in the project root with a valid API key is required for the `default` and `interactive` profiles.
+
+#### Large-Scale Algorithm Validation (`validate_selection_algorithms.ps1`)
+This is a standalone test that validates the core data filtering and selection algorithms at a realistic scale. It uses a large, pre-generated dataset to verify the logic of `select_eligible_candidates.py` and the data-driven cutoff analysis in `select_final_candidates.py`.
+
+This test is optional and requires a one-time manual setup to provide the necessary large-scale data assets.
+
+*   **To run the test:**
+    ```powershell
+    pdm run test-l3-selection
+    ```
+*   **Prerequisites:**
+    You must manually place the following four files in the `tests/assets/large_seed/` directory:
+    ```
+    tests/assets/large_seed/
+    └── data/
+        ├── foundational_assets/
+        │   ├── eminence_scores.csv
+        │   └── ocean_scores.csv
+        ├── reports/
+        │   └── adb_validation_report.csv
+        └── sources/
+            └── adb_raw_export.txt
+    ```
+    These files can be obtained by running the full data preparation pipeline on a large dataset. If these files are not present, the test will be skipped automatically.
 
 ### Layer 4: Main Workflow Integration Testing
 
@@ -328,7 +333,12 @@ Module                              Cov. (%)        Status & Justification
                                                     at two layers. The **Layer 2** test uses mock scripts to validate
                                                     its core state machine and halt/resume logic. The **Layer 3**
                                                     integration test validates the full, live pipeline, including its
-                                                    interactive features, using a profile-driven test harness.
+                                                    interactive and bypass features, using a profile-driven test harness.
+
+`validate_selection_algorithms.ps1` `N/A`           COMPLETE. Standalone test harness that validates the core filtering
+                                                    and cutoff algorithms (`select_eligible_candidates.py`,
+                                                    `select_final_candidates.py`) at scale using a large,
+                                                    pre-generated seed dataset in an isolated sandbox.
 --------------------------------------------------------------------------------------------------------------------
 
 ### Main Experiment & Analysis Pipeline
