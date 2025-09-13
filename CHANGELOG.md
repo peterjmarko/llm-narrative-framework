@@ -1,5 +1,23 @@
 # Changelog
 
+## 9.4.0 (2025-09-13)
+
+### Bump
+
+- **version 9.3.3 → 9.4.0**
+
+### Chore
+
+- **Untrack generated data files and align scope report with Git**
+- **Untrack generated data, artifacts, and redundant config**
+
+### Features
+
+- **Enhance project structure report script**
+  Adds --git flag for efficient, Git-aware reporting, directory file counts with aligned formatting, wildcard exclusions, and automatic backups.
+  
+  Optimizes Git-mode performance by building the report from the file list instead of a full filesystem scan.
+
 ## 9.3.3 (2025-09-13)
 
 ### Bump
