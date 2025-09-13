@@ -27,15 +27,17 @@ hierarchical tree view of all directories and files. The report is useful for
 documentation, project handovers, and gaining a quick overview of the codebase.
 
 Key Features:
--   **Configurable Scan Depth**: The recursion depth of the file scan can be
-    controlled via the `--depth` command-line argument.
--   **Customizable Folder Depths**: The scan depth for specific folders (e.g.,
-    `src`, `output`) can be customized within the script's configuration,
-    allowing for a mix of detailed and summarized views in a single report.
+-   **Configurable Scan Depth**: Control the recursion depth of the file scan
+    via the `--depth` command-line argument.
+-   **Git-Aware Filtering**: Use the `--git` flag to limit the report to only
+    files and directories tracked by the Git repository.
 -   **Intelligent Exclusions**: Automatically excludes configured directories
-    (like `.venv`, `.git`) and file types to produce a clean and relevant report.
--   **Dynamic Output Naming**: The output filename includes the scan depth,
-    making it easy to distinguish between different reports.
+    (like `.venv`, `.git`) and file types using exact names and wildcard
+    patterns, producing a clean and relevant report.
+-   **Dynamic Output Naming**: The output filename includes the scan depth and a
+    `_git` suffix when the Git filter is active.
+-   **Automatic Backups**: Automatically backs up any existing report to
+    `output/backup/` with a timestamp before generating a new one.
 
 Usage:
     # Scan the project root directory only (default depth=0)
@@ -43,6 +45,9 @@ Usage:
 
     # Scan the entire project recursively
     pdm run list-files -- --depth -1
+
+    # Scan only files tracked by Git (recursively)
+    pdm run list-files -- --git --depth -1
 """
 
 # === Start of maintenance/list_project_files.py ===
@@ -61,63 +66,70 @@ import os # Keep os for os.stat if needed, though pathlib usually suffices
 from datetime import datetime
 import traceback # For detailed error logging if needed
 import argparse
+import fnmatch
 from tqdm import tqdm
 import time
+import subprocess
 
 # --- Configuration ---
-# Define custom scan depths for specific directories.
-# Paths should be relative to the project root, using forward slashes.
-# The integer value represents the desired depth *from that folder*.
-#   - 0: Show the folder name, but do not list its contents.
-#   - 1: Show the folder's immediate children.
-#   - 2: Show children and grandchildren.
-#   - -1: Show all contents recursively (infinite depth).
-# Any folder NOT listed here will use the default --depth from the command line.
-CUSTOM_DEPTH_MAP = {
-    "archive": 0,           # Hide contents of 'archive'
-    "main_archive": 0,      # Hide contents of the main archive
-    "data": 3,              # Show contents of 'data' down to 3 levels deep, except:
-    "data/backup": 0,           # 'backup' (hide)
-    "debug": 0,             # Hide contents of 'archive'
-    "docs": 2,              # Show contents of 'docs' down to 2 levels deep
-    "htmlcov": 0,           # Hide contents of 'htmlcov' folder
-    "linter_backups": 0,    # Hide contents of 'linter_backups'
-    "node_modules": 0,      # Hide contents of 'node_modules'
-    "output": 1,            # Show contents of 'output' down to 3 levels deep, except:
-    "output/project_code_as_txt": 0,    # 'project_code_as_txt' (hide)
-    "output/project_reports": 0,        # 'project_reports' (hide)
-    "output/test*": 0,      # Hide contents of 'output/test*' folders
-    "scripts": 2,           # Show contents of 'scripts' down to 2 levels deep, except:
-    "scripts/__pycache__": 0,   # '__pycache__' (hide)
-    "src": 3,               # Show contents of 'src' down to 2 levels deep, except:
-    "src/__pycache__": 0,                        # '__pycache__' (hide)
-    "src/archive": 0,                           # 'archive' (hide)
-    "src/llm_personality_matching.egg-info": 0, # 'llm_personality_matching.egg-info' (hide)
-    "src/temp": 0,                              # 'temp' (hide)
-    "temp_assembly_logic_validation": 0, # Hide contents of temporary validation folders
-    "temp_test_environment": 0,          # Hide contents of temporary test folders
-    "test_backups": 0,      # Hide contents of 'test_backups'
-    "tests": 3,             # Show contents of 'tests' down to 1 level deep, except:
-    "tests/__pycache__": 0,     # '__pycache__' (hide)
-    "tests/archive": 0,         # 'archive' (hide)
-}
 
-# Directories to completely exclude from the scan (names, not paths)
+# --- Configuration ---
+# Directories to completely exclude from the scan (exact names)
 EXCLUDE_DIRS_SET = {
+    # General Python/dev environment folders
     ".venv", "venv", "__pycache__", ".git", ".vscode", ".idea",
-    ".pytest_cache", "node_modules", "build", "dist",
-    "archive", "instance", "*.egg-info", # Common build/dist/docs/archive folders
-    "weather", "project_code_as_txt/weather" # Specific to this project (weather scripts and data)
+    ".pytest_cache", "node_modules",
+    # Build and distribution artifacts
+    "build", "dist", "htmlcov",
+    # Other common folders to exclude
+    "instance"
+}
+# Directory name patterns to exclude (uses glob-style matching)
+EXCLUDE_DIR_PATTERNS = {
+    "*.egg-info",
+    "*archive*",
+    "*backup*",
+    "temp_*",
 }
 # Specific files to always exclude by name
-EXCLUDE_FILES_SET = {".DS_Store", "Thumbs.db", "*.pyc", "*.pyo", "*.pyd", "~$*.*"}
-# File extensions to exclude (alternative to listing full names in EXCLUDE_FILES_SET)
-EXCLUDE_EXTENSIONS_SET = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp"} # Add more as needed
+EXCLUDE_FILES_SET = {".DS_Store", "Thumbs.db"}
+
+# File name patterns to exclude (uses glob-style matching)
+EXCLUDE_FILE_PATTERNS = {"~$*.*"}
+
+# File extensions to exclude (case-insensitive)
+EXCLUDE_EXTENSIONS_SET = {".bak", ".log", ".pyc", ".pyd", ".pyo", ".swp", ".tmp"}
 
 OUTPUT_FILENAME = "project_structure_report.txt"
 REPORT_SUBDIR = "project_reports" # Subdirectory within 'output' for these reports
-FILE_COUNT_WARNING_THRESHOLD = 50000 # Warn if the number of items to inspect exceeds this (speed: 10,000 items/second)
+FILE_COUNT_ALIGN_COLUMN = 90 # Column where the file count will END (right-justified)
 # --- End Configuration ---
+
+def get_git_tracked_paths(project_root: pathlib.Path):
+    """
+    Retrieves a set of all file and directory paths tracked by Git.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "ls-files"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except FileNotFoundError:
+        print(f"{Colors.RED}Error: 'git' command not found. Is Git installed and in your PATH?{Colors.RESET}")
+        sys.exit(1)
+    except subprocess.CalledProcessError:
+        print(f"{Colors.RED}Error: Project root is not a Git repository, or another 'git' error occurred.{Colors.RESET}")
+        sys.exit(1)
+
+    tracked_files = result.stdout.strip().split('\n')
+    git_tracked_paths = set()
+    for file_path_str in filter(None, tracked_files): # Filter out empty strings
+        p = pathlib.Path(file_path_str)
+        git_tracked_paths.add(p)
+    return git_tracked_paths
 
 def get_project_root():
     """Determines the project root, assuming this script is in utilities/"""
@@ -146,80 +158,163 @@ def get_project_root():
 
 def should_exclude_path(path_item: pathlib.Path, project_root: pathlib.Path):
     """
-    Checks if a path item should be excluded based on configured sets.
-    Considers relative path to project root for directory exclusion.
+    Checks if a path should be excluded based on configured exclusion lists.
+    Supports exact name, glob pattern, and file extension matching.
     """
-    # Exclude specific files by name
-    if path_item.name in EXCLUDE_FILES_SET:
-        return True
-    # Exclude by extension
-    if path_item.suffix.lower() in EXCLUDE_EXTENSIONS_SET:
-        return True
+    item_name = path_item.name
 
-    # Check if the item itself is an excluded directory name
-    if path_item.is_dir() and path_item.name in EXCLUDE_DIRS_SET:
-        return True
+    if path_item.is_dir():
+        # Exclude by exact directory name
+        if item_name in EXCLUDE_DIRS_SET:
+            return True
+        # Exclude by directory name pattern
+        for pattern in EXCLUDE_DIR_PATTERNS:
+            if fnmatch.fnmatch(item_name, pattern):
+                return True
+    elif path_item.is_file():
+        # Exclude by exact file name
+        if item_name in EXCLUDE_FILES_SET:
+            return True
+        # Exclude by file name pattern
+        for pattern in EXCLUDE_FILE_PATTERNS:
+            if fnmatch.fnmatch(item_name, pattern):
+                return True
+        # Exclude by file extension
+        if path_item.suffix.lower() in EXCLUDE_EXTENSIONS_SET:
+            return True
 
     return False
 
 
-def count_reportable_items(current_path: pathlib.Path, project_root: pathlib.Path, args, feedback_counter, scan_depth=0):
+def count_reportable_items(current_path: pathlib.Path, project_root: pathlib.Path, args, feedback_counter, dir_file_counts, scan_depth=0, git_tracked_paths=None):
     """
-    Recursively performs a "dry run" to count reportable items, providing
-    real-time feedback on the total number of items discovered.
+    Recursively counts all items and simultaneously calculates the number of
+    reportable files within each directory, respecting the scan depth.
+    Returns the aggregate counts and populates the dir_file_counts map.
     """
-    # First, check if the current directory itself should be excluded.
-    # This prunes entire branches of the file system tree for massive speedup.
-    if should_exclude_path(current_path, project_root):
-        return 0
-
-    count = 0
+    counts = {'total': 0, 'excluded_by_rule': 0, 'final_included': 0}
+    local_file_count = 0
     try:
         items_in_dir = sorted(list(current_path.iterdir()), key=lambda x: (x.is_file(), x.name.lower()))
     except (PermissionError, FileNotFoundError):
-        feedback_counter['discovered'] += 1
-        # Also update the live counter to show progress.
-        print(f"  -> Discovered {feedback_counter['discovered']:,} items...", end='\r')
-        feedback_counter['last_update'] = time.time()
-        return 1
+        return counts # Cannot access contents, so content count is 0.
 
     for item in items_in_dir:
         feedback_counter['discovered'] += 1
         current_time = time.time()
         if current_time - feedback_counter['last_update'] >= 0.1:
-            print(f"  -> Discovered {feedback_counter['discovered']:,} items...", end='\r')
+            print(f"  -> Scanned {feedback_counter['discovered']:,} items from disk...", end='\r')
             feedback_counter['last_update'] = current_time
 
-        if should_exclude_path(item, project_root):
-            continue
+        counts['total'] += 1
+        is_excluded_by_rule = should_exclude_path(item, project_root)
+        is_excluded_by_git = (git_tracked_paths is not None and item.relative_to(project_root) not in git_tracked_paths)
+
+        if is_excluded_by_rule:
+            counts['excluded_by_rule'] += 1
+        elif is_excluded_by_git:
+            pass # Not included in final count, but not a rule-based exclusion.
+        else:
+            counts['final_included'] += 1
+
+        if item.is_file() and not is_excluded_by_rule and not is_excluded_by_git:
+            local_file_count += 1
+
+        if item.is_dir() and not is_excluded_by_rule:
+            if scan_depth == -1 or scan_depth > 0:
+                sub_counts = count_reportable_items(
+                    item, project_root, args, feedback_counter, dir_file_counts,
+                    scan_depth - 1 if scan_depth > 0 else -1,
+                    git_tracked_paths
+                )
+                counts = {k: v + sub_counts.get(k, 0) for k, v in counts.items()}
+                # Add the file count from the subdirectory to the current directory's count.
+                local_file_count += dir_file_counts.get(item, 0)
+
+    dir_file_counts[current_path] = local_file_count
+    return counts
+
+
+def format_count_str(count):
+    """Formats a number into a right-aligned file count string."""
+    num_width = 8  # Fixed width for the number part to ensure alignment
+    num_str = f"{count:,}".rjust(num_width)
+    word_str = " file" if count == 1 else " files"
+    return f"{num_str}{word_str}"
+
+
+def build_git_tree(git_files):
+    """Builds a hierarchical dictionary tree from a flat list of Git files."""
+    tree = {}
+    for file_path in git_files:
+        parts = file_path.parts
+        current_level = tree
+        for part in parts[:-1]:  # Iterate through directories
+            current_level = current_level.setdefault(part, {})
+        current_level[parts[-1]] = None  # Mark file with None
+    return tree
+
+
+def count_from_git_tree(tree, dir_file_counts, current_path, scan_depth):
+    """Recursively counts items and files from the in-memory Git tree."""
+    counts = {'final_included': 0}
+    local_file_count = 0
+    # Sort to process directories before files, then alphabetically
+    sorted_keys = sorted(tree.keys(), key=lambda k: (tree[k] is None, k.lower()))
+
+    for name in sorted_keys:
+        counts['final_included'] += 1
+        is_dir = isinstance(tree[name], dict)
         
-        count += 1
-
-        if item.is_dir():
-            relative_path_str = str(item.relative_to(project_root).as_posix())
-            effective_depth = scan_depth
-            if relative_path_str in CUSTOM_DEPTH_MAP:
-                custom_rule = CUSTOM_DEPTH_MAP[relative_path_str]
-                if custom_rule == 0:
-                    effective_depth = 0
-                else:
-                    effective_depth = max(scan_depth, custom_rule)
+        if is_dir:
+            sub_path = current_path / name
+            if scan_depth == -1 or scan_depth > 0:
+                sub_counts = count_from_git_tree(
+                    tree[name], dir_file_counts, sub_path,
+                    scan_depth - 1 if scan_depth > 0 else -1
+                )
+                counts['final_included'] += sub_counts['final_included']
+                local_file_count += dir_file_counts[sub_path]
+        else:
+            local_file_count += 1
             
-            if effective_depth == -1:
-                count += count_reportable_items(item, project_root, args, feedback_counter, -1)
-            elif effective_depth > 0:
-                count += count_reportable_items(item, project_root, args, feedback_counter, effective_depth - 1)
-    return count
+    dir_file_counts[current_path] = local_file_count
+    return counts
 
-def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pathlib.Path, args, pbar, indent_level=0, scan_depth=0):
-    """
-    Recursively generates a file listing for the output file.
-    Updates a shared progress bar for each item processed.
-    """
-    # First, check if the current directory itself should be excluded.
-    if should_exclude_path(current_path, project_root):
-        return
 
+def generate_from_git_tree(outfile, tree, pbar, dir_file_counts, current_path, indent_level, scan_depth):
+    """Recursively generates the report from the in-memory Git tree."""
+    indent = "  " * indent_level
+    prefix_dir, prefix_file = "📁 ", "📄 "
+    # Sort to process directories before files, then alphabetically
+    sorted_keys = sorted(tree.keys(), key=lambda k: (tree[k] is None, k.lower()))
+    
+    for name in sorted_keys:
+        pbar.update(1)
+        is_dir = isinstance(tree[name], dict)
+
+        if is_dir:
+            base_line = f"{indent}{prefix_dir}{name}/"
+            count = dir_file_counts.get(current_path / name, 0)
+            count_str = format_count_str(count)
+            padding_needed = FILE_COUNT_ALIGN_COLUMN - len(base_line) - len(count_str)
+            padding = " " * (padding_needed if padding_needed > 1 else 2)
+            outfile.write(f"{base_line}{padding}{count_str}\n")
+            
+            if scan_depth == -1 or scan_depth > 0:
+                generate_from_git_tree(
+                    outfile, tree[name], pbar, dir_file_counts,
+                    current_path / name, indent_level + 1,
+                    scan_depth - 1 if scan_depth > 0 else -1
+                )
+        else:
+            outfile.write(f"{indent}{prefix_file}{name}\n")
+
+
+def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pathlib.Path, args, pbar, dir_file_counts, indent_level=0, scan_depth=0, git_tracked_paths=None):
+    """
+    Recursively generates a file listing for the contents of a directory.
+    """
     indent = "  " * indent_level
     prefix_dir = "📁 "
     prefix_file = "📄 "
@@ -227,34 +322,46 @@ def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pat
     try:
         items_in_dir = sorted(list(current_path.iterdir()), key=lambda x: (x.is_file(), x.name.lower()))
     except (PermissionError, FileNotFoundError):
-        outfile.write(f"{indent}{prefix_dir}{current_path.name}/  (Cannot Access)\n")
+        # The parent directory was already written, we just cannot list its contents.
+        # This could be noted by modifying the parent's line, but for simplicity, we just stop.
         return
 
     for item in items_in_dir:
-        if should_exclude_path(item, project_root):
+        is_excluded_by_rule = should_exclude_path(item, project_root)
+        is_excluded_by_git = (git_tracked_paths is not None and item.relative_to(project_root) not in git_tracked_paths)
+
+        if is_excluded_by_rule or is_excluded_by_git:
             continue
 
-        # Update the progress bar only for items that will be processed.
         pbar.update(1)
 
         if item.is_dir():
-            outfile.write(f"{indent}{prefix_dir}{item.name}/\n")
+            base_line = f"{indent}{prefix_dir}{item.name}/"
+            count = dir_file_counts.get(item, 0)
+            count_str = format_count_str(count)
 
-            relative_path_str = str(item.relative_to(project_root).as_posix())
-            effective_depth = scan_depth
+            padding_needed = FILE_COUNT_ALIGN_COLUMN - len(base_line) - len(count_str)
+            padding = " " * (padding_needed if padding_needed > 1 else 2)
+            final_line = f"{base_line}{padding}{count_str}"
 
-            if relative_path_str in CUSTOM_DEPTH_MAP:
-                custom_rule = CUSTOM_DEPTH_MAP[relative_path_str]
-                if custom_rule == 0:
-                    effective_depth = 0
-                else:
-                    effective_depth = max(scan_depth, custom_rule)
+            try:
+                # Check accessibility before recursing.
+                _ = next(item.iterdir(), None)
+                outfile.write(final_line + "\n")
+            except (PermissionError, FileNotFoundError):
+                access_error_str = "(Cannot Access)"
+                padding_needed = FILE_COUNT_ALIGN_COLUMN - len(base_line) - len(access_error_str)
+                padding = " " * (padding_needed if padding_needed > 1 else 2)
+                outfile.write(f"{base_line}{padding}{access_error_str}\n")
+                continue
 
-            if effective_depth == -1:
-                generate_file_listing(outfile, item, project_root, args, pbar, indent_level + 1, -1)
-            elif effective_depth > 0:
-                generate_file_listing(outfile, item, project_root, args, pbar, indent_level + 1, effective_depth - 1)
-
+            if scan_depth == -1 or scan_depth > 0:
+                generate_file_listing(
+                    outfile, item, project_root, args, pbar, dir_file_counts,
+                    indent_level + 1,
+                    scan_depth - 1 if scan_depth > 0 else -1,
+                    git_tracked_paths
+                )
         elif item.is_file():
             outfile.write(f"{indent}{prefix_file}{item.name}\n")
 
@@ -276,6 +383,11 @@ def main():
             default=0,
             help="Directory scan depth for collecting files. 0 for root dir only, -1 for infinite, N for N levels."
         )
+        parser.add_argument(
+            "--git",
+            action="store_true",
+            help="Only include files and directories tracked by Git."
+        )
         args = parser.parse_args()
 
         if args.target_directory:
@@ -286,7 +398,7 @@ def main():
         if not project_root.exists() or not project_root.is_dir():
             print(f"Error: Determined project directory not found or invalid: {project_root}")
             sys.exit(1)
-        
+
         if args.depth == -1:
             depth_suffix = "all"
         else:
@@ -294,7 +406,8 @@ def main():
 
         base_name = pathlib.Path(OUTPUT_FILENAME).stem
         extension = pathlib.Path(OUTPUT_FILENAME).suffix
-        dynamic_filename = f"{base_name}_depth_{depth_suffix}{extension}"
+        git_suffix = "_git" if args.git else ""
+        dynamic_filename = f"{base_name}{git_suffix}_depth_{depth_suffix}{extension}"
 
         print(f"\n{Colors.YELLOW}--- Starting Project Structure Analysis ---{Colors.RESET}")
         print(f"1. Determined project root: {project_root}")
@@ -307,36 +420,66 @@ def main():
             sys.exit(1)
             
         output_file_path = report_output_dir / dynamic_filename
-        print(f"2. Output will be saved to: {output_file_path}")
+        print(f"2. Output will be saved to: {output_file_path.relative_to(project_root)}")
 
-        if args.depth >= 6:
-            print("3. Discovering files and calculating report size... (expecting to discover about 1.5 million items)")
+        dir_file_counts = {}
+        total_on_disk, excluded_by_rule, excluded_by_git, final_item_count = 0, 0, 0, 0
+
+        if args.git:
+            # --- Efficient Git-based Workflow ---
+            print("3. Using efficient Git-based discovery.")
+            git_files_only = get_git_tracked_paths(project_root)
+            git_tree = build_git_tree(git_files_only)
+
+            # The +1 accounts for the root directory itself.
+            content_counts = count_from_git_tree(git_tree, dir_file_counts, project_root, args.depth)
+            final_item_count = content_counts['final_included'] + 1
+            
+            print(f"4. Discovery complete: Found {final_item_count:,} Git-tracked items to report.")
+
         else:
-            print("3. Discovering files and calculating report size...")
-        feedback_counter = {'discovered': 0, 'last_update': time.time()}
-        final_item_count = count_reportable_items(project_root, project_root, args, feedback_counter, scan_depth=args.depth)
-        
-        # Overwrite the last live counter with the final, accurate discovered count to ensure they match.
-        final_discovered_str = f"  -> Discovered {feedback_counter['discovered']:,} items..."
-        # Pad with spaces to ensure the line is cleared of any previous, longer numbers.
-        print(f"{final_discovered_str:<80}", end='\r')
-        print() # Move to the next line for subsequent output.
-        
-        discovered_count = feedback_counter['discovered']
-        excluded_count = discovered_count - final_item_count
-        print(f"4. Discovered {discovered_count:,} total items ({final_item_count:,} will be included and {excluded_count:,} excluded).")
+            # --- Standard Filesystem Workflow ---
+            if args.depth >= 6:
+                print("3. Discovering files and calculating report size... (expecting to scan about 1.5 million items)")
+            else:
+                print("3. Discovering files and calculating report size...")
+            
+            feedback_counter = {'discovered': 0, 'last_update': time.time()}
 
-        if feedback_counter['discovered'] >= FILE_COUNT_WARNING_THRESHOLD:
-            prompt = "This operation could take some time. Do you want to proceed? (Y/N): "
+            # Get counts for items *inside* the project root.
+            content_counts = count_reportable_items(
+                project_root, project_root, args, feedback_counter, dir_file_counts,
+                scan_depth=args.depth, git_tracked_paths=None
+            )
+            
+            print(" " * 80, end='\r'); print()
+            
+            total_on_disk = content_counts['total'] + 1
+            excluded_by_rule = content_counts['excluded_by_rule']
+            final_item_count = content_counts['final_included'] + 1
+
+            print(f"4. Discovery complete:")
+            print(f"   - Found {total_on_disk:,} total items on disk.")
+            print(f"   - Excluded {excluded_by_rule:,} items based on script rules.")
+            print(f"   - Final report will include {final_item_count:,} items.")
+
+        # Backup existing report if it exists
+        if output_file_path.exists():
             try:
-                response = input(prompt)
-                if response.strip().lower() != 'y':
-                    print(f"{Colors.YELLOW}Operation cancelled by user.{Colors.RESET}\n")
-                    sys.exit(0)
-            except (KeyboardInterrupt, EOFError):
-                print(f"\n{Colors.YELLOW}Operation cancelled by user.{Colors.RESET}\n")
-                sys.exit(0)
-            print("-" * 20)
+                # Define and create the backup directory
+                backup_dir = project_root / "output" / "backup"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+
+                # Create a timestamped backup filename
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_filename = f"{output_file_path.stem}_{timestamp}{output_file_path.suffix}"
+                backup_path = backup_dir / backup_filename
+
+                # Move the old report to the backup location
+                output_file_path.rename(backup_path)
+                print(f"   -> Backed up existing report to: {backup_path.relative_to(project_root)}")
+            except OSError as e:
+                print(f"{Colors.YELLOW}Warning: Could not back up existing report: {e}{Colors.RESET}")
 
         print("5. Assembling report...")
         pbar = tqdm(total=final_item_count,
@@ -347,16 +490,49 @@ def main():
             with open(output_file_path, 'w', encoding='utf-8') as outfile:
                 outfile.write(f"Project Structure & File Report\n")
                 outfile.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                if args.git:
+                    outfile.write("Filter: Git-tracked files only\n")
                 outfile.write(f"Project Root: {project_root.resolve()}\n")
                 outfile.write(f"Report Location: {output_file_path.resolve()}\n")
                 outfile.write(f"Excluded Directory Names: {', '.join(sorted(list(EXCLUDE_DIRS_SET)))}\n")
+                outfile.write(f"Excluded Directory Patterns: {', '.join(sorted(list(EXCLUDE_DIR_PATTERNS)))}\n")
                 outfile.write(f"Excluded File Names: {', '.join(sorted(list(EXCLUDE_FILES_SET)))}\n")
+                outfile.write(f"Excluded File Patterns: {', '.join(sorted(list(EXCLUDE_FILE_PATTERNS)))}\n")
                 outfile.write(f"Excluded File Extensions: {', '.join(sorted(list(EXCLUDE_EXTENSIONS_SET)))}\n")
                 outfile.write(f"File Collection Scan Depth: {'Infinite (recursive)' if args.depth == -1 else args.depth}\n")
+                outfile.write("\n--- About File Counts ---\n")
+                outfile.write("The count next to each directory shows the number of reportable files within it.\n")
+                outfile.write("This count respects both the --depth and --git flags.\n")
+                outfile.write("\n--- Discovery Statistics ---\n")
+                outfile.write(f"Total items found on disk: {total_on_disk:,}\n")
+                outfile.write(f"Excluded by script rules: {excluded_by_rule:,}\n")
+                if args.git:
+                    outfile.write(f"Excluded (not tracked by Git): {excluded_by_git:,}\n")
+                outfile.write(f"Final items in report: {final_item_count:,}\n")
                 outfile.write("="*70 + "\n\n")
+                # Write the root directory line with its aligned file count
                 outfile.write("--- Hierarchical Directory Structure ---\n")
-                outfile.write(f"{project_root.name}/\n")
-                generate_file_listing(outfile, project_root, project_root, args, pbar, indent_level=0, scan_depth=args.depth)
+                root_count = dir_file_counts.get(project_root, 0)
+                root_count_str = format_count_str(root_count)
+                root_line = f"{project_root.name}/"
+                
+                padding_needed = FILE_COUNT_ALIGN_COLUMN - len(root_line) - len(root_count_str)
+                padding = " " * (padding_needed if padding_needed > 1 else 2)
+                outfile.write(f"{root_line}{padding}{root_count_str}\n")
+                pbar.update(1) # Manually account for the root directory.
+
+                if args.git:
+                    # Use the in-memory tree for generation
+                    generate_from_git_tree(
+                        outfile, git_tree, pbar, dir_file_counts,
+                        project_root, indent_level=1, scan_depth=args.depth
+                    )
+                else:
+                    # Use the standard filesystem traversal for generation
+                    generate_file_listing(
+                        outfile, project_root, project_root, args, pbar, dir_file_counts,
+                        indent_level=1, scan_depth=args.depth, git_tracked_paths=None
+                    )
                 outfile.write("\n\n" + "="*70 + "\n")
                 outfile.write("Report generation complete.\n")
 
