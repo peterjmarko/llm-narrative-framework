@@ -97,8 +97,8 @@ test-l3 = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.
 test-l3-selection = "pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"
 test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"
 test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"
-test-l4 = "pwsh -File ./tests/testing_harness/experiment_pipeline/layer4/run_layer4_test.ps1"
-test-l5 = "pwsh -File ./tests/testing_harness/experiment_pipeline/layer5/run_layer5_test.ps1"
+test-l4 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer4/run_layer4_test.ps1"
+test-l5 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer5/run_layer5_test.ps1"
 
 # --- PowerShell Pester Tests (By Suite) ---
 # Experiment Lifecycle

@@ -17,18 +17,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/testing_harness/layer4_step3_cleanup.ps1
+# Filename: tests/testing_harness/experiment_lifecycle/layer4/layer4_phase3_cleanup.ps1
 
-$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer4_sandbox"
 $NewExperimentsDir = Join-Path $ProjectRoot "output/new_experiments"
 
 Write-Host ""
-Write-Host "--- Layer 4: Main Workflow Integration Testing ---" -ForegroundColor Cyan
-Write-Host "--- Step 3: Automated Cleanup ---" -ForegroundColor Cyan
+Write-Host "--- Layer 4 Integration Testing: Experiment Creation ---" -ForegroundColor Magenta
+Write-Host "--- Phase 3: Automated Cleanup ---" -ForegroundColor Cyan
 Write-Host ""
 
-if (Test-Path $SandboxDir) {
+try {
+    if (Test-Path $SandboxDir) {
     Write-Host "Removing Layer 4 sandbox directory..."
     Remove-Item -Path $SandboxDir -Recurse -Force
     Write-Host "  -> Done."
@@ -46,5 +47,12 @@ if ($testExperiments) {
 }
 
 Write-Host "`nCleanup complete." -ForegroundColor Green
+Write-Host ""
+}
+catch {
+    Write-Host "`nERROR: Layer 4 cleanup script failed.`n$($_.Exception.Message)" -ForegroundColor Red
+    # Re-throw the original exception to the master runner.
+    throw
+}
 
-# === End of tests/testing_harness/layer4_step3_cleanup.ps1 ===
+# === End of tests/testing_harness/experiment_lifecycle/layer4/layer4_phase3_cleanup.ps1 ===

@@ -25,11 +25,11 @@ Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
 
 {{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=85% | caption=Project Architecture: A high-level overview of the main functional components.}}
 
--   **Automated Batch Execution**: Run hundreds of replications with intelligent self-healing to resume interrupted experiments.
--   **Parallel LLM Sessions**: Maximizes throughput by running multiple LLM API calls concurrently, significantly speeding up data collection.
--   **Guaranteed Reproducibility**: Automatically archives the `config.ini` file with every run, permanently linking results to the exact parameters that generated them.
--   **Hierarchical Analysis & Aggregation**: Performs a bottom-up aggregation of all data, generating level-aware summary files for a fully auditable research archive.
--   **Powerful Reprocessing Engine**: Re-run data processing and analysis on existing results without repeating expensive LLM calls, making it easy to apply analysis updates or bug fixes.
+*   **Automated Batch Execution**: Run hundreds of replications with intelligent self-healing to resume interrupted experiments.
+*   **Parallel LLM Sessions**: Maximizes throughput by running multiple LLM API calls concurrently, significantly speeding up data collection.
+*   **Guaranteed Reproducibility**: Automatically archives the `config.ini` file with every run, permanently linking results to the exact parameters that generated them.
+*   **Hierarchical Analysis & Aggregation**: Performs a bottom-up aggregation of all data, generating level-aware summary files for a fully auditable research archive.
+*   **Powerful Reprocessing Engine**: Re-run data processing and analysis on existing results without repeating expensive LLM calls, making it easy to apply analysis updates or bug fixes.
 
 ## Project Philosophy
 

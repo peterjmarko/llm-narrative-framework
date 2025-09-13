@@ -17,16 +17,29 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/testing_harness/layer4_step2_test_workflow.ps1
+# Filename: tests/testing_harness/experiment_lifecycle/layer4/layer4_phase2_run.ps1
 
-$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer4_sandbox"
 $TestConfigPath = Join-Path $SandboxDir "config.ini"
 
-function Write-TestHeader { param($Message) Write-Host "`n--- $($Message) ---" -ForegroundColor Cyan }
+function Write-TestHeader { param($Message, $Color = 'Blue') Write-Host "`n--- $($Message) ---" -ForegroundColor $Color }
+
+Write-Host "--- Layer 4 Integration Testing: Experiment Creation ---" -ForegroundColor Magenta
+Write-Host "--- Phase 2: Run Test Workflow ---" -ForegroundColor Cyan
 
 try {
-    Write-TestHeader "STEP 1: Creating a new experiment using the sandboxed config..."
+    Write-TestHeader "STEP 1: Creating a new experiment..."
+
+    # Diagnostic Step: Verify the config file content before running the experiment.
+    $configContent = Get-Content $TestConfigPath -Raw
+    $modelName = if ($configContent -match 'model_name\s*=\s*(.*)') { $matches[1].Trim() } else { 'NOT_FOUND' }
+    $numReps = if ($configContent -match 'num_replications\s*=\s*(.*)') { $matches[1].Trim() } else { 'NOT_FOUND' }
+    Write-Host "  -> Verification: Using config with model '$modelName' and $numReps replication(s)." -ForegroundColor Gray
+    
+    Write-Host "`n`nHALT: Sandbox prepared. Inspect the generated config.ini, then press Enter to create the new experiment..." -ForegroundColor Yellow
+    Read-Host | Out-Null # Capture input without echoing
+
     $output = & "$ProjectRoot\new_experiment.ps1" -ConfigPath $TestConfigPath -Verbose
     if ($LASTEXITCODE -ne 0) { throw "new_experiment.ps1 failed." }
     
@@ -61,7 +74,8 @@ try {
 }
 catch {
     Write-Host "`nERROR: Layer 4 test workflow failed.`n$($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+    # Re-throw the original exception to the master runner.
+    throw
 }
 
-# === End of tests/testing_harness/layer4_step2_test_workflow.ps1 ===
+# === End of tests/testing_harness/experiment_lifecycle/layer4/layer4_phase2_run.ps1 ===

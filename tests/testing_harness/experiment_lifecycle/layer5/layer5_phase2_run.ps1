@@ -17,13 +17,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/testing_harness/layer5_step2_test_workflow.ps1
+# Filename: tests/testing_harness/experiment_lifecycle/layer5/layer5_phase2_run.ps1
 
-$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
+$ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer5_sandbox"
 $TestConfigPath = Join-Path $SandboxDir "config.ini"
 
-function Write-TestHeader { param($Message) Write-Host "`n--- $($Message) ---" -ForegroundColor Cyan }
+function Write-TestHeader { param($Message, $Color = 'Blue') Write-Host "`n--- $($Message) ---" -ForegroundColor $Color }
+
+Write-Host "--- Layer 5 Integration Testing: Experiment Migration ---" -ForegroundColor Magenta
+Write-Host "Phase 2: Run Test Workflow" -ForegroundColor Cyan
 
 try {
     $CorruptedExp = Get-ChildItem -Path (Join-Path $ProjectRoot "output/new_experiments") -Directory "l5_test_exp_*"
@@ -50,7 +53,7 @@ try {
 }
 catch {
     Write-Host "`nERROR: Layer 5 test workflow failed.`n$($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+    throw
 }
 
-# === End of tests/testing_harness/layer5_step2_test_workflow.ps1 ===
+# === End of tests/testing_harness/experiment_lifecycle/layer5/layer5_phase2_run.ps1 ===

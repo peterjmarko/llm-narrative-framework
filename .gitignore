@@ -65,7 +65,10 @@ Thumbs.db
 # ==============================================================================
 # Ignore generated final documentation and intermediate images.
 # The .template.md files are the source of truth and are tracked by Git.
+README.md
+TESTING.md
 docs/DOCUMENTATION.md
+docs/article_supplementary_material.md
 docs/images/
 docs/**/*.pdf
 docs/word_docs/

@@ -4,9 +4,8 @@ repos:
       - id: check-docs-updated
         name: Check if documentation is up-to-date
         entry: pdm run build-docs --check
-        language: python
-        additional_dependencies: [pdm]
+        language: system
         pass_filenames: false
-        files: ^(docs/DOCUMENTATION\.template\.md|docs/diagrams/.*\.(mmd|txt))$
-        always_run: true
-        verbose: true
+        # The hook should ONLY run if a source template or a diagram is modified.
+        # This prevents it from running unnecessarily or on generated files.
+        files: \.template\.md$|docs/diagrams/

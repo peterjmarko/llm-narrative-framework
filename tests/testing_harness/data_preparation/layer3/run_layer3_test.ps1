@@ -128,7 +128,7 @@ try {
 
     # --- Phase 2: Execute ---
     # Pass the entire profile object to the workflow script using a splatting hashtable for robustness.
-    $workflowPath = "$PSScriptRoot/layer3_phase2_test_workflow.ps1"
+    $workflowPath = "$PSScriptRoot/layer3_phase2_run.ps1"
     $workflowArgs = @{
         TestProfile = $SelectedProfile
     }

@@ -235,9 +235,8 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
         remaining_reps = len(reps_to_run) - (i + 1)
         time_remaining = remaining_reps * avg_time
         eta = datetime.datetime.now() + datetime.timedelta(seconds=time_remaining)
-        # Use a new magenta color for the ETA line for better visibility.
-        C_MAGENTA = colors.get('magenta', '')
-        print(f"\n{C_MAGENTA}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | Time Remaining: {str(datetime.timedelta(seconds=int(time_remaining)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
+
+        print(f"\n{C_YELLOW}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | Time Remaining: {str(datetime.timedelta(seconds=int(time_remaining)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
 
     return True
 

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/testing_harness/data_preparation/layer3/layer3_phase2_test_workflow.ps1
+# Filename: tests/testing_harness/data_preparation/layer3/layer3_phase2_run.ps1
 
 param(
     [Parameter(Mandatory=$true)]
@@ -686,4 +686,4 @@ finally {
     }
 }
 
-# === End of tests/testing_harness/data_preparation/layer3/layer3_phase2_test_workflow.ps1 ===
+# === End of tests/testing_harness/data_preparation/layer3/layer3_phase2_run.ps1 ===
