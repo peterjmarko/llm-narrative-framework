@@ -20,16 +20,24 @@
 # Filename: scripts/maintenance/generate_scope_report.py
 
 """
-This script generates a high-level quantitative report of the project's scope,
-providing a summary of different asset types (documents, scripts, diagrams, data)
-and their respective "extent" (e.g., pages, lines of code, complexity).
+Generates a quantitative report of the project's scope, aligned with Git tracking.
 
-The report is saved in Markdown format to the project's root directory.
+This utility scans the project and creates a high-level summary of all tracked
+asset types (documents, scripts, diagrams, data) and their "extent" (e.g.,
+word count, lines of code).
+
+The script is "Git-aware": it reads the project's `.gitignore` file and
+automatically excludes any ignored files or directories from the report. This
+ensures the final summary accurately reflects the state of the version-controlled
+source code and foundational assets, not generated build artifacts.
+
+The final report is saved in Markdown format.
 """
 
 import os
 import pathlib
 from datetime import datetime
+from fnmatch import fnmatch
 
 # --- Configuration ---
 # The root of the project, determined by going up two levels from this script's location.
@@ -47,6 +55,18 @@ EXCLUDE_DIRS = {
 
 # File extensions to exclude.
 EXCLUDE_EXTS = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp", ".lock", ".coverage", ".pdf", ".bak"}
+
+def parse_gitignore(root_path: pathlib.Path) -> list:
+    """Parses .gitignore and returns a list of patterns."""
+    gitignore_path = root_path / ".gitignore"
+    patterns = []
+    if gitignore_path.exists():
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped_line = line.strip()
+                if stripped_line and not stripped_line.startswith("#"):
+                    patterns.append(stripped_line)
+    return patterns
 
 # ANSI color codes for better terminal output
 class Colors:
@@ -142,6 +162,8 @@ def main(quiet=False):
     if not quiet:
         print(f"{Colors.YELLOW}\n--- Starting Project Scope Analysis ---{Colors.RESET}")
 
+    gitignore_patterns = parse_gitignore(PROJECT_ROOT)
+
     documents = []
     scripts = []
     diagrams = []
@@ -170,7 +192,16 @@ def main(quiet=False):
 
         for filename in files:
             path = root_path / filename
-            if should_exclude(path):
+            rel_path_for_gitignore = path.relative_to(PROJECT_ROOT).as_posix()
+            
+            # Check against .gitignore patterns
+            is_git_ignored = False
+            for pattern in gitignore_patterns:
+                if fnmatch(rel_path_for_gitignore, pattern.strip('/')):
+                    is_git_ignored = True
+                    break
+            
+            if is_git_ignored or should_exclude(path):
                 continue
 
             file_count += 1

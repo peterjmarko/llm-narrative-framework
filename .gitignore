@@ -70,7 +70,7 @@ TESTING.md
 docs/DOCUMENTATION.md
 docs/article_supplementary_material.md
 docs/images/
-docs/**/*.pdf
+docs/pdf_copies/
 docs/word_docs/
 *.docx
 !docs/custom_reference.docx # Explicitly allow the custom reference document
@@ -117,6 +117,7 @@ docs/word_docs/
 # Linter backups and generated project reports
 /linter_backups/
 /project_scope_report.md
+pytest.ini
 
 # General backup files and temporary office files
 *.bak

@@ -5,21 +5,21 @@ graph TD
         subgraph "Component-Level Validation"
             direction LR
             L1["<b>Layer 1: Unit Testing</b><br/>Validates internal logic of individual Python scripts in isolation.<br/><i>(pytest)</i>"]
-            L2["<b>Layer 2: Orchestration Testing</b><br/>Validates orchestrator state machine logic with mock scripts.<br/><i>(Pester)</i>"]
+            L2["<b>Layer 2: Orchestration Testing</b><br/>Validates orchestrator state machine logic with mock scripts.<br/>"]
         end
 
         subgraph "Pipeline-Level Integration Testing"
             direction LR
-            L3A["<b>Layer 3: Data Pipeline Workflow</b><br/>Validates the full, live data preparation pipeline end-to-end with a seed dataset.<br/><i>(run_layer3_test.ps1)</i>"]
+            L3A["<b>Layer 3: Data Pipeline</b><br/>Validates the full, live data preparation pipeline end-to-end with a seed dataset.<br/><i>(run_layer3_test.ps1)</i>"]
             L3B["<b>Layer 3: Selection Algorithms</b><br/>Validates core selection algorithms at scale with a large seed dataset.<br/><i>(validate_selection_algorithms.ps1)</i>"]
         end
         
-        subgraph "Workflow-Level Integration Testing"
+        subgraph "Lifecycle Integration Testing"
             direction TB
-            L4["<b>Layer 4: Main Experiment Workflow</b><br/>Validates the core `new -> audit -> fix` lifecycle for a single experiment."]
-            L5["<b>Layer 5: Migration Workflow</b><br/>Validates the `migrate_experiment.ps1` workflow on a corrupted experiment."]
-            L6["<b>Layer 6: Post-Hoc Study Evaluation</b><br/>Validates the `compile_study.ps1` workflow on pre-existing experiments."]
-            L7["<b>Layer 7: New Study Lifecycle</b><br/>Validates the full `new_study.ps1` lifecycle from creation to repair."]
+            L4["<b>Layer 4: Experiment Creation</b><br/>Validates the core `new -> audit -> fix` lifecycle for a single experiment."]
+            L5["<b>Layer 5: Experiment Migration</b><br/>Validates the `migrate_experiment.ps1` workflow on a corrupted experiment."]
+            L6["<b>Layer 6: Study Compilation</b><br/>Validates the `compile_study.ps1` workflow on pre-existing experiments."]
+            L7["<b>Layer 7: Study Creation</b><br/>Validates the full `new_study.ps1` lifecycle from creation to repair."]
         end
         
         L1 --> L3A
