@@ -51,7 +51,7 @@ cov-html = {shell = "coverage erase && coverage run -m pytest -p no:cov && cover
 # === MAINTENANCE, LINTING & REPORTING ===
 # ==============================================================================
 clean = {cmd = "python scripts/maintenance/clean_project.py", help = "Clean up temporary and generated files."}
-gen-scope-report = "python scripts/maintenance/generate_scope_report.py"
+scope-report = "python scripts/maintenance/generate_scope_report.py"
 list-files = "python scripts/maintenance/list_project_files.py"
 txt-copy = "python scripts/maintenance/convert_py_to_txt.py"
 lint = {composite = ["check-headers", "lint-docstrings"], help="Run all read-only linting checks."}

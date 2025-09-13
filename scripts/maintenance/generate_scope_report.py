@@ -20,22 +20,21 @@
 # Filename: scripts/maintenance/generate_scope_report.py
 
 """
-Generates a quantitative report of the project's scope, aligned with Git tracking.
+Generates a quantitative report of the project's scope based on tracked Git files.
 
-This utility scans the project and creates a high-level summary of all tracked
-asset types (documents, scripts, diagrams, data) and their "extent" (e.g.,
-word count, lines of code).
+This utility creates a high-level summary of all project assets by analyzing
+the output of the `git ls-files` command. This ensures the report accurately
+reflects the state of all version-controlled source code, documentation, and
+foundational data assets, providing a definitive snapshot of the project's scope.
 
-The script is "Git-aware": it reads the project's `.gitignore` file and
-automatically excludes any ignored files or directories from the report. This
-ensures the final summary accurately reflects the state of the version-controlled
-source code and foundational assets, not generated build artifacts.
-
-The final report is saved in Markdown format.
+The script categorizes each tracked file (document, script, diagram, data) and
+calculates its "extent" (e.g., word count, lines of code). The final, aggregated
+report is saved in Markdown format.
 """
 
 import os
 import pathlib
+import subprocess
 from datetime import datetime
 from fnmatch import fnmatch
 
@@ -172,68 +171,55 @@ def main(quiet=False):
     if not quiet:
         print("1. Scanning project and calculating metrics...")
     
-    file_count = 0
-    excluded_dirs_count = 0
-    
-    for root, dirs, files in os.walk(PROJECT_ROOT, topdown=True):
-        root_path = pathlib.Path(root)
-        
-        # --- Prune Directories In-Place ---
-        # Filter out directories that should be excluded
-        dirs_to_remove = []
-        for d in dirs:
-            if should_exclude_dir(root_path, d):
-                dirs_to_remove.append(d)
-                excluded_dirs_count += 1
-        
-        # Remove excluded directories from the walk
-        for d in dirs_to_remove:
-            dirs.remove(d)
+    try:
+        # Use 'git ls-files' to get the definitive list of tracked files.
+        result = subprocess.run(
+            ["git", "ls-files"],
+            capture_output=True, text=True, check=True,
+            cwd=PROJECT_ROOT, encoding='utf-8'
+        )
+        tracked_files = result.stdout.strip().split('\n')
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        if not quiet:
+            print(f"{Colors.RED}Error: 'git ls-files' failed. Is Git installed and are you in a Git repository?{Colors.RESET}")
+        return
 
-        for filename in files:
-            path = root_path / filename
-            rel_path_for_gitignore = path.relative_to(PROJECT_ROOT).as_posix()
-            
-            # Check against .gitignore patterns
-            is_git_ignored = False
-            for pattern in gitignore_patterns:
-                if fnmatch(rel_path_for_gitignore, pattern.strip('/')):
-                    is_git_ignored = True
-                    break
-            
-            if is_git_ignored or should_exclude(path):
-                continue
+    for rel_path in tracked_files:
+        path = PROJECT_ROOT / rel_path
+        if not path.exists():
+            continue
 
-            file_count += 1
-            rel_path = path.relative_to(PROJECT_ROOT).as_posix()
-            
-            # Categorize files. The order is important: specific types first, then fall back to location-based data files.
-            rel_parts = path.relative_to(PROJECT_ROOT).parts
+        # Categorize the tracked files.
+        rel_parts = pathlib.Path(rel_path).parts
 
-            if path.suffix in [".py", ".ps1"]:
-                lines = count_non_empty_lines(path)
-                scripts.append((f"`{rel_path}`", lines))
-            elif path.suffix == ".md":
-                words = count_words(path)
-                documents.append((f"`{rel_path}`", words))
-            elif path.parent.name == "diagrams" and path.suffix == ".mmd":
-                lines = count_non_empty_lines(path)
-                diagrams.append((f"`{rel_path}`", lines))
-            else:
-                # A file is considered a "data file" if it's under 'data/' or 'tests/assets/'
-                is_data_file = (
-                    len(rel_parts) > 1 and
-                    (rel_parts[0] == 'data' or rel_parts[0:2] == ('tests', 'assets'))
-                )
-                if is_data_file and path.name != "README.md":
-                    size_kb = get_file_size_kb(path)
-                    data_files.append((f"`{rel_path}`", size_kb))
+        if path.suffix in [".py", ".ps1"]:
+            lines = count_non_empty_lines(path)
+            scripts.append((f"`{rel_path}`", lines))
+        elif path.suffix == ".md":
+            words = count_words(path)
+            documents.append((f"`{rel_path}`", words))
+        elif path.parent.name == "diagrams" and path.suffix == ".mmd":
+            lines = count_non_empty_lines(path)
+            diagrams.append((f"`{rel_path}`", lines))
+        else:
+            is_data_file = (
+                len(rel_parts) > 1 and
+                (rel_parts[0] == 'data' or rel_parts[0:2] == ('tests', 'assets'))
+            )
+            if is_data_file:
+                size_kb = get_file_size_kb(path)
+                data_files.append((f"`{rel_path}`", size_kb))
 
     if not quiet:
-        print(f"   ...found and processed {file_count} files (excluded {excluded_dirs_count} directories).")
+        print(f"   ...found and processed {len(tracked_files)} files.")
         print("2. Assembling the report content...")
     # --- Generate Report Content ---
-    report_content = [f"# Project Scope & Extent Report\n\n**Generated on:** {datetime.now().strftime('%Y-%m-%d')}\n\n---\n"]
+    report_content = [f"# Project Scope & Extent Report\n\n**Generated on:** {datetime.now().strftime('%Y-%m-%d')}\n"]
+    report_content.append(
+        "This report was generated by analyzing all files currently tracked by Git. It provides a quantitative summary "
+        "of the project's source code, documentation, and foundational data assets. "
+        "Generated artifacts, temporary files, and files excluded by `.gitignore` are not included.\n\n---\n"
+    )
 
     # --- Pre-calculate all totals for summary ---
     total_words = sum(row[1] for row in documents)
