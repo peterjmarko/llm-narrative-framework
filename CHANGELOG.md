@@ -1,5 +1,36 @@
 # Changelog
 
+## 9.5.0 (2025-09-14)
+
+### Bump
+
+- **version 9.4.1 → 9.5.0**
+
+### Features
+
+- **harden critical modules with focused testing campaign**
+  This release marks a significant milestone in project stability, achieved through a systematic testing initiative that fortified the framework's most critical data processing and state-management modules. By formalizing our quality standards with tiered coverage targets, we executed a focused testing campaign that dramatically increased coverage and uncovered several important bugs.
+  
+  **1. Formalized Testing Strategy:**
+  - A new tiered code coverage strategy has been established to enforce quality standards based on module criticality (**Critical**: 90%+, **Standard**: 80%+, **Utility**: 85%).
+  - The project roadmap has been updated with a detailed, prioritized list of all remaining testing tasks.
+  
+  **2. Critical Module Test Coverage:**
+  - A comprehensive unit test suite was developed for the core data parser, the experiment auditor, and the replication orchestrator, bringing them to an exceptionally high level of validation:
+    - **`process_llm_responses.py`**: Coverage increased from 67% to **95%**.
+    - **`experiment_auditor.py`**: Coverage increased from 69% to **95%**.
+    - **`replication_manager.py`**: Coverage increased from 77% to **95%**.
+      - **Architectural Improvement:** The `replication_manager` script was refactored for testability by extracting its `session_worker` function. This enabled a simpler, more reliable testing strategy using direct patching, a pattern that will be applied to other orchestrators.
+  
+  **3. Bug Fixes:**
+  - The focused testing campaign directly led to the discovery and correction of several important bugs:
+    - **`replication_manager.py`**: Fixed a critical bug where a failed LLM session during a `--reprocess` run would incorrectly report the final status as `REPAIRED` instead of `FAILED`.
+    - **`process_llm_responses.py`**: Fixed a logic error where rank-based scores were being validated *before* being converted, causing valid ranks to be incorrectly rejected.
+    - **`experiment_auditor.py`**: Corrected a logic flaw where a run with too many files was incorrectly classified as `UNKNOWN` instead of `REPAIR_NEEDED`.
+  
+  **4. Documentation Updates:**
+  - The `TESTING.md` and `ROADMAP.md` files have been updated to reflect the new coverage targets, the final 95% scores for the completed modules, and a new visual convention (bold text) to identify **Critical** modules.
+
 ## 9.4.1 (2025-09-14)
 
 ### Bump
