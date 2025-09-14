@@ -1,5 +1,45 @@
 # Changelog
 
+## 9.4.1 (2025-09-14)
+
+### Bump
+
+- **version 9.4.0 → 9.4.1**
+
+### Refactor
+
+- **Relocate and enhance experiment lifecycle tests**
+  This major overhaul refactors the test suite for better organization,
+  significantly increases unit test coverage for critical modules, and
+  standardizes code quality across all refactored test files.
+  
+  **1. Structural Refactoring:**
+  - All 27 Python and PowerShell unit tests for the experiment and study
+    lifecycles have been moved from 'tests/' into a new, dedicated
+    'tests/experiment_lifecycle/' directory.
+  - The 'pyproject.toml' file has been updated with new PDM scripts
+    (test-py-exp, cov-exp) and coverage configuration to support the new
+    test structure and provide a focused reporting workflow.
+  
+  **2. Test Coverage & Code Hardening:**
+  - A systematic campaign was conducted to increase unit test coverage,
+    uncovering and fixing several bugs in production code:
+    - `experiment_manager.py`: Coverage increased from 56% to 80%.
+    - `llm_prompter.py`: Coverage increased from 51% to 81%.
+    - `config_loader.py`: Coverage increased from 53% to 86%.
+    - `analyze_llm_performance.py`: Coverage increased from 63% to 78%.
+  
+  **3. Code Quality:**
+  - A comprehensive linting pass was performed to add and standardize
+    license and copyright headers across all 25 scripts in the new
+    'tests/experiment_lifecycle/' directory.
+  
+  **4. Test Suite Modernization:**
+  - The outdated 'test_orchestrate_replication.py' has been renamed and
+    aligned with the refactored 'replication_manager.py'.
+  - Expected 'scipy' warnings in edge-case statistical tests have been
+    suppressed for a cleaner test output."
+
 ## 9.4.0 (2025-09-13)
 
 ### Bump
