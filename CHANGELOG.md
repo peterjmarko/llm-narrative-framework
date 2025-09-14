@@ -1,5 +1,27 @@
 # Changelog
 
+## 9.5.1 (2025-09-14)
+
+### Bump
+
+- **version 9.5.0 → 9.5.1**
+
+### Fixes
+
+- **Increase test coverage for analysis and DB generation**
+  - Meets code coverage targets for two key modules:
+    - `src/generate_personalities_db.py` (87% -> 90%)
+    - `src/analyze_study_results.py` (62% -> 82%)
+  - Fixes several latent bugs in `analyze_study_results.py` discovered during testing, including errors in the logging setup, post-hoc analysis loop, and Bayes Factor interpretation.
+  - Overhauls the test suite for `analyze_study_results.py` to correctly mock dependencies and validate all major code paths.
+  - Adds new unit tests to `test_generate_personalities_db.py` to cover error handling for malformed data and invalid parameters.
+  - Updates ROADMAP.md and TESTING.template.md to reflect the completed work.
+
+### Test
+
+- **increase test coverage to 95%**
+  Increased the unit test coverage for `src/experiment_manager.py` from 80% to 95%, exceeding the 90% target for critical modules. The enhanced test suite now covers the main state-machine loop, argument parsing, all failure modes, and edge cases. Also removed an obsolete helper function and updated project documentation.
+
 ## 9.5.0 (2025-09-14)
 
 ### Bump
