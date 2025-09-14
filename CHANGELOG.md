@@ -1,5 +1,21 @@
 # Changelog
 
+## 9.5.2 (2025-09-14)
+
+### Bump
+
+- **version 9.5.1 → 9.5.2**
+
+### Fixes
+
+- **Increase coverage and fix bugs**
+  - Meets code coverage targets for two modules:
+    - `src/build_llm_queries.py` (68% -> 84%)
+    - `src/compile_study_results.py` (70% -> 87%)
+  - Fixes bugs discovered during testing, including errors in exception handling, control flow, and logging setup in both scripts.
+  - Expands and corrects the test suites for both modules to robustly handle error conditions and all major code paths.
+  - Updates ROADMAP.md and TESTING.template.md to reflect the completed work.
+
 ## 9.5.1 (2025-09-14)
 
 ### Bump
