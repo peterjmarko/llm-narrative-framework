@@ -526,9 +526,10 @@ Module                                  Cov. (%)        Status & Justification
 
 **Study-Level & Analysis**
 
-`src/compile_study_results.py`          `70%`           COMPLETE. Unit tests cover the recursive aggregation
-                                                        workflow and robustly handle edge cases like empty or missing
-                                                        experiment files.
+`src/compile_study_results.py`          `87%`           COMPLETE. Target met. The test suite was expanded to validate
+                                                        all helper functions and orchestration logic, including data
+                                                        aggregation, file I/O, and robust error handling for empty,
+                                                        missing, or corrupted files.
 
 `src/analyze_study_results.py`          `82%`           COMPLETE. Target met. The test suite was significantly
                                                         overhauled to fix bugs in the script's logging and post-hoc

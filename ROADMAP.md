@@ -31,10 +31,12 @@ This phase focuses on achieving a fully validated and stable codebase before the
       - [ ] `src/analyze_llm_performance.py` (Current: 78%)
       - [x] `src/analyze_study_results.py` (From 62% -> 82%)
         - **Note:** Achieved the 80%+ target by fixing bugs in the script's logging and post-hoc logic, and by implementing a robust test suite that covers data filtering, error handling, and all major analysis code paths.
-      - [ ] `src/build_llm_queries.py` (Current: 68%)
+      - [x] `src/build_llm_queries.py` (From 68% -> 84%)
+        - **Note:** Achieved the 80%+ target by adding comprehensive tests for helper functions and all major orchestration paths, including continued runs, insufficient data handling, and worker script failures.
       - [ ] `src/compile_experiment_results.py` (Current: 74%)
       - [ ] `src/compile_replication_results.py` (Current: 78%)
-      - [ ] `src/compile_study_results.py` (Current: 70%)
+      - [x] `src/compile_study_results.py` (From 70% -> 87%)
+        - **Note:** Achieved the 80%+ target by adding a dedicated test class for the `write_summary_csv` helper function and expanding the main test suite to cover all error conditions and alternate code paths.
       - [ ] `src/create_subject_db.py` (Current: 76%)
       - [ ] `src/find_wikipedia_links.py` (Current: 77%)
       - [ ] `src/generate_eminence_scores.py` (Current: 75%)

@@ -35,9 +35,55 @@ import pandas as pd
 import configparser
 import types
 import importlib
+import io
+import logging
 
 # Import the module to test
 from src import compile_study_results
+
+
+class TestWriteSummaryCSV(unittest.TestCase):
+    """Directly tests the write_summary_csv helper function."""
+
+    def setUp(self):
+        """Set up a temporary directory and mock dependencies for each test."""
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.output_path = Path(self.test_dir.name) / "output.csv"
+        self.sys_exit_patcher = patch('src.compile_study_results.sys.exit')
+        self.mock_sys_exit = self.sys_exit_patcher.start()
+
+    def tearDown(self):
+        """Clean up resources."""
+        self.test_dir.cleanup()
+        self.sys_exit_patcher.stop()
+
+    def test_no_results_list(self):
+        """Verify the function handles an empty results list gracefully."""
+        with self.assertLogs(level='WARNING') as cm:
+            compile_study_results.write_summary_csv(str(self.output_path), [])
+            self.assertFalse(self.output_path.exists())
+            self.assertIn("No results to write", cm.output[0])
+
+    def test_missing_header_config_exits(self):
+        """Verify the function exits if header config is missing."""
+        self.mock_sys_exit.side_effect = SystemExit  # Make the mock raise an exception
+        with patch('src.compile_study_results.get_config_list', return_value=None):
+            with self.assertRaises(SystemExit):
+                compile_study_results.write_summary_csv(str(self.output_path), [{'a': 1}])
+            self.mock_sys_exit.assert_called_with(1)
+
+    def test_adds_missing_columns_from_schema(self):
+        """Verify that columns missing from data but present in schema are added."""
+        results = [{'col_a': 1, 'col_b': 2}]
+        header_order = ['col_a', 'col_b', 'col_c_missing']
+        with patch('src.compile_study_results.get_config_list', return_value=header_order):
+            compile_study_results.write_summary_csv(str(self.output_path), results)
+        
+        self.assertTrue(self.output_path.exists())
+        df = pd.read_csv(self.output_path)
+        self.assertEqual(list(df.columns), header_order)
+        self.assertTrue(pd.isna(df['col_c_missing'].iloc[0]))
+
 
 class TestCompileStudyResults(unittest.TestCase):
     """Test suite for compile_study_results.py."""
@@ -56,6 +102,10 @@ class TestCompileStudyResults(unittest.TestCase):
         fake_mod = types.ModuleType("config_loader")
         fake_mod.APP_CONFIG = configparser.ConfigParser()
         def dummy_get_config_list(config, section, key):
+            # This mock must respect the config object it's given,
+            # otherwise the override test will fail.
+            if config.has_option(section, key):
+                return [v.strip() for v in config.get(section, key).split(',')]
             return self.header_order
         fake_mod.get_config_list = dummy_get_config_list
         
@@ -63,9 +113,17 @@ class TestCompileStudyResults(unittest.TestCase):
         self.config_patcher.start()
         importlib.reload(compile_study_results)
 
+        # Set up a manual log stream handler to robustly capture output
+        # without conflicting with the script's basicConfig call.
+        self.log_stream = io.StringIO()
+        self.test_handler = logging.StreamHandler(self.log_stream)
+        logging.getLogger().addHandler(self.test_handler)
+
     def tearDown(self):
         """Clean up resources."""
         self.test_dir.cleanup()
+        logging.getLogger().removeHandler(self.test_handler)
+        self.log_stream.close()
         self.sys_exit_patcher.stop()
         self.config_patcher.stop()
 
@@ -86,8 +144,10 @@ class TestCompileStudyResults(unittest.TestCase):
         test_argv = ['compile_study_results.py', str(self.study_dir)]
         
         # --- Act ---
-        with patch.object(sys, 'argv', test_argv):
-            compile_study_results.main()
+        with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+            with patch.object(sys, 'argv', test_argv):
+                compile_study_results.main()
+            self.assertIn("Study compilation complete.", mock_stdout.getvalue())
             
         # --- Assert ---
         self.mock_sys_exit.assert_not_called()
@@ -111,12 +171,13 @@ class TestCompileStudyResults(unittest.TestCase):
         test_argv = ['compile_study_results.py', str(self.study_dir)]
         
         # --- Act ---
-        with self.assertLogs(level='WARNING') as cm:
-            with patch.object(sys, 'argv', test_argv):
-                compile_study_results.main()
-            self.assertIn("Skipping empty results file", cm.output[0])
-            
+        with patch.object(sys, 'argv', test_argv):
+            compile_study_results.main()
+        
         # --- Assert ---
+        log_content = self.log_stream.getvalue()
+        self.assertIn("Skipping empty results file", log_content)
+            
         output_csv = self.study_dir / "STUDY_results.csv"
         df = pd.read_csv(output_csv)
         self.assertEqual(len(df), 1)
@@ -148,6 +209,54 @@ class TestCompileStudyResults(unittest.TestCase):
             
         # --- Assert ---
         self.mock_sys_exit.assert_called_with(1)
+
+    def test_main_exits_if_directory_not_found(self):
+        """Verify the script exits with code 1 if the study directory is invalid."""
+        test_argv = ['compile_study_results.py', str(self.study_dir / "nonexistent")]
+        with patch.object(sys, 'argv', test_argv):
+            compile_study_results.main()
+        self.mock_sys_exit.assert_called_with(1)
+
+    def test_main_handles_corrupted_csv(self):
+        """Verify a corrupted (unreadable) CSV is skipped with an error."""
+        exp1_path = self.study_dir / "exp1"
+        self._create_experiment_file(exp1_path, {'mean_mrr': [0.8]})
+
+        corrupted_exp_path = self.study_dir / "exp2"
+        corrupted_exp_path.mkdir()
+        # Create a file that will definitely cause a pandas parsing error
+        # Using unclosed quotes or severely malformed CSV structure
+        (corrupted_exp_path / "EXPERIMENT_results.csv").write_text('header1,header2\n"unclosed quote,data2\ndata3,data4')
+
+        test_argv = ['compile_study_results.py', str(self.study_dir)]
+
+        with patch.object(sys, 'argv', test_argv):
+            compile_study_results.main()
+
+        log_content = self.log_stream.getvalue()
+        self.assertIn("Could not read or process", log_content)
+
+    def test_main_uses_config_path_override(self):
+        """Verify the --config-path argument correctly overrides the default config."""
+        # Create a temporary config file with a different header order
+        temp_config = configparser.ConfigParser()
+        override_header = ['mean_mrr', 'replication', 'run_directory'] # Reversed
+        temp_config['Schema'] = {'csv_header_order': ','.join(override_header)}
+        config_path = self.study_dir / "temp_config.ini"
+        with open(config_path, 'w') as f:
+            temp_config.write(f)
+
+        self._create_experiment_file(self.study_dir / "exp1", {'mean_mrr': [0.8]})
+        
+        test_argv = ['compile_study_results.py', str(self.study_dir), '--config-path', str(config_path)]
+        
+        with patch.object(sys, 'argv', test_argv):
+            compile_study_results.main()
+            
+        output_csv = self.study_dir / "STUDY_results.csv"
+        df = pd.read_csv(output_csv)
+        self.assertEqual(list(df.columns), override_header)
+
 
 if __name__ == '__main__':
     unittest.main()

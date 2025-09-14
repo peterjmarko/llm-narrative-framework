@@ -220,12 +220,13 @@ def main():
     elif args.verbose == 1:
         log_level = logging.INFO
         
-    # Configure logger to write to stderr, which is captured by the orchestrator.
-    # The 'force=True' flag ensures any pre-existing handlers are replaced.
-    logging.basicConfig(level=log_level,
-                        format='%(levelname)s (build_queries): %(message)s',
-                        stream=sys.stderr,
-                        force=True)
+    # Configure logging only if no handlers are already present. This makes the
+    # script compatible with testing frameworks like pytest or unittest's
+    # assertLogs that pre-configure a handler.
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=log_level,
+                            format='%(levelname)s (build_queries): %(message)s',
+                            stream=sys.stderr)
 
     # --- Validate k and iterations ---
     if args.num_iterations <= 0: logging.error("Number of iterations must be positive."); sys.exit(1)
@@ -405,6 +406,9 @@ def main():
     except KeyboardInterrupt:
         logging.info("\nBatch generation interrupted by user (Ctrl+C).")
         sys.exit(1)
+    except SystemExit as e:
+        # Re-raise SystemExit to allow tests to catch it
+        raise e
     except Exception:
         # logging.exception automatically captures and prints the full traceback to stderr.
         logging.exception("An unexpected error occurred during batch processing.")

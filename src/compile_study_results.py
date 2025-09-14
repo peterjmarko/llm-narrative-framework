@@ -45,7 +45,11 @@ import argparse
 import glob
 import importlib
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+# Configure logging only if no handlers are already present. This makes the
+# script compatible with testing frameworks like pytest or unittest's
+# assertLogs that pre-configure a handler.
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 try:
     from config_loader import APP_CONFIG, get_config_list
@@ -95,6 +99,7 @@ def main():
     if not os.path.isdir(args.study_directory):
         logging.error(f"Error: The specified directory does not exist: {args.study_directory}")
         sys.exit(1)
+        return  # Eject for testability
 
     # Search recursively for any EXPERIMENT_results.csv files within the study directory
     search_pattern = os.path.join(args.study_directory, '**', 'EXPERIMENT_results.csv')
