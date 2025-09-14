@@ -455,7 +455,7 @@ Module                                  Cov. (%)        Status & Justification
 **EXPERIMENT LIFECYCLE MANAGEMENT**
 **Primary Orchestrators**
 
-**`src/experiment_manager.py`**             `80%`           COMPLETE. Comprehensive unit tests validate the core state
+**`src/experiment_manager.py`**             `95%`           COMPLETE. Comprehensive unit tests validate the core state
                                                         machine, all helper functions, argument parsing, and critical
                                                         failure paths. The end-to-end `new`/`audit`/`fix` workflows are
                                                         validated by the Layer 4 integration test.

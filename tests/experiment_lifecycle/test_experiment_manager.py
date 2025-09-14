@@ -194,6 +194,20 @@ class TestExperimentManagerStateTransitions(unittest.TestCase):
         mock_reprocess.assert_called_once()
         mock_finalize.assert_called_once()
 
+    @patch('src.experiment_manager._run_finalization')
+    @patch('experiment_auditor.get_experiment_state')
+    @patch('src.experiment_manager.get_config_value')
+    def test_state_aggregation_needed_breaks_loop_and_finalizes(self, mock_get_config, mock_get_state, mock_finalize):
+        """Tests that AGGREGATION_NEEDED state breaks the loop and proceeds to finalization."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_get_state.return_value = ("AGGREGATION_NEEDED", {}, "")
+
+        with patch.object(sys, 'argv', ['script.py', self.test_dir]):
+            experiment_manager.main()
+
+        mock_get_state.assert_called_once()
+        mock_finalize.assert_called_once()
+
     @patch('sys.exit')
     @patch('pathlib.Path.glob')
     @patch('src.experiment_manager._run_finalization')
@@ -232,13 +246,13 @@ class TestExperimentManagerStateTransitions(unittest.TestCase):
         mock_get_config.side_effect = self._get_config_side_effect
         mock_get_state.return_value = ("NEW_NEEDED", {}, "")
 
-        with patch('sys.exit') as mock_exit, \
-             patch.object(sys, 'argv', ['script.py', self.test_dir]):
-            experiment_manager.main()
+        with self.assertRaises(SystemExit) as cm:
+            with patch.object(sys, 'argv', ['script.py', self.test_dir]):
+                experiment_manager.main()
 
+        self.assertEqual(cm.exception.code, 1)
         mock_new_mode.assert_called_once()
         mock_finalize.assert_not_called() # Crucial: finalization should NOT run on failure
-        mock_exit.assert_called_with(1)
 
     @patch('sys.exit')
     @patch('src.experiment_manager._run_finalization')
@@ -281,6 +295,48 @@ class TestExperimentManagerStateTransitions(unittest.TestCase):
         # Verify it exits with the specific code for a user-initiated abort
         mock_exit.assert_called_once_with(experiment_manager.AUDIT_ABORTED_BY_USER)
 
+    @patch('src.experiment_manager._run_finalization')
+    @patch('src.experiment_manager._run_new_mode', return_value=True)
+    @patch('experiment_auditor.get_experiment_state')
+    def test_main_loop_halts_on_max_loops(self, mock_get_state, mock_new_mode, mock_finalize):
+        """Tests that the main loop exits if it exceeds the max_loops count."""
+        # Force the state to always be NEW_NEEDED to create a loop
+        mock_get_state.return_value = ("NEW_NEEDED", {}, "")
+        
+        with self.assertRaises(SystemExit) as cm:
+            with patch.object(sys, 'argv', ['script.py', self.test_dir, '--max-loops=3']):
+                experiment_manager.main()
+        
+        self.assertEqual(cm.exception.code, 1)
+        self.assertEqual(mock_new_mode.call_count, 3)
+        mock_finalize.assert_not_called()
+
+    @patch('sys.exit')
+    @patch('src.experiment_manager._run_finalization')
+    @patch('src.experiment_manager._run_migrate_mode', return_value=True)
+    @patch('experiment_auditor.get_experiment_state')
+    def test_migrate_flag_runs_migrate_workflow(self, mock_get_state, mock_migrate, mock_finalize, mock_exit):
+        """Tests that --migrate flag correctly runs the migration workflow and finalizes."""
+        with patch.object(sys, 'argv', ['script.py', self.test_dir, '--migrate']):
+            experiment_manager.main()
+
+        mock_migrate.assert_called_once()
+        mock_get_state.assert_not_called() # Should not enter the main state loop
+        mock_finalize.assert_called_once()
+        mock_exit.assert_not_called()
+
+    @patch('src.experiment_manager._run_finalization')
+    @patch('src.experiment_manager._run_migrate_mode', return_value=False) # Simulate failure
+    def test_migrate_flag_halts_on_failure(self, mock_migrate, mock_finalize):
+        """Tests that a failed migration halts execution and does not finalize."""
+        with self.assertRaises(SystemExit) as cm:
+            with patch.object(sys, 'argv', ['script.py', self.test_dir, '--migrate']):
+                experiment_manager.main()
+
+        self.assertEqual(cm.exception.code, 1)
+        mock_migrate.assert_called_once()
+        mock_finalize.assert_not_called()
+
     @patch('sys.exit')
     @patch('os.makedirs')
     @patch('os.path.exists', return_value=False)
@@ -297,29 +353,31 @@ class TestExperimentManagerStateTransitions(unittest.TestCase):
 
         mock_makedirs.assert_called_once_with(non_existent_dir)
 
-    @patch('sys.exit')
     @patch('src.experiment_manager._run_finalization')
     @patch('src.experiment_manager._run_full_replication_repair')
     @patch('src.experiment_manager._run_config_repair', return_value=False) # Simulate failure
     @patch('src.experiment_manager._run_repair_mode')
     @patch('experiment_auditor.get_experiment_state')
     @patch('src.experiment_manager.get_config_value')
-    def test_repair_sequence_halts_on_failure(self, mock_get_config, mock_get_state, mock_session_repair, mock_config_repair, mock_full_repair, mock_finalize, mock_exit):
+    def test_repair_sequence_halts_on_failure(self, mock_get_config, mock_get_state, mock_session_repair, mock_config_repair, mock_full_repair, mock_finalize):
         """Tests that a failure in one repair step prevents subsequent repairs."""
         mock_get_config.side_effect = self._get_config_side_effect
         payload = [
             {"repair_type": "config_repair", "dir": "run_1"},
-            {"repair_type": "session_repair", "dir": "run_1", "failed_indices": [1]}
+            {"repair_type": "full_replication_repair", "dir": "run_2"},
+            {"repair_type": "session_repair", "dir": "run_3", "failed_indices": [1]}
         ]
         mock_get_state.return_value = ("REPAIR_NEEDED", payload, "")
 
-        with patch.object(sys, 'argv', ['script.py', self.test_dir]):
-            experiment_manager.main()
+        with self.assertRaises(SystemExit) as cm:
+            with patch.object(sys, 'argv', ['script.py', self.test_dir]):
+                experiment_manager.main()
 
+        self.assertEqual(cm.exception.code, 1)
         mock_config_repair.assert_called_once()
+        mock_full_repair.assert_not_called()
         mock_session_repair.assert_not_called()
         mock_finalize.assert_not_called()
-        mock_exit.assert_called_with(1)
 
 
 class TestModeExecutionHelpers(unittest.TestCase):
@@ -336,6 +394,74 @@ class TestModeExecutionHelpers(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.test_dir)
+
+    @patch('src.experiment_manager.subprocess.Popen')
+    def test_run_new_mode_does_nothing_if_all_reps_exist(self, mock_popen):
+        """Ensure _run_new_mode does nothing if all replications already exist."""
+        # Mock glob to find existing directories for reps 1 and 2
+        with patch('glob.glob', return_value=[
+            os.path.join(self.test_dir, 'run_abc_rep-1_xyz'),
+            os.path.join(self.test_dir, 'run_abc_rep-2_xyz')
+        ]):
+            success = experiment_manager._run_new_mode(
+                target_dir=self.test_dir,
+                start_rep=1,
+                end_rep=2,
+                notes=None,
+                verbose=False,
+                orchestrator_script=self.orchestrator_script,
+                colors=self.colors
+            )
+        
+        self.assertTrue(success)
+        mock_popen.assert_not_called()
+
+    @patch('src.experiment_manager.subprocess.Popen')
+    def test_run_new_mode_does_nothing_if_all_reps_exist(self, mock_popen):
+        """Ensure _run_new_mode does nothing if all replications already exist."""
+        # Mock glob to find existing directories for reps 1 and 2
+        with patch('glob.glob', return_value=[
+            os.path.join(self.test_dir, 'run_abc_rep-1_xyz'),
+            os.path.join(self.test_dir, 'run_abc_rep-2_xyz')
+        ]):
+            success = experiment_manager._run_new_mode(
+                target_dir=self.test_dir,
+                start_rep=1,
+                end_rep=2,
+                notes=None,
+                verbose=False,
+                orchestrator_script=self.orchestrator_script,
+                colors=self.colors
+            )
+        
+        self.assertTrue(success)
+        mock_popen.assert_not_called()
+
+    @patch('src.experiment_manager.subprocess.Popen')
+    def test_run_new_mode_skips_existing_replications(self, mock_popen):
+        """Ensure _run_new_mode correctly skips replications that already exist."""
+        # Mock glob to find an existing directory for rep 1
+        with patch('glob.glob', return_value=[os.path.join(self.test_dir, 'run_abc_rep-1_xyz')]):
+            mock_proc = MagicMock(stdout=[], returncode=0)
+            mock_proc.wait.return_value = 0
+            mock_popen.return_value = mock_proc
+            
+            experiment_manager._run_new_mode(
+                target_dir=self.test_dir,
+                start_rep=1,
+                end_rep=2,
+                notes=None,
+                verbose=False,
+                orchestrator_script=self.orchestrator_script,
+                colors=self.colors
+            )
+        
+        # Should only be called once, for replication #2
+        mock_popen.assert_called_once()
+        args, _ = mock_popen.call_args
+        command_list = args[0]
+        self.assertIn("--replication_num", command_list)
+        self.assertIn("2", command_list)
 
     @patch('src.experiment_manager.subprocess.Popen')
     @patch('glob.glob', return_value=[])
@@ -409,6 +535,42 @@ class TestModeExecutionHelpers(unittest.TestCase):
         self.assertIn("--notes", command_list)
         self.assertIn("reprocess notes", command_list)
 
+    @patch('src.experiment_manager.subprocess.Popen')
+    def test_run_reprocess_mode_returns_false_on_failure(self, mock_popen):
+        """Ensure _run_reprocess_mode returns False if the subprocess fails."""
+        mock_proc = MagicMock(stdout=[], stderr=MagicMock(read=lambda: ''), returncode=1)
+        mock_proc.wait.return_value = 0
+        mock_popen.return_value = mock_proc
+
+        run_info = [{"dir": self.test_dir}]
+        with patch('src.experiment_manager.logging.error'):
+            success = experiment_manager._run_reprocess_mode(
+                runs_to_reprocess=run_info,
+                notes=None,
+                verbose=False,
+                orchestrator_script=self.orchestrator_script,
+                compile_script=None,
+                target_dir=self.test_dir,
+                log_manager_script=None,
+                colors=self.colors
+            )
+        self.assertFalse(success)
+
+
+    @patch('src.experiment_manager.subprocess.Popen')
+    def test_run_repair_mode_skips_runs_with_no_failed_indices(self, mock_popen):
+        """Ensure _run_repair_mode does nothing if a run has no failed indices."""
+        run_info = [{"dir": self.test_dir, "failed_indices": []}]
+        
+        success = experiment_manager._run_repair_mode(
+            runs_to_repair=run_info,
+            orchestrator_script_path=self.orchestrator_script,
+            verbose=False,
+            colors=self.colors
+        )
+        
+        self.assertTrue(success)
+        mock_popen.assert_not_called()
 
     @patch('src.experiment_manager.subprocess.Popen')
     def test_run_repair_mode_constructs_correct_command(self, mock_popen):
@@ -440,6 +602,27 @@ class TestModeExecutionHelpers(unittest.TestCase):
         self.assertIn("5", command_list)
         self.assertIn("10", command_list)
         self.assertIn("--verbose", command_list)
+
+    @patch('shutil.rmtree')
+    @patch('src.experiment_manager.subprocess.run')
+    def test_run_full_replication_repair_with_quiet_flag(self, mock_subprocess, mock_rmtree):
+        """Ensure the quiet flag is passed correctly for full repair."""
+        run_dir = os.path.join(self.test_dir, "run_..._rep-007_...")
+        run_info = [{"dir": run_dir}]
+        
+        experiment_manager._run_full_replication_repair(
+            runs_to_repair=run_info,
+            orchestrator_script=self.orchestrator_script,
+            quiet=True, # Test the quiet path
+            colors=self.colors
+        )
+        
+        mock_subprocess.assert_called_once()
+        args, kwargs = mock_subprocess.call_args
+        command_list = args[0]
+
+        self.assertIn("--quiet", command_list)
+        self.assertTrue(kwargs.get('capture_output'))
 
     @patch('shutil.rmtree')
     @patch('src.experiment_manager.subprocess.run')
@@ -502,6 +685,23 @@ class TestModeExecutionHelpers(unittest.TestCase):
         self.assertIn(self.test_dir, calls[2].args[0])
 
 
+    @patch('pathlib.Path.unlink', side_effect=OSError("Permission denied"))
+    def test_run_migrate_mode_fails_on_cleaning_error(self, mock_unlink):
+        """Ensure migrate mode returns False if initial artifact cleaning fails."""
+        # Create a mock file for the cleanup to find
+        (Path(self.test_dir) / "EXPERIMENT_results.csv").touch()
+
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('src.experiment_manager.logging.error'):
+            success = experiment_manager._run_migrate_mode(
+                target_dir=Path(self.test_dir),
+                patch_script="patch.py",
+                orchestrator_script=self.orchestrator_script,
+                colors=self.colors,
+                verbose=False
+            )
+        self.assertFalse(success)
+
     @patch('src.experiment_manager.subprocess.run')
     @patch('src.experiment_manager._is_patching_needed', return_value=True)
     @patch('pathlib.Path.exists', return_value=True)
@@ -537,6 +737,23 @@ class TestModeExecutionHelpers(unittest.TestCase):
         self.assertIn("--reprocess", reprocess_call.args[0])
         self.assertIn(str(mock_run_dir), reprocess_call.args[0])
 
+
+    @patch('src.experiment_manager.logging.error')
+    @patch('src.experiment_manager.subprocess.run')
+    def test_run_config_repair_logs_and_returns_false_on_failure(self, mock_subprocess, mock_log_error):
+        """Ensure _run_config_repair logs stderr and returns False on failure."""
+        error = subprocess.CalledProcessError(1, "cmd", stderr="config error")
+        mock_subprocess.side_effect = error
+        run_info = [{"dir": "/path/to/run_1"}]
+        
+        success = experiment_manager._run_config_repair(
+            runs_to_repair=run_info,
+            restore_config_script="restore.py",
+            colors=self.colors
+        )
+        
+        self.assertFalse(success)
+        mock_log_error.assert_called_with("Stderr:\nconfig error")
 
     @patch('src.experiment_manager.subprocess.run')
     def test_run_config_repair_calls_restore_script(self, mock_subprocess):
@@ -642,11 +859,12 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertEqual(result, expected)
         self.assertEqual(len(result), 80)
 
+    @patch('builtins.print')
     @patch('src.experiment_manager.os.makedirs')
     @patch('src.experiment_manager.get_config_value')
     @patch('src.experiment_manager.datetime')
-    def test_create_new_experiment_directory(self, mock_datetime, mock_get_config, mock_makedirs):
-        """Verify _create_new_experiment_directory constructs the correct path and creates it."""
+    def test_create_new_experiment_directory(self, mock_datetime, mock_get_config, mock_makedirs, mock_print):
+        """Verify _create_new_experiment_directory constructs path, creates it, and prints."""
         # Mock dependencies
         mock_datetime.datetime.now.return_value.strftime.return_value = "20250101_120000"
         mock_get_config.side_effect = lambda cfg, sec, key, fallback: {
@@ -655,17 +873,19 @@ class TestHelperFunctions(unittest.TestCase):
             'experiment_dir_prefix': 'exp_'
         }.get(key, fallback)
         
-        colors = {'cyan': '', 'reset': ''}
+        colors = {'cyan': 'CYAN', 'reset': 'RESET'}
         
         # Call the function
         result_dir = experiment_manager._create_new_experiment_directory(colors)
         
-        # Verify the path was constructed as expected
+        # Verify path construction and directory creation
         expected_dir = os.path.join(self.project_root, 'output', 'new_exps', 'exp_20250101_120000')
         self.assertEqual(result_dir, expected_dir)
-        
-        # Verify that os.makedirs was called with the correct path
         mock_makedirs.assert_called_once_with(expected_dir)
+        
+        # Verify print output
+        relative_path = os.path.relpath(expected_dir, self.project_root)
+        mock_print.assert_called_once_with(f"CYANNew experiment directory created:\n{relative_path}RESET\n")
 
     @patch('builtins.open')
     @patch('pathlib.Path.exists')
@@ -694,6 +914,13 @@ class TestHelperFunctions(unittest.TestCase):
         is_complete, details = experiment_manager._verify_experiment_level_files(target_dir)
         self.assertFalse(is_complete)
         self.assertEqual(details, ["batch_run_log.csv NOT FINALIZED"])
+
+        # --- Test Failure Case: Unreadable Log ---
+        mock_exists.return_value = True
+        mock_open.side_effect = IOError("Cannot read file")
+        is_complete, details = experiment_manager._verify_experiment_level_files(target_dir)
+        self.assertFalse(is_complete)
+        self.assertEqual(details, ["batch_run_log.csv UNREADABLE"])
 
 class TestMigrationHelpers(unittest.TestCase):
     """Tests for the migration-related helper functions."""
@@ -839,6 +1066,50 @@ class TestFailureScenarios(unittest.TestCase):
             )
         
         self.assertEqual(cm.exception.code, 1)
+
+    @patch('src.experiment_manager.subprocess.Popen', side_effect=KeyboardInterrupt)
+    def test_run_repair_mode_exits_on_keyboard_interrupt(self, mock_popen):
+        """Ensure _run_repair_mode exits on KeyboardInterrupt."""
+        run_info = [{"dir": self.test_dir, "failed_indices": [1]}]
+        with self.assertRaises(SystemExit) as cm:
+            experiment_manager._run_repair_mode(
+                run_info, self.orchestrator_script, False, self.colors
+            )
+        self.assertEqual(cm.exception.code, experiment_manager.AUDIT_ABORTED_BY_USER)
+
+    @patch('shutil.rmtree')
+    @patch('src.experiment_manager.subprocess.run', side_effect=KeyboardInterrupt)
+    def test_full_repair_exits_on_keyboard_interrupt(self, mock_subprocess, mock_rmtree):
+        """Ensure _run_full_replication_repair exits on KeyboardInterrupt."""
+        run_dir = os.path.join(self.test_dir, "run_..._rep-007_...")
+        run_info = [{"dir": run_dir}]
+        with self.assertRaises(SystemExit) as cm:
+            experiment_manager._run_full_replication_repair(
+                run_info, self.orchestrator_script, True, self.colors
+            )
+        self.assertEqual(cm.exception.code, experiment_manager.AUDIT_ABORTED_BY_USER)
+
+    @patch('src.experiment_manager.subprocess.Popen', side_effect=KeyboardInterrupt)
+    def test_run_repair_mode_exits_on_keyboard_interrupt(self, mock_popen):
+        """Ensure _run_repair_mode exits on KeyboardInterrupt."""
+        run_info = [{"dir": self.test_dir, "failed_indices": [1]}]
+        with self.assertRaises(SystemExit) as cm:
+            experiment_manager._run_repair_mode(
+                run_info, self.orchestrator_script, False, self.colors
+            )
+        self.assertEqual(cm.exception.code, experiment_manager.AUDIT_ABORTED_BY_USER)
+
+    @patch('shutil.rmtree')
+    @patch('src.experiment_manager.subprocess.run', side_effect=KeyboardInterrupt)
+    def test_full_repair_exits_on_keyboard_interrupt(self, mock_subprocess, mock_rmtree):
+        """Ensure _run_full_replication_repair exits on KeyboardInterrupt."""
+        run_dir = os.path.join(self.test_dir, "run_..._rep-007_...")
+        run_info = [{"dir": run_dir}]
+        with self.assertRaises(SystemExit) as cm:
+            experiment_manager._run_full_replication_repair(
+                run_info, self.orchestrator_script, True, self.colors
+            )
+        self.assertEqual(cm.exception.code, experiment_manager.AUDIT_ABORTED_BY_USER)
         mock_subprocess.assert_called_once()
 
     @patch('src.experiment_manager.subprocess.Popen')
@@ -885,75 +1156,295 @@ class TestFailureScenarios(unittest.TestCase):
         # In the context of a child process interrupt, the manager should exit
         self.assertEqual(cm.exception.code, 1)
 
-
-class TestSetupAndPaths(unittest.TestCase):
-    """Tests for the _setup_environment_and_paths helper function."""
-
-    @patch('src.experiment_manager.os.path.exists', return_value=True)
-    @patch('src.experiment_manager.get_config_value', return_value=30)
-    @patch('src.experiment_manager.argparse.ArgumentParser')
-    def test_setup_with_target_dir(self, mock_argparse, mock_get_config, mock_exists):
-        """Verify setup when a target directory is provided."""
-        mock_args = MagicMock(target_dir="/provided/path", end_rep=None, reprocess=False, migrate=False)
-        mock_argparse.return_value.parse_args.return_value = mock_args
-
-        args, final_dir, _, _, end_rep = experiment_manager._setup_environment_and_paths()
-
-        self.assertEqual(final_dir, os.path.abspath("/provided/path"))
-        self.assertEqual(end_rep, 30) # Should fall back to config
-
-    @patch('src.experiment_manager.get_config_value', return_value=30)
-    @patch('src.experiment_manager._create_new_experiment_directory', return_value="/new/path")
-    @patch('src.experiment_manager.argparse.ArgumentParser')
-    def test_setup_without_target_dir(self, mock_argparse, mock_create_dir, mock_get_config):
-        """Verify setup when no target directory is provided, triggering creation."""
-        mock_args = MagicMock(target_dir=None, end_rep=15, reprocess=False, migrate=False, verify_only=False)
-        mock_argparse.return_value.parse_args.return_value = mock_args
-
-        args, final_dir, _, _, end_rep = experiment_manager._setup_environment_and_paths()
-
-        mock_create_dir.assert_called_once()
-        self.assertEqual(final_dir, "/new/path")
-        self.assertEqual(end_rep, 15) # Should use the CLI argument
-
-    @patch('src.experiment_manager.argparse.ArgumentParser')
-    def test_setup_fails_with_reprocess_and_no_dir(self, mock_argparse):
-        """Verify setup exits if --reprocess is used without a target directory."""
-        mock_args = MagicMock(target_dir=None, reprocess=True, migrate=False, verify_only=False)
-        mock_argparse.return_value.parse_args.return_value = mock_args
-
-        with self.assertRaises(SystemExit) as cm:
-            experiment_manager._setup_environment_and_paths()
+    @patch('builtins.print')
+    @patch('src.experiment_manager.subprocess.Popen')
+    def test_run_repair_mode_prints_stderr_on_failure(self, mock_popen, mock_print):
+        """Ensure _run_repair_mode prints stderr from a CalledProcessError."""
+        # Simulate a process that fails and has stderr content
+        error = subprocess.CalledProcessError(1, "cmd", stderr="error message")
+        mock_popen.side_effect = error
         
-        self.assertEqual(cm.exception.code, 1)
+        run_info = [{"dir": self.test_dir, "failed_indices": [1]}]
+        
+        with patch('src.experiment_manager.logging.error'):
+            success = experiment_manager._run_repair_mode(
+                run_info, self.orchestrator_script, False, self.colors
+            )
+        
+        self.assertFalse(success)
+        # Verify that the stderr content was printed
+        mock_print.assert_called_with("error message", file=sys.stderr)
 
-    @patch('src.experiment_manager.os.path.exists', return_value=False)
-    @patch('src.experiment_manager.argparse.ArgumentParser')
-    def test_setup_fails_with_nonexistent_dir(self, mock_argparse, mock_exists):
-        """Verify setup exits if a non-existent directory is provided with --reprocess."""
-        mock_args = MagicMock(target_dir="/nonexistent/path", reprocess=True, migrate=False, verify_only=False)
-        mock_argparse.return_value.parse_args.return_value = mock_args
-
+    @patch('src.experiment_manager.subprocess.Popen', side_effect=KeyboardInterrupt)
+    def test_run_reprocess_mode_exits_on_keyboard_interrupt(self, mock_popen):
+        """Ensure _run_reprocess_mode exits on KeyboardInterrupt."""
+        run_info = [{"dir": self.test_dir}]
         with self.assertRaises(SystemExit) as cm:
-            experiment_manager._setup_environment_and_paths()
-            
-        self.assertEqual(cm.exception.code, 1)
+            with patch('src.experiment_manager.logging.error'):
+                experiment_manager._run_reprocess_mode(
+                    run_info, None, False, self.orchestrator_script, None,
+                    self.test_dir, None, self.colors
+                )
+        self.assertEqual(cm.exception.code, experiment_manager.AUDIT_ABORTED_BY_USER)
 
-    @patch('src.experiment_manager.argparse.ArgumentParser')
-    def test_setup_fails_with_action_flag_and_no_dir(self, mock_argparse):
-        """Verify setup exits if action flags are used without a target directory."""
+    @patch('shutil.rmtree')
+    @patch('src.experiment_manager.subprocess.run')
+    @patch('src.experiment_manager.logging.error')
+    def test_full_repair_logs_stderr_on_failure(self, mock_log_error, mock_subprocess, mock_rmtree):
+        """Ensure full repair logs stderr from the orchestrator on failure."""
+        run_dir = os.path.join(self.test_dir, "run_..._rep-007_...")
+        run_info = [{"dir": run_dir}]
+        mock_subprocess.return_value = MagicMock(returncode=1, stdout="out", stderr="err")
+        
+        experiment_manager._run_full_replication_repair(
+            run_info, self.orchestrator_script, True, self.colors
+        )
+        
+        self.assertTrue(any("Orchestrate Replication STDERR" in c.args[0] and "err" in c.args[0]
+                            for c in mock_log_error.call_args_list))
+
+    @patch('src.experiment_manager.subprocess.run')
+    @patch('src.experiment_manager.logging.error')
+    def test_finalization_logs_details_on_failure(self, mock_log_error, mock_subprocess):
+        """Ensure _run_finalization logs stdout and stderr on subprocess failure."""
+        error = subprocess.CalledProcessError(1, "cmd", output="out", stderr="err")
+        mock_subprocess.side_effect = error
+        script_paths = {'log_manager': 'log.py', 'compile_experiment': 'compile.py'}
+        
+        with self.assertRaises(SystemExit):
+            experiment_manager._run_finalization(self.test_dir, script_paths, self.colors)
+        
+        self.assertTrue(any("Stderr" in c.args[0] and "err" in c.args[0]
+                            for c in mock_log_error.call_args_list))
+        self.assertTrue(any("Stdout" in c.args[0] and "out" in c.args[0]
+                            for c in mock_log_error.call_args_list))
+
+    @patch('src.experiment_manager.subprocess.run')
+    @patch('src.experiment_manager.logging.error')
+    def test_finalization_logs_stdout_only_on_failure(self, mock_log_error, mock_subprocess):
+        """Ensure _run_finalization logs stdout when stderr is empty on failure."""
+        error = subprocess.CalledProcessError(1, "cmd", output="stdout only")
+        # Explicitly set stderr to None or empty string
+        error.stderr = None
+        mock_subprocess.side_effect = error
+        script_paths = {'log_manager': 'log.py', 'compile_experiment': 'compile.py'}
+        
+        with self.assertRaises(SystemExit):
+            experiment_manager._run_finalization(self.test_dir, script_paths, self.colors)
+        
+        self.assertTrue(any("Stdout" in c.args[0] and "stdout only" in c.args[0]
+                            for c in mock_log_error.call_args_list))
+        # Verify that Stderr was not logged
+        self.assertFalse(any("Stderr" in c.args[0] for c in mock_log_error.call_args_list))
+
+    @patch('shutil.rmtree')
+    @patch('src.experiment_manager.subprocess.run')
+    @patch('src.experiment_manager.logging.info')
+    def test_full_repair_logs_stdout_only(self, mock_log_info, mock_subprocess, mock_rmtree):
+        """Ensure full repair logs only stdout when stderr is empty."""
+        run_dir = os.path.join(self.test_dir, "run_..._rep-007_...")
+        run_info = [{"dir": run_dir}]
+        # Simulate a successful run with stdout but no stderr
+        mock_subprocess.return_value = MagicMock(returncode=0, stdout="out", stderr=None)
+        
+        experiment_manager._run_full_replication_repair(
+            run_info, self.orchestrator_script, True, self.colors
+        )
+        
+        self.assertTrue(any("Orchestrate Replication STDOUT" in c.args[0] and "out" in c.args[0]
+                            for c in mock_log_info.call_args_list))
+
+    @patch('src.experiment_manager.subprocess.run', side_effect=Exception("Generic error"))
+    @patch('src.experiment_manager.logging.error')
+    def test_finalization_handles_generic_exception(self, mock_log_error, mock_subprocess):
+        """Ensure _run_finalization catches and logs generic exceptions."""
+        script_paths = {'log_manager': 'log.py', 'compile_experiment': 'compile.py'}
+        
+        with self.assertRaises(SystemExit):
+            experiment_manager._run_finalization(self.test_dir, script_paths, self.colors)
+        
+        mock_log_error.assert_called_with("An unexpected error occurred during finalization: Generic error")
+
+
+class TestModuleSetup(unittest.TestCase):
+    """Tests for module-level setup like optional imports."""
+
+    def test_tqdm_fallback_works(self):
+        """Verify the script doesn't crash if tqdm is not installed."""
+        # Hide the real tqdm and reload the module to trigger the fallback
+        with patch.dict('sys.modules', {'tqdm': None}):
+            import importlib
+            importlib.reload(experiment_manager)
+            
+            # Check that the fallback function was created and is callable
+            self.assertTrue(callable(experiment_manager.tqdm))
+            # Call it to ensure it doesn't crash
+            self.assertEqual(list(experiment_manager.tqdm([1, 2])), [1, 2])
+        
+        # Restore the original module to not affect other tests
+        import importlib
+        importlib.reload(experiment_manager)
+
+
+class TestMainFunctionEdgeCases(unittest.TestCase):
+    """Tests for edge cases and argument parsing in the main() function."""
+    def setUp(self):
+        """Set up a temporary directory and mock configuration."""
+        self.test_dir = tempfile.mkdtemp(prefix="exp_manager_main_")
+        self.mock_config = configparser.ConfigParser()
+        self.mock_config.read_dict({
+            'Study': {'num_replications': '1'},
+        })
+    
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def _get_config_side_effect(self, config_obj, section, key, **kwargs):
+        """Helper to safely get values from the mock_config."""
+        if self.mock_config.has_option(section, key):
+            val = self.mock_config.get(section, key)
+            value_type = kwargs.get('value_type', str)
+            return value_type(val)
+        return kwargs.get('fallback', None)
+
+    @patch('src.experiment_manager._create_new_experiment_directory')
+    def test_main_fails_with_action_flag_and_no_dir(self, mock_create):
+        """Verify main() exits if action flags are used without a target directory."""
         for flag in ['--reprocess', '--migrate']:
             with self.subTest(flag=flag):
-                # We need to create a new mock for each subtest
-                args_dict = {'target_dir': None, 'reprocess': False, 'migrate': False, 'verify_only': False}
-                args_dict[flag.strip('-')] = True
-                mock_args = MagicMock(**args_dict)
-                mock_argparse.return_value.parse_args.return_value = mock_args
-
                 with self.assertRaises(SystemExit) as cm:
-                    experiment_manager._setup_environment_and_paths()
-                
+                    with patch.object(sys, 'argv', ['script.py', flag]):
+                        experiment_manager.main()
                 self.assertEqual(cm.exception.code, 1)
+                mock_create.assert_not_called()
+
+    @patch('experiment_auditor.get_experiment_state', side_effect=KeyboardInterrupt)
+    def test_main_exits_gracefully_on_keyboard_interrupt(self, mock_get_state):
+        """Verify the main loop catches KeyboardInterrupt and exits correctly."""
+        with self.assertRaises(SystemExit) as cm:
+            with patch.object(sys, 'argv', ['script.py', self.test_dir]):
+                experiment_manager.main()
+        self.assertEqual(cm.exception.code, experiment_manager.AUDIT_ABORTED_BY_USER)
+
+    @patch('pathlib.Path.glob', return_value=[]) # No run dirs found
+    @patch('src.experiment_manager._run_finalization')
+    @patch('src.experiment_manager._run_reprocess_mode', return_value=True)
+    @patch('experiment_auditor.get_experiment_state')
+    def test_reprocess_flag_on_empty_dir(self, mock_get_state, mock_reprocess, mock_finalize, mock_glob):
+        """Verify --reprocess on an empty dir calls reprocess mode with an empty list."""
+        # The state machine will see it as complete, but the reprocess flag forces one run.
+        mock_get_state.return_value = ("COMPLETE", [], "")
+        
+        with patch.object(sys, 'argv', ['script.py', self.test_dir, '--reprocess']):
+            experiment_manager.main()
+        
+        # It should find no runs, and therefore the payload passed to reprocess should be empty.
+        mock_reprocess.assert_called_once()
+        args, _ = mock_reprocess.call_args
+        self.assertEqual(args[0], []) # The payload should be an empty list.
+        mock_finalize.assert_called_once()
+
+    @patch('experiment_auditor.get_experiment_state')
+    @patch('os.makedirs')
+    @patch('os.path.exists', return_value=False)
+    def test_main_exits_if_reprocess_dir_not_found(self, mock_exists, mock_makedirs, mock_get_state):
+        """Verify main() exits if --reprocess is used with a non-existent directory."""
+        non_existent_dir = os.path.join(self.test_dir, "non_existent")
+        with self.assertRaises(SystemExit) as cm:
+            with patch.object(sys, 'argv', ['script.py', non_existent_dir, '--reprocess']):
+                experiment_manager.main()
+        
+        self.assertEqual(cm.exception.code, 1)
+        mock_makedirs.assert_not_called()
+        # Verify the main loop was never entered, ensuring the test is fast.
+        mock_get_state.assert_not_called()
+
+    @patch('src.experiment_manager._run_finalization')
+    @patch('experiment_auditor.get_experiment_state')
+    @patch('src.experiment_manager.get_config_value')
+    def test_state_aggregation_needed_breaks_loop_and_finalizes(self, mock_get_config, mock_get_state, mock_finalize):
+        """Tests that AGGREGATION_NEEDED state breaks the loop and proceeds to finalization."""
+        mock_get_config.side_effect = self._get_config_side_effect
+        mock_get_state.return_value = ("AGGREGATION_NEEDED", {}, "")
+
+        with patch.object(sys, 'argv', ['script.py', self.test_dir]):
+            experiment_manager.main()
+
+        mock_get_state.assert_called_once()
+        mock_finalize.assert_called_once()
+
+    @patch('sys.exit')
+    @patch('importlib.reload')
+    @patch.dict(sys.modules, {'config_loader': MagicMock(), 'experiment_auditor': MagicMock()})
+    @patch('os.environ', {})
+    def test_main_uses_config_path_override(self, mock_reload, mock_exit):
+        """Verify --config-path sets environ and reloads config modules."""
+        # Create a dummy config file
+        config_path = os.path.join(self.test_dir, 'test_config.ini')
+        with open(config_path, 'w') as f:
+            f.write('[Study]\nnum_replications = 5\n')
+        
+        # We expect main to run to completion (state=COMPLETE) and not exit
+        with patch('experiment_auditor.get_experiment_state', return_value=("COMPLETE", {}, "")), \
+             patch('src.experiment_manager._run_finalization'), \
+             patch.object(sys, 'argv', ['script.py', self.test_dir, f'--config-path={config_path}']):
+            
+            experiment_manager.main()
+
+        # Check that the environment variable was set correctly
+        self.assertIn('PROJECT_CONFIG_OVERRIDE', os.environ)
+        self.assertEqual(os.environ['PROJECT_CONFIG_OVERRIDE'], os.path.abspath(config_path))
+        
+        # Check that the config modules were reloaded
+        self.assertEqual(mock_reload.call_count, 2)
+        mock_reload.assert_any_call(sys.modules['config_loader'])
+        mock_reload.assert_any_call(sys.modules['experiment_auditor'])
+
+    @patch('sys.exit')
+    @patch('importlib.reload')
+    @patch('os.environ', {})
+    def test_main_skips_reload_if_modules_not_present(self, mock_reload, mock_exit):
+        """Verify main() does not try to reload modules that aren't in sys.modules."""
+        
+        # Create a mock dictionary that intercepts the 'in' operator for our specific modules,
+        # forcing the 'if ... in sys.modules' check to be False.
+        class MockModules(dict):
+            def __contains__(self, key):
+                if key in ['config_loader', 'experiment_auditor']:
+                    return False
+                return super().__contains__(key)
+
+        mock_modules_dict = MockModules(sys.modules)
+
+        config_path = os.path.join(self.test_dir, 'test_config.ini')
+        with open(config_path, 'w') as f:
+            f.write('[Study]\nnum_replications = 5\n')
+        
+        # Patch sys.modules with our mock. The 'from' imports will still work because
+        # they use __getitem__, which is handled by the base dict.
+        with patch('sys.modules', mock_modules_dict), \
+             patch('experiment_auditor.get_experiment_state', return_value=("COMPLETE", {}, "")), \
+             patch('src.experiment_manager._run_finalization'), \
+             patch.object(sys, 'argv', ['script.py', self.test_dir, f'--config-path={config_path}']):
+            
+            experiment_manager.main()
+        
+        mock_reload.assert_not_called()
+
+
+    @patch('src.experiment_manager._run_finalization')
+    @patch('experiment_auditor.get_experiment_state', return_value=("COMPLETE", {}, ""))
+    def test_main_with_force_color_flag(self, mock_get_state, mock_finalize):
+        """Verify --force-color flag enables color constants."""
+        with patch.object(sys, 'argv', ['script.py', self.test_dir, '--force-color']):
+            experiment_manager.main()
+        
+        mock_finalize.assert_called_once()
+        args, _ = mock_finalize.call_args
+        colors_dict = args[2] # colors is the 3rd argument
+        
+        self.assertNotEqual(colors_dict['cyan'], '')
+        self.assertNotEqual(colors_dict['reset'], '')
 
 
 if __name__ == '__main__':

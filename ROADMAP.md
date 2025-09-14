@@ -21,7 +21,8 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Implement Layer 7 Test Harness (New Study Lifecycle) to validate the `new_study.ps1`, `audit_study.ps1`, and `fix_study.ps1` workflows.
   - [ ] **Increase Coverage for Existing Test Suites:**
     - **Critical Modules (Target: 90%+)**
-      - [ ] `src/experiment_manager.py` (Current: 80%)
+      - [x] `src/experiment_manager.py` (From 80% -> 95%)
+        - **Note:** Achieved by adding comprehensive tests for the main state-machine loop, argument parsing, all failure modes, and other logic branches.
       - [ ] `src/generate_personalities_db.py` (Current: 87%)
       - [x] `src/replication_manager.py` (From 77% -> 95%)
         - **Note:** This was achieved by refactoring the code for testability (extracting the `session_worker`) and replacing complex, brittle mocks with a simple, direct patching strategy. This pattern should be applied to other orchestrators.

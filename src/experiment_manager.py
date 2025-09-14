@@ -494,62 +494,6 @@ def _run_reprocess_mode(runs_to_reprocess, notes, verbose, orchestrator_script, 
     print(f"\n{C_GREEN}--- All replications reprocessed successfully. ---{C_RESET}")
     return True
 
-def _setup_environment_and_paths():
-    """Parses args, sets up colors, paths, and the experiment directory."""
-    parser = argparse.ArgumentParser(description="State-machine controller for running experiments.")
-    parser.add_argument('target_dir', nargs='?', default=None,
-                        help="Optional. The target directory for the experiment. If not provided, a unique directory will be created.")
-    parser.add_argument('--start-rep', type=int, default=1, help="First replication number for new runs.")
-    parser.add_argument('--end-rep', type=int, default=None, help="Last replication number for new runs.")
-    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose per-replication status updates.')
-    parser.add_argument('--notes', type=str, help='Optional notes for the reports.')
-    parser.add_argument('--max-loops', type=int, default=10, help="Safety limit for state-machine loops.")
-    parser.add_argument('--migrate', action='store_true', help="Run a one-time migration workflow for a legacy experiment directory.")
-    parser.add_argument('--reprocess', action='store_true', help="Force reprocessing of all runs in an experiment, then finalize.")
-    parser.add_argument('--force-color', action='store_true', help=argparse.SUPPRESS) # Hidden from user help
-    args = parser.parse_args()
-
-    # --- Color setup ---
-    use_color = sys.stdout.isatty() or args.force_color
-    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = ('', '', '', '', '')
-    if use_color:
-        C_CYAN = '\033[96m'
-        C_GREEN = '\033[92m'
-        C_YELLOW = '\033[93m'
-        C_RED = '\033[91m'
-        C_RESET = '\033[0m'
-    colors = { 'cyan': C_CYAN, 'green': C_GREEN, 'yellow': C_YELLOW, 'red': C_RED, 'reset': C_RESET }
-
-    # --- Script path setup ---
-    script_paths = {
-        'orchestrator': os.path.join(PROJECT_ROOT, "src", "replication_manager.py"),
-        'compile_experiment': os.path.join(PROJECT_ROOT, "src", 'compile_experiment_results.py'),
-        'log_manager': os.path.join(PROJECT_ROOT, "src", 'manage_experiment_log.py'),
-        'patch': os.path.join(PROJECT_ROOT, "src", "upgrade_legacy_experiment.py"),
-        'restore_config': os.path.join(PROJECT_ROOT, "src", "restore_experiment_config.py")
-    }
-
-    # --- Directory setup ---
-    if args.target_dir:
-        final_output_dir = os.path.abspath(args.target_dir)
-        if not os.path.exists(final_output_dir):
-            if args.verify_only or args.reprocess or args.migrate:
-                print(f"\n{C_RED}Directory not found:{C_RESET}\n{final_output_dir}")
-                sys.exit(1)
-            os.makedirs(final_output_dir)
-            print(f"\nCreated specified target directory:\n{final_output_dir}")
-    else:
-        if args.verify_only or args.reprocess or args.migrate:
-            print(f"\n{C_RED}Error: --verify_only, --reprocess, and --migrate flags require a target directory.{C_RESET}")
-            sys.exit(1)
-        # Pass the individual color vars for now to avoid breaking _create_new_experiment_directory's signature
-        final_output_dir = _create_new_experiment_directory(C_CYAN, C_RESET)
-
-    # --- Config value setup ---
-    config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
-    end_rep = args.end_rep if args.end_rep is not None else config_num_reps
-
-    return args, final_output_dir, script_paths, colors, end_rep
 
 def main():
     """
@@ -627,10 +571,11 @@ def main():
                 if args.reprocess or args.migrate:
                     print(f"\n{C_RED}Directory not found:{C_RESET}\n{final_output_dir}")
                     sys.exit(1)
-                # If a specific target is given but doesn't exist, create it.
-                os.makedirs(final_output_dir)
-                relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
-                print(f"\nCreated specified target directory:\n{relative_path}")
+                else:
+                    # If a specific target is given but doesn't exist, create it.
+                    os.makedirs(final_output_dir)
+                    relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
+                    print(f"\nCreated specified target directory:\n{relative_path}")
         else:
             # If no target is given, we are explicitly in "new experiment" mode.
             # This mode is incompatible with flags that operate on existing data.
@@ -645,11 +590,13 @@ def main():
         # --- Workflow Branching: Handle --migrate as a special one-shot process ---
         if args.migrate:
             # The migrate workflow is a single pass: preprocess, then finalize.
-            if not _run_migrate_mode(Path(final_output_dir), script_paths['patch'], script_paths['orchestrator'], colors, args.verbose):
+            migration_success = _run_migrate_mode(Path(final_output_dir), script_paths['patch'], script_paths['orchestrator'], colors, args.verbose)
+            if migration_success:
+                # After successful migration, the only remaining step is finalization.
+                _run_finalization(final_output_dir, script_paths, colors)
+            else:
                 print(f"{C_RED}--- Migration pre-processing failed. Please review logs. ---{C_RESET}")
                 sys.exit(1)
-            # After migration, the only remaining step is finalization.
-            _run_finalization(final_output_dir, script_paths, colors)
 
         else:
             # --- For all other modes, use the iterative state-machine loop ---
