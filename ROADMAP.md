@@ -23,12 +23,14 @@ This phase focuses on achieving a fully validated and stable codebase before the
     - **Critical Modules (Target: 90%+)**
       - [x] `src/experiment_manager.py` (From 80% -> 95%)
         - **Note:** Achieved by adding comprehensive tests for the main state-machine loop, argument parsing, all failure modes, and other logic branches.
-      - [ ] `src/generate_personalities_db.py` (Current: 87%)
+      - [x] `src/generate_personalities_db.py` (From 87% -> 90%)
+        - **Note:** Achieved by adding tests for missing inputs, malformed data files, out-of-bounds parameters, and user confirmation prompts, meeting the 90%+ target for this critical module.
       - [x] `src/replication_manager.py` (From 77% -> 95%)
         - **Note:** This was achieved by refactoring the code for testability (extracting the `session_worker`) and replacing complex, brittle mocks with a simple, direct patching strategy. This pattern should be applied to other orchestrators.
     - **Standard Modules (Target: 80%+)**
       - [ ] `src/analyze_llm_performance.py` (Current: 78%)
-      - [ ] `src/analyze_study_results.py` (Current: 62%)
+      - [x] `src/analyze_study_results.py` (From 62% -> 82%)
+        - **Note:** Achieved the 80%+ target by fixing bugs in the script's logging and post-hoc logic, and by implementing a robust test suite that covers data filtering, error handling, and all major analysis code paths.
       - [ ] `src/build_llm_queries.py` (Current: 68%)
       - [ ] `src/compile_experiment_results.py` (Current: 74%)
       - [ ] `src/compile_replication_results.py` (Current: 78%)

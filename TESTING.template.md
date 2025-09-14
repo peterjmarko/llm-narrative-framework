@@ -433,9 +433,9 @@ Module                              Cov. (%)        Status & Justification
                                                     logic for default, fast, resume, and bypass modes, as well as
                                                     error handling.
 
-**`src/generate_personalities_db.py`**  `87%`           COMPLETE. Comprehensive unit tests validate the main workflow,
-                                                    core data assembly algorithm, and error handling for stale
-                                                    data, missing inputs, and single-record debug runs.
+**`src/generate_personalities_db.py`**  `90%`           COMPLETE. Target met. Comprehensive unit tests validate the
+                                                    main workflow, core data assembly algorithm, and error handling
+                                                    for stale data, missing inputs, and single-record debug runs.
 
 **`prepare_data.ps1`**                  `N/A`           COMPLETE. As the primary orchestrator, this script is validated
                                                     at two layers. The **Layer 2** test uses mock scripts to validate
@@ -530,11 +530,10 @@ Module                                  Cov. (%)        Status & Justification
                                                         workflow and robustly handle edge cases like empty or missing
                                                         experiment files.
 
-`src/analyze_study_results.py`          `62%`           COMPLETE. The unit test suite fully validates the script's
-                                                        core logic, including data filtering, control flow for different
-                                                        analysis scenarios (e.g., zero variance), and graceful
-                                                        shutdowns. Key statistical and plotting functions are mocked
-                                                        to ensure isolated validation.
+`src/analyze_study_results.py`          `82%`           COMPLETE. Target met. The test suite was significantly
+                                                        overhauled to fix bugs in the script's logging and post-hoc
+                                                        logic. It now robustly covers data filtering, error handling,
+                                                        and all major analysis code paths, meeting the 80%+ target.
 
 **Utility & Other Scripts**
 

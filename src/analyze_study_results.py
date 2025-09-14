@@ -151,10 +151,10 @@ def interpret_bf(bf10):
     if bf10 >= 3: return "Moderate evidence for H1"
     if bf10 > 1: return "Anecdotal evidence for H1"
     if bf10 == 1: return "No evidence"
-    if bf10 > 1/3: return "Anecdotal evidence for H0"
-    if bf10 > 1/10: return "Moderate evidence for H0"
-    if bf10 > 1/30: return "Strong evidence for H0"
-    if bf10 > 1/100: return "Very Strong evidence for H0"
+    if bf10 >= 1/3: return "Anecdotal evidence for H0"
+    if bf10 >= 1/10: return "Moderate evidence for H0"
+    if bf10 >= 1/30: return "Strong evidence for H0"
+    if bf10 >= 1/100: return "Very Strong evidence for H0"
     return "Extreme evidence for H0"
 
 def generate_performance_tiers(df, metric, posthoc_df, sanitized_to_display_map):
@@ -401,6 +401,10 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
             logging.info(f"\nConclusion: Significant effect found for factor(s): {', '.join(significant_factors)}")
             logging.info("\n--- Post-Hoc Analysis ---")
             for factor in significant_factors:
+                # Post-hoc tests are only for main effects, not interactions.
+                if ':' in factor:
+                    continue
+
                 if df[factor].nunique() <= 2:
                     p_val_str = f"{anova_table.loc[f'C({factor})', 'PR(>F)']:.4f}"
                     logging.info(f"\nFactor '{factor}' has only two levels and is significant (ANOVA p={p_val_str}). No pairwise table needed.")
@@ -502,13 +506,28 @@ def main():
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     
-    # Clear any existing handlers
+    # Clear any handlers added by this script in a previous run to avoid duplication.
+    # This is important for testing scenarios where main() might be called multiple times.
     for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+        if hasattr(handler, '_is_study_analyzer_handler'):
+            root_logger.removeHandler(handler)
+
+    # Set up the final logging configuration with two distinct handlers.
+    # This must be done BEFORE any logging calls that need to be captured (like archiving).
+    # 1. Add a handler for the log file that uses the custom formatter to strip color codes.
+    file_handler = logging.FileHandler(log_filepath, mode='w', encoding='utf-8')
+    file_handler.setFormatter(ColorStrippingFormatter('%(message)s'))
+    file_handler._is_study_analyzer_handler = True  # Custom attribute for identification
+    root_logger.addHandler(file_handler)
+
+    # 2. Add a handler for the console that uses the custom ColorFormatter.
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(ColorFormatter('%(message)s'))
+    console_handler._is_study_analyzer_handler = True  # Custom attribute for identification
+    root_logger.addHandler(console_handler)
 
     # --- Single-level Backup of Previous Run ---
     try:
-        import shutil
         archive_dir = os.path.join(output_dir, 'archive')
         # List items in the anova/ directory, excluding the 'archive' subdir and the new log file
         items_to_archive = [item for item in os.listdir(output_dir) if item not in ['archive', log_filename]]
@@ -533,6 +552,8 @@ def main():
         logging.warning(f"Could not archive previous results. Reason: {e}")
     # --- End of Backup ---
 
+    # Logging handlers are now configured earlier in this function.
+
     # --- Create Output Subdirectories ---
     factors_from_config = get_config_list(APP_CONFIG, 'Schema', 'factors')
     if factors_from_config:
@@ -543,17 +564,6 @@ def main():
     
     os.makedirs(os.path.join(output_dir, 'diagnostics'), exist_ok=True)
     # --- End of Directory Creation ---
-
-    # Set up the final logging configuration with two distinct handlers.
-    # 1. Add a handler for the log file that uses the custom formatter to strip color codes.
-    file_handler = logging.FileHandler(log_filepath, mode='w', encoding='utf-8')
-    file_handler.setFormatter(ColorStrippingFormatter('%(message)s'))
-    root_logger.addHandler(file_handler)
-
-    # 2. Add a handler for the console that uses the custom ColorFormatter.
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(ColorFormatter('%(message)s'))
-    root_logger.addHandler(console_handler)
 
     # --- Write the comprehensive header to the log file ---
     logging.info("\n================================================================================")

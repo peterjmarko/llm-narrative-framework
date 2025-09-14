@@ -178,4 +178,72 @@ class TestMainWorkflow:
         captured = capsys.readouterr()
         assert "DEBUG: Processing Subject: Stable" in captured.out
 
+    def test_main_confirms_overwrite(self, mock_input_files, mocker):
+        """Tests that the script proceeds with 'y' input if file is up-to-date."""
+        output_path = mock_input_files["output_path"]
+        output_path.touch()  # Create the file so the prompt appears
+
+        mock_backup = mocker.patch('src.generate_personalities_db.backup_and_remove')
+
+        with patch("builtins.input", return_value="y"):
+            test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"])]
+            with patch("sys.argv", test_args):
+                main()
+
+        mock_backup.assert_called_once_with(output_path)
+        output_df = pd.read_csv(output_path, sep="\t")
+        assert len(output_df) == 2
+
+    def test_main_handles_invalid_test_record_number(self, mock_input_files):
+        """Tests that an out-of-bounds --test-record-number produces an empty file."""
+        sandbox_path = mock_input_files["sandbox_path"]
+        output_path = mock_input_files["output_path"]
+
+        # Mock file has 2 records. Requesting record 999 should result in no records processed.
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force", "--test-record-number", "999"]
+        with patch("sys.argv", test_args):
+            main()
+
+        assert output_path.exists()
+        output_df = pd.read_csv(output_path, sep="\t")
+        assert len(output_df) == 0
+
+    def test_main_handles_malformed_subject_db(self, mock_input_files, caplog):
+        """Tests graceful exit if subject_db.csv is missing a required column."""
+        sandbox_path = mock_input_files["sandbox_path"]
+        subject_db_path = sandbox_path / "data/processed/subject_db.csv"
+
+        # Overwrite the subject_db with a version missing the 'Name' column
+        subject_db_path.write_text(
+            "Index,idADB,Date,Sun,Moon,Ascendant,Midheaven\n"  # Missing 'Name'
+            "1,101,1950-01-01,10.0,100.0,10.0,100.0\n"
+        )
+
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit):
+                main()
+
+        assert "Missing column 'Name'" in caplog.text
+
+    def test_main_handles_path_value_error(self, mock_input_files, mocker, capsys):
+        """Tests that path resolution falls back to absolute on ValueError."""
+        sandbox_path = mock_input_files["sandbox_path"]
+
+        # To trigger the ValueError in `relative_to` without globally patching
+        # pathlib, we mock the PROJECT_ROOT variable it's compared against.
+        # We patch it where it's defined (config_loader) so the import in the
+        # main script receives the mocked value.
+        mocker.patch('config_loader.PROJECT_ROOT', Path("Z:/an/unrelated/path"))
+
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        with patch("sys.argv", test_args):
+            main()
+
+        captured = capsys.readouterr()
+        # Check that the absolute path of the output file is in the output.
+        # The script normalizes path separators to '/' for display.
+        expected_path_str = str(mock_input_files["output_path"]).replace('\\', '/')
+        assert expected_path_str in captured.out
+
 # === End of tests/data_preparation/test_generate_personalities_db.py ===
