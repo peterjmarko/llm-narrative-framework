@@ -73,12 +73,12 @@ FILE_MANIFEST = {
         "path": "config.ini.archived",
         "type": "config_file",
         "required_keys": {
-            "model_name": [("LLM", "model_name"), ("LLM", "model")],
-            "temperature": [("LLM", "temperature")],
-            "mapping_strategy": [("Study", "mapping_strategy")],
-            "num_subjects": [("Study", "group_size"), ("Study", "k_per_query")],
-            "num_trials": [("Study", "num_trials"), ("Study", "num_iterations")],
-            "personalities_db_path": [("Filenames", "personalities_src")],
+            "model_name": {"type": str, "paths": [("LLM", "model_name"), ("LLM", "model")]},
+            "temperature": {"type": float, "paths": [("LLM", "temperature")]},
+            "mapping_strategy": {"type": str, "paths": [("Study", "mapping_strategy")]},
+            "num_subjects": {"type": int, "paths": [("Study", "group_size"), ("Study", "k_per_query")]},
+            "num_trials": {"type": int, "paths": [("Study", "num_trials"), ("Study", "num_iterations")]},
+            "personalities_db_path": {"type": str, "paths": [("Filenames", "personalities_src")]},
         },
     },
     "queries_dir":   {"path": "session_queries"},
@@ -163,23 +163,25 @@ def _check_config_manifest(run_path: Path, k_expected: int, m_expected: int):
     except Exception:
         return "CONFIG_MALFORMED"
 
-    def _get_value(canonical_name, value_type=str):
-        for section, key in required_keys_map[canonical_name]:
+    def _get_value(canonical_name):
+        spec = required_keys_map[canonical_name]
+        value_type = spec["type"]
+        for section, key in spec["paths"]:
             if cfg.has_option(section, key):
                 try:
                     if value_type is int: return cfg.getint(section, key)
                     if value_type is float: return cfg.getfloat(section, key)
                     return cfg.get(section, key)
                 except (configparser.Error, ValueError):
-                    continue
+                    return None  # Indicates a type mismatch, which is a failure
         return None
 
     missing_keys = [name for name in required_keys_map if _get_value(name) is None]
     if missing_keys:
-        return f"CONFIG_MISSING_KEYS: {', '.join(missing_keys)}"
+        return f"CONFIG_MISSING_OR_INVALID_KEYS: {', '.join(missing_keys)}"
 
-    k_cfg = _get_value("num_subjects", value_type=int)
-    m_cfg = _get_value("num_trials", value_type=int)
+    k_cfg = _get_value("num_subjects")
+    m_cfg = _get_value("num_trials")
 
     mismatched = []
     if k_cfg != k_expected: mismatched.append(f"k (expected {k_expected}, found {k_cfg})")
@@ -377,7 +379,7 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
             details.append("experiment_log.csv UNREADABLE")
     return is_complete, details
 
-def get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) -> tuple[str, list, dict]:
+def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, list, dict]:
     """
     High-level state machine driver with correct state priority.
     This is the single source of truth for an experiment's status.
@@ -404,6 +406,10 @@ def get_experiment_state(target_dir: Path, expected_reps: int, verbose=False) ->
             failed_indices = sorted(list(query_indices - response_txt_indices))
             if failed_indices:
                 runs_needing_session_repair.append({"dir": str(run_path), "failed_indices": failed_indices, "repair_type": "session_repair"})
+            else:
+                # Other response issues (e.g., _TOO_MANY, index mismatches) are severe
+                # enough to require a full re-replication.
+                runs_needing_full_replication_repair.append({"dir": str(run_path), "repair_type": "full_replication_repair"})
         elif status == "CONFIG_ISSUE":
             runs_needing_session_repair.append({"dir": str(run_paths_by_name[run_name]), "repair_type": "config_repair"})
         elif status in {"QUERY_ISSUE", "INVALID_NAME"}:
@@ -502,6 +508,11 @@ def main():
         
         audit_message, audit_recommendation = messages.get(audit_result_code, ("UNKNOWN STATE", "Manual investigation required."))
         audit_color = color_map.get(audit_result_code, C_RED)
+
+        # Explicitly handle the UNKNOWN state message, as its exit code maps to MIGRATION
+        if state_name == "UNKNOWN":
+            audit_message = "UNKNOWN STATE"
+            audit_recommendation = "Manual investigation required."
 
         line = audit_color + ("#" * 80) + C_RESET
         print(f"\n{line}\n{audit_color}{_format_header(f'Audit Result: {audit_message}')}{C_RESET}")

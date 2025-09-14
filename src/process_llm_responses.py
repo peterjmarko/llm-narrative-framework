@@ -55,6 +55,7 @@ import numpy as np
 import shutil
 import pandas as pd
 from io import StringIO
+import unicodedata
 
 try:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
@@ -76,7 +77,6 @@ def normalize_text_for_llm(text):
     Normalizes text to a simple ASCII representation to prevent encoding issues.
     This function must be identical to the one in query_generator.py.
     """
-    import unicodedata
     try:
         # Decompose unicode characters (e.g., 'è' -> 'e' + '`'), then encode to ASCII, ignoring non-ASCII marks.
         return unicodedata.normalize('NFKD', str(text)).encode('ascii', 'ignore').decode('ascii')
@@ -203,31 +203,6 @@ def get_list_a_details_from_query(query_filepath):
     except Exception as e:
         logging.error(f"Error reading query file {query_filepath} for k-determination: {e}")
         return None, []
-
-def get_core_name(name_with_details):
-    """
-    Extracts a 'core' name part for matching, e.g., from "Some Name (1990)" -> "some name".
-    This helps match LLM output names to query names if there are minor formatting differences.
-    Adjust regex as needed for your specific name format.
-    """
-    name = name_with_details
-    # 1. Remove (YYYY) or (YYYY-YYYY) from the end of the string
-    name = re.sub(r'\s*\(\d{4}(?:-\d{2,4})?\)$', '', name)
-    
-    # 2. Normalize to plain ASCII to handle Unicode differences (e.g., Dieudonné vs Dieudonne)
-    name = unicodedata.normalize('NFKD', str(name)).encode('ascii', 'ignore').decode('ascii')
-
-    # 3. Optional: Remove very specific prefixes if they are expected from LLM or query.
-    #    For example, if List A items are always "Item N: Actual Name", you could strip "Item N: ".
-    #    The current test data like "Person A (1900)" does not require aggressive prefix stripping
-    #    that would remove "Person A". If the LLM might add "Speaker A: Person A (1900)", then
-    #    a prefix stripper would be needed. For now, let's assume names are relatively clean
-    #    after year removal.
-    # Example of a more targeted prefix removal (if needed):
-    # name = re.sub(r'^(?:item\s+\d+:\s*|speaker\s+\w+:\s*)', '', name, flags=re.IGNORECASE)
-
-    return name.strip().lower()
-
 
 def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_ordered_from_query, is_rank_based=False):
     """
@@ -436,14 +411,7 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
         # 5. Replace any remaining NaNs (should be minimal with manual parsing, but as a safeguard)
         final_scores = np.nan_to_num(final_scores, nan=0.0)
 
-        # 6. Validate scores are within the [0.0, 1.0] range and clamp if necessary.
-        if np.any(final_scores < 0.0) or np.any(final_scores > 1.0):
-            logging.warning(f"  Score matrix contains values outside [0.0, 1.0] range. Clamping scores.")
-            warning_count += 1
-            is_rejected = True # Critical: Scores outside expected range
-            final_scores = np.clip(final_scores, 0.0, 1.0)
-
-        # 7. Handle rank conversion if the LLM output is ranks (e.g., 1=best, k=worst).
+        # 6. Handle rank conversion FIRST if the LLM output is ranks.
         if is_rank_based:
             if k_value > 1:
                 final_scores = np.where(
@@ -454,6 +422,13 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
             else:
                 final_scores = np.where(final_scores == 1, 1.0, 0.0)
             logging.info(f"  Converted ranks to scores (0-1 range).")
+
+        # 7. Validate scores are within the [0.0, 1.0] range and clamp if necessary.
+        if np.any(final_scores < 0.0) or np.any(final_scores > 1.0):
+            logging.warning(f"  Score matrix contains values outside [0.0, 1.0] range. Clamping scores.")
+            warning_count += 1
+            is_rejected = True # Critical: Scores outside expected range
+            final_scores = np.clip(final_scores, 0.0, 1.0)
 
         return final_scores, warning_count, is_rejected
 

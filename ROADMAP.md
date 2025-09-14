@@ -19,7 +19,43 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Complete Test Coverage for Existing Framework**
   - [ ] Implement Layer 6 Test Harness (Post-Hoc Study Evaluation) to validate the `compile_study.ps1` workflow.
   - [ ] Implement Layer 7 Test Harness (New Study Lifecycle) to validate the `new_study.ps1`, `audit_study.ps1`, and `fix_study.ps1` workflows.
-  - [ ] Update and complete unit test suites for any remaining Python scripts with low coverage.
+  - [ ] **Increase Coverage for Existing Test Suites:**
+    - **Critical Modules (Target: 90%+)**
+      - [ ] `src/experiment_manager.py` (Current: 80%)
+      - [ ] `src/generate_personalities_db.py` (Current: 87%)
+      - [x] `src/replication_manager.py` (From 77% -> 95%)
+        - **Note:** This was achieved by refactoring the code for testability (extracting the `session_worker`) and replacing complex, brittle mocks with a simple, direct patching strategy. This pattern should be applied to other orchestrators.
+    - **Standard Modules (Target: 80%+)**
+      - [ ] `src/analyze_llm_performance.py` (Current: 78%)
+      - [ ] `src/analyze_study_results.py` (Current: 62%)
+      - [ ] `src/build_llm_queries.py` (Current: 68%)
+      - [ ] `src/compile_experiment_results.py` (Current: 74%)
+      - [ ] `src/compile_replication_results.py` (Current: 78%)
+      - [ ] `src/compile_study_results.py` (Current: 70%)
+      - [ ] `src/create_subject_db.py` (Current: 76%)
+      - [ ] `src/find_wikipedia_links.py` (Current: 77%)
+      - [ ] `src/generate_eminence_scores.py` (Current: 75%)
+      - [ ] `src/generate_ocean_scores.py` (Current: 79%)
+      - [ ] `src/manage_experiment_log.py` (Current: 79%)
+      - [ ] `src/neutralize_delineations.py` (Current: 74%)
+      - [ ] `src/query_generator.py` (Current: 74%)
+      - [ ] `src/upgrade_legacy_experiment.py` (Current: 75%)
+  - [ ] **Create New Test Suites for Untested Scripts:**
+    - [ ] `src/id_encoder.py`
+    - [ ] `src/utils/analyze_research_patterns.py`
+    - [ ] `src/utils/file_utils.py`
+    - [ ] `src/utils/patch_eminence_scores.py`
+    - [ ] `src/utils/validate_country_codes.py`
+    - [ ] `scripts/analysis/analyze_cutoff_parameters.py`
+    - [ ] `scripts/analysis/get_docstring_summary.py`
+    - [ ] `scripts/analysis/inspect_adb_categories.py`
+    - [ ] `scripts/analysis/validate_import_file.py`
+    - [ ] `scripts/lint/lint_docstrings.py`
+    - [ ] `scripts/lint/lint_file_headers.py`
+    - [ ] `scripts/maintenance/clean_project.py`
+    - [ ] `scripts/maintenance/convert_py_to_txt.py`
+    - [ ] `scripts/maintenance/generate_scope_report.py`
+    - [ ] `scripts/maintenance/list_project_files.py`
 - [ ] **Implement Query Generation & Randomization Integrity Test**
   - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide mathematical proof of the mapping and randomization logic in `query_generator.py`.
   - [ ] The test will run the script in a loop to generate a large sample of trial manifests for both `correct` and `random` strategies. It will then perform statistical validation to confirm the `random` strategy approximates a uniform distribution and that the `correct` strategy is implemented as designed.
@@ -89,6 +125,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
 ### Code Development
 
 - [ ] **Architectural Refactoring for Modularity**
+  - [ ] Apply the "Refactor for Testability" pattern (extracting complex functions to the module level for direct patching) to other orchestrators like `experiment_manager.py`.
   - [ ] Reorganize the `src/` directory into logical subdirectories (`data_preparation/`, `experimentation/`) to improve separation of concerns and navigability.
   - [ ] Mirror the new `src/` structure in the `tests/` directory to create a parallel test suite.
   - [ ] Move tests for developer utility scripts from `tests/` to a self-contained `scripts/tests/` directory.

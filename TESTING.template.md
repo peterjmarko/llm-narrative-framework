@@ -346,7 +346,21 @@ Layer                               Name                        Status & Justifi
                                                                 and repair.
 --------------------------------------------------------------------------------------------------------------------
 
+### Code Coverage Targets
+
+To ensure the framework's reliability, we have established tiered code coverage targets based on the criticality of each module. These targets guide our testing efforts and provide a clear quality standard.
+
+| Module Tier | Description                                                                                                                            | Coverage Target |
+| :---------- | :------------------------------------------------------------------------------------------------------------------------------------- | :-------------- |
+| **Critical**  | Core orchestrators, state-detection logic, and data validation/parsing modules whose failure could lead to data corruption or invalid scientific results. | **90%+**        |
+| **Standard**  | Individual scripts within a pipeline that perform a discrete, well-defined task.                                                       | **80%+**        |
+| **Utility**   | Shared helper modules, such as configuration loaders, that are foundational to many other scripts.                                       | **85%+**        |
+
+PowerShell wrapper scripts are not measured by Python code coverage; their correctness is validated through the multi-layered integration tests (Layers 2-7).
+
 ### Module-Level Test Coverage: Data Preparation
+
+In the tables below, modules designated as **Critical** are indicated with **bold text**.
 
 **Milestone Complete:** All layers of testing for the data preparation pipeline (Core Algorithm, Unit, Orchestration, and Integration) are complete and passing. The status of individual components is detailed below.
 
@@ -355,18 +369,18 @@ Module                              Cov. (%)        Status & Justification
 ----------------------------------- --------------- -----------------------------------------------------------------
 **Core Algorithm Validation**
 
-`Personality Assembly Algorithm`    `N/A`           COMPLETE. Standalone `pytest` suite provides bit-for-bit
+**`Personality Assembly Algorithm`**    `N/A`           COMPLETE. Standalone `pytest` suite provides bit-for-bit
                                                     validation of `generate_personalities_db.py` against a
                                                     pre-computed ground-truth dataset from the source expert system.
 
-`Selection Algorithms`              `N/A`           COMPLETE. Standalone test harness validates the core filtering
+**`Selection Algorithms`**              `N/A`           COMPLETE. Standalone test harness validates the core filtering
                                                     and cutoff algorithms at scale using a large, pre-generated
                                                     seed dataset in an isolated sandbox.
 
-`Query Generation Algorithm`        `N/A`           PLANNED. Standalone test to provide mathematical proof of the
+**`Query Generation Algorithm`**        `N/A`           PLANNED. Standalone test to provide mathematical proof of the
                                                     mapping and randomization logic in `query_generator.py`.
 
-`Statistical Reporting Algorithm`   `N/A`           PLANNED. Standalone test to provide bit-for-bit verification
+**`Statistical Reporting Algorithm`**   `N/A`           PLANNED. Standalone test to provide bit-for-bit verification
                                                     of the entire data analysis and aggregation pipeline against a
                                                     known-good ground truth dataset.
 
@@ -419,11 +433,11 @@ Module                              Cov. (%)        Status & Justification
                                                     logic for default, fast, resume, and bypass modes, as well as
                                                     error handling.
 
-`src/generate_personalities_db.py`  `87%`           COMPLETE. Comprehensive unit tests validate the main workflow,
+**`src/generate_personalities_db.py`**  `87%`           COMPLETE. Comprehensive unit tests validate the main workflow,
                                                     core data assembly algorithm, and error handling for stale
                                                     data, missing inputs, and single-record debug runs.
 
-`prepare_data.ps1`                  `N/A`           COMPLETE. As the primary orchestrator, this script is validated
+**`prepare_data.ps1`**                  `N/A`           COMPLETE. As the primary orchestrator, this script is validated
                                                     at two layers. The **Layer 2** test uses mock scripts to validate
                                                     its core state machine and halt/resume logic. The **Layer 3**
                                                     integration test validates the full, live pipeline, including its
@@ -441,12 +455,12 @@ Module                                  Cov. (%)        Status & Justification
 **EXPERIMENT LIFECYCLE MANAGEMENT**
 **Primary Orchestrators**
 
-`src/experiment_manager.py`             `80%`           COMPLETE. Comprehensive unit tests validate the core state
+**`src/experiment_manager.py`**             `80%`           COMPLETE. Comprehensive unit tests validate the core state
                                                         machine, all helper functions, argument parsing, and critical
                                                         failure paths. The end-to-end `new`/`audit`/`fix` workflows are
                                                         validated by the Layer 4 integration test.
 
-`src/experiment_auditor.py`             `69%`           COMPLETE. The unit test suite validates the auditor's
+**`src/experiment_auditor.py`**             `89%`           COMPLETE. The unit test suite validates the auditor's
                                                         ability to correctly identify all major experiment states
                                                         (New, Complete, Aggregation Needed, Reprocess Needed, Repair
                                                         Needed, and Migration Needed) by using a mocked file system
@@ -466,8 +480,12 @@ Module                                  Cov. (%)        Status & Justification
 **SINGLE REPLICATION PIPELINE**
 **Primary Orchestrator**
 
-`src/replication_manager.py`            `77%`           COMPLETE. Unit tests cover the core control flow for both
-                                                        "new run" and "reprocess" modes, including failure handling.
+**`src/replication_manager.py`**            `95%`           COMPLETE. The script was refactored for testability by
+                                                        extracting the `session_worker` to the module level. This
+                                                        enabled a simple, reliable testing strategy using direct
+                                                        patching, replacing complex and brittle `ThreadPoolExecutor`
+                                                        mocks. The test suite now robustly covers the core control
+                                                        flow, all failure modes, and edge cases.
 
 **Pipeline Stages**
 
@@ -482,9 +500,11 @@ Module                                  Cov. (%)        Status & Justification
                                                         logic, all major failure modes (HTTP errors, timeouts,
                                                         malformed JSON, `KeyboardInterrupt`), file I/O contracts,
                                                         standalone interactive mode, and the internal testing hooks.
-`src/process_llm_responses.py`          `67%`           COMPLETE. Unit tests cover the core parsing logic, including
-                                                        markdown, fallback, flexible spacing, reordered columns, and
-                                                        key failure modes.
+**`src/process_llm_responses.py`**          `95%`           COMPLETE. Comprehensive unit tests validate all core parsing
+                                                        and validation logic, including markdown, fallback, flexible
+                                                        spacing, reordered columns, rank conversion, and a wide
+                                                        range of failure modes for malformed LLM responses and
+                                                        corrupted input files.
 
 `src/analyze_llm_performance.py`        `78%`           COMPLETE. Comprehensive unit tests validate the main
                                                         orchestrator's control flow and early-exit conditions, all
@@ -529,7 +549,7 @@ Module                                  Cov. (%)        Status & Justification
                                                         script exits gracefully if the target directory or report
                                                         files are missing.
 
-`src/config_loader.py`                  `86%`           COMPLETE. Comprehensive unit tests validate all aspects of
+**`src/config_loader.py`**                  `86%`           COMPLETE. Comprehensive unit tests validate all aspects of
                                                         value retrieval, including type conversions (int, float, bool,
                                                         str), fallbacks, `fallback_key` handling, inline comment
                                                         stripping, list parsing, section-to-dict conversion, and
