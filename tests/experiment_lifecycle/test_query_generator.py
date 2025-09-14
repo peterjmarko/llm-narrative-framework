@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_query_generator.py
+# Filename: tests/experiment_lifecycle/test_query_generator.py
 
 import csv
 import sys
@@ -180,4 +180,4 @@ def test_error_handling_empty_personalities_file(setup_test_environment, monkeyp
         run_script(monkeypatch, ["-k", "2"])
     assert e.value.code == 1, "Should exit with code 1 for empty subject file"
 
-# === End of tests/test_query_generator.py ===
+# === End of tests/experiment_lifecycle/test_query_generator.py ===

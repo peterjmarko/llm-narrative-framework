@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_restore_experiment_config.py
+# Filename: tests/experiment_lifecycle/test_restore_experiment_config.py
 
 """
 Unit Tests for the Experiment Configuration Restore Utility.
@@ -129,4 +129,4 @@ Personalities DB:           {params['personalities_src']}
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_restore_experiment_config.py ===
+# === End of tests/experiment_lifecycle/test_restore_experiment_config.py ===

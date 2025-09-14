@@ -17,18 +17,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/fix_study.Tests.ps1
+# Filename: tests/experiment_lifecycle/migrate_study.Tests.ps1
 
 <#
 .SYNOPSIS
-    Test suite for the fix_study.ps1 wrapper script.
+    Test suite for the migrate_study.ps1 wrapper script.
 .DESCRIPTION
-    This script contains tests for the "fix study" workflow, ensuring that
-    it correctly identifies and repairs all fixable experiments within a study.
+    This script contains tests for the "migrate study" workflow, ensuring that
+    it correctly identifies and migrates all legacy experiments within a study.
 #>
 
 # Test cases will be added here.
 
-Write-Host "SUCCESS: All tests for fix_study.ps1 passed." -ForegroundColor Green
+Write-Host "SUCCESS: All tests for migrate_study.Tests.ps1 passed." -ForegroundColor Green
 
-# === End of tests/fix_study.Tests.ps1 ===
+# === End of tests/experiment_lifecycle/migrate_study.Tests.ps1 ===

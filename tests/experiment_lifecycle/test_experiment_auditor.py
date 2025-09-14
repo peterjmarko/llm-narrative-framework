@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_experiment_auditor.py
+# Filename: tests/experiment_lifecycle/test_experiment_auditor.py
 
 """
 Unit Tests for the Experiment Auditor.
@@ -262,4 +262,4 @@ personalities_src = personalities_db.txt
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_experiment_auditor.py ===
+# === End of tests/experiment_lifecycle/test_experiment_auditor.py ===

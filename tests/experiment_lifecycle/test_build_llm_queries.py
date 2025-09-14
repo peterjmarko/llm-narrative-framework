@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_build_llm_queries.py
+# Filename: tests/experiment_lifecycle/test_build_llm_queries.py
 
 """
 Unit Tests for the LLM Query Builder (build_llm_queries.py).
@@ -266,4 +266,4 @@ class TestBuildLLMQueries(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_build_llm_queries.py ===
+# === End of tests/experiment_lifecycle/test_build_llm_queries.py ===

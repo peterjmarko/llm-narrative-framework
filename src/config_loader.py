@@ -237,11 +237,11 @@ def get_config_value(config: configparser.ConfigParser, section: str, key: str,
                                f"(cleaned: '{cleaned_value}') to float. Using fallback: {fallback}")
                 return fallback
         elif value_type == bool:
-            # configparser's getboolean is quite flexible (True/False, yes/no, 1/0, on/off)
-            try:
-                # Use the key that was actually found (`found_key`) for getboolean.
-                return config.getboolean(section, found_key)
-            except ValueError: # getboolean raises ValueError if not a valid boolean string
+            # Replicate getboolean's logic on the cleaned value to handle comments.
+            cleaned_lower = cleaned_value.lower()
+            if cleaned_lower in configparser.ConfigParser.BOOLEAN_STATES:
+                return configparser.ConfigParser.BOOLEAN_STATES[cleaned_lower]
+            else:
                 logger.warning(f"Config: Error converting [{section}]/{found_key} value '{raw_value}' "
                                f"to bool. Using fallback: {fallback}")
                 return fallback

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_process_llm_responses.py
+# Filename: tests/experiment_lifecycle/test_process_llm_responses.py
 
 """
 Unit Tests for the LLM Response Parser (process_llm_responses.py).
@@ -238,4 +238,4 @@ class TestProcessLLMResponses(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_process_llm_responses.py ===
+# === End of tests/experiment_lifecycle/test_process_llm_responses.py ===

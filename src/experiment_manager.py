@@ -60,16 +60,6 @@ try:
 except ImportError:
     def tqdm(iterable, *args, **kwargs): return iterable
 
-def _prompt_for_confirmation(prompt_text: str) -> bool:
-    """Prompts the user for a Y/N confirmation and loops until valid input is received."""
-    while True:
-        choice = input(prompt_text).strip().lower()
-        if choice == 'y':
-            return True
-        if choice == 'n':
-            return False
-        # If input is invalid, the loop continues, effectively re-prompting.
-
 def _format_header(message, total_width=80):
     """Formats a message into a symmetrical header line with ### bookends."""
     prefix = "###"
@@ -148,35 +138,6 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
             details.append("batch_run_log.csv UNREADABLE")
 
     return is_complete, details
-
-def _run_replication_worker(rep_num, orchestrator_script, target_dir, notes, quiet, bias_script):
-    """Worker function to execute one full replication using the orchestrator."""
-    try:
-        # Step 1: Run the main orchestrator for the replication
-        cmd_orch = [sys.executable, orchestrator_script, "--replication_num", str(rep_num), "--base_output_dir", target_dir]
-        if notes: cmd_orch.extend(["--notes", notes])
-        if quiet: cmd_orch.append("--quiet")
-        subprocess.run(cmd_orch, check=True, capture_output=True, text=True)
-        
-        # Step 2: Run bias analysis
-        # Find the newly created directory to pass to the bias script
-        run_dir_pattern = os.path.join(target_dir, f"run_*_rep-{rep_num:02d}_*")
-        run_dirs = glob.glob(run_dir_pattern)
-        if not run_dirs:
-            return rep_num, False, f"Could not find run directory for rep {rep_num} after orchestration."
-        
-        run_dir = run_dirs[0]
-        k_val = get_config_value(APP_CONFIG, 'Study', 'group_size', value_type=int, fallback_key='k_per_query', fallback=10)
-        cmd_bias = [sys.executable, bias_script, run_dir, "--k_value", str(k_val)]
-        if not quiet: cmd_bias.append("--verbose")
-        subprocess.run(cmd_bias, check=True, capture_output=True, text=True)
-        
-        return rep_num, True, None
-    except subprocess.CalledProcessError as e:
-        error_details = f"Replication {rep_num} worker failed.\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
-        return rep_num, False, error_details
-    except Exception as e:
-        return rep_num, False, f"An unexpected error occurred in replication worker {rep_num}: {e}"
 
 def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_script, colors, use_color=False):
     """Executes 'NEW' mode by calling the orchestrator for each replication."""
@@ -377,7 +338,7 @@ def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet, col
             # No further steps are needed here.
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
-            logging.error(f"Full replication repair failed for {os.path.basename(run_dir)}.")
+            logging.error(f"Full replication repair failed for {run_basename}.")
             if isinstance(e, KeyboardInterrupt): sys.exit(AUDIT_ABORTED_BY_USER)
             return False # Indicate failure
     return True

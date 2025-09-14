@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_upgrade_legacy_experiment.py
+# Filename: tests/experiment_lifecycle/test_upgrade_legacy_experiment.py
 
 """
 Unit Tests for the Legacy Experiment Upgrader.
@@ -116,4 +116,4 @@ class TestUpgradeLegacyExperiment(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_upgrade_legacy_experiment.py ===
+# === End of tests/experiment_lifecycle/test_upgrade_legacy_experiment.py ===

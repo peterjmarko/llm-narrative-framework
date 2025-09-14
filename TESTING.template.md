@@ -441,11 +441,12 @@ Module                                  Cov. (%)        Status & Justification
 **EXPERIMENT LIFECYCLE MANAGEMENT**
 **Primary Orchestrators**
 
-`src/experiment_manager.py`             `56%`           COMPLETE. Unit tests are complete, and the core `new`/`audit`/`fix`
-                                                        workflows have been successfully validated via the scripted
-                                                        end-to-end integration test.
+`src/experiment_manager.py`             `80%`           COMPLETE. Comprehensive unit tests validate the core state
+                                                        machine, all helper functions, argument parsing, and critical
+                                                        failure paths. The end-to-end `new`/`audit`/`fix` workflows are
+                                                        validated by the Layer 4 integration test.
 
-`src/experiment_auditor.py`             `71%`           COMPLETE. The unit test suite validates the auditor's
+`src/experiment_auditor.py`             `69%`           COMPLETE. The unit test suite validates the auditor's
                                                         ability to correctly identify all major experiment states
                                                         (New, Complete, Aggregation Needed, Reprocess Needed, Repair
                                                         Needed, and Migration Needed) by using a mocked file system
@@ -477,15 +478,19 @@ Module                                  Cov. (%)        Status & Justification
                                                         mapping strategies, edge cases (e.g., k=max), and key
                                                         failure modes like missing or insufficient input data.
 
-`src/llm_prompter.py`                   `53%`           COMPLETE. Unit tests cover the core logic for successful API
-                                                        calls, error conditions (HTTP, timeout), and file I/O failures.
+`src/llm_prompter.py`                   `81%`           COMPLETE. Comprehensive unit tests validate the core API call
+                                                        logic, all major failure modes (HTTP errors, timeouts,
+                                                        malformed JSON, `KeyboardInterrupt`), file I/O contracts,
+                                                        standalone interactive mode, and the internal testing hooks.
 `src/process_llm_responses.py`          `67%`           COMPLETE. Unit tests cover the core parsing logic, including
                                                         markdown, fallback, flexible spacing, reordered columns, and
                                                         key failure modes.
 
-`src/analyze_llm_performance.py`        `63%`           COMPLETE. Unit tests cover the main orchestrator, all core
-                                                        statistical calculations (including edge cases), and the robust
-                                                        parsing of complex file formats (e.g., Markdown).
+`src/analyze_llm_performance.py`        `78%`           COMPLETE. Comprehensive unit tests validate the main
+                                                        orchestrator's control flow and early-exit conditions, all
+                                                        core statistical calculations (including `IndexError` and
+                                                        `ValueError` handling), meta-analysis functions for combining
+                                                        p-values, and the robust parsing of all input file formats.
 
 `src/run_bias_analysis.py`              `86%`           COMPLETE. Unit tests cover the main orchestrator workflow,
                                                         core bias calculations, and robust handling of empty or
@@ -501,11 +506,11 @@ Module                                  Cov. (%)        Status & Justification
 
 **Study-Level & Analysis**
 
-`src/compile_study_results.py`          `76%`           COMPLETE. Unit tests cover the recursive aggregation
+`src/compile_study_results.py`          `70%`           COMPLETE. Unit tests cover the recursive aggregation
                                                         workflow and robustly handle edge cases like empty or missing
                                                         experiment files.
 
-`src/analyze_study_results.py`          `66%`           COMPLETE. The unit test suite fully validates the script's
+`src/analyze_study_results.py`          `62%`           COMPLETE. The unit test suite fully validates the script's
                                                         core logic, including data filtering, control flow for different
                                                         analysis scenarios (e.g., zero variance), and graceful
                                                         shutdowns. Key statistical and plotting functions are mocked
@@ -524,10 +529,12 @@ Module                                  Cov. (%)        Status & Justification
                                                         script exits gracefully if the target directory or report
                                                         files are missing.
 
-`src/config_loader.py`                  `51%`           COMPLETE. Unit tests cover the core `get_config_value`
-                                                        helper, including successful parsing, type conversions,
-                                                        fallbacks, and robust error handling for missing sections or
-                                                        keys.
+`src/config_loader.py`                  `86%`           COMPLETE. Comprehensive unit tests validate all aspects of
+                                                        value retrieval, including type conversions (int, float, bool,
+                                                        str), fallbacks, `fallback_key` handling, inline comment
+                                                        stripping, list parsing, section-to-dict conversion, and
+                                                        sandbox path resolution. Error logging for invalid types is
+                                                        also covered.
 
 **PowerShell Wrappers (Experiments)**
 

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_compile_replication_results.py
+# Filename: tests/experiment_lifecycle/test_compile_replication_results.py
 
 """
 Unit Tests for the Replication Results Compiler.
@@ -171,4 +171,4 @@ class TestCompileReplicationResults(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_compile_replication_results.py ===
+# === End of tests/experiment_lifecycle/test_compile_replication_results.py ===

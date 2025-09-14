@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_run_bias_analysis.py
+# Filename: tests/experiment_lifecycle/test_run_bias_analysis.py
 
 """
 Unit Tests for the Diagnostic Bias Analyzer (run_bias_analysis.py).
@@ -208,4 +208,4 @@ class TestRunBiasAnalysis(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_run_bias_analysis.py ===
+# === End of tests/experiment_lifecycle/test_run_bias_analysis.py ===

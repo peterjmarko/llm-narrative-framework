@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/migrate_experiment.Tests.ps1
+# Filename: tests/experiment_lifecycle/migrate_experiment.Tests.ps1
 
 . (Join-Path $PSScriptRoot "Test-Harness.ps1")
 
@@ -126,4 +126,4 @@ Run-Test "Failure from python script is propagated" {
 Finalize-Test-Run
 Remove-Item -Path $tempDir -Recurse -Force
 
-# === End of tests/migrate_experiment.Tests.ps1 ===
+# === End of tests/experiment_lifecycle/migrate_experiment.Tests.ps1 ===

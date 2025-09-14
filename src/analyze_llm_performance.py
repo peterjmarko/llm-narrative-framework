@@ -661,7 +661,13 @@ def main():
         read_mappings_and_deduce_k(mappings_filepath_abs, args.k_value, actual_delimiter_for_parsing)
 
     # Gracefully handle the case of zero valid responses
-    if not mappings_list:
+    if mappings_list is None:
+        # Check for logical consistency: if no mappings but num_valid_responses > 0, that's an error
+        if args.num_valid_responses is not None and args.num_valid_responses > 0:
+            logging.error(f"Inconsistent state: num_valid_responses is {args.num_valid_responses} but no mappings found. This indicates a pipeline error.")
+            sys.exit(1) # Exit with error code 1
+            return     # Crucial: Eject from function to prevent falling through to sys.exit(0)
+        
         logging.warning("No valid mappings found. This indicates zero valid LLM responses. Generating a null report.")
         
         summary_data = {
@@ -692,9 +698,9 @@ def main():
 
     # --- Main processing logic now starts, confident that mappings_list is valid ---
     if k_val_from_map_func is None:
-        print("Critical Error: Mappings list is not empty, but could not determine k. Halting.")
+        logging.error("Critical Error: Mappings list is not empty, but could not determine k. Halting.")
         sys.exit(1)
-        return # Eject from function for testability
+        return
     
     k_to_use = k_val_from_map_func 
     delimiter_for_scores = delimiter_determined_for_map
@@ -705,10 +711,23 @@ def main():
     
     score_matrices = read_score_matrices(scores_filepath_abs, k_to_use, delimiter_for_scores)
 
-    if score_matrices is None: print("Halting due to issues reading score matrices."); sys.exit(1)
-    if not mappings_list: print(f"No valid mappings loaded for k={k_to_use} from {mappings_filepath_abs}. Cannot proceed."); sys.exit(1)
-    if not score_matrices: print(f"No valid score matrices loaded for k={k_to_use} from {scores_filepath_abs}. Cannot proceed."); sys.exit(1)
-    if len(score_matrices) != len(mappings_list): print(f"Error: Number of score matrices ({len(score_matrices)}) does not match mappings ({len(mappings_list)})."); sys.exit(1)
+    # Reorder checks to handle None from score_matrices or empty lists gracefully
+    if score_matrices is None:
+        logging.error("Halting due to issues reading score matrices.")
+        sys.exit(1)
+        return
+    if not mappings_list: # This check should already have passed the main null block
+        logging.error(f"No valid mappings loaded for k={k_to_use} from {mappings_filepath_abs}. Cannot proceed.")
+        sys.exit(1)
+        return
+    if not score_matrices: # This catches empty list, after None is handled
+        logging.error(f"No valid score matrices loaded for k={k_to_use} from {scores_filepath_abs}. Cannot proceed.")
+        sys.exit(1)
+        return
+    if len(score_matrices) != len(mappings_list):
+        logging.error(f"Error: Number of score matrices ({len(score_matrices)}) does not match mappings ({len(mappings_list)}).")
+        sys.exit(1)
+        return
 
     # --- FINAL VALIDATION STEP ---
 

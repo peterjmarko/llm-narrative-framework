@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_manage_experiment_log.py
+# Filename: tests/experiment_lifecycle/test_manage_experiment_log.py
 
 """
 Unit Tests for the Experiment Log Manager.
@@ -178,4 +178,4 @@ Totals,2025-01-01 12:00:00,2025-01-01 12:05:00,00:05:00,1,0
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_manage_experiment_log.py ===
+# === End of tests/experiment_lifecycle/test_manage_experiment_log.py ===

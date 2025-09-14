@@ -17,14 +17,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_orchestrate_replication.py
+# Filename: tests/experiment_lifecycle/test_replication_manager.py
 
 """
-Unit Tests for the Single Replication Orchestrator.
+Unit Tests for the Single Replication Manager.
 
-This script validates the control flow and logic of `orchestrate_replication.py`.
-It uses mocking to isolate the orchestrator from its subprocess dependencies
-(e.g., `build_llm_queries.py`, `run_llm_sessions.py`) and the file system.
+This script validates the control flow and logic of `replication_manager.py`.
+It uses mocking to isolate the manager from its subprocess dependencies
+(e.g., `build_llm_queries.py`, `llm_prompter.py`) and the file system.
 
 Test Strategy:
 -   **Isolation**: Each test runs in a temporary directory.
@@ -58,10 +58,10 @@ if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
 # Import the module under test
-from src import orchestrate_replication
+from src import replication_manager
 
-class TestOrchestrateReplication(unittest.TestCase):
-    """Test suite for orchestrate_replication.py."""
+class TestReplicationManager(unittest.TestCase):
+    """Test suite for replication_manager.py."""
 
     def setUp(self):
         """Set up a temporary project structure and mock configuration for each test."""
@@ -82,12 +82,12 @@ class TestOrchestrateReplication(unittest.TestCase):
                 return []
             if "session_queries" in pattern:
                 return [
-                    str(Path(pattern).parent / 'q_001.txt'),
-                    str(Path(pattern).parent / 'q_002.txt'),
-                    str(Path(pattern).parent / 'q_003.txt')
+                    str(Path(pattern).parent / 'llm_query_001.txt'),
+                    str(Path(pattern).parent / 'llm_query_002.txt'),
+                    str(Path(pattern).parent / 'llm_query_003.txt')
                 ]
             return []
-        self.glob_patcher = patch('orchestrate_replication.glob.glob', side_effect=glob_side_effect)
+        self.glob_patcher = patch('replication_manager.glob.glob', side_effect=glob_side_effect)
         self.mock_glob = self.glob_patcher.start()
 
         self.mock_config = configparser.ConfigParser()
@@ -101,10 +101,10 @@ class TestOrchestrateReplication(unittest.TestCase):
         self.config_loader_patcher = patch.dict('sys.modules', {'config_loader': self._create_mock_config_loader()})
         self.mock_config_loader = self.config_loader_patcher.start()
 
-        self.subprocess_patcher = patch('orchestrate_replication.subprocess.run')
+        self.subprocess_patcher = patch('replication_manager.subprocess.run')
         self.mock_subprocess = self.subprocess_patcher.start()
         
-        self.shutil_patcher = patch('orchestrate_replication.shutil.copy2')
+        self.shutil_patcher = patch('replication_manager.shutil.copy2')
         self.mock_shutil = self.shutil_patcher.start()
 
     def tearDown(self):
@@ -150,17 +150,17 @@ class TestOrchestrateReplication(unittest.TestCase):
             
         return success_obj
 
-    @patch('orchestrate_replication.datetime.datetime')
+    @patch('replication_manager.datetime.datetime')
     def test_generate_run_dir_name(self, mock_datetime_cls):
         """Verify the run directory name is generated correctly."""
         mock_datetime_cls.now.return_value = datetime(2025, 1, 1, 12, 0, 0)
         
-        name = orchestrate_replication.generate_run_dir_name(
+        name = replication_manager.generate_run_dir_name(
             'google/test-model', 0.75, 100, 10, 'test_db.txt', 1, 30, 'random'
         )
         self.assertEqual(name, 'run_20250101_120000_rep-001_test-model_tmp-0.75_test_db_sbj-10_trl-100_rps-030_mps-random')
 
-    @patch('orchestrate_replication.ThreadPoolExecutor')
+    @patch('replication_manager.ThreadPoolExecutor')
     def test_happy_path_new_run(self, mock_executor):
         """Test a full, successful execution of a new replication."""
         self.mock_subprocess.side_effect = self._mock_subprocess_side_effect
@@ -169,7 +169,7 @@ class TestOrchestrateReplication(unittest.TestCase):
             lambda fn, index: MagicMock(result=lambda: fn(index))
         
         with patch.object(sys, 'argv', ['script.py', '--base_output_dir', str(self.output_dir), '--replication_num', '1']):
-            orchestrate_replication.main()
+            replication_manager.main()
 
         # 6 stages + 3 worker calls to llm_prompter
         self.assertEqual(self.mock_subprocess.call_count, 9)
@@ -178,7 +178,7 @@ class TestOrchestrateReplication(unittest.TestCase):
         report_file = next(run_dir_actual.glob('replication_report_*.txt'))
         self.assertIn('Final Status:           COMPLETED', report_file.read_text())
 
-    @patch('orchestrate_replication.ThreadPoolExecutor')
+    @patch('replication_manager.ThreadPoolExecutor')
     def test_reprocess_path(self, mock_executor):
         """Test a successful run in reprocess mode."""
         self.mock_subprocess.side_effect = self._mock_subprocess_side_effect
@@ -192,9 +192,9 @@ class TestOrchestrateReplication(unittest.TestCase):
             f.write("[Filenames]\napi_times_log=api.log\n")
 
         with patch.object(sys, 'argv', ['script.py', '--reprocess', '--run_output_dir', str(run_dir)]):
-            orchestrate_replication.main()
+            replication_manager.main()
 
-        # 6 stages (process, analyze, bias, report, summarize) + 3 worker calls
+        # Reprocess: build is skipped (1), workers are called (3), 5 stages run (5) = 8
         self.assertEqual(self.mock_subprocess.call_count, 8)
         report_file = next(run_dir.glob('replication_report_*.txt'))
         self.assertIn('Final Status:           COMPLETED', report_file.read_text())
@@ -218,7 +218,7 @@ class TestOrchestrateReplication(unittest.TestCase):
         self.mock_subprocess.side_effect = failure_side_effect
 
         with patch.object(sys, 'argv', ['script.py', '--base_output_dir', str(self.output_dir)]):
-            orchestrate_replication.main()
+            replication_manager.main()
 
         self.assertEqual(self.mock_subprocess.call_count, 2)
         mock_exit.assert_called_with(1)
@@ -231,4 +231,4 @@ class TestOrchestrateReplication(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_orchestrate_replication.py ===
+# === End of tests/experiment_lifecycle/test_replication_manager.py ===

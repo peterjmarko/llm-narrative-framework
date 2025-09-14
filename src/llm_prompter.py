@@ -382,16 +382,16 @@ def main():
             with open(output_error_file_abs, 'w', encoding='utf-8') as f_err: f_err.write("Query file was empty.")
             sys.exit(1)
 
-        raw_llm_response_json = None
+        api_result = None
         # ---- MOCKING BLOCK FOR TESTING: Simulates `call_openrouter_api` outcomes ----
         if args.test_mock_api_outcome:
             logging.warning(f"!!! RUNNING IN API MOCK MODE: {args.test_mock_api_outcome} FOR QUERY {args.query_identifier} !!!")
             logging.info(f"  MOCK API: Outcome for query {args.query_identifier} set to '{args.test_mock_api_outcome}'.")
             
             if args.test_mock_api_outcome == 'success':
-                raw_llm_response_json = {"choices": [{"message": {"content": args.test_mock_api_content}}]}
+                api_result = {"choices": [{"message": {"content": args.test_mock_api_content}}]}
             elif args.test_mock_api_outcome == 'api_returns_none':
-                raw_llm_response_json = None # This will trigger the generic "None" failure path below
+                api_result = None # This will trigger the generic "None" failure path below
             # For simulating exceptions, we raise them here so the main `except` blocks can catch them
             elif args.test_mock_api_outcome == 'api_timeout':
                 raise requests.exceptions.Timeout("Simulated timeout via --test_mock_api_outcome")

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/test_generate_replication_report.py
+# Filename: tests/experiment_lifecycle/test_generate_replication_report.py
 
 """
 Unit Tests for the Replication Report Generator.
@@ -159,4 +159,4 @@ class TestGenerateReplicationReport(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-# === End of tests/test_generate_replication_report.py ===
+# === End of tests/experiment_lifecycle/test_generate_replication_report.py ===

@@ -88,7 +88,8 @@ mig-stu = "pwsh -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 # ==============================================================================
 # --- Python Unit Tests ---
 test-py-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
-test-py-exp = {cmd = "pytest tests/experiment_pipeline/", help = "Run all experiment pipeline unit tests."}
+test-py-exp = {cmd = "pytest tests/experiment_lifecycle/", help = "Run all experiment lifecycle unit tests."}
+cov-exp = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/experiment_lifecycle/ && coverage report --skip-covered", help = "Run experiment lifecycle tests with a focused coverage report."}
 test-assembly = {cmd = "pytest tests/algorithm_validation/test_profile_generation_algorithm.py", help = "Run the core assembly algorithm integration test."}
 
 # --- Integration Tests (All Layers) ---
@@ -102,17 +103,17 @@ test-l5 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer5/run_la
 
 # --- PowerShell Pester Tests (By Suite) ---
 # Experiment Lifecycle
-test-ps-new-exp = "pwsh ./tests/experiment_pipeline/new_experiment.Tests.ps1"
-test-ps-audit-exp = "pwsh ./tests/experiment_pipeline/audit_experiment.Tests.ps1"
-test-ps-fix-exp = "pwsh ./tests/experiment_pipeline/fix_experiment.Tests.ps1"
-test-ps-migr-exp = "pwsh ./tests/experiment_pipeline/migrate_experiment.Tests.ps1"
+test-ps-new-exp = "pwsh ./tests/experiment_lifecycle/new_experiment.Tests.ps1"
+test-ps-audit-exp = "pwsh ./tests/experiment_lifecycle/audit_experiment.Tests.ps1"
+test-ps-fix-exp = "pwsh ./tests/experiment_lifecycle/fix_experiment.Tests.ps1"
+test-ps-migr-exp = "pwsh ./tests/experiment_lifecycle/migrate_experiment.Tests.ps1"
 test-ps-exp = {composite = ["test-ps-new-exp", "test-ps-audit-exp", "test-ps-fix-exp", "test-ps-migr-exp"], help = "Run all PowerShell tests for the experiment lifecycle."}
 # Study Lifecycle
-test-ps-comp-study = "pwsh ./tests/compile_study.Tests.ps1"
-test-ps-new-study = "pwsh ./tests/new_study.Tests.ps1"
-test-ps-audit-study = "pwsh ./tests/audit_study.Tests.ps1"
-test-ps-fix-study = "pwsh ./tests/fix_study.Tests.ps1"
-test-ps-migr-study = "pwsh ./tests/migrate_study.Tests.ps1"
+test-ps-comp-study = "pwsh ./tests/experiment_lifecycle/compile_study.Tests.ps1"
+test-ps-new-study = "pwsh ./tests/experiment_lifecycle/new_study.Tests.ps1"
+test-ps-audit-study = "pwsh ./tests/experiment_lifecycle/audit_study.Tests.ps1"
+test-ps-fix-study = "pwsh ./tests/experiment_lifecycle/fix_study.Tests.ps1"
+test-ps-migr-study = "pwsh ./tests/experiment_lifecycle/migrate_study.Tests.ps1"
 # Composite Runners
 test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
 test-exp-all = {composite = ["test-py-exp", "test-ps-exp"], help = "Run all Python and PowerShell tests for the experiment lifecycle."}
@@ -126,6 +127,17 @@ version_files = [
 tag_format = "v$version"
 changelog_file = "CHANGELOG.md"
 changelog_format = "keep_a_changelog"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
 
 [dependency-groups]
 dev = [
