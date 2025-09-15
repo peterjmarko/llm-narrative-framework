@@ -1,5 +1,24 @@
 # Changelog
 
+## 9.6.0 (2025-09-14)
+
+### Bump
+
+- **version 9.5.2 → 9.6.0**
+
+### Features
+
+- **complete unit tests for core utils and improve workflow**
+  This commit strengthens the project's foundation by adding comprehensive unit tests for two critical utility modules and significantly improving the developer workflow for testing and coverage analysis.
+  
+  Key improvements include:
+  
+  - Added a complete test suite for `src/utils/file_utils.py`, achieving 100% coverage and validating its core backup/removal logic.
+  - Implemented a test suite for `src/id_encoder.py`, ensuring its Base58 encoding/decoding functions are correct and symmetrical with 100% coverage.
+  - Introduced a streamlined `test-cov-report` PDM script that runs a targeted test and generates a focused coverage report in a single command.
+  - Fixed a persistent pathing issue that prevented the `coverage` tool from discovering files in subdirectories, enabling accurate project-wide coverage metrics.
+  - Updated `TESTING.md` and `ROADMAP.md` to reflect the new testing capabilities and completed work.
+
 ## 9.5.2 (2025-09-14)
 
 ### Bump
