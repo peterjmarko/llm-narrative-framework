@@ -43,9 +43,10 @@ pythonpath = ["src"]
 # ==============================================================================
 # This is the main entry point for all tests (Python and PowerShell).
 test = {cmd = "python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
-cov = {shell = "coverage erase && coverage run -m pytest -p no:cov && coverage report", help="Run all tests with coverage analysis."}
-cov-file = {shell = "coverage erase && coverage run -m pytest -p no:cov {args} && coverage report", help="Run coverage for a specific test file by its full path."}
-cov-html = {shell = "coverage erase && coverage run -m pytest -p no:cov && coverage html", help="Run all tests and generate an HTML coverage report."}
+cov = {shell = "pytest --cov=src --cov-report=term-missing", help = "Run all tests with coverage analysis."}
+test-cov = {shell = "pytest --cov=src --cov-report= {args}", help = "Run tests for a specific file to update .coverage data."}
+report-cov = {shell = "coverage report -m --no-skip-covered {args}", help = "Generate a focused coverage report for specific source file(s)."}
+cov-html = {shell = "pytest --cov=src --cov-report=html", help = "Run all tests and generate an HTML coverage report."}
 
 # ==============================================================================
 # === MAINTENANCE, LINTING & REPORTING ===
@@ -88,9 +89,10 @@ mig-stu = "pwsh -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 # ==============================================================================
 # --- Python Unit Tests ---
 test-py-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
-test-py-exp = {cmd = "pytest tests/experiment_lifecycle/", help = "Run all experiment lifecycle unit tests."}
-cov-exp = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/experiment_lifecycle/ && coverage report --skip-covered", help = "Run experiment lifecycle tests with a focused coverage report."}
+test-py-exp-lc = {cmd = "pytest tests/experiment_lifecycle/", help = "Run all experiment lifecycle unit tests."}
+cov-exp-lc = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/experiment_lifecycle/ && coverage report --skip-covered", help = "Run experiment lifecycle tests with a focused coverage report."}
 test-assembly = {cmd = "pytest tests/algorithm_validation/test_profile_generation_algorithm.py", help = "Run the core assembly algorithm integration test."}
+test-cov-report = {cmd = "pwsh -File ./scripts/testing/run_targeted_coverage.ps1 {args}", help = "Run a test file and generate a focused coverage report for its corresponding source file."}
 
 # --- Integration Tests (All Layers) ---
 test-l2 = "pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"
@@ -134,6 +136,7 @@ omit = ["*/__init__.py"]
 
 [tool.coverage.report]
 show_missing = true
+skip_covered = false
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",

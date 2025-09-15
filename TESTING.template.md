@@ -108,10 +108,10 @@ For developing or modifying any individual script, we follow a robust `Modify ->
 Make the necessary code changes to the target Python script (e.g., `src/generate_eminence_scores.py` or `src/analyze_llm_performance.py`).
 
 **Stage 2: Unit Test (Layer 1)**
-After modifying the code, run the script's dedicated unit test suite to verify its internal logic and catch any regressions.
+After modifying the code, run the script's dedicated unit test suite to verify its internal logic and get a focused coverage report.
 ```powershell
-# Run coverage for the specific test file
-pdm run cov-file tests/data_preparation/test_generate_eminence_scores.py
+# Run the test and generate a focused coverage report
+pdm run test-cov-report tests/data_preparation/test_generate_eminence_scores.py
 ```
 If the unit tests fail, fix the script before proceeding to the next stage.
 
@@ -149,6 +149,7 @@ The project includes a suite of PDM scripts for running tests, defined in `pypro
 | :--- | :--- |
 | **`pdm run test`** | **Primary Entry Point:** Runs all Python and PowerShell tests. |
 | `pdm run cov` | Runs all tests with a console coverage report. |
+| `pdm run test-cov-report` | Runs a specific test file and generates a focused coverage report for its source file. |
 | `pdm run test-l3-default` | Runs the **Layer 3** Integration test for the data pipeline (default profile). |
 | `pdm run test-l3-bypass` | Runs the Layer 3 test with `bypass_candidate_selection` enabled. |
 | `pdm run test-l3-interactive` | Runs the Layer 3 test in interactive "guided tour" mode. |
@@ -555,6 +556,10 @@ Module                                  Cov. (%)        Status & Justification
                                                         stripping, list parsing, section-to-dict conversion, and
                                                         sandbox path resolution. Error logging for invalid types is
                                                         also covered.
+
+**`src/id_encoder.py`**                     `100%`          COMPLETE. Target met. The test suite validates both encoding and decoding functions with known values, invalid inputs, and a round-trip conversion check to ensure perfect symmetry.
+
+**`src/utils/file_utils.py`**               `100%`          COMPLETE. Target met. The test suite validates the `backup_and_remove` function for files, directories, and non-existent paths, ensuring it correctly logs output and handles exceptions gracefully.
 
 **PowerShell Wrappers (Experiments)**
 

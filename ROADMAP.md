@@ -19,24 +19,14 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Complete Test Coverage for Existing Framework**
   - [ ] Implement Layer 6 Test Harness (Post-Hoc Study Evaluation) to validate the `compile_study.ps1` workflow.
   - [ ] Implement Layer 7 Test Harness (New Study Lifecycle) to validate the `new_study.ps1`, `audit_study.ps1`, and `fix_study.ps1` workflows.
+  - [ ] Add an `-Interactive` flag to the Layer 7 test workflow to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` study lifecycle, similar to the existing tour for the data pipeline and the Layer 4 experiment lifecycle.
   - [ ] **Increase Coverage for Existing Test Suites:**
     - **Critical Modules (Target: 90%+)**
-      - [x] `src/experiment_manager.py` (From 80% -> 95%)
-        - **Note:** Achieved by adding comprehensive tests for the main state-machine loop, argument parsing, all failure modes, and other logic branches.
-      - [x] `src/generate_personalities_db.py` (From 87% -> 90%)
-        - **Note:** Achieved by adding tests for missing inputs, malformed data files, out-of-bounds parameters, and user confirmation prompts, meeting the 90%+ target for this critical module.
-      - [x] `src/replication_manager.py` (From 77% -> 95%)
-        - **Note:** This was achieved by refactoring the code for testability (extracting the `session_worker`) and replacing complex, brittle mocks with a simple, direct patching strategy. This pattern should be applied to other orchestrators.
+      - [x] Completed.
     - **Standard Modules (Target: 80%+)**
       - [ ] `src/analyze_llm_performance.py` (Current: 78%)
-      - [x] `src/analyze_study_results.py` (From 62% -> 82%)
-        - **Note:** Achieved the 80%+ target by fixing bugs in the script's logging and post-hoc logic, and by implementing a robust test suite that covers data filtering, error handling, and all major analysis code paths.
-      - [x] `src/build_llm_queries.py` (From 68% -> 84%)
-        - **Note:** Achieved the 80%+ target by adding comprehensive tests for helper functions and all major orchestration paths, including continued runs, insufficient data handling, and worker script failures.
       - [ ] `src/compile_experiment_results.py` (Current: 74%)
       - [ ] `src/compile_replication_results.py` (Current: 78%)
-      - [x] `src/compile_study_results.py` (From 70% -> 87%)
-        - **Note:** Achieved the 80%+ target by adding a dedicated test class for the `write_summary_csv` helper function and expanding the main test suite to cover all error conditions and alternate code paths.
       - [ ] `src/create_subject_db.py` (Current: 76%)
       - [ ] `src/find_wikipedia_links.py` (Current: 77%)
       - [ ] `src/generate_eminence_scores.py` (Current: 75%)
@@ -46,9 +36,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
       - [ ] `src/query_generator.py` (Current: 74%)
       - [ ] `src/upgrade_legacy_experiment.py` (Current: 75%)
   - [ ] **Create New Test Suites for Untested Scripts:**
-    - [ ] `src/id_encoder.py`
     - [ ] `src/utils/analyze_research_patterns.py`
-    - [ ] `src/utils/file_utils.py`
     - [ ] `src/utils/patch_eminence_scores.py`
     - [ ] `src/utils/validate_country_codes.py`
     - [ ] `scripts/analysis/analyze_cutoff_parameters.py`
