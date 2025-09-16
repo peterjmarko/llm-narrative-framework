@@ -1,5 +1,22 @@
 # Changelog
 
+## 9.6.2 (2025-09-16)
+
+### Bump
+
+- **version 9.6.1 → 9.6.2**
+
+### Refactor
+
+- **Consolidate and overhaul project documentation**
+  This commit implements a major refactoring of the project's documentation to improve its organization, clarity, and maintainability.
+  
+  -   **Consolidated Core Guides:** Moved all primary documentation guides (`ROADMAP.md`, `TESTING.md`, etc.) into the `docs/` directory to create a single source of truth for project knowledge.
+  -   **Improved Naming Conventions:** Renamed `README_LIFECYCLE.md` to `LIFECYCLE_GUIDE.md` and `README_DATA.md` to `DATA_DICTIONARY.md` for better clarity and professionalism.
+  -   **Updated All Cross-References:** Updated all links and references in the `README`, `.gitignore`, and the `build_docs.py` script to reflect the new, consolidated file structure.
+  -   **Added Troubleshooting Guides:** Added new "Troubleshooting" sections to both the Developer's Guide (`CONTRIBUTING.md`) and the Replication Guide (`article_supplementary_material.md`) to address common issues.
+  -   **Automated Directory Diagram:** The `view_directory_structure.txt` diagram is now fully automated by the `list_project_files.py` script, driven by a new, manually curated `diagram_comments.json` blueprint.
+
 ## 9.6.1 (2025-09-15)
 
 ### Bump
