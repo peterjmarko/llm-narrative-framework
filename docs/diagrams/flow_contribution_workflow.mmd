@@ -1,0 +1,11 @@
+graph TD
+    A(Start: Make Code Changes) --> B{Tests Pass?};
+    B -- No --> A;
+    B -- Yes --> C(Run Linters);
+    C --> D(Build Documentation);
+    D --> E(Stage Changes);
+    E --> F(Commit with Commitizen);
+    F --> G(End);
+
+    style A fill:#fff2cc,stroke:#d6b656
+    style F fill:#cde4ff,stroke:#333

@@ -20,34 +20,34 @@
 # Filename: scripts/maintenance/list_project_files.py
 
 """
-Generates a detailed text report of the project's file and directory structure.
+Generates reports of the project's file and directory structure.
 
-This utility creates a snapshot of the project's layout, providing a
-hierarchical tree view of all directories and files. The report is useful for
-documentation, project handovers, and gaining a quick overview of the codebase.
+This utility has two primary modes of operation:
 
-Key Features:
--   **Configurable Scan Depth**: Control the recursion depth of the file scan
-    via the `--depth` command-line argument.
--   **Git-Aware Filtering**: Use the `--git` flag to limit the report to only
-    files and directories tracked by the Git repository.
--   **Intelligent Exclusions**: Automatically excludes configured directories
-    (like `.venv`, `.git`) and file types using exact names and wildcard
-    patterns, producing a clean and relevant report.
--   **Dynamic Output Naming**: The output filename includes the scan depth and a
-    `_git` suffix when the Git filter is active.
--   **Automatic Backups**: Automatically backs up any existing report to
-    `output/backup/` with a timestamp before generating a new one.
+1.  **Structure Report Generation (Default Mode):**
+    Creates a detailed, hierarchical text report of all project files, useful
+    for documentation and gaining a quick overview of the codebase.
+    -   **Configurable Scan Depth**: Control the recursion depth via `--depth`.
+    -   **Git-Aware Filtering**: Use `--git` to report only on tracked files.
+    -   **Intelligent Exclusions**: Automatically excludes configured folders
+        (like `.venv`) and file types for a clean, relevant report.
+
+2.  **Documentation Diagram Generation (`--generate-diagram`):**
+    Automatically generates the stylized ASCII art diagram of the directory
+    structure used in the Framework Manual (`docs/diagrams/view_directory_structure.txt`).
+    This mode uses a separate, simplified set of exclusions and pulls
+    descriptive comments from an external JSON configuration file to ensure the
+    diagram is both accurate and informative.
 
 Usage:
-    # Scan the project root directory only (default depth=0)
+    # Generate a standard structure report (scans root directory only)
     pdm run list-files
 
-    # Scan the entire project recursively
-    pdm run list-files -- --depth -1
-
-    # Scan only files tracked by Git (recursively)
+    # Generate a recursive structure report for all tracked Git files
     pdm run list-files -- --git --depth -1
+
+    # Automatically update the directory structure diagram for the documentation
+    pdm run list-files --generate-diagram
 """
 
 # === Start of maintenance/list_project_files.py ===
@@ -67,6 +67,7 @@ from datetime import datetime
 import traceback # For detailed error logging if needed
 import argparse
 import fnmatch
+import json
 from tqdm import tqdm
 import time
 import subprocess
@@ -365,6 +366,84 @@ def generate_file_listing(outfile, current_path: pathlib.Path, project_root: pat
         elif item.is_file():
             outfile.write(f"{indent}{prefix_file}{item.name}\n")
 
+def generate_diagram_view(project_root):
+    """Generates the content for docs/diagrams/view_directory_structure.txt from a declarative config."""
+    print(f"\n{Colors.YELLOW}Generating stylized directory structure diagram...{Colors.RESET}")
+    
+    config_path = pathlib.Path(__file__).parent / "diagram_comments.json"
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    
+    diagram_paths = config.get("diagram_paths", [])
+    comments_data = config.get("comment_map", {})
+    
+    output_lines = [
+        "## Directory Structure\n",
+        "This logical hierarchy is reflected in the physical layout of the repository:\n",
+        project_root.name + "/"
+    ]
+
+    # This mapping will track if a parent branch is the last branch at its level
+    last_branch_map = {}
+    for i, path_str in enumerate(diagram_paths):
+        if path_str == "|": continue
+        parts = path_str.rstrip('/').split('/')
+        for d in range(len(parts)):
+            parent_path = "/".join(parts[:d+1])
+            is_last = True
+            for future_path in diagram_paths[i+1:]:
+                if future_path == "|": continue
+                if future_path.startswith(parent_path) and len(future_path.rstrip('/').split('/')) > len(parts):
+                    continue # It's a child, doesn't count
+                if "/".join(future_path.rstrip('/').split('/')[:d+1]) == parent_path:
+                    is_last = False
+                    break
+            last_branch_map[parent_path] = is_last
+
+    for i, path_str in enumerate(diagram_paths):
+        if path_str == "|":
+            is_last_separator = True
+            for future_path in diagram_paths[i+1:]:
+                 if future_path != "|":
+                     is_last_separator = False
+                     break
+            output_lines.append(" " if is_last_separator else "│")
+            continue
+
+        parts = path_str.rstrip('/').split('/')
+        depth = len(parts) - 1
+        
+        # Build the prefix based on whether parent branches were the last in their list
+        prefix_parts = []
+        for d in range(depth):
+            parent_path = "/".join(parts[:d+1])
+            prefix_parts.append("    " if last_branch_map.get(parent_path, False) else "│   ")
+        prefix = "".join(prefix_parts)
+
+        # Determine the connector for the current item
+        is_last_in_branch = last_branch_map.get(path_str.rstrip('/'), True)
+        connector = "└── " if is_last_in_branch else "├── "
+        
+        display_name = parts[-1]
+        if path_str.endswith('/'):
+            display_name += "/"
+
+        comment = comments_data.get(path_str, "")
+        
+        line = f"{prefix}{connector}{display_name}"
+        if comment:
+            line = f"{line.ljust(35)} # {comment}"
+        output_lines.append(line)
+
+    diagram_path = project_root / "docs" / "diagrams" / "view_directory_structure.txt"
+    with open(diagram_path, 'w', encoding='utf-8') as f:
+        f.write("\n".join(output_lines))
+    
+    line_count = len(output_lines)
+    print(f"  -> Generated {line_count} lines.")
+    print(f"{Colors.GREEN}SUCCESS: Diagram updated at {diagram_path.relative_to(project_root)}{Colors.RESET}\n")
+
+
 def main():
     try:
         parser = argparse.ArgumentParser(
@@ -388,12 +467,21 @@ def main():
             action="store_true",
             help="Only include files and directories tracked by Git."
         )
+        parser.add_argument(
+            "--generate-diagram",
+            action="store_true",
+            help="Generate the stylized directory structure diagram for the Framework Manual."
+        )
         args = parser.parse_args()
 
         if args.target_directory:
             project_root = pathlib.Path(args.target_directory).resolve()
         else:
             project_root = get_project_root()
+
+        if args.generate_diagram:
+            generate_diagram_view(project_root)
+            sys.exit(0)
 
         if not project_root.exists() or not project_root.is_dir():
             print(f"Error: Determined project directory not found or invalid: {project_root}")

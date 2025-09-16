@@ -52,17 +52,17 @@ This project is extensively documented to support different use cases. The resou
 
 -   **For Researchers (Replication):** The best place to start is the **[🔬 Replication Guide (docs/article_supplementary_material.md)](docs/article_supplementary_material.md)**. It provides a step-by-step walkthrough for reproducing the original study's findings.
 
--   **To Understand the Workflow:** For a high-level guide to the `Create -> Check -> Fix -> Compile` workflow, see the **[🚀 Lifecycle Guide (docs/README_LIFECYCLE.md)](docs/README_LIFECYCLE.md)**.
+-   **To Understand the Workflow:** For a high-level guide to the `Create -> Check -> Fix -> Compile` workflow, see the **[🚀 Lifecycle Guide (docs/LIFECYCLE_GUIDE.md)](docs/LIFECYCLE_GUIDE.md)**.
 
 -   **For a Deep Dive (Full Details):** To understand the system's architecture, run new experiments, or explore the complete methodology, see the **[📖 Framework Manual (docs/DOCUMENTATION.md)](docs/DOCUMENTATION.md)**.
 
--   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/README_DATA.md)](data/README_DATA.md)**.
+-   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/DATA_DICTIONARY.md)](data/DATA_DICTIONARY.md)**.
 
 -   **For Developers (Contributing):** To contribute to the project, please see the **[🤝 Developer's Guide (CONTRIBUTING.md)](CONTRIBUTING.md)** for development setup and contribution workflows.
 
--   **To Understand the Validation Strategy:** For a detailed overview of the project's multi-layered testing strategy and validation procedures, see the **[🧪 Testing Guide (TESTING.md)](TESTING.md)**.
+-   **To Understand the Validation Strategy:** For a detailed overview of the project's testing strategy, see the **[🧪 Testing Guide (docs/TESTING.md)](docs/TESTING.md)**.
 
--   **To see what's planned and track known issues**, view the **[🗺️ Project Roadmap (ROADMAP.md)](ROADMAP.md)**.
+-   **To see what's planned and track known issues**, view the **[🗺️ Project Roadmap (docs/ROADMAP.md)](docs/ROADMAP.md)**.
 
 ## 📦 Out of Scope for Publication
 

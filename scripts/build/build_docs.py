@@ -605,12 +605,13 @@ def main():
 
         docs_to_check = [
             ('README.template.md', 'README.md'),
-            ('data/README_DATA.template.md', 'data/README_DATA.md'),
+            ('data/DATA_DICTIONARY.template.md', 'data/DATA_DICTIONARY.md'),
             ('docs/DOCUMENTATION.template.md', 'docs/DOCUMENTATION.md'),
-            ('docs/README_LIFECYCLE.template.md', 'docs/README_LIFECYCLE.md'),
+            ('docs/LIFECYCLE_GUIDE.template.md', 'docs/LIFECYCLE_GUIDE.md'),
+            ('docs/ROADMAP.md', 'docs/ROADMAP.md'),
             ('docs/article_main_text.template.md', 'docs/article_main_text.md'),
             ('docs/article_supplementary_material.template.md', 'docs/article_supplementary_material.md'),
-            ('TESTING.template.md', 'TESTING.md')
+            ('docs/TESTING.template.md', 'docs/TESTING.md')
         ]
         
         # 1. Check diagrams from all templates
@@ -620,6 +621,11 @@ def main():
         # 2. Check content of final markdown files
         all_content_ok = True
         for template_rel_path, final_rel_path in docs_to_check:
+            # If the source and destination are the same, it's a simple MD file, not a template.
+            # Skip the content check for these files.
+            if template_rel_path == final_rel_path:
+                continue
+
             template_path = os.path.join(project_root, template_rel_path)
             final_path = os.path.join(project_root, final_rel_path)
             
@@ -660,12 +666,13 @@ def main():
     # Define which files have placeholders that might contain diagrams
     files_with_diagrams = [
         'README.template.md',
-        'data/README_DATA.template.md',
+        'data/DATA_DICTIONARY.template.md',
         'docs/DOCUMENTATION.template.md',
-        'docs/README_LIFECYCLE.template.md',
+        'docs/LIFECYCLE_GUIDE.template.md',
+        'docs/ROADMAP.md',
         'docs/article_main_text.template.md',
         'docs/article_supplementary_material.template.md',
-        'TESTING.template.md'
+        'docs/TESTING.template.md'
     ]
     if not render_all_diagrams(project_root, force_render=do_force_diagrams, template_files=files_with_diagrams):
         sys.exit(1)
@@ -736,46 +743,55 @@ def main():
         make_readonly(supp_final_path)
         print(f"    - {Colors.GREEN}Successfully built article_supplementary_material.md!{Colors.RESET}")
 
-    # --- 5. Build README_DATA.md ---
-    data_template_path = os.path.join(project_root, 'data/README_DATA.template.md')
-    data_final_path = os.path.join(project_root, 'data/README_DATA.md')
+    # --- 5. Build DATA_DICTIONARY.md ---
+    data_template_path = os.path.join(project_root, 'data/DATA_DICTIONARY.template.md')
+    data_final_path = os.path.join(project_root, 'data/DATA_DICTIONARY.md')
     if not do_force_documents and is_doc_up_to_date(project_root, data_final_path, data_template_path):
-         print(f"    - Skipping {Colors.CYAN}README_DATA.md{Colors.RESET} build (up-to-date).")
+         print(f"    - Skipping {Colors.CYAN}DATA_DICTIONARY.md{Colors.RESET} build (up-to-date).")
     else:
         viewer_content = build_doc_content(project_root, data_template_path, flavor='viewer')
-        header = generate_warning_header('data/README_DATA.md', '/data/README_DATA.template.md')
+        header = generate_warning_header('data/DATA_DICTIONARY.md', '/data/DATA_DICTIONARY.template.md')
         final_content = header + '\n' + viewer_content
 
         make_writable(data_final_path)
         with open(data_final_path, 'w', encoding='utf-8') as f:
             f.write(final_content)
         make_readonly(data_final_path)
-        print(f"    - {Colors.GREEN}Successfully built README_DATA.md!{Colors.RESET}")
+        print(f"    - {Colors.GREEN}Successfully built DATA_DICTIONARY.md!{Colors.RESET}")
 
-    # --- 6. Build README_LIFECYCLE.md ---
-    lifecycle_template_path = os.path.join(project_root, 'docs/README_LIFECYCLE.template.md')
-    lifecycle_final_path = os.path.join(project_root, 'docs/README_LIFECYCLE.md')
+    # --- 6. Build LIFECYCLE_GUIDE.md ---
+    lifecycle_template_path = os.path.join(project_root, 'docs/LIFECYCLE_GUIDE.template.md')
+    lifecycle_final_path = os.path.join(project_root, 'docs/LIFECYCLE_GUIDE.md')
     if not do_force_documents and is_doc_up_to_date(project_root, lifecycle_final_path, lifecycle_template_path):
-         print(f"    - Skipping {Colors.CYAN}README_LIFECYCLE.md{Colors.RESET} build (up-to-date).")
+         print(f"    - Skipping {Colors.CYAN}LIFECYCLE_GUIDE.md{Colors.RESET} build (up-to-date).")
     else:
         viewer_content = build_doc_content(project_root, lifecycle_template_path, flavor='viewer')
-        header = generate_warning_header('docs/README_LIFECYCLE.md', '/docs/README_LIFECYCLE.template.md')
+        header = generate_warning_header('docs/LIFECYCLE_GUIDE.md', '/docs/LIFECYCLE_GUIDE.template.md')
         final_content = header + '\n' + viewer_content
 
         make_writable(lifecycle_final_path)
         with open(lifecycle_final_path, 'w', encoding='utf-8') as f:
             f.write(final_content)
         make_readonly(lifecycle_final_path)
-        print(f"    - {Colors.GREEN}Successfully built README_LIFECYCLE.md!{Colors.RESET}")
+        print(f"    - {Colors.GREEN}Successfully built LIFECYCLE_GUIDE.md!{Colors.RESET}")
 
-    # --- 7. Build TESTING.md ---
-    test_template_path = os.path.join(project_root, 'TESTING.template.md')
-    test_final_path = os.path.join(project_root, 'TESTING.md')
+    # --- 7. Build ROADMAP.md ---
+    roadmap_template_path = os.path.join(project_root, 'docs/ROADMAP.md') # Note: Not a template, but needs to be in the build flow
+    roadmap_final_path = os.path.join(project_root, 'docs/ROADMAP.md')
+    if not do_force_documents and is_doc_up_to_date(project_root, roadmap_final_path, roadmap_template_path):
+         print(f"    - Skipping {Colors.CYAN}ROADMAP.md{Colors.RESET} build (up-to-date).")
+    else:
+        # Since ROADMAP.md is not a template, we just ensure it exists for the DOCX conversion
+        print(f"    - {Colors.GREEN}Verified ROADMAP.md exists for DOCX conversion.{Colors.RESET}")
+    
+    # --- 8. Build TESTING.md ---
+    test_template_path = os.path.join(project_root, 'docs', 'TESTING.template.md')
+    test_final_path = os.path.join(project_root, 'docs', 'TESTING.md')
     if not do_force_documents and is_doc_up_to_date(project_root, test_final_path, test_template_path):
          print(f"    - Skipping {Colors.CYAN}TESTING.md{Colors.RESET} build (up-to-date).")
     else:
         viewer_content = build_doc_content(project_root, test_template_path, flavor='viewer')
-        header = generate_warning_header('TESTING.md', '/TESTING.template.md')
+        header = generate_warning_header('docs/TESTING.md', '/docs/TESTING.template.md')
         final_content = header + '\n' + viewer_content
 
         make_writable(test_final_path)

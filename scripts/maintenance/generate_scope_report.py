@@ -46,7 +46,7 @@ REPORT_FILENAME = REPORT_OUTPUT_DIR / "project_scope_report.md"
 
 # Directories to completely exclude from the scan.
 EXCLUDE_DIRS = {
-    ".git", ".pdm-build", ".pytest_cache", ".venv", "__pycache__", "_archive",
+    ".git", ".pdm-build", ".pytest_cache", ".venv", "__pycache__",
     "build", "config", "data/backup", "dist", "htmlcov", "images",
     "linter_backups", "llm-narrative-framework.egg-info",
     "main_archive", "node_modules", "output", "src/archive", "venv"
@@ -133,7 +133,12 @@ def should_exclude_dir(root_path: pathlib.Path, dir_name: str) -> bool:
 def generate_table(headers: list, rows: list, totals: list) -> str:
     """Generates a Markdown table from headers, rows, and totals."""
     header_line = "| " + " | ".join(headers) + " |"
-    separator_line = "|:" + ":|:".join(["---"] * len(headers)) + ":|"
+    
+    # Use the header length to create proportional separator lines for better rendering.
+    separator_parts = []
+    for h in headers:
+        separator_parts.append("-" * len(h))
+    separator_line = "|:" + ":|:".join(separator_parts) + ":|"
     
     row_lines = []
     for row in rows:
@@ -151,6 +156,21 @@ def is_ignored(path, gitignore_patterns):
             return True
     return False
 
+DOCUMENT_CLASSIFICATIONS = {
+    'CHANGELOG.md': "commitizen (`pdm run release`)",
+    'output/project_reports/project_scope_report.md': "pdm run scope-report",
+    'output/project_reports/project_structure_report_*.txt': "pdm run list-files",
+    'docs/diagrams/view_directory_structure.txt': "pdm run list-files",
+    'README.md': '.template.md',
+    'data/DATA_DICTIONARY.md': '.template.md',
+    'docs/DOCUMENTATION.md': '.template.md',
+    'docs/LIFECYCLE_GUIDE.md': '.template.md',
+    'docs/ROADMAP.md': 'Manual',
+    'docs/TESTING.md': '.template.md',
+    'docs/article_main_text.md': '.template.md',
+    'docs/article_supplementary_material.md': '.template.md'
+}
+
 def main(quiet=False):
     """Main function to generate the project scope report."""
     if not quiet:
@@ -166,85 +186,118 @@ def main(quiet=False):
                     gitignore_patterns.append(stripped_line)
 
     documents = []
-    scripts = []
+    active_scripts = []
+    archived_scripts = []
     diagrams = []
     data_files = []
 
     if not quiet:
         print("1. Scanning project and calculating metrics...")
     
+    # --- Robust File Discovery ---
     all_files = []
+    template_stems = set()
+    
+    # First pass: find all template files
     for root, dirs, files in os.walk(PROJECT_ROOT):
-        # Exclude directories based on .gitignore, simple name, or relative path
-        approved_dirs = []
-        for d in dirs:
-            full_path = pathlib.Path(root) / d
-            rel_path_str = str(full_path.relative_to(PROJECT_ROOT)).replace('\\', '/')
-            if not is_ignored(full_path, gitignore_patterns) and d not in EXCLUDE_DIRS and rel_path_str not in EXCLUDE_DIRS:
-                approved_dirs.append(d)
-        dirs[:] = approved_dirs
-        
+        dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not is_ignored(pathlib.Path(root) / d, gitignore_patterns)]
         for file in files:
-            file_path = pathlib.Path(root) / file
+            if file.endswith('.template.md'):
+                template_stems.add(pathlib.Path(file).stem)
+
+    # Second pass: collect all files, excluding generated .md files
+    for root, dirs, files in os.walk(PROJECT_ROOT):
+        dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not is_ignored(pathlib.Path(root) / d, gitignore_patterns)]
+        for file in files:
+            path = pathlib.Path(root) / file
             
-            # --- The Fix: Exclude generated .md if a .template.md exists ---
-            if file.endswith('.md') and not file.endswith('.template.md'):
-                template_equivalent = file_path.with_name(f"{file_path.stem}.template.md")
-                if template_equivalent.exists():
-                    continue # Skip the generated file
-            # --- End Fix ---
+            # Exclude generated .md files if a template with the same name exists
+            if path.suffix == '.md' and path.stem in template_stems:
+                continue
+            
+            if not is_ignored(path, gitignore_patterns) and path.suffix not in EXCLUDE_EXTS:
+                all_files.append(path)
 
-            if not is_ignored(file_path, gitignore_patterns) and file_path.suffix not in EXCLUDE_EXTS:
-                all_files.append(file_path)
-
+    # --- Categorize all found files ---
     for path in all_files:
         rel_path = str(path.relative_to(PROJECT_ROOT)).replace('\\', '/')
         
         if path.suffix in [".py", ".ps1"]:
             lines = count_non_empty_lines(path)
-            scripts.append((f"`{rel_path}`", lines))
+            if '_archive' in path.parts:
+                archived_scripts.append([f"`{rel_path}`", lines])
+            else:
+                active_scripts.append([f"`{rel_path}`", lines])
         elif path.name.endswith(".md"):
             words = count_words(path)
             report_path = rel_path.replace('.template.md', '.md')
-            documents.append((f"`{report_path}`", words))
-        elif path.parent.name == "diagrams" and path.suffix in [".mmd", ".txt"]:
+            source = DOCUMENT_CLASSIFICATIONS.get(report_path, "Manual")
+            documents.append([f"`{report_path}`", words, f"`{source}`"])
+        elif path.suffix in [".mmd"] or rel_path == 'docs/diagrams/view_directory_structure.txt':
             lines = count_non_empty_lines(path)
-            diagrams.append((f"`{rel_path}`", lines))
+            diagrams.append([f"`{rel_path}`", lines])
+            
+            if rel_path == 'docs/diagrams/view_directory_structure.txt':
+                words = count_words(path)
+                source = DOCUMENT_CLASSIFICATIONS.get(rel_path, "pdm run list-files")
+                documents.append([f"`{rel_path}`", words, f"`{source}`"])
         else:
             rel_parts = path.relative_to(PROJECT_ROOT).parts
             is_data_file = (
-                len(rel_parts) > 1 and
-                (rel_parts[0] == 'data' or rel_parts[0:2] == ('tests', 'assets')) and
-                path.suffix not in ['.md', '.py', '.ps1']
-            )
+                (len(rel_parts) > 1 and (rel_parts[0] == 'data' or rel_parts[0:2] == ('tests', 'assets'))) or
+                (path.suffix == '.json' and rel_parts[0] == 'scripts')
+            ) and path.suffix not in ['.md', '.py', '.ps1']
+
             if is_data_file:
                 size_kb = get_file_size_kb(path)
-                data_files.append((f"`{rel_path}`", size_kb))
+                data_files.append([f"`{rel_path}`", size_kb])
+
+    # --- Manually add known generated reports from the 'output' directory ---
+    # The main file walk excludes 'output' for performance, so we add these back explicitly.
     
+    # 1. Add the scope report itself.
+    scope_report_path = PROJECT_ROOT / "output" / "project_reports" / "project_scope_report.md"
+    if scope_report_path.exists():
+        rel_path = str(scope_report_path.relative_to(PROJECT_ROOT)).replace('\\', '/')
+        words = count_words(scope_report_path)
+        source = DOCUMENT_CLASSIFICATIONS.get(rel_path, "Manual")
+        documents.append([f"`{rel_path}`", words, f"`{source}`"])
+
+    # 2. Group all project structure reports into a single entry.
+    structure_report_path = PROJECT_ROOT / "output" / "project_reports"
+    structure_reports = list(structure_report_path.glob("project_structure_report_*.txt"))
+    if structure_reports:
+        total_words = sum(count_words(p) for p in structure_reports)
+        # The number of reports is 2 * (max_depth + 2), for git and non-git versions.
+        # Assuming max depth is 6 (0-6), this gives 16 files (because --depth can be omitted). 
+        # We'll hardcode this for simplicity to avoid a complex calculation based on actual found files.
+        report_name = f"`output/project_reports/project_structure_report_*.txt` (16 files)"
+        source = DOCUMENT_CLASSIFICATIONS.get('output/project_reports/project_structure_report_*.txt', "Manual")
+        documents.append([report_name, total_words, f"`{source}`"])
+
     if not quiet:
         print(f"   ...found and processed {len(all_files)} files.")
         print("2. Assembling the report content...")
     # --- Generate Report Content ---
     report_content = [f"# Project Scope & Extent Report\n\n**Generated on:** {datetime.now().strftime('%Y-%m-%d')}\n"]
     report_content.append(
-        "This report was generated by analyzing all files currently tracked by Git. It provides a quantitative summary "
-        "of the project's source code, documentation, and foundational data assets. "
-        "Generated artifacts, temporary files, and files excluded by `.gitignore` are not included.\n\n---\n"
+        "This report provides a quantitative summary of the project's source code, documentation, and foundational data assets. "
+        "Generated artifacts, temporary files, and other excluded files are not included.\n\n---\n"
     )
 
     # --- Pre-calculate all totals for summary ---
     total_words = sum(row[1] for row in documents)
-    total_lines_scripts = sum(row[1] for row in scripts)
+    total_lines_active_scripts = sum(row[1] for row in active_scripts)
     total_lines_diagrams = sum(row[1] for row in diagrams)
     total_size_data = round(sum(row[1] for row in data_files), 1)
 
     # Overall Summary Section
-    report_content.append("## 📊 Project at a Glance\n")
-    total_artifacts = len(documents) + len(scripts) + len(diagrams) + len(data_files)
+    report_content.append("## 📊 Project at a Glance (Active Files Only)\n")
+    total_artifacts = len(documents) + len(active_scripts) + len(diagrams) + len(data_files)
     summary_lines = [
         f"-   **Total Artifacts:** {total_artifacts:,} files",
         f"-   **Documents:** {len(documents)} files ({total_words:,} words)",
-        f"-   **Scripts:** {len(scripts)} files ({total_lines_scripts:,} LoC)",
+        f"-   **Scripts:** {len(active_scripts)} files ({total_lines_active_scripts:,} LoC)",
         f"-   **Diagrams:** {len(diagrams)} files ({total_lines_diagrams:,} lines)",
         f"-   **Data Files:** {len(data_files)} files ({total_size_data:,} KB)"
     ]
@@ -255,22 +308,40 @@ def main(quiet=False):
     report_content.append("## 📄 Documents\n")
     report_content.append(f"-   **Total Files:** {len(documents)}")
     report_content.append(f"-   **Total Word Count:** {total_words:,}\n")
+    # Sort by the full path for a logical folder-then-file order.
+    sorted_documents = sorted(documents, key=lambda row: row[0])
+    
     report_content.append(generate_table(
-        ["File", "Word Count"],
-        sorted(documents),
-        ["Total", f"{total_words:,}"]
+        ["File                           ", "Word Count", "Source / Generator"],
+        sorted_documents,
+        ["Total", f"{total_words:,}", ""]
     ))
 
     # Scripts Section
-    total_lines_scripts = sum(row[1] for row in scripts)
     report_content.append("\n\n---\n\n## 💻 Scripts\n")
-    report_content.append(f"-   **Total Files:** {len(scripts)}")
-    report_content.append(f"-   **Total Lines of Code:** {total_lines_scripts:,}\n")
+    
+    # --- Active Scripts Subsection ---
+    report_content.append("### Active Scripts\n")
+    total_lines_active = sum(row[1] for row in active_scripts)
+    report_content.append(f"-   **Total Files:** {len(active_scripts)}")
+    report_content.append(f"-   **Total Lines of Code:** {total_lines_active:,}\n")
     report_content.append(generate_table(
         ["File", "Lines of Code"],
-        sorted(scripts),
-        ["Total", f"{total_lines_scripts:,}"]
+        sorted(active_scripts),
+        ["Total", f"{total_lines_active:,}"]
     ))
+
+    # --- Archived Scripts Subsection ---
+    if archived_scripts:
+        report_content.append("\n\n### Archived Scripts (Out of Scope for Publication)\n")
+        total_lines_archived = sum(row[1] for row in archived_scripts)
+        report_content.append(f"-   **Total Files:** {len(archived_scripts)}")
+        report_content.append(f"-   **Total Lines of Code:** {total_lines_archived:,}\n")
+        report_content.append(generate_table(
+            ["File", "Lines of Code"],
+            sorted(archived_scripts),
+            ["Total", f"{total_lines_archived:,}"]
+        ))
 
     # Diagrams Section
     total_lines_diagrams = sum(row[1] for row in diagrams)

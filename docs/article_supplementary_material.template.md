@@ -367,6 +367,17 @@ The script generates two key outputs in your study directory:
     *   `boxplots/`: Publication-quality plots visualizing the results.
     *   `diagnostics/`: Q-Q plots used for checking statistical assumptions.
 
+## Troubleshooting Common Issues
+
+This section provides solutions to the most common issues researchers may encounter when setting up the framework or running experiments.
+
+| Issue | Solution |
+| :--- | :--- |
+| **`pdm` command not found** | This usually means the Python scripts directory is not in your system's PATH. You can either add it, or use `python -m pdm` as a reliable alternative (e.g., `python -m pdm install -G dev`). |
+| **API Errors during an experiment run** | Network issues or API rate limits can cause individual LLM calls to fail. The framework is designed for this. Simply run the `fix_experiment.ps1` script on the experiment directory. It will automatically find and re-run only the failed API calls. |
+| **"Permission Denied" error when building DOCX files** | This error occurs if a `.docx` file is open in Microsoft Word while the `pdm run build-docs` script is running. Close the file in Word, and the script will automatically retry and continue. |
+| **`git` command not found** | The framework requires Git for versioning and reproducibility checks. Please install it from [git-scm.com](https://git-scm.com/downloads) and ensure it is available in your system's PATH. |
+
 ## Related Files
 
 *   `base_query.txt`

@@ -68,11 +68,12 @@ output/
 # Ignore generated final documentation and intermediate images.
 # The .template.md files are the source of truth and are tracked by Git.
 README.md
-TESTING.md
-data/README_DATA.md
+data/DATA_DICTIONARY.md
 docs/DOCUMENTATION.md
+docs/LIFECYCLE_GUIDE.md
+docs/ROADMAP.md
+docs/TESTING.md
 docs/article_supplementary_material.md
-docs/README_LIFECYCLE.md
 docs/images/
 docs/pdf_copies/
 docs/word_docs/

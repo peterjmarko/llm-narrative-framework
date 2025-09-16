@@ -314,9 +314,9 @@ The project's experiments are organized in a logical hierarchy:
 
 This logical hierarchy is reflected in the physical layout of the repository:
 
-{{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=90%}}
+{{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
 
-A `data/README.md` file provides detailed explanations for each file in the `data/` directory.
+A `data/DATA_DICTIONARY.md` file provides detailed explanations for each file in the `data/` directory.
 
 ## Setup and Installation
 
