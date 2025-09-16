@@ -1,59 +1,11 @@
 graph TD
-    %% --- Style Definitions ---
-    classDef start_end_node fill:#d4edda,stroke:#155724;
-    classDef decision_node fill:#e9d8fd,stroke:#9467bd,color:#333;
-    classDef case_node fill:#cfe2f3,stroke:#6c93c4,color:#333;
-    classDef instruction_node fill:#dbe9f5,stroke:#8cb3d9,color:#333;
-    classDef purpose_node fill:#f0f0f0,stroke:#9e9e9e,color:#333;
-
-    %% === Nodes for Decision Tree Workflow ===
-    start_node(["Start"]):::start_end_node;
-
-    subgraph "Choosing the Right Workflow: Separation of Concerns"
-        direction TB
-
-        main_decision{"What is your goal?"}:::decision_node
-
-        %% Branch 1: Create
-        case_1["**Create**<br/>I want to generate new data from scratch."]:::case_node
-        instruction_1["*Use: new_experiment.ps1*"]:::instruction_node
-        
-        %% Branch 2: Check
-        case_2["**Check**<br/>I want to see the status of an existing experiment."]:::case_node
-        instruction_2["*Use: audit_experiment.ps1*"]:::instruction_node
-
-        %% Branch 3: Fix / Update
-        case_3["**Fix or Update**<br/>I have an experiment with a single, fixable error."]:::case_node
-        instruction_3["*Use: fix_experiment.ps1*"]:::instruction_node
-
-        %% Branch 4: Upgrade
-        case_4["**Upgrade**<br/>I have a legacy or severely corrupted experiment (multiple errors)."]:::case_node
-        instruction_4["*Use: migrate_experiment.ps1*"]:::instruction_node
-
-        %% Branch 5: Compile
-        case_5["**Compile**<br/>I have one or more VALIDATED experiments that I want to compile into a final study report."]:::case_node
-        instruction_5["*Use: compile_study.ps1*"]:::instruction_node
-    end
-
-    end_node(["End"]):::start_end_node;
-
-    %% === Connections ===
-    start_node --> main_decision;
-
-    main_decision --> case_1;
-    main_decision --> case_2;
-    main_decision --> case_3;
-    main_decision --> case_4;
-    main_decision --> case_5;
-
-    case_1 --> instruction_1;
-    case_2 --> instruction_2;
-    case_3 --> instruction_3;
-    case_4 --> instruction_4;
-    case_5 --> instruction_5;
-    
-    instruction_1 --> end_node;
-    instruction_2 --> end_node;
-    instruction_3 --> end_node;
-    instruction_4 --> end_node;
-    instruction_5 --> end_node;
+    A(Start) --> B{"What's the status of the experiment?"};
+    B --> C[audit_experiment.ps1];
+    style C fill:#cde4ff,stroke:#333
+    C --> D{Result?};
+    D -- "VALIDATED" --> E{Need to force an update?};
+    D -- "NEEDS REPAIR" --> F[fix_experiment.ps1];
+    style F fill:#cde4ff,stroke:#333
+    E -- "No" --> G(End);
+    E -- "Yes" --> F;
+    F --> C;

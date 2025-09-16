@@ -1,129 +1,64 @@
 graph TD
-    subgraph "1. Main User Entry Points"
-        direction LR
-        new_experiment_ps1["new_experiment.ps1"]
-        audit_experiment_ps1["audit_experiment.ps1"]
-        fix_experiment_ps1["fix_experiment.ps1"]
-        migrate_experiment_ps1["migrate_experiment.ps1"]
-        audit_study_ps1["audit_study.ps1"]
-        fix_study_ps1["fix_study.ps1"]
-        migrate_study_ps1["migrate_study.ps1"]
-        compile_study_ps1["compile_study.ps1"]
-    end
+    %% 1. Node Definitions
+    new_exp["new_experiment.ps1"]
+    audit_exp["audit_experiment.ps1"]
+    fix_exp["fix_experiment.ps1"]
+    audit_stu["audit_study.ps1"]
+    compile_stu["compile_study.ps1"]
 
+    exp_manager["experiment_manager.py"]
+    exp_auditor["experiment_auditor.py"]
+    manage_log["manage_experiment_log.py"]
+    compile_exp["compile_experiment_results.py"]
+
+    rep_manager["replication_manager.py"]
+    q_gen["query_generator.py"]
+    build_q["build_llm_queries.py"]
+    prompter["llm_prompter.py"]
+    process_resp["process_llm_responses.py"]
+    analyze_perf["analyze_llm_performance.py"]
+    bias_analysis["run_bias_analysis.py"]
+    gen_report["generate_replication_report.py"]
+    compile_rep["compile_replication_results.py"]
+
+    compile_study_results["compile_study_results.py"]
+    analyze_study_results["analyze_study_results.py"]
+
+    cfg["config_loader.py"]
+
+    %% 2. Link Definitions
+    new_exp --> exp_manager
+    audit_exp --> exp_auditor
+    fix_exp --> exp_manager & exp_auditor
+    audit_stu --> exp_auditor
+    compile_stu --> compile_study_results
+
+    exp_manager --> manage_log & compile_exp & rep_manager
+    
+    rep_manager --> build_q
+    build_q --> q_gen
+    build_q --> prompter --> process_resp --> analyze_perf --> bias_analysis --> gen_report --> compile_rep
+
+    compile_study_results --> analyze_study_results
+    
+    exp_manager -.-> cfg
+    rep_manager -.-> cfg
+    compile_study_results -.-> cfg
+    analyze_study_results -.-> cfg
+
+    %% 3. Subgraph Grouping
+    subgraph "1. Main User Entry Points (.ps1)"
+        new_exp; audit_exp; fix_exp; audit_stu; compile_stu;
+    end
     subgraph "2. Experiment Lifecycle Management"
-        direction TB
-        subgraph "Primary Orchestrators"
-            exp_manager["experiment_manager.py"]
-            exp_auditor["experiment_auditor.py"]
-        end
-        subgraph "Finalization Scripts"
-            log_manager["manage_experiment_log.py"]
-            compile_experiment["compile_experiment_results.py"]
-        end
-        subgraph "Study-Level Aggregation"
-            compile_study_results_py["compile_study_results.py"]
-            study_analysis["analyze_study_results.py"]
-        end
+        exp_manager; exp_auditor; manage_log; compile_exp;
     end
-    
     subgraph "3. Single Replication Pipeline"
-        replication_manager["replication_manager.py"]
-        
-        subgraph "Pipeline Stages (executed by replication_manager.py)"
-            direction TB
-            subgraph "Stage 1: Build Queries"
-                direction LR
-                stage1["build_llm_queries.py"]
-                query_generator["query_generator.py"]
-            end
-            stage2["2. llm_prompter.py (in parallel)"]
-            stage3["3. process_llm_responses.py"]
-            stage4["4. analyze_llm_performance.py"]
-            stage4b["5. run_bias_analysis.py"]
-            stage5["6. generate_replication_report.py"]
-            stage6["7. compile_replication_results.py"]
-        end
+        rep_manager; q_gen; build_q; prompter; process_resp; analyze_perf; bias_analysis; gen_report; compile_rep;
     end
-
-    subgraph "Utility & Other Scripts"
-        restore_config["restore_experiment_config.py"]
-        patch_old["upgrade_legacy_experiment.py"]
-        config_loader["config_loader.py"]
+    subgraph "4. Study-Level Analysis"
+        compile_study_results; analyze_study_results;
     end
-
-    %% --- Connections ---
-    new_experiment_ps1 --> exp_manager
-    
-    audit_experiment_ps1 --> exp_auditor
-    audit_study_ps1 --> exp_auditor
-    
-    fix_experiment_ps1 --> exp_auditor
-    fix_experiment_ps1 --> exp_manager
-    fix_study_ps1 --> exp_auditor
-    fix_study_ps1 --> exp_manager
-    
-    migrate_experiment_ps1 --> exp_auditor
-    migrate_experiment_ps1 --> exp_manager
-    migrate_study_ps1 --> exp_auditor
-    migrate_study_ps1 --> exp_manager
-
-    compile_study_ps1 --> compile_study_results_py
-    compile_study_ps1 --> study_analysis
-
-    exp_manager --> replication_manager
-    exp_manager --> compile_experiment
-    exp_manager --> log_manager
-    exp_manager --> restore_config
-    exp_manager -.-> patch_old
-
-    patch_old --> restore_config
-
-    %% Sequential Pipeline Execution
-    replication_manager --> stage1
-    stage1 --> stage2
-    stage2 --> stage3
-    stage3 --> stage4
-    stage4 --> stage4b
-    stage4b --> stage5
-    stage5 --> stage6
-
-    %% Worker Connections
-    stage1 --> query_generator
-
-    %% Import Connections (dotted)
-    exp_manager -.-> exp_auditor
-    exp_manager & exp_auditor & replication_manager & stage1 & stage2 & stage3 & stage4 & stage4b & stage5 & stage6 & query_generator & log_manager & compile_experiment & compile_study_results_py & study_analysis & patch_old & restore_config -.-> config_loader
-
-    %% --- Inline Styling ---
-    style new_experiment_ps1 fill:#cde4ff,stroke:#6c93be
-    style audit_experiment_ps1 fill:#cde4ff,stroke:#6c93be
-    style fix_experiment_ps1 fill:#cde4ff,stroke:#6c93be
-    style migrate_experiment_ps1 fill:#cde4ff,stroke:#6c93be
-    style audit_study_ps1 fill:#cde4ff,stroke:#6c93be
-    style fix_study_ps1 fill:#cde4ff,stroke:#6c93be
-    style migrate_study_ps1 fill:#cde4ff,stroke:#6c93be
-    style compile_study_ps1 fill:#cde4ff,stroke:#6c93be
-
-    style exp_manager fill:#fff3cd,stroke:#f1c40f
-    style exp_auditor fill:#fff3cd,stroke:#f1c40f
-    style log_manager fill:#fff3cd,stroke:#f1c40f
-    style compile_experiment fill:#fff3cd,stroke:#f1c40f
-    style compile_study_results_py fill:#fff3cd,stroke:#f1c40f
-    style study_analysis fill:#fff3cd,stroke:#f1c40f
-    
-    style replication_manager fill:#fdebd0,stroke:#e59866
-    
-    style stage1 fill:#d4edda,stroke:#155724
-    style query_generator fill:#d4edda,stroke:#155724
-    style stage2 fill:#d4edda,stroke:#155724
-    style stage3 fill:#d4edda,stroke:#155724
-    style stage4 fill:#d4edda,stroke:#155724
-    style stage4b fill:#d4edda,stroke:#155724
-    style stage5 fill:#d4edda,stroke:#155724
-    style stage6 fill:#d4edda,stroke:#155724
-
-    style query_generator fill:#e9ecef,stroke:#adb5bd
-    style patch_old fill:#e9ecef,stroke:#adb5bd
-    style restore_config fill:#e9ecef,stroke:#adb5bd
-    style config_loader fill:#e9ecef,stroke:#adb5bd
+    subgraph "5. Utility & Other Scripts"
+        cfg;
+    end

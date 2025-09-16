@@ -1,18 +1,20 @@
 graph TD
-    subgraph "Project Directory (Version Controlled)"
-        direction LR
-        Harness["<b>Test Harness Script</b><br>e.g., run_layer3_test.ps1"]
-        Assets["<b>Static Test Assets</b><br>tests/assets/"]
-        SUT["<b>System Under Test</b><br>e.g., prepare_data.ps1"]
-    end
+    subgraph "Integration Test Sandbox Architecture"
+        subgraph "Project Directory (Version Controlled)"
+            direction LR
+            Harness["<b>Test Harness Script</b><br>e.g., run_layer3_test.ps1"]
+            Assets["<b>Static Test Assets</b><br>tests/assets/"]
+            SUT["<b>System Under Test</b><br>e.g., prepare_data.ps1"]
+        end
 
-    subgraph "Temporary Sandbox (Created at Project Root, Git-Ignored)"
-        Sandbox["temp_test_environment/"]
-    end
+        subgraph "Temporary Sandbox (Created at Project Root, Git-Ignored)"
+            Sandbox["temp_test_environment/"]
+        end
 
-    Harness -- "1. Creates" --> Sandbox
-    Assets -- "2. Copies seed data into" --> Sandbox
-    Harness -- "3. Executes" --> SUT
-    SUT -- "4. Runs inside & generates artifacts in" --> Sandbox
-    Harness -- "5. Validates artifacts in" --> Sandbox
-    Harness -- "6. Archives & Deletes" --> Sandbox
+        Harness -- "1. Creates" --> Sandbox
+        Assets -- "2. Copies seed data into" --> Sandbox
+        Harness -- "3. Executes" --> SUT
+        SUT -- "4. Runs inside & generates artifacts in" --> Sandbox
+        Harness -- "5. Validates artifacts in" --> Sandbox
+        Harness -- "6. Archives & Deletes" --> Sandbox
+    end

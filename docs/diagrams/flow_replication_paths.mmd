@@ -1,0 +1,12 @@
+graph LR
+    A(Start) --> B{What is your research goal?};
+
+    subgraph "Paths"
+        B -- "Verify Original Findings" --> C[Direct Replication];
+        B -- "Test Method Robustness" --> D[Methodological Replication];
+        B -- "Extend the Research" --> E[Conceptual Replication];
+    end
+
+    C --> C1["Use static data files<br>and randomization seeds<br>provided in the repository."];
+    D --> D1["Run the full data pipeline<br>to generate a fresh dataset<br>from live sources."];
+    E --> E1["Modify the framework:<br>- Use a new LLM<br>- Alter analysis scripts<br>- Change core parameters"];

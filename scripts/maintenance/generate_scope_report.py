@@ -46,26 +46,14 @@ REPORT_FILENAME = REPORT_OUTPUT_DIR / "project_scope_report.md"
 
 # Directories to completely exclude from the scan.
 EXCLUDE_DIRS = {
-    ".git", ".pdm-build", ".pytest_cache", ".venv", "__pycache__", "archive",
+    ".git", ".pdm-build", ".pytest_cache", ".venv", "__pycache__", "_archive",
     "build", "config", "data/backup", "dist", "htmlcov", "images",
-    "linter_backups", "llm_personality_matching.egg-info",
-    "main_archive", "node_modules", "output", "venv"
+    "linter_backups", "llm-narrative-framework.egg-info",
+    "main_archive", "node_modules", "output", "src/archive", "venv"
 }
 
 # File extensions to exclude.
 EXCLUDE_EXTS = {".pyc", ".pyo", ".pyd", ".log", ".tmp", ".swp", ".lock", ".coverage", ".pdf", ".bak"}
-
-def parse_gitignore(root_path: pathlib.Path) -> list:
-    """Parses .gitignore and returns a list of patterns."""
-    gitignore_path = root_path / ".gitignore"
-    patterns = []
-    if gitignore_path.exists():
-        with open(gitignore_path, "r", encoding="utf-8") as f:
-            for line in f:
-                stripped_line = line.strip()
-                if stripped_line and not stripped_line.startswith("#"):
-                    patterns.append(stripped_line)
-    return patterns
 
 # ANSI color codes for better terminal output
 class Colors:
@@ -156,12 +144,26 @@ def generate_table(headers: list, rows: list, totals: list) -> str:
     return "\n".join([header_line, separator_line] + row_lines + [total_line])
 
 
+def is_ignored(path, gitignore_patterns):
+    """Check if a path matches any .gitignore patterns."""
+    for pattern in gitignore_patterns:
+        if fnmatch(path, pattern) or fnmatch(path.name, pattern):
+            return True
+    return False
+
 def main(quiet=False):
     """Main function to generate the project scope report."""
     if not quiet:
         print(f"{Colors.YELLOW}\n--- Starting Project Scope Analysis ---{Colors.RESET}")
 
-    gitignore_patterns = parse_gitignore(PROJECT_ROOT)
+    gitignore_patterns = []
+    gitignore_path = PROJECT_ROOT / ".gitignore"
+    if gitignore_path.exists():
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped_line = line.strip()
+                if stripped_line and not stripped_line.startswith("#"):
+                    gitignore_patterns.append(stripped_line)
 
     documents = []
     scripts = []
@@ -171,47 +173,56 @@ def main(quiet=False):
     if not quiet:
         print("1. Scanning project and calculating metrics...")
     
-    try:
-        # Use 'git ls-files' to get the definitive list of tracked files.
-        result = subprocess.run(
-            ["git", "ls-files"],
-            capture_output=True, text=True, check=True,
-            cwd=PROJECT_ROOT, encoding='utf-8'
-        )
-        tracked_files = result.stdout.strip().split('\n')
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        if not quiet:
-            print(f"{Colors.RED}Error: 'git ls-files' failed. Is Git installed and are you in a Git repository?{Colors.RESET}")
-        return
+    all_files = []
+    for root, dirs, files in os.walk(PROJECT_ROOT):
+        # Exclude directories based on .gitignore, simple name, or relative path
+        approved_dirs = []
+        for d in dirs:
+            full_path = pathlib.Path(root) / d
+            rel_path_str = str(full_path.relative_to(PROJECT_ROOT)).replace('\\', '/')
+            if not is_ignored(full_path, gitignore_patterns) and d not in EXCLUDE_DIRS and rel_path_str not in EXCLUDE_DIRS:
+                approved_dirs.append(d)
+        dirs[:] = approved_dirs
+        
+        for file in files:
+            file_path = pathlib.Path(root) / file
+            
+            # --- The Fix: Exclude generated .md if a .template.md exists ---
+            if file.endswith('.md') and not file.endswith('.template.md'):
+                template_equivalent = file_path.with_name(f"{file_path.stem}.template.md")
+                if template_equivalent.exists():
+                    continue # Skip the generated file
+            # --- End Fix ---
 
-    for rel_path in tracked_files:
-        path = PROJECT_ROOT / rel_path
-        if not path.exists():
-            continue
+            if not is_ignored(file_path, gitignore_patterns) and file_path.suffix not in EXCLUDE_EXTS:
+                all_files.append(file_path)
 
-        # Categorize the tracked files.
-        rel_parts = pathlib.Path(rel_path).parts
-
+    for path in all_files:
+        rel_path = str(path.relative_to(PROJECT_ROOT)).replace('\\', '/')
+        
         if path.suffix in [".py", ".ps1"]:
             lines = count_non_empty_lines(path)
             scripts.append((f"`{rel_path}`", lines))
-        elif path.suffix == ".md":
+        elif path.name.endswith(".md"):
             words = count_words(path)
-            documents.append((f"`{rel_path}`", words))
-        elif path.parent.name == "diagrams" and path.suffix == ".mmd":
+            report_path = rel_path.replace('.template.md', '.md')
+            documents.append((f"`{report_path}`", words))
+        elif path.parent.name == "diagrams" and path.suffix in [".mmd", ".txt"]:
             lines = count_non_empty_lines(path)
             diagrams.append((f"`{rel_path}`", lines))
         else:
+            rel_parts = path.relative_to(PROJECT_ROOT).parts
             is_data_file = (
                 len(rel_parts) > 1 and
-                (rel_parts[0] == 'data' or rel_parts[0:2] == ('tests', 'assets'))
+                (rel_parts[0] == 'data' or rel_parts[0:2] == ('tests', 'assets')) and
+                path.suffix not in ['.md', '.py', '.ps1']
             )
             if is_data_file:
                 size_kb = get_file_size_kb(path)
                 data_files.append((f"`{rel_path}`", size_kb))
-
+    
     if not quiet:
-        print(f"   ...found and processed {len(tracked_files)} files.")
+        print(f"   ...found and processed {len(all_files)} files.")
         print("2. Assembling the report content...")
     # --- Generate Report Content ---
     report_content = [f"# Project Scope & Extent Report\n\n**Generated on:** {datetime.now().strftime('%Y-%m-%d')}\n"]

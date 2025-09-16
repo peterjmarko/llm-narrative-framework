@@ -1,47 +1,52 @@
-# Data Directory
+# Data Dictionary
 
 This document is the **Data Dictionary** for the project. Its purpose is to describe the contents and structure of the `data/` directory, explaining the role of each file in the data preparation and analysis pipelines.
+
+The `data/` directory provides the foundational inputs for the project's core logic and stores the intermediate artifacts generated during the data preparation phase, as illustrated in the overall project architecture below.
+
+{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=100% | caption=Project Architecture: The `data/` directory serves as the primary input for the core framework logic.}}
 
 ## Directory Structure
 
 ```
 data/
 │
-├── README.md                   # This file.
-├── base_query.txt              # LLM prompt template for the matching task.
-├── personalities_db.txt        # FINAL PRODUCT: The main database used in experiments.
+├── README_DATA.md                # This file.
+├── base_query.txt                # LLM prompt template.
+├── personalities_db.txt          # Final database for experiments.
 │
 ├── sources/
-│   └── adb_raw_export.txt      # Raw data dump from the automated fetching script.
+│   └── adb_raw_export.txt        # Raw data from automated fetch.
 │
 ├── reports/
 │   ├── adb_validation_report.csv
 │   ├── adb_validation_summary.txt
-│   ├── missing_eminence_scores.txt
+│   ├── delineation_coverage_map.csv
+│   ├── eminence_scores_summary.txt
 │   ├── ocean_scores_summary.txt
-│   └── missing_ocean_scores.txt
+│   └── ... (other audit logs)
 │
 ├── foundational_assets/
-│   ├── neutralized_delineations/   # Sanitized text snippets for database assembly.
-│   ├── sf_chart_export.csv         # Chart data exported from Solar Fire (manual step).
-│   ├── sf_delineations_library.txt # The original, raw delineations exported from Solar Fire.
-│   ├── country_codes.csv           # Mapping of ADB country/state codes to full names.
-│   ├── eminence_scores.csv         # Rank-ordered list of all subjects by eminence.
-│   ├── ocean_scores.csv            # The definitive subject set with OCEAN scores.
-│   ├── point_weights.csv           # Configurable weights for planets/points.
-│   └── balance_thresholds.csv      # Configurable thresholds for balance calculations.
+│   ├── neutralized_delineations/ # Sanitized text snippets.
+│   ├── sf_chart_export.csv       # Chart data from Solar Fire.
+│   ├── sf_delineations_library.txt # Raw text library from Solar Fire.
+│   ├── country_codes.csv         # Maps country/state codes.
+│   ├── eminence_scores.csv       # List ranked by eminence.
+│   ├── ocean_scores.csv          # Definitive subject set.
+│   ├── point_weights.csv         # Weights for profile algorithm.
+│   └── balance_thresholds.csv    # Thresholds for profile algorithm.
 │
 ├── intermediate/
-│   ├── adb_eligible_candidates.txt # All subjects passing initial data quality checks.
-│   ├── adb_final_candidates.txt    # The final subject set, transformed and ready for SF.
-│   ├── ocean_scores_discarded.csv  # Archived OCEAN scores for subjects outside the final set.
-│   └── sf_data_import.txt      # Subjects formatted for Solar Fire import.
+│   ├── adb_eligible_candidates.txt # Subjects passing quality checks.
+│   ├── adb_final_candidates.txt  # Final subject set for SF.
+│   └── sf_data_import.txt        # Formatted for SF import.
 │
 ├── processed/
-│   └── subject_db.csv          # Cleaned, integrated master database ready for generation.
+│   ├── adb_wiki_links.csv        # Best-guess Wikipedia URLs.
+│   └── subject_db.csv            # Cleaned & integrated master DB.
 │
 └── backup/
-    └── ... (timestamped backups) # Automatic backups of generated files.
+    └── ... (timestamped backups) # Automatic backups.
 ```
 
 ## File Descriptions by Directory
@@ -56,11 +61,12 @@ This directory contains the original, unprocessed starting point for the pipelin
 
 These files are generated during the data validation and filtering stages.
 
--   **`adb_validation_report.csv`**: The detailed, row-by-row output of `validate_adb_data.py`. It is used as a master filter by `filter_adb_candidates.py` to ensure reproducibility.
+-   **`adb_validation_report.csv`**: The detailed, row-by-row output of the Wikipedia page validation script. It is a critical input for the final filtering step.
 -   **`adb_validation_summary.txt`**: A human-readable summary of the validation report.
--   **`missing_eminence_scores.txt`**: A log of subjects who lacked an eminence score.
+-   **`delineation_coverage_map.csv`**: A report used by the assembly logic validation workflow to ensure test subjects provide maximum coverage of all text components.
+-   **`eminence_scores_summary.txt`**: A human-readable summary of the eminence scoring run.
 -   **`ocean_scores_summary.txt`**: The detailed summary report from `generate_ocean_scores.py`, including the cutoff analysis and descriptive statistics.
--   **`missing_ocean_scores.txt`**: A complete audit from `generate_ocean_scores.py` listing all subjects who were not scored, either because they were missed by the LLM or were not attempted before the script stopped.
+-   Various other `missing_*.txt` files serve as audit logs for different pipeline stages.
 
 ### 3. `foundational_assets/` - Static Assets for Generation
 
@@ -79,15 +85,15 @@ These files are static, pre-prepared assets that provide the rules and content f
 These files are the outputs of one pipeline script and the inputs to the next.
 
 -   **`adb_eligible_candidates.txt`**: The output of `select_eligible_candidates.py`. Contains all subjects from the raw export that pass initial data quality checks, creating a clean pool for LLM scoring.
--   **`adb_final_candidates.txt`**: The output of `select_final_candidates.py`. This is the definitive, final set of subjects for the experiment. It is created by filtering the eligible list against the OCEAN set, resolving country codes, and sorting by eminence.
--   **`ocean_scores_discarded.csv`**: An archive of all OCEAN scores that were generated for subjects who fell outside the final, truncated dataset. This file is created by `generate_ocean_scores.py` to ensure no generated data is permanently lost.
+-   **`adb_final_candidates.txt`**: The output of `select_final_candidates.py`. This is the definitive, final set of subjects for the experiment, created by applying a data-driven cutoff to the eminence-ranked list.
 -   **`sf_data_import.txt`**: The output of `prepare_sf_import.py`. This file is formatted for direct import into the Solar Fire software.
 
-### 5. `processed/` - Cleaned Master Database
+### 5. `processed/` - Cleaned & Integrated Data
 
-This directory holds the cleaned and integrated master data file, ready for the final generation step.
+This directory holds cleaned and integrated data files that are ready for downstream processing.
 
--   **`subject_db.csv`**: The output of `create_subject_db.py`. This script integrates the Solar Fire chart data with the filtered subject list, fixes character encoding errors, and produces this clean, UTF-8 encoded master CSV with `Index` and `idADB` as the primary identifiers.
+-   **`adb_wiki_links.csv`**: The output of `find_wikipedia_links.py`, containing the best-guess Wikipedia URL for each subject from the raw data export.
+-   **`subject_db.csv`**: The output of `create_subject_db.py`. This script integrates the Solar Fire chart data with the final subject list to produce a clean, master database ready for the final generation step.
 
 ### 6. Top-Level Files - Main Experiment Files
 
@@ -98,6 +104,6 @@ These are the final, high-level files used directly in the LLM experiments.
 
 ## Transition to the Main Experiment Pipeline
 
-Once the data preparation pipeline is complete, its primary output, `personalities_db.txt`, serves as the foundational database for the main experiments. This file, together with the `base_query.txt` prompt template, provides the necessary inputs for the first stage of the main experimental workflow.
+Once the data preparation pipeline is complete, its primary output, `personalities_db.txt`, serves as the foundational database for the main experiments. This file, together with the `base_query.txt` prompt template, provides the necessary inputs for the first stage of the experimental workflow.
 
-For a detailed explanation of the subsequent experimental and analysis pipeline, please refer to the project's main **Framework Manual**.
+For a detailed explanation of the subsequent experiment and analysis pipeline, please see the **[📖 Framework Manual](../docs/DOCUMENTATION.md)**.

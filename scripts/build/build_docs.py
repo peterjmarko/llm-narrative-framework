@@ -84,6 +84,9 @@ import time
 import pathlib
 import stat
 import unicodedata
+import tempfile
+import contextlib
+import tempfile
 
 # Add the script's own directory ('src') to the Python path.
 # This ensures that sibling modules (like docx_postprocessor) can be imported
@@ -295,13 +298,14 @@ def process_markdown_content(content, project_root, template_path_str, flavor='v
                     attr_dict[key.strip().lower()] = value.strip()
 
         pandoc_attr_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
-        pandoc_attributes_string = "{" + " ".join(pandoc_attr_parts) + "}" if pandoc_attr_parts else ""
+        # Prepend the class for centering directly into the attributes block
+        pandoc_attributes_string = "{.CenteredImage " + " ".join(pandoc_attr_parts) + "}"
 
         if raw_pandoc_info_only:
-            # For internal use by grouped_figure, return path and attribute string
             return pandoc_image_path, pandoc_attributes_string
 
         if current_flavor == 'pandoc':
+            # Apply the attributes directly to the image element
             return f"![]({pandoc_image_path}){pandoc_attributes_string}"
         else: # 'viewer' flavor
             html_attrs_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
@@ -332,12 +336,12 @@ def process_markdown_content(content, project_root, template_path_str, flavor='v
         # Render the nested diagram using the helper function to get raw path and attributes.
         diagram_specific_attrs = '|'.join([f'{k}={v}' for k, v in attr_dict.items() if k not in ['caption']])
         
-        # Call _render_single_diagram with the new flag to get path and attributes string, not full ![]()
+        # Call _render_single_diagram with the new flag to get path and attributes string.
+        # The helper function now correctly includes the .CenteredImage class.
         diagram_image_path, diagram_attributes_string = _render_single_diagram(diagram_source_rel_path, diagram_specific_attrs, current_flavor='pandoc', raw_pandoc_info_only=True)
 
         if current_flavor == 'pandoc':
-            # For DOCX, combine caption (markdown) and image into Pandoc's native figure syntax.
-            # The URL part of the outer figure is the image path, followed by attributes for the figure.
+            # For DOCX, use Pandoc's native figure syntax with the attributes applied directly.
             return f"![{caption_text}]({diagram_image_path}){diagram_attributes_string}"
         else: # viewer flavor
             # For MD viewers, render as an HTML block for center alignment and clarity.
@@ -505,21 +509,10 @@ def render_all_diagrams(project_root, force_render=False, template_files=None):
     
     return all_diagrams_ok
 
-def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path=None, source_md_content=None):
-    """
-    Converts a markdown source (from file OR string) to DOCX, with robust error handling.
-    """
-    if not source_md_path and not source_md_content:
-        print(f"{Colors.RED}ERROR: convert_to_docx requires either a source_md_path or source_md_content.{Colors.RESET}")
-        return False
-
-    logical_source_name = os.path.basename(source_md_path) if source_md_path else os.path.basename(output_docx_path).replace('.docx', '.md')
+def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path):
+    """Converts a markdown file to DOCX, with robust error handling."""
     output_filename = os.path.basename(output_docx_path)
-    # Use the project root as the resource path. This allows for unambiguous
-    # image paths in the Markdown (e.g., 'docs/images/my_image.png').
-    resource_path = project_root
-
-    print(f"    - Converting '{Colors.CYAN}{logical_source_name}{Colors.RESET}' to DOCX...")
+    print(f"    - Converting '{Colors.CYAN}{os.path.basename(source_md_path)}{Colors.RESET}' to DOCX...")
     
     permission_error_printed = False
     while True:
@@ -529,44 +522,28 @@ def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path=Non
             if os.path.exists(reference_docx_path):
                 pandoc_args_base.append(f'--reference-doc={reference_docx_path}')
 
-            input_format_with_extensions = 'markdown+latex_macros+raw_attribute'
+            input_format_with_extensions = 'markdown+yaml_metadata_block+latex_macros+raw_attribute'
             final_pandoc_extra_args = ['-f', input_format_with_extensions] + pandoc_args_base
             
-            if source_md_content:
-                pypandoc.convert_text(
-                    source_md_content, 'docx', format='markdown',
-                    outputfile=output_docx_path,
-                    extra_args=final_pandoc_extra_args
-                )
-            else:
-                pypandoc.convert_file(
-                    source_md_path, 'docx', format='markdown',
-                    outputfile=output_docx_path,
-                    extra_args=final_pandoc_extra_args
-                )
+            pypandoc.convert_file(
+                source_md_path, 'docx', format='markdown',
+                outputfile=output_docx_path,
+                extra_args=final_pandoc_extra_args
+            )
             
             if permission_error_printed:
                 print(f"      {Colors.GREEN}File unlocked. Resuming...{Colors.RESET}")
             
             print(f"      {Colors.GREEN}Successfully built '{Colors.CYAN}{output_filename}{Colors.GREEN}'!{Colors.RESET}")
 
-            # --- POST-PROCESSING: Insert Page Breaks ---
-            try:
-                docx_postprocessor.insert_page_breaks_by_marker(output_docx_path, '---PAGEBREAK---')
-            except NameError:
-                # This will catch if the initial import of docx_postprocessor failed
-                print(f"      {Colors.YELLOW}WARNING: docx_postprocessor module not found. Skipping page break insertion.{Colors.RESET}")
-            except Exception as e:
-                print(f"      {Colors.RED}ERROR during post-processing: {e}{Colors.RESET}")
-            # --- END POST-PROCESSING ---
-
+            docx_postprocessor.insert_page_breaks_by_marker(output_docx_path, '---PAGEBREAK---')
             return True
 
         except RuntimeError as e:
             if "permission denied" in str(e).lower():
                 if not permission_error_printed:
                     print(f"      {Colors.YELLOW}[WAITING] Could not write to '{output_filename}'.")
-                    print(f"      The file is likely open in another program (e.g., Microsoft Word).")
+                    print(f"      The file is likely open in another program.")
                     print(f"      Please close the file. The script will retry automatically... (Ctrl+C to cancel){Colors.RESET}")
                     permission_error_printed = True
                 time.sleep(2)
@@ -574,11 +551,9 @@ def convert_to_docx(pypandoc, output_docx_path, project_root, source_md_path=Non
             else:
                 print(f"\n{Colors.RED}[ERROR] An unexpected error occurred with Pandoc.{Colors.RESET}")
                 raise e
-        
         except FileNotFoundError:
             print(f"{Colors.RED}\n[ERROR] `pandoc` command not found. See: https://pandoc.org/installing.html{Colors.RESET}")
             return False
-            
         except KeyboardInterrupt:
             print(f"\n{Colors.YELLOW}Build cancelled by user.{Colors.RESET}")
             return False
@@ -630,7 +605,10 @@ def main():
 
         docs_to_check = [
             ('README.template.md', 'README.md'),
+            ('data/README_DATA.template.md', 'data/README_DATA.md'),
             ('docs/DOCUMENTATION.template.md', 'docs/DOCUMENTATION.md'),
+            ('docs/README_LIFECYCLE.template.md', 'docs/README_LIFECYCLE.md'),
+            ('docs/article_main_text.template.md', 'docs/article_main_text.md'),
             ('docs/article_supplementary_material.template.md', 'docs/article_supplementary_material.md'),
             ('TESTING.template.md', 'TESTING.md')
         ]
@@ -682,9 +660,11 @@ def main():
     # Define which files have placeholders that might contain diagrams
     files_with_diagrams = [
         'README.template.md',
+        'data/README_DATA.template.md',
         'docs/DOCUMENTATION.template.md',
-        'docs/article_main_text.md',
-        'docs/article_supplementary_material.template.md', # Now a template in docs/
+        'docs/README_LIFECYCLE.template.md',
+        'docs/article_main_text.template.md',
+        'docs/article_supplementary_material.template.md',
         'TESTING.template.md'
     ]
     if not render_all_diagrams(project_root, force_render=do_force_diagrams, template_files=files_with_diagrams):
@@ -724,7 +704,23 @@ def main():
         make_readonly(doc_final_path)
         print(f"    - {Colors.GREEN}Successfully built DOCUMENTATION.md!{Colors.RESET}")
 
-    # --- 3. Build article_supplementary_material.md ---
+    # --- 3. Build article_main_text.md ---
+    article_template_path = os.path.join(project_root, 'docs/article_main_text.template.md')
+    article_final_path = os.path.join(project_root, 'docs/article_main_text.md')
+    if not do_force_documents and is_doc_up_to_date(project_root, article_final_path, article_template_path):
+         print(f"    - Skipping {Colors.CYAN}article_main_text.md{Colors.RESET} build (up-to-date).")
+    else:
+        viewer_content = build_doc_content(project_root, article_template_path, flavor='viewer')
+        header = generate_warning_header('docs/article_main_text.md', '/docs/article_main_text.template.md')
+        final_content = header + '\n' + viewer_content
+
+        make_writable(article_final_path)
+        with open(article_final_path, 'w', encoding='utf-8') as f:
+            f.write(final_content)
+        make_readonly(article_final_path)
+        print(f"    - {Colors.GREEN}Successfully built article_main_text.md!{Colors.RESET}")
+
+    # --- 4. Build article_supplementary_material.md ---
     supp_template_path = os.path.join(project_root, 'docs/article_supplementary_material.template.md')
     supp_final_path = os.path.join(project_root, 'docs/article_supplementary_material.md')
     if not do_force_documents and is_doc_up_to_date(project_root, supp_final_path, supp_template_path):
@@ -740,7 +736,39 @@ def main():
         make_readonly(supp_final_path)
         print(f"    - {Colors.GREEN}Successfully built article_supplementary_material.md!{Colors.RESET}")
 
-    # --- 4. Build TESTING.md ---
+    # --- 5. Build README_DATA.md ---
+    data_template_path = os.path.join(project_root, 'data/README_DATA.template.md')
+    data_final_path = os.path.join(project_root, 'data/README_DATA.md')
+    if not do_force_documents and is_doc_up_to_date(project_root, data_final_path, data_template_path):
+         print(f"    - Skipping {Colors.CYAN}README_DATA.md{Colors.RESET} build (up-to-date).")
+    else:
+        viewer_content = build_doc_content(project_root, data_template_path, flavor='viewer')
+        header = generate_warning_header('data/README_DATA.md', '/data/README_DATA.template.md')
+        final_content = header + '\n' + viewer_content
+
+        make_writable(data_final_path)
+        with open(data_final_path, 'w', encoding='utf-8') as f:
+            f.write(final_content)
+        make_readonly(data_final_path)
+        print(f"    - {Colors.GREEN}Successfully built README_DATA.md!{Colors.RESET}")
+
+    # --- 6. Build README_LIFECYCLE.md ---
+    lifecycle_template_path = os.path.join(project_root, 'docs/README_LIFECYCLE.template.md')
+    lifecycle_final_path = os.path.join(project_root, 'docs/README_LIFECYCLE.md')
+    if not do_force_documents and is_doc_up_to_date(project_root, lifecycle_final_path, lifecycle_template_path):
+         print(f"    - Skipping {Colors.CYAN}README_LIFECYCLE.md{Colors.RESET} build (up-to-date).")
+    else:
+        viewer_content = build_doc_content(project_root, lifecycle_template_path, flavor='viewer')
+        header = generate_warning_header('docs/README_LIFECYCLE.md', '/docs/README_LIFECYCLE.template.md')
+        final_content = header + '\n' + viewer_content
+
+        make_writable(lifecycle_final_path)
+        with open(lifecycle_final_path, 'w', encoding='utf-8') as f:
+            f.write(final_content)
+        make_readonly(lifecycle_final_path)
+        print(f"    - {Colors.GREEN}Successfully built README_LIFECYCLE.md!{Colors.RESET}")
+
+    # --- 7. Build TESTING.md ---
     test_template_path = os.path.join(project_root, 'TESTING.template.md')
     test_final_path = os.path.join(project_root, 'TESTING.md')
     if not do_force_documents and is_doc_up_to_date(project_root, test_final_path, test_template_path):
@@ -771,60 +799,45 @@ def main():
             str(pathlib.Path(test_final_path).resolve()),
         }
         
-        # The logic has been simplified. We no longer need to process placeholders
-        # during the DOCX conversion step, as all templates have already been built.
-        # We just convert all final .md files.
         exclude_dirs = {'.git', '.venv', 'node_modules', 'docs/word_docs'}
-        
-        # Use a set comprehension to automatically handle duplicates
         all_md_files = {p for p in project_root.glob('**/*.md')}
         
-        for source_path in sorted(list(all_md_files)): # Sort for deterministic order
-            # Skip files in excluded directories and all *.template.md source files
-            if any(part in exclude_dirs for part in source_path.parts) or source_path.name.endswith('.template.md'):
-                continue
+        # Use a context manager for robust cleanup of temporary files
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for source_path in sorted(list(all_md_files)):
+                if any(part in exclude_dirs for part in source_path.parts) or source_path.name.endswith('.template.md'):
+                    continue
 
-            # Determine output name and path
-            output_filename = source_path.with_suffix(".docx").name
-            output_path = os.path.join(word_docs_dir, output_filename)
-            
-            # Check if build is needed based on modification times
-            should_build = False
-            if do_force_documents or not os.path.exists(output_path):
-                should_build = True
-            elif os.path.getmtime(output_path) < os.path.getmtime(source_path):
-                should_build = True
+                output_filename = source_path.with_suffix(".docx").name
+                output_path = os.path.join(word_docs_dir, output_filename)
+                
+                should_build = False
+                if do_force_documents or not os.path.exists(output_path):
+                    should_build = True
+                elif os.path.getmtime(output_path) < os.path.getmtime(source_path):
+                    should_build = True
 
-            if not should_build:
-                print(f"    - Skipping DOCX conversion for {Colors.CYAN}{output_filename}{Colors.RESET} (up-to-date).")
-                continue
-            
-            # Determine if placeholders need processing by comparing resolved, absolute paths.
-            resolved_path_str = str(source_path.resolve())
-            process_placeholders = resolved_path_str in files_needing_placeholders
-            content_to_convert = None
-            path_to_convert = str(source_path)
-            
-            if process_placeholders:
-                # To correctly generate pandoc-flavored markdown, we must read from the original template,
-                # not the already-processed markdown file.
+                if not should_build:
+                    print(f"    - Skipping DOCX conversion for {Colors.CYAN}{output_filename}{Colors.RESET} (up-to-date).")
+                    continue
+                
+                # Check if this MD file was generated from a template
                 template_path = pathlib.Path(str(source_path).replace('.md', '.template.md'))
-                if not template_path.exists():
-                    print(f"      {Colors.YELLOW}WARNING: Could not find template for {source_path.name}. DOCX figures may not render correctly.{Colors.RESET}")
-                    # Fallback to old behavior
-                    with open(source_path, 'r', encoding='utf-8') as f:
-                        content_to_convert = process_markdown_content(f.read(), project_root, str(source_path), flavor='pandoc')
-                else:
-                    # Correct behavior: process the template file with 'pandoc' flavor.
-                    with open(template_path, 'r', encoding='utf-8') as f:
-                        content_to_convert = process_markdown_content(f.read(), project_root, str(template_path), flavor='pandoc')
+                path_to_convert = str(source_path)
 
-                path_to_convert = None # Pass content instead of path
-            
-            if not convert_to_docx(pypandoc, output_path, project_root, 
-                                   source_md_path=path_to_convert, 
-                                   source_md_content=content_to_convert):
-                sys.exit(1)
+                # If a template exists, we must re-process it with pandoc flavor to ensure
+                # metadata and figures are correctly formatted for DOCX conversion.
+                if template_path.exists():
+                    pandoc_flavored_content = build_doc_content(project_root, str(template_path), flavor='pandoc')
+                    
+                    # Write the processed content to a temporary file for reliable conversion.
+                    temp_md_path = os.path.join(temp_dir, source_path.name)
+                    with open(temp_md_path, 'w', encoding='utf-8') as f:
+                        f.write(pandoc_flavored_content)
+                    path_to_convert = temp_md_path
+                
+                if not convert_to_docx(pypandoc, output_path, project_root, source_md_path=path_to_convert):
+                    sys.exit(1)
         
         print(f"\n{Colors.GREEN}{Colors.BOLD}All documents built successfully.\n{Colors.RESET}")
 

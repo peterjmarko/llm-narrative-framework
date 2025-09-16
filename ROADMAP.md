@@ -4,69 +4,77 @@ This document outlines planned development tasks and tracks known issues for the
 
 ## Tasks Prior to Publication
 
-### Code Development and Testing
+### 1. Framework Validation and Stabilization
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
-- [ ] **Re-validate Integration Tests After Filter Changes**
-  - [ ] Perform a full run of the Layer 4 and Layer 5 integration tests to ensure that the changes to the data filtering logic (Northern Hemisphere and eminence/OCEAN scoring) have not introduced any downstream regressions.
-- [ ] **Develop `new_study.ps1` Orchestrator**
-  - [ ] Implement the `new_study.ps1` workflow to automate multi-experiment studies based on a factor matrix in `config.ini`.
-- [ ] **Test the New Study Orchestrator**
-  - [ ] Create and execute a scripted integration test for the `new_study.ps1` script to ensure it correctly manages the study lifecycle.
-- [ ] **Enhance Layer 4 Test Harness with a Guided Tour**
-  - [ ] Add an `-Interactive` flag to the Layer 4 test workflow to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` experiment lifecycle, similar to the existing tour for the data pipeline.
-- [ ] **Complete Test Coverage for Existing Framework**
-  - [ ] Implement Layer 6 Test Harness (Post-Hoc Study Evaluation) to validate the `compile_study.ps1` workflow.
-  - [ ] Implement Layer 7 Test Harness (New Study Lifecycle) to validate the `new_study.ps1`, `audit_study.ps1`, and `fix_study.ps1` workflows.
-  - [ ] Add an `-Interactive` flag to the Layer 7 test workflow to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` study lifecycle, similar to the existing tour for the data pipeline and the Layer 4 experiment lifecycle.
-  - [ ] **Increase Coverage for Existing Test Suites:**
-    - **Critical Modules (Target: 90%+)**
-      - [x] Completed.
-    - **Standard Modules (Target: 80%+)**
-      - [ ] `src/analyze_llm_performance.py` (Current: 78%)
-      - [ ] `src/compile_experiment_results.py` (Current: 74%)
-      - [ ] `src/compile_replication_results.py` (Current: 78%)
-      - [ ] `src/create_subject_db.py` (Current: 76%)
-      - [ ] `src/find_wikipedia_links.py` (Current: 77%)
-      - [ ] `src/generate_eminence_scores.py` (Current: 75%)
-      - [ ] `src/generate_ocean_scores.py` (Current: 79%)
-      - [ ] `src/manage_experiment_log.py` (Current: 79%)
-      - [ ] `src/neutralize_delineations.py` (Current: 74%)
-      - [ ] `src/query_generator.py` (Current: 74%)
-      - [ ] `src/upgrade_legacy_experiment.py` (Current: 75%)
-  - [ ] **Create New Test Suites for Untested Scripts:**
-    - [ ] `src/utils/analyze_research_patterns.py`
-    - [ ] `src/utils/patch_eminence_scores.py`
-    - [ ] `src/utils/validate_country_codes.py`
-    - [ ] `scripts/analysis/analyze_cutoff_parameters.py`
-    - [ ] `scripts/analysis/get_docstring_summary.py`
-    - [ ] `scripts/analysis/inspect_adb_categories.py`
-    - [ ] `scripts/analysis/validate_import_file.py`
-    - [ ] `scripts/lint/lint_docstrings.py`
-    - [ ] `scripts/lint/lint_file_headers.py`
-    - [ ] `scripts/maintenance/clean_project.py`
-    - [ ] `scripts/maintenance/convert_py_to_txt.py`
-    - [ ] `scripts/maintenance/generate_scope_report.py`
-    - [ ] `scripts/maintenance/list_project_files.py`
+#### A. Complete Unit Test Coverage
+- [ ] **Increase Coverage for Existing Test Suites (Target: 80%+):**
+  - **Critical Modules (Target: 90%+)**
+    - [x] Completed.
+  - **Standard Modules (Target: 80%+)**
+    - [ ] `src/analyze_llm_performance.py` (Current: 78%)
+    - [ ] `src/compile_experiment_results.py` (Current: 74%)
+    - [ ] `src/compile_replication_results.py` (Current: 78%)
+    - [ ] `src/create_subject_db.py` (Current: 76%)
+    - [ ] `src/find_wikipedia_links.py` (Current: 77%)
+    - [ ] `src/generate_eminence_scores.py` (Current: 75%)
+    - [ ] `src/generate_ocean_scores.py` (Current: 79%)
+    - [ ] `src/manage_experiment_log.py` (Current: 79%)
+    - [ ] `src/neutralize_delineations.py` (Current: 74%)
+    - [ ] `src/query_generator.py` (Current: 74%)
+- [ ] **Create New Test Suites for Untested Scripts:**
+  - [ ] `src/utils/analyze_research_patterns.py`
+  - [ ] `src/utils/patch_eminence_scores.py`
+  - [ ] `src/utils/validate_country_codes.py`
+  - [ ] `scripts/analysis/analyze_cutoff_parameters.py`
+  - [ ] `scripts/analysis/get_docstring_summary.py`
+  - [ ] `scripts/analysis/inspect_adb_categories.py`
+  - [ ] `scripts/analysis/validate_import_file.py`
+  - [ ] `scripts/lint/lint_docstrings.py`
+  - [ ] `scripts/lint/lint_file_headers.py`
+  - [ ] `scripts/maintenance/clean_project.py`
+  - [ ] `scripts/maintenance/convert_py_to_txt.py`
+  - [ ] `scripts/maintenance/generate_scope_report.py`
+  - [ ] `scripts/maintenance/list_project_files.py`
+
+#### B. Implement Core Algorithm Validation Tests
 - [ ] **Implement Query Generation & Randomization Integrity Test**
   - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide mathematical proof of the mapping and randomization logic in `query_generator.py`.
-  - [ ] The test will run the script in a loop to generate a large sample of trial manifests for both `correct` and `random` strategies. It will then perform statistical validation to confirm the `random` strategy approximates a uniform distribution and that the `correct` strategy is implemented as designed.
 - [ ] **Implement Statistical Analysis & Reporting Validation Test**
-  - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide bit-for-bit verification of the entire data analysis and aggregation pipeline.
-  - [ ] The test will use a static, pre-generated set of mock LLM response files as input, run the full sequence of analysis and compilation scripts, and compare the final `STUDY_results.csv` and report JSON against a pre-computed, known-good ground truth.
+  - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide bit-for-bit verification of the `compile_study.ps1` and `analyze_study_results.py` pipeline against a known-good ground truth.
 
-### Final Validation and Data Generation
+#### C. Complete Integration Testing
+- [ ] **Re-validate Integration Tests After Filter Changes**
+  - [ ] Perform a full run of the Layer 4 integration test to ensure that the changes to the data filtering logic have not introduced any downstream regressions.
+- [ ] **Implement Layer 6 Test Harness (Post-Hoc Study Evaluation)**
+  - [ ] Create a new scripted integration test for the `compile_study.ps1` workflow.
+- [ ] **Enhance Layer 4 Test Harness (Experiment Lifecycle)**
+  - [ ] Add an `-Interactive` flag to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` lifecycle.
+  - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `manifest.json` file is correctly generated.
+
+#### D. Enhance Reproducibility and Provenance
+- [ ] **Implement Provenance Capture**
+  - [ ] Modify `new_experiment.ps1` to generate a `manifest.json` file in each new experiment directory.
+  - [ ] The manifest will capture Git state (commit SHA, tag) and key environment details (Python version, OS).
+
+### 2. Final Data Generation and Study Execution
 
 - [ ] **Perform and Report Correction for Multiple Comparisons**
   - [x] Apply a Bonferroni or FDR (False Discovery Rate) correction to the final ANOVA results.
   - [ ] Add a footnote or supplementary note to the article reporting the corrected p-values to demonstrate statistical rigor.
-- [ ] **Execute Full End-to-End Study**
-  - [ ] Run the complete data preparation pipeline (`prepare_data.ps1`) to generate a fresh, final dataset from live sources.
-  - [ ] Conduct the full experimental study, varying all three core factors (model name, group size, mapping strategy) to produce the final results.
-  - [ ] This will serve as the final end-to-end validation of the entire framework and will generate the definitive data used in the manuscript.
+- [ ] **Execute Final Data Preparation**
+  - [ ] Run the complete `prepare_data.ps1` pipeline to generate a fresh, final dataset from live sources.
+- [ ] **Execute Final Study Runs**
+  - [ ] Run `new_experiment.ps1` for each experimental condition defined in the paper, using fixed randomization seeds in `config.ini`.
+- [ ] **Organize and Compile Final Study**
+  - [ ] Manually create a final study directory (e.g., `output/studies/publication_run/`).
+  - [ ] Move all generated experiment folders into the study directory.
+  - [ ] Run `compile_study.ps1` to produce the definitive analysis and plots for the manuscript.
+- [ ] **Tag Publication Commit**
+  - [ ] Create a permanent Git tag (e.g., `v1.0-publication`) to mark the exact version of the code used to generate the paper's results.
 
-### Final Documentation Polish
+### 3. Final Documentation Polish
 
 - [ ] **Update All Documents with Final Results**
   - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
@@ -76,7 +84,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Check all tables and diagrams
   - [ ] Check counts and dates 
 
-## Online Presence & Final Review
+## Final Review and Preprint Publication
 
 - [ ] **Establish Public Repository**
   - [ ] Create a public GitHub repository for the project.
@@ -89,7 +97,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Preprint Publication**
   - [ ] Post the final manuscript to a preprint server like PsyArXiv.
 
-## Paper Submission (PCI Psychology & Meta-Psychology)
+## Journal Submission and Peer Review
 
 - [ ] **Solicit Pre-Submission Expert Feedback**
   - [ ] Identify and contact key field experts (e.g., Currey, Godbout) for friendly pre-submission reviews.
@@ -127,6 +135,10 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Implement Shared Progress Bar Utility**
   - [ ] Create a new utility in `src/utils/` to provide a standardized, shared `tqdm` progress bar.
   - [ ] Refactor `generate_eminence_scores.py` and `generate_ocean_scores.py` to use this shared utility for a consistent user experience during long-running LLM calls.
+- [ ] **Implement Automated Study Lifecycle Management**
+  - [ ] Implement a `new_study.ps1` orchestrator to automate the creation of multi-experiment studies based on a factor matrix in `config.ini`.
+  - [ ] Develop a corresponding Layer 7 test harness to validate the full `new -> audit -> break -> fix` study lifecycle.
+  - [ ] Implement `fix_study.ps1` to provide an automated repair workflow for entire studies.
 - [ ] **Improve Experiment Execution and Reproducibility**
   - [ ] Refactor inter-script communication for robustness. Modify core Python scripts (`experiment_manager.py`, etc.) to send all human-readable logs to `stderr` and use `stdout` exclusively for machine-readable output (e.g., the final experiment path). Update PowerShell wrappers to correctly handle these separate streams.
   - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.
@@ -141,8 +153,10 @@ This phase focuses on achieving a fully validated and stable codebase before the
     - [ ] An estimated total cost for the entire run, based on the chosen model's pricing.
     - [ ] A very rough estimated time to completion.
 - [ ] **Improve Migration Workflow**
+  - [ ] Re-introduce the `migrate_experiment.ps1` workflow for upgrading legacy or corrupted single experiments.
   - [ ] Optimize the `migrate` command to skip re-running API calls for replications that are already valid.
   - [ ] Clean up `migrate_experiment.ps1` log files by removing PowerShell transcript headers and footers.
+  - [ ] Implement `migrate_study.ps1` to provide a batch-migration workflow for entire studies.
 
 - [ ] **Refactor Data Pipeline Test Harness for Simplicity**
   - [ ] Modify the main `prepare_data.ps1` orchestrator to include a `-TestMode` flag. This will consolidate the complex test setup logic (e.g., the targeted fetching for Step 1) directly into the production script, eliminating code duplication.

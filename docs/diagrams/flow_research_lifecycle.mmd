@@ -1,0 +1,16 @@
+graph TD
+    subgraph "Step 1: Generate Data for Each Condition"
+        A["Condition A<br>(e.g., mapping_strategy = correct)"] --> B(Run new_experiment.ps1) --> C[/Experiment A Results/]
+        D["Condition B<br>(e.g., mapping_strategy = random)"] --> E(Run new_experiment.ps1) --> F[/Experiment B Results/]
+    end
+
+    subgraph "Step 2: Organize & Analyze Study"
+        G["Manual Step:<br>Organize experiments into<br>a single study directory"]
+        C --> G
+        F --> G
+        G --> H(Run compile_study.ps1) --> I{Final Analysis & Plots}
+    end
+
+    style B fill:#cde4ff,stroke:#333
+    style E fill:#cde4ff,stroke:#333
+    style H fill:#cde4ff,stroke:#333

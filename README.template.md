@@ -1,29 +1,30 @@
-# A Resilient Framework for Large-Scale LLM Experimentation
+# A Framework for Testing Complex Narrative Systems
 
-This document provides a high-level overview of the project. Its purpose is to introduce the framework's key features and guide users to the detailed documentation that best suits their needs.
+This project provides a framework for the resilient and reproducible testing of large-scale LLM experiments with complex narrative systems. It offers a fully automated, end-to-end pipeline that manages the entire experimental lifecycle, from data preparation to final statistical analysis.
+
+This README provides a high-level overview of the framework and guides new users to the detailed documentation that best suits their needs.
 
 ## 🚀 Quick Start
 
-```powershell
-# 1. Configure your experiment in config.ini
-
-# 2. Create and run a new experiment from scratch
-# Results are saved to a new timestamped directory in output/new_experiments/
+```
+# PowerShell Commands:
+# 1. Configure and run each experimental condition
+# (e.g., run once with mapping_strategy = correct, then again with = random)
 ./new_experiment.ps1
 
-# 3. Organize completed experiments into a study folder
+# 2. Organize the completed experiment folders into a single study directory
 # (e.g., move them to output/studies/My_First_Study/)
 
-# 4. Process and analyze the entire study
+# 3. Compile and analyze the entire study
 ./compile_study.ps1 -StudyDirectory output/studies/My_First_Study
 
-# 5. View the final, publication-ready analysis
+# 4. View the final, publication-ready analysis
 Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
 ```
 
 ## ✨ Key Features
 
-{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=85% | caption=Project Architecture: A high-level overview of the main functional components.}}
+{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=75% | caption=Project Architecture: A high-level overview of the main functional components.}}
 
 *   **Automated Batch Execution**: Run hundreds of replications with intelligent self-healing to resume interrupted experiments.
 *   **Parallel LLM Sessions**: Maximizes throughput by running multiple LLM API calls concurrently, significantly speeding up data collection.
@@ -49,9 +50,11 @@ This framework was designed with three core principles in mind:
 
 This project is extensively documented to support different use cases. The resources are listed in the recommended reading order for new users.
 
--   **For Researchers (Replication):** The best place to start is the **[🔬 Replication Guide (article_supplementary_material.md)](article_supplementary_material.md)**. It provides a step-by-step walkthrough for reproducing the original study's findings.
+-   **For Researchers (Replication):** The best place to start is the **[🔬 Replication Guide (docs/article_supplementary_material.md)](docs/article_supplementary_material.md)**. It provides a step-by-step walkthrough for reproducing the original study's findings.
 
--   **For a Deep Dive (Full Details):** To understand the system's architecture, run new experiments, or explore the complete methodology, see the **[📖 Framework Manual (DOCUMENTATION.md)](docs/DOCUMENTATION.md)**.
+-   **To Understand the Workflow:** For a high-level guide to the `Create -> Check -> Fix -> Compile` workflow, see the **[🚀 Lifecycle Guide (docs/README_LIFECYCLE.md)](docs/README_LIFECYCLE.md)**.
+
+-   **For a Deep Dive (Full Details):** To understand the system's architecture, run new experiments, or explore the complete methodology, see the **[📖 Framework Manual (docs/DOCUMENTATION.md)](docs/DOCUMENTATION.md)**.
 
 -   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/README_DATA.md)](data/README_DATA.md)**.
 
@@ -59,9 +62,17 @@ This project is extensively documented to support different use cases. The resou
 
 -   **To Understand the Validation Strategy:** For a detailed overview of the project's multi-layered testing strategy and validation procedures, see the **[🧪 Testing Guide (TESTING.md)](TESTING.md)**.
 
--   **To Understand the Utility Scripts:** For a guide to the project's supporting scripts for maintenance, linting, and analysis, see the **[⚙️ Scripts Guide (scripts/README_SCRIPTS.md)](scripts/README_SCRIPTS.md)**.
-
 -   **To see what's planned and track known issues**, view the **[🗺️ Project Roadmap (ROADMAP.md)](ROADMAP.md)**.
+
+## 📦 Out of Scope for Publication
+
+To streamline the framework for its initial publication, several advanced features for managing the study lifecycle have been deferred to a future release. The source code for these features has been preserved in the `_archive/` directory of the repository for future development.
+
+Archived features include:
+
+*   **Automated Multi-Experiment Studies (`new_study.ps1`)**: A top-level orchestrator for running a matrix of experiments automatically.
+*   **Automated Study Repair (`fix_study.ps1`)**: A wrapper to diagnose and fix all experiments within a study.
+*   **Data Migration Tools (`migrate_*.ps1`)**: Workflows for upgrading legacy or severely corrupted experimental data.
 
 ## ⚖️ Licensing
 

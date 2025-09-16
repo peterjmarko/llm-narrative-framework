@@ -3,11 +3,11 @@ requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
 [project]
-name = "llm-personality-matching"
+name = "llm-narrative-framework"
 version = "9.6.0"
 description = "A reproducible pipeline for LLM personality matching experiments."
 authors = [
-    {name = "Peter Marko", email = "peter.j.marko@gmail.com"},
+    {name = "Peter J. Marko", email = "peter.j.marko@gmail.com"},
 ]
 requires-python = ">=3.11"
 readme = "README.md"
@@ -151,4 +151,17 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.14.1",
     "commitizen>=3.31.0",
+    "python-docx>=1.2.0",
+]
+
+[tool.pylance.exclude]
+# Add other folders as needed, e.g., "**/node_modules"
+exclude = [
+    "**/__pycache__",
+    "**/.venv",
+    "**/output",
+    "**/data/backup",
+    "**/temp_test_environment",
+    "**/_archive",
+    "**/htmlcov"
 ]

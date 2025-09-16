@@ -28,9 +28,9 @@ For a direct or methodological replication, it is crucial to use the exact model
 
 The data preparation pipeline is a fully automated, multi-stage workflow that transforms the raw data from the Astro-Databank into the final `personalities_db.txt` file used in the experiments. The overall flow of data artifacts is shown below.
 
-{{grouped_figure:docs/diagrams/flow_prep_1_qualification.mmd | scale=2.5 | width=70% | caption=Figure S1: Data Prep Flow 1 - Data Sourcing and Candidate Qualification.}}
+{{grouped_figure:docs/diagrams/flow_prep_1_qualification.mmd | scale=2.5 | width=85% | caption=Figure S1: Data Prep Flow 1 - Data Sourcing and Candidate Qualification.}}
 
-{{grouped_figure:docs/diagrams/flow_prep_2_selection.mmd | scale=2.5 | width=80% | caption=Figure S2: Data Prep Flow 2 - LLM-based Candidate Selection.}}
+{{grouped_figure:docs/diagrams/flow_prep_2_selection.mmd | scale=2.5 | width=100% | caption=Figure S2: Data Prep Flow 2 - LLM-based Candidate Selection.}}
 
 {{grouped_figure:docs/diagrams/flow_prep_3_generation.mmd | scale=2.5 | width=100% | caption=Figure S3: Data Prep Flow 3 - Profile Generation.}}
 
@@ -164,7 +164,7 @@ If you are re-running the import process, you must first clear the existing char
     4.  A dialog will ask: "Do you wish to confirm the deletion of each chart individually?". Click **'No'** to delete all charts at once.
     5.  Click **'Cancel'** to close the 'Chart Database' dialog. The file is now empty and ready for a fresh import.
 
-{{grouped_figure:docs/images/replication_guide/sf_workflow_1_clear_charts.png | width=70% | caption=Figure SX: The Solar Fire "Chart Database" dialog with all charts selected for deletion.}}
+{{grouped_figure:docs/images/replication_guide/sf_workflow_1_clear_charts.png | width=95% | caption=Figure SX: The Solar Fire "Chart Database" dialog with all charts selected for deletion.}}
 
 #### Step 1: Import Birth Data
 
@@ -177,7 +177,7 @@ If you are re-running the import process, you must first clear the existing char
     5.  Click the **'Convert'** button.
     6.  Once the import completes, click the **'Quit'** button to close the dialog.
 
-{{grouped_figure:docs/images/replication_guide/sf_workflow_2_import_dialog.png | width=85% | caption=Figure SX: The Solar Fire "Chart Import/Export" dialog configured to import the prepared data.}}
+{{grouped_figure:docs/images/replication_guide/sf_workflow_2_import_dialog.png | width=95% | caption=Figure SX: The Solar Fire "Chart Import/Export" dialog configured to import the prepared data.}}
 
 #### Step 2: Calculate All Charts
 
@@ -312,76 +312,60 @@ All experimental parameters are defined in the `config.ini` file. For a direct r
 
 The framework automatically archives this file with the results for guaranteed reproducibility.
 
-## Experiment Lifecycle & Analysis
+## Experiment and Study Workflow
 
-The experimental pipeline is controlled by a set of user-friendly PowerShell scripts.
+The research process is divided into two main stages: first, generating the data for each experimental condition, and second, compiling those conditions into a final study for analysis.
 
-### Step 1: Running a New Experiment
+### Stage 1: Generate Data for Each Experimental Condition
 
-The `new_experiment.ps1` script runs a full experiment based on the settings in `config.ini`. It creates a timestamped directory in `output/new_experiments/` and executes the configured number of replications.
+The first stage is to generate a complete set of results for each of the 12 conditions in the study's factorial design (2 `mapping_strategy` levels x 6 `group_size` levels).
 
-**Execution:**
-```powershell
-# Create and run a new experiment from scratch
-.\new_experiment.ps1
-```
+For each condition, you will:
+1.  **Configure `config.ini`**: Set the `mapping_strategy` and `group_size` parameters for the specific condition you are running.
+2.  **Run the Experiment**: Execute the `new_experiment.ps1` script. This will create a new, self-contained experiment directory in `output/new_experiments/`.
 
-### Step 2: Auditing and Fixing an Experiment
-
-If a run is interrupted (e.g., due to a network error), you can use the framework's "fix-it" tools.
-
-**a. Audit the Experiment (`audit_experiment.ps1`)**
-This read-only script provides a detailed status report and recommends the correct next step.
-```powershell
-# Get a status report for a specific experiment
-.\audit_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_..."
-```
-
-**b. Fix the Experiment (`fix_experiment.ps1`)**
-This intelligent script automatically applies the safest, most efficient fix. If it detects missing LLM responses, it will re-run only the failed API calls. If it detects only outdated analysis, it will perform a fast, local update without making any API calls.
-```powershell
-# Automatically diagnose and fix the experiment
-.\fix_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_..."
-```
-
-**c. Migrate Legacy Data (`migrate_experiment.ps1`)**
-For legacy data or severely corrupted experiments, this script provides a safe, non-destructive upgrade path. It creates a clean, timestamped copy of the target experiment and runs the full repair and validation process on the copy, leaving the original data untouched.
-```powershell
-# Create a clean, upgraded copy of a legacy experiment
-.\migrate_experiment.ps1 -ExperimentDirectory "output/legacy/My_Old_Experiment"
-```
-
-### Step 3: Evaluating a Full Study
-
-After running several experiments (e.g., one for `mapping_strategy = correct` and another for `random`), you can analyze them together as a single study.
-
-**a. Organize the Study**
-Manually create a directory in `output/studies/` (e.g., `output/studies/My_Replication_Study/`) and move your completed experiment folders into it.
-
-**b. Compile the Study (`compile_study.ps1`)**
-This script orchestrates the final evaluation. It audits all experiments in the study directory, compiles the results into a master `STUDY_results.csv` file, and runs the final statistical analysis (Two-Way ANOVA).
+This process must be repeated until you have 12 separate experiment directories.
 
 **Execution:**
 ```powershell
-# Compile and analyze all experiments in the study directory
-.\compile_study.ps1 -StudyDirectory "output/studies/My_Replication_Study"
+# Example: After setting parameters in config.ini
+./new_experiment.ps1
+```
+
+> **Tip for Long Runs:** Generating all 12 experiments can take a significant amount of time and may be interrupted. The framework is designed for this.
+> -   Use `audit_experiment.ps1` to get a detailed, read-only status report on any experiment.
+> -   Use `fix_experiment.ps1` to intelligently resume any interrupted run. The script will automatically pick up where it left off, ensuring no work is lost.
+
+### Stage 2: Compile and Analyze the Study
+
+Once you have generated and validated all 12 experiment directories, you can proceed to the final analysis.
+
+**Step 1: Organize Your Experiments**
+Manually create a new study directory (e.g., `output/studies/My_Replication_Study/`) and move all 12 of your completed experiment folders into it.
+
+**Step 2: Perform a Pre-Flight Check (`audit_study.ps1`)**
+Before running the final compilation, it is best practice to run a consolidated audit on the entire study directory. This script checks every experiment and confirms that the study is complete and ready for analysis.
+
+**Execution:**
+```powershell
+./audit_study.ps1 -StudyDirectory "output/studies/My_Replication_Study"
+```
+
+**Step 3: Run the Final Analysis (`compile_study.ps1`)**
+This is the final step. The `compile_study.ps1` script orchestrates the entire analysis pipeline. It aggregates the data from all experiments, runs the Two-Way ANOVA, and generates the final, publication-ready reports and plots.
+
+**Execution:**
+```powershell
+./compile_study.ps1 -StudyDirectory "output/studies/My_Replication_Study"
 ```
 
 **Final Artifacts:**
 The script generates two key outputs in your study directory:
-1.  A master `STUDY_results.csv` file containing the aggregated data.
+1.  A master `STUDY_results.csv` file containing the aggregated data from all 12 experiments.
 2.  A new `anova/` subdirectory containing:
     *   `STUDY_analysis_log.txt`: A comprehensive text report of the statistical findings.
     *   `boxplots/`: Publication-quality plots visualizing the results.
-
-### Step 4: Scaling Up: The Study-Level Workflow
-
-Once you are familiar with managing individual experiments, the framework provides a parallel set of powerful wrappers for managing entire studies. These scripts allow you to automate and scale your research efficiently.
-
-*   **`new_study.ps1`**: Automates the creation of an entire study by running multiple experiments based on a matrix of factors defined in `config.ini` (e.g., testing several models against both `correct` and `random` mapping strategies).
-*   **`audit_study.ps1`**: Provides a consolidated, read-only audit of all experiments in a study to verify their readiness for final analysis.
-*   **`fix_study.ps1`**: The primary "fix-it" tool for a study. It audits all experiments and automatically calls `fix_experiment.ps1` on any that need to be resumed, repaired, or updated.
-*   **`migrate_study.ps1`**: A batch utility for safely upgrading an entire study that contains legacy or corrupted experiments.
+    *   `diagnostics/`: Q-Q plots used for checking statistical assumptions.
 
 ## Related Files
 
