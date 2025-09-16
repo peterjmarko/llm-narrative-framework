@@ -1,5 +1,44 @@
 # Changelog
 
+## 9.6.1 (2025-09-15)
+
+### Bump
+
+- **version 9.6.0 → 9.6.1**
+
+### Refactor
+
+- **Streamline and refactor project for publication**
+  This commit implements a major strategic refactoring to streamline the project for its initial publication. The primary goals were to simplify the user-facing workflow, overhaul all documentation for clarity and accuracy, and remove or archive all non-essential features.
+  
+  ### Project Streamlining & Archival
+  
+  -   **Archived Non-Essential Features:** All advanced lifecycle management scripts (`new_study.ps1`, `fix_study.ps1`, `migrate_study.ps1`) and the data migration workflow (`migrate_experiment.ps1`) have been moved to an `_archive/` directory, along with their corresponding tests and diagrams.
+  -   **Simplified Core Workflow:** The project now focuses exclusively on the `Create -> Check -> Fix -> Compile` user journey, using `new_experiment.ps1` as the primary entry point for data generation.
+  
+  ### Comprehensive Documentation Overhaul
+  
+  -   **Rebranded Project:** Renamed the project to "LLM Narrative Framework" to better reflect its purpose as a general-purpose scientific tool. The new name has been updated across all documentation and configuration files.
+  -   **Restructured and Consolidated Guides:** Merged the content of `README_SCRIPTS.md` into `CONTRIBUTING.md` and `README_ASSEMBLY.md` into `TESTING.template.md` to reduce file fragmentation and improve context.
+  -   **Created New High-Level Guides:**
+      -   Added a new `docs/README_LIFECYCLE.md` to provide a concise overview of the experiment and study workflow.
+      -   Converted `data/README_DATA.md` into a template-driven "Data Dictionary" that now includes a high-level architecture diagram.
+  -   **Added 7 New Diagrams:** Introduced new visual aids to explain the core research question, replication paths, testing architecture, and contribution workflow.
+  -   **Converted Key Documents to Templates:** Converted `docs/article_main_text.md` and `data/README_DATA.md` to `.template.md` files to allow for dynamic diagram insertion and full integration into the build system.
+  
+  ### Build System and Scripting Improvements
+  
+  -   **Refactored Scope Report:** The `generate_scope_report.py` script was completely refactored to use `os.walk` instead of `git ls-files`. It is now independent of the Git index and correctly discovers all relevant project files, including new and uncommitted ones, while properly excluding generated artifacts and archived content.
+  -   **Fixed DOCX Generation:** Resolved several persistent bugs in the `build_docs.py` script:
+      -   Fixed the issue preventing diagrams from being centered in the final `.docx` files by implementing the correct Pandoc styling syntax.
+      -   Fixed a bug that caused the YAML front matter (title, author, abstract) of the main article to be omitted from the `.docx` output.
+  
+  ### Configuration Updates
+  
+  -   **Updated `pyproject.toml`:** Set the project `name` to `llm-narrative-framework` and added `python-docx` as a development dependency.
+  -   **Improved Pylance Performance:** Added an `exclude` list to `pyproject.toml` to prevent the language server from scanning non-source directories like `.venv` and `output`.
+  -   **Updated `.gitignore`:** Added all newly generated documentation files (`data/README_DATA.md`, etc.) to ensure they are not tracked by Git.
+
 ## 9.6.0 (2025-09-14)
 
 ### Bump
