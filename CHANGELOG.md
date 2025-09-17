@@ -1,5 +1,25 @@
 # Changelog
 
+## 9.6.3 (2025-09-17)
+
+### Bump
+
+- **version 9.6.2 → 9.6.3**
+
+### Fixes
+
+- **stabilize experiment lifecycle and complete unit tests**
+  Resolves numerous critical bugs in the experiment lifecycle and analysis pipeline, discovered during a comprehensive unit testing campaign. This work completes the "Framework Validation and Stabilization" milestone.
+  
+  Key bug fixes include:
+  - A `TypeError` crash on final JSON serialization due to unhandled NumPy types.
+  - A dangerous false positive in the analysis validation logic that could allow runs with corrupted data to appear successful.
+  - A silent data corruption bug in the Markdown table parser that could drop valid numeric data.
+  - Fragile delimiter handling that failed on common whitespace patterns.
+  - Multiple control-flow bugs in the log and results compilers that prevented correct error handling for missing or malformed files.
+  
+  As a result of this work, unit test coverage for all core experiment lifecycle scripts now meets or exceeds the 80% target. The project roadmap and testing strategy have been updated to reflect this progress.
+
 ## 9.6.2 (2025-09-16)
 
 ### Bump
