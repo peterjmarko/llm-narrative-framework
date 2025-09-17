@@ -1,5 +1,34 @@
 # Changelog
 
+## 9.7.0 (2025-09-17)
+
+### Bump
+
+- **version 9.6.3 → 9.7.0**
+
+### Features
+
+- **Complete unit testing for data prep pipeline**
+  This commit finalizes the "Framework Validation and Stabilization" milestone by achieving comprehensive unit test coverage for all remaining standard modules in the data preparation pipeline. This intensive testing campaign was highly effective, uncovering and leading to the remediation of several critical bugs and logic flaws that could have impacted data integrity.
+  
+  Key Accomplishments:
+  
+  1.  **Achieved 80%+ Test Coverage Across All Pipeline Stages:** We successfully increased unit test coverage to meet or exceed our targets for five key scripts across three stages of the data preparation pipeline:
+      *   **Stage 2:** `find_wikipedia_links.py`
+      *   **Stage 3:** `generate_eminence_scores.py`, `generate_ocean_scores.py`
+      *   **Stage 4:** `create_subject_db.py`, `neutralize_delineations.py`
+  
+  2.  **Elevated Critical Orchestrator to 90%+ Coverage:** The test suite for `neutralize_delineations.py` was significantly expanded, increasing its coverage from 74% to 91%. This work elevates the script beyond the "Standard" 80% target to meet the 90%+ "Critical" tier standard, which is crucial for an orchestrator that manages paid API calls.
+  
+  3.  **Identified and Remediated Production Bugs:** The process of writing thorough tests revealed several important issues that have now been fixed:
+      *   **Corrected Logic Flaws:** Fixed bugs in file parsing, interactive user prompts, and report generation that were causing incorrect behavior.
+      *   **Improved Error Handling:** Hardened the scripts against common failure modes like I/O errors, missing input files, API worker crashes, and malformed data records.
+      *   **Enhanced Pathing Robustness:** Replaced unreliable relative path calculations with the centralized `get_path` function to ensure file-system robustness.
+  
+  4.  **Refined Test Suite Accuracy:** Corrected flawed mocks and inaccurate assertions to ensure that the tests are reliably and precisely validating the production code's intended behavior.
+  
+  5.  **Updated Project Documentation:** Both `ROADMAP.md` and `TESTING.template.md` have been updated to reflect the completion of this milestone.
+
 ## 9.6.3 (2025-09-17)
 
 ### Bump
