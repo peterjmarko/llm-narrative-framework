@@ -150,6 +150,93 @@ class TestCompileExperimentResults(unittest.TestCase):
         # --- Assert ---
         self.mock_sys_exit.assert_called_with(1)
 
+    def test_main_handles_non_existent_directory(self):
+        """Verify the script exits with code 1 for a non-existent directory."""
+        non_existent_dir = self.exp_dir / "does_not_exist"
+        test_argv = ['compile_exp_results.py', str(non_existent_dir)]
+        
+        # The script should log an error and call sys.exit(1)
+        # We don't need to check the log content if the exit code is correct,
+        # as that path is only taken if the error is logged.
+        with patch.object(sys, 'argv', test_argv):
+            compile_experiment_results.main()
+                
+        self.mock_sys_exit.assert_called_with(1)
+
+    def test_main_handles_malformed_csv(self):
+        """Verify a malformed (unparseable) CSV is skipped with an error."""
+        # --- Arrange ---
+        valid_file_path = self._create_replication_file(run_num=1, mrr_val=0.8)
+        malformed_run_dir = self.exp_dir / "run_malformed"
+        malformed_run_dir.mkdir()
+        malformed_file_path = malformed_run_dir / "REPLICATION_results.csv"
+        malformed_file_path.touch()
+
+        test_argv = ['compile_exp_results.py', str(self.exp_dir)]
+        
+        # --- Act & Assert ---
+        # We mock pd.read_csv to force an exception for the malformed file.
+        original_read_csv = pd.read_csv
+        def read_csv_side_effect(filepath, *args, **kwargs):
+            if str(filepath) == str(malformed_file_path):
+                raise Exception("Simulated parse error")
+            return original_read_csv(filepath, *args, **kwargs)
+
+        with patch('pandas.read_csv', side_effect=read_csv_side_effect), \
+             self.assertLogs(level='ERROR') as cm:
+            with patch.object(sys, 'argv', test_argv):
+                compile_experiment_results.main()
+            self.assertIn("Could not read or process", cm.output[0])
+            
+        # --- Assert ---
+        # The script should still create a summary from the one valid file.
+        output_csv = self.exp_dir / "EXPERIMENT_results.csv"
+        self.assertTrue(output_csv.is_file())
+        df = pd.read_csv(output_csv)
+        self.assertEqual(len(df), 1)
+
+    def test_write_summary_csv_handles_missing_column(self):
+        """Verify that a missing column specified in the header is added with NA."""
+        # --- Arrange ---
+        # Note: self.header_order is ['run_directory', 'replication', 'mean_mrr']
+        # This test data is intentionally missing the 'mean_mrr' column.
+        results_list = [{'run_directory': 'run_1', 'replication': 1}]
+        output_path = self.exp_dir / "summary_with_missing_col.csv"
+        
+        # --- Act ---
+        compile_experiment_results.write_summary_csv(output_path, results_list)
+        
+        # --- Assert ---
+        self.assertTrue(output_path.is_file())
+        df = pd.read_csv(output_path)
+        self.assertEqual(len(df), 1)
+        self.assertIn('mean_mrr', df.columns)
+        self.assertTrue(pd.isna(df['mean_mrr'].iloc[0]))
+
+    def test_write_summary_csv_exits_if_no_header_in_config(self):
+        """Verify sys.exit is called if 'csv_header_order' is missing from config."""
+        # --- Arrange ---
+        # Temporarily override the mock to simulate a missing config value.
+        with patch.object(compile_experiment_results, 'get_config_list', return_value=[]):
+            with self.assertLogs(level='ERROR') as cm:
+                compile_experiment_results.write_summary_csv("any_path.csv", [{'a': 1}])
+                self.assertIn("'csv_header_order' not found in config.ini", cm.output[0])
+        
+        self.mock_sys_exit.assert_called_with(1)
+        
+    def test_write_summary_csv_handles_no_results(self):
+        """Verify a warning is logged when writing an empty list of results."""
+        # --- Arrange ---
+        output_path = self.exp_dir / "empty_summary.csv"
+        
+        # --- Act ---
+        with self.assertLogs(level='WARNING') as cm:
+            compile_experiment_results.write_summary_csv(output_path, [])
+            self.assertIn("No results to write", cm.output[0])
+            
+        # --- Assert ---
+        self.assertFalse(output_path.exists()) # The file should not be created.
+
 if __name__ == '__main__':
     unittest.main()
 

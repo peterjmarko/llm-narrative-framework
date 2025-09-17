@@ -180,4 +180,83 @@ def test_error_handling_empty_personalities_file(setup_test_environment, monkeyp
         run_script(monkeypatch, ["-k", "2"])
     assert e.value.code == 1, "Should exit with code 1 for empty subject file"
 
+
+# --- New Tests for Increased Coverage ---
+
+def test_normalize_text_for_llm_handles_non_string():
+    """Verify normalize_text_for_llm returns non-string input as-is."""
+    from query_generator import normalize_text_for_llm
+    assert normalize_text_for_llm(123) == 123
+    assert normalize_text_for_llm(None) is None
+
+def test_main_handles_empty_base_query(setup_test_environment, monkeypatch):
+    """Verify script runs correctly if base_query.txt is empty."""
+    tmp_path = setup_test_environment
+    output_dir = tmp_path / "output" / "qgen_standalone_output"
+    # Overwrite the base query file with whitespace
+    (tmp_path / "data" / "base_query.txt").write_text("   \n   ", encoding="utf-8")
+
+    run_script(monkeypatch, ["-k", "2", "--seed", "1"])
+
+    query_content = (output_dir / "llm_query.txt").read_text(encoding="utf-8")
+    assert "Base query" not in query_content
+    assert query_content.startswith("List A"), "Query should start with List A if base query is empty"
+
+def test_error_handling_malformed_personalities_row(setup_test_environment, monkeypatch):
+    """Tests that the script skips a malformed row in the personalities file."""
+    tmp_path = setup_test_environment
+    output_dir = tmp_path / "output" / "qgen_standalone_output"
+    # Add a malformed row (non-integer year)
+    malformed_content = MOCK_PERSONALITIES_CONTENT + "5\tPerson E\tnot_a_year\tDescription E\t105\n"
+    (tmp_path / "data" / "personalities_db.txt").write_text(malformed_content, encoding="utf-8")
+
+    # Run with k=4. Should succeed by skipping the bad row, leaving 4 valid ones.
+    run_script(monkeypatch, ["-k", "4", "--seed", "1"])
+    assert (output_dir / "manifest.txt").exists()
+
+def test_error_handling_k_zero(setup_test_environment, monkeypatch):
+    """Tests that the script exits if k is zero or negative."""
+    with pytest.raises(SystemExit) as e:
+        run_script(monkeypatch, ["-k", "0"])
+    assert e.value.code == 1
+
+def test_orchestrator_path_mismatched_k(setup_test_environment, monkeypatch):
+    """Tests error handling when the temp subset file has the wrong number of entries."""
+    tmp_path = setup_test_environment
+    # The script being tested runs from the project root, and its __file__ is in src/
+    script_dir = tmp_path / "src"
+    script_dir.mkdir()
+    monkeypatch.setattr('query_generator.__file__', str(script_dir / 'query_generator.py'))
+
+    # Create a temp subset file in src/ (where the script is "located")
+    temp_subset_file = script_dir / "temp_subset_personalities.txt"
+    temp_subset_file.write_text(MOCK_PERSONALITIES_CONTENT, encoding="utf-8") # Has 4 entries
+
+    # Request k=3, but the file has 4. This should fail.
+    with pytest.raises(SystemExit) as e:
+        run_script(monkeypatch, ["-k", "3", "--personalities_file", "temp_subset_personalities.txt"])
+    assert e.value.code == 1
+
+def test_main_custom_output_path(setup_test_environment, monkeypatch):
+    """Tests a standalone run with a custom output path and prefix."""
+    tmp_path = setup_test_environment
+    custom_dir = tmp_path / "output" / "my" / "custom" / "path"
+
+    run_script(monkeypatch, [
+        "-k", "2", "--seed", "1",
+        "--output_basename_prefix", "my/custom/path/my_run_"
+    ])
+
+    assert (custom_dir / "my_run_manifest.txt").exists()
+    assert not (tmp_path / "output" / "qgen_standalone_output").exists()
+
+@patch('builtins.open')
+def test_write_tab_separated_file_raises_io_error(mock_open, tmp_path):
+    """Verify the write helper propagates IOError."""
+    from query_generator import write_tab_separated_file
+    mock_open.side_effect = IOError("Permission denied")
+    filepath = tmp_path / "test.txt"
+    with pytest.raises(IOError):
+        write_tab_separated_file(filepath, "header", [["data"]])
+
 # === End of tests/experiment_lifecycle/test_query_generator.py ===

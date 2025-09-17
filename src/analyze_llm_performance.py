@@ -244,9 +244,18 @@ def read_mappings_and_deduce_k(filepath, k_override=None, specified_delimiter_ke
 
     delimiter_char_to_try_first = None
     if specified_delimiter_keyword:
-        if specified_delimiter_keyword == ',': delimiter_char_to_try_first = ','
-        elif specified_delimiter_keyword.lower() == 'tab': delimiter_char_to_try_first = '\t'
-        elif specified_delimiter_keyword.lower() == 'space': delimiter_char_to_try_first = ' ' 
+        # Normalize keyword to the actual delimiter character
+        keyword = specified_delimiter_keyword.lower()
+        if keyword == 'comma' or keyword == ',':
+            delimiter_char_to_try_first = ','
+        elif keyword == 'tab':
+            delimiter_char_to_try_first = '\t'
+        elif keyword == 'space':
+            # Set to None to trigger default line.split() behavior, which correctly handles multiple spaces
+            delimiter_char_to_try_first = None 
+        else:
+            # Assume a non-keyword delimiter character was passed directly
+            delimiter_char_to_try_first = specified_delimiter_keyword
     
     actual_delimiter_to_parse_with = delimiter_char_to_try_first
 
@@ -436,20 +445,29 @@ def read_score_matrices(filepath, expected_k, delimiter_char=None):
                     # 1. Handle Markdown table format
                     if line.startswith('|'):
                         if '---' in line: continue # Skip separator line
-                        # Parse cells, removing empty strings from start/end pipes
                         parts = [p.strip() for p in line.strip('|').split('|')]
-                        if len(parts) > 1:
-                            try:
-                                # Heuristic: if the second element is a number, it's a data row.
-                                float(parts[1])
-                                # Data row found, skip the first element (row label)
-                                row_items_str_cleaned = parts[1:]
-                            except (ValueError, IndexError):
-                                # This is likely the header row. Skip it.
+                        # Filter out empty strings that can result from leading/trailing pipes
+                        parts = [p for p in parts if p]
+                        
+                        if not parts: continue
+
+                        try:
+                            # First, attempt to parse the entire row as numeric data.
+                            [float(p) for p in parts]
+                            row_items_str_cleaned = parts
+                        except ValueError:
+                            # If that fails, it might have a text label in the first column.
+                            if len(parts) > 1:
+                                try:
+                                    # Try parsing again, skipping the first element.
+                                    [float(p) for p in parts[1:]]
+                                    row_items_str_cleaned = parts[1:]
+                                except (ValueError, IndexError):
+                                    # Still fails. It's a header or malformed. Skip.
+                                    continue
+                            else:
+                                # Not enough columns to be data-with-a-label. Skip.
                                 continue
-                        else:
-                            # Not a valid data line (e.g., just `| |`)
-                            continue
                     
                     # 2. Handle standard delimited formats (tab, space, comma)
                     else:
@@ -604,6 +622,16 @@ def save_metric_distribution(metric_values, output_dir, filename, quiet=False):
         print(f"Error: Could not save metric distribution to {filename}. Reason: {e}")
 
 
+def _numpy_converter(obj):
+    """
+    JSON serializer for NumPy types.
+    Converts NumPy generic types to their Python equivalents.
+    """
+    if isinstance(obj, np.generic):
+        return obj.item()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Performs statistical analysis on LLM matching scores.")
     # Make run_output_dir a required argument for analyze_llm_performance.py
@@ -648,10 +676,14 @@ def main():
 
     actual_delimiter_for_parsing = None
     if args.delimiter is not None:
-        if args.delimiter.lower() == 'none': actual_delimiter_for_parsing = None
-        elif args.delimiter.lower() == 'tab': actual_delimiter_for_parsing = '\t'
-        elif args.delimiter.lower() == 'space': actual_delimiter_for_parsing = ' '
-        else: actual_delimiter_for_parsing = args.delimiter
+        delimiter_arg = args.delimiter.lower()
+        if delimiter_arg == 'none': actual_delimiter_for_parsing = None
+        elif delimiter_arg == 'tab': actual_delimiter_for_parsing = '\t'
+        elif delimiter_arg == 'space':
+            # Set to None to trigger line.split() for robust whitespace handling
+            actual_delimiter_for_parsing = None
+        else:
+            actual_delimiter_for_parsing = args.delimiter
 
     # --- Start of Processing ---
     if not args.quiet:
@@ -687,12 +719,11 @@ def main():
         metrics_filepath = os.path.join(analysis_inputs_dir, metrics_filename)
         try:
             with open(metrics_filepath, 'w', encoding='utf-8') as f:
-                json.dump(summary_data, f, indent=4)
+                json.dump(summary_data, f, indent=4, default=_numpy_converter)
         except IOError as e:
             logging.error(f"Could not write null metrics to {metrics_filepath}: {e}")
 
-        # Print success marker for the orchestrator
-        print("\nANALYZER_VALIDATION_SUCCESS\n")
+        # Do not print success marker; this path indicates zero valid responses.
         sys.exit(0) # Exit successfully
         return # Eject from function for testability
 
@@ -743,6 +774,9 @@ def main():
 
     original_indices = read_successful_indices(successful_indices_path)
 
+    # A flag to control the final success signal.
+    validation_passed = False 
+
     if original_indices and len(original_indices) == len(mappings_list):
         if not args.quiet:
             logging.info("--- Performing Final Validation: Checking all_mappings.txt against manifests ---")
@@ -769,14 +803,14 @@ def main():
                 validation_errors += 1
 
         if validation_errors > 0:
-            print(f"\nCRITICAL: ANALYZER VALIDATION FAILED WITH {validation_errors} ERRORS. Halting analysis.\n")
-            sys.exit(1)
-            return # Eject from function for testability
+            logging.error(f"CRITICAL: ANALYZER VALIDATION FAILED WITH {validation_errors} ERRORS. Analysis will complete, but the run is marked as invalid.")
+            validation_passed = False
         else:
-            # This success message MUST always be printed for the orchestrator to see.
-            print("\nANALYZER_VALIDATION_SUCCESS\n")
+            validation_passed = True
+            
     else:
-        logging.warning("Could not perform final validation: success index file missing or length mismatch.")
+        logging.critical("Could not perform final validation: success index file missing or length mismatch. Analysis will complete, but the run is marked as invalid.")
+        validation_passed = False
 
     num_tests_loaded = len(score_matrices)
     
@@ -928,11 +962,16 @@ def main():
     # Save the metrics to the JSON file
     try:
         with open(metrics_filepath, 'w', encoding='utf-8') as f:
-            json.dump(summary_data, f, indent=4)
+            json.dump(summary_data, f, indent=4, default=_numpy_converter)
         if not args.quiet:
             print(f"Successfully saved metrics to: {metrics_filepath}")
     except IOError as e:
         print(f"Error: Could not write metrics to {metrics_filepath}. Reason: {e}")
+
+    # Only print the success marker if validation was explicitly passed.
+    if validation_passed:
+        print("\nANALYZER_VALIDATION_SUCCESS\n")
+
 
 if __name__ == "__main__":
     main()

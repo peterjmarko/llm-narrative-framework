@@ -49,6 +49,7 @@ import glob
 import argparse
 import io
 from datetime import datetime
+import logging
 
 try:
     from config_loader import PROJECT_ROOT
@@ -89,7 +90,7 @@ def parse_report_file(report_path):
             json_data = json.loads(json_match.group(1).strip())
             metrics.update(json_data)
         except (json.JSONDecodeError, IndexError):
-            print(f"Warning: Malformed JSON in {os.path.basename(report_path)}")
+            logging.warning(f"Malformed JSON in {os.path.basename(report_path)}")
             
     end_time = None
     time_match_end = re.search(r'_(\d{8}-\d{6})\.txt$', os.path.basename(report_path))
@@ -150,13 +151,12 @@ def finalize_log(log_file_path):
         data_lines.pop()
 
     clean_csv_content = "".join(data_lines)
-    if not clean_csv_content.strip() or not data_lines:
-        print("Warning: Log file contains no valid data rows. Cannot finalize.")
-        return
 
-    # Step 2: Parse only the cleaned CSV data in-memory
+    # Step 2: Parse the cleaned CSV data and check if any data rows were found
     rows = list(csv.DictReader(io.StringIO(clean_csv_content)))
-    if not rows: return
+    if not rows:
+        logging.warning("Log file contains no valid data rows. Cannot finalize.")
+        return
 
     # Step 3: Perform calculations on the clean data (this logic is now safe)
     summary_start_time = rows[0]['StartTime']
@@ -172,7 +172,7 @@ def finalize_log(log_file_path):
         minutes, secs = divmod(rem, 60)
         total_duration_str = f"{int(hours):02d}:{int(minutes):02d}:{int(round(secs)):02d}"
     except (ValueError, TypeError) as e:
-        print(f"Warning: Could not calculate total duration. Error: {e}", file=sys.stderr)
+        logging.warning(f"Could not calculate total duration. Error: {e}")
     
     completed_count = sum(1 for r in rows if r["Status"] == "COMPLETED")
     failed_count = len(rows) - completed_count
@@ -243,7 +243,7 @@ def main():
                     writer.writerow(log_entry)
         
         if not report_files:
-            print("No report files found. An empty log with a header has been created.", file=sys.stderr)
+            logging.error("No report files found. An empty log with a header has been created.")
         else:
             print(f"\nSuccessfully rebuilt {os.path.basename(log_file_path)} from {len(report_files)} reports.")
 

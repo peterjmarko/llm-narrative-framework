@@ -38,7 +38,7 @@ from pathlib import Path
 import numpy as np
 import importlib
 import pytest
-
+import builtins
 # Import the module to test
 from src import analyze_llm_performance
 
@@ -47,6 +47,9 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
 
     def setUp(self):
         """Set up a temporary directory and mock dependencies for each test."""
+        # Backup sys.modules to ensure test isolation
+        self.sys_modules_backup = sys.modules.copy()
+
         self.test_dir = tempfile.TemporaryDirectory(prefix="analyze_perf_test_")
         self.project_root = self.test_dir.name
         
@@ -87,6 +90,10 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         self.test_dir.cleanup()
         self.config_patcher.stop()
         self.sys_exit_patcher.stop()
+        
+        # Restore sys.modules to its state before the test ran
+        sys.modules.clear()
+        sys.modules.update(self.sys_modules_backup)
 
     # --- Group 1: Main Orchestrator Tests ---
 
@@ -147,6 +154,9 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         self.assertAlmostEqual(results['mean_mrr'], 0.75)
         self.assertAlmostEqual(results['mean_top_1_acc'], 0.5)
         self.assertEqual(results['n_valid_responses'], 2)
+
+        # Verify that the value from a NumPy operation (np.mean) is a standard Python float
+        self.assertIsInstance(results['mean_mrr'], float)
         
         # Check that distribution files were created
         self.assertTrue((self.analysis_dir / "mrr_distribution_k2.txt").is_file())
@@ -178,29 +188,82 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         self.assertEqual(results['n_valid_responses'], 0)
         self.assertIsNone(results['mean_mrr'])
 
-    def test_main_validation_failure_exits_with_error(self):
-        """Verify the script exits on a manifest vs. mapping mismatch."""
+    # --- Group 9: Validation Logic Tests ---
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    @patch('builtins.print')
+    @patch('src.analyze_llm_performance.logging.error')
+    def test_main_completes_but_suppresses_success_on_validation_mismatch(self, mock_log_error, mock_print):
+        """Verify script completes but suppresses success marker if a manifest mismatches."""
         # --- Arrange ---
-        # Create a valid set of files first
         self._create_test_input_files()
-        # NOW, intentionally corrupt one of the ground-truth files
+        # Intentionally corrupt a manifest file to cause a validation mismatch
         (self.queries_dir / "llm_query_001_manifest.txt").write_text(
             "Shuffled_Name\tShuffled_Desc_Text\tShuffled_Desc_Index\n"
-            "Person A\tDesc A\t9\n" # This index mismatches mappings.txt
+            "Person A\tDesc A\t9\n"
             "Person B\tDesc B\t9\n"
         )
-        
         test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir)]
-        
+
         # --- Act ---
-        # The script should now find the mismatch and call sys.exit(1)
         with patch.object(sys, 'argv', test_argv):
             analyze_llm_performance.main()
-                
+        
         # --- Assert ---
-        # We assert that our mock of sys.exit was called with the error code.
-        # The `assertRaises` is incorrect because the mock prevents the exception.
-        self.mock_sys_exit.assert_called_with(1)
+        self.mock_sys_exit.assert_not_called()
+        mock_log_error.assert_any_call("CRITICAL: ANALYZER VALIDATION FAILED WITH 1 ERRORS. Analysis will complete, but the run is marked as invalid.")
+        success_message_found = any("ANALYZER_VALIDATION_SUCCESS" in call.args[0] for call in mock_print.call_args_list if call.args)
+        self.assertFalse(success_message_found)
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    @patch('builtins.print')
+    def test_main_zero_responses_path_does_not_print_success(self, mock_print):
+        """Verify the 'zero valid responses' path exits cleanly without printing a success message."""
+        (self.analysis_dir / "all_mappings.txt").touch()
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir), '--num_valid_responses', '0']
+        
+        with patch.object(sys, 'argv', test_argv):
+            analyze_llm_performance.main()
+
+        self.mock_sys_exit.assert_called_with(0)
+        success_message_found = any("ANALYZER_VALIDATION_SUCCESS" in call.args[0] for call in mock_print.call_args_list if call.args)
+        self.assertFalse(success_message_found, "Validation success message should not be printed for zero responses.")
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    @patch('builtins.print')
+    @patch('src.analyze_llm_performance.logging.critical')
+    def test_main_completes_but_suppresses_success_if_indices_file_is_missing(self, mock_log_critical, mock_print):
+        """Verify the script completes but suppresses the success marker if successful_indices.txt is missing."""
+        self._create_test_input_files()
+        (self.analysis_dir / "successful_indices.txt").unlink()
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir)]
+
+        with patch.object(sys, 'argv', test_argv):
+            analyze_llm_performance.main()
+            self.mock_sys_exit.assert_not_called()
+            mock_log_critical.assert_called_once()
+            self.assertIn("Could not perform final validation", mock_log_critical.call_args[0][0])
+            success_message_found = any("ANALYZER_VALIDATION_SUCCESS" in call.args[0] for call in mock_print.call_args_list if call.args)
+            self.assertFalse(success_message_found)
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    @patch('builtins.print')
+    @patch('src.analyze_llm_performance.logging.critical')
+    def test_main_completes_but_suppresses_success_on_length_mismatch(self, mock_log_critical, mock_print):
+        """Verify script completes but suppresses success on indices/mappings length mismatch."""
+        self._create_test_input_files()
+        # Add an extra line to cause a length mismatch
+        with open(self.analysis_dir / "successful_indices.txt", "a") as f:
+            f.write("3\n")
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir)]
+
+        with patch.object(sys, 'argv', test_argv):
+            analyze_llm_performance.main()
+            self.mock_sys_exit.assert_not_called()
+            mock_log_critical.assert_called_once()
+            self.assertIn("Could not perform final validation", mock_log_critical.call_args[0][0])
+            success_message_found = any("ANALYZER_VALIDATION_SUCCESS" in call.args[0] for call in mock_print.call_args_list if call.args)
+            self.assertFalse(success_message_found)
 
     # --- Group 2: Core Statistical Function Tests ---
 
@@ -734,6 +797,332 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         chi2_empty, p_empty = analyze_llm_performance.combine_p_values_fisher([])
         self.assertIsNone(chi2_empty)
         self.assertIsNone(p_empty)
+
+
+    # --- Group 6: Additional Coverage Tests ---
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    def test_main_config_loader_import_failure_uses_fallback(self):
+        """Test lines 50-57: Verify fallback configuration is used when import fails."""
+        # Unload the target module to force a re-import under the patch
+        if 'src.analyze_llm_performance' in sys.modules:
+            del sys.modules['src.analyze_llm_performance']
+
+        # Temporarily make 'config_loader' un-importable.
+        with patch.dict('sys.modules', {'config_loader': None}):
+            # Re-importing the module now triggers the 'except ImportError' block
+            from src import analyze_llm_performance as reloaded_analyze
+
+            # --- Arrange ---
+            self._create_test_input_files()
+            test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir), '--num_valid_responses', '2']
+
+            # --- Act & Assert ---
+            with patch.object(sys, 'argv', test_argv):
+                reloaded_analyze.main()
+                # A successful run with data does not call sys.exit; it just finishes.
+                self.mock_sys_exit.assert_not_called()
+
+        # No manual cleanup needed; tearDown now handles restoring sys.modules.
+
+
+    @patch('src.analyze_llm_performance.print')
+    def test_evaluate_single_test_wrong_matrix_shape(self, mock_print):
+        """Test line 105: Verify error return for wrong matrix shape."""
+        # Matrix is 2x2, but k is 3
+        result = analyze_llm_performance.evaluate_single_test([[1, 2], [3, 4]], [1, 2, 3], k_val=3)
+        self.assertIsNone(result)
+        mock_print.assert_any_call("Warning: evaluate_single_test received matrix with incorrect shape (2, 2), expected (3,3). Skipping this test.")
+
+    @patch('src.analyze_llm_performance.print')
+    def test_evaluate_single_test_wrong_mapping_length(self, mock_print):
+        """Test line 108: Verify error return for wrong mapping length."""
+        # Matrix is 2x2, k is 2, but mapping length is 1
+        result = analyze_llm_performance.evaluate_single_test([[1, 2], [3, 4]], [1], k_val=2)
+        self.assertIsNone(result)
+        mock_print.assert_any_call("Warning: correct_mapping_indices_1_based has 1 elements, expected 2. Skipping this test.")
+
+    @patch('src.analyze_llm_performance.print')
+    def test_evaluate_single_test_invalid_mapping_value(self, mock_print):
+        """Test line 118: Verify error return for mapping index out of 1-based range."""
+        # Matrix is 2x2, k is 2, mapping index 3 is > 2
+        result = analyze_llm_performance.evaluate_single_test([[1, 2], [3, 4]], [1, 3], k_val=2)
+        self.assertIsNone(result)
+        mock_print.assert_any_call("Warning: Invalid value in correct_mapping_indices_1_based (not between 1 and 2). Skipping this test.")
+
+    def test_combine_p_values_stouffer_only_filtered_out(self):
+        """Test lines 197, 202: Stouffer's method handles inputs that are all None/NaN/Zero length."""
+        # List where all values are filtered out by the list comprehension
+        p_values_filtered = [None, np.nan]
+        z_filtered, p_filtered = analyze_llm_performance.combine_p_values_stouffer(p_values_filtered)
+        self.assertIsNone(z_filtered)
+        self.assertIsNone(p_filtered)
+
+    def test_combine_p_values_fisher_only_non_positive(self):
+        """Test lines 219, 223: Fisher's method handles inputs that are all None/NaN/non-positive."""
+        # List where all values are filtered out (p > 0 required)
+        p_values = [None, np.nan, 0.0, 0.0]
+        chi2, p = analyze_llm_performance.combine_p_values_fisher(p_values)
+        self.assertIsNone(chi2)
+        self.assertIsNone(p)
+    
+    @patch('src.analyze_llm_performance.print')
+    def test_read_mappings_and_deduce_k_empty_or_non_data_file_failure(self, mock_print):
+        """Test lines 387-389, 423-425: Verify logic for empty file and failure to deduce k."""
+        
+        # Test empty file (lines 387-389)
+        (self.analysis_dir / "empty_map.txt").write_text("")
+        mappings, k, delim = analyze_llm_performance.read_mappings_and_deduce_k(
+            self.analysis_dir / "empty_map.txt", k_override=None
+        )
+        self.assertIsNone(mappings)
+        self.assertIsNone(k)
+        mock_print.assert_any_call(f"Error: Mappings file {self.analysis_dir / 'empty_map.txt'} is empty.")
+        
+        # Test file that contains only text/non-numeric content (should fail to deduce k > 0)
+        (self.analysis_dir / "non_numeric_map.txt").write_text("a b c\nd e f\n")
+        mappings, k, delim = analyze_llm_performance.read_mappings_and_deduce_k(
+            self.analysis_dir / "non_numeric_map.txt", k_override=None
+        )
+        self.assertIsNone(mappings)
+        self.assertIsNone(k)
+        # The code falls back to the default delimiter (None), so the error message prints repr(None)
+        mock_print.assert_any_call(f"Error: Could not deduce a valid k > 0 from {self.analysis_dir / 'non_numeric_map.txt'} with delimiter '{repr(None)}'.")
+        
+
+    @patch('src.analyze_llm_performance.print')
+    def test_read_score_matrices_file_not_found_error(self, mock_print):
+        """Test line 581: Verify error handling when score file is missing."""
+        path = self.analysis_dir / "missing_scores.txt"
+        matrices = analyze_llm_performance.read_score_matrices(path, expected_k=2)
+        self.assertIsNone(matrices)
+        mock_print.assert_any_call(f"Error: Score matrices file not found at {path}")
+
+    @patch('src.analyze_llm_performance.print')
+    def test_read_score_matrices_non_float_in_row_makes_block_malformed(self, mock_print):
+        """Verify a row with non-float data is skipped, causing a block size error at EOF."""
+        # The line with "FAIL" will be skipped by the line-by-line parser.
+        # This leaves a final block of only 1 row, which is incorrect for k=2.
+        content = (
+            "1.0\t0.0\n"
+            "0.0\tFAIL\n"
+        )
+        path = self.analysis_dir / "non_float_matrix_eof.txt"
+        path.write_text(content)
+
+        matrices = analyze_llm_performance.read_score_matrices(path, expected_k=2, delimiter_char='\t')
+
+        # No matrices should be loaded because the only block is malformed (1 row instead of 2).
+        self.assertEqual(len(matrices), 0)
+
+        # The warning should be about the final block having the wrong number of lines.
+        warning_found = any("Last mat block 1 lines, exp 2. Skip." in call.args[0] for call in mock_print.call_args_list)
+        self.assertTrue(warning_found, "Expected wrong line count warning at EOF not found.")
+
+    @patch('src.analyze_llm_performance.read_score_matrices', return_value=None)
+    @patch('src.analyze_llm_performance.read_mappings_and_deduce_k', return_value=([1], 1, ' '))
+    def test_main_exit_on_score_matrices_read_failure(self, mock_read_mappings, mock_read_scores):
+        """Test line 932->exit: Verify main exits with error code 1 if score matrices read returns None."""
+        # --- Arrange ---
+        self._create_test_input_files()
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir)]
+        
+        # --- Act ---
+        with patch.object(sys, 'argv', test_argv), \
+             patch('src.analyze_llm_performance.logging.error') as mock_log_error:
+            analyze_llm_performance.main()
+            
+        # --- Assert ---
+            self.mock_sys_exit.assert_called_with(1)
+            mock_log_error.assert_called_once_with("Halting due to issues reading score matrices.")
+
+
+    # --- Group 7: Final Coverage Push (80%+) ---
+
+    def test_main_delimiter_argument_parsing(self):
+        """Test lines 651-660: Verify --delimiter 'space' is parsed correctly."""
+        # --- Arrange ---
+        # Create files with space-separated values and a header for robust parsing
+        (self.analysis_dir / "all_scores.txt").write_text("0.9 0.1\n0.2 0.8\n")
+        (self.analysis_dir / "all_mappings.txt").write_text("h1 h2\n1 2\n")
+        (self.analysis_dir / "successful_indices.txt").write_text("1\n")
+        (self.queries_dir / "llm_query_001_manifest.txt").write_text(
+            "Shuffled_Name\tShuffled_Desc_Text\tShuffled_Desc_Index\n"
+            "Person A\tDesc A\t1\n"
+            "Person B\tDesc B\t2\n"
+        )
+
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir), '--delimiter', 'space', '-k', '2']
+
+        # --- Act & Assert ---
+        with patch.object(sys, 'argv', test_argv), \
+             patch('builtins.print') as mock_print:
+            analyze_llm_performance.main()
+            # The script intentionally converts the 'space' keyword to `None` to enable robust
+            # whitespace splitting via line.split(). The test correctly validates that the
+            # final log message reports 'None' as the delimiter used.
+            info_found = any("Delimiter for mappings: 'None'" in call.args[0] for call in mock_print.call_args_list)
+            self.assertTrue(info_found, "Expected log for whitespace delimiter ('None') not found.")
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    @patch('builtins.print')
+    @patch('src.analyze_llm_performance.logging.error')
+    def test_main_validation_fails_if_manifest_is_missing(self, mock_log_error, mock_print):
+        """Verify script completes but suppresses success if a manifest is missing."""
+        # --- Arrange ---
+        self._create_test_input_files()
+        # Delete one of the required manifests
+        (self.queries_dir / "llm_query_002_manifest.txt").unlink()
+
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir)]
+        
+        # --- Act & Assert ---
+        with patch.object(sys, 'argv', test_argv):
+            analyze_llm_performance.main()
+            
+            # The script should NOT exit
+            self.mock_sys_exit.assert_not_called()
+            
+            # It should log the specific error
+            mock_log_error.assert_any_call(f"  VALIDATION FAIL: Manifest for original index 2 not found at '{self.queries_dir / 'llm_query_002_manifest.txt'}'")
+            
+            # It should suppress the final success marker
+            success_message_found = any("ANALYZER_VALIDATION_SUCCESS" in call.args[0] for call in mock_print.call_args_list if call.args)
+            self.assertFalse(success_message_found)
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    @patch('builtins.print')
+    @patch('src.analyze_llm_performance.logging.error')
+    def test_main_validation_fails_on_manifest_read_error(self, mock_log_error, mock_print):
+        """Verify script completes but suppresses success if a manifest cannot be read."""
+        # --- Arrange ---
+        self._create_test_input_files()
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir)]
+
+        original_open = builtins.open
+        def open_side_effect(file, *args, **kwargs):
+            if "llm_query_002_manifest.txt" in str(file):
+                raise IOError("Test IO Error")
+            return original_open(file, *args, **kwargs)
+
+        # --- Act & Assert ---
+        with patch('builtins.open', side_effect=open_side_effect), \
+             patch.object(sys, 'argv', test_argv):
+            analyze_llm_performance.main()
+
+            # The script should NOT exit
+            self.mock_sys_exit.assert_not_called()
+
+            # It should log the specific error
+            mock_log_error.assert_any_call("  VALIDATION ERROR: Could not process manifest for original index 2: Test IO Error")
+            
+            # It should suppress the final success marker
+            success_message_found = any("ANALYZER_VALIDATION_SUCCESS" in call.args[0] for call in mock_print.call_args_list if call.args)
+            self.assertFalse(success_message_found)
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    def test_main_io_error_on_final_metrics_save(self):
+        """Test lines 850-853: Verify an error is printed if final JSON save fails."""
+        # --- Arrange ---
+        self._create_test_input_files()
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir)]
+        
+        original_open = builtins.open
+        def open_side_effect(file, *args, **kwargs):
+            # Only fail when trying to write the final metrics file
+            if "replication_metrics.json" in str(file):
+                raise IOError("Permission denied")
+            return original_open(file, *args, **kwargs)
+
+        # --- Act & Assert ---
+        with patch('builtins.open', side_effect=open_side_effect), \
+             patch.object(sys, 'argv', test_argv), \
+             patch('builtins.print') as mock_print:
+            
+            analyze_llm_performance.main()
+            metrics_filepath = self.analysis_dir / "replication_metrics.json"
+            mock_print.assert_any_call(f"Error: Could not write metrics to {metrics_filepath}. Reason: Permission denied")
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    def test_main_wilcoxon_value_error_in_mean_rank_analysis(self):
+        """Test lines 809-815: Verify the except block for wilcoxon ValueError is hit gracefully."""
+        # --- Arrange ---
+        self._create_test_input_files()
+        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir)]
+        
+        # --- Act & Assert ---
+        # Patch wilcoxon to raise a ValueError, simulating a failure condition
+        with patch.object(sys, 'argv', test_argv), \
+             patch('src.analyze_llm_performance.wilcoxon', side_effect=ValueError("Test wilcoxon error")):
+            
+            analyze_llm_performance.main()
+            
+            # The script should complete successfully, but the p-value will be None
+            metrics_file = self.analysis_dir / "replication_metrics.json"
+            self.assertTrue(metrics_file.is_file())
+            with open(metrics_file, 'r') as f:
+                results = json.load(f)
+            self.assertIsNone(results['rank_of_correct_id_p'])
+
+    def test_read_score_matrices_skips_markdown_separator(self):
+        """Test line 452: Verify the parser correctly handles and skips markdown table separator lines."""
+        md_content = (
+            "| Person 1  | 0.9    | 0.1    |\n"
+            "|-----------|--------|--------|\n" # This should be skipped
+            "| Person 2  | 0.2    | 0.8    |\n"
+        )
+        (self.analysis_dir / "md_scores_sep.txt").write_text(md_content)
+        
+        matrices = analyze_llm_performance.read_score_matrices(
+            self.analysis_dir / "md_scores_sep.txt", expected_k=2
+        )
+        
+        self.assertEqual(len(matrices), 1)
+        expected_matrix = np.array([[0.9, 0.1], [0.2, 0.8]])
+        np.testing.assert_array_equal(matrices[0], expected_matrix)
+
+
+    # --- Group 8: Serialization and Data Type Tests ---
+    
+    def test_numpy_converter_handles_numpy_types(self):
+        """Verify the _numpy_converter correctly converts NumPy scalars."""
+        # Test np.float64
+        np_float = np.float64(3.14)
+        py_float = analyze_llm_performance._numpy_converter(np_float)
+        self.assertIsInstance(py_float, float)
+        self.assertAlmostEqual(py_float, 3.14)
+
+        # Test np.int64
+        np_int = np.int64(42)
+        py_int = analyze_llm_performance._numpy_converter(np_int)
+        self.assertIsInstance(py_int, int)
+        self.assertEqual(py_int, 42)
+
+    def test_numpy_converter_raises_type_error_for_unhandled_types(self):
+        """Verify the _numpy_converter raises TypeError for non-NumPy objects."""
+        with self.assertRaises(TypeError):
+            analyze_llm_performance._numpy_converter({1, 2, 3}) # A set is not serializable
+
+
+    def test_read_score_matrices_markdown_with_numeric_first_column(self):
+        """Verify the parser does not drop the first column if it's numeric."""
+        # This content would fail with the old logic, which would incorrectly
+        # drop the first column (e.g., '1.0', '2.0'). This test provides a
+        # valid 3x3 matrix to the k=3 parser.
+        md_content = (
+            "| 1.0 | 0.9 | 0.1 |\n"
+            "| 2.0 | 0.2 | 0.8 |\n"
+            "| 3.0 | 0.3 | 0.7 |\n"
+        )
+        (self.analysis_dir / "md_scores_numeric.txt").write_text(md_content)
+        
+        matrices = analyze_llm_performance.read_score_matrices(
+            self.analysis_dir / "md_scores_numeric.txt", expected_k=3
+        )
+        
+        self.assertEqual(len(matrices), 1)
+        expected_matrix = np.array([[1.0, 0.9, 0.1], [2.0, 0.2, 0.8], [3.0, 0.3, 0.7]])
+        np.testing.assert_array_equal(matrices[0], expected_matrix)
 
 
 if __name__ == '__main__':

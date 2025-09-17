@@ -175,6 +175,98 @@ Totals,2025-01-01 12:00:00,2025-01-01 12:05:00,00:05:00,1,0
         self.assertEqual(content, expected_header)
 
 
+    def test_rebuild_with_no_reports_creates_empty_log(self):
+        """Verify 'rebuild' creates a header-only log when no reports are found."""
+        # --- Arrange ---
+        test_argv = ['manage_experiment_log.py', 'rebuild', str(self.exp_dir)]
+        log_path = self.exp_dir / "experiment_log.csv"
+
+        # --- Act ---
+        # The message for no reports goes to stderr via logging.error
+        with self.assertLogs(level='ERROR') as cm:
+            with patch.object(sys, 'argv', test_argv):
+                manage_experiment_log.main()
+            self.assertIn("No report files found", cm.output[0])
+
+        # --- Assert ---
+        self.assertTrue(log_path.exists())
+        with open(log_path, 'r') as f:
+            # Should contain only the header, so one line.
+            self.assertEqual(len(f.readlines()), 1)
+
+    def test_parse_report_with_missing_info(self):
+        """Verify parser handles missing timestamps and rep numbers gracefully."""
+        # --- Arrange ---
+        # Create a directory and report with malformed names (no timestamp, no rep-num)
+        run_dir = self.exp_dir / "run_malformed_name"
+        run_dir.mkdir()
+        report_path = run_dir / "replication_report_malformed.txt"
+        report_path.write_text("Final Status: COMPLETED\n")
+        
+        # --- Act ---
+        result = manage_experiment_log.parse_report_file(str(report_path))
+        
+        # --- Assert ---
+        self.assertEqual(result['ReplicationNum'], 'N/A')
+        self.assertEqual(result['StartTime'], 'N/A')
+        self.assertEqual(result['EndTime'], 'N/A')
+        self.assertEqual(result['Duration'], 'N/A')
+
+    def test_parse_report_with_malformed_json(self):
+        """Verify parser handles reports with invalid JSON."""
+        # --- Arrange ---
+        run_dir = self.exp_dir / "run_rep-001"
+        run_dir.mkdir()
+        report_path = run_dir / "replication_report.txt"
+        report_path.write_text("<<<METRICS_JSON_START>>>{'bad':json}<<<METRICS_JSON_END>>>")
+
+        # --- Act ---
+        with self.assertLogs(level='WARNING') as cm:
+            result = manage_experiment_log.parse_report_file(str(report_path))
+            self.assertIn("Malformed JSON", cm.output[0])
+        
+        # --- Assert ---
+        self.assertEqual(result['MeanMRR'], 'N/A')
+        self.assertEqual(result['MeanTop1Acc'], 'N/A')
+
+    def test_finalize_on_header_only_log(self):
+        """Verify finalize handles a log with only a header and no data."""
+        # --- Arrange ---
+        log_path = self.exp_dir / "experiment_log.csv"
+        log_path.write_text("ReplicationNum,Status\n") # Minimal header
+        test_argv = ['manage_experiment_log.py', 'finalize', str(self.exp_dir)]
+        
+        # --- Act ---
+        with self.assertLogs(level='WARNING') as cm:
+            with patch.object(sys, 'argv', test_argv):
+                manage_experiment_log.main()
+            self.assertIn("Log file contains no valid data rows", cm.output[0])
+            
+        # --- Assert ---
+        # The file content should be unchanged
+        self.assertEqual(log_path.read_text(), "ReplicationNum,Status\n")
+
+    def test_finalize_on_log_with_bad_timestamps(self):
+        """Verify finalize handles bad timestamps and reports N/A for duration."""
+        # --- Arrange ---
+        log_path = self.exp_dir / "experiment_log.csv"
+        log_content = """ReplicationNum,Status,StartTime,EndTime
+001,COMPLETED,not-a-date,not-a-date
+"""
+        log_path.write_text(log_content)
+        test_argv = ['manage_experiment_log.py', 'finalize', str(self.exp_dir)]
+
+        # --- Act ---
+        with self.assertLogs(level='WARNING') as cm:
+            with patch.object(sys, 'argv', test_argv):
+                manage_experiment_log.main()
+            self.assertIn("Could not calculate total duration", cm.output[0])
+
+        # --- Assert ---
+        final_content = log_path.read_text()
+        self.assertIn("Totals,not-a-date,not-a-date,N/A,1,0", final_content)
+
+
 if __name__ == '__main__':
     unittest.main()
 

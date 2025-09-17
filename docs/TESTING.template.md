@@ -288,14 +288,15 @@ Module                                  Cov. (%)        Status & Justification
 
 **Finalization Scripts**
 
-`src/manage_experiment_log.py`          `79%`           COMPLETE. The unit test suite validates all core commands
-                                                        (`rebuild`, `finalize`, `start`) and their file I/O
-                                                        operations. It confirms correct CSV parsing, generation, and
-                                                        the idempotency of the `finalize` command.
+`src/manage_experiment_log.py`          `87%`           COMPLETE. Target met. The unit test suite was expanded to
+                                                        validate all core commands (`rebuild`, `finalize`, `start`)
+                                                        and robustly handle edge cases, including malformed report
+                                                        files, missing data, and invalid log file states.
 
-`src/compile_experiment_results.py`     `74%`           COMPLETE. Unit tests cover the main aggregation workflow and
-                                                        robustly handle edge cases like empty or missing replication
-                                                        files.
+`src/compile_experiment_results.py`     `89%`           COMPLETE. Target met. Unit test suite expanded to cover
+                                                        all major error handling paths (e.g., non-existent dirs,
+                                                        malformed CSVs, missing config) and edge cases for data
+                                                        aggregation.
 
 **SINGLE REPLICATION PIPELINE**
 **Primary Orchestrator**
@@ -309,12 +310,15 @@ Module                                  Cov. (%)        Status & Justification
 
 **Pipeline Stages**
 
-`src/build_llm_queries.py`              `68%`           COMPLETE. Unit tests cover the core orchestration logic,
-                                                        including new runs, continued runs, and key failure modes.
+`src/build_llm_queries.py`              `84%`           COMPLETE. Target met. The test suite was expanded to validate
+                                                        argument parsing, error handling for invalid states (e.g.,
+                                                        k > n), and the correct cleanup of temporary directories
+                                                        and files for both new and continued runs.
 
-`src/query_generator.py`                `74%`           COMPLETE. Unit tests cover both 'correct' and 'random'
-                                                        mapping strategies, edge cases (e.g., k=max), and key
-                                                        failure modes like missing or insufficient input data.
+`src/query_generator.py`                `80%`           COMPLETE. Target met. Unit tests cover both 'correct' and
+                                                        'random' mapping strategies, argument parsing, all major
+                                                        error handling paths (e.g., invalid k, file I/O errors),
+                                                        and edge cases for file content.
 
 `src/llm_prompter.py`                   `81%`           COMPLETE. Comprehensive unit tests validate the core API call
                                                         logic, all major failure modes (HTTP errors, timeouts,
@@ -326,11 +330,10 @@ Module                                  Cov. (%)        Status & Justification
                                                         range of failure modes for malformed LLM responses and
                                                         corrupted input files.
 
-`src/analyze_llm_performance.py`        `78%`           COMPLETE. Comprehensive unit tests validate the main
-                                                        orchestrator's control flow and early-exit conditions, all
-                                                        core statistical calculations (including `IndexError` and
-                                                        `ValueError` handling), meta-analysis functions for combining
-                                                        p-values, and the robust parsing of all input file formats.
+`src/analyze_llm_performance.py`        `83%`           COMPLETE. Target met. Unit test suite significantly
+                                                        expanded to validate core statistical logic, file I/O
+                                                        contracts, all major failure modes, and edge cases for
+                                                        data parsing and validation.
 
 `src/run_bias_analysis.py`              `86%`           COMPLETE. Unit tests cover the main orchestrator workflow,
                                                         core bias calculations, and robust handling of empty or
@@ -340,9 +343,10 @@ Module                                  Cov. (%)        Status & Justification
                                                         robust error handling for missing/corrupted files and correct
                                                         fallback for optional data sources.
 
-`src/compile_replication_results.py`    `78%`           COMPLETE. Unit tests cover the main workflow, data merging
-                                                        logic, and robust error handling for missing or invalid input
-                                                        files.
+`src/compile_replication_results.py`    `91%`           COMPLETE. Target met. Unit test suite expanded to cover
+                                                        all major error handling paths, including malformed JSON,
+                                                        incomplete/legacy config files, and invalid run directory
+                                                        structures.
 
 **Study-Level & Analysis**
 
@@ -382,4 +386,32 @@ Module                                  Cov. (%)        Status & Justification
 
 `compile_study.ps1`                     `N/A`           PENDING. Will be validated by the planned integration test harness
                                                         for study compilation.
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+### Module-Level Test Coverage: Developer & Utility Scripts
+
+The following scripts are developer utilities used for maintenance, one-off analysis, or test asset generation. They are not part of the core, automated data pipeline. As per the project roadmap, creating unit test suites for these scripts is planned for after the initial publication.
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+Module                                          Cov. (%)        Status & Justification
+----------------------------------------------- --------------- ----------------------------------------------------------------------------------
+**Test Asset Generation**
+`scripts/workflows/assembly_logic/*.py`         `N/A`           PLANNED. These scripts are developer tools used to generate
+                                                                a ground-truth test asset. Their functional correctness is
+                                                                validated end-to-end by the Core Algorithm Validation test, but
+                                                                unit tests for their internal logic are postponed.
+**Utilities**
+`src/utils/analyze_research_patterns.py`        `N/A`           PLANNED. Postponed until after publication.
+`src/utils/patch_eminence_scores.py`            `N/A`           PLANNED. Postponed until after publication.
+`src/utils/validate_country_codes.py`           `N/A`           PLANNED. Postponed until after publication.
+
+**Analysis Scripts**
+`scripts/analysis/analyze_cutoff_parameters.py` `N/A`           PLANNED. Postponed until after publication.
+`scripts/analysis/get_docstring_summary.py`     `N/A`           PLANNED. Postponed until after publication.
+`scripts/analysis/inspect_adb_categories.py`    `N/A`           PLANNED. Postponed until after publication.
+`scripts/analysis/validate_import_file.py`      `N/A`           PLANNED. Postponed until after publication.
+
+**Linting & Maintenance Scripts**
+`scripts/lint/*.py`                             `N/A`           PLANNED. Postponed until after publication.
+`scripts/maintenance/*.py`                      `N/A`           PLANNED. Postponed until after publication.
 -----------------------------------------------------------------------------------------------------------------------------------------

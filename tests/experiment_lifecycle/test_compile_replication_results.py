@@ -168,6 +168,112 @@ class TestCompileReplicationResults(unittest.TestCase):
         flat3 = compile_replication_results._flatten_bias_metrics(data3)
         self.assertDictEqual(flat3, {"a": 1, "positional_bias_metrics": "not_a_dict"})
 
+    def test_main_exits_if_metrics_file_is_malformed(self):
+        """Verify script exits if replication_metrics.json is unparseable."""
+        # --- Arrange ---
+        self._create_input_files()
+        # Overwrite with invalid JSON
+        (self.analysis_dir / "replication_metrics.json").write_text("{'bad': json,}")
+        test_argv = ['compile_results.py', str(self.run_dir)]
+        
+        # --- Act ---
+        with self.assertLogs(level='ERROR') as cm:
+            with patch.object(sys, 'argv', test_argv):
+                compile_replication_results.main()
+            self.assertIn("Could not read or parse replication_metrics.json", cm.output[0])
+            
+        # --- Assert ---
+        self.mock_sys_exit.assert_called_with(1)
+
+    def test_parse_config_params_handles_missing_and_legacy_keys(self):
+        """Verify config parser returns defaults for missing keys and finds legacy keys."""
+        # --- Arrange ---
+        config = configparser.ConfigParser()
+        # Use legacy section and key names (e.g., [Model] instead of [LLM])
+        config['Model'] = {'model': 'legacy-model/test-v1'}
+        # Omit 'Study' section entirely to test defaults
+        config_path = self.run_dir / "legacy_config.ini.archived"
+        with open(config_path, 'w') as f:
+            config.write(f)
+
+        # --- Act ---
+        params = compile_replication_results.parse_config_params(config_path)
+
+        # --- Assert ---
+        self.assertEqual(params['model'], 'legacy-model/test-v1') # Found legacy key
+        self.assertEqual(params['mapping_strategy'], 'unknown_strategy') # Used default
+        self.assertEqual(params['k'], 0) # Used default
+
+    def test_parse_config_params_handles_malformed_config(self):
+        """Verify config parser handles a completely malformed config file."""
+        # --- Arrange ---
+        config_path = self.run_dir / "malformed_config.ini.archived"
+        config_path.write_text("this is not a valid ini file")
+
+        # --- Act ---
+        with self.assertLogs(level='WARNING') as cm:
+            params = compile_replication_results.parse_config_params(config_path)
+            self.assertIn("Could not fully parse config", cm.output[0])
+
+        # --- Assert ---
+        # Should return a dictionary of default values
+        self.assertEqual(params['model'], 'unknown_model')
+
+    def test_main_handles_run_dir_without_rep_number(self):
+        """Verify replication number defaults to 0 if not in directory name."""
+        # --- Arrange ---
+        # Rename the run directory to remove the 'rep-1' part
+        new_run_dir_name = "run_20250101_120000"
+        new_run_dir = Path(self.test_dir.name) / new_run_dir_name
+        self.run_dir.rename(new_run_dir)
+        self.run_dir = new_run_dir # Update self for teardown
+        self.analysis_dir = self.run_dir / "analysis_inputs" # Update analysis_dir path
+
+        self._create_input_files()
+        test_argv = ['compile_results.py', str(self.run_dir)]
+
+        # --- Act ---
+        with patch.object(sys, 'argv', test_argv):
+            compile_replication_results.main()
+        
+        # --- Assert ---
+        output_csv = self.run_dir / "REPLICATION_results.csv"
+        self.assertTrue(output_csv.is_file())
+        df = pd.read_csv(output_csv)
+        self.assertEqual(df.iloc[0]['replication'], 0)
+
+    def test_write_summary_csv_handles_no_results(self):
+        """Verify a warning is logged when writing an empty list of results."""
+        with self.assertLogs(level='WARNING') as cm:
+            compile_replication_results.write_summary_csv("path.csv", [])
+            self.assertIn("No results to write", cm.output[0])
+
+    def test_write_summary_csv_returns_if_no_header_config(self):
+        """Verify the function returns early if header config is missing."""
+        with patch('src.compile_replication_results.get_config_list', return_value=[]), \
+             self.assertLogs(level='ERROR') as cm:
+            compile_replication_results.write_summary_csv("path.csv", [{'a': 1}])
+            self.assertIn("'csv_header_order' not found", cm.output[0])
+        # Assert that sys.exit was NOT called, as the function should return.
+        self.mock_sys_exit.assert_not_called()
+
+    def test_write_summary_csv_adds_missing_columns(self):
+        """Verify that columns in header_order but not in data are added as NA."""
+        # Arrange
+        # self.header_order includes 'top1_pred_bias_std', which is missing from this data
+        results_list = [{'run_directory': 'run_1', 'replication': 1, 'mean_mrr': 0.5}]
+        output_path = self.run_dir / "summary_with_missing_col.csv"
+        
+        # Act
+        compile_replication_results.write_summary_csv(output_path, results_list)
+        
+        # Assert
+        self.assertTrue(output_path.is_file())
+        df = pd.read_csv(output_path)
+        self.assertIn('top1_pred_bias_std', df.columns)
+        self.assertTrue(pd.isna(df['top1_pred_bias_std'].iloc[0]))
+
+
 if __name__ == '__main__':
     unittest.main()
 

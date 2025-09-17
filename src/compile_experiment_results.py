@@ -67,6 +67,7 @@ def write_summary_csv(output_path, results_list):
     if not fieldnames:
         logging.error("FATAL: 'csv_header_order' not found in config.ini. Cannot write CSV.")
         sys.exit(1)
+        return # Eject for testability and to prevent further execution
 
     df = pd.DataFrame(results_list)
     for col in fieldnames:
@@ -87,6 +88,7 @@ def main():
     if not os.path.isdir(args.experiment_directory):
         logging.error(f"Error: The specified directory does not exist: {args.experiment_directory}")
         sys.exit(1)
+        return  # Eject for testability and to prevent further execution
 
     search_pattern = os.path.join(args.experiment_directory, 'run_*', 'REPLICATION_results.csv')
     replication_files = glob.glob(search_pattern)
@@ -110,7 +112,7 @@ def main():
             logging.error(f"  - Error: Could not read or process {f}. Reason: {e}")
             
     if not all_replication_data:
-        logging.error("No valid data could be read from any replication files. Halting.")
+        logging.error("No valid data could be read from any of the {len(replication_files)} files found. Halting.")
         sys.exit(1)
         return  # Eject for testability
 

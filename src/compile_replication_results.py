@@ -98,6 +98,11 @@ def parse_config_params(config_path):
 
     except Exception as e:
         logging.warning(f"  - Could not fully parse config {os.path.basename(config_path)}. Error: {e}")
+        # Ensure a dictionary with default values is returned on catastrophic failure
+        params = {
+            'model': 'unknown_model', 'mapping_strategy': 'unknown_strategy',
+            'temperature': 0.0, 'k': 0, 'm': 0, 'db': 'unknown_db.file'
+        }
     return params
 
 def write_summary_csv(output_path, results_list):
