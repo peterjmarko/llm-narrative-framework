@@ -459,4 +459,90 @@ class TestInputFileValidation:
 
         assert expected_error_msg in caplog.text
 
+class TestCoverageAndEdgeCases:
+    """Additional tests for uncovered lines and edge cases."""
+
+    def test_is_research_entry_with_comma_name(self, mocker, mock_research_config):
+        """Tests that a non-person name with a comma is still identified as research."""
+        with open(mock_research_config, 'r') as f:
+            mock_categories_data = json.load(f)
+        mocker.patch('src.find_wikipedia_links.load_research_categories', return_value=mock_categories_data)
+        # This name uses a prefix and contains a comma, but is not a person's name.
+        assert find_wikipedia_links.is_research_entry("Earthquakes: Chile, 1960") is True
+
+    def test_get_english_wiki_url_no_fallback(self, mocker):
+        """Tests that a non-English URL without an English link returns None."""
+        from src.find_wikipedia_links import get_english_wiki_url
+        mock_soup = BeautifulSoup('<html><body><a class="interlanguage-link-target" lang="fr">French</a></body></html>', 'html.parser')
+        mocker.patch('src.find_wikipedia_links.fetch_page_content', return_value=mock_soup)
+        result = get_english_wiki_url("https://de.wikipedia.org/wiki/Test")
+        assert result is None
+
+    def test_is_disambiguation_page_with_text_match(self):
+        """Tests disambiguation detection via 'may refer to' text."""
+        html = "<html><body>This name may refer to: ...</body></html>"
+        soup = BeautifulSoup(html, 'html.parser')
+        assert is_disambiguation_page(soup) is True
+
+    def test_worker_task_with_malformed_line(self):
+        """Tests that worker_task returns None for a line with too few columns."""
+        result = find_wikipedia_links.worker_task("1\t101\tDoe", MagicMock(), 1)
+        assert result is None
+
+    def test_sort_output_file_on_empty_file(self, tmp_path):
+        """Tests that sort_output_file runs without error on an empty file."""
+        from src.find_wikipedia_links import sort_output_file
+        empty_file = tmp_path / "empty.csv"
+        empty_file.touch()
+        # The function should simply return without raising an exception.
+        sort_output_file(empty_file, ['h1', 'h2'])
+        assert empty_file.read_text() == ""
+
+    def test_load_processed_ids_handles_value_error(self, tmp_path):
+        """Tests that load_processed_ids skips rows with non-integer Index."""
+        output_file = tmp_path / "output.csv"
+        output_file.write_text("Index,idADB\nnot_an_int,101\n2,102\n")
+        processed, _, _, max_idx, _ = load_processed_ids(output_file)
+        assert processed == {"101", "102"}
+        assert max_idx == 2
+
+    def test_main_handles_user_confirmation_for_up_to_date_file(self, mock_sandbox, capsys):
+        """Tests the interactive prompt when the output file is already up to date."""
+        output_path = mock_sandbox / "data/processed/adb_wiki_links.csv"
+        # Make the output file seem complete by having an entry for every input line
+        output_path.write_text(
+            'Index,idADB,ADB_Name,Wikipedia_URL,Notes\n'
+            '1,101,"Doe, John",http://a.com,\n'
+            '2,102,"Smith, Jane",http://b.com,\n'
+        )
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
+        # Simulate user pressing 'y' to force a re-run
+        # Mock the worker to return a valid dictionary structure
+        mock_worker = patch('src.find_wikipedia_links.worker_task_with_timeout', return_value={
+            'Index': 1, 'idADB': '101', 'ADB_Name': 'Doe, John', 'BirthYear': '1990',
+            'Entry_Type': 'Person', 'Wikipedia_URL': 'http://a.com', 'Notes': ''
+        })
+
+        with patch("sys.argv", test_args), patch("builtins.input", return_value="y"), mock_worker:
+            find_wikipedia_links.main()
+        
+        captured = capsys.readouterr()
+        assert "is already up to date" in captured.out
+        assert "Forcing overwrite" in captured.out
+
+    def test_finalize_and_report_for_partial_run(self, tmp_path, capsys):
+        """Tests the summary message for a partial run (processed < total)."""
+        output_path = tmp_path / "output.csv"
+        fieldnames = ['Index', 'idADB']
+        # 2 processed records, but the full input has 4 records
+        all_lines = ["h", "l1", "l2", "l3"]
+        output_path.write_text("Index,idADB\n1,101\n2,102\n")
+        
+        # We need to mock PROJECT_ROOT in the module where it is defined.
+        with patch('src.config_loader.PROJECT_ROOT', str(tmp_path)):
+            finalize_and_report(output_path, fieldnames, all_lines, was_interrupted=False)
+        captured = capsys.readouterr()
+        assert "across 2 processed records (out of 4 total)" in captured.out
+
 # === End of tests/data_preparation/test_find_wikipedia_links.py ===

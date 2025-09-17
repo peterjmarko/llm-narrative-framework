@@ -8,29 +8,18 @@ This document outlines planned development tasks and tracks known issues for the
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
-#### A. Complete Unit Test Coverage
-- **Critical Modules (Target: 90%+)**
-  - [x] Completed.
-- **Standard Modules (Target: 80%+)**
-  - [x] Completed for all Experiment Lifecycle scripts.
-  - [ ] `src/create_subject_db.py` (Current: 76%)
-  - [ ] `src/find_wikipedia_links.py` (Current: 77%)
-  - [ ] `src/generate_eminence_scores.py` (Current: 75%)
-  - [ ] `src/generate_ocean_scores.py` (Current: 79%)
-  - [ ] `src/neutralize_delineations.py` (Current: 74%)
-
-#### B. Correct Methodological Flaws
+#### A. Correct Methodological Flaws
 - [ ] **Address Mann-Whitney U Test Independence Violation**
   - [ ] Modify `analyze_llm_performance.py` to remove the pooled MWU test, which violates the statistical assumption of independence.
   - [ ] Update the downstream consumer of the MWU metrics (`run_bias_analysis.py`) to handle their removal and prevent pipeline failures.
 
-#### C. Implement Core Algorithm Validation Tests
+#### B. Implement Core Algorithm Validation Tests
 - [ ] **Implement Query Generation & Randomization Integrity Test**
   - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide mathematical proof of the mapping and randomization logic in `query_generator.py`.
 - [ ] **Implement Statistical Analysis & Reporting Validation Test**
   - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide bit-for-bit verification of the `compile_study.ps1` and `analyze_study_results.py` pipeline against a known-good ground truth.
 
-#### D. Complete Integration Testing
+#### C. Complete Integration Testing
 - [ ] **Re-validate Integration Tests After Filter Changes**
   - [ ] Perform a full run of the Layer 4 integration test to ensure that the changes to the data filtering logic have not introduced any downstream regressions.
 - [ ] **Implement Layer 6 Test Harness (Post-Hoc Study Evaluation)**
@@ -39,7 +28,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Add an `-Interactive` flag to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` lifecycle.
   - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `manifest.json` file is correctly generated.
 
-#### E. Enhance Reproducibility and Provenance
+#### D. Enhance Reproducibility and Provenance
 - [ ] **Implement Provenance Capture**
   - [ ] Modify `new_experiment.ps1` to generate a `manifest.json` file in each new experiment directory.
   - [ ] The manifest will capture Git state (commit SHA, tag) and key environment details (Python version, OS).

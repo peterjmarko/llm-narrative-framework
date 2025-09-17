@@ -119,8 +119,68 @@ def test_create_subject_db_logic(mock_input_files):
 
 
 
+class TestHelperFunctions:
+    """Tests for helper functions in create_subject_db."""
+
+    def test_load_lookup_data_success(self, tmp_path):
+        """Tests successful loading of a lookup CSV."""
+        from src.create_subject_db import load_lookup_data
+        lookup_file = tmp_path / "lookup.csv"
+        lookup_file.write_text("key,value\nA,1\nB,2")
+        result = load_lookup_data(lookup_file, "key", "value")
+        assert result == {"A": "1", "B": "2"}
+
+    def test_load_lookup_data_errors(self, tmp_path):
+        """Tests FileNotFoundError and KeyError in load_lookup_data."""
+        from src.create_subject_db import load_lookup_data
+        # Test FileNotFoundError
+        with pytest.raises(SystemExit) as e:
+            load_lookup_data(Path("non_existent_file.csv"), "key", "value")
+        assert e.value.code == 1
+        
+        # Test KeyError for missing column
+        lookup_file = tmp_path / "lookup.csv"
+        lookup_file.write_text("wrong_key,value\nA,1\n")
+        with pytest.raises(SystemExit) as e:
+            load_lookup_data(lookup_file, "key", "value")
+        assert e.value.code == 1
+
+    def test_load_chart_data_map_skips_malformed_records(self, tmp_path, caplog):
+        """Tests that incomplete or malformed records in chart data are skipped."""
+        from src.create_subject_db import load_chart_data_map
+        chart_file = tmp_path / "malformed_chart.csv"
+        # Create a file with multiple error types: bad Base58 ID, too few fields, and bad mojibake
+        bad_utf8 = b'\x80\x90'  # Invalid utf-8 sequence
+        bad_name = bad_utf8.decode('latin-1') # This creates the mojibake
+        content = (
+            f'"{bad_name}","4 Jan 1643","1:00","badID","-0:01","London","UK","51n30","0w5"\n'
+            '"Body Name","Body Abbr","Longitude"\n' + '"Sun","Sun","285.65"\n' * 12 +
+            '"Too Few Fields","Date"\n' # This line starts the second, malformed block
+            '"Body Name","Body Abbr","Longitude"\n' + '"Sun","Sun","285.65"\n' * 12 # Provide a full block
+        )
+        chart_file.write_text(content, encoding='latin-1')
+
+        chart_map = load_chart_data_map(chart_file)
+        # Should return an empty map because all records are bad
+        assert len(chart_map) == 0
+        assert "Could not decode idADB" in caplog.text
+        assert "Skipping malformed person info line" in caplog.text
+
+
 class TestMainWorkflow:
     """Tests the main orchestration logic of the script."""
+
+    def test_main_handles_user_confirmation(self, mock_input_files):
+        """Tests that the script proceeds if the user confirms an up-to-date run."""
+        output_path = mock_input_files["output_path"]
+        output_path.touch()
+
+        with patch("builtins.input", return_value="y"):
+            test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"])]
+            with patch("sys.argv", test_args):
+                main()
+        
+        assert output_path.read_text() != ""
 
     def test_main_handles_user_cancellation(self, mock_input_files):
         """Tests that the script exits if the user cancels an up-to-date run."""
@@ -174,7 +234,7 @@ class TestMainWorkflow:
         with open(candidates_path, "a", encoding="utf-8") as f:
             f.write("3\t999\tMissing\tPerson\n")
 
-        mocker.patch('sys.exit', side_effect=SystemExit)
+        mocker.patch('src.create_subject_db.sys.exit', side_effect=SystemExit(1))
 
         test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
         with patch("sys.argv", test_args):
@@ -188,5 +248,74 @@ class TestMainWorkflow:
         assert "Person Missing" in content
         
         assert "A diagnostic report has been created" in caplog.text
+
+    def test_main_handles_invalid_idADB_in_candidates(self, mock_input_files, mocker, caplog):
+        """Tests that a report is generated for invalid idADB in the candidates file."""
+        sandbox_path = mock_input_files["sandbox_path"]
+        candidates_path = sandbox_path / "data/intermediate/adb_final_candidates.txt"
+        with open(candidates_path, "a", encoding="utf-8") as f:
+            f.write("3\tnot_an_id\tInvalid\tID\n")
+
+        mocker.patch('sys.exit', side_effect=SystemExit)
+
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit):
+                main()
+        
+        missing_report_path = sandbox_path / "data/reports/missing_sf_subjects.csv"
+        assert missing_report_path.exists()
+        content = missing_report_path.read_text()
+        assert "not_an_id" in content
+        assert "Invalid idADB" in content
+
+    def test_main_handles_missing_column_in_candidates(self, mock_input_files, mocker):
+        """Tests graceful exit if a required column is missing from candidates file."""
+        sandbox_path = mock_input_files["sandbox_path"]
+        (sandbox_path / "data/intermediate/adb_final_candidates.txt").write_text(
+            "Index\tLastName\tFirstName\n1\tNewton\tIsaac\n"
+        )
+        # We must patch the specific sys.exit instance within the module being tested.
+        # This also ensures the raised exception carries the exit code.
+        mocker.patch('src.create_subject_db.sys.exit', side_effect=SystemExit(1))
+
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit) as e:
+                main()
+            assert e.value.code == 1
+
+    def test_main_handles_zero_subjects_processed(self, mock_input_files, caplog):
+        """Tests the 'FAILURE' message path when no subjects are successfully processed."""
+        sandbox_path = mock_input_files["sandbox_path"]
+        # Overwrite with an empty candidates file (header only)
+        (sandbox_path / "data/intermediate/adb_final_candidates.txt").write_text(
+            "Index\tidADB\tLastName\tFirstName\n"
+        )
+        
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        with patch("sys.argv", test_args):
+            main()
+        
+        assert "FAILURE: Final Count: 0 subjects. No records were processed." in caplog.text
+
+    def test_main_handles_io_error_on_write(self, mock_input_files, mocker):
+        """Tests graceful exit if the final output file cannot be written."""
+        mocker.patch('src.create_subject_db.sys.exit', side_effect=SystemExit(1))
+        
+        # This side_effect ensures that only the final write operation fails.
+        original_open = open
+        def open_side_effect(file, mode='r', **kwargs):
+            if 'subject_db.csv' in str(file) and mode == 'w':
+                raise IOError("Permission denied")
+            return original_open(file, mode, **kwargs)
+
+        mocker.patch('builtins.open', side_effect=open_side_effect)
+
+        test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"]), "--force"]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit) as e:
+                main()
+            assert e.value.code == 1
 
 # === End of tests/data_preparation/test_create_subject_db.py ===

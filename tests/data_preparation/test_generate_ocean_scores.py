@@ -71,7 +71,9 @@ def mock_sandbox_with_bypass_config(tmp_path: Path) -> Path:
         "[DataGeneration]\nbypass_candidate_selection = true\n"
     )
     
-    (tmp_path / "data" / "foundational_assets" / "eminence_scores.csv").write_text("idADB,EminenceScore\n101,90.0\n")
+    # Create a valid eminence scores file with all required columns
+    eminence_content = "Index,idADB,Name,BirthYear,EminenceScore\n1,101,Test Person,1990,90.0\n"
+    (tmp_path / "data" / "foundational_assets" / "eminence_scores.csv").write_text(eminence_content)
     return tmp_path
 
 
@@ -137,10 +139,11 @@ class MockLLMWorker:
         response_file = Path(args['output_response_file'])
         
         query_text = query_file.read_text()
-        requested = re.findall(r'(\w+\s\d+)\s\(\d+\),\sID\s(\d+)', query_text)
+        requested = re.findall(r'([^(]+?)\s\((\d+)\),\sID\s(\d+)', query_text)
         
         response_data = []
-        for name, id_adb in requested:
+        for name, year, id_adb in requested:  # Updated to handle 3 capture groups
+            name = name.strip()  # Remove any trailing whitespace
             if id_adb not in self.ids_to_miss:
                 response_data.append({ "idADB": id_adb, "Name": name, "Openness": 5.0, "Conscientiousness": 5.0,
                                         "Extraversion": 5.0, "Agreeableness": 5.0, "Neuroticism": 5.0 })
@@ -225,6 +228,112 @@ def test_stale_input_triggers_rerun(mock_sandbox_for_main_tests, capsys):
     captured = capsys.readouterr()
     assert "Stale data detected" in captured.out
 
+
+class TestCoverageAndEdgeCases:
+    """Additional tests for uncovered lines and edge cases."""
+
+    def test_load_processed_ids_handles_io_error(self, tmp_path):
+        """Tests that the script exits if the existing scores file cannot be read."""
+        from src.generate_ocean_scores import load_processed_ids
+        scores_file = tmp_path / "scores.csv"
+        scores_file.write_text("content") # Must not be empty to trigger open
+        with patch('builtins.open', side_effect=IOError("Permission denied")):
+            with pytest.raises(SystemExit):
+                load_processed_ids(scores_file)
+
+    def test_save_scores_to_csv_handles_io_error(self, tmp_path):
+        """Tests that an IOError during save is logged correctly."""
+        from src.generate_ocean_scores import save_scores_to_csv
+        output_path = tmp_path / "test.csv"
+        output_path.touch()
+        output_path.chmod(0o444) # Read-only permissions
+        
+        with patch('logging.error') as mock_log:
+            save_scores_to_csv(output_path, [{"idADB": "1"}])
+            mock_log.assert_called_once()
+            assert "Failed to write scores" in mock_log.call_args[0][0]
+    
+    def test_generate_summary_handles_empty_input(self, tmp_path, capsys):
+        """Tests that the summary generator handles an empty input file."""
+        from src.generate_ocean_scores import generate_summary_report
+        scores_file = tmp_path / "scores.csv"
+        scores_file.touch() # Create an empty file
+        generate_summary_report(scores_file, 10)
+        captured = capsys.readouterr()
+        assert "Output file is empty. No summary to generate." in captured.out
+
+    def test_main_handles_missing_eminence_file(self, mock_sandbox_for_main_tests):
+        """Tests graceful exit if eminence_scores.csv is missing."""
+        paths = mock_sandbox_for_main_tests
+        (paths["sandbox_path"] / "data/foundational_assets/eminence_scores.csv").unlink()
+        
+        test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"])]
+        with patch("sys.argv", test_args):
+            from src import generate_ocean_scores
+            with pytest.raises(SystemExit) as e:
+                generate_ocean_scores.main()
+            assert e.value.code == 1
+
+    def test_main_handles_llm_returning_duplicates(self, mock_sandbox_for_main_tests, capsys):
+        """Tests that duplicate subjects returned by the LLM are skipped."""
+        paths = mock_sandbox_for_main_tests
+        test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"]), "--batch-size", "5"]
+        
+        # Mock the worker to return a duplicate ID
+        class MockDuplicateWorker(MockLLMWorker):
+            def run(self, cmd, check, **kwargs):
+                super().run(cmd, check, **kwargs)
+                response_file = Path(cmd[cmd.index("--output_response_file") + 1])
+                response_data = json.loads(response_file.read_text())
+                response_data.append(response_data[0]) # Add a duplicate
+                response_file.write_text(json.dumps(response_data))
+        
+        mock_worker = MockDuplicateWorker()
+        with patch("sys.argv", test_args), patch("src.generate_ocean_scores.subprocess.run", side_effect=mock_worker.run):
+            from src import generate_ocean_scores
+            generate_ocean_scores.main()
+
+        captured = capsys.readouterr()
+        assert "Warning: Skipped 1 duplicate subject(s)" in captured.out
+
+    def test_main_handles_llm_returning_extraneous_subjects(self, mock_sandbox_for_main_tests, capsys):
+        """Tests that subjects not in the original request batch are skipped."""
+        paths = mock_sandbox_for_main_tests
+        test_args = ["script.py", "--sandbox-path", str(paths["sandbox_path"]), "--batch-size", "2"]
+
+        # Mock the worker to add an extra, unrequested subject
+        class MockExtraWorker(MockLLMWorker):
+            def run(self, cmd, check, **kwargs):
+                super().run(cmd, check, **kwargs)
+                response_file = Path(cmd[cmd.index("--output_response_file") + 1])
+                response_data = json.loads(response_file.read_text())
+                response_data.append({"idADB": "999", "Name": "Extra Person"})
+                response_file.write_text(json.dumps(response_data))
+        
+        mock_worker = MockExtraWorker()
+        with patch("sys.argv", test_args), patch("src.generate_ocean_scores.subprocess.run", side_effect=mock_worker.run):
+            from src import generate_ocean_scores
+            generate_ocean_scores.main()
+
+        df = pd.read_csv(paths["output_path"])
+        # The final CSV should not contain the extraneous subject
+        assert "999" not in df['idADB'].astype(str).values
+
+    def test_main_handles_non_interactive_bypass(self, mock_sandbox_with_bypass_config, capsys):
+        """Tests that the script runs non-interactively when bypass is active if not a TTY."""
+        # This test ensures the `if sys.stdout.isatty():` branch is correctly handled.
+        mock_worker = MockLLMWorker()
+        with patch("sys.stdout.isatty", return_value=False), \
+             patch("src.generate_ocean_scores.subprocess.run", side_effect=mock_worker.run):
+            test_args = ["script.py", "--sandbox-path", str(mock_sandbox_with_bypass_config)]
+            with patch("sys.argv", test_args):
+                from src import generate_ocean_scores
+                # Should run to completion without prompting
+                generate_ocean_scores.main()
+        
+        captured = capsys.readouterr()
+        assert "BYPASS ACTIVE" in captured.out
+        assert "Do you wish to proceed anyway?" not in captured.out
 
 def test_regenerate_summary_mode_runs_offline(tmp_path: Path):
     """Tests that the --regenerate-summary flag runs without making API calls."""

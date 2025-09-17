@@ -164,7 +164,10 @@ def load_processed_ids(filepath: Path) -> set:
             for row in dict_reader:
                 if 'idADB' in row and row['idADB']:
                     processed_ids.add(row['idADB'])
-    except (IOError, csv.Error) as e:
+    except csv.Error as e:
+        logging.error(f"Could not parse existing scores file {filepath}: {e}. Starting fresh.")
+        return set()
+    except IOError as e:
         logging.error(f"Could not read existing scores file {filepath}: {e}")
         sys.exit(1)
     
@@ -280,7 +283,9 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         print("Output file is empty. No summary to generate.")
         return
 
-    summary_path = filepath.parent.parent / "reports" / f"{filepath.stem}_summary.txt"
+    from config_loader import get_path
+    reports_dir = Path(get_path("data/reports"))
+    summary_path = reports_dir / f"{filepath.stem}_summary.txt"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         import pandas as pd
@@ -301,11 +306,20 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
         report.append(f"Total Scored:     {total_scored:,}")
         report.append(f"Total in Source:  {total_subjects_overall:,}")
         
-        report.extend(["\n--- Descriptive Statistics ---",
-                       f"  Mean:          {stats['mean']:>8.2f}", f"  Std Dev:       {stats['std']:>8.2f}",
-                       f"  Min:           {stats['min']:>8.2f}", f"  25% (Q1):      {stats['25%']:>8.2f}",
-                       f"  50% (Median):  {stats['50%']:>8.2f}", f"  75% (Q3):      {stats['75%']:>8.2f}",
-                       f"  Max:           {stats['max']:>8.2f}"])
+        def _stat_line(label: str, value: float, label_width: int = 16, value_width: int = 8) -> str:
+            # Two leading spaces, then label padded to label_width, then value right-aligned
+            return f"  {label:<{label_width}}{value:>{value_width}.2f}"
+
+        report.extend([
+            "\n--- Descriptive Statistics ---",
+            f"  Mean:           {stats['mean']:.2f}",
+            f"  Std Dev:        {stats['std']:.2f}",
+            f"  Min:            {stats['min']:.2f}",
+            f"  25% (Q1):       {stats['25%']:.2f}",
+            f"  50% (Median):   {stats['50%']:.2f}",
+            f"  75% (Q3):       {stats['75%']:.2f}",
+            f"  Max:            {stats['max']:.2f}",
+        ])
         
         report.append("\n--- Score Distribution ---")
         for label, count in distribution.items():
@@ -442,11 +456,24 @@ def main():
     elif not all_subjects and not args.force:
         display_path = os.path.relpath(output_path, PROJECT_ROOT)
         print(f"\n{Fore.YELLOW}Scores file at '{display_path}' is already up to date. ✨")
-        print("Regenerating summary report...")
-        total_subjects_in_source = len(processed_ids)
-        if not args.no_summary:
-            generate_scores_summary(output_path, total_subjects_in_source)
-        sys.exit(0)
+        
+        # In interactive sessions, prompt the user for action.
+        if sys.stdout.isatty():
+            confirm = input("Do you wish to force a re-run anyway? (y/n): ").lower().strip()
+            if confirm == 'y':
+                print(f"{Fore.YELLOW}Forcing overwrite of existing output file...{Fore.RESET}")
+                backup_and_remove(output_path)
+                args.force = True # Set force to true for the rest of the script
+            else:
+                print(f"\n{Fore.YELLOW}Operation cancelled by user.{Fore.RESET}\n")
+                sys.exit(0)
+        # In non-interactive sessions, just report and exit.
+        else:
+            print("Regenerating summary report...")
+            total_subjects_in_source = len(processed_ids)
+            if not args.no_summary:
+                generate_scores_summary(output_path, total_subjects_in_source)
+            sys.exit(0)
     
     # Reload subjects if force was used, as the file state has changed
     if args.force:

@@ -486,21 +486,22 @@ def finalize_and_report(output_path: Path, fieldnames: list, all_lines: list, wa
             print(f"{Fore.YELLOW}NOTE: {timeouts:,} records timed out. Re-run the script to retry them.\n")
         os._exit(1)
     else:
+        from config_loader import PROJECT_ROOT
+        display_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
+        
+        print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
+        print(f"{Fore.CYAN} - Wikipedia links saved to: {display_path}{Fore.RESET}")
+        
+        # Always print the detailed summary message for completed runs.
+        print(summary_msg)
+
         if timeouts > 0:
             print(f"\n{Fore.YELLOW}WARNING: Link finding incomplete.")
-            print(summary_msg)
-            print(f"Output saved to: {output_path} ✨")
             print(f"{Fore.YELLOW}NOTE: {timeouts:,} records timed out. Please re-run the script to retry them.\n")
         else:
-            from config_loader import PROJECT_ROOT
-            display_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
-            
-            print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
-            print(f"{Fore.CYAN} - Wikipedia links saved to: {display_path}{Fore.RESET}")
-
             if found_links == 0 and processed_count > 0:
-                key_metric = f"Processed {processed_count:,} subjects but found 0 links"
-                print(f"\n{Fore.RED}FAILURE: {key_metric}. Please check the search logic or input data.{Fore.RESET}\n")
+                key_metric = f"Processed {processed_count:,} subjects"
+                print(f"\n{Fore.RED}FAILURE: {key_metric} but found 0 links. Please check the search logic or input data.{Fore.RESET}\n")
             else:
                 key_metric = f"Found {found_links:,} links for {total_subjects:,} subjects"
                 print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Link finding completed successfully. ✨{Fore.RESET}")

@@ -212,9 +212,10 @@ Module                              Cov. (%)        Status & Justification
 
 **Stage 2: Candidate Qualification**
 
-`src/find_wikipedia_links.py`       `77%`           COMPLETE. Comprehensive unit tests validate the main workflow,
-                                                    all helper functions, and critical error handling for input
-                                                    validation, worker timeouts, and mocked API calls.
+`src/find_wikipedia_links.py`       `80%`           COMPLETE. Target met. Unit test suite expanded to validate
+                                                    the main workflow, all helper functions, and robustly handle
+                                                    edge cases for file I/O, API failures, timeouts, and malformed
+                                                    input data.
 
 `src/validate_wikipedia_pages.py`   `82%`           COMPLETE. Comprehensive unit tests validate the main workflow,
                                                     all helper functions, and critical error handling for input
@@ -226,14 +227,15 @@ Module                              Cov. (%)        Status & Justification
 
 **Stage 3: LLM-based Selection**
 
-`src/generate_eminence_scores.py`   `75%`           COMPLETE. Comprehensive unit tests validate the main workflow,
-                                                    offline parsing, and critical error handling (stale data,
-                                                    missing inputs, worker failures). Live LLM calls are validated
-                                                    via integration testing.
+`src/generate_eminence_scores.py`   `87%`           COMPLETE. Target met. Unit test suite expanded to validate
+                                                    the main workflow, all helper functions, and robustly handle
+                                                    edge cases for file I/O, API failures, user-driven workflow
+                                                    paths (force, stale, bypass), and summary report generation.
 
-`src/generate_ocean_scores.py`      `79%`           COMPLETE. Unit tests cover the main processing loop,
-                                                    resumability, error handling, and the offline summary
-                                                    regeneration feature.
+`src/generate_ocean_scores.py`      `82%           COMPLETE. Target met. Unit test suite expanded to validate
+                                                    the main workflow, all helper functions, and robustly handle
+                                                    edge cases for file I/O, API failures, user-driven workflow
+                                                    paths (force, stale, bypass), and summary report generation.
 
 `src/select_final_candidates.py`    `80%`           COMPLETE. Unit tests cover the entire data transformation
                                                     workflow for both default and bypass modes, including the
@@ -245,13 +247,15 @@ Module                              Cov. (%)        Status & Justification
                                                     core data transformation, and error handling for stale data,
                                                     missing inputs, and invalid records.
 
-`src/create_subject_db.py`          `76%`           COMPLETE. Comprehensive unit tests validate the main workflow,
-                                                    core data integration, and error handling for stale data,
-                                                    missing inputs, and mismatched subjects.
+`src/create_subject_db.py`          `92%`           COMPLETE. Target met. Unit test suite expanded to validate
+                                                    all major data integration logic, including Base58 ID decoding,
+                                                    robust error handling for malformed chart data and candidate
+                                                    files, and all user-driven workflow paths (force, stale, cancel).
 
-`src/neutralize_delineations.py`    `74%`           COMPLETE. Unit test suite validates the core orchestration
-                                                    logic for default, fast, resume, and bypass modes, as well as
-                                                    error handling.
+`src/neutralize_delineations.py`    `91%`           COMPLETE. Target met. Unit test suite expanded to validate
+                                                    core orchestration, all helper functions (parsing, grouping,
+                                                    sorting), and robustly handle edge cases for file I/O, API
+                                                    failures, and user-driven workflow paths.
 
 **`src/generate_personalities_db.py`**  `90%`           COMPLETE. Target met. Comprehensive unit tests validate the
                                                     main workflow, core data assembly algorithm, and error handling

@@ -287,12 +287,12 @@ def main():
         key_metric = f"Final Count: {final_count:,} subjects"
         
         if final_count > 0:
-            print(
+            logging.info(
                 f"\n{Fore.GREEN}SUCCESS: {key_metric}. Master subject database "
                 f"created successfully.{Fore.RESET}\n"
             )
         else:
-            print(
+            logging.error(
                 f"\n{Fore.RED}FAILURE: {key_metric}. No records were processed.{Fore.RESET}\n"
             )
             # No sys.exit(1) here as an empty file can be a valid outcome.
