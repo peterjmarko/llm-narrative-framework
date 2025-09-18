@@ -36,6 +36,7 @@ import types
 import importlib
 import io
 import builtins
+import json
 
 # Import the module to test
 from src import experiment_auditor
@@ -139,8 +140,7 @@ personalities_src = personalities_db.txt
             report_content = f"""
 <<<METRICS_JSON_START>>>
 {{
-    "n_valid_responses": {num_valid}, "mwu_stouffer_z": 0, "mwu_stouffer_p": 0, "mwu_fisher_chi2": 0,
-    "mwu_fisher_p": 0, "mean_effect_size_r": 0, "effect_size_r_p": 0, "mean_mrr": 0,
+    "n_valid_responses": {num_valid}, "mean_mrr": 0,
     "mrr_p": 0, "mean_top_1_acc": 0, "top_1_acc_p": 0, "mean_top_3_acc": 0,
     "top_3_acc_p": 0, "mean_rank_of_correct_id": 0, "rank_of_correct_id_p": 0,
     "bias_slope": 0, "bias_intercept": 0, "bias_r_value": 0, "bias_p_value": 0, "bias_std_err": 0,
@@ -383,25 +383,37 @@ personalities_src = personalities_db.txt
         self.assertEqual(state_name, "REPAIR_NEEDED")
         self.assertEqual(payload[0]['repair_type'], 'full_replication_repair')
 
-    def test_reprocess_needed_for_bad_nested_report_key(self):
-        """Verify reprocess state for a report with a malformed nested dict."""
-        run_dir = self._create_mock_run_dir(rep_num=1, report_complete=False)
-        # Write a report where the nested key is not a dict
-        report_content = (
-            '<<<METRICS_JSON_START>>>\n'
-            '{"n_valid_responses": 10, "mwu_stouffer_z": 0, "mwu_stouffer_p": 0, "mwu_fisher_chi2": 0, '
-            '"mwu_fisher_p": 0, "mean_effect_size_r": 0, "effect_size_r_p": 0, "mean_mrr": 0, "mrr_p": 0, '
-            '"mean_top_1_acc": 0, "top_1_acc_p": 0, "mean_top_3_acc": 0, "top_3_acc_p": 0, '
-            '"mean_rank_of_correct_id": 0, "rank_of_correct_id_p": 0, "bias_slope": 0, '
-            '"bias_intercept": 0, "bias_r_value": 0, "bias_p_value": 0, "bias_std_err": 0, '
-            '"mean_mrr_lift": 0, "mean_top_1_acc_lift": 0, "mean_top_3_acc_lift": 0, '
-            '"positional_bias_metrics": "this is not a dict"}\n'
-            '<<<METRICS_JSON_END>>>'
-        )
-        (run_dir / "replication_report_2025-01-01_120000.txt").write_text(report_content)
+    def test_check_report_detects_schema_mismatch_exactly(self):
+        """Verify _check_report requires an exact match of metrics, flagging missing or extra keys."""
+        run_dir = self.exp_dir / "run_for_schema_test"
+        run_dir.mkdir()
 
-        state_name, _, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
-        self.assertEqual(state_name, "REPROCESS_NEEDED")
+        # Helper to set the active report file for the auditor to find
+        def set_active_report(content):
+            for f in run_dir.glob("replication_report_*.txt"):
+                f.unlink()
+            (run_dir / "replication_report_active.txt").write_text(content)
+
+        # Case 1: Perfect match
+        required_keys = experiment_auditor.REPORT_REQUIRED_METRICS
+        perfect_metrics = {key: 0 for key in required_keys}
+        report_content_perfect = f'<<<METRICS_JSON_START>>>\n{json.dumps(perfect_metrics)}\n<<<METRICS_JSON_END>>>'
+        set_active_report(report_content_perfect)
+        self.assertEqual(experiment_auditor._check_report(run_dir), "VALID")
+        
+        # Case 2: Missing key
+        missing_key_metrics = perfect_metrics.copy()
+        del missing_key_metrics['mean_mrr']
+        report_content_missing = f'<<<METRICS_JSON_START>>>\n{json.dumps(missing_key_metrics)}\n<<<METRICS_JSON_END>>>'
+        set_active_report(report_content_missing)
+        self.assertIn("REPORT_INCOMPLETE_METRICS: mean_mrr", experiment_auditor._check_report(run_dir))
+        
+        # Case 3: Extra key
+        extra_key_metrics = perfect_metrics.copy()
+        extra_key_metrics['obsolete_metric'] = 123
+        report_content_extra = f'<<<METRICS_JSON_START>>>\n{json.dumps(extra_key_metrics)}\n<<<METRICS_JSON_END>>>'
+        set_active_report(report_content_extra)
+        self.assertIn("REPORT_UNEXPECTED_METRICS: obsolete_metric", experiment_auditor._check_report(run_dir))
 
     def test_aggregation_needed_for_missing_log(self):
         """Verify aggregation state when experiment_log.csv is missing."""
@@ -465,25 +477,6 @@ personalities_src = personalities_db.txt
         run_dir = self._create_mock_run_dir(rep_num=1, report_complete=False)
         # Ensure the final results CSV is present to distinguish from an analysis issue
         (run_dir / "REPLICATION_results.csv").touch()
-        state_name, _, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
-        self.assertEqual(state_name, "REPROCESS_NEEDED")
-
-    def test_reprocess_needed_for_bad_nested_sub_key(self):
-        """Verify reprocess state for a report with a missing nested sub-key."""
-        run_dir = self._create_mock_run_dir(rep_num=1, report_complete=False)
-        # Write a report where the nested dict is missing a key
-        report_content = (
-            '<<<METRICS_JSON_START>>>\n'
-            '{"n_valid_responses": 10, "mwu_stouffer_z": 0, "mwu_stouffer_p": 0, "mwu_fisher_chi2": 0, '
-            '"mwu_fisher_p": 0, "mean_effect_size_r": 0, "effect_size_r_p": 0, "mean_mrr": 0, "mrr_p": 0, '
-            '"mean_top_1_acc": 0, "top_1_acc_p": 0, "mean_top_3_acc": 0, "top_3_acc_p": 0, '
-            '"mean_rank_of_correct_id": 0, "rank_of_correct_id_p": 0, "bias_slope": 0, '
-            '"bias_intercept": 0, "bias_r_value": 0, "bias_p_value": 0, "bias_std_err": 0, '
-            '"mean_mrr_lift": 0, "mean_top_1_acc_lift": 0, "mean_top_3_acc_lift": 0, '
-            '"positional_bias_metrics": {"top1_pred_bias_std": 0}}\n' # Missing true_false_score_diff
-            '<<<METRICS_JSON_END>>>'
-        )
-        (run_dir / "replication_report_2025-01-01_120000.txt").write_text(report_content)
         state_name, _, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
         self.assertEqual(state_name, "REPROCESS_NEEDED")
 
@@ -702,7 +695,7 @@ personalities_src = personalities_db.txt
         run_dir = self._create_mock_run_dir(rep_num=1, report_complete=False)
         report_content = (
             '<<<METRICS_JSON_START>>>\n'
-            '{"mwu_stouffer_z": 0}\n' # Some other valid key, but n_valid is missing
+            '{"mean_mrr": 0}\n' # Some other valid key, but n_valid is missing
             '<<<METRICS_JSON_END>>>'
         )
         (run_dir / "replication_report_2025-01-01_120000.txt").write_text(report_content)

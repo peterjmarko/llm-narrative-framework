@@ -108,7 +108,8 @@ class TestGenerateReplicationReport(unittest.TestCase):
         # "LLM Model:" is 10 chars, so it requires 14 spaces for alignment.
         self.assertIn("LLM Model:              test-model/test-1.0", report_content)
         self.assertIn("This is the base query.", report_content)
-        self.assertIn("Mean: 0.8500, Wilcoxon p-value", report_content) # MRR
+        self.assertIn("1. Overall Ranking Performance (MRR)", report_content)
+        self.assertIn("Mean: 0.8500, Wilcoxon p-value", report_content)
         self.assertIn(json.dumps(self.metrics_data, indent=4), report_content)
 
     def test_main_handles_missing_metrics_file(self):

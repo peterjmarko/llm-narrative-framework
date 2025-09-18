@@ -1,60 +1,24 @@
 ================================================================================
- REPLICATION RUN REPORT
-================================================================================
-Date:                   <Run Date>
-Final Status:           <Pipeline Status>
-Parsing Status:         <Parsing Status>
-Validation Status:      <Validation Status>
-Replication Number:     <Replication #>
-Run Directory:          <Run Directory Name>
-Report File:            <Report Filename>
-
---- Run Parameters ---
-Number of Trials (m):   <m_iterations>
-Group Size (k):         <k_per_query>
-Mapping Strategy:       <mapping_strategy>
-Personalities Source:   <db_filename>
-LLM Model:              <model_name>
-Run Notes:              <run_notes>
-================================================================================
-
---- Base Query Prompt Used ---
-{...base_query_prompt_content...}
--------------------------------
-
-================================================================================
 ### OVERALL META-ANALYSIS RESULTS ###
 ================================================================================
+Number of Valid Responses: <n_valid_responses>
 
-1. Combined Significance of Score Differentiation (N=<n_valid>):
-   Stouffer's Method: Combined p-value = <p_value>
-   Fisher's Method: Combined p-value = <p_value>
-
-2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r') (vs Chance=0.0000):
+1. Overall Ranking Performance (MRR) (vs Chance=<chance_val>):
    Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
 
-3. Overall Ranking Performance (MRR) (vs Chance=<chance_val>):
+2. Overall Ranking Performance (Top-1 Accuracy) (vs Chance=<chance_val>):
    Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
 
-4. Overall Ranking Performance (Top-1 Accuracy) (vs Chance=<chance_val>):
+3. Overall Ranking Performance (Top-3 Accuracy) (vs Chance=<chance_val>):
    Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
 
-5. Overall Ranking Performance (Top-3 Accuracy) (vs Chance=<chance_val>):
-   Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
-
-6. Bias and Other Metrics:
+4. Bias and Other Metrics:
    Top-1 Prediction Bias (StdDev of choice counts): <std_dev>
    Mean Score Difference (Correct - Incorrect): <score_diff>
 
 
 <<<METRICS_JSON_START>>>
 {
-    "mwu_stouffer_z": <value>,
-    "mwu_stouffer_p": <value>,
-    "mwu_fisher_chi2": <value>,
-    "mwu_fisher_p": <value>,
-    "mean_effect_size_r": <value>,
-    "effect_size_r_p": <value>,
     "mean_mrr": <value>,
     "mrr_p": <value>,
     "mean_top_1_acc": <value>,

@@ -82,7 +82,6 @@ The primary dependent variables were "lift" metrics, which normalize for chance 
 
 *   **Mean Reciprocal Rank (MRR) Lift**: The observed MRR divided by the MRR expected by chance.
 *   **Top-1 and Top-3 Accuracy Lift**: Observed accuracy divided by chance accuracy.
-*   **Effect Size (r) and Stouffer's Z-score**: Combined metrics of statistical effect size.
 
 A Two-Way Analysis of Variance (ANOVA) was conducted for each metric to assess the main effects of `mapping_strategy` and `k`, as well as their interaction. Effect sizes were calculated using eta-squared (η²) to determine the proportion of variance attributable to each factor (Cohen, 1988). Post-hoc comparisons for significant main effects were performed using Tukey's HSD test. The significance level was set at α = .05. Our single core hypothesis was tested across several related but distinct performance metrics. Each ANOVA was therefore treated as a separate, pre-specified test of this hypothesis, and no correction for multiple comparisons was applied. To complement the frequentist analysis, a Bayesian analysis was also conducted. This allowed us to quantify the evidence for the astrological hypothesis (that a real signal exists) against the null hypothesis (that there is no signal and performance is due to chance). This approach responds to the ongoing debate about the proper use of statistical inference in psychology (van Dongen & van Grootel, 2022).
 

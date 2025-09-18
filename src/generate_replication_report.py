@@ -127,18 +127,14 @@ def main():
 
     summary_lines = [
         "="*80, "### OVERALL META-ANALYSIS RESULTS ###", "="*80,
-        f"\n1. Combined Significance of Score Differentiation (N={metrics.get('n_valid_responses', 0)}):",
-        f"   Stouffer's Method: Combined p-value = {metrics.get('mwu_stouffer_p', 0):.4f}",
-        f"   Fisher's Method: Combined p-value = {metrics.get('mwu_fisher_p', 0):.4f}",
-        f"\n2. Overall Magnitude of Score Differentiation (MWU Effect Size 'r') (vs Chance=0.0000):",
-        f"   Mean: {metrics.get('mean_effect_size_r', 0):.4f}, Wilcoxon p-value: p = {metrics.get('effect_size_r_p', 0):.4f}",
-        f"\n3. Overall Ranking Performance (MRR) (vs Chance={calculate_mrr_chance(k_per_query):.4f}):",
+        f"Number of Valid Responses: {metrics.get('n_valid_responses', 0)}",
+        f"\n1. Overall Ranking Performance (MRR) (vs Chance={calculate_mrr_chance(k_per_query):.4f}):",
         f"   Mean: {metrics.get('mean_mrr', 0):.4f}, Wilcoxon p-value: p = {metrics.get('mrr_p', 0):.4f}",
-        f"\n4. Overall Ranking Performance (Top-1 Accuracy) (vs Chance={1/k_per_query:.2%}):",
+        f"\n2. Overall Ranking Performance (Top-1 Accuracy) (vs Chance={1/k_per_query:.2%}):",
         f"   Mean: {metrics.get('mean_top_1_acc', 0):.2%}, Wilcoxon p-value: p = {metrics.get('top_1_acc_p', 0):.4f}",
-        f"\n5. Overall Ranking Performance (Top-{k_num} Accuracy) (vs Chance={min(k_num, k_per_query)/k_per_query:.2%}):",
+        f"\n3. Overall Ranking Performance (Top-{k_num} Accuracy) (vs Chance={min(k_num, k_per_query)/k_per_query:.2%}):",
         f"   Mean: {metrics.get(top_k_acc_key, 0):.2%}, Wilcoxon p-value: p = {metrics.get(top_k_p_key, 0):.4f}",
-        f"\n6. Bias and Other Metrics:",
+        f"\n4. Bias and Other Metrics:",
         f"   Top-1 Prediction Bias (StdDev of choice counts): {metrics.get('top1_pred_bias_std', 0):.4f}",
         f"   Mean Score Difference (Correct - Incorrect): {metrics.get('true_false_score_diff', 0):.4f}"
     ]

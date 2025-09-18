@@ -267,6 +267,42 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
 
     # --- Group 2: Core Statistical Function Tests ---
 
+    def test_evaluate_single_test_unbiased_tie_breaking(self):
+        """Verify that tie-breaking for chosen_positions is unbiased."""
+        # --- Arrange ---
+        # Row 0 has a tie for the top score at indices 0 and 2.
+        # Row 1 has a clear winner at index 1.
+        # Row 2 is padding to make the matrix 3x3 as required by k=3.
+        score_matrix = np.array([
+            [0.9, 0.1, 0.9], 
+            [0.2, 0.8, 0.3],
+            [0.4, 0.5, 0.6]
+        ])
+        correct_mapping = [1, 2, 3]
+        k = 3
+        
+        # --- Act ---
+        # Run many times to check the distribution of random choices
+        choices = []
+        for _ in range(1000):
+            # Seed random for reproducibility within the test
+            np.random.seed(_)
+            results = analyze_llm_performance.evaluate_single_test(score_matrix, correct_mapping, k)
+            # We only care about the choice for the first person (row 0)
+            choices.append(results['raw_chosen_positions'][0])
+
+        # --- Assert ---
+        # Check that both tied indices (0 and 2) were chosen
+        self.assertIn(0, choices)
+        self.assertIn(2, choices)
+        # Check that the non-tied index (1) was never chosen
+        self.assertNotIn(1, choices)
+
+        # Check that the choices are approximately evenly distributed
+        counts = {i: choices.count(i) for i in set(choices)}
+        self.assertAlmostEqual(counts[0] / 1000, 0.5, delta=0.1)
+        self.assertAlmostEqual(counts[2] / 1000, 0.5, delta=0.1)
+
     def test_evaluate_single_test_handles_ties(self):
         """Test the core evaluation function with tied scores."""
         # --- Arrange ---
@@ -296,6 +332,23 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         # Mapping length is wrong
         result2 = analyze_llm_performance.evaluate_single_test([[1,2],[3,4]], [1], k_val=2)
         self.assertIsNone(result2)
+
+    def test_analyze_metric_distribution_uses_correct_hypothesis_for_rank(self):
+        """Verify the t-test uses alternative='less' for rank-based metrics."""
+        # --- Arrange ---
+        # This data has a mean rank of 2.0, which is significantly *less* than chance (5.5)
+        ranks = [1, 1, 2, 2, 3, 3]
+        chance_level = 5.5
+        
+        # --- Act ---
+        # The metric_name contains "rank", which should trigger the 'less' hypothesis.
+        results = analyze_llm_performance.analyze_metric_distribution(ranks, chance_level, "mean_rank")
+        
+        # --- Assert ---
+        # If alternative='less' was used correctly, the p-value should be very small.
+        # If the incorrect 'greater' was used, the p-value would be close to 1.0.
+        self.assertLess(results['ttest_1samp_p'], 0.05)
+
 
     @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -382,6 +435,32 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         self.assertEqual(delim, ',')
         self.assertEqual(len(mappings), 2)
         self.assertEqual(mappings[0], [1, 2, 3])
+
+    def test_read_mappings_and_deduce_k_skips_non_permutations(self):
+        """Verify the mapping parser skips lines that are not valid permutations."""
+        content = (
+            "1,2,3\n"  # Valid
+            "1,1,2\n"  # Invalid (duplicate)
+            "3,1,2\n"  # Valid
+            "1,2,4\n"  # Invalid (out of range)
+        )
+        (self.analysis_dir / "mappings.csv").write_text(content)
+        
+        with patch('src.analyze_llm_performance.logging.warning') as mock_log_warning:
+            mappings, k, delim = analyze_llm_performance.read_mappings_and_deduce_k(
+                self.analysis_dir / "mappings.csv", k_override=3
+            )
+
+        # Assert that only the two valid permutations were loaded
+        self.assertEqual(len(mappings), 2)
+        self.assertEqual(mappings[0], [1, 2, 3])
+        self.assertEqual(mappings[1], [3, 1, 2])
+        
+        # Assert that warnings were logged for the two invalid lines
+        self.assertEqual(mock_log_warning.call_count, 2)
+        self.assertIn("not a valid permutation", mock_log_warning.call_args_list[0].args[0])
+        self.assertIn("not a valid permutation", mock_log_warning.call_args_list[1].args[0])
+
 
     # --- Group 4: Helper Function Tests ---
 
@@ -578,44 +657,16 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
                     break
             self.assertTrue(warning_found, "Expected IndexError warning not found in print calls.")
 
-    def test_evaluate_single_test_no_variance_mwu(self):
-        """Verify MWU warning when all scores are identical."""
-        score_matrix = np.array([[0.5, 0.5], [0.5, 0.5]])
-        correct_mapping = [1, 2]
-        k = 2
-        
-        with patch('builtins.print') as mock_print:
-            results = analyze_llm_performance.evaluate_single_test(score_matrix, correct_mapping, k)
-            self.assertIsNotNone(results)
-            self.assertEqual(results['p_value_mwu'], 1.0)
-            self.assertEqual(results['effect_size_r'], 0.0)
-            mock_print.assert_called_with("Warning: Insufficient variance for Mann-Whitney U test. Assigning non-significant p-value.")
-
-    def test_evaluate_single_test_mwu_value_error(self):
-        """Verify MWU ValueError handling (when mannwhitneyu itself raises an error)."""
-        score_matrix = np.array([[0.8, 0.2], [0.1, 0.9]]) # Data with variance
-        correct_mapping = [1, 2]
-        k = 2
-        
-        # Patch mannwhitneyu to explicitly raise ValueError
-        with patch('src.analyze_llm_performance.mannwhitneyu', side_effect=ValueError("Test MWU ValueError")), \
-             patch('builtins.print') as mock_print:
-            results = analyze_llm_performance.evaluate_single_test(score_matrix, correct_mapping, k)
-            self.assertIsNotNone(results)
-            self.assertIsNone(results['p_value_mwu']) # Should be None if MWU call failed
-            mock_print.assert_called_with("Mann-Whitney U error for a test: Test MWU ValueError.")
-
-
     def test_analyze_metric_distribution_ttest_error(self):
         """Verify analyze_metric_distribution handles ttest_1samp errors."""
         metric_values = [0.1, 0.2, 0.3]
         
         with patch('src.analyze_llm_performance.ttest_1samp', side_effect=Exception("Test ttest error")), \
-             patch('builtins.print') as mock_print:
+             patch('src.analyze_llm_performance.logging.error') as mock_log_error:
             result = analyze_llm_performance.analyze_metric_distribution(metric_values, 0.1, "test_metric")
             self.assertIsNotNone(result)
             self.assertIsNone(result['ttest_1samp_p'])
-            mock_print.assert_called_with("Error during t-test for test_metric: Test ttest error")
+            mock_log_error.assert_called_with("Error during t-test for test_metric: Test ttest error")
 
     @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     def test_analyze_metric_distribution_wilcoxon_error_zero_diff(self):
@@ -701,64 +752,52 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         result = analyze_llm_performance.read_score_matrices(self.analysis_dir / "any_file.txt", expected_k=0)
         self.assertIsNone(result)
 
-    def test_read_score_matrices_malformed_block(self):
-        """Verify read_score_matrices handles malformed blocks (wrong number of rows)."""
+    @patch('src.analyze_llm_performance.logging.warning')
+    def test_read_score_matrices_parser_robustness(self, mock_log_warning):
+        """Verify the parser correctly handles row labels, malformed data, and incorrect column counts."""
         content = (
-            "0.9\t0.1\t0.0\n"
-            "0.2\t0.8\t0.0\n"
-            "\n" # Block of 2 rows, should be skipped for k=3
-            "0.3\t0.7\t0.0\n"
-            "0.6\t0.4\t0.0\n"
-            "0.5\t0.5\t0.0\n" # Block of 3 rows, should be loaded
+            "RowA 0.9 0.1\n"
+            "RowB 0.2 0.8\n"
+            "\n"
+            "1.0 NOT_A_FLOAT\n"
+            "3.0 4.0\n"
+            "\n"
+            "5.0 6.0 7.0\n"
+            "8.0 9.0\n"
+            "\n"
+            "1.1 2.2\n"
+            "3.3 4.4\n"
         )
-        (self.analysis_dir / "malformed_block.txt").write_text(content)
-        
-        with patch('builtins.print') as mock_print:
-            matrices = analyze_llm_performance.read_score_matrices(self.analysis_dir / "malformed_block.txt", expected_k=3)
-            self.assertEqual(len(matrices), 1) # Should load the valid 3x3 matrix
-            
-            # Search for the specific warning message in the print calls
-            warning_found = False
-            for call_args, _ in mock_print.call_args_list:
-                if call_args and isinstance(call_args[0], str) and "mat end ~L3): 2 lines, exp 3. Skip." in call_args[0]:
-                    self.assertRegex(call_args[0], r"W \(File: .*\.txt, mat end ~L3\): 2 lines, exp 3\. Skip\.")
-                    warning_found = True
-                    break
-            self.assertTrue(warning_found, "Expected malformed block warning not found.")
+        path = self.analysis_dir / "robustness_test.txt"
+        path.write_text(content)
 
-    def test_read_score_matrices_non_float_data(self):
-        """Verify non-float data in a row causes a warning and the block to be skipped."""
-        content = "0.9\t0.1\nnot_a_float\t0.8\n\n0.3\t0.7\n0.6\t0.4\n"
-        (self.analysis_dir / "non_float.txt").write_text(content)
-        
-        with patch('builtins.print') as mock_print:
-            matrices = analyze_llm_performance.read_score_matrices(self.analysis_dir / "non_float.txt", expected_k=2)
-            # The first block is discarded due to the non-float line. The second block is loaded.
-            self.assertEqual(len(matrices), 1)
-            
-            # The logic treats 'not_a_float' as a label, parses the rest ('[0.8]'),
-            # which has 1 column, triggering a column-count warning.
-            warning_found = any("L2): 1 cols, exp 2." in call.args[0] for call in mock_print.call_args_list)
-            self.assertTrue(warning_found, "Expected wrong column count warning (due to non-float line) not found.")
+        matrices = analyze_llm_performance.read_score_matrices(path, expected_k=2)
 
-    def test_read_score_matrices_wrong_col_count(self):
-        """Verify wrong column count prints a warning and skips the line."""
-        content = "0.9\t0.1\n0.2\t0.8\t0.99\n\n0.3\t0.7\n0.6\t0.4\n"
-        (self.analysis_dir / "wrong_cols.txt").write_text(content)
-        
-        with patch('builtins.print') as mock_print:
-            matrices = analyze_llm_performance.read_score_matrices(self.analysis_dir / "wrong_cols.txt", expected_k=2)
-            self.assertEqual(len(matrices), 1)
-            
-            # The script should print a warning about the wrong number of columns for the specific line.
-            warning_found = any("L2): 3 cols, exp 2." in call.args[0] for call in mock_print.call_args_list)
-            self.assertTrue(warning_found, "Expected wrong column count warning not found.")
+        # Should load the first and fourth blocks, skipping the two invalid ones.
+        self.assertEqual(len(matrices), 2)
+        expected_matrix_1 = np.array([[0.9, 0.1], [0.2, 0.8]])
+        expected_matrix_4 = np.array([[1.1, 2.2], [3.3, 4.4]])
+        np.testing.assert_array_equal(matrices[0], expected_matrix_1)
+        np.testing.assert_array_equal(matrices[1], expected_matrix_4)
+
+        # Check that the correct warnings were logged for the two bad rows.
+        self.assertEqual(mock_log_warning.call_count, 2)
+        all_log_calls = [call.args[0] for call in mock_log_warning.call_args_list]
+        log_text = "\n".join(all_log_calls)
+
+        # Check for malformed data warning from the "NOT_A_FLOAT" row
+        self.assertIn("Malformed score line", log_text)
+        self.assertIn("1.0 NOT_A_FLOAT", log_text)
+
+        # Check for wrong column count warning from the "5.0 6.0 7.0" row
+        self.assertIn("3 cols, exp 2", log_text)
 
 
     def test_read_mappings_auto_detects_delimiter_from_data(self):
         """Verify mapping parser auto-detects delimiter from data lines when header is ambiguous."""
-        # This content has no clear text header, forcing the data-sniffing logic
-        content = "1\t2\t3\n4\t5\t6\n7\t8\t9\n"
+        # This content has no clear text header, forcing the data-sniffing logic.
+        # All lines are valid permutations of [1,2,3].
+        content = "1\t2\t3\n3\t1\t2\n2\t3\t1\n"
         (self.analysis_dir / "mappings.tsv").write_text(content)
         
         with patch('builtins.print') as mock_print:
@@ -772,32 +811,6 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
 
     # --- Group 5: Meta-Analysis Function Tests ---
     
-    def test_combine_p_values_stouffer(self):
-        """Test Stouffer's method for combining p-values."""
-        p_values = [0.1, 0.05, 0.2]
-        # Corrected expected results
-        z, p = analyze_llm_performance.combine_p_values_stouffer(p_values)
-        self.assertAlmostEqual(z, 2.175, places=3)
-        self.assertAlmostEqual(p, 0.0148, places=4)
-        
-        # Test with empty list
-        z_empty, p_empty = analyze_llm_performance.combine_p_values_stouffer([])
-        self.assertIsNone(z_empty)
-        self.assertIsNone(p_empty)
-
-    def test_combine_p_values_fisher(self):
-        """Test Fisher's method for combining p-values."""
-        p_values = [0.1, 0.05, 0.2]
-        # Corrected expected results
-        chi2_stat, p = analyze_llm_performance.combine_p_values_fisher(p_values)
-        self.assertAlmostEqual(chi2_stat, 13.82, places=2)
-        self.assertAlmostEqual(p, 0.03177, places=5)
-
-        # Test with empty list
-        chi2_empty, p_empty = analyze_llm_performance.combine_p_values_fisher([])
-        self.assertIsNone(chi2_empty)
-        self.assertIsNone(p_empty)
-
 
     # --- Group 6: Additional Coverage Tests ---
 
@@ -850,22 +863,6 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         self.assertIsNone(result)
         mock_print.assert_any_call("Warning: Invalid value in correct_mapping_indices_1_based (not between 1 and 2). Skipping this test.")
 
-    def test_combine_p_values_stouffer_only_filtered_out(self):
-        """Test lines 197, 202: Stouffer's method handles inputs that are all None/NaN/Zero length."""
-        # List where all values are filtered out by the list comprehension
-        p_values_filtered = [None, np.nan]
-        z_filtered, p_filtered = analyze_llm_performance.combine_p_values_stouffer(p_values_filtered)
-        self.assertIsNone(z_filtered)
-        self.assertIsNone(p_filtered)
-
-    def test_combine_p_values_fisher_only_non_positive(self):
-        """Test lines 219, 223: Fisher's method handles inputs that are all None/NaN/non-positive."""
-        # List where all values are filtered out (p > 0 required)
-        p_values = [None, np.nan, 0.0, 0.0]
-        chi2, p = analyze_llm_performance.combine_p_values_fisher(p_values)
-        self.assertIsNone(chi2)
-        self.assertIsNone(p)
-    
     @patch('src.analyze_llm_performance.print')
     def test_read_mappings_and_deduce_k_empty_or_non_data_file_failure(self, mock_print):
         """Test lines 387-389, 423-425: Verify logic for empty file and failure to deduce k."""
@@ -939,30 +936,42 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
 
     # --- Group 7: Final Coverage Push (80%+) ---
 
-    def test_main_delimiter_argument_parsing(self):
-        """Test lines 651-660: Verify --delimiter 'space' is parsed correctly."""
-        # --- Arrange ---
-        # Create files with space-separated values and a header for robust parsing
-        (self.analysis_dir / "all_scores.txt").write_text("0.9 0.1\n0.2 0.8\n")
-        (self.analysis_dir / "all_mappings.txt").write_text("h1 h2\n1 2\n")
+    def _run_space_delimiter_test(self, delimiter_arg):
+        """Helper function to run the core logic for space delimiter tests."""
+        # Create files with irregular whitespace that would fail a simple line.split(' ')
+        (self.analysis_dir / "all_scores.txt").write_text("0.9  0.1\n0.2\t0.8\n") # multiple spaces, tab
+        (self.analysis_dir / "all_mappings.txt").write_text("h1 h2\n1   2\n") # multiple spaces
         (self.analysis_dir / "successful_indices.txt").write_text("1\n")
         (self.queries_dir / "llm_query_001_manifest.txt").write_text(
             "Shuffled_Name\tShuffled_Desc_Text\tShuffled_Desc_Index\n"
             "Person A\tDesc A\t1\n"
             "Person B\tDesc B\t2\n"
         )
-
-        test_argv = ['analyze_llm_performance.py', '--run_output_dir', str(self.run_dir), '--delimiter', 'space', '-k', '2']
-
-        # --- Act & Assert ---
-        with patch.object(sys, 'argv', test_argv), \
-             patch('builtins.print') as mock_print:
+        test_argv = [
+            'analyze_llm_performance.py',
+            '--run_output_dir', str(self.run_dir),
+            '--delimiter', delimiter_arg,
+            '-k', '2',
+            '--num_valid_responses', '1'
+        ]
+        with patch.object(sys, 'argv', test_argv):
             analyze_llm_performance.main()
-            # The script intentionally converts the 'space' keyword to `None` to enable robust
-            # whitespace splitting via line.split(). The test correctly validates that the
-            # final log message reports 'None' as the delimiter used.
-            info_found = any("Delimiter for mappings: 'None'" in call.args[0] for call in mock_print.call_args_list)
-            self.assertTrue(info_found, "Expected log for whitespace delimiter ('None') not found.")
+
+        # A successful run (no sys.exit call) is the primary validation.
+        self.mock_sys_exit.assert_not_called()
+        metrics_file = self.analysis_dir / "replication_metrics.json"
+        self.assertTrue(metrics_file.is_file())
+        with open(metrics_file, 'r') as f:
+            results = json.load(f)
+        self.assertEqual(results['n_valid_responses'], 1)
+
+    def test_main_handles_space_delimiter_keyword(self):
+        """Verify the script correctly parses irregular whitespace for the 'space' keyword."""
+        self._run_space_delimiter_test('space')
+
+    def test_main_handles_space_delimiter_literal(self):
+        """Verify the script correctly parses irregular whitespace for the ' ' literal."""
+        self._run_space_delimiter_test(' ')
 
     @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     @patch('builtins.print')

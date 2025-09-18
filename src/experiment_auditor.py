@@ -94,17 +94,13 @@ FILE_MANIFEST = {
     "replication_report": {"pattern": r"replication_report_\d{4}-\d{2}-\d{2}.*\.txt"},
 }
 
+# A single, flattened set of all required keys for exact schema validation.
 REPORT_REQUIRED_METRICS = {
-    "n_valid_responses", "mwu_stouffer_z", "mwu_stouffer_p", "mwu_fisher_chi2",
-    "mwu_fisher_p", "mean_effect_size_r", "effect_size_r_p", "mean_mrr",
-    "mrr_p", "mean_top_1_acc", "top_1_acc_p", "mean_top_3_acc",
-    "top_3_acc_p", "mean_rank_of_correct_id", "rank_of_correct_id_p",
-    "bias_slope", "bias_intercept", "bias_r_value", "bias_p_value", "bias_std_err",
-    "mean_mrr_lift", "mean_top_1_acc_lift", "mean_top_3_acc_lift"
-}
-
-REPORT_REQUIRED_NESTED_KEYS = {
-    "positional_bias_metrics": {"top1_pred_bias_std", "true_false_score_diff"}
+    "n_valid_responses", "mean_mrr", "mrr_p", "mean_top_1_acc", "top_1_acc_p",
+    "mean_top_3_acc", "top_3_acc_p", "mean_rank_of_correct_id",
+    "rank_of_correct_id_p", "bias_slope", "bias_intercept", "bias_r_value",
+    "bias_p_value", "bias_std_err", "mean_mrr_lift", "mean_top_1_acc_lift",
+    "mean_top_3_acc_lift", "top1_pred_bias_std", "true_false_score_diff"
 }
 
 # --- Verification Helper Functions ---
@@ -234,16 +230,23 @@ def _check_report(run_path: Path):
         j = json.loads(text[start + len("<<<METRICS_JSON_START>>>"):end])
     except Exception:
         return "REPORT_MALFORMED"
-    missing_metrics = REPORT_REQUIRED_METRICS - j.keys()
-    if missing_metrics:
-        return f"REPORT_INCOMPLETE_METRICS: {', '.join(sorted(missing_metrics))}"
-    for nested_key, required_sub_keys in REPORT_REQUIRED_NESTED_KEYS.items():
-        nested_dict = j.get(nested_key)
-        if not isinstance(nested_dict, dict):
-            return f"REPORT_MISSING_NESTED_DICT: {nested_key}"
-        missing_sub_keys = required_sub_keys - nested_dict.keys()
-        if missing_sub_keys:
-            return f"REPORT_INCOMPLETE_NESTED_KEYS ({nested_key}): {', '.join(sorted(missing_sub_keys))}"
+
+    # Flatten the keys from the JSON for a direct set comparison.
+    actual_keys = set(j.keys())
+    if 'positional_bias_metrics' in j and isinstance(j.get('positional_bias_metrics'), dict):
+        actual_keys.remove('positional_bias_metrics')
+        actual_keys.update(j['positional_bias_metrics'].keys())
+
+    # Check for missing and unexpected keys.
+    required = REPORT_REQUIRED_METRICS
+    missing = required - actual_keys
+    unexpected = actual_keys - required
+
+    if missing:
+        return f"REPORT_INCOMPLETE_METRICS: {', '.join(sorted(missing))}"
+    if unexpected:
+        return f"REPORT_UNEXPECTED_METRICS: {', '.join(sorted(unexpected))}"
+
     return "VALID"
 
 def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:

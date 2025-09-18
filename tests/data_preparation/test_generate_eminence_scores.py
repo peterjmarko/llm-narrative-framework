@@ -342,20 +342,34 @@ class TestCoverageAndEdgeCases:
             mock_log.assert_called_once()
             assert "Failed to write scores" in mock_log.call_args[0][0]
 
-    def test_sort_and_reindex_scores_handles_import_error(self, tmp_path, caplog):
+    def test_sort_and_reindex_scores_handles_import_error(self, tmp_path):
         """Tests the fallback behavior when pandas is not installed."""
-        from src.generate_eminence_scores import sort_and_reindex_scores
+        import importlib
+        from src import generate_eminence_scores
+
         scores_file = tmp_path / "scores.csv"
         scores_file.write_text("Index,EminenceScore\n2,80\n1,90")
-        
+
         with patch.dict('sys.modules', {'pandas': None}):
-            result = sort_and_reindex_scores(scores_file)
-        
-        assert result is True
-        assert "Pandas not installed. Skipping sorting." in caplog.text
+            with patch('logging.warning') as mock_warning:
+                importlib.reload(generate_eminence_scores)
+                result = generate_eminence_scores.sort_and_reindex_scores(scores_file)
+
+                assert result is True
+                # Use the full, correct warning message from the production code
+                expected_msg = "Pandas not installed. Skipping sorting. Install with 'pdm add pandas'."
+                mock_warning.assert_called_once_with(expected_msg)
+
         # Verify the file was NOT sorted
         content = scores_file.read_text()
         assert content.startswith("Index,EminenceScore\n2,80")
+
+        # IMPORTANT: Reload the module again outside the patch to restore its state
+        importlib.reload(generate_eminence_scores)
+
+        # IMPORTANT: Reload the module again outside the patch to restore its state
+        # for subsequent tests in the suite.
+        importlib.reload(generate_eminence_scores)
 
     def test_main_handles_up_to_date_file_with_user_confirmation(self, mock_sandbox, capsys):
         """Tests the interactive prompt when the user confirms an overwrite."""

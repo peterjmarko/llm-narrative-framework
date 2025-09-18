@@ -8,27 +8,23 @@ This document outlines planned development tasks and tracks known issues for the
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
-#### A. Correct Methodological Flaws
-- [ ] **Address Mann-Whitney U Test Independence Violation**
-  - [ ] Modify `analyze_llm_performance.py` to remove the pooled MWU test, which violates the statistical assumption of independence.
-  - [ ] Update the downstream consumer of the MWU metrics (`run_bias_analysis.py`) to handle their removal and prevent pipeline failures.
-
-#### B. Implement Core Algorithm Validation Tests
+#### A. Implement Core Algorithm Validation Tests
 - [ ] **Implement Query Generation & Randomization Integrity Test**
   - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide mathematical proof of the mapping and randomization logic in `query_generator.py`.
 - [ ] **Implement Statistical Analysis & Reporting Validation Test**
   - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide bit-for-bit verification of the `compile_study.ps1` and `analyze_study_results.py` pipeline against a known-good ground truth.
 
-#### C. Complete Integration Testing
-- [ ] **Re-validate Integration Tests After Filter Changes**
-  - [ ] Perform a full run of the Layer 4 integration test to ensure that the changes to the data filtering logic have not introduced any downstream regressions.
-- [ ] **Implement Layer 6 Test Harness (Post-Hoc Study Evaluation)**
+#### B. Complete Integration Testing
+- [ ] **Re-validate Integration Tests After Code Stabilization**
+  - [ ] Perform full runs of the Layer 2 and 3 integration tests to confirm the stability of the data preparation pipeline after recent bug fixes.
+  - [ ] Perform a full run of the Layer 4 integration test to ensure that the code stabilization has not introduced any downstream regressions.
+- [ ] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)**
   - [ ] Create a new scripted integration test for the `compile_study.ps1` workflow.
 - [ ] **Enhance Layer 4 Test Harness (Experiment Lifecycle)**
   - [ ] Add an `-Interactive` flag to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` lifecycle.
   - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `manifest.json` file is correctly generated.
 
-#### D. Enhance Reproducibility and Provenance
+#### C. Enhance Reproducibility and Provenance
 - [ ] **Implement Provenance Capture**
   - [ ] Modify `new_experiment.ps1` to generate a `manifest.json` file in each new experiment directory.
   - [ ] The manifest will capture Git state (commit SHA, tag) and key environment details (Python version, OS).
@@ -123,6 +119,9 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Architectural Refactoring for Modularity**
   - [ ] Apply the "Refactor for Testability" pattern (extracting complex functions to the module level for direct patching) to other orchestrators like `experiment_manager.py`.
   - [ ] Reorganize the `src/` directory into logical subdirectories (`data_preparation/`, `experimentation/`) to improve separation of concerns and navigability.
+
+- [ ] **Refactor Core Scripts for Consistent Logging**
+  - [ ] Systematically replace all user-facing `print()` statements with appropriate `logging` calls to ensure that `--quiet` flags are respected framework-wide. This task is parked for post-publication as it requires a significant refactoring of the unit test suites that currently mock `print()`.
   - [ ] Mirror the new `src/` structure in the `tests/` directory to create a parallel test suite.
   - [ ] Move tests for developer utility scripts from `tests/` to a self-contained `scripts/tests/` directory.
   - [ ] Systematically update all import statements and script paths across the entire project to reflect the new structure.

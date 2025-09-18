@@ -256,6 +256,8 @@ If a replication run has **two or more** distinct problems (e.g., a missing conf
 
 The `Details` string provides a semicolon-separated list of all detected issues (e.g., `CONFIG_MISSING; RESPONSE_FILES_INCOMPLETE`).
 
+A key part of this validation is a strict schema check on the `replication_report.txt` file. The audit verifies that the JSON block of metrics contains *exactly* the set of required keys—no more, and no less. A report with missing (`REPORT_INCOMPLETE_METRICS`) or extra, obsolete metrics (`REPORT_UNEXPECTED_METRICS`) will be flagged with an `ANALYSIS_ISSUE`. This ensures that analysis is only ever performed on data with a correct and up-to-date schema.
+
 In addition to the per-replication table, the audit provides an `Overall Summary` that includes the `Experiment Aggregation Status`. This checks for the presence and completeness of top-level summary files (`EXPERIMENT_results.csv`, `experiment_log.csv`), confirming whether the last aggregation step for the experiment was successfully completed.
 
 #### Workflow 3: Fixing or Updating an Experiment

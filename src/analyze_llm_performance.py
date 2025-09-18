@@ -38,7 +38,6 @@ It is called by `orchestrate_replication.py`.
 import numpy as np
 from scipy.stats import mannwhitneyu, norm, chi2, ttest_1samp, wilcoxon, rankdata, linregress
 import argparse
-import math
 import os
 import sys
 import logging
@@ -77,10 +76,14 @@ def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, t
     for person_idx in range(k_val):
         try:
             correct_id_idx_0_based = correct_mapping_indices_1_based[person_idx] - 1
-            person_scores = matrix[person_idx, :] 
-            chosen_positions.append(np.argmax(person_scores))
+            person_scores = matrix[person_idx, :]
+            
+            # Use random choice for ties to avoid systematic bias of argmax.
+            max_score = np.max(person_scores)
+            top_indices = np.flatnonzero(person_scores == max_score)
+            chosen_positions.append(np.random.choice(top_indices))
 
-            for id_idx_0_based in range(k_val): 
+            for id_idx_0_based in range(k_val):
                 score = person_scores[id_idx_0_based]
                 if id_idx_0_based == correct_id_idx_0_based:
                     correct_scores.append(score)
@@ -100,34 +103,6 @@ def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, t
             ranks_of_correct_ids.append(float('nan'))
             continue 
 
-    p_value_mwu, effect_size_r, u_statistic = None, None, None
-    if not correct_scores or not incorrect_scores:
-        print("Warning: No correct or incorrect scores collected for a test. Skipping MWU.")
-    else:
-        is_variable = False
-        if correct_scores and incorrect_scores:
-            all_scores_combined = np.array(correct_scores + incorrect_scores)
-            if len(np.unique(all_scores_combined)) > 1:
-                 is_variable = True
-        
-        if is_variable:
-            try:
-                u_statistic, p_value_mwu = mannwhitneyu(correct_scores,
-                                                        incorrect_scores,
-                                                        alternative='greater')
-                if p_value_mwu is not None and not np.isnan(p_value_mwu):
-                    p_clamped = np.clip(p_value_mwu, 1e-10, 1 - 1e-10) 
-                    z_score = norm.ppf(1 - p_clamped) 
-                    n_total = len(correct_scores) + len(incorrect_scores)
-                    if n_total > 0 :
-                        effect_size_r = z_score / np.sqrt(n_total)
-            except ValueError as e: 
-                print(f"Mann-Whitney U error for a test: {e}.")
-        else:
-            print("Warning: Insufficient variance for Mann-Whitney U test. Assigning non-significant p-value.")
-            p_value_mwu = 1.0 
-            effect_size_r = 0.0
-
     num_people_for_ranks = len(ranks_of_correct_ids)
     valid_ranks = [r for r in ranks_of_correct_ids if not np.isnan(r)]
 
@@ -144,10 +119,9 @@ def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, t
     mean_rank_of_correct_id = np.mean(valid_ranks) if valid_ranks else np.nan
     
     return {
-        'k_val': k_val, 'p_value_mwu': p_value_mwu, 'effect_size_r': effect_size_r,
+        'k_val': k_val,
         'mrr': mean_reciprocal_rank, 'top_1_accuracy': top_1_accuracy,
         f'top_{top_k_value_for_accuracy}_accuracy': top_k_accuracy_val,
-        'u_statistic': u_statistic,
         'mean_rank_of_correct_id': mean_rank_of_correct_id, # Add the new metric
         'raw_correct_scores': correct_scores,
         'raw_incorrect_scores': incorrect_scores,
@@ -155,26 +129,6 @@ def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, t
     }
 
 # --- II. Meta-Analysis Functions ---
-def combine_p_values_stouffer(p_values):
-    p_values = [p for p in p_values if p is not None and not np.isnan(p)]
-    if not p_values: return None, None
-    p_values_clamped = np.clip(p_values, 1e-10, 1.0 - 1e-10)
-    z_scores = norm.ppf(1 - p_values_clamped)
-    if len(z_scores) == 0: return None, None
-    combined_z = np.sum(z_scores) / np.sqrt(len(z_scores))
-    combined_p = 1 - norm.cdf(combined_z)
-    return combined_z, combined_p
-
-def combine_p_values_fisher(p_values):
-    p_values = [p for p in p_values if p is not None and not np.isnan(p) and p > 0]
-    if not p_values: return None, None
-    p_values_clamped = np.clip(p_values, 1e-300, 1.0)
-    if len(p_values_clamped) == 0: return None, None
-    chi_squared_stat = -2 * np.sum(np.log(p_values_clamped))
-    df = 2 * len(p_values_clamped)
-    combined_p = chi2.sf(chi_squared_stat, df)
-    return chi_squared_stat, combined_p
-
 def analyze_metric_distribution(metric_values, chance_level, metric_name):
     metric_values = [m for m in metric_values if m is not None and not np.isnan(m)]
     base_return = {
@@ -191,9 +145,11 @@ def analyze_metric_distribution(metric_values, chance_level, metric_name):
     
     if len(metric_values) >= 2:
         try:
-            stat, p_val = ttest_1samp(metric_values, chance_level, alternative='greater', nan_policy='omit')
+            # For rank metrics, 'less' is better. For others, 'greater' is better.
+            alt_hypothesis = 'less' if 'rank' in metric_name.lower() else 'greater'
+            stat, p_val = ttest_1samp(metric_values, chance_level, alternative=alt_hypothesis, nan_policy='omit')
             base_return['ttest_1samp_stat'], base_return['ttest_1samp_p'] = stat, p_val
-        except Exception as e: print(f"Error during t-test for {metric_name}: {e}")
+        except Exception as e: logging.error(f"Error during t-test for {metric_name}: {e}")
     elif len(metric_values) == 1:
         print(f"Warning: Only one sample for {metric_name}, t-test not meaningfully computed.")
 
@@ -358,11 +314,15 @@ def read_mappings_and_deduce_k(filepath, k_override=None, specified_delimiter_ke
                 if line:
                     parsed_indices, num_items = try_parse_mapping_line(line, final_k_to_use, actual_delimiter_to_parse_with)
                     if parsed_indices and num_items == final_k_to_use:
-                        mappings_list.append(parsed_indices)
+                        # Enforce permutation contract
+                        if sorted(parsed_indices) == list(range(1, final_k_to_use + 1)):
+                            mappings_list.append(parsed_indices)
+                        else:
+                            logging.warning(f"Warning (File: {filepath}, line ~{line_num}): Line is not a valid permutation of 1 to {final_k_to_use}. Skip: '{line}'")
                     elif num_items != final_k_to_use and num_items > 0 :
-                        print(f"Warning (File: {filepath}, line ~{line_num}): Parsed with {num_items} elements, expected k={final_k_to_use}. Delim='{repr(actual_delimiter_to_parse_with)}'. Skip: '{line}'")
+                        logging.warning(f"Warning (File: {filepath}, line ~{line_num}): Parsed with {num_items} elements, expected k={final_k_to_use}. Delim='{repr(actual_delimiter_to_parse_with)}'. Skip: '{line}'")
                     elif not parsed_indices and line: 
-                         print(f"Warning (File: {filepath}, line ~{line_num}): Could not parse as data. Delim='{repr(actual_delimiter_to_parse_with)}'. Skip: '{line}'")
+                         logging.warning(f"Warning (File: {filepath}, line ~{line_num}): Could not parse as data. Delim='{repr(actual_delimiter_to_parse_with)}'. Skip: '{line}'")
     except FileNotFoundError:
         print(f"Error: Mappings file not found at {filepath} (during full read).")
         return None, None, None
@@ -442,61 +402,45 @@ def read_score_matrices(filepath, expected_k, delimiter_char=None):
                     
                     row_items_str_cleaned = None
 
-                    # 1. Handle Markdown table format
-                    if line.startswith('|'):
-                        if '---' in line: continue # Skip separator line
-                        parts = [p.strip() for p in line.strip('|').split('|')]
-                        # Filter out empty strings that can result from leading/trailing pipes
-                        parts = [p for p in parts if p]
-                        
-                        if not parts: continue
+                    parts_to_parse = None
+                    row_items_str_cleaned = None
 
-                        try:
-                            # First, attempt to parse the entire row as numeric data.
-                            [float(p) for p in parts]
-                            row_items_str_cleaned = parts
-                        except ValueError:
-                            # If that fails, it might have a text label in the first column.
-                            if len(parts) > 1:
-                                try:
-                                    # Try parsing again, skipping the first element.
-                                    [float(p) for p in parts[1:]]
-                                    row_items_str_cleaned = parts[1:]
-                                except (ValueError, IndexError):
-                                    # Still fails. It's a header or malformed. Skip.
-                                    continue
-                            else:
-                                # Not enough columns to be data-with-a-label. Skip.
-                                continue
-                    
-                    # 2. Handle standard delimited formats (tab, space, comma)
+                    # 1. Extract potential data parts from Markdown or standard formats
+                    if line.startswith('|'):
+                        if '---' in line: continue  # Skip separator line
+                        parts = [p.strip() for p in line.strip('|').split('|')]
+                        parts = [p for p in parts if p]
                     else:
                         parts = line.split(delimiter_char) if delimiter_char else line.split()
+
+                    if not parts: continue
+
+                    # 2. Determine which parts of the row should be numeric
+                    try:
+                        # Test if the first column is numeric.
+                        float(parts[0])
+                        # If so, the entire row should be numeric.
+                        parts_to_parse = parts
+                    except (ValueError, IndexError):
+                        # If not, assume the first column is a text label and the rest should be numeric.
+                        parts_to_parse = parts[1:]
+
+                    # 3. Validate and convert the numeric parts
+                    if parts_to_parse:
                         try:
-                            # First, try to parse the row as-is (all numbers)
-                            [float(p.strip()) for p in parts]
-                            row_items_str_cleaned = [p.strip() for p in parts]
-                        except ValueError:
-                            # If that fails, it might have a text label in the first column.
-                            # Try parsing it again, skipping the first element.
-                            if len(parts) > 1:
-                                try:
-                                    [float(p.strip()) for p in parts[1:]]
-                                    row_items_str_cleaned = [p.strip() for p in parts[1:]]
-                                except (ValueError, IndexError):
-                                    # Still fails. It's probably a header or malformed. Skip.
-                                    continue
-                            else:
-                                # Not enough columns to be data-with-a-label. Skip.
-                                continue
-                    
-                    # If the line was identified as a header/separator, skip to the next line
-                    if row_items_str_cleaned is None:
-                        continue
+                            # This conversion will fail if any non-numeric data remains after
+                            # slicing off an optional label, preventing data corruption.
+                            [float(p) for p in parts_to_parse]
+                            row_items_str_cleaned = parts_to_parse
+                        except (ValueError, TypeError):
+                            # This row is not a header, not data with a label. It's malformed.
+                            # Log a warning and skip this line to the next.
+                            logging.warning(f"Malformed score line (contains non-numeric data). Skipping line {line_num}: '{line}'")
+                            continue
                     ### END NEW LOGIC ###
 
                     if len(row_items_str_cleaned) != expected_k:
-                        print(f"W (File: {filepath}, L{line_num}): {len(row_items_str_cleaned)} cols, exp {expected_k}. Delim='{repr(delimiter_char)}'. Line: '{line}'. Skip block.")
+                        logging.warning(f"W (File: {filepath}, L{line_num}): {len(row_items_str_cleaned)} cols, exp {expected_k}. Delim='{repr(delimiter_char)}'. Line: '{line}'. Skip block.")
                         current_matrix_str_rows = [] 
                         # Consume rest of malformed block until blank line
                         while line.strip():
@@ -675,12 +619,15 @@ def main():
     mappings_filepath_abs = os.path.join(analysis_inputs_dir, mappings_filename)
 
     actual_delimiter_for_parsing = None
-    if args.delimiter is not None:
+    if args.delimiter:
         delimiter_arg = args.delimiter.lower()
-        if delimiter_arg == 'none': actual_delimiter_for_parsing = None
-        elif delimiter_arg == 'tab': actual_delimiter_for_parsing = '\t'
-        elif delimiter_arg == 'space':
-            # Set to None to trigger line.split() for robust whitespace handling
+        if delimiter_arg == 'none':
+            actual_delimiter_for_parsing = None
+        elif delimiter_arg == 'tab':
+            actual_delimiter_for_parsing = '\t'
+        elif delimiter_arg in ['space', ' ']:
+            # Explicitly map 'space' or a literal space to None to trigger
+            # line.split(), which robustly handles any amount of whitespace.
             actual_delimiter_for_parsing = None
         else:
             actual_delimiter_for_parsing = args.delimiter
@@ -853,13 +800,6 @@ def main():
         sys.exit(1)
 
     # --- Data Aggregation for Final JSON ---
-    mwu_p_values = [res['p_value_mwu'] for res in all_test_results if res.get('p_value_mwu') is not None and not np.isnan(res.get('p_value_mwu'))]
-    stouffer_z, stouffer_p = combine_p_values_stouffer(mwu_p_values) if mwu_p_values else (None, None)
-    fisher_chi2, fisher_p = combine_p_values_fisher(mwu_p_values) if mwu_p_values else (None, None)
-    
-    effect_sizes_r = [res['effect_size_r'] for res in all_test_results if res.get('effect_size_r') is not None]
-    effect_size_analysis = analyze_metric_distribution(effect_sizes_r, 0, "MWU Effect Size r")
-    
     mrrs = [res['mrr'] for res in all_test_results if res.get('mrr') is not None]
     mrr_chance = calculate_mrr_chance(k_to_use)
     mrr_analysis = analyze_metric_distribution(mrrs, mrr_chance, "Mean Reciprocal Rank (MRR)")
@@ -888,8 +828,6 @@ def main():
         
     # --- Saving Section ---
     data_output_dir = os.path.dirname(scores_filepath_abs)
-    save_metric_distribution(mwu_p_values, data_output_dir, f"mwu_p_value_distribution_k{k_to_use}.txt", quiet=args.quiet)
-    save_metric_distribution(effect_sizes_r, data_output_dir, f"effect_size_r_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(mrrs, data_output_dir, f"mrr_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(top_1_accs, data_output_dir, f"top_1_accuracy_distribution_k{k_to_use}.txt", quiet=args.quiet)
     save_metric_distribution(top_k_accs, data_output_dir, f"top_{args.top_k_acc}_accuracy_distribution_k{k_to_use}.txt", quiet=args.quiet)
@@ -914,14 +852,6 @@ def main():
     top_k_acc_lift = (mean_top_k_acc / top_k_chance) if top_k_chance > 0 and mean_top_k_acc is not None else np.nan
 
     summary_data = {
-        # Combined Significance
-        'mwu_stouffer_z': stouffer_z,
-        'mwu_stouffer_p': stouffer_p,
-        'mwu_fisher_chi2': fisher_chi2,
-        'mwu_fisher_p': fisher_p,
-        # Effect Size
-        'mean_effect_size_r': effect_size_analysis.get('mean'),
-        'effect_size_r_p': effect_size_analysis.get('wilcoxon_signed_rank_p'),
         # MRR
         'mean_mrr': mrr_analysis.get('mean'),
         'mrr_p': mrr_analysis.get('wilcoxon_signed_rank_p'),
