@@ -1,5 +1,29 @@
 # Changelog
 
+## 10.0.0 (2025-09-18)
+
+### Bump
+
+- **version 9.7.0 → 10.0.0**
+
+### Refactor
+
+- **Remove invalid MWU test and harden schema validation**
+  This commit corrects a significant methodological flaw and hardens the framework's validation logic.
+  
+  Phase 1: Correct Methodological Flaw
+  - The pooled Mann-Whitney U (MWU) test was statistically invalid as it violated the assumption of independence.
+  - Systematically removed the test and all its derived metrics (Effect Size r, Stouffer's Z, etc.) from the entire analysis pipeline, including core logic, reporting, config schema, and the main article.
+  
+  Phase 2: Harden Validation Logic
+  - The experiment auditor's validation was too lenient, only checking for the presence of required keys, not the absence of obsolete ones, creating technical debt.
+  - Hardened the auditor (`experiment_auditor.py`) to perform a strict, exact schema match, failing reports that contain unexpected/extra keys.
+  - Updated the test suite to validate this new, stricter behavior.
+  
+  Also resolved a critical test isolation failure in `test_generate_eminence_scores.py` that was causing intermittent failures in the full test suite.
+  
+  BREAKING CHANGE: The data schema for replication reports and aggregated results has changed. The Mann-Whitney U test metrics (`mwu_stouffer_p`, `mean_effect_size_r`, etc.) have been removed from the `replication_report.txt` JSON block and the final `STUDY_results.csv`. Downstream consumers must be updated to align with the new, simpler schema.
+
 ## 9.7.0 (2025-09-17)
 
 ### Bump
