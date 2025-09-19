@@ -1,5 +1,34 @@
 # Changelog
 
+## 10.1.0 (2025-09-18)
+
+### Bump
+
+- **version 10.0.0 → 10.1.0**
+
+### Features
+
+- **add query generation validation test**
+  Implements a new Core Algorithm Validation test suite for `query_generator.py` to provide mathematical proof of its randomization and mapping logic.
+  
+  This comprehensive effort includes a new test harness, a Python-based statistical analyzer, significant UX enhancements, and supporting modifications to existing project files.
+  
+  **New Test Suite:**
+  - Creates a new PowerShell harness (`validate_query_generation.ps1`) to orchestrate the test in an isolated sandbox.
+  - Creates a new Python analyzer (`analyze_query_generation_results.py`) to perform the statistical validation.
+  - Adds a `test-query-gen` command to `pyproject.toml` for easy execution.
+  - The suite validates two key properties:
+      1.  **Determinism:** Confirms the 'correct' strategy produces bit-for-bit identical outputs when given a fixed random seed.
+      2.  **Non-Determinism:** Confirms the 'random' strategy produces different outputs across multiple runs.
+  
+  **Statistical Rigor & UX:**
+  - The test is now parameterized by statistical power. The harness takes a `-Beta` (Type II error rate) argument and automatically calculates the required number of iterations `N` for the desired confidence level.
+  - The user experience has been polished with a clean, 4-stage output, a custom progress bar with ETA, and graceful keyboard interrupt handling.
+  
+  **Supporting Changes:**
+  - The Layer 3 integration test (`layer3_phase2_run.ps1`) now automatically bootstraps the required seed assets, removing the need for manual setup.
+  - The core `query_generator.py` script's logging has been fixed to default to a quiet `WARNING` level, cleaning up the test output.
+
 ## 10.0.0 (2025-09-18)
 
 ### Bump
