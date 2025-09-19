@@ -432,13 +432,21 @@ def _run_finalization(final_output_dir, script_paths, colors):
         log_message = "Rebuilding batch log..." if os.path.exists(log_file_path) else "Building batch log..."
         
         print(f"\n--- {log_message} ---")
-        subprocess.run([sys.executable, script_paths['log_manager'], "rebuild", final_output_dir], check=True, capture_output=True)
+        result = subprocess.run([sys.executable, script_paths['log_manager'], "rebuild", final_output_dir], 
+                               check=True, capture_output=True, text=True, timeout=30)
         
         print("--- Compiling final experiment summary... ---")
-        subprocess.run([sys.executable, script_paths['compile_experiment'], final_output_dir], check=True, capture_output=True)
+        result = subprocess.run([sys.executable, script_paths['compile_experiment'], final_output_dir], 
+                               check=True, capture_output=True, text=True, timeout=30)
         
         print("--- Finalizing batch log with summary... ---")
-        subprocess.run([sys.executable, script_paths['log_manager'], "finalize", final_output_dir], check=True, capture_output=True)
+        result = subprocess.run([sys.executable, script_paths['log_manager'], "finalize", final_output_dir], 
+                               check=True, capture_output=True, text=True, timeout=30)
+    except subprocess.TimeoutExpired as e:
+        logging.error(f"Finalization step timed out after 30 seconds: {' '.join(e.cmd)}")
+        if e.stdout: logging.error(f"Stdout:\n{e.stdout}")
+        if e.stderr: logging.error(f"Stderr:\n{e.stderr}")
+        sys.exit(1)
     except subprocess.CalledProcessError as e:
         # Provide more context on subprocess failures
         logging.error("A child process failed during the finalization stage.")

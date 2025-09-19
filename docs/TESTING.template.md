@@ -186,7 +186,7 @@ This section provides a summary of the project's validation status.
 | Test Category | Workflow | Status & Justification |
 | :--- | :--- | :--- |
 | **Integration** | Data Preparation Pipeline | **COMPLETE.** Validated by a robust, profile-driven test harness that runs the full, live pipeline in an isolated sandbox with a controlled seed dataset. |
-| | Experiment Lifecycle | **PLANNED.** The scripted test harness will validate the full `new -> audit -> break -> fix` lifecycle for a single experiment. |
+| | Experiment Lifecycle | **COMPLETE.** Validated by Layer 4 integration tests that execute the full `new -> audit -> break -> fix` lifecycle in an isolated sandbox environment. Tests creation, validation, deliberate corruption, automated repair, and final verification of experiment integrity. |
 | | Study Compilation | **PLANNED.** The test harness will validate the `compile_study.ps1` workflow using a set of pre-generated, valid experiments. |
 
 ### Code Coverage Targets

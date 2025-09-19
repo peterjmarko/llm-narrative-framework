@@ -94,7 +94,7 @@ try {
     if ($LogFilePath -and (Test-Path -LiteralPath $LogFilePath)) {
         try { $c = Get-Content -Path $LogFilePath -Raw; $c = $c -replace "`e\[[0-9;]*m", ''; Set-Content -Path $LogFilePath -Value $c.Trim() -Force } catch {}
         $relativeLogPath = Resolve-Path -Path $LogFilePath -Relative
-        Write-Host "`nLog saved to:`n$relativeLogPath`n" -ForegroundColor Gray
+        Write-Host "`nLog saved to:`n$relativeLogPath`n" -ForegroundColor Cyan
     }
 }
 exit $scriptExitCode

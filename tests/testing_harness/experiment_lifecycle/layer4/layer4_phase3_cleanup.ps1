@@ -37,14 +37,8 @@ try {
     Write-Host "Layer 4 sandbox directory not found. Nothing to remove."
 }
 
-$testExperiments = Get-ChildItem -Path $NewExperimentsDir -Directory "experiment_*" -ErrorAction SilentlyContinue
-if ($testExperiments) {
-    Write-Host "Removing temporary experiment directories from 'output/new_experiments'..."
-    $testExperiments | Remove-Item -Recurse -Force
-    Write-Host "  -> Done."
-} else {
-    Write-Host "No temporary experiment directories found. Nothing to remove."
-}
+Write-Host "Note: Test experiment preserved in production directory 'output/new_experiments'."
+Write-Host "      This allows inspection of the full experiment lifecycle results."
 
 Write-Host "`nCleanup complete." -ForegroundColor Green
 Write-Host ""

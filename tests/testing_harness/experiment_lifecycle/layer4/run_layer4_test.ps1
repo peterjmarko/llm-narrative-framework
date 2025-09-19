@@ -32,8 +32,6 @@ try {
 
     # Phase 2: Run the test workflow
     & "$ScriptDir\layer4_phase2_run.ps1"
-
-    Write-Host "`nLayer 4 test completed successfully." -ForegroundColor Green
 }
 catch {
     Write-Host "`nFATAL: Layer 4 test run failed." -ForegroundColor Red
@@ -47,6 +45,11 @@ finally {
         & "$ScriptDir\layer4_phase3_cleanup.ps1"
     } else {
         Write-Host "`nCleanup skipped due to -SkipCleanup flag." -ForegroundColor Yellow
+    }
+    
+    # Final success message (only if we got this far without exceptions)
+    if (-not $Error) {
+        Write-Host "Layer 4 test completed successfully.`n" -ForegroundColor Green
     }
 }
 

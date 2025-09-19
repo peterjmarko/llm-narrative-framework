@@ -327,6 +327,7 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
         status_details.append("analysis OK")
 
     failures = [d for d in status_details if not d.endswith(" OK")]
+    
     if not failures:
         return "VALIDATED", status_details
 
@@ -393,7 +394,9 @@ def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, lis
         return "NEW_NEEDED", [], {}
 
     run_paths_by_name = {p.name: p for p in run_dirs}
-    granular = {p.name: _verify_single_run_completeness(p) for p in run_dirs}
+    granular = {}
+    for p in run_dirs:
+        granular[p.name] = _verify_single_run_completeness(p)
     fails = {n: (s, d) for n, (s, d) in granular.items() if s != "VALIDATED"}
 
     if any(s == "RUN_CORRUPTED" for s, d in fails.values()):

@@ -70,6 +70,10 @@ except ImportError:
 # Initialize colorama
 init(autoreset=True)
 
+# Define ANSI color codes for consistency with experiment_manager.py
+C_YELLOW = '\033[93m'
+C_RESET = '\033[0m'
+
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s (orchestrator): %(message)s', stream=sys.stderr)
 
@@ -190,7 +194,8 @@ def main():
         
         # Determine if this is a repair or a full reprocess for logging clarity
         mode_string = "REPAIR MODE" if args.indices else "REPROCESS MODE"
-        print(f"\n{Fore.YELLOW}--- {mode_string} for: ---\n{os.path.basename(run_specific_dir_path)}{Fore.RESET}")
+        print(f"\n{C_YELLOW}--- {mode_string} for: ---{C_RESET}")
+        print(f"{os.path.basename(run_specific_dir_path)}")
         
         config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
         if not os.path.exists(config_path):

@@ -9,8 +9,6 @@ This document outlines planned development tasks and tracks known issues for the
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
 #### A. Complete Integration Testing
-- [ ] **Re-validate Unit and Integration Tests After Code Stabilization**
-  - [ ] Perform a full run of the Layer 4 integration test to ensure that the code stabilization has not introduced any downstream regressions.
 - [ ] **Enhance Layer 4 Test Harness (Experiment Lifecycle)**
   - [ ] Add an `-Interactive` flag to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` lifecycle.
 - [ ] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)**

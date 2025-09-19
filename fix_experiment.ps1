@@ -204,9 +204,14 @@ try {
                 default { return }
             }
         }
-        $scriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
-        1 { $procArgs = @($scriptPath, $ExperimentDirectory, "--reprocess", "--non-interactive") }
-        2 { $procArgs = @($scriptPath, $ExperimentDirectory, "--non-interactive") }
+        1 { 
+            $scriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
+            $procArgs = @($scriptPath, $ExperimentDirectory, "--reprocess", "--non-interactive") 
+        }
+        2 { 
+            $scriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
+            $procArgs = @($scriptPath, $ExperimentDirectory, "--non-interactive") 
+        }
         3 { Write-Host "Experiment needs migration. Run migrate_experiment.ps1." -ForegroundColor Yellow; exit 1 }
         4 { Invoke-FinalizeExperiment-Local -ProjectRoot $ProjectRoot -ExperimentDirectory $ExperimentDirectory -LogFilePath $logFilePath; $actionTaken = $true }
         default { throw "Audit failed with exit code $auditExitCode" }

@@ -19,33 +19,39 @@
 #
 # Filename: tests/testing_harness/experiment_lifecycle/layer4/layer4_phase2_run.ps1
 
+$C_ORANGE = "`e[38;5;208m"
+$C_RESET = "`e[0m"
+
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer4_sandbox"
 $TestConfigPath = Join-Path $SandboxDir "config.ini"
 
-function Write-TestHeader { param($Message, $Color = 'Blue') Write-Host "`n--- $($Message) ---" -ForegroundColor $Color }
+function Write-TestHeader { param($Message, $Color = 'Blue') Write-Host "--- $($Message) ---" -ForegroundColor $Color }
 
-Write-Host "--- Layer 4 Integration Testing: Experiment Creation ---" -ForegroundColor Magenta
 Write-Host "--- Phase 2: Run Test Workflow ---" -ForegroundColor Cyan
 
 try {
     Write-TestHeader "STEP 1: Creating a new experiment..."
 
-    # Diagnostic Step: Verify the config file content before running the experiment.
-    $configContent = Get-Content $TestConfigPath -Raw
-    $modelName = if ($configContent -match 'model_name\s*=\s*(.*)') { $matches[1].Trim() } else { 'NOT_FOUND' }
-    $numReps = if ($configContent -match 'num_replications\s*=\s*(.*)') { $matches[1].Trim() } else { 'NOT_FOUND' }
-    Write-Host "  -> Verification: Using config with model '$modelName' and $numReps replication(s)." -ForegroundColor Gray
-    
-    Write-Host "`n`nHALT: Sandbox prepared. Inspect the generated config.ini, then press Enter to create the new experiment..." -ForegroundColor Yellow
-    Read-Host | Out-Null # Capture input without echoing
-
-    $output = & "$ProjectRoot\new_experiment.ps1" -ConfigPath $TestConfigPath -Verbose
+    $output = & "$ProjectRoot\new_experiment.ps1" -ConfigPath $TestConfigPath -Verbose 2>&1
     if ($LASTEXITCODE -ne 0) { throw "new_experiment.ps1 failed." }
     
-    $NewExperimentPath = ($output | Out-String) -split '\r?\n' | Select-Object -Last 1
-    if (-not (Test-Path $NewExperimentPath -PathType Container)) { throw "Could not parse new experiment path from output." }
-    Write-Host "  -> New experiment created at: $NewExperimentPath"
+    # Extract experiment directory from orchestrator output
+    $outputString = ($output | Out-String)
+    
+    # Look for the orchestrator line with the full run path
+    $orchestratorMatch = $outputString | Select-String "INFO \(orchestrator\): Created unique output directory: (.+)\\run_"
+    if ($orchestratorMatch) {
+        # Extract the experiment directory (everything before \run_)
+        $NewExperimentPath = $orchestratorMatch.Matches[0].Groups[1].Value
+    } else {
+        throw "Could not find orchestrator output line in experiment output."
+    }
+    
+    if (-not (Test-Path $NewExperimentPath -PathType Container)) { throw "Experiment directory not found: $NewExperimentPath" }
+    $RelativePath = (Resolve-Path $NewExperimentPath -Relative).TrimStart(".\")
+    Write-Host "  -> New experiment created at: $RelativePath" -ForegroundColor Green
+    Write-Host ""
 
     Write-TestHeader "STEP 2: Auditing the new experiment (should be VALIDATED)..."
     & "$ProjectRoot\audit_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath
@@ -55,7 +61,8 @@ try {
     $responseFile = Get-ChildItem -Path $NewExperimentPath -Filter "llm_response_*.txt" -Recurse | Select-Object -First 1
     if (-not $responseFile) { throw "Could not find a response file to delete." }
     Remove-Item -Path $responseFile.FullName -Force
-    Write-Host "  -> Deleted response file: $($responseFile.Name)"
+    Write-Host "  -> Deleted response file: $($responseFile.Name)" -ForegroundColor Red
+    Write-Host ""
 
     Write-TestHeader "STEP 4: Auditing the broken experiment (should need REPAIR)..."
     & "$ProjectRoot\audit_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath

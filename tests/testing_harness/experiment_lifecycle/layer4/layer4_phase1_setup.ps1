@@ -33,11 +33,8 @@ try {
         Write-Host "`nCleaning up previous Layer 4 sandbox..." -ForegroundColor Yellow
         Remove-Item -Path $SandboxDir -Recurse -Force
     }
-    $testExperiments = Get-ChildItem -Path $NewExperimentsDir -Directory "experiment_*" -ErrorAction SilentlyContinue
-    if ($testExperiments) {
-        Write-Host "`nCleaning up leftover test experiments from 'output/new_experiments'..." -ForegroundColor Yellow
-        $testExperiments | Remove-Item -Recurse -Force
-    }
+    # Note: The test will create an experiment in the production 'output/new_experiments' directory.
+    # This is intentional to test the real workflow, and the experiment will be preserved.
 
     # --- Create the test environment ---
     New-Item -ItemType Directory -Path $TestEnvRoot -Force | Out-Null
@@ -45,10 +42,17 @@ try {
 
     # --- Create a minimal, test-specific personalities database ---
 $dbContent = @"
-1,Biography 1,Personality Text 1
-2,Biography 2,Personality Text 2
-3,Biography 3,Personality Text 3
-4,Biography 4,Personality Text 4
+Index	idADB	Name	BirthYear	DescriptionText
+1	1001	Test Person 1	1980	Personality description for test person 1
+2	1002	Test Person 2	1985	Personality description for test person 2
+3	1003	Test Person 3	1990	Personality description for test person 3
+4	1004	Test Person 4	1995	Personality description for test person 4
+5	1005	Test Person 5	1975	Personality description for test person 5
+6	1006	Test Person 6	1988	Personality description for test person 6
+7	1007	Test Person 7	1992	Personality description for test person 7
+8	1008	Test Person 8	1987	Personality description for test person 8
+9	1009	Test Person 9	1983	Personality description for test person 9
+10	1010	Test Person 10	1991	Personality description for test person 10
 "@
 $dbContent | Set-Content -Path $TestDbPath -Encoding UTF8
 
@@ -65,17 +69,17 @@ mapping_strategy = random
 model_name = google/gemini-flash-1.5
 temperature = 0.2
 
-[DataGeneration]
-personalities_db_file = $($TestDbPath -replace [regex]::Escape($ProjectRoot + "\"), "" -replace "\\", "/")
+[Filenames]
+personalities_src = $("../" + ($TestDbPath -replace [regex]::Escape($ProjectRoot + "\"), "" -replace "\\", "/"))
+
+[Schema]
+csv_header_order = run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,mean_rank_of_correct_id,rank_of_correct_id_p,top1_pred_bias_std,true_false_score_diff,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err
 "@
 $configContent.Trim() | Set-Content -Path $TestConfigPath -Encoding UTF8
 
-    Write-Host ""
-    Write-Host "--- Layer 4 Integration Testing: Experiment Creation ---" -ForegroundColor Magenta
     Write-Host "--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green
-    Write-Host ""
 
 }
 catch {
