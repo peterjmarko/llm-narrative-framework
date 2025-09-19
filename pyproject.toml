@@ -102,6 +102,8 @@ test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer
 test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"
 test-l4 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer4/run_layer4_test.ps1"
 test-l5 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer5/run_layer5_test.ps1"
+test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.ps1"
+test-stats-reporting = "pwsh -File ./tests/testing_harness/validate_statistical_reporting.ps1"
 
 # --- PowerShell Pester Tests (By Suite) ---
 # Experiment Lifecycle

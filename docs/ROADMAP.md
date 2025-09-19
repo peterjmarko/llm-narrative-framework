@@ -8,13 +8,7 @@ This document outlines planned development tasks and tracks known issues for the
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
-#### A. Implement Core Algorithm Validation Tests
-- [ ] **Implement Query Generation & Randomization Integrity Test**
-  - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide mathematical proof of the mapping and randomization logic in `query_generator.py`.
-- [ ] **Implement Statistical Analysis & Reporting Validation Test**
-  - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide bit-for-bit verification of the `compile_study.ps1` and `analyze_study_results.py` pipeline against a known-good ground truth.
-
-#### B. Complete Integration Testing
+#### A. Complete Integration Testing
 - [ ] **Re-validate Integration Tests After Code Stabilization**
   - [ ] Perform full runs of the Layer 2 and 3 integration tests to confirm the stability of the data preparation pipeline after recent bug fixes.
   - [ ] Perform a full run of the Layer 4 integration test to ensure that the code stabilization has not introduced any downstream regressions.
@@ -23,6 +17,10 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Enhance Layer 4 Test Harness (Experiment Lifecycle)**
   - [ ] Add an `-Interactive` flag to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` lifecycle.
   - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `manifest.json` file is correctly generated.
+
+#### B. Implement Core Algorithm Validation Tests
+- [ ] **Implement Statistical Analysis & Reporting Validation Test**
+  - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide bit-for-bit verification of the `compile_study.ps1` and `analyze_study_results.py` pipeline against a known-good ground truth.
 
 #### C. Enhance Reproducibility and Provenance
 - [ ] **Implement Provenance Capture**

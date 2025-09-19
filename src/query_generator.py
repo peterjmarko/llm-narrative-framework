@@ -322,10 +322,14 @@ def main():
     args = parser.parse_args()
 
     # 2. Configure Logging Level (based on CLI -v flags and config)
-    log_level_final_qgen = DEFAULT_LOG_LEVEL_QGEN 
-    if args.verbose == 1: log_level_final_qgen = "INFO"
-    elif args.verbose >= 2: log_level_final_qgen = "DEBUG"
-    numeric_final_log_level = getattr(logging, log_level_final_qgen.upper(), logging.INFO)
+    # Set log level based on verbosity flags. Default to WARNING.
+    if args.verbose == 1:
+        log_level_final_qgen = "INFO"
+    elif args.verbose >= 2:
+        log_level_final_qgen = "DEBUG"
+    else:
+        log_level_final_qgen = "WARNING" # Default to a quiet level
+    numeric_final_log_level = getattr(logging, log_level_final_qgen.upper(), logging.WARNING)
     root_logger = logging.getLogger(); root_logger.setLevel(numeric_final_log_level)
     # ... (ensure handler setup as before) ...
     if not root_logger.hasHandlers() or not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):

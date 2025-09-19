@@ -620,13 +620,43 @@ Assertive and pioneering.
     }
 
     # --- 6. Final Verification ---
-    Write-Host "`n--- VERIFYING: Checking final output... ---$($C_RESET)" -ForegroundColor Cyan
+    Write-Host "`n${C_CYAN}--- VERIFYING: Checking final output... ---${C_RESET}"
     $finalDbPath = Join-Path $SandboxDir "data/personalities_db.txt"
     if (-not (Test-Path $finalDbPath)) { throw "FAIL: The final 'personalities_db.txt' file was not created." }
     Test-StepContinuity "Final Database" $finalDbPath 1 -SubjectsToCheck $FinalSubjects
     $lineCount = (Get-Content $finalDbPath).Length
     if ($lineCount -ne $TestProfile.ExpectedFinalLineCount) { throw "FAIL: Expected $($TestProfile.ExpectedFinalLineCount) lines, but found $lineCount." }
-    Write-Host "`nPASS: The final 'personalities_db.txt' was created with the correct number of lines for this profile." -ForegroundColor Green
+    Write-Host "`n${C_GREEN}PASS: The final 'personalities_db.txt' was created with the correct number of lines for this profile.${C_RESET}"
+
+    # --- 7. Bootstrap Test Assets for Other Tests ---
+    # This step automatically generates and caches the required seed files
+    # (`personalities_db.txt`, `subject_db.csv`) for the Query Generation
+    # validation test. This removes the need for manual setup.
+    Write-Host "`n${C_MAGENTA}--- BOOTSTRAPPING: Caching generated assets for other tests... ---${C_RESET}"
+    $queryGenSeedDir = Join-Path $ProjectRoot "tests\assets\query_gen_seed"
+
+    if (-not (Test-Path $queryGenSeedDir)) {
+        Write-Host "${C_CYAN}  -> Creating seed directory for Query Generation test...${C_RESET}"
+        New-Item -ItemType Directory -Path $queryGenSeedDir | Out-Null
+    }
+
+    # Define source and destination paths based on where the pipeline actually creates them
+    $sourcePersonalities = Join-Path $SandboxDir "data/personalities_db.txt"
+    $destPersonalities = Join-Path $queryGenSeedDir "personalities_db.txt"
+    $sourceSubjectDb = Join-Path $SandboxDir "data/processed/subject_db.csv"
+    $destSubjectDb = Join-Path $queryGenSeedDir "subject_db.csv"
+
+    # Copy personalities_db.txt if it was generated and doesn't already exist at the destination
+    if ((Test-Path $sourcePersonalities) -and -not (Test-Path $destPersonalities)) {
+        Write-Host "${C_CYAN}  -> Caching 'personalities_db.txt' for use in other validation tests.${C_RESET}"
+        Copy-Item -Path $sourcePersonalities -Destination $destPersonalities
+    }
+
+    # Copy subject_db.csv if it was generated and doesn't already exist at the destination
+    if ((Test-Path $sourceSubjectDb) -and -not (Test-Path $destSubjectDb)) {
+        Write-Host "${C_CYAN}  -> Caching 'subject_db.csv' for use in other validation tests.${C_RESET}"
+        Copy-Item -Path $sourceSubjectDb -Destination $destSubjectDb
+    }
 }
 catch {
     throw "Layer 3 test workflow failed.`n$($_.Exception.Message)"

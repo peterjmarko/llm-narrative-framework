@@ -62,17 +62,38 @@ This is a standalone test (`validate_selection_algorithms.ps1`) that validates t
 -   **Prerequisites:**
     This test is optional and requires a one-time manual setup. You must place the required large-scale data assets in the `tests/assets/large_seed/` directory. If these files are not present, the test will be skipped automatically.
 
-#### Query Generation & Randomization Integrity Test (Planned)
+#### Query Generation & Randomization Integrity Test
 
-> **Note:** This is a planned validation test.
+This standalone test provides mathematical proof of the mapping and randomization logic in `query_generator.py`. The test is composed of two scripts that work in tandem:
 
-This standalone test will provide mathematical proof of the mapping and randomization logic in `query_generator.py`. The test will run the script in a loop to generate a large sample of trial manifests for both `correct` and `random` strategies. It will then perform statistical validation to confirm the `random` strategy approximates a uniform distribution and that the `correct` strategy is implemented as designed.
+1.  **`validate_query_generation.ps1` (The Harness):** The user-facing entry point. It prepares a sandbox and calls `query_generator.py` in a loop to generate a statistically significant sample of manifest files.
+2.  **`analyzers/analyze_query_generation_results.py` (The Analyzer):** A worker script called by the harness. It inspects the generated files to validate two core properties:
+    *   **Determinism:** That the `correct` strategy produces bit-for-bit identical outputs when given the same random seed.
+    *   **Non-Determinism:** That the `random` strategy produces different outputs across multiple runs.
 
-#### Statistical Analysis & Reporting Validation (Planned)
+**Statistical Rigor:** The test is parameterized by statistical power. The user specifies the acceptable Type II error rate (`-Beta`), and the harness automatically calculates the required number of iterations `N` to achieve the corresponding statistical power (1 - `Beta`). This ensures that the non-determinism check is statistically sound.
 
-> **Note:** This is a planned validation test.
+-   **To run the test:**
+    ```powershell
+    # Run with default 99.9999% power (Beta = 0.000001), which requires 9 iterations for k=3.
+    pdm run test-query-gen
 
-This standalone test will provide bit-for-bit verification of the entire data analysis and aggregation pipeline. The test will use a static, pre-generated set of mock LLM response files as input, run the full sequence of analysis and compilation scripts, and compare the final `STUDY_results.csv` and report JSON against a pre-computed, known-good ground truth.
+    # Run with a custom 99.9% power (Beta = 0.001), which requires 5 iterations.
+    pdm run test-query-gen -Beta 0.001
+    ```
+-   **Prerequisites:**
+    This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3-default` once to bootstrap these assets. If the assets are not present, the test will be skipped.
+
+#### Statistical Analysis & Reporting Validation
+
+This is a standalone test (`validate_statistical_reporting.ps1`) that provides bit-for-bit verification of the entire data analysis and aggregation pipeline. The test uses a static, pre-generated set of mock LLM response files as input, runs the full sequence of analysis and compilation scripts, and compares the final `STUDY_results.csv` and report JSON against a pre-computed, known-good ground truth.
+
+-   **To run the test:**
+    ```powershell
+    pdm run test-stats-reporting
+    ```
+-   **Prerequisites:**
+    This test is optional and requires a one-time manual setup. You must place the required mock experiment assets in the `tests/assets/mock_study/` directory. If these files are not present, the test will be skipped automatically.
 
 ### Unit Testing
 
@@ -90,6 +111,8 @@ The project includes a suite of PDM scripts for running tests, defined in `pypro
 | `pdm run test-l3-bypass` | Runs the Layer 3 test with `bypass_candidate_selection` enabled. |
 | `pdm run test-l3-interactive` | Runs the Layer 3 test in interactive "guided tour" mode. |
 | `pdm run test-l3-selection` | Runs the **Large-Scale Algorithm Validation** for the selection logic. |
+| `pdm run test-query-gen` | Runs the **Query Generation Algorithm Validation**. |
+| `pdm run test-stats-reporting` | Runs the **Statistical Reporting Algorithm Validation**. |
 | `pdm run test-l4` | Runs the **Layer 4** Integration test for the experiment lifecycle. |
 | `pdm run test-l5` | Runs the **Layer 5** Integration test for the migration workflow. |
 
@@ -197,8 +220,10 @@ Module                              Cov. (%)        Status & Justification
                                                     and cutoff algorithms at scale using a large, pre-generated
                                                     seed dataset in an isolated sandbox.
 
-**`Query Generation Algorithm`**        `N/A`           PLANNED. Standalone test to provide mathematical proof of the
-                                                    mapping and randomization logic in `query_generator.py`.
+**`Query Generation Algorithm`**        `N/A`           COMPLETE. Standalone test provides mathematical proof of the
+                                                    mapping and randomization logic. It validates that the 'random'
+                                                    strategy is non-deterministic and that the 'correct' strategy is
+                                                    deterministic when provided with a fixed seed.
 
 **`Statistical Reporting Algorithm`**   `N/A`           PLANNED. Standalone test to provide bit-for-bit verification
                                                     of the entire data analysis and aggregation pipeline against a
