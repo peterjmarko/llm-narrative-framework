@@ -1,5 +1,20 @@
 # Changelog
 
+## 10.1.1 (2025-09-19)
+
+### Bump
+
+- **version 10.1.0 → 10.1.1**
+
+### Fixes
+
+- **resolve interactive mode display bugs**
+  The Layer 3 interactive test ("guided tour") had several visual bugs that have been resolved.
+  
+  - The root cause of missing script summaries was an incorrect file path to `get_docstring_summary.py`, which has been corrected in all relevant scripts.
+  - The display order for manual step validation has been fixed to ensure the script summary appears before validation output.
+  - The worker script `layer3_phase2_run.ps1` now has a pre-flight check to prevent direct execution and guide users to the correct `pdm run` commands.
+
 ## 10.1.0 (2025-09-18)
 
 ### Bump
