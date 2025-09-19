@@ -20,12 +20,29 @@
 # Filename: tests/testing_harness/data_preparation/layer3/layer3_phase2_run.ps1
 
 param(
-    [Parameter(Mandatory=$true)]
+    # This parameter is functionally mandatory but declared optional to allow
+    # a pre-flight check to run before PowerShell prompts the user.
+    [Parameter(Mandatory=$false)]
     [hashtable]$TestProfile,
 
     [Parameter(Mandatory=$false)]
     [switch]$Interactive
 )
+
+# --- Pre-flight Check: Prevent direct execution ---
+if ($null -eq $TestProfile) {
+    $C_YELLOW = "`e[93m"
+    $C_CYAN = "`e[96m"
+    $C_RESET = "`e[0m"
+    Write-Host "`n${C_YELLOW}WARNING: This is a worker script and should not be run directly.${C_RESET}"
+    Write-Host "It requires a complex 'TestProfile' parameter that is supplied by the main test harness."
+    Write-Host "`n${C_YELLOW}Please use one of the following PDM commands to run the data pipeline tests:${C_RESET}"
+    Write-Host "  pdm run test-l3              ${C_CYAN}- Runs the standard data pipeline test.${C_RESET}"
+    Write-Host "  pdm run test-l3-interactive  ${C_CYAN}- Runs the interactive 'guided tour' of the pipeline.${C_RESET}"
+    Write-Host "  pdm run test-l3-bypass       ${C_CYAN}- Runs the test with LLM selection bypassed.${C_RESET}"
+    Write-Host "  pdm run test-l3-selection    ${C_CYAN}- Runs the large-scale selection algorithm validation.${C_RESET}`n"
+    exit 1
+}
 
 $ErrorActionPreference = "Stop"
 
@@ -250,7 +267,7 @@ try {
     
     # Replicate the standard step info block for consistency in interactive mode
     if ($Interactive) {
-        $summaryHelper = Join-Path $ProjectRoot "scripts/get_docstring_summary.py"
+        $summaryHelper = Join-Path $ProjectRoot "scripts/analysis/get_docstring_summary.py"
         $fetchScriptPath = Join-Path $ProjectRoot "src/fetch_adb_data.py"
         $summary = & python $summaryHelper $fetchScriptPath 2>$null
         if ($summary) {
@@ -429,36 +446,36 @@ try {
         $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = "SUCCESS"; 'Output File' = $step.'Output File' })
     }
 
+    # --- SIMULATE Manual Step 9: Solar Fire Processing ---
+    if ($Interactive) {
+        # Manually print the info block for this step as the orchestrator has halted.
+        $summary9 = "This is a manual step. It simulates the process of importing the `sf_data_import.txt` file into the Solar Fire software, running the necessary chart calculations, and exporting the results to `sf_chart_export.csv`."
+        $note9 = "Test Harness Note: This test automates the manual step by creating a pre-computed `sf_chart_export.csv` file."
+        Write-Host "`n${C_BLUE}Script Summary: $summary9${C_RESET}"
+        Write-Host "${C_MAGENTA}$note9${C_RESET}"
+        Write-Host "`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}"
+        Write-Host ""
+        Write-Host "${C_RESET}  INPUTS:"
+        Write-Host "    - data/intermediate/sf_data_import.txt"
+        Write-Host ""
+        Write-Host "  OUTPUT:"
+        Write-Host "    - data/foundational_assets/sf_chart_export.csv"
+    }
+
     # --- VALIDATE INTERMEDIATE RESULTS ---
+    # These checks validate the outputs of the previous automated steps before proceeding.
     Test-StepContinuity "Eligible Candidates" (Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt") 1 "`t" $FinalSubjects
     if ($TestProfile.ConfigOverrides["bypass_candidate_selection"] -eq "true") {
         $eligibleFile = Join-Path $SandboxDir "data/intermediate/adb_eligible_candidates.txt"; $finalFile = Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt"; Test-CandidateListEquality -File1 $eligibleFile -File2 $finalFile
     } else {
-        # NOTE: OCEAN scores file has Index as col 0, idADB as col 1.
         Test-StepContinuity "OCEAN Scores" (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") 1 "," $FinalSubjects
     }
-
-    # --- SIMULATE Manual Step 9: Solar Fire Processing ---
-    if ($Interactive) {
-        # Manually print the info block for this step as the orchestrator has halted.
-        $summary9 = "This is a manual step. It simulates the process of importing the `sf_data_import.txt` file into the Solar Fire software, running the necessary chart calculations, and exporting the results to `sf_chart_export.csv`. This test automates this by creating a pre-computed `sf_chart_export.csv` file."
-        [Console]::WriteLine("${C_BLUE}Script Summary: $summary9${C_RESET}")
-        [Console]::WriteLine("`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}")
-        [Console]::WriteLine()
-        [Console]::WriteLine("${C_RESET}  INPUTS:")
-        [Console]::WriteLine("    - data/intermediate/sf_data_import.txt")
-        [Console]::WriteLine()
-        [Console]::WriteLine("  OUTPUT:")
-        [Console]::WriteLine("    - data/foundational_assets/sf_chart_export.csv")
-    }
     $sfImportFile = Join-Path $SandboxDir "data/intermediate/sf_data_import.txt"
-    Write-Host "" # Add a blank line for spacing
     Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
     Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
 
     if ($Interactive) {
-        [Console]::Write("`n${C_ORANGE}Press Enter to simulate this manual step (Ctrl+C to exit)...${C_RESET} ")
-        [Console]::ReadLine() | Out-Null
+        Read-Host -Prompt "`n${C_ORANGE}Press Enter to simulate this manual step (Ctrl+C to exit)...${C_RESET}" | Out-Null
     }
 
     Write-Host "`n--- SIMULATING: Solar Fire Processing... ---$($C_RESET)" -ForegroundColor Magenta
@@ -553,7 +570,7 @@ Assertive and pioneering.
     Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader11 -ForegroundColor Blue; Write-Host "Simulating the LLM text neutralization by copying pre-generated assets." -ForegroundColor Blue
 
     if ($Interactive) {
-        $summaryHelper = Join-Path $ProjectRoot "scripts/get_docstring_summary.py"
+        $summaryHelper = Join-Path $ProjectRoot "scripts/analysis/get_docstring_summary.py"
         $targetScriptPath = Join-Path $ProjectRoot "src/neutralize_delineations.py"
         $summary = & python $summaryHelper $targetScriptPath 2>$null
         if ($summary) {
@@ -713,6 +730,14 @@ finally {
             Write-Host $rowLine
         }
     Write-Host ""
+    }
+
+    # --- Final Cleanup: Remove any accidentally created '0' file ---
+    # This acts as a safeguard against shell redirection quirks.
+    $rogueFile = Join-Path $ProjectRoot "0"
+    if (Test-Path $rogueFile) {
+        Write-Host "`n--- HARNESS: Removing unexpected file '0' from project root. ---" -ForegroundColor Yellow
+        Remove-Item $rogueFile -Force
     }
 }
 

@@ -102,13 +102,11 @@ if ($Interactive) {
     Write-Host "Welcome to the Layer 3 Interactive Test (Guided Tour)." -ForegroundColor Cyan
     Write-Host "This test will walk you through the entire data preparation pipeline in a safe, isolated sandbox."
     Write-Host "It consists of three phases:"
-    Write-Host "  1. Setup:    Creates a temporary sandbox and copies in a small seed dataset."
-    Write-Host "  2. Execute:  Runs the full pipeline, which consists of 15 tasks (13 steps"
-    Write-Host "               plus 2 validation sub-steps), pausing for your inspection before each one."
-    Write-Host "  3. Cleanup:  Archives the test results and removes the sandbox."
+    Write-Host "  1. Setup:      Creates a temporary sandbox and copies in a small seed dataset."
+    Write-Host "  2. Execution:  Runs the full pipeline of 15 tasks, pausing for inspection before each one."
+    Write-Host "  3. Cleanup:    Archives the test results and removes the sandbox."
     Write-Host ""
-    [Console]::Write("${C_ORANGE}Press Enter to begin the Setup phase...`n${C_RESET} ")
-    Read-Host | Out-Null
+    Read-Host -Prompt "${C_ORANGE}Press Enter to begin the Setup phase...${C_RESET}" | Out-Null
 }
 
 try {

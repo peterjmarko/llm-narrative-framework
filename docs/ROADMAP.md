@@ -9,14 +9,12 @@ This document outlines planned development tasks and tracks known issues for the
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
 #### A. Complete Integration Testing
-- [ ] **Re-validate Integration Tests After Code Stabilization**
-  - [ ] Perform full runs of the Layer 2 and 3 integration tests to confirm the stability of the data preparation pipeline after recent bug fixes.
+- [ ] **Re-validate Unit and Integration Tests After Code Stabilization**
   - [ ] Perform a full run of the Layer 4 integration test to ensure that the code stabilization has not introduced any downstream regressions.
-- [ ] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)**
-  - [ ] Create a new scripted integration test for the `compile_study.ps1` workflow.
 - [ ] **Enhance Layer 4 Test Harness (Experiment Lifecycle)**
   - [ ] Add an `-Interactive` flag to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` lifecycle.
-  - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `manifest.json` file is correctly generated.
+- [ ] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)**
+  - [ ] Create a new scripted integration test for the `compile_study.ps1` workflow.
 
 #### B. Implement Core Algorithm Validation Tests
 - [ ] **Implement Statistical Analysis & Reporting Validation Test**
@@ -26,6 +24,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
 - [ ] **Implement Provenance Capture**
   - [ ] Modify `new_experiment.ps1` to generate a `manifest.json` file in each new experiment directory.
   - [ ] The manifest will capture Git state (commit SHA, tag) and key environment details (Python version, OS).
+  - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `manifest.json` file is correctly generated.
 
 ### 2. Final Data Generation and Study Execution
 

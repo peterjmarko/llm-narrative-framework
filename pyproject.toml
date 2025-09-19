@@ -88,8 +88,8 @@ mig-stu = "pwsh -ExecutionPolicy Bypass -File ./migrate_study.ps1"
 # === DETAILED TEST SUITES ===
 # ==============================================================================
 # --- Python Unit Tests ---
-test-py-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
-test-py-exp-lc = {cmd = "pytest tests/experiment_lifecycle/", help = "Run all experiment lifecycle unit tests."}
+test-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+test-exp-lc = {cmd = "pytest tests/experiment_lifecycle/", help = "Run all experiment lifecycle unit tests."}
 cov-exp-lc = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/experiment_lifecycle/ && coverage report --skip-covered", help = "Run experiment lifecycle tests with a focused coverage report."}
 test-assembly = {cmd = "pytest tests/algorithm_validation/test_profile_generation_algorithm.py", help = "Run the core assembly algorithm integration test."}
 test-cov-report = {cmd = "pwsh -File ./scripts/testing/run_targeted_coverage.ps1 {args}", help = "Run a test file and generate a focused coverage report for its corresponding source file."}
@@ -97,9 +97,9 @@ test-cov-report = {cmd = "pwsh -File ./scripts/testing/run_targeted_coverage.ps1
 # --- Integration Tests (All Layers) ---
 test-l2 = "pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"
 test-l3 = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"
-test-l3-selection = "pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"
-test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"
 test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"
+test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"
+test-l3-selection = "pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"
 test-l4 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer4/run_layer4_test.ps1"
 test-l5 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer5/run_layer5_test.ps1"
 test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.ps1"

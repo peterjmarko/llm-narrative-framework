@@ -176,7 +176,7 @@ function Get-ConfigValue {
 function Get-ScriptDocstringSummary {
     param([string]$ScriptPath)
     try {
-        $helperScript = Join-Path $ProjectRoot "scripts/get_docstring_summary.py"
+        $helperScript = Join-Path $ProjectRoot "scripts/analysis/get_docstring_summary.py"
         $summary = & python $helperScript $ScriptPath 2>$null
         return $summary.Trim()
     }
