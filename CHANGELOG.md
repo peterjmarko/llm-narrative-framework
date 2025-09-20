@@ -1,5 +1,36 @@
 # Changelog
 
+## 10.3.0 (2025-09-19)
+
+### Bump
+
+- **version 10.2.0 → 10.3.0**
+
+### Features
+
+- **add interactive guided tour for Layer 4 experiment lifecycle test**
+  Implement comprehensive interactive mode for Layer 4 integration test that transforms
+  the automated test into an educational guided tour of the experiment lifecycle.
+  
+  ## Key Features
+  - Interactive flag (`-Interactive`) with step-by-step prompts
+  - Detailed educational content explaining each step's purpose
+  - Visual consistency with Layer 3 implementation using ANSI colors
+  - Fixed 6-stage display issue by removing output redirection
+  - Added PDM shortcut (`pdm run test-l4-interactive`)
+  - Comprehensive documentation for new  audit  break  fix workflow
+  
+  ## Technical Fixes
+  - Resolved missing replication stages during experiment creation
+  - Standardized success/completion message colors (green/orange)
+  - Added consistent Layer 4 headers across all phases
+  - Improved experiment directory detection method
+  - Enhanced error handling and user experience
+  
+  ## Impact
+  The implementation provides educational value while maintaining full technical
+  validation of the experiment lifecycle framework.
+
 ## 10.2.0 (2025-09-19)
 
 ### Bump
