@@ -138,4 +138,6 @@ temp_*.log
 commit.txt
 
 # General debugging directory
-/debug/
+/debug/CONTRIBUTING.md
+CONTRIBUTING.md
+debug/

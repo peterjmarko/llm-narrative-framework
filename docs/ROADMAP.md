@@ -9,10 +9,10 @@ This document outlines planned development tasks and tracks known issues for the
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
 #### A. Complete Integration Testing
-- [ ] **Enhance Layer 4 Test Harness (Experiment Lifecycle)**
-  - [ ] Add an `-Interactive` flag to provide a guided, step-by-step tour of the `new -> audit -> break -> fix` lifecycle.
-- [ ] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)**
-  - [ ] Create a new scripted integration test for the `compile_study.ps1` workflow.
+- [x] **Enhance Layer 4 Test Harness (Experiment Lifecycle)**
+  - [x] Refactor Layer 4 to create experiments in sandbox instead of production directory for better test isolation and consistency with other layers.
+- [x] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)**
+  - [x] Create a new scripted integration test for the `compile_study.ps1` workflow.
 
 #### B. Implement Core Algorithm Validation Tests
 - [ ] **Implement Statistical Analysis & Reporting Validation Test**

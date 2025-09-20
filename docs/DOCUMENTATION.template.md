@@ -552,7 +552,7 @@ This section provides a reference for the structure of the most important data f
 
 ## Testing
 
-The project includes a comprehensive test suite managed by PDM scripts, which provides shortcuts for running tests with and without code coverage.
+The project includes a comprehensive test suite managed by PDM scripts, which provides shortcuts for running tests with and without code coverage. Several integration tests offer interactive modes that provide guided tours of the framework's capabilities.
 
 ### Automated CI Checks
 

@@ -56,10 +56,10 @@ try {
     $stepHeader = ">>> Step 1/6: Create New Experiment <<<"
     Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
     Write-Host $stepHeader -ForegroundColor Blue
-    Write-Host "Creates a new experiment using new_experiment.ps1 with test configuration." -ForegroundColor Blue
+    Write-Host "Creates 4 experiments using a 2x2 factorial design (mapping_strategy x group_size)." -ForegroundColor Blue
     
     if ($Interactive) {
-        Write-Host "`n${C_BLUE}Step Summary: This step demonstrates creating a new experiment from scratch using the framework's main orchestrator script. It will generate a complete experiment with 1 replication containing 2 trials, using a minimal test database of 10 subjects.${C_RESET}"
+        Write-Host "`n${C_BLUE}Step Summary: This step demonstrates creating multiple experiments for a factorial study design. It will generate 4 complete experiments (2x2 factorial: correct/random mapping × 4/10 group size), each with 1 replication containing 2 trials.${C_RESET}"
         Write-Host "`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}"
         Write-Host ""
         Write-Host "${C_RESET}  INPUTS:"
@@ -73,18 +73,50 @@ try {
         Write-Host ""
     }
 
-    & "$ProjectRoot\new_experiment.ps1" -ConfigPath $TestConfigPath
-    if ($LASTEXITCODE -ne 0) { throw "new_experiment.ps1 failed." }
+    # Create 2x2 factorial design: mapping_strategy (correct, random) x group_size (4, 10)
+    $factorialDesign = @(
+        @{ mapping_strategy = "correct"; group_size = 4 }
+        @{ mapping_strategy = "random"; group_size = 4 }
+        @{ mapping_strategy = "correct"; group_size = 10 }
+        @{ mapping_strategy = "random"; group_size = 10 }
+    )
     
-    # Find the most recently created experiment directory
-    $basePath = Join-Path $ProjectRoot "output/new_experiments"
-    $latestExperiment = Get-ChildItem -Path $basePath -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
+    $createdExperiments = @()
+    $basePath = Join-Path $SandboxDir "experiments"
     
-    if ($null -eq $latestExperiment) {
-        throw "No experiment directory found after creation."
+    foreach ($condition in $factorialDesign) {
+        Write-Host "  Creating experiment: mapping_strategy=$($condition.mapping_strategy), group_size=$($condition.group_size)" -ForegroundColor Cyan
+        
+        # Create temporary config for this condition
+        $tempConfig = $TestConfigPath -replace "\.ini$", "_temp.ini"
+        $configContent = Get-Content $TestConfigPath -Raw
+        $configContent = $configContent -replace "mapping_strategy = \w+", "mapping_strategy = $($condition.mapping_strategy)"
+        $configContent = $configContent -replace "group_size = \d+", "group_size = $($condition.group_size)"
+        $configContent | Set-Content -Path $tempConfig -Encoding UTF8
+        
+        & "$ProjectRoot\new_experiment.ps1" -ConfigPath $tempConfig
+        if ($LASTEXITCODE -ne 0) { 
+            Remove-Item -Path $tempConfig -Force -ErrorAction SilentlyContinue
+            throw "new_experiment.ps1 failed for condition: $($condition | ConvertTo-Json -Compress)" 
+        }
+        
+        # Find the newly created experiment
+        $latestExperiment = Get-ChildItem -Path $basePath -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
+        if ($latestExperiment) {
+            $createdExperiments += $latestExperiment.FullName
+            Write-Host "    -> Created: $($latestExperiment.Name)" -ForegroundColor Green
+        }
+        
+        Remove-Item -Path $tempConfig -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1  # Ensure timestamp differences between experiments
     }
     
-    $NewExperimentPath = $latestExperiment.FullName
+    if ($createdExperiments.Count -ne 4) {
+        throw "Expected 4 experiments to be created, but got $($createdExperiments.Count)"
+    }
+    
+    # Use the first experiment for the break/fix cycle demonstration
+    $NewExperimentPath = $createdExperiments[0]
     
     if (-not (Test-Path $NewExperimentPath -PathType Container)) { throw "Experiment directory not found: $NewExperimentPath" }
     $RelativePath = (Resolve-Path $NewExperimentPath -Relative).TrimStart(".\")
@@ -135,26 +167,90 @@ try {
     Write-Host "Deliberately corrupts the experiment to simulate a common failure scenario." -ForegroundColor Blue
     
     if ($Interactive) {
-        Write-Host "`n${C_BLUE}Step Summary: This step simulates a real-world failure by deleting an LLM response file. This represents what happens when API calls are interrupted (network issues, rate limits, etc.). The framework should be able to detect and repair this automatically.${C_RESET}"
-        Write-Host "`n${C_GRAY}  TARGET: LLM response file (llm_response_*.txt)${C_RESET}"
+        Write-Host "`n${C_BLUE}Step Summary: This step simulates 4 different real-world failure scenarios across all experiments. Each failure type represents a common issue that can occur during experiment execution. The framework should detect and repair all of them automatically.${C_RESET}"
+        Write-Host "`n${C_GRAY}  FAILURE SCENARIOS:${C_RESET}"
+        Write-Host "    1. API Failure: Missing LLM response (network interruption)"
+        Write-Host "    2. Processing Failure: Corrupted analysis file (I/O error)"
+        Write-Host "    3. Data Failure: Missing trial directory (storage failure)" 
+        Write-Host "    4. Config Failure: Broken metadata (invalid state)"
         Write-Host ""
-        Write-Host "${C_RESET}  SIMULATION:"
-        Write-Host "    - Find first LLM response file"
-        Write-Host "    - Delete it to simulate interrupted API call"
-        Write-Host "    - Leave all other files intact"
+        Write-Host "${C_RESET}  Each experiment will demonstrate a different failure mode."
         
-        Read-Host -Prompt "`n${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}" | Out-Null
+        Read-Host -Prompt "`n${C_ORANGE}Press Enter to corrupt all 4 experiments (Ctrl+C to exit)...${C_RESET}" | Out-Null
         Write-Host ""
     }
 
-    # Starting Step 3 execution
-    $responseFile = Get-ChildItem -Path $NewExperimentPath -Filter "llm_response_*.txt" -Recurse | Select-Object -First 1
-    if (-not $responseFile) { throw "Could not find a response file to delete." }
-    Remove-Item -Path $responseFile.FullName -Force
-    Write-Host "  -> Deleted response file: $($responseFile.Name)" -ForegroundColor Red
+    # Starting Step 3 execution - Create different error conditions for each experiment
+    $errorConditions = @(
+        @{ Type = "Missing LLM Response"; Description = "API-level failure (network interruption)" }
+        @{ Type = "Corrupted Analysis"; Description = "Processing failure (I/O error)" }  
+        @{ Type = "Missing Trial Data"; Description = "Data-level failure (storage failure)" }
+        @{ Type = "Broken Configuration"; Description = "Configuration failure (invalid state)" }
+    )
+    
+    for ($i = 0; $i -lt $createdExperiments.Count; $i++) {
+        $experimentPath = $createdExperiments[$i]
+        $experimentName = Split-Path $experimentPath -Leaf
+        $errorCondition = $errorConditions[$i]
+        
+        # Create banner for each experiment
+        $bannerText = "EXPERIMENT $($i+1)/4: $($errorCondition.Type)"
+        $bannerLine = "=" * 60
+        Write-Host "`n$bannerLine" -ForegroundColor DarkCyan
+        Write-Host $bannerText -ForegroundColor Cyan
+        Write-Host "$($errorCondition.Description)" -ForegroundColor Gray
+        Write-Host $bannerLine -ForegroundColor DarkCyan
+        
+        Write-Host "  Target: $experimentName" -ForegroundColor Yellow
+        Write-Host "    Error type: $($errorCondition.Type) - $($errorCondition.Description)" -ForegroundColor Gray
+        
+        if ($Interactive -and $i -eq 0) {
+            # Detailed walkthrough for first experiment only
+            Write-Host "`n${C_BLUE}DETAILED WALKTHROUGH (Experiment 1 only):${C_RESET}"
+            Write-Host "This experiment will lose an LLM response file, simulating what happens"
+            Write-Host "when an API call is interrupted by network issues or rate limits."
+            Write-Host "The audit will detect the missing file and fix_experiment.ps1 will"
+            Write-Host "automatically re-run only the failed API call."
+            Read-Host -Prompt "`n${C_ORANGE}Press Enter to corrupt this experiment...${C_RESET}" | Out-Null
+        } elseif ($Interactive) {
+            # Brief prompt for remaining experiments
+            Read-Host -Prompt "${C_ORANGE}Press Enter to corrupt experiment $($i+1)...${C_RESET}" | Out-Null
+        }
+        
+        switch ($i) {
+            0 { # Missing LLM Response File
+                $responseFile = Get-ChildItem -Path $experimentPath -Filter "llm_response_*.txt" -Recurse | Select-Object -First 1
+                if ($responseFile) {
+                    Remove-Item -Path $responseFile.FullName -Force
+                    Write-Host "    -> Deleted: $($responseFile.Name)" -ForegroundColor Red
+                }
+            }
+            1 { # Corrupted Analysis File  
+                $resultsFile = Get-ChildItem -Path $experimentPath -Filter "EXPERIMENT_results.csv" -Recurse | Select-Object -First 1
+                if ($resultsFile) {
+                    "corrupted,data,invalid" | Set-Content -Path $resultsFile.FullName -Force
+                    Write-Host "    -> Corrupted: EXPERIMENT_results.csv" -ForegroundColor Red
+                }
+            }
+            2 { # Missing Trial Data
+                $trialDir = Get-ChildItem -Path $experimentPath -Directory -Filter "run_*" | Get-ChildItem -Directory -Filter "trial_*" | Select-Object -First 1
+                if ($trialDir) {
+                    Remove-Item -Path $trialDir.FullName -Recurse -Force
+                    Write-Host "    -> Deleted: $($trialDir.Name) directory" -ForegroundColor Red
+                }
+            }
+            3 { # Broken Configuration State
+                $configFile = Join-Path $experimentPath "experiment_metadata.json"
+                if (Test-Path $configFile) {
+                    '{"invalid": "config", "broken": true}' | Set-Content -Path $configFile -Force
+                    Write-Host "    -> Corrupted: experiment_metadata.json" -ForegroundColor Red
+                }
+            }
+        }
+    }
+    
     Write-Host ""
-
-    Write-Host "`n${C_YELLOW}Experiment corrupted: Deleted response file '$($responseFile.Name)'.${C_RESET}"
+    Write-Host "`n${C_YELLOW}All 4 experiments corrupted with different error conditions.${C_RESET}"
     
     if ($Interactive) {
         Write-Host "`nStep complete. The experiment now has missing data." -ForegroundColor Yellow
@@ -180,11 +276,24 @@ try {
         Write-Host ""
     }
 
-    # Starting Step 4 execution
-    & "$ProjectRoot\audit_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath
-    if ($LASTEXITCODE -ne 2) { throw "Audit did not correctly identify the experiment as needing REPAIR (Exit Code 2)." }
+    # Starting Step 4 execution - Audit all corrupted experiments
+    for ($i = 0; $i -lt $createdExperiments.Count; $i++) {
+        $experimentPath = $createdExperiments[$i]
+        $experimentName = Split-Path $experimentPath -Leaf
+        $errorCondition = $errorConditions[$i]
+        
+        Write-Host "  Auditing experiment $($i+1): $experimentName" -ForegroundColor Cyan
+        Write-Host "    Expected error: $($errorCondition.Type)" -ForegroundColor Gray
+        
+        & "$ProjectRoot\audit_experiment.ps1" -ExperimentDirectory $experimentPath -ConfigPath $TestConfigPath
+        if ($LASTEXITCODE -ne 2) { 
+            throw "Audit of experiment $($i+1) did not correctly identify it as needing REPAIR (Exit Code 2)." 
+        }
+        Write-Host "    -> Correctly identified as needing repair" -ForegroundColor Green
+        Write-Host ""
+    }
 
-    Write-Host "`n${C_GREEN}SUCCESS: Audit detected the corruption and recommended repair.${C_RESET}"
+    Write-Host "`n${C_GREEN}SUCCESS: All audits detected their respective corruptions and recommended repair.${C_RESET}"
     
     if ($Interactive) {
         Write-Host "`nStep complete. The audit correctly identified the missing data." -ForegroundColor Gray
@@ -211,11 +320,32 @@ try {
         Write-Host ""
     }
 
-    # Starting Step 5 execution
-    & "$ProjectRoot\fix_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath -NonInteractive -Verbose
-    if ($LASTEXITCODE -ne 0) { throw "fix_experiment.ps1 failed to repair the experiment." }
+    # Starting Step 5 execution - Repair all corrupted experiments
+    for ($i = 0; $i -lt $createdExperiments.Count; $i++) {
+        $experimentPath = $createdExperiments[$i]
+        $experimentName = Split-Path $experimentPath -Leaf
+        $errorCondition = $errorConditions[$i]
+        
+        Write-Host "  Repairing experiment $($i+1): $experimentName" -ForegroundColor Cyan
+        Write-Host "    Fixing: $($errorCondition.Type)" -ForegroundColor Gray
+        
+        if ($Interactive -and $i -eq 0) {
+            Write-Host "`n${C_BLUE}DETAILED REPAIR (Experiment 1):${C_RESET}"
+            Write-Host "The repair will identify what's missing and re-run only the failed API call."
+            Read-Host -Prompt "${C_ORANGE}Press Enter to repair this experiment...${C_RESET}" | Out-Null
+        } elseif ($Interactive) {
+            Read-Host -Prompt "${C_ORANGE}Press Enter to repair experiment $($i+1)...${C_RESET}" | Out-Null
+        }
+        
+        & "$ProjectRoot\fix_experiment.ps1" -ExperimentDirectory $experimentPath -ConfigPath $TestConfigPath -NonInteractive
+        if ($LASTEXITCODE -ne 0) { 
+            throw "fix_experiment.ps1 failed to repair experiment $($i+1)." 
+        }
+        Write-Host "    -> Repair completed successfully" -ForegroundColor Green
+        Write-Host ""
+    }
 
-    Write-Host "`n${C_GREEN}SUCCESS: Experiment repair completed successfully.${C_RESET}"
+    Write-Host "`n${C_GREEN}SUCCESS: All 4 experiments repaired successfully.${C_RESET}"
     
     if ($Interactive) {
         Write-Host "`nStep complete. The experiment has been automatically repaired." -ForegroundColor Gray

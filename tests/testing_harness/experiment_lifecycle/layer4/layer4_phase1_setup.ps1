@@ -59,7 +59,7 @@ try {
     # --- Create the test environment ---
     New-Item -ItemType Directory -Path $TestEnvRoot -Force | Out-Null
     New-Item -ItemType Directory -Path $SandboxDataDir -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $SandboxDir "output/new_experiments") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $SandboxDir "experiments") -Force | Out-Null
 
     # --- Create a minimal, test-specific personalities database ---
 $dbContent = @"
@@ -92,13 +92,13 @@ temperature = 0.2
 max_parallel_sessions = 10
 
 [General]
-base_output_dir = output
-new_experiments_subdir = new_experiments
+base_output_dir = temp_test_environment/layer4_sandbox
+new_experiments_subdir = experiments
 experiment_dir_prefix = experiment_
 default_log_level = INFO
 
 [Filenames]
-personalities_src = $("../" + ($TestDbPath -replace [regex]::Escape($ProjectRoot + "\"), "" -replace "\\", "/"))
+personalities_src = data/personalities_db.txt
 
 [Schema]
 csv_header_order = run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,mean_rank_of_correct_id,rank_of_correct_id_p,top1_pred_bias_std,true_false_score_diff,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err

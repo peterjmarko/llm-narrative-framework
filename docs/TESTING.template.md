@@ -114,11 +114,23 @@ The project includes a suite of PDM scripts for running tests, defined in `pypro
 | `pdm run test-query-gen` | Runs the **Query Generation Algorithm Validation**. |
 | `pdm run test-stats-reporting` | Runs the **Statistical Reporting Algorithm Validation**. |
 | `pdm run test-l4` | Runs the **Layer 4** Integration test for the experiment lifecycle. |
+| `pdm run test-l4-interactive` | Runs the Layer 4 test in interactive "guided tour" mode. |
 | `pdm run test-l5` | Runs the **Layer 5** Integration test for the migration workflow. |
 
 ### Pipeline & Workflow Integration Testing
 
 This category includes end-to-end tests that validate the complete, live execution flows for the project's two main functional domains. All integration tests create a temporary `temp_test_environment` directory at the project root to run in a safe, isolated sandbox. These tests are non-destructive and will not modify your main project files.
+
+#### Interactive Testing Mode
+
+Several integration tests offer an interactive mode that transforms automated validation into educational guided tours. These interactive modes are designed for:
+
+- **Learning the Framework**: New users can understand how each component works
+- **Documentation Purposes**: Live demonstrations of framework capabilities  
+- **Debugging Workflows**: Step-by-step inspection of complex processes
+- **Training Materials**: Hands-on education for team members
+
+Interactive tests pause before each major step, provide detailed explanations of what will happen, and allow users to inspect intermediate results. This makes them invaluable for understanding the framework's internal operations while maintaining the same technical validation as automated tests.
 
 {{diagram:docs/diagrams/test_sandbox_architecture.mmd | scale=2.5 | width=100% | caption=The Integration Test Sandbox Architecture: All integration tests run in a temporary, isolated environment.}}
 
@@ -156,26 +168,45 @@ This category validates the end-to-end workflows for creating experiments and co
 
 ##### Experiment Creation (`new -> audit -> fix`)
 
-This procedure validates the core `new -> audit -> break -> fix` experiment lifecycle for a single experiment in an isolated sandbox. It follows a clean `Setup -> Test -> Cleanup` pattern.
+This procedure validates the core `new -> audit -> break -> fix` experiment lifecycle for a single experiment in an isolated sandbox. It follows a clean `Setup -> Test -> Cleanup` pattern and includes both automated and interactive modes.
 
-*   **Step 1: Automated Setup**
-    ```powershell
-    .\tests\testing_harness\layer4_step1_setup.ps1
-    ```
-*   **Step 2: Execute the Test Workflow**
-    ```powershell
-    .\tests\testing_harness\layer4_step2_test_workflow.ps1
-    ```
-*   **Step 3: Automated Cleanup**
-    ```powershell
-    .\tests\testing_harness\layer4_step3_cleanup.ps1
-    ```
+**Automated Mode:**
+```powershell
+pdm run test-l4
+```
 
-##### Study Compilation (Planned)
+**Interactive Mode (Guided Tour):**
+```powershell
+pdm run test-l4-interactive
+```
 
-> **Note:** This is a planned test harness.
+The interactive mode provides a comprehensive educational experience that walks users through each step of the experiment lifecycle with detailed explanations, making it ideal for learning how the framework operates. The automated mode provides quick validation for CI/CD pipelines.
 
-This procedure will validate the `compile_study.ps1` workflow. The test will create a mock study directory, populate it with pre-generated valid experiment artifacts, run the compilation script, and verify that the final analysis outputs are created correctly.
+**Manual Execution (Advanced):**
+If you need to run individual phases manually:
+*   **Phase 1: Automated Setup**
+```powershell
+    .\tests\testing_harness\experiment_lifecycle\layer4\layer4_phase1_setup.ps1
+```
+*   **Phase 2: Execute the Test Workflow**
+```powershell
+    .\tests\testing_harness\experiment_lifecycle\layer4\layer4_phase2_run.ps1
+```
+*   **Phase 3: Automated Cleanup**
+```powershell
+    .\tests\testing_harness\experiment_lifecycle\layer4\layer4_phase3_cleanup.ps1
+```
+
+##### Study Compilation
+
+This procedure validates the complete `compile_study.ps1` workflow using a 3-phase structure (setup, execution, cleanup). The test creates experiments using Layer 4 when available, or falls back to intelligent mock data generation when Layer 4 experiments are unavailable.
+
+**Automated Mode:**
+```powershell
+pdm run test-l5
+```
+
+The test validates full study compilation, ANOVA analysis, and artifact generation with proper cross-layer integration testing of research workflows.
 
 ## Testing Status
 
@@ -186,8 +217,8 @@ This section provides a summary of the project's validation status.
 | Test Category | Workflow | Status & Justification |
 | :--- | :--- | :--- |
 | **Integration** | Data Preparation Pipeline | **COMPLETE.** Validated by a robust, profile-driven test harness that runs the full, live pipeline in an isolated sandbox with a controlled seed dataset. |
-| | Experiment Lifecycle | **COMPLETE.** Validated by Layer 4 integration tests that execute the full `new -> audit -> break -> fix` lifecycle in an isolated sandbox environment. Tests creation, validation, deliberate corruption, automated repair, and final verification of experiment integrity. |
-| | Study Compilation | **PLANNED.** The test harness will validate the `compile_study.ps1` workflow using a set of pre-generated, valid experiments. |
+| | Experiment Lifecycle | **COMPLETE.** Validated by Layer 4 integration tests that execute the full `new -> audit -> break -> fix` lifecycle in an isolated sandbox environment. Tests creation, validation, deliberate corruption, automated repair, and final verification of experiment integrity. Features both automated and interactive modes for different use cases. |
+| | Study Compilation | **COMPLETE.** Validated by Layer 5 integration tests that execute the full study compilation workflow in an isolated sandbox environment. Tests full ANOVA analysis pipeline with intelligent fallback to mock data when Layer 4 experiments unavailable. |
 
 ### Code Coverage Targets
 

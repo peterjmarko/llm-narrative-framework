@@ -26,16 +26,12 @@ param (
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
 
-Write-Host "--- Starting Layer 5: Migration Workflow Test ---" -ForegroundColor Yellow
-
 try {
     # Phase 1: Setup
     & "$ScriptDir\layer5_phase1_setup.ps1"
 
     # Phase 2: Run the test workflow
     & "$ScriptDir\layer5_phase2_run.ps1"
-
-    Write-Host "`nLayer 5 test completed successfully." -ForegroundColor Green
 }
 catch {
     Write-Host "`nFATAL: Layer 5 test run failed." -ForegroundColor Red
@@ -49,6 +45,11 @@ finally {
         & "$ScriptDir\layer5_phase3_cleanup.ps1"
     } else {
         Write-Host "`nCleanup skipped due to -SkipCleanup flag." -ForegroundColor Yellow
+    }
+    
+    # Final success message (only if we got this far without exceptions)
+    if (-not $Error) {
+        Write-Host "Layer 5 test completed successfully.`n" -ForegroundColor Green
     }
 }
 

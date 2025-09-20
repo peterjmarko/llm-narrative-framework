@@ -605,6 +605,7 @@ def main():
 
         docs_to_check = [
             ('README.template.md', 'README.md'),
+            ('CONTRIBUTING.template.md', 'CONTRIBUTING.md'),
             ('data/DATA_DICTIONARY.template.md', 'data/DATA_DICTIONARY.md'),
             ('docs/DOCUMENTATION.template.md', 'docs/DOCUMENTATION.md'),
             ('docs/LIFECYCLE_GUIDE.template.md', 'docs/LIFECYCLE_GUIDE.md'),
@@ -666,6 +667,7 @@ def main():
     # Define which files have placeholders that might contain diagrams
     files_with_diagrams = [
         'README.template.md',
+        'CONTRIBUTING.template.md',
         'data/DATA_DICTIONARY.template.md',
         'docs/DOCUMENTATION.template.md',
         'docs/LIFECYCLE_GUIDE.template.md',
@@ -695,7 +697,23 @@ def main():
         make_readonly(readme_final_path)
         print(f"    - {Colors.GREEN}Successfully built README.md!{Colors.RESET}")
     
-    # --- 2. Build DOCUMENTATION.md ---
+    # --- 2. Build CONTRIBUTING.md ---
+    contrib_template_path = os.path.join(project_root, 'CONTRIBUTING.template.md')
+    contrib_final_path = os.path.join(project_root, 'CONTRIBUTING.md')
+    if not do_force_documents and is_doc_up_to_date(project_root, contrib_final_path, contrib_template_path):
+        print(f"    - Skipping {Colors.CYAN}CONTRIBUTING.md{Colors.RESET} build (up-to-date).")
+    else:
+        viewer_content = build_doc_content(project_root, contrib_template_path, flavor='viewer')
+        header = generate_warning_header('CONTRIBUTING.md', '/CONTRIBUTING.template.md')
+        final_content = header + '\n' + viewer_content
+        
+        make_writable(contrib_final_path)
+        with open(contrib_final_path, 'w', encoding='utf-8') as f:
+            f.write(final_content)
+        make_readonly(contrib_final_path)
+        print(f"    - {Colors.GREEN}Successfully built CONTRIBUTING.md!{Colors.RESET}")
+
+    # --- 3. Build DOCUMENTATION.md ---
     doc_template_path = os.path.join(project_root, 'docs/DOCUMENTATION.template.md')
     doc_final_path = os.path.join(project_root, 'docs/DOCUMENTATION.md')
     if not do_force_documents and is_doc_up_to_date(project_root, doc_final_path, doc_template_path):
@@ -711,7 +729,7 @@ def main():
         make_readonly(doc_final_path)
         print(f"    - {Colors.GREEN}Successfully built DOCUMENTATION.md!{Colors.RESET}")
 
-    # --- 3. Build article_main_text.md ---
+    # --- 4. Build article_main_text.md ---
     article_template_path = os.path.join(project_root, 'docs/article_main_text.template.md')
     article_final_path = os.path.join(project_root, 'docs/article_main_text.md')
     if not do_force_documents and is_doc_up_to_date(project_root, article_final_path, article_template_path):
@@ -727,7 +745,7 @@ def main():
         make_readonly(article_final_path)
         print(f"    - {Colors.GREEN}Successfully built article_main_text.md!{Colors.RESET}")
 
-    # --- 4. Build article_supplementary_material.md ---
+    # --- 5. Build article_supplementary_material.md ---
     supp_template_path = os.path.join(project_root, 'docs/article_supplementary_material.template.md')
     supp_final_path = os.path.join(project_root, 'docs/article_supplementary_material.md')
     if not do_force_documents and is_doc_up_to_date(project_root, supp_final_path, supp_template_path):
@@ -743,7 +761,7 @@ def main():
         make_readonly(supp_final_path)
         print(f"    - {Colors.GREEN}Successfully built article_supplementary_material.md!{Colors.RESET}")
 
-    # --- 5. Build DATA_DICTIONARY.md ---
+    # --- 6. Build DATA_DICTIONARY.md ---
     data_template_path = os.path.join(project_root, 'data/DATA_DICTIONARY.template.md')
     data_final_path = os.path.join(project_root, 'data/DATA_DICTIONARY.md')
     if not do_force_documents and is_doc_up_to_date(project_root, data_final_path, data_template_path):
@@ -759,7 +777,7 @@ def main():
         make_readonly(data_final_path)
         print(f"    - {Colors.GREEN}Successfully built DATA_DICTIONARY.md!{Colors.RESET}")
 
-    # --- 6. Build LIFECYCLE_GUIDE.md ---
+    # --- 7. Build LIFECYCLE_GUIDE.md ---
     lifecycle_template_path = os.path.join(project_root, 'docs/LIFECYCLE_GUIDE.template.md')
     lifecycle_final_path = os.path.join(project_root, 'docs/LIFECYCLE_GUIDE.md')
     if not do_force_documents and is_doc_up_to_date(project_root, lifecycle_final_path, lifecycle_template_path):
@@ -775,7 +793,7 @@ def main():
         make_readonly(lifecycle_final_path)
         print(f"    - {Colors.GREEN}Successfully built LIFECYCLE_GUIDE.md!{Colors.RESET}")
 
-    # --- 7. Build ROADMAP.md ---
+    # --- 8. Build ROADMAP.md ---
     roadmap_template_path = os.path.join(project_root, 'docs/ROADMAP.md') # Note: Not a template, but needs to be in the build flow
     roadmap_final_path = os.path.join(project_root, 'docs/ROADMAP.md')
     if not do_force_documents and is_doc_up_to_date(project_root, roadmap_final_path, roadmap_template_path):
@@ -784,7 +802,7 @@ def main():
         # Since ROADMAP.md is not a template, we just ensure it exists for the DOCX conversion
         print(f"    - {Colors.GREEN}Verified ROADMAP.md exists for DOCX conversion.{Colors.RESET}")
     
-    # --- 8. Build TESTING.md ---
+    # --- 9. Build TESTING.md ---
     test_template_path = os.path.join(project_root, 'docs', 'TESTING.template.md')
     test_final_path = os.path.join(project_root, 'docs', 'TESTING.md')
     if not do_force_documents and is_doc_up_to_date(project_root, test_final_path, test_template_path):

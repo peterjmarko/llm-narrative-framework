@@ -102,6 +102,33 @@ The `scripts/` directory contains helper utilities for development, maintenance,
 -   [`maintenance/`](scripts/maintenance/): Contains scripts for general project upkeep and report generation.
 -   [`workflows/`](scripts/workflows/): Contains multi-step, ordered workflows for complex validation tasks.
 
+### Syncing Assets for Claude Development
+
+For developers working with Claude's project repository feature, the `sync_project_assets.py` script streamlines the process of keeping your staged files current.
+
+**Purpose**: This script copies key project assets into a staging directory (`output/project_staging/`) and identifies which files have changed since the last sync, making it easy to upload only updated files to Claude's project repository.
+
+**Basic Usage**:
+```bash
+# Sync all project assets and identify changes
+python scripts/maintenance/sync_project_assets.py
+
+# Preview what would be copied without actually copying
+python scripts/maintenance/sync_project_assets.py --dry-run
+```
+
+**Workflow**:
+1. **First run**: All files are staged and copied to `changed_files/` folder
+2. **Subsequent runs**: Only actually modified files appear in `changed_files/`
+3. **Upload priority**: Upload `changed_files/` contents first for immediate updates
+
+The script organizes assets into:
+- **`stable/`**: Reference materials for persistent Claude project repository storage
+- **`development/`**: Scripts for session-specific uploads when debugging/enhancing
+- **`changed_files/`**: Only files that have changed since last sync (priority uploads)
+
+This enables an efficient Claude development workflow where you only upload the files that have actually changed, rather than re-uploading the entire project every time.
+
 ## Code Quality and Style
 
 All contributions must adhere to standard software engineering best practices to ensure the codebase remains clean, readable, and maintainable.
@@ -179,6 +206,7 @@ The project's documentation is managed through three distinct methods. For a com
 **2. Template-Driven Documents**
 
 -   **Description:** These are the project's core documents. Their final `.md` versions are **generated** from a corresponding `*.template.md` source file, which allows for the dynamic insertion of diagrams and other content.
+-   **Development Tools:** Use `sync_project_assets.py` for efficient synchronization of documentation changes during Claude development workflows.
 -   **The Golden Rule:** **Always edit the `*.template.md` file, never the generated `.md` file.** The generated files are set to read-only as a safety measure.
 -   **Workflow:**
 

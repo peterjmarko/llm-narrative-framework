@@ -13,13 +13,13 @@ This README provides a high-level overview of the framework and guides new users
 ./new_experiment.ps1
 
 # 2. Organize the completed experiment folders into a single study directory
-# (e.g., move them to output/studies/My_First_Study/)
+# (e.g., move them to output/new_studies/My_First_Study/)
 
 # 3. Compile and analyze the entire study
-./compile_study.ps1 -StudyDirectory output/studies/My_First_Study
+./compile_study.ps1 -StudyDirectory output/new_studies/My_First_Study
 
 # 4. View the final, publication-ready analysis
-Get-Content output/studies/My_First_Study/anova/STUDY_analysis_log.txt
+Get-Content output/new_studies/My_First_Study/anova/STUDY_analysis_log.txt
 ```
 
 ## ✨ Key Features
@@ -72,6 +72,8 @@ Archived features include:
 
 *   **Automated Multi-Experiment Studies (`new_study.ps1`)**: A top-level orchestrator for running a matrix of experiments automatically.
 *   **Automated Study Repair (`fix_study.ps1`)**: A wrapper to diagnose and fix all experiments within a study.
+*   **Factorial Study Generation (`generate_factorial_commands.ps1`)**: A generator tool for creating factorial study specifications.
+*   **Development Synchronization (`sync_project_assets.py`)**: Efficient project asset synchronization for Claude development workflows.
 *   **Data Migration Tools (`migrate_*.ps1`)**: Workflows for upgrading legacy or severely corrupted experimental data.
 
 ## ⚖️ Licensing
