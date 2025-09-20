@@ -20,18 +20,58 @@
 # Filename: tests/testing_harness/experiment_lifecycle/layer4/run_layer4_test.ps1
 
 param (
-    [switch]$SkipCleanup
+    [switch]$SkipCleanup,
+    [switch]$Interactive
 )
+
+# --- Define ANSI Color Codes (matching Layer 3) ---
+$C_RESET = "`e[0m"
+$C_GRAY = "`e[90m"
+$C_MAGENTA = "`e[95m"
+$C_RED = "`e[91m"
+$C_ORANGE = "`e[38;5;208m"
+$C_YELLOW = "`e[93m"
+$C_GREEN = "`e[92m"
+$C_CYAN = "`e[96m"
+$C_BLUE = "`e[94m"
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
 
 try {
-    # Phase 1: Setup
-    & "$ScriptDir\layer4_phase1_setup.ps1"
+    if ($Interactive) {
+        Write-Host "`n--- Layer 4: Experiment Lifecycle Integration Testing ---" -ForegroundColor Magenta
+        Write-Host "--- Interactive Mode: Guided Tour ---" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Welcome to the Layer 4 Interactive Test (Guided Tour)." -ForegroundColor Cyan
+        Write-Host "This test will walk you through the complete experiment lifecycle in a safe, isolated sandbox."
+        Write-Host "It consists of three phases:"
+        Write-Host "  1. Setup:      Creates a temporary sandbox with test data and configuration"
+        Write-Host "  2. Execution:  Demonstrates the full 'new -> audit -> break -> fix' lifecycle"
+        Write-Host "  3. Cleanup:    Archives the test results and removes the sandbox"
+        Write-Host ""
+        Read-Host -Prompt "${C_ORANGE}Press Enter to begin the Setup phase...${C_RESET}" | Out-Null
+        
+        Write-Host "--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
+        & "$ScriptDir\layer4_phase1_setup.ps1" -Interactive
+        
+        Write-Host "---" -ForegroundColor DarkGray
+        Write-Host "Phase 1 (Setup) is complete. The test environment has been created." -ForegroundColor Cyan
+        Write-Host "Next, we will begin Phase 2 (Execution), which will demonstrate the experiment lifecycle."
+        Write-Host ""
+        Write-Host "You will be prompted to continue before each major step."
+        Write-Host ""
+        [Console]::Write("${C_ORANGE}Press Enter to begin the Execution phase...${C_RESET} ")
+        Read-Host | Out-Null
+        
+        & "$ScriptDir\layer4_phase2_run.ps1" -Interactive
+    } else {
+        # Phase 1: Setup
+        & "$ScriptDir\layer4_phase1_setup.ps1"
 
-    # Phase 2: Run the test workflow
-    & "$ScriptDir\layer4_phase2_run.ps1"
+        # Phase 2: Run the test workflow
+        & "$ScriptDir\layer4_phase2_run.ps1"
+    }
 }
 catch {
     Write-Host "`nFATAL: Layer 4 test run failed." -ForegroundColor Red
@@ -42,7 +82,11 @@ catch {
 finally {
     # Phase 3: Cleanup
     if (-not $SkipCleanup) {
-        & "$ScriptDir\layer4_phase3_cleanup.ps1"
+        if ($Interactive) {
+            & "$ScriptDir\layer4_phase3_cleanup.ps1" -Interactive
+        } else {
+            & "$ScriptDir\layer4_phase3_cleanup.ps1"
+        }
     } else {
         Write-Host "`nCleanup skipped due to -SkipCleanup flag." -ForegroundColor Yellow
     }

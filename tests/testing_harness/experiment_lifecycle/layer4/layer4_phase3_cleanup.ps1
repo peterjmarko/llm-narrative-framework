@@ -19,14 +19,35 @@
 #
 # Filename: tests/testing_harness/experiment_lifecycle/layer4/layer4_phase3_cleanup.ps1
 
+param(
+    [switch]$Interactive
+)
+
+# --- Define ANSI Color Codes ---
+$C_RESET = "`e[0m"
+$C_ORANGE = "`e[38;5;208m"
+$C_GREEN = "`e[92m"
+$C_CYAN = "`e[96m"
+$C_MAGENTA = "`e[95m"
+
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $SandboxDir = Join-Path $ProjectRoot "temp_test_environment/layer4_sandbox"
 $NewExperimentsDir = Join-Path $ProjectRoot "output/new_experiments"
 
 Write-Host ""
-Write-Host "--- Layer 4 Integration Testing: Experiment Creation ---" -ForegroundColor Magenta
-Write-Host "--- Phase 3: Automated Cleanup ---" -ForegroundColor Cyan
-Write-Host ""
+if ($Interactive) {
+    Write-Host "--- Layer 4: Experiment Lifecycle Integration Testing ---" -ForegroundColor Magenta
+    Write-Host "--- Phase 3: Guided Cleanup ---" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "The experiment lifecycle test has completed successfully!" -ForegroundColor Green
+    Write-Host "This final phase will clean up the test environment while preserving the experiment for inspection."
+    Write-Host ""
+    Read-Host -Prompt "${C_ORANGE}Press Enter to begin cleanup...${C_RESET}" | Out-Null
+} else {
+    Write-Host "--- Layer 4 Integration Testing: Experiment Creation ---" -ForegroundColor Magenta
+    Write-Host "--- Phase 3: Automated Cleanup ---" -ForegroundColor Cyan
+    Write-Host ""
+}
 
 try {
     if (Test-Path $SandboxDir) {
@@ -40,7 +61,17 @@ try {
 Write-Host "Note: Test experiment preserved in production directory 'output/new_experiments'."
 Write-Host "      This allows inspection of the full experiment lifecycle results."
 
-Write-Host "`nCleanup complete." -ForegroundColor Green
+if ($Interactive) {
+    Write-Host "`nGuided cleanup complete!" -ForegroundColor Green
+    Write-Host "Thank you for taking the Layer 4 Interactive Tour. You've seen how the framework:"
+    Write-Host "  • Creates experiments reliably"
+    Write-Host "  • Diagnoses issues automatically"  
+    Write-Host "  • Repairs corruption intelligently"
+    Write-Host "  • Maintains data integrity throughout"
+    Write-Host ""
+} else {
+    Write-Host "`nCleanup complete." -ForegroundColor Green
+}
 Write-Host ""
 }
 catch {

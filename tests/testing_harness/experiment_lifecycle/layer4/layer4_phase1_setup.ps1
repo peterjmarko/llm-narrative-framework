@@ -19,6 +19,18 @@
 #
 # Filename: tests/testing_harness/experiment_lifecycle/layer4/layer4_phase1_setup.ps1
 
+param(
+    [switch]$Interactive
+)
+
+# --- Define ANSI Color Codes ---
+$C_RESET = "`e[0m"
+$C_ORANGE = "`e[38;5;208m"
+$C_GREEN = "`e[92m"
+$C_CYAN = "`e[96m"
+$C_YELLOW = "`e[93m"
+$C_MAGENTA = "`e[95m"
+
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $TestEnvRoot = Join-Path $ProjectRoot "temp_test_environment"
 $SandboxDir = Join-Path $TestEnvRoot "layer4_sandbox"
@@ -28,9 +40,17 @@ $TestDbPath = Join-Path $SandboxDataDir "personalities_db.txt"
 $NewExperimentsDir = Join-Path $ProjectRoot "output/new_experiments"
 
 try {
+    if ($Interactive) {
+        Write-Host "Setting up the test environment..." -ForegroundColor White
+    }
+
     # --- Cleanup from previous failed runs ---
     if (Test-Path $SandboxDir) {
-        Write-Host "`nCleaning up previous Layer 4 sandbox..." -ForegroundColor Yellow
+        if ($Interactive) {
+            Write-Host "Cleaning up previous Layer 4 sandbox..." -ForegroundColor Yellow
+        } else {
+            Write-Host "`nCleaning up previous Layer 4 sandbox..." -ForegroundColor Yellow
+        }
         Remove-Item -Path $SandboxDir -Recurse -Force
     }
     # Note: The test will create an experiment in the production 'output/new_experiments' directory.
@@ -39,6 +59,7 @@ try {
     # --- Create the test environment ---
     New-Item -ItemType Directory -Path $TestEnvRoot -Force | Out-Null
     New-Item -ItemType Directory -Path $SandboxDataDir -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $SandboxDir "output/new_experiments") -Force | Out-Null
 
     # --- Create a minimal, test-specific personalities database ---
 $dbContent = @"
@@ -68,6 +89,13 @@ mapping_strategy = random
 [LLM]
 model_name = google/gemini-flash-1.5
 temperature = 0.2
+max_parallel_sessions = 10
+
+[General]
+base_output_dir = output
+new_experiments_subdir = new_experiments
+experiment_dir_prefix = experiment_
+default_log_level = INFO
 
 [Filenames]
 personalities_src = $("../" + ($TestDbPath -replace [regex]::Escape($ProjectRoot + "\"), "" -replace "\\", "/"))
@@ -77,9 +105,25 @@ csv_header_order = run_directory,replication,n_valid_responses,model,mapping_str
 "@
 $configContent.Trim() | Set-Content -Path $TestConfigPath -Encoding UTF8
 
-    Write-Host "--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green
+if ($Interactive) {
+        Write-Host ""
+        Write-Host "--- Layer 4: Experiment Lifecycle Integration Testing ---" -ForegroundColor Magenta
+        Write-Host "--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Setup components created:" -ForegroundColor White
+        Write-Host "  ✓ Isolated test sandbox" -ForegroundColor Green
+        Write-Host "  ✓ Minimal test database (10 subjects)" -ForegroundColor Green
+        Write-Host "  ✓ Test configuration (1 replication, 2 trials)" -ForegroundColor Green
+        Write-Host "  ✓ Safe experiment output directory" -ForegroundColor Green
+    } else {
+        Write-Host ""
+        Write-Host "--- Layer 4: Experiment Lifecycle Integration Testing ---" -ForegroundColor Magenta
+        Write-Host "--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green
+    }
 
 }
 catch {
