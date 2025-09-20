@@ -1,5 +1,22 @@
 # Changelog
 
+## 10.4.0 (2025-09-20)
+
+### Bump
+
+- **version 10.3.0 → 10.4.0**
+
+### Features
+
+- **enhance testing infrastructure and add development tools**
+  - Refactor Layer 4 test harness for sandbox isolation and 2x2 factorial design
+  - Implement Layer 5 integration testing for study compilation workflow
+  - Add generate_factorial_commands.ps1 for safe factorial study generation
+  - Add sync_project_assets.py for efficient development asset synchronization
+  - Convert CONTRIBUTING.md to template-driven documentation system
+  - Update documentation to reflect completed testing infrastructure
+  - Mark Layer 4/5 test harnesses as complete in roadmap
+
 ## 10.3.0 (2025-09-19)
 
 ### Bump
