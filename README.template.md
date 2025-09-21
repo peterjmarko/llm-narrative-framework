@@ -46,6 +46,18 @@ This framework was designed with three core principles in mind:
 -   PDM package manager
 -   PowerShell (Core) for Windows, Linux, or macOS
 
+## 📚 Documentation Architecture
+
+This project uses a **coordinated documentation strategy** with each document serving a specific purpose:
+
+| Document | Primary Focus | When to Use |
+|----------|---------------|-------------|
+| **[🚀 Lifecycle Guide](docs/LIFECYCLE_GUIDE.md)** | High-level workflow overview | Start here for workflow understanding |
+| **[📖 Framework Manual](docs/FRAMEWORK_MANUAL.md)** | Complete system architecture | Deep technical reference |
+| **[📁 Data Preparation](data/DATA_PREPARATION_DATA_DICTIONARY.md)** | Input data pipeline | Understanding data sources |
+| **[📊 Experiment Lifecycle](output/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md)** | Output & results structure | Understanding experimental results |
+| **[🔬 Replication Guide](docs/REPLICATION_GUIDE.md)** | Step-by-step reproduction | Reproducing study findings |
+
 ## 📚 Where to Go Next
 
 This project is extensively documented to support different use cases. The resources are listed in the recommended reading order for new users.
@@ -56,7 +68,9 @@ This project is extensively documented to support different use cases. The resou
 
 -   **For a Deep Dive (Full Details):** To understand the system's architecture, run new experiments, or explore the complete methodology, see the **[📖 Framework Manual (docs/FRAMEWORK_MANUAL.md)](docs/FRAMEWORK_MANUAL.md)**.
 
--   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/DATA_PREPARATION_DATA_DICTIONARY.md)](data/DATA_PREPARATION_DATA_DICTIONARY.md)**.
+-   **To Understand the Data:** For detailed explanations of all data files:
+    - **[📁 Data Preparation Pipeline (docs/DATA_PREPARATION_DATA_DICTIONARY.md)](docs/DATA_PREPARATION_DATA_DICTIONARY.md)** - Input data and preparation workflow
+    - **[📊 Experiment Lifecycle (output/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md)](output/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md)** - Output structure and experimental results
 
 -   **For Developers (Contributing):** To contribute to the project, please see the **[🤝 Developer's Guide (DEVELOPERS_GUIDE.md)](DEVELOPERS_GUIDE.md)** for development setup and contribution workflows.
 

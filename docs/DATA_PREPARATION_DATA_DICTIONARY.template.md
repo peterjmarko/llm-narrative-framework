@@ -106,4 +106,4 @@ These are the final, high-level files used directly in the LLM experiments.
 
 Once the data preparation pipeline is complete, its primary output, `personalities_db.txt`, serves as the foundational database for the main experiments. This file, together with the `base_query.txt` prompt template, provides the necessary inputs for the first stage of the experimental workflow.
 
-For a detailed explanation of the subsequent experiment and analysis pipeline, please see the **[📖 Framework Manual](../docs/DOCUMENTATION.md)**.
+For a detailed explanation of the subsequent experiment and analysis pipeline, see the **[📖 Framework Manual](../docs/FRAMEWORK_MANUAL.md)**. For comprehensive documentation of the experimental output files and results structure, see the **[📊 Experiment Lifecycle Data Dictionary](../output/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md)**.

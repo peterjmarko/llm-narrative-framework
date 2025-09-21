@@ -318,7 +318,7 @@ This logical hierarchy is reflected in the physical layout of the repository:
 
 {{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
 
-A `data/DATA_DICTIONARY.md` file provides detailed explanations for each file in the `data/` directory.
+Data dictionaries provide detailed explanations for all files: [📁 Data Preparation Data Dictionary](../docs/DATA_PREPARATION_DATA_DICTIONARY.md) covers the `data/` directory, and [📊 Experiment Lifecycle Data Dictionary](../output/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md) covers the `output/` directory structure and experimental results.
 
 ## Setup and Installation
 

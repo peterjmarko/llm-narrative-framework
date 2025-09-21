@@ -42,13 +42,15 @@ class ProjectSyncer:
         self.project_root = Path(project_root)
         self.staging_dir = staging_dir or self.project_root / "output/project_staging"
         self.changes_dir = self.staging_dir / "changed_files"
+        self.previous_staging = {}  # Initialize the missing attribute
         
         # Define asset categories based on your framework structure
         self.stable_assets = {
             "./": [
                 "README.template.md",
-                "CONTRIBUTING.template.md", 
+                "DEVELOPERS_GUIDE.template.md", 
                 "config.ini",
+                ".gitignore",
                 "new_experiment.ps1",
                 "audit_experiment.ps1",
                 "fix_experiment.ps1", 
@@ -58,16 +60,17 @@ class ProjectSyncer:
             ],
             
             "docs/": [
-                "DOCUMENTATION.template.md",
-                "TESTING.template.md",
+                "DATA_PREPARATION_DATA_DICTIONARY.template.md",
+                "EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.template.md",
+                "FRAMEWORK_MANUAL.template.md",
+                "TESTING_GUIDE.template.md", 
                 "LIFECYCLE_GUIDE.template.md",
                 "article_main_text.template.md",
-                "article_supplementary_material.template.md",
-                "ROADMAP.md"
+                "REPLICATION_GUIDE.template.md",
+                "PROJECT_ROADMAP.md"
             ],
             
             "data/": [
-                "DATA_DICTIONARY.template.md",
                 "base_query.txt"
             ],
             
@@ -93,7 +96,12 @@ class ProjectSyncer:
             
             "scripts/maintenance/": [
                 "clean_project.py",
-                "list_project_files.py"
+                "list_project_files.py",
+                "sync_project_assets.py"
+            ],
+            
+            "scripts/build/": [
+                "build_docs.py"
             ]
         }
 
@@ -539,7 +547,7 @@ def main():
                             dest_name = file_name
                         all_files.append(f"{source_dir}{file_name} -> {dest_name}")
             
-            changed_files = syncer.detect_changes(all_files)
+            changed_files = syncer.detect_changes_before_copy()
             if changed_files:
                 for _, dest_name in changed_files:
                     print(f"  📝 {dest_name}")
