@@ -1,6 +1,6 @@
-# Data Dictionary
+# Data Preparation Data Dictionary
 
-This document is the **Data Dictionary** for the project. Its purpose is to describe the contents and structure of the `data/` directory, explaining the role of each file in the data preparation and analysis pipelines.
+This document is the **Data Preparation Data Dictionary** for the project. Its purpose is to describe the contents and structure of the `data/` directory, explaining the role of each file in the data preparation and analysis pipelines.
 
 The `data/` directory provides the foundational inputs for the project's core logic and stores the intermediate artifacts generated during the data preparation phase, as illustrated in the overall project architecture below.
 

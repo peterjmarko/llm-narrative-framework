@@ -50,17 +50,17 @@ This framework was designed with three core principles in mind:
 
 This project is extensively documented to support different use cases. The resources are listed in the recommended reading order for new users.
 
--   **For Researchers (Replication):** The best place to start is the **[🔬 Replication Guide (docs/article_supplementary_material.md)](docs/article_supplementary_material.md)**. It provides a step-by-step walkthrough for reproducing the original study's findings.
+-   **For Researchers (Replication):** The best place to start is the **[🔬 Replication Guide (docs/REPLICATION_GUIDE.md)](docs/REPLICATION_GUIDE.md)**. It provides a step-by-step walkthrough for reproducing the original study's findings.
 
 -   **To Understand the Workflow:** For a high-level guide to the `Create -> Check -> Fix -> Compile` workflow, see the **[🚀 Lifecycle Guide (docs/LIFECYCLE_GUIDE.md)](docs/LIFECYCLE_GUIDE.md)**.
 
--   **For a Deep Dive (Full Details):** To understand the system's architecture, run new experiments, or explore the complete methodology, see the **[📖 Framework Manual (docs/DOCUMENTATION.md)](docs/DOCUMENTATION.md)**.
+-   **For a Deep Dive (Full Details):** To understand the system's architecture, run new experiments, or explore the complete methodology, see the **[📖 Framework Manual (docs/FRAMEWORK_MANUAL.md)](docs/FRAMEWORK_MANUAL.md)**.
 
--   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/DATA_DICTIONARY.md)](data/DATA_DICTIONARY.md)**.
+-   **To Understand the Data:** For a detailed explanation of all data files and their roles in the pipeline, see the **[🗂️ Data Dictionary (data/DATA_PREPARATION_DATA_DICTIONARY.md)](data/DATA_PREPARATION_DATA_DICTIONARY.md)**.
 
--   **For Developers (Contributing):** To contribute to the project, please see the **[🤝 Developer's Guide (CONTRIBUTING.md)](CONTRIBUTING.md)** for development setup and contribution workflows.
+-   **For Developers (Contributing):** To contribute to the project, please see the **[🤝 Developer's Guide (DEVELOPERS_GUIDE.md)](DEVELOPERS_GUIDE.md)** for development setup and contribution workflows.
 
--   **To Understand the Validation Strategy:** For a detailed overview of the project's testing strategy, see the **[🧪 Testing Guide (docs/TESTING.md)](docs/TESTING.md)**.
+-   **To Understand the Validation Strategy:** For a detailed overview of the project's testing strategy, see the **[🧪 Testing Guide (docs/TESTING_GUIDE.md)](docs/TESTING_GUIDE.md)**.
 
 -   **To see what's planned and track known issues**, view the **[🗺️ Project Roadmap (docs/ROADMAP.md)](docs/ROADMAP.md)**.
 

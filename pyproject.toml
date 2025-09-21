@@ -54,6 +54,7 @@ cov-html = {shell = "pytest --cov=src --cov-report=html", help = "Run all tests 
 clean = {cmd = "python scripts/maintenance/clean_project.py", help = "Clean up temporary and generated files."}
 scope-report = "python scripts/maintenance/generate_scope_report.py"
 list-files = "python scripts/maintenance/list_project_files.py"
+sync-project = "python scripts/maintenance/sync_project_assets.py"
 txt-copy = "python scripts/maintenance/convert_py_to_txt.py"
 lint = {composite = ["check-headers", "lint-docstrings"], help="Run all read-only linting checks."}
 lint-fix = {composite = ["lint-headers-fix", "lint-docstrings"], help="Run all linters and apply automatic fixes."}

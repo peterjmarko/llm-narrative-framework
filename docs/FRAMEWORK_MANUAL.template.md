@@ -68,7 +68,7 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 .\prepare_data.ps1 -ReportOnly
 ```
 > **Warning on Using `-Force`**: The `-Force` flag triggers a full, destructive re-run of the entire pipeline. It backs up and deletes all existing data, re-downloads the full raw dataset, and re-runs all expensive LLM scoring steps. This process is very time-consuming and will incur API costs.
-> **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING.md)](../TESTING.md)** for details on running the Layer 3 Interactive Mode.
+> **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING_GUIDE.md)](../TESTING_GUIDE.md)** for details on running the Layer 3 Interactive Mode.
 
 The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.
 
@@ -348,7 +348,7 @@ To run any project command, such as the test suite, prefix it with `pdm run`:
 pdm run test
 ```
 
-> **For Developers:** If you intend to contribute to the project or encounter issues with the simple setup, please see the **[Developer Setup Guide in CONTRIBUTING.md](CONTRIBUTING.md#getting-started-development-environment-setup)** for more detailed instructions and troubleshooting.
+> **For Developers:** If you intend to contribute to the project or encounter issues with the simple setup, please see the **[Developer Setup Guide in DEVELOPERS_GUIDE.md](DEVELOPERS_GUIDE.md#getting-started-development-environment-setup)** for more detailed instructions and troubleshooting.
 
 ## Configuration (`config.ini`)
 
