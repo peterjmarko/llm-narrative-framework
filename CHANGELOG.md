@@ -1,5 +1,46 @@
 # Changelog
 
+## 10.6.0 (2025-09-21)
+
+### Bump
+
+- **version 10.5.0 → 10.6.0**
+
+### Documentation
+
+- **Complete systematic documentation refactoring for publication readiness**
+  Renamed core template documents to professional naming convention:
+  * CONTRIBUTING.template.md  DEVELOPERS_GUIDE.template.md
+  * data/DATA_DICTIONARY.template.md  data/DATA_PREPARATION_DATA_DICTIONARY.template.md
+  * docs/DOCUMENTATION.template.md  docs/FRAMEWORK_MANUAL.template.md
+  * docs/ROADMAP.md  docs/PROJECT_ROADMAP.md (generated file)
+  * docs/article_supplementary_material.template.md  docs/REPLICATION_GUIDE.template.md
+  * docs/TESTING.template.md  docs/TESTING_GUIDE.template.md
+  
+  Updated all cross-references and build system:
+  * README.template.md navigation links updated
+  * Template cross-references updated in all renamed documents
+  * build_docs.py paths and headers updated for new filenames
+  * pyproject.toml updated for new document names
+  * .gitignore updated to reflect new generated file names
+  
+  This establishes consistent, professional naming suitable for scientific
+  publication while maintaining all functionality and reference integrity.
+
+### Features
+
+- **add comprehensive Experiment Lifecycle Data Dictionary**
+  Create comprehensive documentation for experimental output pipeline and reorganize docs structure
+  
+  - Add docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.template.md documenting complete output/ directory structure including experiments/, studies/, CSV schemas (27 columns), JSON metrics with bias analysis, statistical ANOVA formats, and configuration management
+  - Move DATA_PREPARATION_DATA_DICTIONARY.template.md from data/ to docs/ directory for consistent documentation organization alongside other reference materials
+  - Integrate new dictionary into build system with proper template processing, add to docs_to_check validation, files_with_diagrams rendering, and automated .md generation
+  - Update README.template.md with coordinated documentation architecture section explaining document roles and cross-references between input/output pipelines
+  - Update Framework Manual to fix DATA_DICTIONARY.md reference path and add experiment lifecycle dictionary cross-reference
+  - Update sync_project_assets.py to track both dictionaries in docs/ location instead of data/ location
+  - Establish complete documentation coverage spanning data preparation input pipeline through experimental output pipeline with hierarchical CSV aggregation and statistical analysis workflows
+  - Add cross-references between all documents creating coordinated ecosystem where users can navigate from workflow guides to technical references to file specifications
+
 ## 10.5.0 (2025-09-21)
 
 ### Bump

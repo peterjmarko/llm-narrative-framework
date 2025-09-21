@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "llm-narrative-framework"
-version = "10.5.0"
+version = "10.6.0"
 description = "A reproducible pipeline for LLM personality matching experiments."
 authors = [
     {name = "Peter J. Marko", email = "peter.j.marko@gmail.com"},
@@ -118,7 +118,7 @@ test-exp-all = {composite = ["test-py-exp", "test-ps-exp"], help = "Run all Pyth
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "10.5.0"
+version = "10.6.0"
 version_files = [
     "pyproject.toml:version"
 ]
