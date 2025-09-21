@@ -1,5 +1,28 @@
 # Changelog
 
+## 10.5.0 (2025-09-21)
+
+### Bump
+
+- **version 10.4.0 → 10.5.0**
+
+### Features
+
+- **complete Layer 4 integration test enhancement with sandbox configuration**
+  Core Achievements:
+  - Restore experiment config repair functionality from archive
+  - Implement sandbox configuration override system in experiment_manager.py
+  - Enhance CSV validation with comprehensive 27-column schema checking
+  - Complete Layer 4 test harness with corruption/repair workflow testing
+  - Correct Layer 5 status documentation (implemented but not validated)
+  
+  Technical Changes:
+  - Move restore_experiment_config.py back to active codebase with test
+  - Add config override support enabling sandbox-based testing
+  - Enhance experiment_auditor.py with robust validation logic
+  - Update all Layer 4 test phases for isolated sandbox operation
+  - Synchronize ROADMAP and TESTING documentation to reflect actual status
+
 ## 10.4.0 (2025-09-20)
 
 ### Bump
