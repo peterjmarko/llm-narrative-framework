@@ -47,7 +47,19 @@ This stage focuses on generating the raw data. For each condition, you will conf
 -   **`audit_experiment.ps1` (Check)**: A read-only diagnostic tool to check the status and health of an experiment.
 -   **`fix_experiment.ps1` (Fix)**: If an experiment is interrupted, this script intelligently resumes it.
 
-**Learning the Workflow**: For users new to the framework, an interactive guided tour is available that demonstrates the complete experiment lifecycle with detailed explanations at each step. This can be accessed through the testing system (see the Framework Manual for details).
+**Learning the Workflow**: For users new to the framework, a comprehensive interactive guided tour is available that demonstrates the complete experiment lifecycle with detailed explanations at each step. This Layer 4 integration test walks users through:
+
+- Creating a 2×2 factorial experiment design (4 experiments)
+- Auditing experiment health and completeness
+- Simulating 4 distinct real-world failure scenarios:
+  - Missing LLM responses (API interruption)
+  - Corrupted analysis files (I/O errors)
+  - Corrupted configuration data (metadata damage)
+  - Corrupted report files (storage corruption)
+- Automated detection and repair of each corruption type
+- Final verification of experiment integrity
+
+This can be accessed via `pdm run test-l4-interactive` (see the Testing Guide for details).
 
 ### Stage 2: Compile and Analyze the Study
 
@@ -59,6 +71,35 @@ Once you have a separate experiment directory for each of your conditions, you c
 
 3.  **Compile the Study (`compile_study.ps1`)**: This is the final step. It aggregates all data, runs the statistical analysis, and generates the publication-ready reports and plots.
 
+## Workflow Validation & Reliability
+
+The experiment lifecycle workflow has been comprehensively validated through integration testing that demonstrates the framework's self-healing capabilities:
+
+### Automated Corruption Detection
+The audit system can detect and classify multiple types of experiment corruption:
+
+- **REPAIR_NEEDED**: Single-category failures (missing files, simple corruption)
+- **REPROCESS_NEEDED**: Analysis corruption requiring regeneration
+- **AGGREGATION_NEEDED**: Experiment-level file corruption
+- **MIGRATION_NEEDED**: Complex multi-category corruption (archived functionality)
+
+### Intelligent Repair Strategies
+The repair system automatically determines the appropriate recovery strategy:
+
+- **Session Repair**: Re-runs only failed API calls, preserving existing data
+- **Analysis Regeneration**: Rebuilds analysis from raw response data
+- **Configuration Restoration**: Restores corrupted config files from source parameters
+- **Summary Regeneration**: Rebuilds experiment-level aggregation files
+
+### Validation Coverage
+The framework's reliability is validated through comprehensive testing that covers:
+- End-to-end experiment creation and compilation workflows
+- Deliberate corruption scenarios with automated recovery
+- State detection accuracy across all failure modes
+- Data integrity verification throughout the repair process
+
+This ensures that researchers can trust the framework to maintain data integrity even when facing common real-world failures like network interruptions, storage errors, or process crashes.
+
 ## For More Detail
 
-This guide covers the high-level user journey. For a comprehensive technical deep-dive into the framework's architecture, methodology, and configuration options, please see the full **[📖 Framework Manual](DOCUMENTATION.md)**. For hands-on learning, the **[🧪 Testing Guide](TESTING.md)** includes interactive tutorials that walk through the complete experiment lifecycle.
+This guide covers the high-level user journey. For a comprehensive technical deep-dive into the framework's architecture, methodology, and configuration options, please see the full **[📖 Framework Manual](DOCUMENTATION.md)**. For hands-on learning, the **[🧪 Testing Guide](TESTING.md)** includes comprehensive interactive tutorials, including the Layer 4 integration test that provides a complete guided tour of the experiment lifecycle with deliberate corruption and repair scenarios.

@@ -74,11 +74,26 @@ Index	idADB	Name	BirthYear	DescriptionText
 8	1008	Test Person 8	1987	Personality description for test person 8
 9	1009	Test Person 9	1983	Personality description for test person 9
 10	1010	Test Person 10	1991	Personality description for test person 10
+11	1011	Test Person 11	1982	Personality description for test person 11
+12	1012	Test Person 12	1986	Personality description for test person 12
+13	1013	Test Person 13	1993	Personality description for test person 13
+14	1014	Test Person 14	1979	Personality description for test person 14
+15	1015	Test Person 15	1984	Personality description for test person 15
+16	1016	Test Person 16	1989	Personality description for test person 16
+17	1017	Test Person 17	1994	Personality description for test person 17
+18	1018	Test Person 18	1981	Personality description for test person 18
+19	1019	Test Person 19	1977	Personality description for test person 19
+20	1020	Test Person 20	1996	Personality description for test person 20
+21	1021	Test Person 21	1985	Personality description for test person 21
+22	1022	Test Person 22	1990	Personality description for test person 22
+23	1023	Test Person 23	1987	Personality description for test person 23
+24	1024	Test Person 24	1992	Personality description for test person 24
+25	1025	Test Person 25	1988	Personality description for test person 25
 "@
 $dbContent | Set-Content -Path $TestDbPath -Encoding UTF8
 
     # --- Create a minimal, test-specific config.ini ---
-    # IMPORTANT: The personalities_db_file path must be relative to the project root.
+    # FIXED: The personalities_db_file path must be relative to the sandbox directory, not project root
 $configContent = @"
 [Study]
 num_replications = 1
@@ -98,7 +113,7 @@ experiment_dir_prefix = experiment_
 default_log_level = INFO
 
 [Filenames]
-personalities_src = data/personalities_db.txt
+personalities_src = ../temp_test_environment/layer4_sandbox/data/personalities_db.txt
 
 [Schema]
 csv_header_order = run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,mean_rank_of_correct_id,rank_of_correct_id_p,top1_pred_bias_std,true_false_score_diff,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err
@@ -114,7 +129,7 @@ if ($Interactive) {
         Write-Host ""
         Write-Host "Setup components created:" -ForegroundColor White
         Write-Host "  ✓ Isolated test sandbox" -ForegroundColor Green
-        Write-Host "  ✓ Minimal test database (10 subjects)" -ForegroundColor Green
+        Write-Host "  ✓ Minimal test database (25 subjects)" -ForegroundColor Green
         Write-Host "  ✓ Test configuration (1 replication, 2 trials)" -ForegroundColor Green
         Write-Host "  ✓ Safe experiment output directory" -ForegroundColor Green
     } else {

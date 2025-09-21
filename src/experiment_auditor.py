@@ -146,6 +146,152 @@ def _count_matrices_in_file(filepath: str, k: int) -> int:
     except Exception:
         return 0
 
+def _check_csv_content(filepath: Path, required_min_rows: int = 1) -> str:
+    """Validates that a CSV file has valid structure and content."""
+    if not filepath.exists():
+        return f"{filepath.name.upper().replace('.', '_')}_MISSING"
+    
+    try:
+        import csv
+        with open(filepath, 'r', encoding='utf-8') as f:
+            # Check if file is empty
+            content = f.read()
+            if not content.strip():
+                return f"{filepath.name.upper().replace('.', '_')}_EMPTY"
+            
+            # Reset file pointer and parse as CSV
+            f.seek(0)
+            reader = csv.reader(f)
+            
+            # Check for header
+            try:
+                header = next(reader)
+                if not header or all(not cell.strip() for cell in header):
+                    return f"{filepath.name.upper().replace('.', '_')}_NO_HEADER"
+            except StopIteration:
+                return f"{filepath.name.upper().replace('.', '_')}_EMPTY"
+            
+            # Check for data rows
+            rows = list(reader)
+            if len(rows) < required_min_rows:
+                return f"{filepath.name.upper().replace('.', '_')}_NO_DATA"
+                
+    except (csv.Error, UnicodeDecodeError, Exception):
+        return f"{filepath.name.upper().replace('.', '_')}_CORRUPTED"
+    
+    return "VALID"
+
+def _check_experiment_log_content(filepath: Path) -> str:
+    """Validates experiment log CSV has BatchSummary and valid structure."""
+    basic_check = _check_csv_content(filepath, required_min_rows=1)
+    if basic_check != "VALID":
+        return basic_check
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+            if "BatchSummary" not in content:
+                return "EXPERIMENT_LOG_NOT_FINALIZED"
+    except Exception:
+        return "EXPERIMENT_LOG_UNREADABLE"
+    
+    return "VALID"
+
+def _check_experiment_results_csv(target_dir: Path, expected_reps: int) -> str:
+    """Validates EXPERIMENT_results.csv has correct schema and row count."""
+    results_file = target_dir / "EXPERIMENT_results.csv"
+    
+    # Basic CSV validation first
+    basic_check = _check_csv_content(results_file, required_min_rows=expected_reps)
+    if basic_check != "VALID":
+        return basic_check
+    
+    try:
+        import csv
+        with open(results_file, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            rows = list(reader)
+        
+        # Check row count matches expected replications
+        if len(rows) != expected_reps:
+            return f"EXPERIMENT_RESULTS_WRONG_ROW_COUNT: expected {expected_reps}, found {len(rows)}"
+        
+        # Check for required columns from schema
+        required_columns = {
+            'run_directory', 'replication', 'n_valid_responses', 'model', 
+            'mapping_strategy', 'temperature', 'k', 'm', 'db'
+        }
+        header_set = set(col.strip() for col in header)
+        
+        missing_columns = required_columns - header_set
+        if missing_columns:
+            return f"EXPERIMENT_RESULTS_MISSING_COLUMNS: {', '.join(missing_columns)}"
+        
+        # Check data integrity - all rows should have same number of columns as header
+        for i, row in enumerate(rows):
+            if len(row) != len(header):
+                return f"EXPERIMENT_RESULTS_ROW_MISMATCH: row {i+1} has {len(row)} columns, expected {len(header)}"
+        
+    except Exception:
+        return "EXPERIMENT_RESULTS_CORRUPTED"
+    
+    return "VALID"
+
+def _check_replication_results_csv(replication_csv_path: Path) -> str:
+    """Validates REPLICATION_results.csv has correct schema and content."""
+    
+    # Basic CSV validation first
+    basic_check = _check_csv_content(replication_csv_path, required_min_rows=1)
+    if basic_check != "VALID":
+        return basic_check
+    
+    try:
+        import csv
+        with open(replication_csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            rows = list(reader)
+        
+        # Check for required columns from REPLICATION schema
+        required_columns = {
+            'run_directory', 'replication', 'n_valid_responses', 'model', 
+            'mapping_strategy', 'temperature', 'k', 'm', 'db',
+            'mean_mrr', 'mrr_p', 'mean_top_1_acc', 'top_1_acc_p',
+            'mean_top_3_acc', 'top_3_acc_p', 'mean_mrr_lift', 
+            'mean_top_1_acc_lift', 'mean_top_3_acc_lift',
+            'mean_rank_of_correct_id', 'rank_of_correct_id_p',
+            'top1_pred_bias_std', 'true_false_score_diff',
+            'bias_slope', 'bias_intercept', 'bias_r_value', 
+            'bias_p_value', 'bias_std_err'
+        }
+        header_set = set(col.strip() for col in header)
+        
+        missing_columns = required_columns - header_set
+        if missing_columns:
+            return f"REPLICATION_RESULTS_MISSING_COLUMNS: {', '.join(sorted(missing_columns))}"
+        
+        # Check that we have exactly one data row for a replication
+        if len(rows) != 1:
+            return f"REPLICATION_RESULTS_WRONG_ROW_COUNT: expected 1, found {len(rows)}"
+        
+        # Check data integrity - row should have same number of columns as header
+        row = rows[0]
+        if len(row) != len(header):
+            return f"REPLICATION_RESULTS_ROW_MISMATCH: row has {len(row)} columns, expected {len(header)}"
+        
+        # Validate critical numeric fields are not empty
+        critical_fields = ['replication', 'n_valid_responses', 'k', 'm']
+        for i, col_name in enumerate(header):
+            if col_name.strip() in critical_fields:
+                if not row[i].strip():
+                    return f"REPLICATION_RESULTS_EMPTY_CRITICAL_FIELD: {col_name}"
+        
+    except Exception:
+        return "REPLICATION_RESULTS_CORRUPTED"
+    
+    return "VALID"
+
 def _check_config_manifest(run_path: Path, k_expected: int, m_expected: int):
     cfg_path = run_path / FILE_MANIFEST["config"]["path"]
     required_keys_map = FILE_MANIFEST["config"]["required_keys"]
@@ -295,8 +441,10 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
     else: status_details.append("responses OK")
 
     analysis_ok = True
-    if not (run_path / "REPLICATION_results.csv").exists():
-        status_details.append("REPLICATION_RESULTS_MISSING")
+    # Check REPLICATION_results.csv existence and content with enhanced validation
+    replication_csv_status = _check_replication_results_csv(run_path / "REPLICATION_results.csv")
+    if replication_csv_status != "VALID":
+        status_details.append(replication_csv_status)
         analysis_ok = False
     
     stat_rep = _check_report(run_path)
@@ -363,24 +511,26 @@ def _verify_single_run_completeness(run_path: Path) -> tuple[str, list[str]]:
     # Otherwise, it's a simple analysis issue
     return "ANALYSIS_ISSUE", status_details
 
-def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
+def _verify_experiment_level_files(target_dir: Path, expected_reps: int = None) -> tuple[bool, list[str]]:
     is_complete = True
     details = []
-    required_files = ["experiment_log.csv", "EXPERIMENT_results.csv"]
-    for filename in required_files:
-        if not (target_dir / filename).exists():
-            is_complete = False
-            details.append(f"MISSING: {filename}")
-    log_path = target_dir / "experiment_log.csv"
-    if log_path.exists():
-        try:
-            with open(log_path, 'r', encoding='utf-8') as f:
-                if "BatchSummary" not in f.read():
-                    is_complete = False
-                    details.append("experiment_log.csv NOT FINALIZED")
-        except Exception:
-            is_complete = False
-            details.append("experiment_log.csv UNREADABLE")
+    
+    # Check experiment_log.csv with enhanced validation
+    log_status = _check_experiment_log_content(target_dir / "experiment_log.csv")
+    if log_status != "VALID":
+        is_complete = False
+        details.append(log_status)
+    
+    # Check EXPERIMENT_results.csv with enhanced schema validation
+    if expected_reps:
+        results_status = _check_experiment_results_csv(target_dir, expected_reps)
+    else:
+        results_status = _check_csv_content(target_dir / "EXPERIMENT_results.csv")
+    
+    if results_status != "VALID":
+        is_complete = False
+        details.append(results_status)
+    
     return is_complete, details
 
 def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, list, dict]:
@@ -434,7 +584,7 @@ def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, lis
         return "NEW_NEEDED", [], granular
 
     if not fails and len(run_dirs) >= expected_reps:
-        is_complete, _ = _verify_experiment_level_files(target_dir)
+        is_complete, _ = _verify_experiment_level_files(target_dir, expected_reps)
         if not is_complete:
             return "AGGREGATION_NEEDED", [], granular
         return "COMPLETE", [], granular

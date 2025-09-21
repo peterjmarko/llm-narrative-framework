@@ -86,11 +86,13 @@ python -m pdm add new-package-name
 python -m pdm add -G dev new-dev-package-name
 ```
 
-## Getting Acquainted: The Interactive Guided Tour
+## Getting Acquainted: The Interactive Guided Tours
 
-For new contributors, the best way to understand the data preparation pipeline is to use the **Interactive Guided Tour**. This is a step-by-step walkthrough of the entire data processing workflow and a highly recommended first step for any developer looking to work on these scripts.
+For new contributors, the best way to understand the framework is to use the **Interactive Guided Tours**. These provide step-by-step walkthroughs of the main workflows and are highly recommended first steps for any developer.
 
-Detailed instructions for running the tour are available in the **[🧪 Testing Guide (TESTING.md)](TESTING.md)** under the "Data Preparation Pipeline" integration testing section.
+**Data Preparation Pipeline Tour**: Learn how the framework processes raw data into experimental stimuli. Detailed instructions are available in the **[🧪 Testing Guide (TESTING.md)](TESTING.md)** under the "Data Preparation Pipeline" integration testing section.
+
+**Experiment Lifecycle Tour**: Learn how the framework creates, audits, corrupts, and repairs experiments through the Layer 4 integration test. This demonstrates the complete "Create -> Check -> Fix -> Compile" workflow with 4 distinct corruption scenarios and automated repair. Run with `pdm run test-l4-interactive`.
 
 ## Developer Utilities (`scripts/` folder)
 
@@ -249,6 +251,8 @@ The test suite is divided into two parts: a `pytest` suite for the Python source
 | :--- | :--- |
 | `pdm run test-ps-exp` | Single Experiment Lifecycle (`new`, `audit`, `fix`) |
 | `pdm run test-ps-stu` | Study Processing (`compile_study.ps1`, `audit_study.ps1`) |
+| `pdm run test-l4` | Experiment Lifecycle Integration (automated validation) |
+| `pdm run test-l4-interactive` | Experiment Lifecycle Integration (guided tour) |
 
 #### How to Write a New Test (Best Practices)
 

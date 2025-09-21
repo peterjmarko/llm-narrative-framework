@@ -44,11 +44,13 @@ try {
         Write-Host "--- Interactive Mode: Guided Tour ---" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "Welcome to the Layer 4 Interactive Test (Guided Tour)." -ForegroundColor Cyan
-        Write-Host "This test will walk you through the complete experiment lifecycle in a safe, isolated sandbox."
-        Write-Host "It consists of three phases:"
+        Write-Host "This test demonstrates the experiment lifecycle using a 2x2 factorial design in a safe, isolated sandbox."
+        Write-Host "It will create 4 experiments (mapping_strategy x group_size: correct/random x 4/10 subjects)."
+        Write-Host "The test consists of three phases:"
         Write-Host "  1. Setup:      Creates a temporary sandbox with test data and configuration"
-        Write-Host "  2. Execution:  Demonstrates the full 'new -> audit -> break -> fix' lifecycle"
-        Write-Host "  3. Cleanup:    Archives the test results and removes the sandbox"
+        Write-Host "  2. Execution:  Demonstrates the full 'new -> audit -> break -> fix' lifecycle with 4 failure scenarios"
+        Write-Host "  3. Cleanup:    Archives the 4 experiments and removes the sandbox"
+        Write-Host "Note: The test does not compile the 4 experiments into a complete study."
         Write-Host ""
         Read-Host -Prompt "${C_ORANGE}Press Enter to begin the Setup phase...${C_RESET}" | Out-Null
         
@@ -91,10 +93,7 @@ finally {
         Write-Host "`nCleanup skipped due to -SkipCleanup flag." -ForegroundColor Yellow
     }
     
-    # Final success message (only if we got this far without exceptions)
-    if (-not $Error) {
-        Write-Host "Layer 4 test completed successfully.`n" -ForegroundColor Green
-    }
+    # Final messaging is handled by the cleanup script based on completion status
 }
 
 # === End of tests/testing_harness/experiment_lifecycle/layer4/run_layer4_test.ps1 ===

@@ -1374,31 +1374,26 @@ class TestMainFunctionEdgeCases(unittest.TestCase):
         mock_finalize.assert_called_once()
 
     @patch('sys.exit')
-    @patch('importlib.reload')
-    @patch.dict(sys.modules, {'config_loader': MagicMock(), 'experiment_auditor': MagicMock()})
     @patch('os.environ', {})
-    def test_main_uses_config_path_override(self, mock_reload, mock_exit):
-        """Verify --config-path sets environ and reloads config modules."""
+    def test_main_uses_config_path_override(self, mock_exit):
+        """Verify --config-path sets environ variable before module import."""
         # Create a dummy config file
         config_path = os.path.join(self.test_dir, 'test_config.ini')
         with open(config_path, 'w') as f:
             f.write('[Study]\nnum_replications = 5\n')
         
-        # We expect main to run to completion (state=COMPLETE) and not exit
-        with patch('experiment_auditor.get_experiment_state', return_value=("COMPLETE", {}, "")), \
-             patch('src.experiment_manager._run_finalization'), \
-             patch.object(sys, 'argv', ['script.py', self.test_dir, f'--config-path={config_path}']):
-            
-            experiment_manager.main()
-
-        # Check that the environment variable was set correctly
+        # Reload the experiment_manager module to test the early parsing logic
+        import importlib
+        with patch.object(sys, 'argv', ['script.py', self.test_dir, f'--config-path={config_path}']):
+            importlib.reload(experiment_manager)
+        
+        # Check that the environment variable was set correctly during module import
         self.assertIn('PROJECT_CONFIG_OVERRIDE', os.environ)
         self.assertEqual(os.environ['PROJECT_CONFIG_OVERRIDE'], os.path.abspath(config_path))
         
-        # Check that the config modules were reloaded
-        self.assertEqual(mock_reload.call_count, 2)
-        mock_reload.assert_any_call(sys.modules['config_loader'])
-        mock_reload.assert_any_call(sys.modules['experiment_auditor'])
+        # Clean up by reloading without the config override
+        with patch.object(sys, 'argv', ['script.py']):
+            importlib.reload(experiment_manager)
 
     @patch('sys.exit')
     @patch('importlib.reload')

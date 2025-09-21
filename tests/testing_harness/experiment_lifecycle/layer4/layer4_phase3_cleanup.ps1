@@ -39,8 +39,16 @@ if ($Interactive) {
     Write-Host "--- Layer 4: Experiment Lifecycle Integration Testing ---" -ForegroundColor Magenta
     Write-Host "--- Phase 3: Guided Cleanup ---" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "The experiment lifecycle test has completed successfully!" -ForegroundColor Green
-    Write-Host "This final phase will clean up the test environment while preserving the experiment for inspection."
+    
+    # Check if any experiments were created (indicates test completion vs interruption)
+    $experimentsCreated = Test-Path (Join-Path $SandboxDir "experiments") -PathType Container
+    if ($experimentsCreated -and (Get-ChildItem -Path (Join-Path $SandboxDir "experiments") -Directory -ErrorAction SilentlyContinue).Count -gt 0) {
+        Write-Host "The experiment lifecycle test has completed successfully!" -ForegroundColor Green
+        Write-Host "This final phase will clean up the test environment while preserving the experiment for inspection."
+    } else {
+        Write-Host "Test was interrupted. Cleaning up partial test environment..." -ForegroundColor Yellow
+        Write-Host "This cleanup will remove any partial artifacts that were created."
+    }
     Write-Host ""
     Read-Host -Prompt "${C_ORANGE}Press Enter to begin cleanup...${C_RESET}" | Out-Null
 } else {
@@ -101,15 +109,21 @@ if (Test-Path $experimentsDir) {
 }
 
 if ($Interactive) {
-    Write-Host "`nGuided cleanup complete!" -ForegroundColor Green
-    Write-Host "Thank you for taking the Layer 4 Interactive Tour. You've seen how the framework:"
-    Write-Host "  • Creates experiments reliably"
-    Write-Host "  • Diagnoses issues automatically"  
-    Write-Host "  • Repairs corruption intelligently"
-    Write-Host "  • Maintains data integrity throughout"
-    Write-Host ""
+    # Check if any experiments were created (indicates test completion)
+    $experimentsCreated = Test-Path (Join-Path $SandboxDir "experiments") -PathType Container
+    if ($experimentsCreated -and (Get-ChildItem -Path (Join-Path $SandboxDir "experiments") -Directory -ErrorAction SilentlyContinue).Count -gt 0) {
+        Write-Host "`nGuided cleanup complete!" -ForegroundColor Green
+        Write-Host "Thank you for taking the Layer 4 Interactive Tour. You've seen how the framework:"
+        Write-Host "  • Creates experiments reliably"
+        Write-Host "  • Diagnoses issues automatically"  
+        Write-Host "  • Repairs corruption intelligently"
+        Write-Host "  • Maintains data integrity throughout"
+        Write-Host "`nLayer 4 test completed successfully.`n" -ForegroundColor Green
+    } else {
+        Write-Host "`nCleanup complete. Test environment removed.`n" -ForegroundColor Green
+    }
 } else {
-    Write-Host "`nCleanup complete." -ForegroundColor Green
+    Write-Host "`nCleanup complete.`n" -ForegroundColor Green
 }
 Write-Host ""
 }

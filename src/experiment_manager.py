@@ -90,11 +90,14 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-try:
-    from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
-except ImportError as e:
-    print(f"FATAL: Could not import config_loader.py. Error: {e}", file=sys.stderr)
-    sys.exit(1)
+# Parse args early to check for config override before any imports
+parser_early = argparse.ArgumentParser(add_help=False)
+parser_early.add_argument('--config-path', type=str, default=None)
+args_early, _ = parser_early.parse_known_args()
+
+# Set config override BEFORE importing config_loader
+if args_early.config_path:
+    os.environ['PROJECT_CONFIG_OVERRIDE'] = os.path.abspath(args_early.config_path)
 
 try:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
@@ -530,20 +533,7 @@ def main():
     parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
     args = parser.parse_args()
 
-    # If a test-specific config path is provided, set an environment variable.
-    # Then, reload the config_loader module to ensure the global APP_CONFIG
-    # is updated with the new path. This is the key to sandboxed testing.
-    if args.config_path:
-        os.environ['PROJECT_CONFIG_OVERRIDE'] = os.path.abspath(args.config_path)
-        # We need to find the config_loader module to reload it
-        if 'config_loader' in sys.modules:
-            importlib.reload(sys.modules['config_loader'])
-        # Also reload the auditor to ensure it picks up the new config.
-        if 'experiment_auditor' in sys.modules:
-            importlib.reload(sys.modules['experiment_auditor'])
-        # Re-import the necessary components into the local scope after reload.
-        from config_loader import APP_CONFIG
-        from experiment_auditor import get_experiment_state
+    # Config override is now handled at module import time, no reload needed
 
     # Define color constants, defaulting to empty strings
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET, C_MAGENTA = ('', '', '', '', '', '')

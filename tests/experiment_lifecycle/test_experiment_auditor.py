@@ -65,6 +65,21 @@ class TestExperimentAuditor(unittest.TestCase):
         self.sys_exit_patcher.stop()
         self.config_patcher.stop()
 
+    def _create_valid_experiment_results_csv(self):
+        """Create a valid EXPERIMENT_results.csv with proper schema for 2 replications."""
+        csv_content = """run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_rank_of_correct_id,rank_of_correct_id_p,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,top1_pred_bias_std,true_false_score_diff
+run_20250101_120000_rep-001_sbj-10_trl-010_model-name,1,10,mock-model,correct,0.5,10,10,personalities_db.txt,0.75,0.001,0.6,0.01,0.8,0.001,2.5,0.01,0.1,0.5,0.7,0.02,0.05,0.1,0.05,0.15,0.02,0.03
+run_20250101_120001_rep-002_sbj-10_trl-010_model-name,2,10,mock-model,correct,0.5,10,10,personalities_db.txt,0.72,0.002,0.58,0.02,0.78,0.002,2.6,0.02,0.11,0.52,0.68,0.025,0.055,0.08,0.03,0.12,0.025,0.035"""
+        return csv_content
+
+    def _create_valid_experiment_log_csv(self):
+        """Create a valid experiment_log.csv that's finalized."""
+        return """timestamp,event,details
+2025-01-01 12:00:00,START,Experiment started
+2025-01-01 12:30:00,REPLICATION_COMPLETE,Replication 1 finished
+2025-01-01 13:00:00,REPLICATION_COMPLETE,Replication 2 finished
+2025-01-01 13:30:00,BatchSummary,complete"""
+
     def _setup_mock_config(self):
         """Creates a mock config and applies it to the module."""
         mock_app_config = configparser.ConfigParser()
@@ -91,6 +106,12 @@ class TestExperimentAuditor(unittest.TestCase):
         self.config_patcher.start()
         importlib.reload(experiment_auditor)
 
+    def _create_valid_experiment_results_csv_single(self, run_name):
+        """Create a valid EXPERIMENT_results.csv with proper schema for 1 replication."""
+        csv_content = f"""run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_rank_of_correct_id,rank_of_correct_id_p,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,top1_pred_bias_std,true_false_score_diff
+{run_name},1,10,mock-model,correct,0.5,10,10,personalities_db.txt,0.75,0.001,0.6,0.01,0.8,0.001,2.5,0.01,0.1,0.5,0.7,0.02,0.05,0.1,0.05,0.15,0.02,0.03"""
+        return csv_content
+    
     def _create_mock_run_dir(self, rep_num, k=10, m=10, is_valid=True, analysis_complete=True, report_complete=True):
         """Helper to create a mock run directory with a specified state of completeness."""
         run_name = f"run_20250101_120000_rep-{rep_num:03d}_sbj-{k:02d}_trl-{m:03d}_model-name"
@@ -130,7 +151,10 @@ personalities_src = personalities_db.txt
             # all_mappings.txt contains a header + one line per valid response
             mappings_content = "header\n" + ("map\n" * num_valid)
             (run_dir / "analysis_inputs" / "all_mappings.txt").write_text(mappings_content)
-            (run_dir / "REPLICATION_results.csv").touch()
+            # Create a valid CSV file with complete schema matching enhanced validation
+            replication_csv = """run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,mean_rank_of_correct_id,rank_of_correct_id_p,top1_pred_bias_std,true_false_score_diff,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err
+{},{},10,mock-model,correct,0.5,{},{},personalities_db.txt,0.75,0.001,0.6,0.01,0.8,0.001,0.1,0.05,0.15,2.5,0.01,0.02,0.03,0.1,0.5,0.7,0.02,0.05""".format(run_name, rep_num, k, m)
+            (run_dir / "REPLICATION_results.csv").write_text(replication_csv)
         
         if report_complete:
             # Create a report with all required JSON metrics
@@ -172,9 +196,9 @@ personalities_src = personalities_db.txt
         self._create_mock_run_dir(rep_num=1)
         self._create_mock_run_dir(rep_num=2)
 
-        # Create top-level summary files
-        (self.exp_dir / "EXPERIMENT_results.csv").touch()
-        (self.exp_dir / "experiment_log.csv").write_text("header\nBatchSummary,...")
+        # Create top-level summary files with valid CSV content
+        (self.exp_dir / "EXPERIMENT_results.csv").write_text(self._create_valid_experiment_results_csv())
+        (self.exp_dir / "experiment_log.csv").write_text(self._create_valid_experiment_log_csv())
 
         # --- Act ---
         state_name, payload, _ = experiment_auditor.get_experiment_state(self.exp_dir, expected_reps)
@@ -335,9 +359,10 @@ personalities_src = personalities_db.txt
     def test_main_cli_complete_state(self, mock_stdout):
         """Verify the CLI output and exit code for a COMPLETE experiment."""
         # --- Arrange ---
-        self._create_mock_run_dir(rep_num=1)
-        (self.exp_dir / "EXPERIMENT_results.csv").touch()
-        (self.exp_dir / "experiment_log.csv").write_text("BatchSummary")
+        run_dir = self._create_mock_run_dir(rep_num=1)
+        # Create valid CSV files with matching run name
+        (self.exp_dir / "EXPERIMENT_results.csv").write_text(self._create_valid_experiment_results_csv_single(run_dir.name))
+        (self.exp_dir / "experiment_log.csv").write_text(self._create_valid_experiment_log_csv())
         self.mock_config.set('Study', 'num_replications', '1')
         test_argv = ['experiment_auditor.py', str(self.exp_dir)]
         
@@ -418,7 +443,7 @@ personalities_src = personalities_db.txt
     def test_aggregation_needed_for_missing_log(self):
         """Verify aggregation state when experiment_log.csv is missing."""
         self._create_mock_run_dir(rep_num=1)
-        (self.exp_dir / "EXPERIMENT_results.csv").touch()
+        (self.exp_dir / "EXPERIMENT_results.csv").write_text(self._create_valid_experiment_results_csv())
         # Do not create experiment_log.csv
         state_name, _, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
         self.assertEqual(state_name, "AGGREGATION_NEEDED")
@@ -437,10 +462,10 @@ personalities_src = personalities_db.txt
         test_config_file = self.exp_dir / "test_config.ini"
         test_config_file.write_text("[Study]\nnum_replications = 1\n")
         
-        # Create 1 complete run
-        self._create_mock_run_dir(rep_num=1)
-        (self.exp_dir / "EXPERIMENT_results.csv").touch()
-        (self.exp_dir / "experiment_log.csv").write_text("BatchSummary")
+        # Create 1 complete run with valid CSV files
+        run_dir = self._create_mock_run_dir(rep_num=1)
+        (self.exp_dir / "EXPERIMENT_results.csv").write_text(self._create_valid_experiment_results_csv_single(run_dir.name))
+        (self.exp_dir / "experiment_log.csv").write_text(self._create_valid_experiment_log_csv())
 
         test_argv = ['auditor.py', str(self.exp_dir), '--config-path', str(test_config_file)]
         
@@ -757,6 +782,195 @@ personalities_src = personalities_db.txt
         finally:
             if real_config_loader:
                 sys.modules['config_loader'] = real_config_loader
+
+    # New tests for CSV validation functions
+    def test_check_csv_content_empty_file(self):
+        """Verify _check_csv_content detects empty CSV files."""
+        empty_file = self.exp_dir / "empty.csv"
+        empty_file.write_text("")
+        result = experiment_auditor._check_csv_content(empty_file)
+        self.assertEqual(result, "EMPTY_CSV_EMPTY")
+
+    def test_check_csv_content_no_header(self):
+        """Verify _check_csv_content detects CSV files without headers."""
+        no_header_file = self.exp_dir / "no_header.csv"
+        no_header_file.write_text("   \n   \n")  # Only whitespace
+        result = experiment_auditor._check_csv_content(no_header_file)
+        self.assertEqual(result, "NO_HEADER_CSV_EMPTY")
+
+    def test_check_csv_content_no_data(self):
+        """Verify _check_csv_content detects CSV files with header but no data."""
+        header_only_file = self.exp_dir / "header_only.csv"
+        header_only_file.write_text("col1,col2,col3\n")
+        result = experiment_auditor._check_csv_content(header_only_file, required_min_rows=1)
+        self.assertEqual(result, "HEADER_ONLY_CSV_NO_DATA")
+
+    def test_check_csv_content_corrupted_file(self):
+        """Verify _check_csv_content detects corrupted CSV files."""
+        corrupted_file = self.exp_dir / "corrupted.csv"
+        # Create a file that will cause csv.reader to fail
+        corrupted_file.write_bytes(b'\x00\x01\x02\x03')  # Binary data
+        result = experiment_auditor._check_csv_content(corrupted_file)
+        self.assertEqual(result, "CORRUPTED_CSV_NO_DATA")
+
+    def test_check_csv_content_valid_file(self):
+        """Verify _check_csv_content validates proper CSV files."""
+        valid_file = self.exp_dir / "valid.csv"
+        valid_file.write_text("col1,col2,col3\nval1,val2,val3\nval4,val5,val6\n")
+        result = experiment_auditor._check_csv_content(valid_file, required_min_rows=2)
+        self.assertEqual(result, "VALID")
+
+    def test_check_experiment_log_content_not_finalized(self):
+        """Verify _check_experiment_log_content detects non-finalized logs."""
+        log_file = self.exp_dir / "experiment_log.csv"
+        log_file.write_text("header\ndata1\ndata2\n")  # No BatchSummary
+        result = experiment_auditor._check_experiment_log_content(log_file)
+        self.assertEqual(result, "EXPERIMENT_LOG_NOT_FINALIZED")
+
+    def test_check_experiment_log_content_valid_finalized(self):
+        """Verify _check_experiment_log_content validates finalized logs."""
+        log_file = self.exp_dir / "experiment_log.csv"
+        log_file.write_text("header\ndata1\nBatchSummary,complete\n")
+        result = experiment_auditor._check_experiment_log_content(log_file)
+        self.assertEqual(result, "VALID")
+
+    def test_check_experiment_results_csv_wrong_row_count(self):
+        """Verify _check_experiment_results_csv detects insufficient data rows."""
+        results_file = self.exp_dir / "EXPERIMENT_results.csv"
+        # Create file with complete header and 1 row when expecting 2 replications
+        # The basic CSV validation detects insufficient data for expected replications
+        results_file.write_text("run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_rank_of_correct_id,rank_of_correct_id_p,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,top1_pred_bias_std,true_false_score_diff\nrun1,1,10,model,correct,0.5,10,10,db.txt,0.75,0.001,0.6,0.01,0.8,0.001,2.5,0.01,0.1,0.5,0.7,0.02,0.05,0.1,0.05,0.15,0.02,0.03")    
+        result = experiment_auditor._check_experiment_results_csv(self.exp_dir, 2)
+        self.assertEqual(result, "EXPERIMENT_RESULTS_CSV_NO_DATA")
+
+    def test_check_experiment_results_csv_missing_columns(self):
+        """Verify _check_experiment_results_csv detects missing required columns."""
+        results_file = self.exp_dir / "EXPERIMENT_results.csv"
+        # Missing required columns like 'replication', 'model', etc.
+        results_file.write_text("run_directory,mean_mrr\nrun1,0.5\nrun2,0.6\n")
+        result = experiment_auditor._check_experiment_results_csv(self.exp_dir, 2)
+        self.assertIn("EXPERIMENT_RESULTS_MISSING_COLUMNS", result)
+
+    def test_check_experiment_results_csv_valid(self):
+        """Verify _check_experiment_results_csv validates proper files."""
+        results_file = self.exp_dir / "EXPERIMENT_results.csv"
+        results_file.write_text(self._create_valid_experiment_results_csv())
+        result = experiment_auditor._check_experiment_results_csv(self.exp_dir, 2)
+        self.assertEqual(result, "VALID")
+
+    def test_reprocess_needed_for_corrupted_replication_csv(self):
+        """Verify reprocess state for corrupted REPLICATION_results.csv."""
+        run_dir = self._create_mock_run_dir(rep_num=1)
+        # Create a CSV with wrong schema - missing required columns
+        (run_dir / "REPLICATION_results.csv").write_text("wrong,columns,header\ndata,values,here")
+        state_name, payload, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
+        self.assertEqual(state_name, "REPROCESS_NEEDED")
+
+    def test_aggregation_needed_for_corrupted_experiment_csv(self):
+        """Verify aggregation state for corrupted EXPERIMENT_results.csv."""
+        self._create_mock_run_dir(rep_num=1)
+        (self.exp_dir / "EXPERIMENT_results.csv").write_text("corrupted,invalid,data")
+        (self.exp_dir / "experiment_log.csv").write_text(self._create_valid_experiment_log_csv())
+        state_name, _, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
+        self.assertEqual(state_name, "AGGREGATION_NEEDED")
+
+    def test_check_csv_content_empty_file(self):
+        """Verify _check_csv_content detects empty CSV files."""
+        empty_file = self.exp_dir / "empty.csv"
+        empty_file.write_text("")
+        result = experiment_auditor._check_csv_content(empty_file)
+        self.assertEqual(result, "EMPTY_CSV_EMPTY")
+
+    def test_check_csv_content_no_header(self):
+        """Verify _check_csv_content detects CSV files without headers."""
+        no_header_file = self.exp_dir / "no_header.csv"
+        no_header_file.write_text("   \n   \n")  # Only whitespace
+        result = experiment_auditor._check_csv_content(no_header_file)
+        self.assertEqual(result, "NO_HEADER_CSV_EMPTY")  # Fixed: whitespace-only content = empty
+
+    def test_check_csv_content_no_data(self):
+        """Verify _check_csv_content detects CSV files with header but no data."""
+        header_only_file = self.exp_dir / "header_only.csv"
+        header_only_file.write_text("col1,col2,col3\n")
+        result = experiment_auditor._check_csv_content(header_only_file, required_min_rows=1)
+        self.assertEqual(result, "HEADER_ONLY_CSV_NO_DATA")
+
+    def test_check_csv_content_corrupted_file(self):
+        """Verify _check_csv_content detects corrupted CSV files."""
+        corrupted_file = self.exp_dir / "corrupted.csv"
+        # Create a file that will cause csv.reader to fail
+        corrupted_file.write_bytes(b'\x00\x01\x02\x03')  # Binary data
+        result = experiment_auditor._check_csv_content(corrupted_file)
+        self.assertEqual(result, "CORRUPTED_CSV_NO_DATA")  # Fixed: binary data reads as no data
+
+    def test_check_csv_content_valid_file(self):
+        """Verify _check_csv_content validates proper CSV files."""
+        valid_file = self.exp_dir / "valid.csv"
+        valid_file.write_text("col1,col2,col3\nval1,val2,val3\nval4,val5,val6\n")
+        result = experiment_auditor._check_csv_content(valid_file, required_min_rows=2)
+        self.assertEqual(result, "VALID")
+
+    def test_check_experiment_log_content_not_finalized(self):
+        """Verify _check_experiment_log_content detects non-finalized logs."""
+        log_file = self.exp_dir / "experiment_log.csv"
+        log_file.write_text("header\ndata1\ndata2\n")  # No BatchSummary
+        result = experiment_auditor._check_experiment_log_content(log_file)
+        self.assertEqual(result, "EXPERIMENT_LOG_NOT_FINALIZED")
+
+    def test_check_experiment_log_content_valid_finalized(self):
+        """Verify _check_experiment_log_content validates finalized logs."""
+        log_file = self.exp_dir / "experiment_log.csv"
+        log_file.write_text("header\ndata1\nBatchSummary,complete\n")
+        result = experiment_auditor._check_experiment_log_content(log_file)
+        self.assertEqual(result, "VALID")
+
+    def test_reprocess_needed_for_corrupted_replication_csv(self):
+        """Verify reprocess state for corrupted REPLICATION_results.csv."""
+        run_dir = self._create_mock_run_dir(rep_num=1)
+        # Corrupt the REPLICATION_results.csv file
+        (run_dir / "REPLICATION_results.csv").write_text("corrupted,invalid,data")
+        state_name, payload, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
+        self.assertEqual(state_name, "REPROCESS_NEEDED")
+
+    def test_aggregation_needed_for_corrupted_experiment_csv(self):
+        """Verify aggregation state for corrupted EXPERIMENT_results.csv."""
+        self._create_mock_run_dir(rep_num=1)
+        (self.exp_dir / "EXPERIMENT_results.csv").write_text("corrupted,invalid,data")
+        (self.exp_dir / "experiment_log.csv").write_text("header\nBatchSummary,complete\n")
+        state_name, _, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
+        self.assertEqual(state_name, "AGGREGATION_NEEDED")
+
+    def test_check_replication_results_csv_missing_columns(self):
+        """Verify _check_replication_results_csv detects missing required columns."""
+        run_dir = self.exp_dir / "test_run"
+        run_dir.mkdir()
+        replication_file = run_dir / "REPLICATION_results.csv"
+        # Missing many required columns
+        replication_file.write_text("run_directory,mean_mrr\nrun1,0.5")
+        result = experiment_auditor._check_replication_results_csv(replication_file)
+        self.assertIn("REPLICATION_RESULTS_MISSING_COLUMNS", result)
+
+    def test_check_replication_results_csv_wrong_row_count(self):
+        """Verify _check_replication_results_csv detects wrong row count."""
+        run_dir = self.exp_dir / "test_run"
+        run_dir.mkdir()
+        replication_file = run_dir / "REPLICATION_results.csv"
+        # Create valid header but multiple rows (should be exactly 1)
+        header = "run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,mean_rank_of_correct_id,rank_of_correct_id_p,top1_pred_bias_std,true_false_score_diff,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err"
+        replication_file.write_text(f"{header}\nrow1,1,10,model,correct,0.5,10,10,db,0.75,0.001,0.6,0.01,0.8,0.001,0.1,0.05,0.15,2.5,0.01,0.02,0.03,0.1,0.5,0.7,0.02,0.05\nrow2,2,10,model,correct,0.5,10,10,db,0.72,0.002,0.58,0.02,0.78,0.002,0.08,0.03,0.12,2.6,0.02,0.025,0.035,0.11,0.52,0.68,0.025,0.055")
+        result = experiment_auditor._check_replication_results_csv(replication_file)
+        self.assertEqual(result, "REPLICATION_RESULTS_WRONG_ROW_COUNT: expected 1, found 2")
+
+    def test_check_replication_results_csv_valid(self):
+        """Verify _check_replication_results_csv validates proper files."""
+        run_dir = self.exp_dir / "test_run"
+        run_dir.mkdir()
+        replication_file = run_dir / "REPLICATION_results.csv"
+        # Create valid replication CSV with all required columns
+        header = "run_directory,replication,n_valid_responses,model,mapping_strategy,temperature,k,m,db,mean_mrr,mrr_p,mean_top_1_acc,top_1_acc_p,mean_top_3_acc,top_3_acc_p,mean_mrr_lift,mean_top_1_acc_lift,mean_top_3_acc_lift,mean_rank_of_correct_id,rank_of_correct_id_p,top1_pred_bias_std,true_false_score_diff,bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err"
+        replication_file.write_text(f"{header}\nrun1,1,10,model,correct,0.5,10,10,db,0.75,0.001,0.6,0.01,0.8,0.001,0.1,0.05,0.15,2.5,0.01,0.02,0.03,0.1,0.5,0.7,0.02,0.05")
+        result = experiment_auditor._check_replication_results_csv(replication_file)
+        self.assertEqual(result, "VALID")
 
 if __name__ == '__main__':
     unittest.main()

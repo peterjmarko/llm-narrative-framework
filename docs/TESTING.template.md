@@ -115,7 +115,7 @@ The project includes a suite of PDM scripts for running tests, defined in `pypro
 | `pdm run test-stats-reporting` | Runs the **Statistical Reporting Algorithm Validation**. |
 | `pdm run test-l4` | Runs the **Layer 4** Integration test for the experiment lifecycle. |
 | `pdm run test-l4-interactive` | Runs the Layer 4 test in interactive "guided tour" mode. |
-| `pdm run test-l5` | Runs the **Layer 5** Integration test for the migration workflow. |
+| `pdm run test-l5` | **(Pending Validation)** Layer 5 Integration test for study compilation workflow. |
 
 ### Pipeline & Workflow Integration Testing
 
@@ -197,16 +197,18 @@ If you need to run individual phases manually:
     .\tests\testing_harness\experiment_lifecycle\layer4\layer4_phase3_cleanup.ps1
 ```
 
-##### Study Compilation
+##### Study Compilation (Pending Validation)
 
-This procedure validates the complete `compile_study.ps1` workflow using a 3-phase structure (setup, execution, cleanup). The test creates experiments using Layer 4 when available, or falls back to intelligent mock data generation when Layer 4 experiments are unavailable.
+> **Note:** This test harness is implemented but not yet validated.
+
+This procedure will validate the complete `compile_study.ps1` workflow using a 3-phase structure (setup, execution, cleanup). The test creates experiments using Layer 4 when available, or falls back to intelligent mock data generation when Layer 4 experiments are unavailable.
 
 **Automated Mode:**
 ```powershell
 pdm run test-l5
 ```
 
-The test validates full study compilation, ANOVA analysis, and artifact generation with proper cross-layer integration testing of research workflows.
+The test will validate full study compilation, ANOVA analysis, and artifact generation with proper cross-layer integration testing of research workflows.
 
 ## Testing Status
 
@@ -218,7 +220,7 @@ This section provides a summary of the project's validation status.
 | :--- | :--- | :--- |
 | **Integration** | Data Preparation Pipeline | **COMPLETE.** Validated by a robust, profile-driven test harness that runs the full, live pipeline in an isolated sandbox with a controlled seed dataset. |
 | | Experiment Lifecycle | **COMPLETE.** Validated by Layer 4 integration tests that execute the full `new -> audit -> break -> fix` lifecycle in an isolated sandbox environment. Tests creation, validation, deliberate corruption, automated repair, and final verification of experiment integrity. Features both automated and interactive modes for different use cases. |
-| | Study Compilation | **COMPLETE.** Validated by Layer 5 integration tests that execute the full study compilation workflow in an isolated sandbox environment. Tests full ANOVA analysis pipeline with intelligent fallback to mock data when Layer 4 experiments unavailable. |
+| | Study Compilation | **PENDING VALIDATION.** Layer 5 integration test harness is implemented but requires validation testing before being marked complete. |
 
 ### Code Coverage Targets
 
@@ -408,6 +410,13 @@ Module                                  Cov. (%)        Status & Justification
                                                         incomplete/legacy config files, and invalid run directory
                                                         structures.
 
+`src/restore_experiment_config.py`      `83%`           COMPLETE. Unit tests validate config file restoration
+                                                        functionality used during CONFIG_ISSUE repairs. Test coverage
+                                                        includes config parsing, restoration logic, and error handling.
+                                                        Integrated with Layer 4 test (experiment 3 corruption scenario).
+                                                        Gap areas: Lines 80-83, 89-91 (error paths), Line 151 (cleanup),
+                                                        and 5 partial branch coverage scenarios need additional testing.
+
 **Study-Level & Analysis**
 
 `src/compile_study_results.py`          `87%`           COMPLETE. Target met. The test suite was expanded to validate
@@ -435,14 +444,14 @@ Module                                  Cov. (%)        Status & Justification
 
 **PowerShell Wrappers**
 
-`new_experiment.ps1`                    `N/A`           PENDING. Will be validated by the planned integration test harness
-                                                        for the experiment lifecycle.
+`new_experiment.ps1`                    `N/A`           COMPLETE. Validated by Layer 4 integration test which exercises
+                                                        the full experiment creation workflow in an isolated sandbox.
 
-`audit_experiment.ps1`                  `N/A`           PENDING. Will be validated by the planned integration test harness
-                                                        for the experiment lifecycle.
+`audit_experiment.ps1`                  `N/A`           COMPLETE. Validated by Layer 4 integration test which exercises
+                                                        experiment auditing with 4 distinct corruption scenarios.
 
-`fix_experiment.ps1`                    `N/A`           PENDING. Will be validated by the planned integration test harness
-                                                        for the experiment lifecycle.
+`fix_experiment.ps1`                    `N/A`           COMPLETE. Validated by Layer 4 integration test which exercises
+                                                        experiment repair workflows including config restoration.
 
 `compile_study.ps1`                     `N/A`           PENDING. Will be validated by the planned integration test harness
                                                         for study compilation.

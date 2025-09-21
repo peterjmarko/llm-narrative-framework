@@ -88,7 +88,21 @@ if ($pythonExitCode -ne 0) {
 }
 
 try {
-    $basePath = Join-Path $ProjectRoot "output/new_experiments"
+    # Read the output directory from config instead of hardcoding
+    $basePath = Join-Path $ProjectRoot "output/new_experiments"  # Default fallback
+    
+    if (-not [string]::IsNullOrEmpty($ConfigPath) -and (Test-Path $ConfigPath)) {
+        # Parse config to get the actual output directory
+        $configContent = Get-Content $ConfigPath -Raw
+        if ($configContent -match '(?m)^base_output_dir\s*=\s*(.+)$') {
+            $baseOutputDir = $matches[1].Trim()
+            if ($configContent -match '(?m)^new_experiments_subdir\s*=\s*(.+)$') {
+                $newExperimentsSubdir = $matches[1].Trim()
+                $basePath = Join-Path $ProjectRoot (Join-Path $baseOutputDir $newExperimentsSubdir)
+            }
+        }
+    }
+    
     $latestExperiment = Get-ChildItem -Path $basePath -Directory | Sort-Object CreationTime -Descending | Select-Object -First 1
     if ($null -ne $latestExperiment) {
         Write-Header -Lines "Verifying Final Experiment State" -Color Cyan
