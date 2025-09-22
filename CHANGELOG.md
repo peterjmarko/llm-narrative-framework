@@ -1,5 +1,25 @@
 # Changelog
 
+## 10.10.0 (2025-09-22)
+
+### Bump
+
+- **version 10.9.0 → 10.10.0**
+
+### Features
+
+- **implement statistical analysis validation mock study generator**
+  Implement Step 3 of Statistical Analysis & Reporting Validation Test with well-calibrated parameters:
+  
+  - Create generate_mock_study_assets.ps1 with M=32 trials (250.85 response rate)
+  - Implement 22 factorial design: Mapping Strategy  Group Size (k=4,10)
+  - Use real personality data with controlled mock LLM responses for validation
+  - Group size-specific performance patterns replace model-specific logic
+  - Ready for GraphPad Prism validation (Step 4)
+  - Update PROJECT_ROADMAP.md and TESTING_GUIDE.template.md documentation
+  
+  Total: 768 trials across 4 experiments for comprehensive statistical pipeline validation
+
 ## 10.9.0 (2025-09-22)
 
 ### Bump
