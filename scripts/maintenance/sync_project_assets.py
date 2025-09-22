@@ -50,6 +50,7 @@ class ProjectSyncer:
                 "README.template.md",
                 "DEVELOPERS_GUIDE.template.md", 
                 "config.ini",
+                "pyproject.toml",
                 ".gitignore",
                 "new_experiment.ps1",
                 "audit_experiment.ps1",

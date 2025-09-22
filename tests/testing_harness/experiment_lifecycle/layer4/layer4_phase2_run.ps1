@@ -421,21 +421,22 @@ if ($Interactive) {
     Write-Host "Performs final audit to confirm the experiment is fully restored." -ForegroundColor Blue
     
     if ($Interactive) {
-        Write-Host "`n${C_BLUE}Step Summary: This final step verifies that the repair was successful. The audit should now show all experiments as 'VALIDATED' (with study incomplete) again, proving that the framework can automatically recover from common failure scenarios.${C_RESET}"
-        Write-Host "`n${C_GRAY}  VERIFICATION TARGET: Complete experiment integrity${C_RESET}"
+        Write-Host "`n${C_BLUE}Step Summary: This final step performs a comprehensive study-level audit to verify that all 4 experiments in the factorial design were successfully repaired. The audit should show all experiments as 'VALIDATED' but the overall study as incomplete (since we haven't compiled it yet), proving that the framework can automatically recover from multiple failure scenarios.${C_RESET}"
+        Write-Host "`n${C_GRAY}  VERIFICATION TARGET: Complete factorial study integrity${C_RESET}"
         Write-Host ""
         Write-Host "${C_RESET}  EXPECTED RESULT:"
-        Write-Host "    - Overall Status: VALIDATED"
-        Write-Host "    - All files restored and valid"
+        Write-Host "    - Individual Experiments: VALIDATED (all 4)"
+        Write-Host "    - Overall Study Status: Incomplete (expected)"
         Write-Host "    - Exit Code: 0 (success)"
         
         Read-Host -Prompt "`n${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}" | Out-Null
         Write-Host ""
     }
 
-    # Starting Step 6 execution
-    & "$ProjectRoot\audit_experiment.ps1" -ExperimentDirectory $NewExperimentPath -ConfigPath $TestConfigPath
-    if ($LASTEXITCODE -ne 0) { throw "Final verification audit failed. Experiment should be VALIDATED." }
+    # Starting Step 6 execution - Use audit_study.ps1 for complete study validation
+    $studyDirectory = Join-Path $SandboxDir "experiments"
+    & "$ProjectRoot\audit_study.ps1" -StudyDirectory $studyDirectory -ConfigPath $TestConfigPath -NoHeader
+    if ($LASTEXITCODE -ne 0) { throw "Final verification audit failed. Study should be validated but incomplete." }
     
     if ($Interactive) {
         Write-Host "`n🎉 SUCCESS! The complete experiment lifecycle test passed!" -ForegroundColor Green
@@ -450,6 +451,7 @@ if ($Interactive) {
         Read-Host -Prompt "${C_ORANGE}Press Enter to continue to cleanup...${C_RESET}" | Out-Null
     } else {
         Write-Host "SUCCESS: The full 'new -> audit -> break -> fix' lifecycle completed successfully." -ForegroundColor Green
+        Write-Host "NOTE: Missing study artifacts (STUDY_results.csv, anova/) are expected - Layer 4 tests experiment creation, not study compilation." -ForegroundColor Gray
     }
 }
 catch {

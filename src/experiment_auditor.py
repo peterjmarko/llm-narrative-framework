@@ -618,7 +618,22 @@ def main():
     if use_color: C_CYAN, C_GREEN, C_YELLOW, C_RED, C_RESET = '\033[96m', '\033[92m', '\033[93m', '\033[91m', '\033[0m'
 
     target_dir = Path(args.target_dir)
-    num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+    
+    # Try to read num_replications from the archived config within the experiment directory
+    archived_config_path = target_dir / "config.ini.archived"
+    num_reps = 30  # fallback default
+    if archived_config_path.exists():
+        try:
+            archived_config = ConfigParser()
+            with open(archived_config_path, 'r', encoding='utf-8') as f:
+                archived_config.read_file(f)
+            num_reps = archived_config.getint('Study', 'num_replications', fallback=30)
+        except Exception:
+            # If archived config is corrupted or missing the key, use global config as fallback
+            num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+    else:
+        # If no archived config exists, use global config (for new/incomplete experiments)
+        num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
     
     # Use the definitive state-checking function
     state_name, _, granular_details = get_experiment_state(target_dir, num_reps)

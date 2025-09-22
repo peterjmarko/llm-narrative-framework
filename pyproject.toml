@@ -101,7 +101,7 @@ test-l4 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer4/run_la
 test-l4-interactive = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer4/run_layer4_test.ps1 -Interactive"
 test-l5 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer5/run_layer5_test.ps1"
 test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.ps1"
-test-stats-reporting = "pwsh -File ./tests/testing_harness/validate_statistical_reporting.ps1"
+test-stats-reporting = "pwsh -File ./tests/algorithm_validation/validate_statistical_reporting.ps1"
 
 # --- PowerShell Tests (By Suite) ---
 # Experiment Lifecycle

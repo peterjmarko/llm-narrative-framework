@@ -8,16 +8,7 @@ This document outlines planned development tasks and tracks known issues for the
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
-#### A. Complete Integration Testing
-- [x] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)** ✅ **COMPLETE**
-  - [x] Create a new scripted integration test for the `compile_study.ps1` workflow.
-  - [x] Test Layer 5 harness. Successfully validates study compilation workflow with appropriate handling of test data limitations.
-- [ ] **Fix final audit of Layer 4 Test Harness**
-  - [ ] Replace experiment audit with study audit. Expected outcome: validated but incomplete.
-- [ ] **Fix configuration file Experiment Auditor is working with**
-  - [ ] It should be using the archived `config.ini` and not the global one.
-
-#### B. Implement Core Algorithm Validation Tests
+#### A. Implement Core Algorithm Validation Tests
 - [ ] **Implement Statistical Analysis & Reporting Validation Test** ⚠️ **HIGH PRIORITY**
   - [ ] Create the missing `validate_statistical_reporting.ps1` script that is described in the Testing Guide but not yet implemented.
   - [ ] Generate mock study assets in `tests/assets/mock_study/` with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis).
@@ -25,7 +16,7 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Test the complete statistical pipeline that gets filtered out in Layer 5 due to insufficient test data.
   - [ ] This test complements Layer 5 by validating the full statistical analysis when there are sufficient replications, while Layer 5 validates appropriate handling of insufficient data scenarios.
 
-#### C. Enhance Reproducibility and Provenance
+#### B. Enhance Reproducibility and Provenance
 - [ ] **Implement Provenance Capture**
   - [ ] Modify `new_experiment.ps1` to generate a `manifest.json` file in each new experiment directory.
   - [ ] The manifest will capture Git state (commit SHA, tag) and key environment details (Python version, OS).
