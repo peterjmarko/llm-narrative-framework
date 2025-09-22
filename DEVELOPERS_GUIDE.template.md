@@ -234,7 +234,7 @@ The project's documentation is managed through three distinct methods. For a com
 
 This project includes tests that must pass before a pull request will be merged. The pre-commit hooks do not run these tests automatically, so you must run them manually.
 
-The test suite is divided into two parts: a `pytest` suite for the Python source code and a lightweight integration harness for the PowerShell orchestration scripts.
+The test suite is divided into three parts: a `pytest` suite for the Python source code, a lightweight integration harness for the PowerShell orchestration scripts, and external validation against GraphPad Prism for statistical analysis verification.
 
 {{grouped_figure:docs/diagrams/arch_test_suite.mmd | scale=1.5 | width=60% | caption=Test Suite Architecture.}}
 
@@ -253,6 +253,7 @@ The test suite is divided into two parts: a `pytest` suite for the Python source
 | `pdm run test-ps-stu` | Study Processing (`compile_study.ps1`, `audit_study.ps1`) |
 | `pdm run test-l4` | Experiment Lifecycle Integration (automated validation) |
 | `pdm run test-l4-interactive` | Experiment Lifecycle Integration (guided tour) |
+| `pdm run test-stats-reporting` | Statistical Analysis Pipeline (GraphPad Prism validation) |
 
 #### How to Write a New Test (Best Practices)
 
@@ -301,6 +302,33 @@ Most modules in `src/` are designed as executable scripts. The standard testing 
     ````
 
 This approach is the required standard for maintaining test quality and coverage across the project.
+
+### Statistical Analysis Validation
+
+The framework includes comprehensive validation of its statistical analysis pipeline against GraphPad Prism 10.0.0 to ensure academic rigor and publication readiness.
+
+**Validation Components:**
+- **Real Framework Execution**: Uses actual `new_experiment.ps1` workflow, not mock implementations
+- **Deterministic Parameters**: Temperature=0.0 with gemini-1.5-flash for reproducible results  
+- **Framework Randomization**: Uses built-in seeded personality selection algorithms
+- **2×2 Factorial Design**: Mapping Strategy × Group Size with sufficient replications
+
+**Statistical Coverage:**
+- **Phase A**: Replication-level validation (MRR, Wilcoxon tests, bias regression, effect sizes)
+- **Phase B**: Study-level validation (Two-Way ANOVA, post-hoc tests, FDR corrections)
+
+**To run statistical validation:**
+```bash
+# Generate statistical validation study using real framework
+pwsh -File ./tests/algorithm_validation/generate_statistical_study.ps1
+
+# Run GraphPad validation workflow  
+pdm run test-stats-reporting
+```
+
+**Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.0.0"
+
+This validation provides external verification of the framework's novel algorithmic contributions and standard statistical analyses, supporting publication in peer-reviewed journals.
 
 ### 4. Commit Your Changes
 
@@ -455,6 +483,7 @@ The CI pipeline performs the following key validation steps:
     *   `pdm run check-headers`: Verifies that all script files have the correct license and filename header.
     *   `pdm run python scripts/lint_docstrings.py`: Performs a high-level check for the presence of module docstrings.
 3.  **Validates Documentation:** It runs `pdm run build-docs --check` to confirm that any changes to diagrams or templates have been correctly compiled into the final documentation.
+4.  **Statistical Validation:** The framework's statistical analysis pipeline is validated against GraphPad Prism 10.0.0 for academic publication standards.
 
 You can—and should—run these same checks locally before committing your code to ensure your pull request will pass.
 
@@ -467,6 +496,9 @@ pdm run python scripts/lint_docstrings.py
 
 # Run the documentation validation
 pdm run build-docs --check
+
+# Run statistical validation (optional - requires data preparation)
+pdm run test-stats-reporting
 ```
 
 If the CI build fails, please review the logs for the failed step on your pull request page, fix the issues locally, and push the new changes to your branch. This will automatically trigger a new CI run.

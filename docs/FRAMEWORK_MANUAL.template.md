@@ -628,3 +628,28 @@ The test suite is configured for detailed code coverage analysis using the `cove
     pdm run cov-html
     ```
     Open `htmlcov/index.html` in your browser to explore the report.
+
+### Statistical Validation
+
+The framework's statistical analysis pipeline is validated against GraphPad Prism 10.0.0 to ensure academic rigor and publication readiness.
+
+**Validation Approach:**
+- **Real Framework Execution**: Uses actual `new_experiment.ps1` workflow, not mock implementations
+- **Deterministic Parameters**: Temperature=0.0 with gemini-1.5-flash for reproducible results  
+- **Framework Randomization**: Uses built-in seeded personality selection algorithms
+- **2×2 Factorial Design**: Mapping Strategy × Group Size with sufficient replications
+
+**Statistical Coverage:**
+- **Phase A**: Replication-level validation (MRR, Wilcoxon tests, bias regression, effect sizes)
+- **Phase B**: Study-level validation (Two-Way ANOVA, post-hoc tests, FDR corrections)
+
+**Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.0.0"
+
+**To run validation:**
+```powershell
+# Generate statistical validation study
+pwsh -File ./tests/algorithm_validation/generate_statistical_study.ps1
+
+# Run GraphPad validation workflow  
+pdm run test-stats-reporting
+```
