@@ -1,5 +1,25 @@
 # Changelog
 
+## 10.11.0 (2025-09-22)
+
+### Bump
+
+- **version 10.10.0 → 10.11.0**
+
+### Features
+
+- **complete step 4 graphpad prism validation implementation**
+  Complete Step 4 GraphPad Prism Validation Implementation
+  
+  - Rename generate_mock_study_assets.ps1  generate_statistical_study.ps1
+  - Update validation approach to use real framework execution instead of mock data
+  - Correct parameters: temperature=0.0, framework seeded randomization
+  - Update output directory: mock_study  statistical_validation_study
+  - Complete GraphPad Prism validation workflow implementation
+  - Update documentation across all guides (Testing, Framework, Developer, Roadmap)
+  - Mark Step 4 as COMPLETE in Project Roadmap
+  - Add statistical validation to developer test workflows
+
 ## 10.10.0 (2025-09-22)
 
 ### Bump
