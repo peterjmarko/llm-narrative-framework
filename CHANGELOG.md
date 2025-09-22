@@ -1,5 +1,29 @@
 # Changelog
 
+## 10.9.0 (2025-09-22)
+
+### Bump
+
+- **version 10.8.0 → 10.9.0**
+
+### Features
+
+- **analysis scripts with validation improvements**
+  Implement Priority 1-3 statistical validation improvements across analysis pipeline:
+  
+  - Priority 1 (Statistical Validation): Add documented chance calculation functions with mathematical foundations, enhance directional testing logic for rank-based metrics
+  - Priority 2 (Enhanced Error Handling): Implement categorized error handling (statistical, data structure, file I/O, validation errors) with specific recovery strategies
+  - Priority 3 (Validation Enhancement): Add experiment consistency validation, compilation metadata tracking, and enhanced logging
+  
+  Key changes:
+  - analyze_llm_performance.py: Add calculate_mean_rank_chance() function, improve error categorization
+  - analyze_study_results.py: Enhance Bayesian analysis error handling, improve Games-Howell fallback
+  - compile_study_results.py: Add validation functions and metadata tracking
+  - Comprehensive test suite updates maintaining 82-83% coverage
+  - Documentation updates for statistical assumptions, error recovery, and validation criteria
+  
+  Prepares framework for GraphPad Prism validation and establishes foundation for peer-reviewed publication.
+
 ## 10.8.0 (2025-09-22)
 
 ### Bump
