@@ -1,5 +1,24 @@
 # Changelog
 
+## 10.8.0 (2025-09-22)
+
+### Bump
+
+- **version 10.7.0 → 10.8.0**
+
+### Features
+
+- **implement Layer 4 audit fix and statistical validation framework**
+  Enhance testing framework reliability and prepare statistical validation infrastructure
+  
+  - Fix Layer 4 test harness to use study audit instead of experiment audit in final verification
+  - Fix experiment auditor to use archived config.ini instead of global config
+  - Add pyproject.toml to sync assets for better PDM configuration tracking
+  - Remove completed integration testing section from roadmap and renumber remaining sections
+  - Correct PDM script path for statistical validation test
+  - Add comprehensive implementation plan for statistical analysis validation using GraphPad Prism
+  - Improve configuration consistency and cross-layer integration testing
+
 ## 10.7.0 (2025-09-22)
 
 ### Bump
