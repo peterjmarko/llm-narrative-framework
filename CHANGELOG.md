@@ -1,5 +1,39 @@
 # Changelog
 
+## 10.7.0 (2025-09-22)
+
+### Bump
+
+- **version 10.6.0 → 10.7.0**
+
+### Features
+
+- **complete Layer 5 integration test with extensive debugging and documentation updates**
+  Layer 5 Implementation & Debugging:
+  - Add complete Layer 5 test harness with 3-phase structure (setup/run/cleanup)
+  - Integrate with Layer 4 experiments for realistic 22 factorial design testing
+  - Debug and fix critical issues through extensive troubleshooting:
+    * Config path consistency - unified approach with Layer 4 for test configuration
+    * Complete config sections - full project config integration for analysis
+    * Realistic data expectations - correctly expect 4 experiment rows not 12 replications
+    * Flexible analysis validation - handle both full statistical analysis and filtered models
+  - Fix Layer 4 archiving bug - preserve experiments before sandbox deletion (layer4_phase3_cleanup.ps1)
+  - Implement robust study compilation validation with appropriate test data handling
+  - Add cross-layer integration testing demonstrating complete research workflow
+  
+  Project Configuration:
+  - Add pdm run test-l5 script to pyproject.toml
+  - Update sync_project_assets.py to track new Layer 5 test files
+  - Generate Layer 4 factorial study test assets for Layer 5 consumption
+  
+  Documentation Updates:
+  - Mark Layer 5 integration test as COMPLETE in roadmap and testing guide
+  - Elevate Statistical Analysis & Reporting Validation test to HIGH PRIORITY
+  - Document Layer 5's successful validation of study compilation workflow
+  - Clarify complementary relationship between Layer 5 (test data) and planned full statistical validation
+  - Add completion tracking and testing gaps sections to roadmap
+  - Identify missing coverage for full statistical analysis pipeline with sufficient replications
+
 ## 10.6.0 (2025-09-21)
 
 ### Bump
