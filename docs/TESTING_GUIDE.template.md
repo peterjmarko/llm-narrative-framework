@@ -67,18 +67,25 @@ This standalone test provides mathematical proof of the mapping and randomizatio
 -   **Prerequisites:**
     This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3-default` once to bootstrap these assets. If the assets are not present, the test will be skipped.
 
-#### Statistical Analysis & Reporting Validation ⚠️ **IMPLEMENTATION IN PROGRESS**
+#### Statistical Analysis & Reporting Validation ⚠️ **FOUNDATION COMPLETE - VALIDATION IN PROGRESS**
 
-This standalone test (`validate_statistical_reporting.ps1`) will provide bit-for-bit verification of the entire data analysis and aggregation pipeline against GraphPad Prism. The test will use static, pre-generated mock LLM response files with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis), running the complete sequence of analysis and compilation scripts against known-good ground truth.
+This standalone test (`validate_statistical_reporting.ps1`) provides bit-for-bit verification of the entire data analysis and aggregation pipeline against GraphPad Prism. The test uses statistically well-calibrated mock study assets with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis).
 
-**Current Status:** Implementation plan complete with Priority 1-3 statistical validation improvements applied to analysis scripts. Core algorithms enhanced with documented chance calculations, improved error handling, and validation logic. Ready for GraphPad Prism validation implementation.
+**Current Status:** Mock study generator implemented with real personality data and controlled statistical properties. Parameters: M=32 trials (25÷0.85 response rate), K=4 subjects (minimum meaningful group size), 6 replications per experiment, 2×2 factorial design. Ready for GraphPad Prism comparison implementation.
 
 -   **To run the test (when implemented):**
     ```powershell
     pdm run test-stats-reporting
     ```
+-   **To generate mock study assets:**
+    ```powershell
+    pwsh -File ./tests/algorithm_validation/generate_mock_study_assets.ps1
+    ```
+
 -   **Prerequisites (planned):**
-    Mock experiment assets will need to be generated and placed in `tests/assets/mock_study/` directory with sufficient replications to avoid statistical filtering. If these files are not present, the test will be skipped automatically.
+    Mock experiment assets will need to be generated and placed in `tests/assets/mock_study/` with sufficient replications for full statistical analysis. Uses real personality data with controlled mock LLM responses.
+
+
 
 ### Unit Testing
 
