@@ -451,7 +451,7 @@ if ($Interactive) {
         Read-Host -Prompt "${C_ORANGE}Press Enter to continue to cleanup...${C_RESET}" | Out-Null
     } else {
         Write-Host "SUCCESS: The full 'new -> audit -> break -> fix' lifecycle completed successfully." -ForegroundColor Green
-        Write-Host "NOTE: Missing study artifacts (STUDY_results.csv, anova/) are expected - Layer 4 tests experiment creation, not study compilation." -ForegroundColor Gray
+        Write-Host "NOTE: Missing study artifacts (STUDY_results.csv, anova/) are expected - Layer 4 tests experiment creation, not study compilation." -ForegroundColor Yellow
     }
 }
 catch {

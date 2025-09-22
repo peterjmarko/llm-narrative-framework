@@ -59,6 +59,51 @@ except ImportError:
         sys.path.insert(0, current_script_dir)
     from config_loader import APP_CONFIG, get_config_list
 
+def validate_experiment_consistency(dataframes, experiment_files):
+    """
+    Validate that all experiments use consistent parameters and schema.
+    Returns (is_valid, warnings) tuple.
+    """
+    if not dataframes:
+        return True, []
+    
+    warnings = []
+    first_df = dataframes[0]
+    reference_cols = set(first_df.columns)
+    reference_factors = {}
+    
+    # Extract key experimental parameters from first experiment
+    factor_cols = ['model', 'mapping_strategy', 'k', 'm', 'db']
+    for col in factor_cols:
+        if col in first_df.columns:
+            reference_factors[col] = set(first_df[col].unique())
+    
+    # Check consistency across all experiments
+    for i, (df, filepath) in enumerate(zip(dataframes[1:], experiment_files[1:]), 1):
+        # Check column consistency
+        current_cols = set(df.columns)
+        if current_cols != reference_cols:
+            missing = reference_cols - current_cols
+            extra = current_cols - reference_cols
+            exp_name = os.path.basename(os.path.dirname(filepath))
+            warning_msg = f"Experiment '{exp_name}' has schema differences:"
+            if missing:
+                warning_msg += f" missing columns {sorted(missing)},"
+            if extra:
+                warning_msg += f" extra columns {sorted(extra)},"
+            warnings.append(warning_msg.rstrip(','))
+        
+        # Check parameter consistency for key factors
+        for col, ref_values in reference_factors.items():
+            if col in df.columns:
+                current_values = set(df[col].unique())
+                if col in ['k', 'm']:  # These should be identical across experiments
+                    if current_values != ref_values:
+                        exp_name = os.path.basename(os.path.dirname(filepath))
+                        warnings.append(f"Experiment '{exp_name}' has different {col} values: {sorted(current_values)} vs reference {sorted(ref_values)}")
+    
+    return len(warnings) == 0, warnings
+
 def write_summary_csv(output_path, results_list):
     """Writes a list of result dictionaries to a structured CSV file."""
     if not results_list:
@@ -113,11 +158,15 @@ def main():
     logging.info(f"Found {len(experiment_files)} experiment result files to compile.")
 
     all_experiment_data = []
+    valid_experiment_files = []
     for f in experiment_files:
         try:
             df = pd.read_csv(f)
             if not df.empty:
                 all_experiment_data.append(df)
+                valid_experiment_files.append(f)
+            else:
+                logging.warning(f"  - Warning: Skipping empty results file: {f}")
         except pd.errors.EmptyDataError:
             logging.warning(f"  - Warning: Skipping empty results file: {f}")
         except Exception as e:
@@ -128,12 +177,49 @@ def main():
         sys.exit(1)
         return  # Eject for testability
 
+    # Validate experiment consistency before compilation
+    is_consistent, validation_warnings = validate_experiment_consistency(all_experiment_data, valid_experiment_files)
+    
+    if validation_warnings:
+        logging.warning(f"Found {len(validation_warnings)} consistency issue(s):")
+        for warning in validation_warnings:
+            logging.warning(f"  - {warning}")
+        
+        if not is_consistent:
+            logging.warning("Proceeding with compilation despite consistency issues. Results may require manual review.")
+
     study_df = pd.concat(all_experiment_data, ignore_index=True)
 
     output_filename = "STUDY_results.csv"
     output_path = os.path.join(args.study_directory, output_filename)
     
     write_summary_csv(output_path, study_df.to_dict('records'))
+    
+    # Generate compilation metadata
+    metadata_path = os.path.join(args.study_directory, "STUDY_compilation_metadata.txt")
+    try:
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            from datetime import datetime
+            f.write(f"Study Compilation Metadata\n")
+            f.write(f"==========================\n\n")
+            f.write(f"Compilation Time: {datetime.now().isoformat()}\n")
+            f.write(f"Total Experiments: {len(valid_experiment_files)}\n")
+            f.write(f"Total Replications: {len(study_df)}\n")
+            f.write(f"Output File: {output_filename}\n\n")
+            f.write(f"Source Experiments:\n")
+            for i, filepath in enumerate(valid_experiment_files, 1):
+                exp_name = os.path.basename(os.path.dirname(filepath))
+                rows_from_exp = len(all_experiment_data[i-1])
+                f.write(f"  {i:2d}. {exp_name} ({rows_from_exp} replications)\n")
+            
+            if validation_warnings:
+                f.write(f"\nValidation Warnings ({len(validation_warnings)}):\n")
+                for warning in validation_warnings:
+                    f.write(f"  - {warning}\n")
+        
+        logging.info(f"  -> Compilation metadata saved to: {metadata_path}")
+    except Exception as e:
+        logging.warning(f"Could not write compilation metadata: {e}")
     
     print("\nStudy compilation complete.")
 

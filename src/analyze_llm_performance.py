@@ -172,12 +172,28 @@ def analyze_metric_distribution(metric_values, chance_level, metric_name):
     return base_return
 
 def calculate_mrr_chance(k_val):
+    """
+    Calculate expected MRR under null hypothesis (uniform random selection).
+    For k equally likely positions, expected MRR = (1/k) * sum(1/j for j=1 to k)
+    """
     if k_val <= 0: return 0.0
     return (1.0/k_val) * sum(1.0/j for j in range(1, int(k_val) + 1))
 
 def calculate_top_k_accuracy_chance(K, k_val):
+    """
+    Calculate expected top-K accuracy under null hypothesis.
+    For uniform random selection: P(correct in top K) = min(K, k) / k
+    """
     if k_val <= 0: return 0.0
     return min(float(K), float(k_val)) / float(k_val)
+
+def calculate_mean_rank_chance(k_val):
+    """
+    Calculate expected mean rank under null hypothesis (uniform random selection).
+    For k equally likely positions, expected rank = (k + 1) / 2
+    """
+    if k_val <= 0: return 0.0
+    return (k_val + 1) / 2.0
 
 # --- III. File Parsing Functions ---
 def try_parse_mapping_line(line, k_val_if_known, delimiter_char=None):
@@ -745,8 +761,14 @@ def main():
                     if manifest_indices != mapping_from_file:
                         logging.error(f"  VALIDATION FAIL: Mismatch for original index {original_index}!")
                         validation_errors += 1
-            except Exception as e:
-                logging.error(f"  VALIDATION ERROR: Could not process manifest for original index {original_index}: {e}")
+            except FileNotFoundError as file_err:
+                logging.error(f"  VALIDATION ERROR: Manifest file missing for index {original_index}: {file_err}")
+                validation_errors += 1
+            except (IndexError, ValueError) as parse_err:
+                logging.error(f"  VALIDATION ERROR: Could not parse manifest for index {original_index}: {parse_err}")
+                validation_errors += 1
+            except Exception as unexpected_err:
+                logging.error(f"  VALIDATION ERROR: Unexpected error processing manifest for index {original_index}: {unexpected_err}")
                 validation_errors += 1
 
         if validation_errors > 0:
@@ -814,14 +836,16 @@ def main():
     top_k_analysis = analyze_metric_distribution(top_k_accs, top_k_chance, f"Top-{args.top_k_acc} Accuracy")
 
     mean_ranks = [res['mean_rank_of_correct_id'] for res in all_test_results if res.get('mean_rank_of_correct_id') is not None]
-    mean_rank_chance = (k_to_use + 1) / 2.0
+    mean_rank_chance = calculate_mean_rank_chance(k_to_use)
     mean_rank_analysis = analyze_metric_distribution(mean_ranks, mean_rank_chance, "Mean Rank of Correct ID")
-    # For rank, lower is better, so the alternative hypothesis for the test is 'less'
+    # For rank metrics, lower values indicate better performance, so we test
+    # alternative='less' to detect if observed ranks are significantly below chance
     if mean_ranks:
         try:
             w_stat, w_p = wilcoxon(np.array(mean_ranks) - mean_rank_chance, alternative='less')
             mean_rank_analysis['wilcoxon_signed_rank_p'] = w_p
-        except ValueError: # Handle cases where wilcoxon fails
+        except ValueError as e:
+            logging.warning(f"Wilcoxon test failed for mean rank analysis: {e}")
             mean_rank_analysis['wilcoxon_signed_rank_p'] = None
     else:
         mean_rank_analysis['wilcoxon_signed_rank_p'] = None

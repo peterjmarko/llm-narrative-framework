@@ -381,6 +381,23 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         result2 = analyze_llm_performance.calculate_positional_bias(scores_short)
         self.assertTrue(np.isnan(result2['bias_slope']))
 
+    def test_calculate_mean_rank_chance(self):
+        """Test mean rank chance calculation for various k values."""
+        # For k=2, expected rank = (2+1)/2 = 1.5
+        self.assertAlmostEqual(analyze_llm_performance.calculate_mean_rank_chance(2), 1.5)
+        
+        # For k=4, expected rank = (4+1)/2 = 2.5
+        self.assertAlmostEqual(analyze_llm_performance.calculate_mean_rank_chance(4), 2.5)
+        
+        # For k=10, expected rank = (10+1)/2 = 5.5
+        self.assertAlmostEqual(analyze_llm_performance.calculate_mean_rank_chance(10), 5.5)
+        
+        # Edge case: k=0 should return 0.0
+        self.assertEqual(analyze_llm_performance.calculate_mean_rank_chance(0), 0.0)
+        
+        # Edge case: negative k should return 0.0
+        self.assertEqual(analyze_llm_performance.calculate_mean_rank_chance(-1), 0.0)
+
     # --- Group 3: File Parsing Tests ---
 
     def test_read_score_matrices_markdown_format(self):
@@ -1022,8 +1039,8 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
             # The script should NOT exit
             self.mock_sys_exit.assert_not_called()
 
-            # It should log the specific error
-            mock_log_error.assert_any_call("  VALIDATION ERROR: Could not process manifest for original index 2: Test IO Error")
+            # It should log the specific error with enhanced error handling
+            mock_log_error.assert_any_call("  VALIDATION ERROR: Unexpected error processing manifest for index 2: Test IO Error")
             
             # It should suppress the final success marker
             success_message_found = any("ANALYZER_VALIDATION_SUCCESS" in call.args[0] for call in mock_print.call_args_list if call.args)
@@ -1062,9 +1079,13 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         # --- Act & Assert ---
         # Patch wilcoxon to raise a ValueError, simulating a failure condition
         with patch.object(sys, 'argv', test_argv), \
-             patch('src.analyze_llm_performance.wilcoxon', side_effect=ValueError("Test wilcoxon error")):
+             patch('src.analyze_llm_performance.wilcoxon', side_effect=ValueError("Test wilcoxon error")), \
+             patch('src.analyze_llm_performance.logging.warning') as mock_log_warning:
             
             analyze_llm_performance.main()
+            
+            # Verify the enhanced error logging was called
+            mock_log_warning.assert_called_with("Wilcoxon test failed for mean rank analysis: Test wilcoxon error")
             
             # The script should complete successfully, but the p-value will be None
             metrics_file = self.analysis_dir / "replication_metrics.json"

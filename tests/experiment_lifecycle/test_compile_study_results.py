@@ -257,6 +257,61 @@ class TestCompileStudyResults(unittest.TestCase):
         df = pd.read_csv(output_csv)
         self.assertEqual(list(df.columns), override_header)
 
+    def test_experiment_consistency_validation_warns_on_mismatches(self):
+        """Verify validation function detects and warns about experiment inconsistencies."""
+        # Create experiments with different column structures
+        exp1_path = self.study_dir / "exp1"
+        exp2_path = self.study_dir / "exp2"
+        self._create_experiment_file(exp1_path, {'mean_mrr': [0.8], 'k': [2], 'm': [5]})
+        self._create_experiment_file(exp2_path, {'mean_mrr': [0.7], 'k': [3], 'm': [5]})  # Different k
+        
+        test_argv = ['compile_study_results.py', str(self.study_dir)]
+        
+        with patch.object(sys, 'argv', test_argv):
+            compile_study_results.main()
+        
+        log_content = self.log_stream.getvalue()
+        self.assertIn("consistency issue(s)", log_content)
+        self.assertIn("different k values", log_content)
+
+    def test_compilation_metadata_generation(self):
+        """Verify compilation metadata file is generated with correct information."""
+        exp1_path = self.study_dir / "exp1"
+        exp2_path = self.study_dir / "exp2"
+        self._create_experiment_file(exp1_path, {'mean_mrr': [0.8, 0.82]})
+        self._create_experiment_file(exp2_path, {'mean_mrr': [0.7]})
+        
+        test_argv = ['compile_study_results.py', str(self.study_dir)]
+        
+        with patch.object(sys, 'argv', test_argv):
+            compile_study_results.main()
+        
+        metadata_file = self.study_dir / "STUDY_compilation_metadata.txt"
+        self.assertTrue(metadata_file.exists())
+        
+        metadata_content = metadata_file.read_text()
+        self.assertIn("Total Experiments: 2", metadata_content)
+        self.assertIn("Total Replications: 3", metadata_content)
+        self.assertIn("exp1 (2 replications)", metadata_content)
+        self.assertIn("exp2 (1 replications)", metadata_content)
+
+    def test_validation_handles_missing_columns_gracefully(self):
+        """Verify validation handles experiments with completely different schemas."""
+        exp1_path = self.study_dir / "exp1"
+        exp2_path = self.study_dir / "exp2"
+        self._create_experiment_file(exp1_path, {'mean_mrr': [0.8], 'model': ['test']})
+        self._create_experiment_file(exp2_path, {'different_metric': [0.7], 'other_col': ['value']})
+        
+        test_argv = ['compile_study_results.py', str(self.study_dir)]
+        
+        with patch.object(sys, 'argv', test_argv):
+            compile_study_results.main()
+        
+        log_content = self.log_stream.getvalue()
+        self.assertIn("schema differences", log_content)
+        self.assertIn("missing columns", log_content)
+        self.assertIn("extra columns", log_content)
+
 
 if __name__ == '__main__':
     unittest.main()

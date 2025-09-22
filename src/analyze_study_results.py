@@ -387,11 +387,16 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
                 bf10 = float(bf_result['BF10'].iloc[0])
 
                 logging.info(f"Comparing '{levels[0]}' vs '{levels[1]}'")
-                logging.info("The Bayes Factor (BF₁₀) quantifies how many times more likely the data are")
+                logging.info("The Bayes Factor (BFâ‚â‚€) quantifies how many times more likely the data are")
                 logging.info("under the alternative hypothesis (H1: a difference exists) than the null (H0).")
-                logging.info(f" -> Bayes Factor (BF₁₀): {bf10:.3f}")
+                logging.info(f" -> Bayes Factor (BFâ‚â‚€): {bf10:.3f}")
                 logging.info(f" -> Interpretation: {interpret_bf(bf10)}")
-            except Exception as e:
+            except (ValueError, ZeroDivisionError) as stats_error:
+                logging.warning(f"\nWARNING: Bayesian analysis failed due to statistical issues: {stats_error}")
+            except (KeyError, IndexError) as data_error:
+                logging.warning(f"\nWARNING: Bayesian analysis failed due to data structure issues: {data_error}")
+            except Exception as unexpected_error:
+                logging.error(f"\nERROR: Unexpected error in Bayesian analysis: {unexpected_error}")
                 logging.warning(f"\nWARNING: Could not perform Bayesian analysis for 'mapping_strategy'. Reason: {e}")
         # --- End of Bayesian Analysis ---
         
@@ -424,16 +429,21 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
                     posthoc_df = pd.DataFrame(data=tukey_result._results_table.data[1:], columns=tukey_result._results_table.data[0])
 
                 except (ValueError, ZeroDivisionError) as tukey_err:
-                    logging.warning(f"  - Tukey HSD failed: {tukey_err}")
+                    logging.warning(f"  - Tukey HSD failed due to statistical issues: {tukey_err}")
                     logging.info("  - Falling back to Games-Howell test (does not assume equal variance).")
                     
-                    gh_result = pg.pairwise_gameshowell(data=df, dv=metric_key, between=factor)
-                    logging.info(f"\n{gh_result.to_string()}")
-                    
-                    # Standardize Games-Howell output to match the format needed for tier generation
-                    posthoc_df = gh_result[['A', 'B', 'pval']].copy()
-                    posthoc_df.rename(columns={'A': 'group1', 'B': 'group2'}, inplace=True)
-                    posthoc_df['reject'] = posthoc_df['pval'] < 0.05
+                    try:
+                        gh_result = pg.pairwise_gameshowell(data=df, dv=metric_key, between=factor)
+                        logging.info(f"\n{gh_result.to_string()}")
+                        
+                        # Standardize Games-Howell output to match the format needed for tier generation
+                        posthoc_df = gh_result[['A', 'B', 'pval']].copy()
+                        posthoc_df.rename(columns={'A': 'group1', 'B': 'group2'}, inplace=True)
+                        posthoc_df['reject'] = posthoc_df['pval'] < 0.05
+                    except Exception as gh_err:
+                        logging.error(f"  - Games-Howell test also failed: {gh_err}")
+                        logging.error(f"  - Skipping post-hoc analysis for factor '{factor}'")
+                        posthoc_df = None
 
                 if factor == 'model' and posthoc_df is not None:
                     generate_performance_tiers(df, metric_key, posthoc_df, sanitized_to_display_map)

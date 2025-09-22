@@ -113,6 +113,20 @@ bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err
 - **Positional Bias**: Linear regression analysis of performance degradation over trial sequence
 - **Bias Analysis**: Standard deviation of top-1 predictions across positions and true vs. false match scoring differences
 
+**Statistical Assumptions and Chance Level Calculations:**
+
+The framework calculates chance levels under the null hypothesis of uniform random selection across k possible positions:
+
+- **MRR Chance**: `(1/k) × Σ(1/j)` for j=1 to k (harmonic mean of reciprocal ranks)
+- **Top-K Accuracy Chance**: `min(K, k) / k` (probability of correct answer in top K positions)
+- **Mean Rank Chance**: `(k + 1) / 2` (expected rank under uniform distribution)
+
+**Statistical Test Directionality:**
+- **Performance metrics** (MRR, Top-K accuracy): Use `alternative='greater'` (higher values indicate better performance)
+- **Rank metrics** (mean rank of correct ID): Use `alternative='less'` (lower ranks indicate better performance)
+
+All statistical tests use the Wilcoxon signed-rank test for non-parametric comparison against theoretical chance levels, with Benjamini-Hochberg FDR correction applied across multiple comparisons.
+
 #### Execution Artifacts
 
 **`replication_report_[timestamp].txt`** - Human-readable summary with embedded JSON metrics:

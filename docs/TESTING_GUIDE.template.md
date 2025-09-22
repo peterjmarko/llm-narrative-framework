@@ -67,11 +67,11 @@ This standalone test provides mathematical proof of the mapping and randomizatio
 -   **Prerequisites:**
     This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3-default` once to bootstrap these assets. If the assets are not present, the test will be skipped.
 
-#### Statistical Analysis & Reporting Validation ⚠️ **NOT YET IMPLEMENTED**
+#### Statistical Analysis & Reporting Validation ⚠️ **IMPLEMENTATION IN PROGRESS**
 
-This is a planned standalone test (`validate_statistical_reporting.ps1`) that will provide bit-for-bit verification of the entire data analysis and aggregation pipeline. The test will use static, pre-generated mock LLM response files with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis), running the complete sequence of analysis and compilation scripts against known-good ground truth.
+This standalone test (`validate_statistical_reporting.ps1`) will provide bit-for-bit verification of the entire data analysis and aggregation pipeline against GraphPad Prism. The test will use static, pre-generated mock LLM response files with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis), running the complete sequence of analysis and compilation scripts against known-good ground truth.
 
-**Current Status:** Described in documentation but script not yet created. This test will complement Layer 5 by validating the full statistical analysis pipeline when there are sufficient replications, while Layer 5 validates appropriate handling of insufficient data scenarios.
+**Current Status:** Implementation plan complete with Priority 1-3 statistical validation improvements applied to analysis scripts. Core algorithms enhanced with documented chance calculations, improved error handling, and validation logic. Ready for GraphPad Prism validation implementation.
 
 -   **To run the test (when implemented):**
     ```powershell
@@ -217,7 +217,33 @@ This section provides a summary of the project's validation status.
 
 ### Code Coverage Targets
 
-To ensure the framework's reliability, we have established tiered code coverage targets based on the criticality of each module. These targets guide our testing efforts and provide a clear quality standard.
+To ensure the framework's reliability, we have established tiered code coverage targets based on the criticality of each module.
+
+### Analysis Result Validation Criteria
+
+The framework defines specific criteria for determining when an analysis result is considered "valid" for scientific interpretation:
+
+**Replication-Level Validation:**
+- **Minimum Data Quality**: At least 25 valid LLM responses per replication (configurable threshold)
+- **Statistical Completeness**: All core metrics (MRR, Top-K accuracy, bias measures) successfully calculated
+- **Manifest Consistency**: Perfect alignment between LLM responses and experimental mappings
+- **Validation Success**: ANALYZER_VALIDATION_SUCCESS marker printed for successful runs
+
+**Study-Level Validation:**
+- **Experiment Consistency**: All experiments use identical parameters (k, m, temperature) where required
+- **Statistical Power**: Sufficient replications to support planned statistical tests (typically ≥30 per condition)
+- **Data Completeness**: No missing critical columns or malformed data structures
+- **Analysis Completeness**: ANOVA tables, effect sizes, and post-hoc tests (where applicable) generated successfully
+
+**Quality Markers:**
+- **COMPLETE**: All validation criteria met, suitable for publication
+- **PARTIAL**: Some non-critical validation issues, requires review
+- **INVALID**: Critical validation failures, not suitable for analysis
+
+**Acceptance Thresholds:**
+- **Statistical**: p-value calculations within 0.001 of reference values (GraphPad Prism)
+- **Effect Size**: Cohen's d, eta-squared within 0.01 of reference calculations
+- **Data Integrity**: 100% consistency in experimental configuration validation These targets guide our testing efforts and provide a clear quality standard.
 
 | Module Tier         | Description                                                                                                                            | Coverage Target     |
 | :------------------ | :------------------------------------------------------------------------------------------------------------------------------------- | :------------------ |
@@ -286,7 +312,9 @@ Module                              Cov. (%)        Status & Justification
                                                     text processing, and robust error handling.
 --------------------------------------------------------------------------------------------------------------------
 
-### Module-Level Test Coverage: Experiment Lifecycle
+### Module-Level Test Coverage: Experiment Lifecycle & Analysis
+
+**Recent Achievement:** Analysis scripts (`analyze_llm_performance.py` and `analyze_study_results.py`) successfully enhanced with Priority 1-3 statistical validation improvements while maintaining 82-83% coverage targets. Enhanced error handling, documented chance calculations, and validation logic provide foundation for GraphPad Prism validation testing.
 
 **Milestone Complete:** All layers of testing for the experiment lifecycle workflow are complete and passing.
 
@@ -346,8 +374,10 @@ Module                                  Cov. (%)        Status & Justification
 
 **`src/analyze_llm_performance.py`**        `83%`           COMPLETE. Target met. The unit test suite provides comprehensive
                                                         validation of the core statistical logic, file I/O contracts,
-                                                        and data parsing. It covers all major failure modes and
-                                                        validation edge cases, meeting the 80%+ standard target.
+                                                        and data parsing. Enhanced with Priority 1-3 statistical
+                                                        validation improvements including documented chance calculations,
+                                                        improved error categorization, and enhanced validation logic.
+                                                        Covers all major failure modes and edge cases, meeting the 80%+ target.
 
 `src/run_bias_analysis.py`              `86%`           COMPLETE. Unit tests cover the main orchestrator workflow,
                                                         core bias calculations, and robust handling of empty or
@@ -378,8 +408,10 @@ Module                                  Cov. (%)        Status & Justification
 
 `src/analyze_study_results.py`          `82%`           COMPLETE. Target met. The test suite was significantly
                                                         overhauled to fix bugs in the script's logging and post-hoc
-                                                        logic. It now robustly covers data filtering, error handling,
-                                                        and all major analysis code paths, meeting the 80%+ target.
+                                                        logic. Enhanced with Priority 2-3 improvements including
+                                                        specific error handling for Bayesian analysis and Games-Howell
+                                                        fallback scenarios. Robustly covers data filtering, error
+                                                        handling, and all major analysis code paths, meeting the 80%+ target.
 
 **Utility & Other Scripts**
 

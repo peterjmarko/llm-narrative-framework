@@ -312,6 +312,46 @@ The project's experiments are organized in a logical hierarchy:
 -   **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
 -   **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
 
+## Error Recovery and Resilience
+
+The framework implements comprehensive error recovery mechanisms to ensure data integrity and experimental continuity even when facing real-world failures.
+
+### Categorized Error Handling
+
+The pipeline categorizes errors by type and severity to apply appropriate recovery strategies:
+
+**Statistical Issues:**
+- Problems with data variance, sample sizes, or statistical test assumptions
+- **Recovery**: Fallback strategies (e.g., Games-Howell when Tukey HSD fails)
+- **Impact**: Analysis continues with reduced functionality but preserved scientific validity
+
+**Data Structure Issues:**
+- Missing columns, malformed files, or schema mismatches  
+- **Recovery**: Validation with repair recommendations and graceful degradation
+- **Impact**: Quality warnings generated while preserving completed analysis
+
+**File I/O Issues:**
+- Permission errors, missing manifests, or corrupted data files
+- **Recovery**: Specific error logging with targeted recovery paths
+- **Impact**: Affected components isolated while other analysis continues
+
+**Validation Errors:**
+- Manifest mismatches or experimental consistency failures
+- **Recovery**: Analysis completion with quality status marking
+- **Impact**: Results flagged for review but data preserved
+
+### Intelligent Recovery Strategies
+
+**Graceful Degradation:** When non-critical components fail, the analysis continues with reduced functionality rather than aborting entirely. For example, if Bayesian analysis fails due to data structure issues, the frequentist analysis proceeds normally.
+
+**Intelligent Fallbacks:** The system automatically selects alternative methods when primary approaches fail. Post-hoc testing falls back from Tukey HSD to Games-Howell when equal variance assumptions are violated.
+
+**Quality Preservation:** Results are marked with validation status (COMPLETE, PARTIAL, INVALID) while preserving all successfully completed analysis, ensuring maximum data recovery from partial failures.
+
+**Enhanced Logging:** Error categorization enables targeted troubleshooting by distinguishing between statistical issues, data problems, and system failures, accelerating diagnosis and repair.
+
+This multi-layered approach ensures that researchers can trust the framework to maintain scientific rigor and data integrity even when facing common real-world failures like network interruptions, storage errors, or process crashes.
+
 ## Directory Structure
 
 This logical hierarchy is reflected in the physical layout of the repository:

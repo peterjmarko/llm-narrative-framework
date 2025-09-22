@@ -397,6 +397,47 @@ class TestAnalyzeStudyResults(unittest.TestCase):
                 analyze_study_results.main()
             self.assertIn("No residuals found", self.log_stream.getvalue())
 
+    def test_bayesian_analysis_enhanced_error_handling(self):
+        """Verify enhanced error handling in Bayesian analysis."""
+        # Test data structure error (missing BF10 column)
+        mock_bad_result = pd.DataFrame({'t-stat': [2.5], 'p-val': [0.02]})  # Missing BF10
+        self.mock_pg.ttest.return_value = mock_bad_result
+        
+        mock_data = {
+            'model': ['google/gemini-flash-1.5'] * 2 + ['anthropic/claude-3'] * 2,
+            'mapping_strategy': ['correct', 'random'] * 2,
+            'mean_mrr': [0.8, 0.1, 0.85, 0.15],
+            'n_valid_responses': [30, 30, 30, 30]
+        }
+        self._create_mock_csv(mock_data)
+        
+        with patch.object(sys, 'argv', ['py', str(self.study_dir)]):
+            analyze_study_results.main()
+        
+        log_content = self.log_stream.getvalue()
+        self.assertIn("Bayesian analysis failed due to statistical issues", log_content)
+
+    def test_games_howell_fallback_enhanced_error_handling(self):
+        """Verify enhanced error handling in Games-Howell fallback."""
+        # Make Tukey fail, then make Games-Howell also fail
+        self.mock_tukey.side_effect = ValueError("Tukey statistical error")
+        self.mock_pg.pairwise_gameshowell.side_effect = Exception("Games-Howell failed")
+        
+        mock_data = {
+            'model': ['m1', 'm2', 'm3'],  # Must have > 2 levels for post-hoc
+            'mapping_strategy': ['correct', 'random', 'correct'],
+            'mean_mrr': [0.8, 0.1, 0.5], 'n_valid_responses': [30, 30, 30]
+        }
+        self._create_mock_csv(mock_data)
+        
+        with patch.object(sys, 'argv', ['py', str(self.study_dir)]):
+            analyze_study_results.main()
+        
+        log_content = self.log_stream.getvalue()
+        self.assertIn("Tukey HSD failed due to statistical issues", log_content)
+        self.assertIn("Games-Howell test also failed", log_content)
+        self.assertIn("Skipping post-hoc analysis for factor", log_content)
+
 
 if __name__ == '__main__':
     unittest.main()
