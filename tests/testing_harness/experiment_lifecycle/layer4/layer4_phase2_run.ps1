@@ -123,7 +123,7 @@ try {
     Write-Host "  -> New experiment created at: $RelativePath" -ForegroundColor Green
     Write-Host ""
 
-    Write-Host "`n${C_GREEN}SUCCESS: Experiment created successfully at '$RelativePath'.${C_RESET}"
+    Write-Host "${C_GREEN}SUCCESS: Experiment created successfully at '$RelativePath'.${C_RESET}"
     
     if ($Interactive) {
         Write-Host "`n${C_ORANGE}Step complete. Inspect the output, then press Enter to continue..."
@@ -154,7 +154,7 @@ try {
     & "$ProjectRoot\audit_study.ps1" -StudyDirectory $studyDirectory -ConfigPath $TestConfigPath -NoHeader
     if ($LASTEXITCODE -ne 0) { throw "Initial study audit failed. All experiments should be VALIDATED." }
 
-    Write-Host "`n${C_GREEN}SUCCESS: All 4 experiments in the factorial study are VALIDATED.${C_RESET}"
+    Write-Host "${C_GREEN}SUCCESS: All 4 experiments in the factorial study are VALIDATED.${C_RESET}"
     
     if ($Interactive) {
         Write-Host "`nStep complete. Inspect the audit results above." -ForegroundColor Yellow
@@ -334,7 +334,7 @@ try {
         Write-Host ""
     }
 
-    Write-Host "`n${C_GREEN}SUCCESS: All audits detected their respective corruptions and recommended repair.${C_RESET}"
+    Write-Host "${C_GREEN}SUCCESS: All audits detected their respective corruptions and recommended repair.${C_RESET}"
     
     if ($Interactive) {
         Write-Host "`nStep complete. The audit correctly identified the missing data." -ForegroundColor DarkYellow
@@ -407,7 +407,7 @@ if ($Interactive) {
         Write-Host ""
     }
 
-    Write-Host "`n${C_GREEN}SUCCESS: All 4 experiments repaired successfully.${C_RESET}"
+    Write-Host "${C_GREEN}SUCCESS: All 4 experiments repaired successfully.${C_RESET}"
     
     if ($Interactive) {
         Write-Host "`nStep complete. The experiment has been automatically repaired." -ForegroundColor DarkYellow
@@ -449,7 +449,7 @@ if ($Interactive) {
         Write-Host "`nYou can inspect the experiment at: $RelativePath" -ForegroundColor Gray
         Read-Host -Prompt "${C_ORANGE}Press Enter to continue to cleanup...${C_RESET}" | Out-Null
     } else {
-        Write-Host "`nSUCCESS: The full 'new -> audit -> break -> fix' lifecycle completed successfully." -ForegroundColor Green
+        Write-Host "SUCCESS: The full 'new -> audit -> break -> fix' lifecycle completed successfully." -ForegroundColor Green
     }
 }
 catch {

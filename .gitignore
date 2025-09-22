@@ -115,7 +115,7 @@ docs/word_docs/
 .pytest_cache/
 .coverage
 /tests/archive/
-/tests/assets/large_seed/
+/tests/assets/
 /tests/temp_test_environment/
 /temp_test_environment/
 /temp_assembly_logic_validation/

@@ -96,12 +96,17 @@ class ProjectSyncer:
             
             "scripts/maintenance/": [
                 "clean_project.py",
+                "generate_scope_report.py",
                 "list_project_files.py",
                 "sync_project_assets.py"
             ],
             
             "scripts/build/": [
                 "build_docs.py"
+            ],
+            
+            "output/project_reports/": [
+                "project_scope_report.md"
             ]
         }
 

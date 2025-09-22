@@ -37,6 +37,12 @@ try {
     }
 
     Write-Host "`nCleanup complete." -ForegroundColor Green
+}
+catch {
+    Write-Host "`nERROR: Layer 5 cleanup failed.`n$($_.Exception.Message)" -ForegroundColor Red
+    throw
+}
+
 Write-Host ""
 
 # === End of tests/testing_harness/experiment_lifecycle/layer5/layer5_phase3_cleanup.ps1 ===

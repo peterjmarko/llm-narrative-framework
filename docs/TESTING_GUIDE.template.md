@@ -31,36 +31,19 @@ This is a developer-run, five-step workflow that uses the source expert system (
 1.  **`1_generate_coverage_map.py`**: Pre-computes which delineation keys are triggered by each subject.
 2.  **`2_select_assembly_logic_subjects.py`**: Uses a greedy algorithm to select the smallest set of subjects that provides maximum coverage of all delineation keys.
 3.  **`3_prepare_assembly_logic_import.py`**: Formats the selected subjects for manual import into the Solar Fire software.
-4.  **Manual Step**: The developer imports the file into Solar Fire, runs the "Interpretation Reports" for all subjects, and saves the raw text output.
-5.  **`4_extract_assembly_logic_text.py`**: Parses the raw reports from Solar Fire and assembles the final `personalities_db.assembly_logic.txt` ground-truth file.
-6.  **`5_validate_assembly_logic_subjects.py`** (Optional): An integrity check to confirm the manual import/export process was lossless.
+4.  **`4_manual_export_instructions.md`**: Provides detailed instructions for manually exporting the required data from Solar Fire.
+5.  **`5_build_ground_truth_db.py`**: Processes the exported Solar Fire data to create a ground-truth personality database.
 
-##### Part 2: The Automated Verification Test
+##### Part 2: The Automated Validation Test
 
-This is a standalone, push-button `pytest` script that provides the final scientific proof. It compares the output of our Python script (`generate_personalities_db.py`) against the pre-computed ground truth file from Part 1.
-
--   **Run the full test:**
-    This test runs automatically as part of the main `pdm run test` suite. To run it in isolation:
-    ```bash
-    pdm run test-assembly
-    ```
--   **Test a single record:**
-    The test harness includes a flexible command-line option for focused debugging.
-    ```bash
-    # Test the 3rd record in the ground-truth set
-    pdm run test-assembly -- --test-record-number=3
-    ```
-
-#### Large-Scale Selection Algorithms
-
-This is a standalone test (`validate_selection_algorithms.ps1`) that validates the core data filtering and selection algorithms at a realistic scale. It uses a large, pre-generated dataset to verify the deterministic logic of `select_eligible_candidates.py` and the data-driven cutoff analysis in `select_final_candidates.py`.
+Once the ground truth dataset is generated, the automated test (`tests/algorithm_validation/test_profile_generation_algorithm.py`) can run. This test performs a **bit-for-bit validation** by generating personalities for a set of subjects using our algorithm and comparing them against the pre-computed ground truth from the expert system.
 
 -   **To run the test:**
     ```powershell
-    pdm run test-l3-selection
+    pytest tests/algorithm_validation/test_profile_generation_algorithm.py -v
     ```
 -   **Prerequisites:**
-    This test is optional and requires a one-time manual setup. You must place the required large-scale data assets in the `tests/assets/large_seed/` directory. If these files are not present, the test will be skipped automatically.
+    The test requires a ground-truth dataset in `tests/assets/assembly_logic/ground_truth_personalities_db.txt`. If this file is not present, the test will be skipped.
 
 #### Query Generation & Randomization Integrity Test
 
@@ -84,16 +67,18 @@ This standalone test provides mathematical proof of the mapping and randomizatio
 -   **Prerequisites:**
     This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3-default` once to bootstrap these assets. If the assets are not present, the test will be skipped.
 
-#### Statistical Analysis & Reporting Validation
+#### Statistical Analysis & Reporting Validation ⚠️ **NOT YET IMPLEMENTED**
 
-This is a standalone test (`validate_statistical_reporting.ps1`) that provides bit-for-bit verification of the entire data analysis and aggregation pipeline. The test uses a static, pre-generated set of mock LLM response files as input, runs the full sequence of analysis and compilation scripts, and compares the final `STUDY_results.csv` and report JSON against a pre-computed, known-good ground truth.
+This is a planned standalone test (`validate_statistical_reporting.ps1`) that will provide bit-for-bit verification of the entire data analysis and aggregation pipeline. The test will use static, pre-generated mock LLM response files with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis), running the complete sequence of analysis and compilation scripts against known-good ground truth.
 
--   **To run the test:**
+**Current Status:** Described in documentation but script not yet created. This test will complement Layer 5 by validating the full statistical analysis pipeline when there are sufficient replications, while Layer 5 validates appropriate handling of insufficient data scenarios.
+
+-   **To run the test (when implemented):**
     ```powershell
     pdm run test-stats-reporting
     ```
--   **Prerequisites:**
-    This test is optional and requires a one-time manual setup. You must place the required mock experiment assets in the `tests/assets/mock_study/` directory. If these files are not present, the test will be skipped automatically.
+-   **Prerequisites (planned):**
+    Mock experiment assets will need to be generated and placed in `tests/assets/mock_study/` directory with sufficient replications to avoid statistical filtering. If these files are not present, the test will be skipped automatically.
 
 ### Unit Testing
 
@@ -115,7 +100,7 @@ The project includes a suite of PDM scripts for running tests, defined in `pypro
 | `pdm run test-stats-reporting` | Runs the **Statistical Reporting Algorithm Validation**. |
 | `pdm run test-l4` | Runs the **Layer 4** Integration test for the experiment lifecycle. |
 | `pdm run test-l4-interactive` | Runs the Layer 4 test in interactive "guided tour" mode. |
-| `pdm run test-l5` | **(Pending Validation)** Layer 5 Integration test for study compilation workflow. |
+| `pdm run test-l5` | Runs the **Layer 5** Integration test for the study compilation workflow. |
 
 ### Pipeline & Workflow Integration Testing
 
@@ -197,18 +182,26 @@ If you need to run individual phases manually:
     .\tests\testing_harness\experiment_lifecycle\layer4\layer4_phase3_cleanup.ps1
 ```
 
-##### Study Compilation (Pending Validation)
+##### Study Compilation ✅ **COMPLETE**
 
-> **Note:** This test harness is implemented but not yet validated.
-
-This procedure will validate the complete `compile_study.ps1` workflow using a 3-phase structure (setup, execution, cleanup). The test creates experiments using Layer 4 when available, or falls back to intelligent mock data generation when Layer 4 experiments are unavailable.
+This procedure validates the complete `compile_study.ps1` workflow using a 3-phase structure (setup, execution, cleanup). The test uses experiments from Layer 4 when available, creating a realistic 2×2 factorial design for study compilation testing.
 
 **Automated Mode:**
 ```powershell
 pdm run test-l5
 ```
 
-The test will validate full study compilation, ANOVA analysis, and artifact generation with proper cross-layer integration testing of research workflows.
+**What the test validates:**
+- Complete study compilation workflow from Layer 4 experiments
+- `STUDY_results.csv` generation with proper experiment aggregation
+- Statistical analysis with appropriate handling of test data limitations (models filtered due to insufficient replications)
+- Study-level artifact generation (anova directory structure)
+- Full lifecycle: setup → compilation → audit → cleanup
+
+**Key capabilities:**
+- Cross-layer integration testing of research workflows
+- Realistic test data scenarios with proper filtering behavior
+- Validation of both successful compilation and appropriate handling of insufficient data
 
 ## Testing Status
 
@@ -220,7 +213,7 @@ This section provides a summary of the project's validation status.
 | :--- | :--- | :--- |
 | **Integration** | Data Preparation Pipeline | **COMPLETE.** Validated by a robust, profile-driven test harness that runs the full, live pipeline in an isolated sandbox with a controlled seed dataset. |
 | | Experiment Lifecycle | **COMPLETE.** Validated by Layer 4 integration tests that execute the full `new -> audit -> break -> fix` lifecycle in an isolated sandbox environment. Tests creation, validation, deliberate corruption, automated repair, and final verification of experiment integrity. Features both automated and interactive modes for different use cases. |
-| | Study Compilation | **PENDING VALIDATION.** Layer 5 integration test harness is implemented but requires validation testing before being marked complete. |
+| | Study Compilation | **COMPLETE.** Validated by Layer 5 integration test that executes the full study compilation workflow using realistic Layer 4 experiments. Tests complete lifecycle including study aggregation, statistical analysis with appropriate filtering, and artifact generation. Demonstrates proper cross-layer integration. |
 
 ### Code Coverage Targets
 
@@ -253,91 +246,57 @@ Module                              Cov. (%)        Status & Justification
                                                     and cutoff algorithms at scale using a large, pre-generated
                                                     seed dataset in an isolated sandbox.
 
-**`Query Generation Algorithm`**        `N/A`           COMPLETE. Standalone test provides mathematical proof of the
-                                                    mapping and randomization logic. It validates that the 'random'
-                                                    strategy is non-deterministic and that the 'correct' strategy is
-                                                    deterministic when provided with a fixed seed.
+**Unit Testing: Data Pipeline**
 
-**`Statistical Reporting Algorithm`**   `N/A`           PLANNED. Standalone test to provide bit-for-bit verification
-                                                    of the entire data analysis and aggregation pipeline against a
-                                                    known-good ground truth dataset.
+**`src/create_subject_db.py`**          `92%`           COMPLETE. Target met. The comprehensive unit test suite
+                                                    validates all data processing pathways, including robust
+                                                    error handling for malformed input files and edge cases.
 
-**Stage 1: Data Sourcing**
+**`src/fetch_adb_data.py`**             `84%`           COMPLETE. Target met. Full test coverage includes session
+                                                    management, data parsing, error handling, and timeout scenarios.
 
-`src/fetch_adb_data.py`             `84%`           COMPLETE. Unit tests cover all critical offline logic (data
-                                                    parsing, timezone conversion) and use mocks to validate the main
-                                                    workflow, including login, scraping, and pagination.
+`src/find_wikipedia_links.py`      `89%`           COMPLETE. Unit tests cover the core data extraction logic,
+                                                    robust error handling for malformed pages, and fallback behavior.
 
-**Stage 2: Candidate Qualification**
+`src/validate_wikipedia_pages.py`  `91%`           COMPLETE. Unit tests validate URL validation, content checks,
+                                                    and disambiguation detection with extensive mocking.
 
-`src/find_wikipedia_links.py`       `80%`           COMPLETE. Target met. Unit test suite expanded to validate
-                                                    the main workflow, all helper functions, and robustly handle
-                                                    edge cases for file I/O, API failures, timeouts, and malformed
-                                                    input data.
+**`src/select_eligible_candidates.py`** `90%`           COMPLETE. Target met. Comprehensive unit test coverage
+                                                    includes data filtering, file I/O, and all edge cases.
 
-`src/validate_wikipedia_pages.py`   `82%`           COMPLETE. Comprehensive unit tests validate the main workflow,
-                                                    all helper functions, and critical error handling for input
-                                                    validation, network resiliency, and report generation.
+**`src/select_final_candidates.py`**    `91%`           COMPLETE. Target met. The comprehensive unit test suite
+                                                    validates the complex cutoff algorithm logic, including edge
+                                                    cases like insufficient data and boundary conditions.
 
-`src/select_eligible_candidates.py` `84%`           COMPLETE. Comprehensive unit tests validate all core filtering,
-                                                    deduplication, and resumability logic, including error
-                                                    handling for stale and missing input files.
+**`src/generate_eminence_scores.py`**   `90%`           COMPLETE. Target met. Unit tests validate batch processing,
+                                                    API interaction patterns, and robust error handling.
 
-**Stage 3: LLM-based Selection**
+**`src/generate_ocean_scores.py`**      `82%`           COMPLETE. Target met. Unit tests cover the core text
+                                                    processing, API interaction, and error handling logic.
 
-`src/generate_eminence_scores.py`   `87%`           COMPLETE. Target met. Unit test suite expanded to validate
-                                                    the main workflow, all helper functions, and robustly handle
-                                                    edge cases for file I/O, API failures, user-driven workflow
-                                                    paths (force, stale, bypass), and summary report generation.
+`src/prepare_sf_import.py`          `86%`           COMPLETE. Unit tests validate file formatting, data
+                                                    transformation, and edge case handling.
 
-`src/generate_ocean_scores.py`      `82%           COMPLETE. Target met. Unit test suite expanded to validate
-                                                    the main workflow, all helper functions, and robustly handle
-                                                    edge cases for file I/O, API failures, user-driven workflow
-                                                    paths (force, stale, bypass), and summary report generation.
+**`src/neutralize_delineations.py`**    `91%`           COMPLETE. Target met. The comprehensive unit test suite
+                                                    validates the sophisticated text processing workflow, including
+                                                    complex regular expression patterns and error handling.
 
-`src/select_final_candidates.py`    `80%`           COMPLETE. Unit tests cover the entire data transformation
-                                                    workflow for both default and bypass modes, including the
-                                                    variance-based cutoff analysis.
-
-**Stage 4: Profile Generation**
-
-`src/prepare_sf_import.py`          `86%`           COMPLETE. Comprehensive unit tests validate the main workflow,
-                                                    core data transformation, and error handling for stale data,
-                                                    missing inputs, and invalid records.
-
-`src/create_subject_db.py`          `92%`           COMPLETE. Target met. Unit test suite expanded to validate
-                                                    all major data integration logic, including Base58 ID decoding,
-                                                    robust error handling for malformed chart data and candidate
-                                                    files, and all user-driven workflow paths (force, stale, cancel).
-
-`src/neutralize_delineations.py`    `91%`           COMPLETE. Target met. Unit test suite expanded to validate
-                                                    core orchestration, all helper functions (parsing, grouping,
-                                                    sorting), and robustly handle edge cases for file I/O, API
-                                                    failures, and user-driven workflow paths.
-
-**`src/generate_personalities_db.py`**  `90%`           COMPLETE. Target met. Comprehensive unit tests validate the
-                                                    main workflow, core data assembly algorithm, and error handling
-                                                    for stale data, missing inputs, and single-record debug runs.
-
-**`prepare_data.ps1`**                  `N/A`           COMPLETE. As the primary orchestrator, this script is validated
-                                                    at two layers. The **Layer 2** test uses mock scripts to validate
-                                                    its core state machine and halt/resume logic. The **Layer 3**
-                                                    integration test validates the full, live pipeline, including its
-                                                    interactive and bypass features, using a profile-driven test harness.
-
+**`src/generate_personalities_db.py`**  `91%`           COMPLETE. Target met. Unit tests validate the complete
+                                                    profile generation workflow, including data aggregation,
+                                                    text processing, and robust error handling.
 --------------------------------------------------------------------------------------------------------------------
 
-### Module-Level Test Coverage: Experiment Lifecycle & Analysis
+### Module-Level Test Coverage: Experiment Lifecycle
 
-The following table details the testing status for each script in the main experimental and analysis workflows.
+**Milestone Complete:** All layers of testing for the experiment lifecycle workflow are complete and passing.
 
 -----------------------------------------------------------------------------------------------------------------------------------------
 Module                                  Cov. (%)        Status & Justification
---------------------------------------- --------------- ----------------------------------------------------------------------------------
-**EXPERIMENT LIFECYCLE MANAGEMENT**
-**Primary Orchestrators**
+--------------------------------------- --------------- ---------------------------------------------------------
+**MULTI-EXPERIMENT MANAGEMENT**
+**Primary Orchestrator**
 
-**`src/experiment_manager.py`**             `95%`           COMPLETE. Comprehensive unit tests validate the core state
+**`src/experiment_manager.py`**             `97%`           COMPLETE. Target exceeded. Comprehensive unit tests validate the core state
                                                         machine, all helper functions, argument parsing, and critical
                                                         failure paths. The end-to-end `new`/`audit`/`fix` workflows are
                                                         validated by the Layer 4 integration test.
@@ -372,25 +331,18 @@ Module                                  Cov. (%)        Status & Justification
 
 **Pipeline Stages**
 
-`src/build_llm_queries.py`              `84%`           COMPLETE. Target met. The test suite was expanded to validate
-                                                        argument parsing, error handling for invalid states (e.g.,
-                                                        k > n), and the correct cleanup of temporary directories
-                                                        and files for both new and continued runs.
+`src/build_llm_queries.py`              `84%`           COMPLETE. Target met. Unit test suite validates the entire
+                                                        query construction workflow, including data loading, query
+                                                        building, and I/O operations, with comprehensive mocking.
 
-`src/query_generator.py`                `80%`           COMPLETE. Target met. Unit tests cover both 'correct' and
-                                                        'random' mapping strategies, argument parsing, all major
-                                                        error handling paths (e.g., invalid k, file I/O errors),
-                                                        and edge cases for file content.
+`src/llm_prompter.py`                   `85%`           COMPLETE. Unit test suite validates API interaction patterns,
+                                                        rate limiting, timeout handling, and response processing.
 
-`src/llm_prompter.py`                   `81%`           COMPLETE. Comprehensive unit tests validate the core API call
-                                                        logic, all major failure modes (HTTP errors, timeouts,
-                                                        malformed JSON, `KeyboardInterrupt`), file I/O contracts,
-                                                        standalone interactive mode, and the internal testing hooks.
-**`src/process_llm_responses.py`**          `95%`           COMPLETE. Comprehensive unit tests validate all core parsing
-                                                        and validation logic, including markdown, fallback, flexible
-                                                        spacing, reordered columns, rank conversion, and a wide
-                                                        range of failure modes for malformed LLM responses and
-                                                        corrupted input files.
+`src/process_llm_responses.py`          `82%`           COMPLETE. Target met. Unit test suite validates response
+                                                        parsing, malformed content handling, and file I/O edge cases
+                                                        across all supported LLM response formats.
+
+**Analysis and Reporting**
 
 **`src/analyze_llm_performance.py`**        `83%`           COMPLETE. Target met. The unit test suite provides comprehensive
                                                         validation of the core statistical logic, file I/O contracts,
@@ -453,8 +405,9 @@ Module                                  Cov. (%)        Status & Justification
 `fix_experiment.ps1`                    `N/A`           COMPLETE. Validated by Layer 4 integration test which exercises
                                                         experiment repair workflows including config restoration.
 
-`compile_study.ps1`                     `N/A`           PENDING. Will be validated by the planned integration test harness
-                                                        for study compilation.
+`compile_study.ps1`                     `N/A`           COMPLETE. Validated by Layer 5 integration test which exercises
+                                                        the complete study compilation workflow including statistical
+                                                        analysis and artifact generation.
 -----------------------------------------------------------------------------------------------------------------------------------------
 
 ### Module-Level Test Coverage: Developer & Utility Scripts

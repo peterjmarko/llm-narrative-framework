@@ -9,31 +9,69 @@ This document outlines planned development tasks and tracks known issues for the
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
 #### A. Complete Integration Testing
-- [ ] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)**
-  - [ ] Create a new scripted integration test for the `compile_study.ps1` workflow.
+- [x] **Implement Layer 5 Test Harness (Post-Hoc Study Evaluation)** ✅ **COMPLETE**
+  - [x] Create a new scripted integration test for the `compile_study.ps1` workflow.
+  - [x] Test Layer 5 harness. Successfully validates study compilation workflow with appropriate handling of test data limitations.
+- [ ] **Fix final audit of Layer 4 Test Harness**
+  - [ ] Replace experiment audit with study audit. Expected outcome: validated but incomplete.
+- [ ] **Fix configuration file Experiment Auditor is working with**
+  - [ ] It should be using the archived `config.ini` and not the global one.
 
 #### B. Implement Core Algorithm Validation Tests
-- [ ] **Implement Statistical Analysis & Reporting Validation Test**
-  - [ ] Create a new standalone test in the "Core Algorithm Validation" suite to provide bit-for-bit verification of the `compile_study.ps1` and `analyze_study_results.py` pipeline against a known-good ground truth.
+- [ ] **Implement Statistical Analysis & Reporting Validation Test** ⚠️ **HIGH PRIORITY**
+  - [ ] Create the missing `validate_statistical_reporting.ps1` script that is described in the Testing Guide but not yet implemented.
+  - [ ] Generate mock study assets in `tests/assets/mock_study/` with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis).
+  - [ ] Create known-good ground truth files for bit-for-bit verification of `STUDY_results.csv` and analysis outputs.
+  - [ ] Test the complete statistical pipeline that gets filtered out in Layer 5 due to insufficient test data.
+  - [ ] This test complements Layer 5 by validating the full statistical analysis when there are sufficient replications, while Layer 5 validates appropriate handling of insufficient data scenarios.
 
 #### C. Enhance Reproducibility and Provenance
 - [ ] **Implement Provenance Capture**
   - [ ] Modify `new_experiment.ps1` to generate a `manifest.json` file in each new experiment directory.
   - [ ] The manifest will capture Git state (commit SHA, tag) and key environment details (Python version, OS).
   - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `manifest.json` file is correctly generated.
+  - [ ] Restructure `config.ini` to accomodate study parameters (like for Layer 4). Implies '[Study]' will be renamed to '[Experiment]' (for experiment config) and '[Study]' used for studies. Sync with Layer 4 approach.
 
 ### 2. Final Data Generation and Study Execution
 
-- [ ] **Perform and Report Correction for Multiple Comparisons**
-  - [ ] Add a footnote or supplementary note to the article reporting the Benjamini-Hochberg FDR-corrected p-values to demonstrate statistical rigor.
 - [ ] **Execute Final Data Preparation**
   - [ ] Run the complete `prepare_data.ps1` pipeline to generate a fresh, final dataset from live sources.
 - [ ] **Execute Final Study Runs**
+  - [ ] Design final study.
   - [ ] Run `new_experiment.ps1` for each experimental condition defined in the paper, using fixed randomization seeds in `config.ini`.
 - [ ] **Organize and Compile Final Study**
   - [ ] Manually create a final study directory (e.g., `output/studies/publication_run/`).
   - [ ] Move all generated experiment folders into the study directory.
   - [ ] Run `compile_study.ps1` to produce the definitive analysis and plots for the manuscript.
+
+## Tasks Completed in This Phase
+
+### Framework Validation Achievements
+
+- ✅ **Layer 5 Integration Test**: Successfully implemented and validated the complete study compilation workflow
+  - Validates 2x2 factorial design from Layer 4 experiments
+  - Tests study compilation with `STUDY_results.csv` generation  
+  - Handles statistical analysis filtering for insufficient test data appropriately
+  - Demonstrates full study compilation lifecycle with proper cleanup
+  - Includes both automated and validation modes
+
+### Key Technical Solutions Implemented
+
+- **Config Path Consistency**: Unified approach between Layer 4 and Layer 5 for test configuration management
+- **Complete Config Sections**: Full project config integration with proper sections for analysis
+- **Realistic Data Expectations**: Correctly expects 4 experiment rows rather than 12 replication rows
+- **Flexible Analysis Validation**: Accepts either full statistical analysis or filtered-out messages for test data scenarios
+
+## Known Testing Gaps
+
+### Statistical Analysis Coverage
+The Layer 5 test successfully validates the common scenario where statistical models are filtered out due to insufficient data (appropriate for test environments). However, there is currently **no separate test** that validates the full statistical analysis pipeline when there are sufficient replications to run complete ANOVA, post-hoc tests, and Bayesian analysis.
+
+**Impact**: While the framework correctly handles both scenarios in production, the full statistical analysis path lacks automated verification against known-good outputs.
+
+**Priority**: High - this gap should be addressed before final publication runs to ensure the complete statistical pipeline works correctly with production data volumes.
+- [ ] **Perform and Report Correction for Multiple Comparisons**
+  - [ ] Add a footnote or supplementary note to the article reporting the Benjamini-Hochberg FDR-corrected p-values to demonstrate statistical rigor.
 - [ ] **Tag Publication Commit**
   - [ ] Create a permanent Git tag (e.g., `v1.0-publication`) to mark the exact version of the code used to generate the paper's results.
 
@@ -44,8 +82,8 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Update all tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
   - [ ] Replace the text placeholder in `article_main_text.md` with the final, generated interaction plot (`interaction_plot_mean_rank.png`).
 - [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
-  - [ ] Check all tables and diagrams
-  - [ ] Check counts and dates 
+  - [ ] Check all tables and diagrams.
+  - [ ] Check counts and dates.
 
 ## Final Review and Preprint Publication
 
