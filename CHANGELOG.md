@@ -1,5 +1,25 @@
 # Changelog
 
+## 10.11.1 (2025-09-23)
+
+### Bump
+
+- **version 10.11.0 → 10.11.1**
+
+### Fixes
+
+- **restructure statistical validation study generator for proper factorial design**
+  Resolved critical issues in statistical validation study generator that was producing incorrect experimental structure and failing framework validation.
+  
+  - Fixed fundamental replication structure: now creates 4 experiments with 6 replications each instead of 24 single-replication experiments
+  - Corrected model parameter from "gemini-1.5-flash" to "google/gemini-flash-1.5"
+  - Added debug output to experiment auditor to diagnose finalization issues
+  - Added --verbose flag to analyze_study_results.py to reduce console verbosity by default
+  - Improved output flow and user experience with proper progress indicators
+  - Added final cleanup to restore config.ini after script completion
+  - Made factorial design parameters configurable (MappingStrategies, GroupSizes)
+  - Renamed parameter from M to TrialsPerReplication for clarity
+
 ## 10.11.0 (2025-09-22)
 
 ### Bump
