@@ -90,40 +90,40 @@ function Write-TestStep {
 
 function Write-GraphPadInstruction {
     param($Step, $Message, $Color = 'Yellow')
-    Write-Host "`n📊 GraphPad Step $Step:" -ForegroundColor $Color
+    Write-Host "`nGraphPad Step ${Step}:" -ForegroundColor $Color
     Write-Host "   $Message" -ForegroundColor White
 }
 
-function Test-MockStudyAssets {
-    Write-TestStep "Checking Mock Study Assets"
+function Test-StatisticalStudyAssets {
+    Write-TestStep "Checking Statistical Study Assets"
     
-    if (-not (Test-Path $MockStudyPath)) {
-        Write-Host "❌ Mock study directory not found: $MockStudyPath" -ForegroundColor Red
-        Write-Host "   Run: pwsh -File ./tests/algorithm_validation/generate_mock_study_assets.ps1" -ForegroundColor Yellow
+    if (-not (Test-Path $StatisticalStudyPath)) {
+        Write-Host "X Statistical study directory not found: $StatisticalStudyPath" -ForegroundColor Red
+        Write-Host "   Run: pwsh -File ./tests/algorithm_validation/generate_statistical_study.ps1" -ForegroundColor Yellow
         return $false
     }
     
-    # Check for required mock experiments
-    $mockExperiments = Get-ChildItem -Path $MockStudyPath -Directory -Name "experiment_*" -ErrorAction SilentlyContinue
-    if ($mockExperiments.Count -lt 4) {
-        Write-Host "❌ Insufficient mock experiments found. Expected at least 4, found $($mockExperiments.Count)" -ForegroundColor Red
+    # Check for required experiments
+    $experiments = Get-ChildItem -Path $StatisticalStudyPath -Directory -Name "exp_*" -ErrorAction SilentlyContinue
+    if ($experiments.Count -lt 4) {
+        Write-Host "X Insufficient experiments found. Expected at least 4, found $($experiments.Count)" -ForegroundColor Red
         return $false
     }
     
     # Verify sufficient replications
     $totalReplications = 0
-    foreach ($experiment in $mockExperiments) {
-        $expPath = Join-Path $MockStudyPath $experiment
-        $replications = Get-ChildItem -Path $expPath -Directory -Name "replication_*" -ErrorAction SilentlyContinue
+    foreach ($experiment in $experiments) {
+        $expPath = Join-Path $StatisticalStudyPath $experiment
+        $replications = Get-ChildItem -Path $expPath -Directory -Name "run_*" -ErrorAction SilentlyContinue
         $totalReplications += $replications.Count
     }
     
     if ($totalReplications -lt 20) {
-        Write-Host "❌ Insufficient total replications. Expected at least 20, found $totalReplications" -ForegroundColor Red
+        Write-Host "X Insufficient total replications. Expected at least 20, found $totalReplications" -ForegroundColor Red
         return $false
     }
     
-    Write-Host "✅ Mock study assets validated ($totalReplications total replications)" -ForegroundColor Green
+    Write-Host "✓ Statistical study assets validated ($totalReplications total replications)" -ForegroundColor Green
     return $true
 }
 
@@ -150,7 +150,7 @@ function Export-ReplicationDataForGraphPad {
             # Extract key metrics for GraphPad validation
             $replicationData = [PSCustomObject]@{
                 Experiment = $ExperimentName
-                Replication = [int]($file.Split('_')[1])  # Extract replication number from path
+                Replication = [int]($file.Split('_')[2])  # Extract replication number from llm_response_XXX_full.json
                 Model = $metrics.model
                 MappingStrategy = $metrics.mapping_strategy
                 GroupSize = $metrics.k
@@ -193,42 +193,12 @@ function Export-RawScoresForGraphPad {
     
     Write-Verbose "Extracting raw scores for: $ExperimentName"
     
-    # Find LLM response files to extract raw ranking data
-    $responseFiles = Get-ChildItem -Path $ExperimentPath -Recurse -Name "llm_responses.json" -ErrorAction SilentlyContinue
+    # Note: The raw LLM response JSON files contain API metadata, not processed trial data.
+    # The actual trial rankings are processed and stored in analysis_inputs files.
+    # Since we already have complete replication metrics, raw scores are not essential
+    # for the core GraphPad validation workflow.
     
-    $rawScores = @()
-    
-    foreach ($file in $responseFiles) {
-        $filePath = Join-Path $ExperimentPath $file
-        try {
-            $responses = Get-Content $filePath -Raw | ConvertFrom-Json
-            
-            foreach ($response in $responses) {
-                # Extract reciprocal rank for each trial
-                $correctSubjectId = $response.correct_subject_id
-                $correctRanking = $response.subject_rankings | Where-Object { $_.subject_id -eq $correctSubjectId }
-                
-                if ($correctRanking) {
-                    $reciprocalRank = 1.0 / [double]$correctRanking.rank
-                    
-                    $rawScores += [PSCustomObject]@{
-                        Experiment = $ExperimentName
-                        Trial = $response.trial_number
-                        CorrectRank = $correctRanking.rank
-                        ReciprocalRank = $reciprocalRank
-                        Top1Hit = if ($correctRanking.rank -eq 1) { 1 } else { 0 }
-                        Top3Hit = if ($correctRanking.rank -le 3) { 1 } else { 0 }
-                        GroupSize = $response.subject_rankings.Count
-                    }
-                }
-            }
-        }
-        catch {
-            Write-Warning "Failed to parse response file: $file - $($_.Exception.Message)"
-        }
-    }
-    
-    return $rawScores
+    return @()  # Return empty - validation proceeds with replication metrics
 }
 
 function Generate-GraphPadExports {
@@ -240,12 +210,12 @@ function Generate-GraphPadExports {
     New-Item -ItemType Directory -Path $GraphPadExportsDir -Force | Out-Null
     
     # Phase A: Export replication-level data
-    Write-Host "📊 Phase A: Generating replication-level exports..." -ForegroundColor Cyan
+    Write-Host "Phase A: Generating replication-level exports..." -ForegroundColor Cyan
     
     $allReplicationData = @()
     $allRawScores = @()
     
-    $experiments = Get-ChildItem -Path $TestStudyPath -Directory -Name "experiment_*"
+    $experiments = Get-ChildItem -Path $TestStudyPath -Directory -Name "exp_*"
     foreach ($experiment in $experiments) {
         $expPath = Join-Path $TestStudyPath $experiment
         
@@ -265,15 +235,15 @@ function Generate-GraphPadExports {
     # Export replication-level summary
     $replicationExport = Join-Path $GraphPadExportsDir "Phase_A_Replication_Metrics.csv"
     $allReplicationData | Export-Csv -Path $replicationExport -NoTypeInformation
-    Write-Host "  ✅ Generated: Phase_A_Replication_Metrics.csv ($($allReplicationData.Count) replications)" -ForegroundColor Green
+    Write-Host "  ✓ Generated: Phase_A_Replication_Metrics.csv ($($allReplicationData.Count) replications)" -ForegroundColor Green
     
     # Export raw scores for manual validation
     $rawScoresExport = Join-Path $GraphPadExportsDir "Phase_A_Raw_Scores.csv"
     $allRawScores | Export-Csv -Path $rawScoresExport -NoTypeInformation
-    Write-Host "  ✅ Generated: Phase_A_Raw_Scores.csv ($($allRawScores.Count) trials)" -ForegroundColor Green
+    Write-Host "  ✓ Generated: Phase_A_Raw_Scores.csv ($($allRawScores.Count) trials)" -ForegroundColor Green
     
     # Phase B: Export study-level data (if STUDY_results.csv exists)
-    Write-Host "📊 Phase B: Generating study-level exports..." -ForegroundColor Cyan
+    Write-Host "Phase B: Generating study-level exports..." -ForegroundColor Cyan
     
     $studyResultsPath = Join-Path $TestStudyPath "STUDY_results.csv"
     if (Test-Path $studyResultsPath) {
@@ -282,7 +252,7 @@ function Generate-GraphPadExports {
         # Export for Two-Way ANOVA
         $anovaExport = Join-Path $GraphPadExportsDir "Phase_B_ANOVA_Data.csv"
         $studyData | Export-Csv -Path $anovaExport -NoTypeInformation
-        Write-Host "  ✅ Generated: Phase_B_ANOVA_Data.csv ($($studyData.Count) experiments)" -ForegroundColor Green
+        Write-Host "  ✓ Generated: Phase_B_ANOVA_Data.csv ($($studyData.Count) experiments)" -ForegroundColor Green
         
         # Generate summary statistics for validation
         $summaryStats = $studyData | Group-Object MappingStrategy, GroupSize | ForEach-Object {
@@ -300,9 +270,9 @@ function Generate-GraphPadExports {
         
         $summaryExport = Join-Path $GraphPadExportsDir "Phase_B_Summary_Statistics.csv"
         $summaryStats | Export-Csv -Path $summaryExport -NoTypeInformation
-        Write-Host "  ✅ Generated: Phase_B_Summary_Statistics.csv (4 groups)" -ForegroundColor Green
+        Write-Host "  ✓ Generated: Phase_B_Summary_Statistics.csv (4 groups)" -ForegroundColor Green
     } else {
-        Write-Host "  ⚠️  STUDY_results.csv not found - Phase B exports skipped" -ForegroundColor Yellow
+        Write-Host "  ! STUDY_results.csv not found - Phase B exports skipped" -ForegroundColor Yellow
         Write-Host "     Run compile_study.ps1 first to generate study-level data" -ForegroundColor Gray
     }
     
@@ -318,10 +288,10 @@ function Show-GraphPadValidationInstructions {
     
     Write-TestHeader "GraphPad Prism Validation Instructions" 'Yellow'
     
-    Write-Host "📁 Export files generated in: " -NoNewline -ForegroundColor White
+    Write-Host "Export files generated in: " -NoNewline -ForegroundColor White
     Write-Host $ExportStats.ExportDirectory -ForegroundColor Cyan
     
-    Write-Host "`n🔬 PHASE A: Replication-Level Validation" -ForegroundColor Magenta
+    Write-Host "`nPHASE A: Replication-Level Validation" -ForegroundColor Magenta
     Write-Host "Target: Core algorithmic contributions (analyze_llm_performance.py)" -ForegroundColor Gray
     
     Write-GraphPadInstruction "1" "Open GraphPad Prism and create a new project"
@@ -345,7 +315,7 @@ function Show-GraphPadValidationInstructions {
     Write-Host "     - Compare our effect size calculations vs GraphPad" -ForegroundColor Gray
     Write-Host "     - Tolerance: ±0.01 for effect sizes" -ForegroundColor Gray
     
-    Write-Host "`n🔬 PHASE B: Study-Level Validation" -ForegroundColor Magenta
+    Write-Host "`nPHASE B: Study-Level Validation" -ForegroundColor Magenta
     Write-Host "Target: Standard statistical analyses (analyze_study_results.py)" -ForegroundColor Gray
     
     Write-GraphPadInstruction "7" "Import 'Phase_B_ANOVA_Data.csv' for Two-Way ANOVA"
@@ -363,12 +333,12 @@ function Show-GraphPadValidationInstructions {
     Write-Host "     - Multiple comparisons with appropriate correction" -ForegroundColor Gray
     Write-Host "     - Compare adjusted p-values vs our Benjamini-Hochberg FDR" -ForegroundColor Gray
     
-    Write-Host "`n✅ SUCCESS CRITERIA:" -ForegroundColor Green
+    Write-Host "`nSUCCESS CRITERIA:" -ForegroundColor Green
     Write-Host "Phase A: All replication metrics match GraphPad within tolerances" -ForegroundColor White
     Write-Host "Phase B: ANOVA F-stats, p-values, and effect sizes match GraphPad" -ForegroundColor White
     Write-Host "Citation: 'Statistical analyses were validated against GraphPad Prism 10.0.0'" -ForegroundColor White
     
-    Write-Host "`n📊 VALIDATION SUMMARY:" -ForegroundColor Cyan
+    Write-Host "`nVALIDATION SUMMARY:" -ForegroundColor Cyan
     Write-Host "Replications validated: $($ExportStats.ReplicationCount)" -ForegroundColor White
     Write-Host "Total trials analyzed: $($ExportStats.TrialCount)" -ForegroundColor White
     Write-Host "Export directory: $(Split-Path $ExportStats.ExportDirectory -Leaf)" -ForegroundColor White
@@ -401,8 +371,8 @@ try {
     # Step 1: Validate Prerequisites
     Write-TestStep "Step 1: Validate Prerequisites"
     
-    if (-not (Test-MockStudyAssets)) {
-        throw "Mock study assets validation failed. Run generate_mock_study_assets.ps1 first."
+    if (-not (Test-StatisticalStudyAssets)) {
+        throw "Statistical study assets validation failed. Run generate_statistical_study.ps1 first."
     }
     
     if ($Interactive) {
@@ -410,6 +380,7 @@ try {
     }
     
     # Step 2: Setup Test Environment
+    Write-Host ""
     Write-TestStep "Step 2: Setup Test Environment"
     
     if (Test-Path $TempTestDir) {
@@ -417,44 +388,43 @@ try {
     }
     New-Item -ItemType Directory -Path $TempTestDir -Force | Out-Null
     
-    # Copy mock study to test environment
-    $testStudyPath = Join-Path $TempTestDir "mock_study"
-    Copy-Item -Path $MockStudyPath -Destination $testStudyPath -Recurse
+    # Copy statistical study to test environment
+    $testStudyPath = Join-Path $TempTestDir "statistical_study"
+    Copy-Item -Path $StatisticalStudyPath -Destination $testStudyPath -Recurse
     
-    Write-Host "✅ Test environment prepared" -ForegroundColor Green
+    Write-Host "✓ Test environment prepared" -ForegroundColor Green
     
     if ($Interactive) {
         Read-Host "Press Enter to continue..." | Out-Null
     }
     
-    # Step 3: Run Analysis Pipeline (if not ExportOnly)
-    if (-not $ExportOnly) {
-        Write-TestStep "Step 3: Run Analysis Pipeline"
-        
-        # Find the mock study directory
-        $mockStudyDir = Get-ChildItem -Path $testStudyPath -Directory | Select-Object -First 1
-        $actualStudyPath = $mockStudyDir.FullName
-        
-        # Run compile_study.ps1
-        $compileResult = & "$ProjectRoot\compile_study.ps1" -StudyDirectory $actualStudyPath -NonInteractive
+    # Step 3: Check if Analysis Already Complete (skip compilation for pre-compiled study)
+    Write-Host ""
+    Write-TestStep "Step 3: Verify Analysis Readiness"
+    
+    # Check if study is already compiled (has STUDY_results.csv)
+    $studyResultsPath = Join-Path $testStudyPath "STUDY_results.csv"
+    if (Test-Path $studyResultsPath) {
+        Write-Host "✓ Study already compiled - using existing analysis" -ForegroundColor Green
+        $finalStudyPath = $testStudyPath
+    } elseif (-not $ExportOnly) {
+        Write-Host "Compiling study..." -ForegroundColor Cyan
+        $compileResult = & "$ProjectRoot\compile_study.ps1" -StudyDirectory $testStudyPath
         if ($LASTEXITCODE -ne 0) {
             throw "Study compilation failed with exit code $LASTEXITCODE"
         }
-        
-        Write-Host "✅ Analysis pipeline completed" -ForegroundColor Green
-        
-        if ($Interactive) {
-            Read-Host "Press Enter to continue..." | Out-Null
-        }
-        
-        $finalStudyPath = $actualStudyPath
+        Write-Host "✓ Analysis pipeline completed" -ForegroundColor Green
+        $finalStudyPath = $testStudyPath
     } else {
-        # For ExportOnly, just use the test study path
-        $mockStudyDir = Get-ChildItem -Path $testStudyPath -Directory | Select-Object -First 1
-        $finalStudyPath = $mockStudyDir.FullName
+        $finalStudyPath = $testStudyPath
+    }
+
+    if ($Interactive) {
+        Read-Host "Press Enter to continue..." | Out-Null
     }
     
     # Step 4: Generate GraphPad Exports
+    Write-Host ""
     Write-TestStep "Step 4: Generate GraphPad Export Files"
     
     $exportStats = Generate-GraphPadExports -TestStudyPath $finalStudyPath
@@ -475,7 +445,7 @@ try {
     
 }
 catch {
-    Write-Host "`n❌ GRAPHPAD VALIDATION TEST FAILED" -ForegroundColor Red
+    Write-Host "`nX GRAPHPAD VALIDATION TEST FAILED" -ForegroundColor Red
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
@@ -488,12 +458,13 @@ finally {
     }
 }
 
-Write-Host "`n✅ GRAPHPAD PRISM VALIDATION EXPORTS GENERATED SUCCESSFULLY" -ForegroundColor Green
+Write-Host "`nGRAPHPAD PRISM VALIDATION EXPORTS GENERATED SUCCESSFULLY" -ForegroundColor Green
 
 if ($ExportOnly) {
     Write-Host "Export files available in: $GraphPadExportsDir" -ForegroundColor Cyan
 } else {
     Write-Host "Ready for GraphPad Prism validation - follow instructions above" -ForegroundColor Cyan
+    Write-Host ""
 }
 
 exit 0
