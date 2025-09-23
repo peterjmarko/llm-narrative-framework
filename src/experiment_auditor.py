@@ -517,6 +517,7 @@ def _verify_experiment_level_files(target_dir: Path, expected_reps: int = None) 
     
     # Check experiment_log.csv with enhanced validation
     log_status = _check_experiment_log_content(target_dir / "experiment_log.csv")
+    print(f"DEBUG: experiment_log.csv status = {log_status}")
     if log_status != "VALID":
         is_complete = False
         details.append(log_status)
@@ -524,13 +525,16 @@ def _verify_experiment_level_files(target_dir: Path, expected_reps: int = None) 
     # Check EXPERIMENT_results.csv with enhanced schema validation
     if expected_reps:
         results_status = _check_experiment_results_csv(target_dir, expected_reps)
+        print(f"DEBUG: EXPERIMENT_results.csv status = {results_status} (expected_reps={expected_reps})")
     else:
         results_status = _check_csv_content(target_dir / "EXPERIMENT_results.csv")
+        print(f"DEBUG: EXPERIMENT_results.csv status = {results_status} (no expected_reps)")
     
     if results_status != "VALID":
         is_complete = False
         details.append(results_status)
     
+    print(f"DEBUG: is_complete = {is_complete}, details = {details}")
     return is_complete, details
 
 def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, list, dict]:

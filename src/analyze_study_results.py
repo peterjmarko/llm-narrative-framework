@@ -492,6 +492,7 @@ def main():
         """)
     )
     parser.add_argument("study_directory", help="Path to the top-level study directory containing the master CSV.")
+    parser.add_argument('--verbose', action='store_true', help="Enable verbose console output")
     parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
     args = parser.parse_args()
 
@@ -530,11 +531,19 @@ def main():
     file_handler._is_study_analyzer_handler = True  # Custom attribute for identification
     root_logger.addHandler(file_handler)
 
-    # 2. Add a handler for the console that uses the custom ColorFormatter.
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(ColorFormatter('%(message)s'))
-    console_handler._is_study_analyzer_handler = True  # Custom attribute for identification
-    root_logger.addHandler(console_handler)
+    # 2. Add a handler for the console only if verbose mode is enabled
+    if args.verbose:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(ColorFormatter('%(message)s'))
+        console_handler._is_study_analyzer_handler = True  # Custom attribute for identification
+        root_logger.addHandler(console_handler)
+    else:
+        # In quiet mode, show only essential progress messages
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.WARNING)  # Only show warnings/errors
+        console_handler.setFormatter(logging.Formatter('%(message)s'))
+        console_handler._is_study_analyzer_handler = True
+        root_logger.addHandler(console_handler)
 
     # --- Single-level Backup of Previous Run ---
     try:
