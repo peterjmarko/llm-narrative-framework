@@ -1,5 +1,28 @@
 # Changelog
 
+## 11.0.0 (2025-09-24)
+
+### Bump
+
+- **version 10.12.0 → 11.0.0**
+
+### Features
+
+- **implement complete 4-step GraphPad validation workflow for academic publication**
+  Establish complete Create  Generate  Validate workflow with script renames, enhanced exports, and comprehensive documentation updates.
+     - Rename scripts for clarity: generate_statistical_study.ps1  create_statistical_study.ps1, validate_statistical_reporting.ps1  generate_graphpad_exports.ps1
+     - Create new validate_graphpad_results.ps1 for automated result comparison
+     - Fix metadata extraction from config.ini.archived files (was incorrectly reading JSON)
+     - Export all 18 statistical metrics instead of subset of 15
+     - Implement dual-format exports: standard long + GraphPad wide format
+     - Generate 5 export files: Phase A replication/raw scores, Phase B ANOVA/summary
+     - Add PDM shortcuts: test-stats-study, test-stats-exports, test-stats-results
+     - Update documentation across testing guide, framework manual, developer guide
+     - Apply DRY principle to eliminate duplicate workflow documentation
+     - Update academic citation to GraphPad Prism 10.6.1
+  
+  BREAKING CHANGE: Script names changed from generate_statistical_study.ps1 and validate_statistical_reporting.ps1 to new names. Users must update any references to old script names and PDM commands.
+
 ## 10.12.0 (2025-09-24)
 
 ### Bump
