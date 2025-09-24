@@ -78,8 +78,8 @@ This 4-step validation workflow provides external validation of the entire stati
 # Step 1: Create statistical validation study using real framework
 pdm run test-stats-study
 
-# Step 2: Generate GraphPad export files  
-pdm run test-stats-exports
+# Step 2: Generate GraphPad import files  
+pdm run test-stats-imports
 
 # Step 3: Manual GraphPad Prism processing (import, analyze, export results)
 

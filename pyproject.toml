@@ -104,7 +104,7 @@ test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.p
 
 # --- Statistical Analysis Validation Workflow ---
 test-stats-study = "pwsh -File ./tests/algorithm_validation/create_statistical_study.ps1"
-test-stats-exports = "pwsh -File ./tests/algorithm_validation/generate_graphpad_exports.ps1" 
+test-stats-imports = "pwsh -File ./tests/algorithm_validation/generate_graphpad_imports.ps1" 
 test-stats-results = "pwsh -File ./tests/algorithm_validation/validate_graphpad_results.ps1"
 
 # --- PowerShell Tests (By Suite) ---

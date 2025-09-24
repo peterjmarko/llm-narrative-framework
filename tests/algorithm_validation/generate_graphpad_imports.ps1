@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/algorithm_validation/generate_graphpad_exports.ps1
+# Filename: tests/algorithm_validation/generate_graphpad_imports.ps1
 
 <#
 .SYNOPSIS
@@ -30,7 +30,7 @@
     Phase A (Replication-Level): Validates core algorithmic contributions (MRR, Wilcoxon tests, bias regression)
     Phase B (Study-Level): Validates standard statistical analyses (Two-Way ANOVA, post-hoc tests)
     
-    The test generates GraphPad-compatible export files and provides detailed instructions for
+    The test generates GraphPad-compatible import files and provides detailed instructions for
     manual verification, supporting the academic citation: "Statistical analyses were validated 
     against GraphPad Prism 10.0.0"
 
@@ -38,18 +38,18 @@
     Run in interactive mode with step-by-step GraphPad validation instructions.
 
 .PARAMETER ExportOnly
-    Generate GraphPad export files without running validation checks.
+    Generate GraphPad import files without running validation checks.
 
 .PARAMETER Verbose
     Enable verbose output showing detailed export file generation.
 
 .EXAMPLE
-    .\generate_graphpad_exports.ps1 -Interactive
+    .\generate_graphpad_imports.ps1 -Interactive
     Run the full GraphPad validation workflow with step-by-step guidance.
 
 .EXAMPLE
-    .\generate_graphpad_exports.ps1 -ExportOnly
-    Generate GraphPad export files only (for batch processing).
+    .\generate_graphpad_imports.ps1 -ExportOnly
+    Generate GraphPad import files only (for batch processing).
 #>
 
 param(
@@ -72,7 +72,7 @@ $C_CYAN = "`e[96m"
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 $StatisticalStudyPath = Join-Path $ProjectRoot "tests/assets/statistical_validation_study"
 $TempTestDir = Join-Path $ProjectRoot "temp_test_environment/graphpad_validation"
-$GraphPadExportsDir = Join-Path $ProjectRoot "tests/assets/statistical_validation_study/graphpad_exports"
+$GraphPadImportsDir = Join-Path $ProjectRoot "tests/assets/statistical_validation_study/graphpad_imports"
 
 # --- Helper Functions ---
 function Write-TestHeader { 
@@ -288,10 +288,10 @@ function Export-RawScoresForGraphPadWide {
 function Generate-GraphPadExports {
     param($TestStudyPath)
     
-    Write-TestStep "Generating GraphPad Prism Export Files"
+    Write-TestStep "Generating GraphPad Prism Import Files"
     
     # Create export directory
-    New-Item -ItemType Directory -Path $GraphPadExportsDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $GraphPadImportsDir -Force | Out-Null
     
     # Phase A: Export replication-level data
     Write-Host "Phase A: Generating replication-level exports..." -ForegroundColor Cyan
@@ -328,16 +328,16 @@ function Generate-GraphPadExports {
     Write-Progress -Activity "Generating GraphPad exports" -Completed
     
     # Export replication-level summary
-    $replicationExport = Join-Path $GraphPadExportsDir "Phase_A_Replication_Metrics.csv"
+    $replicationExport = Join-Path $GraphPadImportsDir "Phase_A_Replication_Metrics.csv"
     $allReplicationData | Export-Csv -Path $replicationExport -NoTypeInformation
     Write-Host "  ✓ Generated: Phase_A_Replication_Metrics.csv ($($allReplicationData.Count) replications)" -ForegroundColor Green
     
     # Export raw scores for manual validation
-    $rawScoresExport = Join-Path $GraphPadExportsDir "Phase_A_Raw_Scores.csv"
+    $rawScoresExport = Join-Path $GraphPadImportsDir "Phase_A_Raw_Scores.csv"
     $allRawScores | Export-Csv -Path $rawScoresExport -NoTypeInformation
     
     # Export raw scores in wide format for GraphPad column-based analysis
-    $rawScoresWideExport = Join-Path $GraphPadExportsDir "Phase_A_Raw_Scores_Wide.csv"
+    $rawScoresWideExport = Join-Path $GraphPadImportsDir "Phase_A_Raw_Scores_Wide.csv"
     $allRawScoresWide = Export-RawScoresForGraphPadWide -AllRawScores $allRawScores
     if ($allRawScoresWide) {
         $allRawScoresWide | Export-Csv -Path $rawScoresWideExport -NoTypeInformation
@@ -354,7 +354,7 @@ function Generate-GraphPadExports {
         $studyData = Import-Csv $studyResultsPath
         
         # Export for Two-Way ANOVA
-        $anovaExport = Join-Path $GraphPadExportsDir "Phase_B_ANOVA_Data.csv"
+        $anovaExport = Join-Path $GraphPadImportsDir "Phase_B_ANOVA_Data.csv"
         $studyData | Export-Csv -Path $anovaExport -NoTypeInformation
         Write-Host "  ✓ Generated: Phase_B_ANOVA_Data.csv ($($studyData.Count) experiments)" -ForegroundColor Green
         
@@ -372,7 +372,7 @@ function Generate-GraphPadExports {
             }
         }
         
-        $summaryExport = Join-Path $GraphPadExportsDir "Phase_B_Summary_Statistics.csv"
+        $summaryExport = Join-Path $GraphPadImportsDir "Phase_B_Summary_Statistics.csv"
         $summaryStats | Export-Csv -Path $summaryExport -NoTypeInformation
         Write-Host "  ✓ Generated: Phase_B_Summary_Statistics.csv (4 groups)" -ForegroundColor Green
     } else {
@@ -383,7 +383,7 @@ function Generate-GraphPadExports {
     return @{
         ReplicationCount = $allReplicationData.Count
         TrialCount = $allRawScores.Count
-        ExportDirectory = $GraphPadExportsDir
+        ExportDirectory = $GraphPadImportsDir
     }
 }
 
@@ -392,12 +392,12 @@ function Show-GraphPadValidationInstructions {
     
     Write-TestHeader "GraphPad Prism Manual Analysis Instructions (Step 3 of 4)" 'Yellow'
     
-    Write-Host "Export files generated in: " -NoNewline -ForegroundColor White
+    Write-Host "Import files generated in: " -NoNewline -ForegroundColor White
     Write-Host $ExportStats.ExportDirectory -ForegroundColor Cyan
     
     Write-Host "`nComplete 4-Step Validation Workflow:" -ForegroundColor Magenta
     Write-Host "✓ Step 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
-    Write-Host "✓ Step 2: generate_graphpad_exports.ps1 - COMPLETED" -ForegroundColor Green
+    Write-Host "✓ Step 2: generate_graphpad_imports.ps1 - COMPLETED" -ForegroundColor Green
     Write-Host "→ Step 3: Manual GraphPad Analysis - FOLLOW INSTRUCTIONS BELOW" -ForegroundColor Yellow
     Write-Host "  Step 4: validate_graphpad_results.ps1 - PENDING" -ForegroundColor Gray
     
@@ -418,20 +418,20 @@ function Show-GraphPadValidationInstructions {
     
     Write-GraphPadInstruction "3.4" "Validate Wilcoxon tests (optional):"
     Write-Host "     - Use Phase_A_Raw_Scores_Wide.csv → One sample t test and Wilcoxon test" -ForegroundColor Gray
-    Write-Host "     - Test against chance level (1/K where K=GroupSize)" -ForegroundColor Gray
+    Write-Host "     - Test against chance level (1/k where k=group_size)" -ForegroundColor Gray
     
     Write-GraphPadInstruction "3.5" "Validate ANOVA results (optional):"
     Write-Host "     - Use Phase_B_ANOVA_Data.csv → Two-way ANOVA" -ForegroundColor Gray
-    Write-Host "     - Factors: mapping_strategy × k" -ForegroundColor Gray
+    Write-Host "     - Factors: mapping_strategy x k" -ForegroundColor Gray
     Write-Host "     - Compare F-statistics and p-values" -ForegroundColor Gray
     
     Write-Host "`nAFTER COMPLETING GRAPHPAD ANALYSIS:" -ForegroundColor Cyan
     Write-Host "Run Step 4 validation:" -ForegroundColor White
-    Write-Host "pwsh -File ./tests/algorithm_validation/validate_graphpad_results.ps1 -GraphPadExportsDir '$($ExportStats.ExportDirectory)'" -ForegroundColor Gray
+    Write-Host "pdm run test-stats-results" -ForegroundColor Gray
     
     Write-Host "`nSUCCESS CRITERIA:" -ForegroundColor Green
     Write-Host "Step 4 will validate MRR calculations within ±0.0001 tolerance" -ForegroundColor White
-    Write-Host "Citation ready: 'Statistical analyses were validated against GraphPad Prism 10.0.0'" -ForegroundColor White
+    Write-Host "Citation ready: 'Statistical analyses were validated against GraphPad Prism 10.6.1'" -ForegroundColor White
     
     Write-Host "`nVALIDATION SUMMARY:" -ForegroundColor Cyan
     Write-Host "Replications to validate: $($ExportStats.ReplicationCount)" -ForegroundColor White
@@ -441,7 +441,7 @@ function Show-GraphPadValidationInstructions {
 
 # --- Main Test Execution ---
 try {
-    Write-TestHeader "Statistical Analysis & Reporting - GraphPad Prism Validation" 'Magenta'
+    Write-TestHeader "Statistical Analysis & Reporting - Step 2/4: GraphPad Export Generation" 'Magenta'
     
     if ($Interactive) {
         Write-Host "${C_BLUE}This test implements the Two-Phase GraphPad Prism Validation Strategy:${C_RESET}"
@@ -458,7 +458,7 @@ try {
         Write-Host "  • Multi-factor experimental design validation"
         Write-Host ""
         Write-Host "${C_YELLOW}This provides academic defensibility for the citation:${C_RESET}"
-        Write-Host "${C_GREEN}'Statistical analyses were validated against GraphPad Prism 10.0.0'${C_RESET}"
+        Write-Host "${C_GREEN}'Statistical analyses were validated against GraphPad Prism 10.6.1'${C_RESET}"
         Write-Host ""
         Read-Host "Press Enter to begin validation..." | Out-Null
     }
@@ -566,7 +566,7 @@ finally {
 Write-Host "`nGRAPHPAD PRISM VALIDATION EXPORTS GENERATED SUCCESSFULLY" -ForegroundColor Green
 
 if ($ExportOnly) {
-    Write-Host "Export files available in: $GraphPadExportsDir" -ForegroundColor Cyan
+    Write-Host "Import files available in: $GraphPadImportsDir" -ForegroundColor Cyan
 } else {
     Write-Host "Ready for GraphPad Prism validation - follow instructions above" -ForegroundColor Cyan
     Write-Host ""
@@ -574,4 +574,4 @@ if ($ExportOnly) {
 
 exit 0
 
-# === End of tests/algorithm_validation/generate_graphpad_exports.ps1 ===
+# === End of tests/algorithm_validation/generate_graphpad_imports.ps1 ===
