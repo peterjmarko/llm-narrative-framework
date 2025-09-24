@@ -8,25 +8,14 @@ This document outlines planned development tasks and tracks known issues for the
 
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
-#### A. Implement Core Algorithm Validation Tests
-- [x] **Statistical Analysis & Reporting Validation Test Foundation** ✅ **COMPLETE**
-  - [x] Create `generate_statistical_study.ps1` script using real framework execution
-  - [x] Generate statistical validation study using actual `new_experiment.ps1` workflow
-  - [x] Implement 2×2 factorial design (Mapping Strategy × Group Size) with sufficient replications (6 per condition = 24 total)
-  - [x] Real framework parameters: M=25 trials, K=4,10 subjects, temperature=0.0 for deterministic responses
-  - [x] Framework's built-in seeded randomization for personality selection
-- [x] **Complete GraphPad Prism Validation Implementation** ✅ **COMPLETE**
-  - [x] Create `validate_statistical_reporting.ps1` script for GraphPad Prism comparison
-  - [x] Execute two-phase validation: replication-level and study-level statistical comparison
-  - [x] Generate GraphPad-compatible export files for external validation
-  - [x] Document validation methodology for publication citing GraphPad Prism 10.0.0
-
-#### B. Enhance Reproducibility and Provenance
-- [ ] **Implement Provenance Capture**
-  - [ ] Modify `new_experiment.ps1` to generate a `manifest.json` file in each new experiment directory.
-  - [ ] The manifest will capture Git state (commit SHA, tag) and key environment details (Python version, OS).
-  - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `manifest.json` file is correctly generated.
-  - [ ] Restructure `config.ini` to accomodate study parameters (like for Layer 4). Implies '[Study]' will be renamed to '[Experiment]' (for experiment config) and '[Study]' used for studies. Sync with Layer 4 approach.
+#### A. Execute Statistical Analysis Validation
+- [ ] **Execute GraphPad Prism Validation**
+  - [ ] Use GraphPad Prism 10.0.0 to manually validate exported statistical metrics against framework calculations
+  - [ ] Phase A: Validate replication-level metrics (MRR, Wilcoxon tests, bias regression, effect sizes) using `Phase_A_Replication_Metrics.csv`
+  - [ ] Phase B: Validate study-level analyses (Two-Way ANOVA, post-hoc tests, summary statistics) using `Phase_B_ANOVA_Data.csv`
+  - [ ] Document validation results and any code corrections required
+  - [ ] Re-run validation if statistical analysis code modifications are needed
+  - [ ] Confirm academic citation readiness: "Statistical analyses were validated against GraphPad Prism 10.0.0"
 
 ### 2. Final Data Generation and Study Execution
 
@@ -168,13 +157,21 @@ The framework now has complete validation coverage for the statistical analysis 
   - [ ] Create a new utility in `src/utils/` to provide a standardized, shared `tqdm` progress bar.
   - [ ] Refactor `generate_eminence_scores.py` and `generate_ocean_scores.py` to use this shared utility for a consistent user experience during long-running LLM calls.
 - [ ] **Implement Automated Study Lifecycle Management**
+  - [ ] Restructure `config.ini` to accommodate study parameters (like for Layer 4). Implies '[Study]' will be renamed to '[Experiment]' (for experiment config) and '[Study]' used for studies. Sync with Layer 4 approach.
   - [ ] Implement a `new_study.ps1` orchestrator to automate the creation of multi-experiment studies based on a factor matrix in `config.ini`.
   - [ ] Develop a corresponding Layer 7 test harness to validate the full `new -> audit -> break -> fix` study lifecycle.
   - [ ] Implement `fix_study.ps1` to provide an automated repair workflow for entire studies.
+- [ ] **Implement Provenance Capture**
+  - [ ] Modify `new_experiment.ps1` to generate a `provenance.json` file in each new experiment directory.
+  - [ ] The provenance file will capture Git state (commit SHA, tag) and key environment details (Python version, OS).
+  - [ ] Implement a smoke test that runs `new_experiment.ps1` with a minimal configuration and asserts that the `provenance.json` file is correctly generated.
+
+**Note**: This task is distinct from the "Generate an experiment parameters manifest (`parameters.json`) to permanently record all parameters used" task under "Improve Experiment Execution and Reproducibility" below. The current provenance capture focuses on environmental metadata only (via `provenance.json`), while the future parameters manifest (via `parameters.json`) will be part of CLI-driven experiments and replace config.ini as the parameter source.
+
 - [ ] **Improve Experiment Execution and Reproducibility**
   - [ ] Refactor inter-script communication for robustness. Modify core Python scripts (`experiment_manager.py`, etc.) to send all human-readable logs to `stderr` and use `stdout` exclusively for machine-readable output (e.g., the final experiment path). Update PowerShell wrappers to correctly handle these separate streams.
   - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.
-  - [ ] Generate an experiment manifest file with results to permanently record all parameters used (this will replace config.ini as the source of parameters).
+  - [ ] Generate an experiment parameters manifest (`parameters.json`) to permanently record all parameters used (this will replace config.ini as the source of parameters).
   - [ ] Update `audit`, `repair`, and `migrate` workflows to use the manifest as the ground truth.
 - [ ] **Concurrent LLM Averaging for Eminence and OCEAN Scores**
   - [ ] Use a "wisdom of the crowd" approach by querying multiple different LLMs for the same batch and averaging their scores to get more stable, less biased results for both eminence and personality scoring.

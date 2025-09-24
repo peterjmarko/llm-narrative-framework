@@ -72,7 +72,7 @@ $C_CYAN = "`e[96m"
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 $StatisticalStudyPath = Join-Path $ProjectRoot "tests/assets/statistical_validation_study"
 $TempTestDir = Join-Path $ProjectRoot "temp_test_environment/graphpad_validation"
-$GraphPadExportsDir = Join-Path $TempTestDir "graphpad_exports"
+$GraphPadExportsDir = Join-Path $ProjectRoot "tests/assets/statistical_validation_study/graphpad_exports"
 
 # --- Helper Functions ---
 function Write-TestHeader { 
@@ -297,8 +297,9 @@ function Show-GraphPadValidationInstructions {
     Write-GraphPadInstruction "1" "Open GraphPad Prism and create a new project"
     Write-GraphPadInstruction "2" "Import 'Phase_A_Replication_Metrics.csv' as a data table"
     Write-GraphPadInstruction "3" "Validate Mean Reciprocal Rank calculations:"
-    Write-Host "     - Use 'Phase_A_Raw_Scores.csv' to manually verify MRR calculations" -ForegroundColor Gray
-    Write-Host "     - Compare ReciprocalRank column against our MRR values" -ForegroundColor Gray
+    Write-Host "     - Note: Raw scores CSV is empty (extraction not implemented)" -ForegroundColor Gray
+    Write-Host "     - Validation proceeds using aggregated replication metrics" -ForegroundColor Gray
+    Write-Host "     - Compare MRR values directly against GraphPad calculations" -ForegroundColor Gray
     
     Write-GraphPadInstruction "4" "Validate Wilcoxon signed-rank tests:"
     Write-Host "     - Test MRR against chance level (1/K where K=GroupSize)" -ForegroundColor Gray
@@ -341,6 +342,9 @@ function Show-GraphPadValidationInstructions {
     Write-Host "`nVALIDATION SUMMARY:" -ForegroundColor Cyan
     Write-Host "Replications validated: $($ExportStats.ReplicationCount)" -ForegroundColor White
     Write-Host "Total trials analyzed: $($ExportStats.TrialCount)" -ForegroundColor White
+    if ($ExportStats.TrialCount -eq 0) {
+        Write-Host "Note: Raw trial extraction not implemented - validation proceeds with replication metrics" -ForegroundColor Gray
+    }
     Write-Host "Export directory: $(Split-Path $ExportStats.ExportDirectory -Leaf)" -ForegroundColor White
 }
 
