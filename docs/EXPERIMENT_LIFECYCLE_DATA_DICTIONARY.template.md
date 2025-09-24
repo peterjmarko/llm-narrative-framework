@@ -240,9 +240,9 @@ Study-level files provide master aggregation and statistical analysis across all
 **`STUDY_analysis_log.txt`** - Complete statistical analysis with standardized format:
 
 ```
-================================================================================
-       LLM Personality Matching Study: Comprehensive Statistical Analysis
-================================================================================
+=========================================================================
+       LLM Narrative Framework: Comprehensive Statistical Analysis
+=========================================================================
 
 ANALYSIS FOR METRIC: 'Mean Reciprocal Rank (MRR)'
 ================================================================================

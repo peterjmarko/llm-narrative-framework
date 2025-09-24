@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 #
-# Personality Matching Experiment Framework
+# A Framework for Testing Complex Narrative Systems
 # Copyright (C) 2025 Peter J. Marko
 #
 # This program is free software: you can redistribute it and/or modify
@@ -585,9 +585,9 @@ def main():
     # --- End of Directory Creation ---
 
     # --- Write the comprehensive header to the log file ---
-    logging.info("\n================================================================================")
-    logging.info("       LLM Personality Matching Study: Comprehensive Statistical Analysis")
-    logging.info("================================================================================")
+    logging.info("\n=========================================================================")
+    logging.info("       LLM Narrative Framework: Comprehensive Statistical Analysis")
+    logging.info("=========================================================================")
     logging.info("\nIntroduction")
     logging.info("------------")
     logging.info("This document details the comprehensive statistical analysis for the entire study, automatically")

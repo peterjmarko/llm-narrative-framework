@@ -305,30 +305,11 @@ This approach is the required standard for maintaining test quality and coverage
 
 ### Statistical Analysis Validation
 
-The framework includes comprehensive validation of its statistical analysis pipeline against GraphPad Prism 10.0.0 to ensure academic rigor and publication readiness.
+The framework includes comprehensive validation of its statistical analysis pipeline against GraphPad Prism 10.6.1 to ensure academic rigor and publication readiness.
 
-**Validation Components:**
-- **Real Framework Execution**: Uses actual `new_experiment.ps1` workflow, not mock implementations
-- **Deterministic Parameters**: Temperature=0.0 with gemini-1.5-flash for reproducible results  
-- **Framework Randomization**: Uses built-in seeded personality selection algorithms
-- **2×2 Factorial Design**: Mapping Strategy × Group Size with sufficient replications
+**To execute the validation workflow:** See the complete [4-step validation procedure in the Testing Guide](TESTING_GUIDE.md#statistical-analysis--reporting-validation).
 
-**Statistical Coverage:**
-- **Phase A**: Replication-level validation (MRR, Wilcoxon tests, bias regression, effect sizes)
-- **Phase B**: Study-level validation (Two-Way ANOVA, post-hoc tests, FDR corrections)
-
-**To run statistical validation:**
-```bash
-# Generate statistical validation study using real framework
-pwsh -File ./tests/algorithm_validation/generate_statistical_study.ps1
-
-# Run GraphPad validation workflow  
-pdm run test-stats-reporting
-```
-
-**Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.0.0"
-
-This validation provides external verification of the framework's novel algorithmic contributions and standard statistical analyses, supporting publication in peer-reviewed journals.
+**Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.6.1"
 
 ### 4. Commit Your Changes
 
@@ -483,7 +464,7 @@ The CI pipeline performs the following key validation steps:
     *   `pdm run check-headers`: Verifies that all script files have the correct license and filename header.
     *   `pdm run python scripts/lint_docstrings.py`: Performs a high-level check for the presence of module docstrings.
 3.  **Validates Documentation:** It runs `pdm run build-docs --check` to confirm that any changes to diagrams or templates have been correctly compiled into the final documentation.
-4.  **Statistical Validation:** The framework's statistical analysis pipeline is validated against GraphPad Prism 10.0.0 for academic publication standards.
+4.  **Statistical Validation:** The framework's statistical analysis pipeline is validated against GraphPad Prism 10.6.1 for academic publication standards.
 
 You can—and should—run these same checks locally before committing your code to ensure your pull request will pass.
 

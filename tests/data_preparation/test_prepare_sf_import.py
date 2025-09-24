@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 #
-# Personality Matching Experiment Framework
+# A Framework for Testing Complex Narrative Systems
 # Copyright (C) 2025 Peter J. Marko
 #
 # This program is free software: you can redistribute it and/or modify

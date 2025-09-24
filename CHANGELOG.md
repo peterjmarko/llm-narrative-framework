@@ -3071,7 +3071,7 @@
   -   **Cleanup**:
       -   Removed temporary refactoring scripts (`rename_diagrams.ps1`,
         `update_doc_references.ps1`) that are no longer needed.
-All notable changes to the Personality Matching Experiment Framework will be documented in this file.
+All notable changes to the LLM Narrative Framework will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -3690,7 +3690,7 @@ of the experiment migration workflow:
 ## [1.0.0] - 2025-07-11
 
 ### Added
-    - Initial personality matching experiment framework
+    - Initial personality matching experiment (now: LLM narrative) framework
     - LLM query generation and processing pipeline
     - Statistical analysis with ANOVA and bias detection
     - Experiment replication management system

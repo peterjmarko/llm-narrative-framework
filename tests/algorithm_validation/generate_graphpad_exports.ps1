@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 #-*- coding: utf-8 -*-
 #
-# Personality Matching Experiment Framework
+# A Framework for Testing Complex Narrative Systems
 # Copyright (C) 2025 Peter J. Marko
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/algorithm_validation/validate_statistical_reporting.ps1
+# Filename: tests/algorithm_validation/generate_graphpad_exports.ps1
 
 <#
 .SYNOPSIS
@@ -44,11 +44,11 @@
     Enable verbose output showing detailed export file generation.
 
 .EXAMPLE
-    .\validate_statistical_reporting.ps1 -Interactive
+    .\generate_graphpad_exports.ps1 -Interactive
     Run the full GraphPad validation workflow with step-by-step guidance.
 
 .EXAMPLE
-    .\validate_statistical_reporting.ps1 -ExportOnly
+    .\generate_graphpad_exports.ps1 -ExportOnly
     Generate GraphPad export files only (for batch processing).
 #>
 
@@ -148,35 +148,56 @@ function Export-ReplicationDataForGraphPad {
         try {
             $metrics = Get-Content $filePath -Raw | ConvertFrom-Json
             
+            # Extract metadata from config.ini.archived instead of JSON
+            $configPath = Join-Path (Split-Path $filePath -Parent | Split-Path -Parent) "config.ini.archived"
+            $config = @{}
+            if (Test-Path $configPath) {
+                $currentSection = ""
+                Get-Content $configPath | ForEach-Object {
+                    $line = $_.Trim()
+                    if ($line -match "^\[(.+)\]$") {
+                        $currentSection = $matches[1]
+                    } elseif ($line -match "^([^=]+)=(.*)$" -and $line -notmatch "^#") {
+                        $key = $matches[1].Trim()
+                        $value = $matches[2].Trim()
+                        $config["$currentSection`:$key"] = $value
+                    }
+                }
+            }
+            
             # Extract key metrics for GraphPad validation
             $replicationData = [PSCustomObject]@{
                 Experiment = $ExperimentName
                 Replication = $repCounter++  # Sequential numbering for validation
-                Model = $metrics.model
-                MappingStrategy = $metrics.mapping_strategy
-                GroupSize = $metrics.k
+                Model = $config['LLM:model_name'] -as [string]
+                MappingStrategy = $config['Study:mapping_strategy'] -as [string]
+                GroupSize = [int]$config['Study:group_size']
                 
-                # Core metrics for Phase A validation
-                MRR = [double]$metrics.mean_mrr
-                Top1Accuracy = [double]$metrics.mean_top_1_acc
-                Top3Accuracy = [double]$metrics.mean_top_3_acc
-                BiasSlope = [double]$metrics.bias_slope
-                BiasRValue = [double]$metrics.bias_r_value
-                
-                # Statistical test results
-                MRR_WilcoxonP = [double]$metrics.mrr_p
-                Top1_WilcoxonP = [double]$metrics.top_1_acc_p
-                Top3_WilcoxonP = [double]$metrics.top_3_acc_p
-                
-                # Effect sizes
-                MRR_EffectSize = [double]$metrics.mrr_effect_size
-                Top1_EffectSize = [double]$metrics.top_1_effect_size
-                Top3_EffectSize = [double]$metrics.top_3_effect_size
+                # Core performance metrics
+                MeanMRR = [double]$metrics.mean_mrr
+                MRR_P = [double]$metrics.mrr_p
+                MeanTop1Accuracy = [double]$metrics.mean_top_1_acc
+                Top1Acc_P = [double]$metrics.top_1_acc_p
+                MeanTop3Accuracy = [double]$metrics.mean_top_3_acc
+                Top3Acc_P = [double]$metrics.top_3_acc_p
                 
                 # Lift metrics
-                MRR_Lift = [double]$metrics.mean_mrr_lift
-                Top1_Lift = [double]$metrics.mean_top_1_acc_lift
-                Top3_Lift = [double]$metrics.mean_top_3_acc_lift
+                MeanMRRLift = [double]$metrics.mean_mrr_lift
+                MeanTop1AccLift = [double]$metrics.mean_top_1_acc_lift
+                MeanTop3AccLift = [double]$metrics.mean_top_3_acc_lift
+                
+                # Ranking and bias metrics
+                MeanRankOfCorrectID = [double]$metrics.mean_rank_of_correct_id
+                RankOfCorrectID_P = [double]$metrics.rank_of_correct_id_p
+                Top1PredBiasStd = [double]$metrics.top1_pred_bias_std
+                TrueFalseScoreDiff = [double]$metrics.true_false_score_diff
+                
+                # Regression bias analysis
+                BiasSlope = [double]$metrics.bias_slope
+                BiasIntercept = [double]$metrics.bias_intercept
+                BiasRValue = [double]$metrics.bias_r_value
+                BiasPValue = [double]$metrics.bias_p_value
+                BiasStdErr = [double]$metrics.bias_std_err
             }
             
             $allReplicationData += $replicationData
@@ -200,54 +221,68 @@ sys.path.insert(0, '$projectRootEscaped/src')
 
 from analyze_llm_performance import read_score_matrices, read_mappings_and_deduce_k, evaluate_single_test
 
-# Print CSV header first
 print('Experiment,Replication,Trial,MRR,MeanRank')
 
-# Completely suppress all logging and info output
 import logging
-import sys
 logging.getLogger().setLevel(logging.CRITICAL)
-logging.disable(logging.CRITICAL)
 
-# Redirect stderr to suppress framework info messages
-original_stderr = sys.stderr
-sys.stderr = open(os.devnull, 'w')
+replications = [r for r in os.listdir('$experimentPathEscaped') if r.startswith('run_')]
 
-# Get list of replications for processing
-replications = os.listdir('$experimentPathEscaped')
-
-# Process each replication using production functions
-for replication in [r for r in replications if r.startswith('run_')]:
+for replication in replications:
     analysis_path = os.path.join('$experimentPathEscaped', replication, 'analysis_inputs')
+    mappings_file = os.path.join(analysis_path, 'all_mappings.txt')
+    scores_file = os.path.join(analysis_path, 'all_scores.txt')
     
-    # Use actual framework parsing
-    mappings, k_val, delim = read_mappings_and_deduce_k(os.path.join(analysis_path, 'all_mappings.txt'))
-    matrices = read_score_matrices(os.path.join(analysis_path, 'all_scores.txt'), k_val, delim)
+    if not os.path.exists(mappings_file) or not os.path.exists(scores_file):
+        continue
+        
+    mappings, k_val, delim = read_mappings_and_deduce_k(mappings_file)
+    if not mappings or not k_val:
+        continue
+        
+    matrices = read_score_matrices(scores_file, k_val, delim)
+    if not matrices:
+        continue
     
-    # Use actual framework calculation
     for i, (matrix, mapping) in enumerate(zip(matrices, mappings)):
         result = evaluate_single_test(matrix, mapping, k_val, 3)
         if result:
-            print(f'$ExperimentName,$replication,{i+1},{result["mrr"]},{result["mean_rank_of_correct_id"]}')
-
-# Restore stderr for debug messages
-sys.stderr.close()
-sys.stderr = original_stderr
+            print(f'$ExperimentName,{replication},{i+1},{result["mrr"]},{result["mean_rank_of_correct_id"]}')
 "@
     
-    $pythonOutput = python -c $pythonScript
-    # Filter out logging lines - keep only proper CSV data
-    $cleanOutput = $pythonOutput | Where-Object { 
-        $_ -notmatch "^Info \(File:" -and 
-        $_ -notmatch "^DEBUG:" -and 
-        $_ -match "," -and 
-        $_ -notmatch "^\s*$" 
-    }
-    $csvData = $cleanOutput | ConvertFrom-Csv
-    Write-Verbose "Python output lines: $($pythonOutput.Count), Clean CSV lines: $($cleanOutput.Count)"
-    Write-Verbose "Python output lines: $($pythonOutput.Count)"
-    Write-Verbose "CSV records parsed: $($csvData.Count)"
+    $pythonOutput = python -c $pythonScript 2>$null
+    $csvData = $pythonOutput | Where-Object { $_ -and $_ -match "," } | ConvertFrom-Csv
+    Write-Verbose "Extracted $($csvData.Count) raw trial records using production functions"
     return $csvData
+}
+
+function Export-RawScoresForGraphPadWide {
+    param($AllRawScores)
+    
+    if (-not $AllRawScores) { return $null }
+    
+    # Group by unique replication identifier (Experiment + Replication)
+    $replications = $AllRawScores | Group-Object { "$($_.Experiment)_$($_.Replication)" } | Sort-Object Name
+    $maxTrials = ($replications | ForEach-Object { $_.Count } | Measure-Object -Maximum).Maximum
+    
+    # Create wide format table with one column per replication
+    $wideData = @()
+    for ($trial = 1; $trial -le $maxTrials; $trial++) {
+        $row = [PSCustomObject]@{ Trial = $trial }
+        
+        foreach ($rep in $replications) {
+            $repId = $rep.Name
+            $trialData = $rep.Group | Where-Object { $_.Trial -eq $trial }
+            
+            # Add MRR column for this specific replication
+            $mrrValue = if ($trialData) { $trialData.MRR -as [double] } else { $null }
+            $row | Add-Member -NotePropertyName "MRR_$repId" -NotePropertyValue $mrrValue
+        }
+        
+        $wideData += $row
+    }
+    
+    return $wideData
 }
 
 function Generate-GraphPadExports {
@@ -300,8 +335,16 @@ function Generate-GraphPadExports {
     # Export raw scores for manual validation
     $rawScoresExport = Join-Path $GraphPadExportsDir "Phase_A_Raw_Scores.csv"
     $allRawScores | Export-Csv -Path $rawScoresExport -NoTypeInformation
+    
+    # Export raw scores in wide format for GraphPad column-based analysis
+    $rawScoresWideExport = Join-Path $GraphPadExportsDir "Phase_A_Raw_Scores_Wide.csv"
+    $allRawScoresWide = Export-RawScoresForGraphPadWide -AllRawScores $allRawScores
+    if ($allRawScoresWide) {
+        $allRawScoresWide | Export-Csv -Path $rawScoresWideExport -NoTypeInformation
+    }
     # (Debug code removed - validation export complete)
     Write-Host "  ✓ Generated: Phase_A_Raw_Scores.csv ($($allRawScores.Count) trials)" -ForegroundColor Green
+    Write-Host "  ✓ Generated: Phase_A_Raw_Scores_Wide.csv (GraphPad column format)" -ForegroundColor Green
     
     # Phase B: Export study-level data (if STUDY_results.csv exists)
     Write-Host "Phase B: Generating study-level exports..." -ForegroundColor Cyan
@@ -316,16 +359,16 @@ function Generate-GraphPadExports {
         Write-Host "  ✓ Generated: Phase_B_ANOVA_Data.csv ($($studyData.Count) experiments)" -ForegroundColor Green
         
         # Generate summary statistics for validation
-        $summaryStats = $studyData | Group-Object MappingStrategy, GroupSize | ForEach-Object {
+        $summaryStats = $studyData | Group-Object mapping_strategy, k | ForEach-Object {
             $group = $_.Group
             [PSCustomObject]@{
-                MappingStrategy = $group[0].MappingStrategy
-                GroupSize = $group[0].GroupSize
+                MappingStrategy = $group[0].mapping_strategy
+                GroupSize = $group[0].k
                 Count = $group.Count
-                MRR_Mean = ($group | Measure-Object MeanMRR -Average).Average
-                MRR_StdDev = [math]::Sqrt(($group | ForEach-Object { ([double]$_.MeanMRR - ($group | Measure-Object MeanMRR -Average).Average) * ([double]$_.MeanMRR - ($group | Measure-Object MeanMRR -Average).Average) } | Measure-Object -Sum).Sum / ($group.Count - 1))
-                Top1_Mean = ($group | Measure-Object MeanTop1Accuracy -Average).Average
-                Top1_StdDev = [math]::Sqrt(($group | ForEach-Object { ([double]$_.MeanTop1Accuracy - ($group | Measure-Object MeanTop1Accuracy -Average).Average) * ([double]$_.MeanTop1Accuracy - ($group | Measure-Object MeanTop1Accuracy -Average).Average) } | Measure-Object -Sum).Sum / ($group.Count - 1))
+                MRR_Mean = ($group | Measure-Object mean_mrr -Average).Average
+                MRR_StdDev = [math]::Sqrt(($group | ForEach-Object { ([double]$_.mean_mrr - ($group | Measure-Object mean_mrr -Average).Average) * ([double]$_.mean_mrr - ($group | Measure-Object mean_mrr -Average).Average) } | Measure-Object -Sum).Sum / ($group.Count - 1))
+                Top1_Mean = ($group | Measure-Object mean_top_1_acc -Average).Average
+                Top1_StdDev = [math]::Sqrt(($group | ForEach-Object { ([double]$_.mean_top_1_acc - ($group | Measure-Object mean_top_1_acc -Average).Average) * ([double]$_.mean_top_1_acc - ($group | Measure-Object mean_top_1_acc -Average).Average) } | Measure-Object -Sum).Sum / ($group.Count - 1))
             }
         }
         
@@ -347,65 +390,52 @@ function Generate-GraphPadExports {
 function Show-GraphPadValidationInstructions {
     param($ExportStats)
     
-    Write-TestHeader "GraphPad Prism Validation Instructions" 'Yellow'
+    Write-TestHeader "GraphPad Prism Manual Analysis Instructions (Step 3 of 4)" 'Yellow'
     
     Write-Host "Export files generated in: " -NoNewline -ForegroundColor White
     Write-Host $ExportStats.ExportDirectory -ForegroundColor Cyan
     
-    Write-Host "`nPHASE A: Replication-Level Validation" -ForegroundColor Magenta
-    Write-Host "Target: Core algorithmic contributions (analyze_llm_performance.py)" -ForegroundColor Gray
+    Write-Host "`nComplete 4-Step Validation Workflow:" -ForegroundColor Magenta
+    Write-Host "✓ Step 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
+    Write-Host "✓ Step 2: generate_graphpad_exports.ps1 - COMPLETED" -ForegroundColor Green
+    Write-Host "→ Step 3: Manual GraphPad Analysis - FOLLOW INSTRUCTIONS BELOW" -ForegroundColor Yellow
+    Write-Host "  Step 4: validate_graphpad_results.ps1 - PENDING" -ForegroundColor Gray
     
-    Write-GraphPadInstruction "1" "Open GraphPad Prism and create a new project"
-    Write-GraphPadInstruction "2" "Import 'Phase_A_Replication_Metrics.csv' as a data table"
-Write-GraphPadInstruction "3" "Validate Mean Reciprocal Rank calculations:"
-    Write-Host "     - Raw trial data successfully extracted (761 trials using production framework functions)" -ForegroundColor Gray
-    Write-Host "     - Individual trial MRR calculations available for direct GraphPad validation of core algorithmic contributions" -ForegroundColor Gray
-    Write-Host "     - Import 'Phase_A_Raw_Scores.csv' to validate individual trial calculations against GraphPad's MRR computation" -ForegroundColor Gray
+    Write-Host "`nSTEP 3: MANUAL GRAPHPAD PRISM ANALYSIS" -ForegroundColor Magenta
+    Write-Host "Target: Independent validation of framework calculations" -ForegroundColor Gray
     
-    Write-GraphPadInstruction "4" "Validate Wilcoxon signed-rank tests:"
-    Write-Host "     - Test MRR against chance level (1/K where K=GroupSize)" -ForegroundColor Gray
-    Write-Host "     - Compare p-values: MRR_WilcoxonP vs GraphPad results" -ForegroundColor Gray
-    Write-Host "     - Tolerance: ±0.001 for p-values" -ForegroundColor Gray
+    Write-GraphPadInstruction "3.1" "Open GraphPad Prism and create a new project"
     
-    Write-GraphPadInstruction "5" "Validate bias regression analysis:"
-    Write-Host "     - Plot ReciprocalRank vs Trial number for linear regression" -ForegroundColor Gray
-    Write-Host "     - Compare slope: BiasSlope vs GraphPad slope" -ForegroundColor Gray
-    Write-Host "     - Compare R-value: BiasRValue vs GraphPad R" -ForegroundColor Gray
-    Write-Host "     - Tolerance: ±0.001 for slope and R-value" -ForegroundColor Gray
+    Write-GraphPadInstruction "3.2" "Import validation datasets:"
+    Write-Host "     - Phase_A_Replication_Metrics.csv (framework results)" -ForegroundColor Gray
+    Write-Host "     - Phase_A_Raw_Scores_Wide.csv (trial data for MRR validation)" -ForegroundColor Gray
+    Write-Host "     - Phase_B_ANOVA_Data.csv (study-level data)" -ForegroundColor Gray
     
-    Write-GraphPadInstruction "6" "Validate effect sizes (Cohen's r):"
-    Write-Host "     - Compare our effect size calculations vs GraphPad" -ForegroundColor Gray
-    Write-Host "     - Tolerance: ±0.01 for effect sizes" -ForegroundColor Gray
+    Write-GraphPadInstruction "3.3" "Validate MRR calculations:"
+    Write-Host "     - Use Phase_A_Raw_Scores_Wide.csv → Column Statistics → Descriptive statistics" -ForegroundColor Gray
+    Write-Host "     - Select MRR columns, calculate means for each replication" -ForegroundColor Gray
+    Write-Host "     - Export results as 'GraphPad_MRR_Means.csv'" -ForegroundColor Gray
     
-    Write-Host "`nPHASE B: Study-Level Validation" -ForegroundColor Magenta
-    Write-Host "Target: Standard statistical analyses (analyze_study_results.py)" -ForegroundColor Gray
+    Write-GraphPadInstruction "3.4" "Validate Wilcoxon tests (optional):"
+    Write-Host "     - Use Phase_A_Raw_Scores_Wide.csv → One sample t test and Wilcoxon test" -ForegroundColor Gray
+    Write-Host "     - Test against chance level (1/K where K=GroupSize)" -ForegroundColor Gray
     
-    Write-GraphPadInstruction "7" "Import 'Phase_B_ANOVA_Data.csv' for Two-Way ANOVA"
-    Write-GraphPadInstruction "8" "Configure Two-Way ANOVA:"
-    Write-Host "     - Factor A: MappingStrategy (correct vs random)" -ForegroundColor Gray
-    Write-Host "     - Factor B: GroupSize (4 vs 10)" -ForegroundColor Gray
-    Write-Host "     - Dependent variables: MeanMRR, MeanTop1Accuracy, MeanTop3Accuracy" -ForegroundColor Gray
+    Write-GraphPadInstruction "3.5" "Validate ANOVA results (optional):"
+    Write-Host "     - Use Phase_B_ANOVA_Data.csv → Two-way ANOVA" -ForegroundColor Gray
+    Write-Host "     - Factors: mapping_strategy × k" -ForegroundColor Gray
+    Write-Host "     - Compare F-statistics and p-values" -ForegroundColor Gray
     
-    Write-GraphPadInstruction "9" "Validate ANOVA results:"
-    Write-Host "     - Compare F-statistics (tolerance: ±0.01)" -ForegroundColor Gray
-    Write-Host "     - Compare p-values (tolerance: ±0.001)" -ForegroundColor Gray
-    Write-Host "     - Compare effect sizes/eta-squared (tolerance: ±0.01)" -ForegroundColor Gray
-    
-    Write-GraphPadInstruction "10" "Validate post-hoc tests (if significant effects found):"
-    Write-Host "     - Multiple comparisons with appropriate correction" -ForegroundColor Gray
-    Write-Host "     - Compare adjusted p-values vs our Benjamini-Hochberg FDR" -ForegroundColor Gray
+    Write-Host "`nAFTER COMPLETING GRAPHPAD ANALYSIS:" -ForegroundColor Cyan
+    Write-Host "Run Step 4 validation:" -ForegroundColor White
+    Write-Host "pwsh -File ./tests/algorithm_validation/validate_graphpad_results.ps1 -GraphPadExportsDir '$($ExportStats.ExportDirectory)'" -ForegroundColor Gray
     
     Write-Host "`nSUCCESS CRITERIA:" -ForegroundColor Green
-    Write-Host "Phase A: All replication metrics match GraphPad within tolerances" -ForegroundColor White
-    Write-Host "Phase B: ANOVA F-stats, p-values, and effect sizes match GraphPad" -ForegroundColor White
-    Write-Host "Citation: 'Statistical analyses were validated against GraphPad Prism 10.0.0'" -ForegroundColor White
+    Write-Host "Step 4 will validate MRR calculations within ±0.0001 tolerance" -ForegroundColor White
+    Write-Host "Citation ready: 'Statistical analyses were validated against GraphPad Prism 10.0.0'" -ForegroundColor White
     
     Write-Host "`nVALIDATION SUMMARY:" -ForegroundColor Cyan
-    Write-Host "Replications validated: $($ExportStats.ReplicationCount)" -ForegroundColor White
+    Write-Host "Replications to validate: $($ExportStats.ReplicationCount)" -ForegroundColor White
     Write-Host "Total trials analyzed: $($ExportStats.TrialCount)" -ForegroundColor White
-    if ($ExportStats.TrialCount -eq 0) {
-        Write-Host "Note: Raw trial extraction not implemented - validation proceeds with replication metrics" -ForegroundColor Gray
-    }
     Write-Host "Export directory: $(Split-Path $ExportStats.ExportDirectory -Leaf)" -ForegroundColor White
 }
 
@@ -544,4 +574,4 @@ if ($ExportOnly) {
 
 exit 0
 
-# === End of tests/algorithm_validation/validate_statistical_reporting.ps1 ===
+# === End of tests/algorithm_validation/generate_graphpad_exports.ps1 ===

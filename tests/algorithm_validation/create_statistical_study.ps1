@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 #-*- coding: utf-8 -*-
 #
-# Personality Matching Experiment Framework
+# A Framework for Testing Complex Narrative Systems
 # Copyright (C) 2025 Peter J. Marko
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/algorithm_validation/generate_statistical_study.ps1
+# Filename: tests/algorithm_validation/create_statistical_study.ps1
 
 <#
 .SYNOPSIS
@@ -52,11 +52,11 @@
     Enable verbose output
 
 .EXAMPLE
-    .\generate_statistical_study.ps1
+    .\create_statistical_study.ps1
     Generate the statistical validation study with default parameters.
 
 .EXAMPLE
-    .\generate_statistical_study.ps1 -ReplicationsPerExperiment 8 -Force
+    .\create_statistical_study.ps1 -ReplicationsPerExperiment 8 -Force
     Generate with 8 replications per experiment, overwriting existing data.
 #>
 
@@ -362,8 +362,8 @@ try {
 
 # Next steps guidance for validation
 Write-Host "`n=== Next Steps for GraphPad Validation ===" -ForegroundColor Cyan
-Write-Host "1. Run GraphPad validation script:" -ForegroundColor Gray
-Write-Host "   pdm run test-stats-reporting" -ForegroundColor Gray
+Write-Host "1. Generate GraphPad export files:" -ForegroundColor Gray
+Write-Host "   pdm run test-graphpad-exports" -ForegroundColor Gray
 Write-Host "2. Follow GraphPad Prism comparison instructions" -ForegroundColor Gray
 Write-Host "3. Document validation results for publication" -ForegroundColor Gray
 
@@ -385,8 +385,12 @@ if (Test-Path "config.ini.backup") {
 
 if (-not $compilationFailed) {
     Write-Host "`n=== Next Steps for GraphPad Validation ===" -ForegroundColor Cyan
-    Write-Host "1. Run GraphPad validation script:" -ForegroundColor Gray
-    Write-Host "   pdm run test-stats-reporting" -ForegroundColor Gray
+    Write-Host "`n=== 4-Step GraphPad Validation Workflow ===" -ForegroundColor Cyan
+    Write-Host "✓ Step 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
+    Write-Host "→ Step 2: Generate GraphPad export files" -ForegroundColor Yellow
+    Write-Host "   pwsh -File ./tests/algorithm_validation/generate_graphpad_exports.ps1" -ForegroundColor Gray
+    Write-Host "  Step 3: Manual GraphPad Prism analysis (import, analyze, export)" -ForegroundColor Gray
+    Write-Host "  Step 4: Validate results against framework" -ForegroundColor Gray
     Write-Host "2. Follow GraphPad Prism comparison instructions" -ForegroundColor Gray
     Write-Host "3. Document validation results for publication" -ForegroundColor Gray
 
@@ -394,4 +398,4 @@ if (-not $compilationFailed) {
     Write-Host "Focus: Complete 2x2 factorial study ready for GraphPad Prism comparison`n" -ForegroundColor Cyan
 }
 
-# === End of tests/algorithm_validation/generate_statistical_study.ps1 ===
+# === End of tests/algorithm_validation/create_statistical_study.ps1 ===

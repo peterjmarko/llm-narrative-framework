@@ -9,13 +9,16 @@ This document outlines planned development tasks and tracks known issues for the
 This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
 
 #### A. Execute Statistical Analysis Validation
-- [ ] **Execute GraphPad Prism Validation**
-  - [ ] Use GraphPad Prism 10.0.0 to manually validate exported statistical metrics against framework calculations
-  - [ ] Phase A: Validate replication-level metrics (MRR, Wilcoxon tests, bias regression, effect sizes) using `Phase_A_Replication_Metrics.csv`
-  - [ ] Phase B: Validate study-level analyses (Two-Way ANOVA, post-hoc tests, summary statistics) using `Phase_B_ANOVA_Data.csv`
-  - [ ] Document validation results and any code corrections required
-  - [ ] Re-run validation if statistical analysis code modifications are needed
-  - [ ] Confirm academic citation readiness: "Statistical analyses were validated against GraphPad Prism 10.0.0"
+- [x] **Create GraphPad Validation Workflow** - 4-step process: Create → Generate → Process → Validate
+- [x] **Execute Step 1**: `create_statistical_study.ps1` - Generated real statistical study using framework
+- [x] **Execute Step 2**: `generate_graphpad_exports.ps1` - Created Phase A/B export files for GraphPad
+- [ ] **Execute Step 3**: Manual GraphPad Prism processing
+  - [ ] Import Phase_A_Raw_Scores_Wide.csv and Phase_A_Replication_Metrics.csv
+  - [ ] Run MRR validation (Step 3), Wilcoxon tests (Step 4), bias regression (Step 5)
+  - [ ] Import Phase_B_ANOVA_Data.csv for Two-Way ANOVA validation
+  - [ ] Export GraphPad results for comparison
+- [ ] **Execute Step 4**: `validate_graphpad_results.ps1` - Compare GraphPad vs framework results
+- [ ] **Document validation results** and confirm academic citation readiness
 
 ### 2. Final Data Generation and Study Execution
 
@@ -40,7 +43,11 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - Demonstrates full study compilation lifecycle with proper cleanup
   - Includes both automated and validation modes
 
-- ✅ **Statistical Analysis Validation Complete**: Successfully implemented GraphPad Prism validation using real framework execution
+- ✅ **Statistical Analysis Validation Workflow**: Created complete 4-step GraphPad Prism validation process
+  - ✅ Step 1: `create_statistical_study.ps1` - Real framework execution completed
+  - ✅ Step 2: `generate_graphpad_exports.ps1` - Export generation completed
+  - ⏳ Step 3: Manual GraphPad Prism processing - IN PROGRESS
+  - ⏳ Step 4: `validate_graphpad_results.ps1` - Pending Step 3 completion
   - Created statistical validation study generator using actual `new_experiment.ps1` workflow
   - Real LLM responses with deterministic parameters (temperature=0.0, gemini-1.5-flash)
   - Framework's built-in seeded randomization for personality selection (no parallel implementation)
@@ -65,7 +72,7 @@ The framework now has complete validation coverage for the statistical analysis 
 
 **Coverage**: Both common test scenarios and production data volumes are now validated against academic standards.
 
-**Academic Rigor**: External validation against GraphPad Prism 10.0.0 provides publication-ready validation methodology.
+**Academic Rigor**: External validation against GraphPad Prism 10.6.1 provides publication-ready validation methodology.
 
 - [ ] **Perform and Report Correction for Multiple Comparisons**
   - [ ] Add a footnote or supplementary note to the article reporting the Benjamini-Hochberg FDR-corrected p-values to demonstrate statistical rigor.
