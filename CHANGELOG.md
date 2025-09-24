@@ -1,5 +1,30 @@
 # Changelog
 
+## 10.12.0 (2025-09-24)
+
+### Bump
+
+- **version 10.11.2 → 10.12.0**
+
+### Documentation
+
+- **defer provenance capture post-publication**
+  Move provenance capture task from pre-publication to post-publication section. Archive complete implementation (schema, tests, functions) for future v1.1. Focus pre-publication efforts on core deliverables. Current config.ini.archived provides sufficient reproducibility for publication.
+
+### Features
+
+- **implement GraphPad Prism validation with production function reuse**
+  Complete rewrite of GraphPad validation to use actual framework functions for genuine external verification.
+  
+  - Replace custom PowerShell parsing with production framework functions
+  - Call actual evaluate_single_test(), read_score_matrices(), read_mappings_and_deduce_k()
+  - Extract 761 real experimental trials for external validation
+  - Fix field name mismatches and path escaping issues
+  - Add progress bars for Steps 2 and 4
+  - Filter Python logging output from CSV exports
+  - Update validation instructions to reflect raw trial data capability
+  - Enable genuine algorithmic validation vs. data consistency checking
+
 ## 10.11.2 (2025-09-23)
 
 ### Bump
