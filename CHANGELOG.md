@@ -1,5 +1,19 @@
 # Changelog
 
+## 11.0.1 (2025-09-24)
+
+### Bump
+
+- **version 11.0.0 → 11.0.1**
+
+### Refactor
+
+- **rename GraphPad validation files for clarity**
+  - Rename generate_graphpad_exports.ps1  generate_graphpad_imports.ps1
+  - Update directory names: graphpad_exports  graphpad_imports
+  - Update PDM shortcuts: test-stats-exports  test-stats-imports
+  - Clarify naming convention: GraphPad imports our files, exports results
+
 ## 11.0.0 (2025-09-24)
 
 ### Bump
