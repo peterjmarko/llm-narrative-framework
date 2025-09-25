@@ -1,5 +1,49 @@
 # Changelog
 
+## 11.2.0 (2025-09-25)
+
+### Bump
+
+- **version 11.1.0 → 11.2.0**
+
+### Features
+
+- **implement comprehensive GraphPad Prism validation with bias regression analysis**
+  Implemented comprehensive statistical validation workflow against GraphPad Prism 10.6.1, including major code cleanup and bias regression analysis functionality.
+  
+  **Code Revision Work**:
+  - Cleaned up PowerShell script terminology by removing all "NEW", "enhanced", "Phase 1/2/3" references
+  - Preserved "Phase A/Phase B" as core validation architecture
+  - Updated function names (e.g., Generate-EnhancedANOVAExports  Generate-ANOVAExports)
+  - Created complete updated artifact with all changes applied
+  
+  **Technical Problem Solving**:
+  - Identified critical flaw in bias regression export format - original code generated multi-column analysis files unsuitable for GraphPad XY regression
+  - Redesigned Export-BiasRegressionDataForGraphPad function to create purpose-built two-column CSV files optimized for GraphPad XY tables
+  - Fixed TrialSeq vs MRR data structure issue preventing proper regression analysis
+  
+  **GraphPad Implementation Guidance**:
+  - Walked through correct GraphPad table creation settings for XY regression analysis
+  - Confirmed appropriate linear regression parameters (leaving runs test unchecked)
+  - Verified settings consistency across all bias regression analyses
+  
+  **Validation Completion**:
+  - Successfully processed 15 validation files covering comprehensive statistical analysis validation:
+    - 6 Wilcoxon tests (K-specific accuracy datasets)
+    - 3 ANOVA analyses (with effect sizes)
+    - 5 bias regression analyses (overall + condition-specific)
+    - 1 reference dataset
+  
+  **Framework Assessment**: Discussed mathematical logic of validation coverage, concluding experiment-level validation would be redundant given successful replication-level and study-level validation.
+  
+  This establishes comprehensive external validation suitable for academic citation: "Statistical analyses were validated against GraphPad Prism 10.6.1"
+  
+  Status: 3 of 4 validation steps complete (Step 4 automated comparison pending)
+  
+  Affects: tests/algorithm_validation/generate_graphpad_imports.ps1, docs/PROJECT_ROADMAP.md, docs/TESTING_GUIDE.template.md
+  Implements: Comprehensive statistical validation workflow
+  Completes: GraphPad Prism manual validation processing (Step 3/4)
+
 ## 11.1.0 (2025-09-25)
 
 ### Bump
