@@ -81,13 +81,25 @@ pdm run test-stats-study
 # Step 2: Generate GraphPad import files  
 pdm run test-stats-imports
 
-# Step 3: Manual GraphPad Prism processing (import, analyze, export results)
+# Step 3: Manual GraphPad Prism processing - COMPLETED
+# (Manual import, analyze, export of 15 validation files)
 
-# Step 4: Validate GraphPad results against framework calculations
+# Step 4: Validate GraphPad results against framework calculations - PENDING
 pdm run test-stats-results
 ```
 
+**Current Status: 3 of 4 Steps Complete**
+- ✅ **Steps 1-3**: Statistical study creation, export generation, and manual GraphPad processing completed
+- ⏳ **Step 4**: Automated validation comparison pending
+- **Validation Coverage**: 15 files processed (6 Wilcoxon tests, 3 ANOVA analyses, 5 bias regression analyses)
+
 **Prerequisites:** Requires `data/personalities_db.txt` from data preparation pipeline.
+
+**Comprehensive Validation Coverage:**
+- **6 Wilcoxon signed-rank tests**: K-specific validation (K=4, K=10) for MRR, Top-1, and Top-3 accuracy
+- **3 Two-way ANOVA analyses**: MRR, Top-1, and Top-3 with eta-squared effect sizes  
+- **5 Bias regression analyses**: Overall and condition-specific linear regression validation
+- **Purpose-built GraphPad formats**: Two-column XY files for regression, grouped tables for ANOVA
 
 **Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.6.1"
 
