@@ -327,24 +327,43 @@ function Generate-GraphPadExports {
     
     Write-Progress -Activity "Generating GraphPad exports" -Completed
     
-    # Export replication-level summary
-    $replicationExport = Join-Path $GraphPadImportsDir "Phase_A_Replication_Metrics.csv"
-    $allReplicationData | Export-Csv -Path $replicationExport -NoTypeInformation
-    Write-Host "  ✓ Generated: Phase_A_Replication_Metrics.csv ($($allReplicationData.Count) replications)" -ForegroundColor Green
+    # Create reference data directory
+    $ReferenceDataDir = Join-Path $GraphPadImportsDir "reference_data"
+    New-Item -ItemType Directory -Path $ReferenceDataDir -Force | Out-Null
     
-    # Export raw scores for manual validation
-    $rawScoresExport = Join-Path $GraphPadImportsDir "Phase_A_Raw_Scores.csv"
-    $allRawScores | Export-Csv -Path $rawScoresExport -NoTypeInformation
+    # Export replication-level summary to reference folder
+    $replicationExport = Join-Path $ReferenceDataDir "Phase_A_Replication_Metrics.csv"
+    $allReplicationData | Export-Csv -Path $replicationExport -NoTypeInformation
+    Write-Host "  ✓ Generated: Phase_A_Replication_Metrics.csv ($($allReplicationData.Count) replications) [reference]" -ForegroundColor Green
+    
+    # Export raw scores in long format to reference folder
+    $rawScoresLongExport = Join-Path $ReferenceDataDir "Phase_A_Raw_Scores_Long.csv"
+    $allRawScores | Export-Csv -Path $rawScoresLongExport -NoTypeInformation
     
     # Export raw scores in wide format for GraphPad column-based analysis
-    $rawScoresWideExport = Join-Path $GraphPadImportsDir "Phase_A_Raw_Scores_Wide.csv"
+    $rawScoresExport = Join-Path $GraphPadImportsDir "Phase_A_Raw_Scores.csv"
     $allRawScoresWide = Export-RawScoresForGraphPadWide -AllRawScores $allRawScores
     if ($allRawScoresWide) {
-        $allRawScoresWide | Export-Csv -Path $rawScoresWideExport -NoTypeInformation
+        $allRawScoresWide | Export-Csv -Path $rawScoresExport -NoTypeInformation
     }
     # (Debug code removed - validation export complete)
-    Write-Host "  ✓ Generated: Phase_A_Raw_Scores.csv ($($allRawScores.Count) trials)" -ForegroundColor Green
-    Write-Host "  ✓ Generated: Phase_A_Raw_Scores_Wide.csv (GraphPad column format)" -ForegroundColor Green
+    Write-Host "  ✓ Generated: Phase_A_Raw_Scores_Long.csv ($($allRawScores.Count) trials) [reference]" -ForegroundColor Green
+    Write-Host "  ✓ Generated: Phase_A_Raw_Scores.csv (GraphPad column format)" -ForegroundColor Green
+    
+    # Generate K-specific MRR datasets for separate Wilcoxon testing
+    Write-Host "Phase A: Generating K-specific MRR exports..." -ForegroundColor Cyan
+    
+    $k4Data = $allReplicationData | Where-Object { $_.GroupSize -eq 4 } | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.25}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k10Data = $allReplicationData | Where-Object { $_.GroupSize -eq 10 } | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.1}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+
+    $k4Export = Join-Path $GraphPadImportsDir "Phase_A_MRR_K4.csv"
+    $k10Export = Join-Path $GraphPadImportsDir "Phase_A_MRR_K10.csv"
+    
+    $k4Data | Export-Csv -Path $k4Export -NoTypeInformation
+    $k10Data | Export-Csv -Path $k10Export -NoTypeInformation
+
+    Write-Host "  ✓ Generated: Phase_A_MRR_K4.csv ($($k4Data.Count) replications, chance = 0.25)" -ForegroundColor Green
+    Write-Host "  ✓ Generated: Phase_A_MRR_K10.csv ($($k10Data.Count) replications, chance = 0.1)" -ForegroundColor Green
     
     # Phase B: Export study-level data (if STUDY_results.csv exists)
     Write-Host "Phase B: Generating study-level exports..." -ForegroundColor Cyan
@@ -353,12 +372,57 @@ function Generate-GraphPadExports {
     if (Test-Path $studyResultsPath) {
         $studyData = Import-Csv $studyResultsPath
         
-        # Export for Two-Way ANOVA
-        $anovaExport = Join-Path $GraphPadImportsDir "Phase_B_ANOVA_Data.csv"
-        $studyData | Export-Csv -Path $anovaExport -NoTypeInformation
-        Write-Host "  ✓ Generated: Phase_B_ANOVA_Data.csv ($($studyData.Count) experiments)" -ForegroundColor Green
+        # Generate GraphPad Grouped Table format (rows=mapping_strategy, columns=k, subcolumns=replicates)
+        Write-Host "Phase B: Generating GraphPad grouped table format..." -ForegroundColor Cyan
         
-        # Generate summary statistics for validation
+        # Extract MRR values by condition
+        $correctK4Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 4 }).mean_mrr)
+        $correctK10Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 10 }).mean_mrr)
+        $randomK4Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 4 }).mean_mrr)
+        $randomK10Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 10 }).mean_mrr)
+        
+        # Determine number of replicates (should be 6 each)
+        $numReplicates = [math]::Max([math]::Max($correctK4Values.Count, $correctK10Values.Count), [math]::Max($randomK4Values.Count, $randomK10Values.Count))
+        
+        # Create header row with repeated column factor levels for each subcolumn
+        $headerParts = @()
+        # K4 repeated 6 times for 6 subcolumns
+        for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K4" }
+        # K10 repeated 6 times for 6 subcolumns  
+        for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K10" }
+        $headerRow = "," + ($headerParts -join ",")
+        
+        # Create Correct row (mapping_strategy = correct)
+        $correctRowParts = @("Correct")
+        for ($i = 0; $i -lt $numReplicates; $i++) {
+            $correctRowParts += if ($i -lt $correctK4Values.Count) { $correctK4Values[$i] } else { "" }
+        }
+        for ($i = 0; $i -lt $numReplicates; $i++) {
+            $correctRowParts += if ($i -lt $correctK10Values.Count) { $correctK10Values[$i] } else { "" }
+        }
+        $correctRow = $correctRowParts -join ","
+        
+        # Create Random row (mapping_strategy = random)
+        $randomRowParts = @("Random")
+        for ($i = 0; $i -lt $numReplicates; $i++) {
+            $randomRowParts += if ($i -lt $randomK4Values.Count) { $randomK4Values[$i] } else { "" }
+        }
+        for ($i = 0; $i -lt $numReplicates; $i++) {
+            $randomRowParts += if ($i -lt $randomK10Values.Count) { $randomK10Values[$i] } else { "" }
+        }
+        $randomRow = $randomRowParts -join ","
+        
+        # Combine all rows
+        $csvContent = @($headerRow, $correctRow, $randomRow)
+        
+        $anovaGraphPadExport = Join-Path $GraphPadImportsDir "Phase_B_ANOVA.csv"
+        $csvContent | Out-File -FilePath $anovaGraphPadExport -Encoding UTF8
+        
+        Write-Host "  ✓ Generated: Phase_B_ANOVA.csv (GraphPad grouped table format)" -ForegroundColor Green
+        Write-Host "    - Rows: Correct vs Random (mapping strategy)" -ForegroundColor Gray
+        Write-Host "    - Columns: K4 vs K10 (group size) with $numReplicates subcolumns each" -ForegroundColor Gray
+
+        # Generate summary statistics for reference
         $summaryStats = $studyData | Group-Object mapping_strategy, k | ForEach-Object {
             $group = $_.Group
             [PSCustomObject]@{
@@ -372,9 +436,9 @@ function Generate-GraphPadExports {
             }
         }
         
-        $summaryExport = Join-Path $GraphPadImportsDir "Phase_B_Summary_Statistics.csv"
+        $summaryExport = Join-Path $ReferenceDataDir "Phase_B_Summary_Statistics.csv"
         $summaryStats | Export-Csv -Path $summaryExport -NoTypeInformation
-        Write-Host "  ✓ Generated: Phase_B_Summary_Statistics.csv (4 groups)" -ForegroundColor Green
+        Write-Host "  ✓ Generated: Phase_B_Summary_Statistics.csv (4 groups) [reference]" -ForegroundColor Green
     } else {
         Write-Host "  ! STUDY_results.csv not found - Phase B exports skipped" -ForegroundColor Yellow
         Write-Host "     Run compile_study.ps1 first to generate study-level data" -ForegroundColor Gray
@@ -405,25 +469,37 @@ function Show-GraphPadValidationInstructions {
     Write-Host "Target: Independent validation of framework calculations" -ForegroundColor Gray
     
     Write-GraphPadInstruction "3.1" "Open GraphPad Prism and create a new project"
+    Write-Host "     - File → New → New Project File"
+    Write-Host "     - CREATE 'Multiple variables' → 'Enter or import data into a new table', then save the project file"
+    Write-Host "     - Select 'Project info 1' in the Info section and enter project details"
     
-    Write-GraphPadInstruction "3.2" "Import validation datasets:"
-    Write-Host "     - Phase_A_Replication_Metrics.csv (framework results)" -ForegroundColor Gray
-    Write-Host "     - Phase_A_Raw_Scores_Wide.csv (trial data for MRR validation)" -ForegroundColor Gray
-    Write-Host "     - Phase_B_ANOVA_Data.csv (study-level data)" -ForegroundColor Gray
+    Write-GraphPadInstruction "3.2" "Process raw MRR scores:"
+    Write-Host "     - Select the 'Data 1' table and import 'Phase_A_Raw_Scores.csv' with the following options: 'insert and maintain link', auto-update, and 'separate adjacent columns' for commas"
+    Write-Host "     - Analyze Data → Column analyses → Descriptive statistics" -ForegroundColor Gray
+    Write-Host "     - Select all MRR columns (deselect 'A:Trial'), then calculate the 'Basics' set of 4 stats groups for each replication" -ForegroundColor Gray
+    Write-Host "     - Export results as 'GraphPad_MRR_Means' (CSV) to the 'graphpad_exports' folder" -ForegroundColor Gray
     
-    Write-GraphPadInstruction "3.3" "Validate MRR calculations:"
-    Write-Host "     - Use Phase_A_Raw_Scores_Wide.csv → Column Statistics → Descriptive statistics" -ForegroundColor Gray
-    Write-Host "     - Select MRR columns, calculate means for each replication" -ForegroundColor Gray
-    Write-Host "     - Export results as 'GraphPad_MRR_Means.csv'" -ForegroundColor Gray
+    Write-GraphPadInstruction "3.3" "Process Wilcoxon test results using K-specific datasets:"
+    Write-Host "     K=4 Analysis:" -ForegroundColor Gray
+    Write-Host "     - Create a new 'Multiple variables' data table and select the 'enter or import data' option" -ForegroundColor Gray
+    Write-Host "     - Import Phase_A_MRR_K4.csv into this new table and select the following options: 'insert and maintain link', auto-update, and 'separate adjacent columns' for commas" -ForegroundColor Gray
+    Write-Host "     - Analyze Data → Column analyses → One sample t test and Wilcoxon test" -ForegroundColor Gray
+    Write-Host "     - Select the MRR column only, then choose 'Wilcoxon signed-rank test' with hypothetical value = 0.25" -ForegroundColor Gray
+    Write-Host "     - Export results as 'GraphPad_Wilcoxon_K4' (CSV) to the 'graphpad_exports' folder" -ForegroundColor Gray
+    Write-Host "     " -ForegroundColor Gray
+    Write-Host "     K=10 Analysis:" -ForegroundColor Gray
+    Write-Host "     - Create a new 'Multiple variables' data table and select the 'enter or import data' option" -ForegroundColor Gray
+    Write-Host "     - Import Phase_A_MRR_K10.csv into this new table and select the following options: 'insert and maintain link', auto-update, and 'separate adjacent columns' for commas" -ForegroundColor Gray
+    Write-Host "     - Analyze Data → Column analyses → One sample t test and Wilcoxon test" -ForegroundColor Gray
+    Write-Host "     - Select the MRR column only, then choose 'Wilcoxon signed-rank test' with hypothetical value = 0.1" -ForegroundColor Gray
+    Write-Host "     - Export results as 'GraphPad_Wilcoxon_K10' (CSV) to the 'graphpad_exports' folder" -ForegroundColor Gray
     
-    Write-GraphPadInstruction "3.4" "Validate Wilcoxon tests (optional):"
-    Write-Host "     - Use Phase_A_Raw_Scores_Wide.csv → One sample t test and Wilcoxon test" -ForegroundColor Gray
-    Write-Host "     - Test against chance level (1/k where k=group_size)" -ForegroundColor Gray
-    
-    Write-GraphPadInstruction "3.5" "Validate ANOVA results (optional):"
-    Write-Host "     - Use Phase_B_ANOVA_Data.csv → Two-way ANOVA" -ForegroundColor Gray
-    Write-Host "     - Factors: mapping_strategy x k" -ForegroundColor Gray
-    Write-Host "     - Compare F-statistics and p-values" -ForegroundColor Gray
+    Write-GraphPadInstruction "3.4" "Process ANOVA results:"
+    Write-Host "     - Create a new 'Grouped' data table, select the import option, and specify 6 replicate values in subcolumns" -ForegroundColor Gray
+    Write-Host "     - Import Phase_B_ANOVA.csv into this new table and select the following options: 'insert and maintain link', auto-update, and 'separate adjacent columns' for commas" -ForegroundColor Gray
+    Write-Host "     - Analyze Data → Grouped analyses → Two-way ANOVA (or mixed model) " -ForegroundColor Gray
+    Write-Host "     - Leave both columns selected, then enable the interaction term (full model)" -ForegroundColor Gray
+    Write-Host "     - Export results as 'GraphPad_ANOVA' (CSV) to the 'graphpad_exports' folder" -ForegroundColor Gray
     
     Write-Host "`nAFTER COMPLETING GRAPHPAD ANALYSIS:" -ForegroundColor Cyan
     Write-Host "Run Step 4 validation:" -ForegroundColor White
@@ -441,7 +517,7 @@ function Show-GraphPadValidationInstructions {
 
 # --- Main Test Execution ---
 try {
-    Write-TestHeader "Statistical Analysis & Reporting - Step 2/4: GraphPad Export Generation" 'Magenta'
+    Write-TestHeader "Statistical Analysis & Reporting - Step 2/4: GraphPad Import Generation" 'Magenta'
     
     if ($Interactive) {
         Write-Host "${C_BLUE}This test implements the Two-Phase GraphPad Prism Validation Strategy:${C_RESET}"
