@@ -1,5 +1,27 @@
 # Changelog
 
+## 11.1.0 (2025-09-25)
+
+### Bump
+
+- **version 11.0.1 → 11.1.0**
+
+### Features
+
+- **add GraphPad Prism validation workflow with proper data formats**
+  Implement comprehensive GraphPad validation system for statistical analysis pipeline.
+  
+  - Create proper grouped table format for Two-way ANOVA with interaction terms
+  - Generate K-specific MRR datasets for separate Wilcoxon validation (K=4, K=10)
+  - Establish clean file organization with reference_data subfolder for non-import files
+  - Update GraphPad Prism version references to 10.6.1 for consistency
+  - Replace long PowerShell commands with PDM shortcuts (test-stats-results)
+  - Fix data structure issues preventing interaction term analysis in GraphPad
+  - Standardize export file naming without redundant suffixes
+  - Create 4-file import structure covering core algorithmic and statistical validation
+  - Add GraphPad Prism project workspace for manual validation steps
+  - Maintain academic citation readiness for publication validation methodology
+
 ## 11.0.1 (2025-09-24)
 
 ### Bump
