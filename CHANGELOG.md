@@ -1,5 +1,26 @@
 # Changelog
 
+## 11.2.3 (2025-09-26)
+
+### Bump
+
+- **version 11.2.2 → 11.2.3**
+
+### Fixes
+
+- **resolve crashes, infinite loops, and parsing failures across LLM framework**
+  Comprehensive fixes to handle unreliable LLM models and mixed response formats:
+  
+  - Fix NoneType formatting crashes in report generation with "N/A" fallback display
+  - Generate complete metric sets including lift calculations for zero-response runs
+  - Resolve infinite reprocessing loops by correcting state machine transitions
+  - Add session failure tolerance (20% threshold) for API resilience
+  - Implement markdown table parsing with pipe-to-tab conversion
+  - Fix birth year anchor detection for malformed names like "Jackie (1927) Robinson"
+  - Enhance audit output with trial success rates display
+  - Remove legacy metrics and filename references
+  - Reduce max loop count from 10 to 3 for faster failure detection
+
 ## 11.2.2 (2025-09-26)
 
 ### Bump
