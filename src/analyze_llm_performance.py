@@ -161,7 +161,9 @@ def analyze_metric_distribution(metric_values, chance_level, metric_name):
              base_return['wilcoxon_signed_rank_stat'] = 0.0
         else:
             try:
-                stat, p_val = wilcoxon(differences, alternative='greater', zero_method='wilcox')
+                # Use same directional logic as t-test for consistency
+                alt_hypothesis = 'less' if metric_name == 'Mean Rank of Correct ID' else 'greater'
+                stat, p_val = wilcoxon(differences, alternative=alt_hypothesis, zero_method='wilcox')
                 base_return['wilcoxon_signed_rank_stat'], base_return['wilcoxon_signed_rank_p'] = stat, p_val
             except ValueError as e: 
                 print(f"Error during Wilcoxon test for {metric_name} (data: {differences[:5]}...): {e}")

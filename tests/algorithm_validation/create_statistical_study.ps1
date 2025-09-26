@@ -64,7 +64,7 @@ param(
     [string]$OutputPath = "tests/assets/statistical_validation_study",
     [int]$ReplicationsPerExperiment = 6,
     [int]$TrialsPerReplication = 32,
-    [string]$Model = "google/gemini-flash-1.5",
+    [string]$Model = "google/gemini-flash-1.5-8b",
     [array]$MappingStrategies = @("correct", "random"),
     [array]$GroupSizes = @(4, 10),
     [switch]$Force,
@@ -366,15 +366,6 @@ Write-Host "1. Generate GraphPad export files:" -ForegroundColor Gray
 Write-Host "   pdm run test-graphpad-exports" -ForegroundColor Gray
 Write-Host "2. Follow GraphPad Prism comparison instructions" -ForegroundColor Gray
 Write-Host "3. Document validation results for publication" -ForegroundColor Gray
-
-} catch {
-    Write-Warning "Study compilation failed: $($_.Exception.Message)"
-    Write-Host "`nThe experiments were generated but need finalization before compilation." -ForegroundColor Yellow
-    Write-Host "Run the following commands to complete the study:" -ForegroundColor Yellow
-    Write-Host "  Get-ChildItem '$OutputPath' -Directory | ForEach-Object { .\fix_experiment.ps1 -ExperimentDirectory `$_.FullName }" -ForegroundColor Gray
-    Write-Host "  .\compile_study.ps1 -StudyDirectory '$OutputPath'" -ForegroundColor Gray
-    $compilationFailed = $true
-}
 
 # Final cleanup: Ensure config.ini is restored to original state
 Write-Verbose "Performing final cleanup..."

@@ -131,6 +131,8 @@ pytest.ini
 
 # General backup files and temporary office files
 *.bak
+*.backup
+config.ini.backup
 ~$*
 
 # Temporary files for PowerShell streaming

@@ -622,62 +622,61 @@ function Export-BiasRegressionDataForGraphPad {
 function Export-TrialByTrialPerformance {
     param($ReplicationPath, $ExperimentName, $ReplicationName)
     
-    # Extract bias metrics from existing replication_metrics.json
-    $metricsPath = Join-Path $ReplicationPath "analysis_inputs/replication_metrics.json"
-    if (-not (Test-Path $metricsPath)) {
-        Write-Verbose "No metrics file found at $metricsPath"
-        return $null
-    }
+    # Use the same Python extraction logic as Export-RawScoresForGraphPad
+    $projectRootEscaped = $ProjectRoot -replace '\\', '/'
+    $replicationPathEscaped = $ReplicationPath -replace '\\', '/'
     
-    try {
-        $metrics = Get-Content $metricsPath -Raw | ConvertFrom-Json
-        
-        # Extract configuration metadata
-        $configPath = Join-Path $ReplicationPath "config.ini.archived"
-        $config = @{}
-        if (Test-Path $configPath) {
-            $currentSection = ""
-            Get-Content $configPath | ForEach-Object {
-                $line = $_.Trim()
-                if ($line -match "^\[(.+)\]$") {
-                    $currentSection = $matches[1]
-                } elseif ($line -match "^([^=]+)=(.*)$" -and $line -notmatch "^#") {
-                    $key = $matches[1].Trim()
-                    $value = $matches[2].Trim()
-                    $config["$currentSection`:$key"] = $value
-                }
-            }
-        }
-        
-        $mappingStrategy = $config['Study:mapping_strategy'] -as [string]
-        $groupSize = [int]$config['Study:group_size']
-        
-        # Create a single record with the bias regression metrics from this replication
-        $biasRecord = [PSCustomObject]@{
-            Experiment = $ExperimentName
-            Replication = $ReplicationName
-            MappingStrategy = $mappingStrategy
-            GroupSize = $groupSize
-            Trial = 1  # Single record per replication
-            TrialSeq = 1
-            MRR = [double]$metrics.mean_mrr
-            Top1Accuracy = [double]$metrics.mean_top_1_acc
-            Top3Accuracy = [double]$metrics.mean_top_3_acc
-            MeanRank = [double]$metrics.mean_rank_of_correct_id
-            Slope = [double]$metrics.bias_slope
-            Intercept = [double]$metrics.bias_intercept
-            RValue = [double]$metrics.bias_r_value
-            PValue = [double]$metrics.bias_p_value
-        }
-        
-        Write-Verbose "$ExperimentName/$ReplicationName contributed 1 bias regression record"
-        return @($biasRecord)
-    }
-    catch {
-        $errorMessage = $_.Exception.Message
-        Write-Verbose "Failed to parse metrics from ${metricsPath}. Error: $errorMessage"
-        return $null
-    }
+    $pythonScript = @"
+import sys, os
+sys.path.insert(0, '$projectRootEscaped/src')
+
+from analyze_llm_performance import read_score_matrices, read_mappings_and_deduce_k, evaluate_single_test
+import logging
+logging.getLogger().setLevel(logging.CRITICAL)
+
+analysis_path = os.path.join('$replicationPathEscaped', 'analysis_inputs')
+mappings_file = os.path.join(analysis_path, 'all_mappings.txt')
+scores_file = os.path.join(analysis_path, 'all_scores.txt')
+
+if not os.path.exists(mappings_file) or not os.path.exists(scores_file):
+    exit()
+    
+mappings, k_val, delim = read_mappings_and_deduce_k(mappings_file)
+if not mappings or not k_val:
+    exit()
+    
+matrices = read_score_matrices(scores_file, k_val, delim)
+if not matrices:
+    exit()
+
+# Extract config info for metadata
+config_path = os.path.join('$replicationPathEscaped', 'config.ini.archived')
+config_info = {}
+if os.path.exists(config_path):
+    current_section = ""
+    with open(config_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('[') and line.endswith(']'):
+                current_section = line[1:-1]
+            elif '=' in line and not line.startswith('#'):
+                key, value = line.split('=', 1)
+                config_info[f'{current_section}:{key.strip()}'] = value.strip()
+
+mapping_strategy = config_info.get('Study:mapping_strategy', 'unknown')
+group_size = int(config_info.get('Study:group_size', k_val))
+
+for i, (matrix, mapping) in enumerate(zip(matrices, mappings)):
+    result = evaluate_single_test(matrix, mapping, k_val, 3)
+    if result:
+        print(f'$ExperimentName,$ReplicationName,{i+1},{result["mrr"]},{result["top_1_accuracy"]},{result["top_3_accuracy"]},{result["mean_rank_of_correct_id"]},{group_size},{mapping_strategy}')
+"@
+    
+    $pythonOutput = python -c $pythonScript 2>$null
+    $csvData = $pythonOutput | Where-Object { $_ -and $_ -match "," } | ConvertFrom-Csv -Header "Experiment","Replication","Trial","MRR","Top1Accuracy","Top3Accuracy","MeanRank","GroupSize","MappingStrategy"
+    
+    Write-Verbose "Extracted $($csvData.Count) actual trial records from $ReplicationName"
+    return $csvData
 }
 
 function Show-Phase3ValidationInstructions {
