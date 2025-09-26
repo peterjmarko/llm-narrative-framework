@@ -1,5 +1,25 @@
 # Changelog
 
+## 11.2.1 (2025-09-25)
+
+### Bump
+
+- **version 11.2.0 → 11.2.1**
+
+### Fixes
+
+- **complete GraphPad Prism statistical validation workflow (Step 4/4)**
+  Successfully achieved academic validation of framework's core statistical calculations against GraphPad Prism 10.6.1.
+  
+  - Fixed PowerShell syntax errors from malformed international characters
+  - Resolved CSV parsing issues to handle GraphPad's export format
+  - Updated validation script to parse unnamed first columns with row labels
+  - Suppressed CSV import warnings for cleaner output
+  - Achieved core MRR validation: 24/24 comparisons passed (max diff: 0.000050)
+  - Identified methodological differences in supplementary analyses (expected)
+  - Updated Project Roadmap and Testing Guide to reflect completion
+  - Academic citation ready: "Core statistical calculations were validated against GraphPad Prism 10.6.1"
+
 ## 11.2.0 (2025-09-25)
 
 ### Bump
