@@ -1,5 +1,30 @@
 # Changelog
 
+## 11.2.2 (2025-09-26)
+
+### Bump
+
+- **version 11.2.1 → 11.2.2**
+
+### Fixes
+
+- **resolve statistical validation pipeline blocking issues**
+  Address multiple critical issues preventing statistical validation against GraphPad Prism.
+  
+  This commit resolves four separate blocking issues that were preventing the statistical validation pipeline from executing:
+  
+  1. **API Connectivity**: Updated LLM model from decommissioned 'google/gemini-flash-1.5' to current 'google/gemini-flash-1.5-8b' in config.ini to restore OpenRouter API functionality.
+  
+  2. **Wilcoxon Test Directionality**: Fixed incorrect directional testing logic in analyze_llm_performance.py. Changed from broad substring matching ('rank' in metric_name.lower()) to precise metric identification (metric_name == 'Mean Rank of Correct ID') to ensure only rank metrics use 'alternative=less' while accuracy metrics correctly use 'alternative=greater'.
+  
+  3. **PowerShell Syntax**: Removed duplicated catch block around line 370 in create_statistical_study.ps1 that was causing parser errors during study generation.
+  
+  4. **Bias Regression Data Export**: Enhanced Export-TrialByTrialPerformance function in generate_graphpad_imports.ps1 to extract individual trial results instead of aggregated replication summaries, providing proper statistical power for GraphPad validation.
+  
+  5. **Git Ignore**: Added *.backup and config.ini.backup patterns to .gitignore to prevent temporary configuration files from being tracked.
+  
+  These fixes enable the complete statistical validation workflow to verify framework calculations against GraphPad Prism 10.6.1 for academic publication standards.
+
 ## 11.2.1 (2025-09-25)
 
 ### Bump
