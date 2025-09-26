@@ -118,7 +118,7 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
     
     # These consolidated summary files should exist in the experiment's root directory.
     required_files = [
-        "batch_run_log.csv",
+        "experiment_log.csv",
         "EXPERIMENT_results.csv"
     ]
 
@@ -127,18 +127,18 @@ def _verify_experiment_level_files(target_dir: Path) -> tuple[bool, list[str]]:
             is_complete = False
             details.append(f"MISSING: {filename}")
 
-    # Check if the batch log is finalized (contains a summary line)
-    log_path = target_dir / "batch_run_log.csv"
+    # Check if the experiment log is finalized (contains a summary line)
+    log_path = target_dir / "experiment_log.csv"
     if log_path.exists():
         try:
             with open(log_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             if "BatchSummary" not in content:
                 is_complete = False
-                details.append("batch_run_log.csv NOT FINALIZED")
+                details.append("experiment_log.csv NOT FINALIZED")
         except Exception:
             is_complete = False
-            details.append("batch_run_log.csv UNREADABLE")
+            details.append("experiment_log.csv UNREADABLE")
 
     return is_complete, details
 
@@ -524,7 +524,7 @@ def main():
     parser.add_argument('--end-rep', type=int, default=None, help="Last replication number for new runs.")
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose per-replication status updates.')
     parser.add_argument('--notes', type=str, help='Optional notes for the reports.')
-    parser.add_argument('--max-loops', type=int, default=10, help="Safety limit for state-machine loops.")
+    parser.add_argument('--max-loops', type=int, default=3, help="Safety limit for state-machine loops.")
     parser.add_argument('--migrate', action='store_true', help="Run a one-time migration workflow for a legacy experiment directory.")
     parser.add_argument('--reprocess', action='store_true', help="Force reprocessing of all runs in an experiment, then finalize.")
     parser.add_argument('--force-color', action='store_true', help=argparse.SUPPRESS) # Hidden from user help
@@ -601,12 +601,21 @@ def main():
             force_reprocess_once = args.reprocess
             loop_count = 0
             pipeline_successful = True
+            previous_state = None
+            loop_count = 0
             while loop_count < args.max_loops:
-                loop_count += 1
                 action_taken = False
                 success = True
 
                 state_name, payload_details, _ = get_experiment_state(Path(final_output_dir), end_rep)
+                
+                # Only count loops when we repeat the same state (indicating a problem)
+                if state_name == previous_state:
+                    loop_count += 1
+                else:
+                    loop_count = 0  # Reset counter for new state
+                
+                previous_state = state_name
 
                 if state_name == "NEW_NEEDED":
                     success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, args.verbose, script_paths['orchestrator'], colors, use_color=use_color)
@@ -634,7 +643,11 @@ def main():
                     action_taken = True
                     force_reprocess_once = False
 
-                elif state_name == "COMPLETE" or state_name == "AGGREGATION_NEEDED":
+                elif state_name == "AGGREGATION_NEEDED":
+                    print(f"{C_GREEN}--- All replications complete. Running finalization. ---{C_RESET}")
+                    break  # Exit loop and proceed to finalization
+
+                elif state_name == "COMPLETE":
                     print(f"{C_GREEN}--- Experiment is VALIDATED. Proceeding to finalization. ---{C_RESET}")
                     break
 

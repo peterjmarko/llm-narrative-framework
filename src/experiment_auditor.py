@@ -517,7 +517,6 @@ def _verify_experiment_level_files(target_dir: Path, expected_reps: int = None) 
     
     # Check experiment_log.csv with enhanced validation
     log_status = _check_experiment_log_content(target_dir / "experiment_log.csv")
-    print(f"DEBUG: experiment_log.csv status = {log_status}")
     if log_status != "VALID":
         is_complete = False
         details.append(log_status)
@@ -525,16 +524,12 @@ def _verify_experiment_level_files(target_dir: Path, expected_reps: int = None) 
     # Check EXPERIMENT_results.csv with enhanced schema validation
     if expected_reps:
         results_status = _check_experiment_results_csv(target_dir, expected_reps)
-        print(f"DEBUG: EXPERIMENT_results.csv status = {results_status} (expected_reps={expected_reps})")
     else:
         results_status = _check_csv_content(target_dir / "EXPERIMENT_results.csv")
-        print(f"DEBUG: EXPERIMENT_results.csv status = {results_status} (no expected_reps)")
     
     if results_status != "VALID":
         is_complete = False
         details.append(results_status)
-    
-    print(f"DEBUG: is_complete = {is_complete}, details = {details}")
     return is_complete, details
 
 def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, list, dict]:
@@ -664,7 +659,31 @@ def main():
             for name, (status, details) in granular_details.items():
                 display_name = name if len(name) <= max_name_len else name[:max_name_len-3] + "..."
                 status_color = C_GREEN if status == "VALIDATED" else C_RED
-                print(f"{display_name:<{max_name_len}} {status_color}{status:<20}{C_RESET} {'; '.join(details)}")
+                
+                # Extract trial counts for VALIDATED runs
+                trial_info = ""
+                if status == "VALIDATED":
+                    run_path = target_dir / name
+                    try:
+                        # Read trial counts from replication metrics
+                        metrics_path = run_path / "analysis_inputs" / "replication_metrics.json"
+                        if metrics_path.exists():
+                            with open(metrics_path, 'r', encoding='utf-8') as f:
+                                metrics = json.load(f)
+                            n_valid = metrics.get('n_valid_responses', 0)
+                            
+                            # Get total trials from config
+                            config_path = run_path / "config.ini.archived"
+                            if config_path.exists():
+                                config = configparser.ConfigParser()
+                                config.read(config_path)
+                                n_total = config.getint('Study', 'num_trials', fallback=0)
+                                trial_info = f" ({n_valid}/{n_total} trials)"
+                    except Exception:
+                        pass  # Ignore errors, just don't show trial info
+                
+                status_with_trials = f"{status}{trial_info}"
+                print(f"{display_name:<{max_name_len}} {status_color}{status_with_trials:<20}{C_RESET} {'; '.join(details)}")
 
         messages = {
             AUDIT_NEEDS_MIGRATION: ("Experiment needs MIGRATION.", "Run `migrate_experiment.ps1` to create an upgraded copy."),

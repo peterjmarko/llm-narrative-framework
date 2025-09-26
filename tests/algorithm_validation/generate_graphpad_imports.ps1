@@ -566,9 +566,13 @@ function Export-BiasRegressionDataForGraphPad {
     
     # Create sequential trial numbering for regression analysis
     $trialSequence = 1
+    $allBiasDataWithSeq = @()
     foreach ($record in $allBiasData) {
-        $record.TrialSeq = $trialSequence++
+        $newRecord = $record.PSObject.Copy()
+        $newRecord | Add-Member -NotePropertyName 'TrialSeq' -NotePropertyValue $trialSequence++
+        $allBiasDataWithSeq += $newRecord
     }
+    $allBiasData = $allBiasDataWithSeq
     
     # Generate purpose-built two-column files for GraphPad XY regression
     
@@ -1236,9 +1240,6 @@ if ($ExportOnly) {
     Write-Host "Phase 3: Bias regression analysis validation" -ForegroundColor Cyan
 } else {
     Write-Host "Ready for GraphPad Prism validation - follow instructions above" -ForegroundColor Cyan
-    Write-Host "Phase 1: Added Top-1 and Top-3 accuracy validation" -ForegroundColor Green
-    Write-Host "Phase 2: Added ANOVA effect size (eta-squared) validation" -ForegroundColor Green
-    Write-Host "Phase 3: Added bias regression (slope, intercept, R-value) validation" -ForegroundColor Green
     Write-Host ""
 }
 

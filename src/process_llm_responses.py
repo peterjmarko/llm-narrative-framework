@@ -235,22 +235,85 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
             logging.debug("Found table in markdown code block.")
             table_text = code_block_match.group(1).strip()
         else:
-            # Fallback Strategy: No markdown block. Try to get the last k+1 non-empty lines.
-            logging.warning("No markdown block found. Attempting to parse last k+1 lines as fallback.")
-            warning_count += 1
-            
-            # Get all non-empty lines from the full response
+            # Check for markdown table format first
             all_lines = [line.strip() for line in response_text.split('\n') if line.strip()]
+            markdown_table_lines = [line for line in all_lines if line.startswith('|') and '|' in line]
+            logging.warning(f"PARSER: Found {len(markdown_table_lines)} lines starting with '|' out of {len(all_lines)} total lines")
+            if markdown_table_lines:
+                logging.warning(f"PARSER: First markdown line: '{markdown_table_lines[0]}'")
             
-            if len(all_lines) >= k_value + 1:
-                # Take the slice of the last k+1 lines (header + k data rows)
-                candidate_lines = all_lines[-(k_value + 1):]
-                table_text = "\n".join(candidate_lines)
-                logging.debug(f"Using last {k_value + 1} non-empty lines as table candidate.")
+            if len(markdown_table_lines) >= k_value + 1:
+                # Filter out separator lines and convert to tab-separated format
+                table_lines = [line for line in markdown_table_lines if not '---' in line]
+                if len(table_lines) >= k_value + 1:
+                    # Convert markdown table to tab-separated format
+                    converted_lines = []
+                    for line in table_lines:
+                        parts = [p.strip() for p in line.strip('|').split('|')]
+                        parts = [p for p in parts if p]  # Remove empty parts
+                        converted_lines.append('\t'.join(parts))
+                    table_text = "\n".join(converted_lines)
+                    logging.warning(f"MARKDOWN TABLE DETECTED: Converted {len(table_lines)} lines to tab-separated format.")
+                    print(f"DEBUG: First converted line: '{converted_lines[0] if converted_lines else 'None'}'")
+                else:
+                    # Fall through to pattern detection
+                    logging.warning("Markdown table found but insufficient data rows. Attempting pattern detection.")
+                    warning_count += 1
+                    # Execute pattern detection logic
+                    table_lines = []
+                    for i in range(len(all_lines) - k_value):
+                        candidate_lines = all_lines[i:i + k_value + 1]
+                        if len(candidate_lines) == k_value + 1:
+                            tab_counts = [line.count('\t') for line in candidate_lines]
+                            space_counts = [len(line.split()) for line in candidate_lines]
+                            if len(set(tab_counts)) == 1 and tab_counts[0] > 1:
+                                table_lines = candidate_lines
+                                logging.debug(f"Found tab-separated table at lines {i}-{i+k_value}")
+                                break
+                            elif len(set(space_counts)) == 1 and space_counts[0] > k_value:
+                                table_lines = candidate_lines
+                                logging.debug(f"Found space-separated table at lines {i}-{i+k_value}")
+                                break
+                    
+                    if table_lines:
+                        table_text = "\n".join(table_lines)
+                    elif len(all_lines) >= k_value + 1:
+                        candidate_lines = all_lines[-(k_value + 1):]
+                        table_text = "\n".join(candidate_lines)
+                        logging.debug(f"Using last {k_value + 1} non-empty lines as table candidate.")
+                    else:
+                        logging.warning(f"Not enough non-empty lines ({len(all_lines)}) for fallback. Reverting to parse entire response.")
+                        table_text = response_text
             else:
-                # Last resort: not enough lines for the fallback, so parse the whole response.
-                logging.warning(f"Not enough non-empty lines ({len(all_lines)}) for fallback. Reverting to parse entire response.")
-                table_text = response_text
+                # No markdown table found - use pattern detection
+                logging.warning("No markdown block or table found. Attempting to detect table pattern.")
+                warning_count += 1
+                
+                # Strategy 1: Look for consecutive k+1 lines that look like table data
+                table_lines = []
+                for i in range(len(all_lines) - k_value):
+                    candidate_lines = all_lines[i:i + k_value + 1]
+                    if len(candidate_lines) == k_value + 1:
+                        tab_counts = [line.count('\t') for line in candidate_lines]
+                        space_counts = [len(line.split()) for line in candidate_lines]
+                        if len(set(tab_counts)) == 1 and tab_counts[0] > 1:
+                            table_lines = candidate_lines
+                            logging.debug(f"Found tab-separated table at lines {i}-{i+k_value}")
+                            break
+                        elif len(set(space_counts)) == 1 and space_counts[0] > k_value:
+                            table_lines = candidate_lines
+                            logging.debug(f"Found space-separated table at lines {i}-{i+k_value}")
+                            break
+                
+                if table_lines:
+                    table_text = "\n".join(table_lines)
+                elif len(all_lines) >= k_value + 1:
+                    candidate_lines = all_lines[-(k_value + 1):]
+                    table_text = "\n".join(candidate_lines)
+                    logging.debug(f"Using last {k_value + 1} non-empty lines as table candidate.")
+                else:
+                    logging.warning(f"Not enough non-empty lines ({len(all_lines)}) for fallback. Reverting to parse entire response.")
+                    table_text = response_text
 
         raw_lines = table_text.split('\n')
         
@@ -264,10 +327,35 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
             return np.full((k_value, k_value), 0.0), warning_count, is_rejected
 
         # 2. Identify the header row and its column structure
-        # Assume the first processed line is the header, as per prompt instruction.
-        header_line_content = processed_lines[0]
-        header_parts_raw = []
-        header_split_method = None
+        # Check if first line is a header by examining the last k fields (score columns)
+        first_line = processed_lines[0]
+        first_line_parts = first_line.split('\t') if '\t' in first_line else first_line.split()
+        
+        # Check if the last k fields contain numerical data
+        has_header = True
+        if len(first_line_parts) >= k_value + 1:  # Need at least name + k scores
+            score_parts = first_line_parts[-k_value:]  # Last k fields (score columns)
+            try:
+                [float(part) for part in score_parts]
+                has_header = False  # Last k fields are numerical, so no header
+                logging.debug("Detected headerless table - score columns contain numerical data.")
+            except ValueError:
+                has_header = True  # Last k fields contain non-numerical data, so has header
+                logging.debug("Detected table with header - score columns contain non-numerical data.")
+        
+        if has_header:
+            # Standard header processing - skip first line
+            header_line_content = first_line
+            data_lines = processed_lines[1:]  # Skip header, use next k lines
+            header_parts_raw = []
+            header_split_method = None
+        else:
+            # Headerless table - use first k lines as data
+            data_lines = processed_lines[:k_value]  # Use first k lines
+            # Create synthetic header for parsing logic
+            header_line_content = f"Name\t" + "\t".join([f"ID {i+1}" for i in range(k_value)])
+            header_parts_raw = []
+            header_split_method = None
 
         # Attempt 1: Tab-separated header (as per instruction: "single tab character")
         parts_tab = header_line_content.split('\t')
@@ -330,7 +418,7 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
 
         # 3. Extract score data rows using a more robust strategy
         collected_score_data = []
-        data_lines = processed_lines[1:] # All lines after the header
+        # data_lines already defined above based on header detection
         
         if len(data_lines) != k_value:
              logging.warning(f"  Expected {k_value} data rows, but found {len(data_lines)}. The response may be incomplete or malformed.")
@@ -338,16 +426,26 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
              is_rejected = True
 
         for line in data_lines:
-            # Use the birth year in parentheses as a reliable anchor to split the name from the scores
-            match = re.search(r'(\(\d{4}\))', line)
-            if not match:
-                logging.warning(f"  Could not find birth year anchor '(YYYY)' in line. Skipping line: '{line}'")
+            logging.debug(f"Processing data line: '{line}'")
+            
+            # Handle markdown table format by removing pipes first
+            if line.startswith('|'):
+                parts = [p.strip() for p in line.strip('|').split('|')]
+                line = '\t'.join([p for p in parts if p])  # Convert to tab-separated
+                logging.debug(f"Converted markdown line to: '{line}'")
+            
+            # Find where numerical scores begin by looking for the first tab followed by a number
+            # This handles malformed names like "Jackie (1927) Robinson" correctly
+            scores_match = re.search(r'\t(\d+\.?\d*)', line)
+            if not scores_match:
+                logging.warning(f"  Could not find numerical scores in line. Skipping line: '{line}'")
                 warning_count += 1
                 is_rejected = True
                 continue
-                
-            # The scores are everything after the closing parenthesis of the year
-            split_point = match.end()
+            
+            # Split at the tab before the first numerical score
+            split_point = scores_match.start()
+            scores_part_of_line = line[split_point:].strip()
             scores_part_of_line = line[split_point:].strip()
             
             # Split only the scores part using the flexible regex

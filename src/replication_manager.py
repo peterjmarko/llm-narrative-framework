@@ -333,14 +333,22 @@ def main():
                     if log_entry.strip() and "STAGE:" not in log_entry: # Avoid re-printing the header
                         logging.error(log_entry)
                 
-                # For NEW runs, a session failure is fatal to the entire replication.
-                # For REPAIR/REPROCESS runs, we log the failure but continue gracefully.
-                # The run will remain incomplete and can be re-repaired later.
-                if not args.reprocess:
-                    raise Exception(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed. See logs for details.")
+                # Calculate failure rate to determine if replication should continue
+                failure_rate = failed_sessions / len(indices_to_run)
+                failure_threshold = 0.2  # Allow up to 20% failures
+                
+                if failure_rate > failure_threshold:
+                    # High failure rate - treat as fatal error
+                    if not args.reprocess:
+                        raise Exception(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed ({failure_rate:.1%} failure rate). See logs for details.")
+                    else:
+                        repair_had_failures = True
+                        logging.warning(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed to repair. The script will continue, but the run remains incomplete.")
                 else:
-                    repair_had_failures = True
-                    logging.warning(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed to repair. The script will continue, but the run remains incomplete.")
+                    # Low failure rate - continue with warning
+                    logging.warning(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed ({failure_rate:.1%} failure rate), but continuing with {len(indices_to_run) - failed_sessions} successful responses.")
+                    if args.reprocess:
+                        repair_had_failures = True
 
         # Stage 3: Process LLM Responses
         cmd3 = [sys.executable, process_script, "--run_output_dir", run_specific_dir_path]

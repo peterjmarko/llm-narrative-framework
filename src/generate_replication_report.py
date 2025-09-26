@@ -125,18 +125,22 @@ def main():
     top_k_p_key = 'top_3_acc_p'
     k_num = 3
 
+    def format_metric(value, format_spec):
+        """Format a metric value, showing 'N/A' for None values."""
+        return f"{value:{format_spec}}" if value is not None else "N/A"
+
     summary_lines = [
         "="*80, "### OVERALL META-ANALYSIS RESULTS ###", "="*80,
         f"Number of Valid Responses: {metrics.get('n_valid_responses', 0)}",
         f"\n1. Overall Ranking Performance (MRR) (vs Chance={calculate_mrr_chance(k_per_query):.4f}):",
-        f"   Mean: {metrics.get('mean_mrr', 0):.4f}, Wilcoxon p-value: p = {metrics.get('mrr_p', 0):.4f}",
+        f"   Mean: {format_metric(metrics.get('mean_mrr'), '.4f')}, Wilcoxon p-value: p = {format_metric(metrics.get('mrr_p'), '.4f')}",
         f"\n2. Overall Ranking Performance (Top-1 Accuracy) (vs Chance={1/k_per_query:.2%}):",
-        f"   Mean: {metrics.get('mean_top_1_acc', 0):.2%}, Wilcoxon p-value: p = {metrics.get('top_1_acc_p', 0):.4f}",
+        f"   Mean: {format_metric(metrics.get('mean_top_1_acc'), '.2%')}, Wilcoxon p-value: p = {format_metric(metrics.get('top_1_acc_p'), '.4f')}",
         f"\n3. Overall Ranking Performance (Top-{k_num} Accuracy) (vs Chance={min(k_num, k_per_query)/k_per_query:.2%}):",
-        f"   Mean: {metrics.get(top_k_acc_key, 0):.2%}, Wilcoxon p-value: p = {metrics.get(top_k_p_key, 0):.4f}",
+        f"   Mean: {format_metric(metrics.get(top_k_acc_key), '.2%')}, Wilcoxon p-value: p = {format_metric(metrics.get(top_k_p_key), '.4f')}",
         f"\n4. Bias and Other Metrics:",
-        f"   Top-1 Prediction Bias (StdDev of choice counts): {metrics.get('top1_pred_bias_std', 0):.4f}",
-        f"   Mean Score Difference (Correct - Incorrect): {metrics.get('true_false_score_diff', 0):.4f}"
+        f"   Top-1 Prediction Bias (StdDev of choice counts): {format_metric(metrics.get('top1_pred_bias_std'), '.4f')}",
+        f"   Mean Score Difference (Correct - Incorrect): {format_metric(metrics.get('true_false_score_diff'), '.4f')}"
     ]
 
     # --- Assemble and Write Report ---

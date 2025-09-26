@@ -668,10 +668,9 @@ def main():
         logging.warning("No valid mappings found. This indicates zero valid LLM responses. Generating a null report.")
         
         summary_data = {
-            'mwu_stouffer_z': None, 'mwu_stouffer_p': None, 'mwu_fisher_chi2': None,
-            'mwu_fisher_p': None, 'mean_effect_size_r': None, 'effect_size_r_p': None,
             'mean_mrr': None, 'mrr_p': None, 'mean_top_1_acc': None, 'top_1_acc_p': None,
             f'mean_top_{args.top_k_acc}_acc': None, f'top_{args.top_k_acc}_acc_p': None,
+            'mean_mrr_lift': None, 'mean_top_1_acc_lift': None, f'mean_top_{args.top_k_acc}_acc_lift': None,
             'mean_rank_of_correct_id': None, 'rank_of_correct_id_p': None,
             'top1_pred_bias_std': None, 'true_false_score_diff': None,
             'bias_slope': None, 'bias_intercept': None, 'bias_r_value': None,

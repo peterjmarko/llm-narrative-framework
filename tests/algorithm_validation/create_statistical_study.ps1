@@ -64,7 +64,7 @@ param(
     [string]$OutputPath = "tests/assets/statistical_validation_study",
     [int]$ReplicationsPerExperiment = 6,
     [int]$TrialsPerReplication = 32,
-    [string]$Model = "google/gemini-flash-1.5-8b",
+    [string]$Model = "meta-llama/llama-4-maverick",
     [array]$MappingStrategies = @("correct", "random"),
     [array]$GroupSizes = @(4, 10),
     [switch]$Force,
