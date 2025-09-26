@@ -300,7 +300,7 @@ function Export-RawScoresForGraphPadWide {
 function Generate-KSpecificAccuracyExports {
     param($AllReplicationData)
     
-    Write-Host "Phase A: Generating K-specific accuracy validation exports (Phase 1)..." -ForegroundColor Cyan
+    Write-Host "Phase A: Generating K-specific accuracy validation exports..." -ForegroundColor Cyan
     
     # Filter data by group size
     $k4Data = $AllReplicationData | Where-Object { $_.GroupSize -eq 4 }
@@ -379,7 +379,7 @@ function Generate-KSpecificAccuracyExports {
 function Export-EffectSizeDataForGraphPad {
     param($TestStudyPath)
     
-    Write-Host "Phase B: Generating effect size validation exports (Phase 2)..." -ForegroundColor Cyan
+    Write-Host "Phase B: Generating effect size validation exports..." -ForegroundColor Cyan
     
     # Check if study compilation generated ANOVA analysis
     $anovaLogPath = Join-Path $TestStudyPath "anova/STUDY_analysis_log.txt"
@@ -401,7 +401,7 @@ function Export-EffectSizeDataForGraphPad {
 function Generate-EnhancedANOVAExports {
     param($TestStudyPath)
     
-    Write-Host "Phase B: Generating enhanced ANOVA exports with effect size validation (Phase 2)..." -ForegroundColor Cyan
+    Write-Host "Phase B: Generating enhanced ANOVA exports with effect size validation..." -ForegroundColor Cyan
     
     $studyResultsPath = Join-Path $TestStudyPath "STUDY_results.csv"
     if (-not (Test-Path $studyResultsPath)) {
@@ -520,7 +520,7 @@ function Generate-EnhancedANOVAExports {
     
     Write-Host "  ✓ Generated: Phase_B_ANOVA_Top1.csv (Top-1 accuracy grouped format for effect size verification)" -ForegroundColor Green
     Write-Host "  ✓ Generated: Phase_B_ANOVA_Top3.csv (Top-3 accuracy grouped format for effect size verification)" -ForegroundColor Green
-    Write-Host "    - 3 grouped ANOVA files total (MRR, Top-1, Top-3) for comprehensive effect size validation" -ForegroundColor Gray
+    Write-Host "    - 3 grouped ANOVA files total (MRR, Top-1, Top-3) for effect size validation" -ForegroundColor Gray
     
     # Export effect size data from framework analysis
     $effectSizeStats = Export-EffectSizeDataForGraphPad -TestStudyPath $TestStudyPath
@@ -533,7 +533,7 @@ function Generate-EnhancedANOVAExports {
 }
 
 # =============================================================================
-# PHASE 3: BIAS REGRESSION ANALYSIS ENHANCEMENT
+# BIAS REGRESSION ANALYSIS
 # =============================================================================
 
 function Export-BiasRegressionDataForGraphPad {
@@ -574,21 +574,21 @@ function Export-BiasRegressionDataForGraphPad {
     
     # Overall regression: TrialSeq vs MRR
     $overallMRRData = $allBiasData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='MRR';E={$_.MRR}}
-    $overallMRRExport = Join-Path $GraphPadImportsDir "Phase_A_Bias_Regression_MRR.csv"
+    $overallMRRExport = Join-Path $GraphPadImportsDir "Phase_B_Bias_Regression_MRR.csv"
     $overallMRRData | Export-Csv -Path $overallMRRExport -NoTypeInformation
-    Write-Host "  ✅ Generated: Phase_A_Bias_Regression_MRR.csv (TrialSeq vs MRR, $($overallMRRData.Count) points)" -ForegroundColor Green
+    Write-Host "  ✅ Generated: Phase_B_Bias_Regression_MRR.csv (TrialSeq vs MRR, $($overallMRRData.Count) points)" -ForegroundColor Green
     
     # Overall regression: TrialSeq vs Top1Accuracy
     $overallTop1Data = $allBiasData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='Top1Accuracy';E={$_.Top1Accuracy}}
-    $overallTop1Export = Join-Path $GraphPadImportsDir "Phase_A_Bias_Regression_Top1.csv"
+    $overallTop1Export = Join-Path $GraphPadImportsDir "Phase_B_Bias_Regression_Top1.csv"
     $overallTop1Data | Export-Csv -Path $overallTop1Export -NoTypeInformation
-    Write-Host "  ✅ Generated: Phase_A_Bias_Regression_Top1.csv (TrialSeq vs Top1Accuracy, $($overallTop1Data.Count) points)" -ForegroundColor Green
+    Write-Host "  ✅ Generated: Phase_B_Bias_Regression_Top1.csv (TrialSeq vs Top1Accuracy, $($overallTop1Data.Count) points)" -ForegroundColor Green
     
     # Overall regression: TrialSeq vs Top3Accuracy
     $overallTop3Data = $allBiasData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='Top3Accuracy';E={$_.Top3Accuracy}}
-    $overallTop3Export = Join-Path $GraphPadImportsDir "Phase_A_Bias_Regression_Top3.csv"
+    $overallTop3Export = Join-Path $GraphPadImportsDir "Phase_B_Bias_Regression_Top3.csv"
     $overallTop3Data | Export-Csv -Path $overallTop3Export -NoTypeInformation
-    Write-Host "  ✅ Generated: Phase_A_Bias_Regression_Top3.csv (TrialSeq vs Top3Accuracy, $($overallTop3Data.Count) points)" -ForegroundColor Green
+    Write-Host "  ✅ Generated: Phase_B_Bias_Regression_Top3.csv (TrialSeq vs Top3Accuracy, $($overallTop3Data.Count) points)" -ForegroundColor Green
     
     # Condition-specific analysis
     $correctData = $allBiasData | Where-Object { $_.MappingStrategy -eq "correct" }
@@ -597,17 +597,17 @@ function Export-BiasRegressionDataForGraphPad {
     if ($correctData.Count -gt 0) {
         # Correct condition: TrialSeq vs MRR
         $correctMRRData = $correctData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='MRR';E={$_.MRR}}
-        $correctMRRExport = Join-Path $GraphPadImportsDir "Phase_A_Bias_Regression_Correct_MRR.csv"
+        $correctMRRExport = Join-Path $GraphPadImportsDir "Phase_B_Bias_Regression_Correct_MRR.csv"
         $correctMRRData | Export-Csv -Path $correctMRRExport -NoTypeInformation
-        Write-Host "  ✅ Generated: Phase_A_Bias_Regression_Correct_MRR.csv ($($correctMRRData.Count) points)" -ForegroundColor Green
+        Write-Host "  ✅ Generated: Phase_B_Bias_Regression_Correct_MRR.csv ($($correctMRRData.Count) points)" -ForegroundColor Green
     }
     
     if ($randomData.Count -gt 0) {
         # Random condition: TrialSeq vs MRR
         $randomMRRData = $randomData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='MRR';E={$_.MRR}}
-        $randomMRRExport = Join-Path $GraphPadImportsDir "Phase_A_Bias_Regression_Random_MRR.csv"
+        $randomMRRExport = Join-Path $GraphPadImportsDir "Phase_B_Bias_Regression_Random_MRR.csv"
         $randomMRRData | Export-Csv -Path $randomMRRExport -NoTypeInformation
-        Write-Host "  ✅ Generated: Phase_A_Bias_Regression_Random_MRR.csv ($($randomMRRData.Count) points)" -ForegroundColor Green
+        Write-Host "  ✅ Generated: Phase_B_Bias_Regression_Random_MRR.csv ($($randomMRRData.Count) points)" -ForegroundColor Green
     }
     
     Write-Host "    - All files are two-column format optimized for GraphPad XY regression" -ForegroundColor Gray
@@ -683,18 +683,18 @@ function Export-TrialByTrialPerformance {
 function Show-Phase3ValidationInstructions {
     param($ExportStats)
     
-    Write-TestHeader "Comprehensive GraphPad Prism Manual Analysis Instructions - Phase 3 (Step 3 of 4)" 'Yellow'
+    Write-TestHeader "GraphPad Prism Manual Analysis Instructions (Step 3 of 4)" 'Yellow'
     
     Write-Host "Import files generated in: " -NoNewline -ForegroundColor White
     Write-Host $ExportStats.ExportDirectory -ForegroundColor Cyan
     
     Write-Host "`nComplete 4-Step Validation Workflow:" -ForegroundColor Magenta
     Write-Host "✓ Step 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
-    Write-Host "✓ Step 2: generate_graphpad_imports.ps1 - COMPLETED (PHASE 1 + 2 + 3)" -ForegroundColor Green
+    Write-Host "✓ Step 2: generate_graphpad_imports.ps1 - COMPLETED" -ForegroundColor Green
     Write-Host "→ Step 3: Manual GraphPad Analysis - FOLLOW INSTRUCTIONS BELOW" -ForegroundColor Yellow
     Write-Host "  Step 4: validate_graphpad_results.ps1 - PENDING" -ForegroundColor Gray
     
-    Write-Host "`nSTEP 3: COMPREHENSIVE MANUAL GRAPHPAD PRISM ANALYSIS (Phase 1 + 2 + 3)" -ForegroundColor Magenta
+    Write-Host "`nSTEP 3: MANUAL GRAPHPAD PRISM ANALYSIS" -ForegroundColor Magenta
     Write-Host "Target: Independent validation of framework calculations including bias analysis" -ForegroundColor Gray
     
     Write-GraphPadInstruction "3.1" "Open GraphPad Prism and create a new project:"
@@ -707,9 +707,9 @@ function Show-Phase3ValidationInstructions {
     Write-Host "       with the following options: 'insert and maintain link', auto-update, and 'separate adjacent columns' for commas. Check the box for setting these as default."
     Write-Host "     - Analyze Data → Column analyses → Descriptive statistics" -ForegroundColor Gray
     Write-Host "     - Deselect 'A:Trial' (leave all MRR columns selected), then calculate the 'Basics' set of 4 stats groups for each replication" -ForegroundColor Gray
-    Write-Host "     - Export results as 'tests/assets/statistical_validation_study/graphpad_exports/GraphPad_MRR_Means.csv'" -ForegroundColor Gray
+    Write-Host "     - Export analysis results as 'tests/assets/statistical_validation_study/graphpad_exports/GraphPad_MRR_Means.csv'" -ForegroundColor Gray
     
-    Write-GraphPadInstruction "3.3" "Process enhanced Wilcoxon test results using K-specific datasets (PHASE 1 ENHANCED):"
+    Write-GraphPadInstruction "3.3" "Process enhanced Wilcoxon test results using K-specific datasets:"
     Write-Host ""
     Write-Host "     MRR Analysis:" -ForegroundColor Cyan
     Write-Host "     • K=4 MRR:" -ForegroundColor Gray
@@ -717,88 +717,81 @@ function Show-Phase3ValidationInstructions {
     Write-Host "       - Import 'graphpad_imports/Phase_A_MRR_K4.csv' into this new table"
     Write-Host "       - Analyze Data → Column analyses → One sample t test and Wilcoxon test"
     Write-Host "       - Select the MRR column only, then choose 'Wilcoxon signed-rank test' with hypothetical value = 0.25"
-    Write-Host "       - Export results as 'graphpad_exports/GraphPad_Wilcoxon_K4.csv'"
+    Write-Host "       - Export analysis results results as 'graphpad_exports/GraphPad_Wilcoxon_K4.csv'"
     Write-Host "     • K=10 MRR:" -ForegroundColor Gray
-    Write-Host "       - Repeat analysis for K=10 MRR: Import 'graphpad_imports/Phase_A_MRR_K10.csv' → hypothetical = 0.1"
-    Write-Host "       - Export as 'graphpad_exports/GraphPad_Wilcoxon_MRR_K10.csv'"
+    Write-Host "       - Repeat import and analysis for 'graphpad_imports/Phase_A_MRR_K10.csv' → hypothetical = 0.1"
+    Write-Host "       - Export analysis results as 'graphpad_exports/GraphPad_Wilcoxon_MRR_K10.csv'"
     Write-Host ""
     Write-Host "     Top-1 Accuracy Analysis:" -ForegroundColor Cyan
     Write-Host "     • K=4 Top-1:" -ForegroundColor Gray
-    Write-Host "       - Repeat analysis for K=4 Top-1: Import 'graphpad_imports/Phase_A_Top1_K4.csv' → hypothetical = 0.25"
-    Write-Host "       - Export as 'graphpad_exports/GraphPad_Wilcoxon_Top1_K4.csv'"
+    Write-Host "       - Repeat import and analysis for 'graphpad_imports/Phase_A_Top1_K4.csv' → hypothetical = 0.25"
+    Write-Host "       - Export analysis results as 'graphpad_exports/GraphPad_Wilcoxon_Top1_K4.csv'"
     Write-Host "     • K=10 Top-1:" -ForegroundColor Gray
-    Write-Host "       - Repeat analysis for K=10 Top-1: Import 'graphpad_imports/Phase_A_Top1_K10.csv' → hypothetical = 0.1"
-    Write-Host "       - Export as 'graphpad_exports/GraphPad_Wilcoxon_Top1_K10.csv'"
+    Write-Host "       - Repeat import and analysis for 'graphpad_imports/Phase_A_Top1_K10.csv' → hypothetical = 0.1"
+    Write-Host "       - Export analysis results as 'graphpad_exports/GraphPad_Wilcoxon_Top1_K10.csv'"
     Write-Host ""
     Write-Host "     Top-3 Accuracy Analysis:" -ForegroundColor Cyan
     Write-Host "     • K=4 Top-3:" -ForegroundColor Gray
-    Write-Host "       - Repeat analysis for K=4 Top-3: Import 'graphpad_imports/Phase_A_Top3_K4.csv' → hypothetical = 0.75"
-    Write-Host "       - Export as 'graphpad_exports/GraphPad_Wilcoxon_Top3_K4.csv'"
+    Write-Host "       - Repeat import and analysis for 'graphpad_imports/Phase_A_Top3_K4.csv' → hypothetical = 0.75"
+    Write-Host "       - Export analysis results as 'graphpad_exports/GraphPad_Wilcoxon_Top3_K4.csv'"
     Write-Host "     • K=10 Top-3:" -ForegroundColor Gray
-    Write-Host "       - Repeat analysis for K=10 Top-3: Import 'graphpad_imports/Phase_A_Top3_K10.csv' → hypothetical = 0.3"
-    Write-Host "       - Export as 'graphpad_exports/GraphPad_Wilcoxon_Top3_K10.csv'"
+    Write-Host "       - Repeat import and analysis for 'graphpad_imports/Phase_A_Top3_K10.csv' → hypothetical = 0.3"
+    Write-Host "       - Export analysis results as 'graphpad_exports/GraphPad_Wilcoxon_Top3_K10.csv'"
     
-    Write-GraphPadInstruction "3.4" "Process Enhanced ANOVA with Effect Size Validation (NEW - Phase 2):"
+    Write-GraphPadInstruction "3.4" "Process Enhanced ANOVA with Effect Size Validation:"
     Write-Host ""
     Write-Host "     MRR ANOVA Analysis with Effect Size:" -ForegroundColor Cyan
     Write-Host "     • Create new 'Grouped' table, specify 6 replicate values in subcolumns" -ForegroundColor Gray
     Write-Host "     • Import 'graphpad_imports/Phase_B_ANOVA_MRR.csv'" -ForegroundColor Gray
     Write-Host "     • Analyze Data → Grouped analyses → Two-way ANOVA" -ForegroundColor Gray
     Write-Host "     • Enable interaction term (full model) and 'Show effect size (eta-squared)'" -ForegroundColor Gray
-    Write-Host "     • Export results as 'graphpad_exports/GraphPad_ANOVA_MRR.csv'" -ForegroundColor Gray
+    Write-Host "     • Export analysis results as 'graphpad_exports/GraphPad_ANOVA_MRR.csv'" -ForegroundColor Gray
     Write-Host ""
     Write-Host "     Top-1 Accuracy ANOVA Analysis with Effect Size:" -ForegroundColor Cyan
-    Write-Host "     • Create new 'Grouped' table, specify 6 replicate values in subcolumns" -ForegroundColor Gray
-    Write-Host "     • Import 'graphpad_imports/Phase_B_ANOVA_Top1.csv'" -ForegroundColor Gray
-    Write-Host "     • Analyze Data → Grouped analyses → Two-way ANOVA" -ForegroundColor Gray
-    Write-Host "     • Enable interaction term (full model) and 'Show effect size (eta-squared)'" -ForegroundColor Gray
-    Write-Host "     • Export results as 'graphpad_exports/GraphPad_ANOVA_Top1.csv'" -ForegroundColor Gray
+    Write-Host "     • Repeat import and analysis for 'graphpad_imports/Phase_B_ANOVA_Top1.csv'" -ForegroundColor Gray
+    Write-Host "     • Export analysis results as 'graphpad_exports/GraphPad_ANOVA_Top1.csv'" -ForegroundColor Gray
     Write-Host ""
     Write-Host "     Top-3 Accuracy ANOVA Analysis with Effect Size:" -ForegroundColor Cyan
-    Write-Host "     • Create new 'Grouped' table, specify 6 replicate values in subcolumns" -ForegroundColor Gray
-    Write-Host "     • Import 'graphpad_imports/Phase_B_ANOVA_Top3.csv'" -ForegroundColor Gray
-    Write-Host "     • Analyze Data → Grouped analyses → Two-way ANOVA" -ForegroundColor Gray
-    Write-Host "     • Enable interaction term (full model) and 'Show effect size (eta-squared)'" -ForegroundColor Gray
-    Write-Host "     • Export results as 'graphpad_exports/GraphPad_ANOVA_Top3.csv'" -ForegroundColor Gray
+    Write-Host "     • Repeat import and analysis for 'graphpad_imports/Phase_B_ANOVA_Top3.csv'" -ForegroundColor Gray
+    Write-Host "     • Export analysis results as 'graphpad_exports/GraphPad_ANOVA_Top3.csv'" -ForegroundColor Gray
     
-    # Phase 3 Instructions (Bias Regression Analysis) - NEW
-    Write-GraphPadInstruction "3.5" "Process Bias Regression Analysis (NEW - Phase 3):"
+    # Bias Regression Analysis Instructions
+    Write-GraphPadInstruction "3.5" "Process Bias Regression Analysis:"
     Write-Host ""
     Write-Host "     Overall Bias Regression Analysis:" -ForegroundColor Cyan
-    Write-Host "     • Create new 'XY' data table" -ForegroundColor Gray
-    Write-Host "     • Import 'graphpad_imports/Phase_A_Bias_Regression.csv'" -ForegroundColor Gray
-    Write-Host "     • X-axis: TrialSeq (trial sequence number)" -ForegroundColor Gray
-    Write-Host "     • Y-axis: MRR (performance over time)" -ForegroundColor Gray
-    Write-Host "     • Analyze Data → XY analyses → Linear regression" -ForegroundColor Gray
-    Write-Host "     • Export regression results as 'graphpad_exports/GraphPad_Bias_Regression_Overall.csv'" -ForegroundColor Gray
+    Write-Host "     • Create new 'XY' data table with numbers for X and single values for Y" -ForegroundColor Gray
+    Write-Host "     • Import 'graphpad_imports/Phase_B_Bias_Regression.csv'" -ForegroundColor Gray
+    Write-Host "     • Analyze Data → XY analyses → Simple linear regression" -ForegroundColor Gray
+    Write-Host "     • Export analysis results as 'graphpad_exports/GraphPad_Bias_Regression_Overall.csv'" -ForegroundColor Gray
     Write-Host ""
     Write-Host "     Condition-Specific Bias Analysis:" -ForegroundColor Cyan
     Write-Host "     • Correct Condition:" -ForegroundColor Gray
-    Write-Host "       - Import 'graphpad_imports/Phase_A_Bias_Regression_Correct.csv' into XY table" -ForegroundColor Gray
-    Write-Host "       - Linear regression: TrialSeq vs MRR" -ForegroundColor Gray
-    Write-Host "       - Export as 'graphpad_exports/GraphPad_Bias_Regression_Correct.csv'" -ForegroundColor Gray
+    Write-Host "       - Repeat import and analysis for 'graphpad_imports/Phase_B_Bias_Regression_Correct.csv'" -ForegroundColor Gray
+    Write-Host "       - Export analysis results as 'graphpad_exports/GraphPad_Bias_Regression_Correct.csv'" -ForegroundColor Gray
     Write-Host "     • Random Condition:" -ForegroundColor Gray
-    Write-Host "       - Import 'graphpad_imports/Phase_A_Bias_Regression_Random.csv' into XY table" -ForegroundColor Gray
-    Write-Host "       - Linear regression: TrialSeq vs MRR" -ForegroundColor Gray
-    Write-Host "       - Export as 'graphpad_exports/GraphPad_Bias_Regression_Random.csv'" -ForegroundColor Gray
+    Write-Host "       - Repeat import and analysis for 'graphpad_imports/Phase_B_Bias_Regression_Random.csv'" -ForegroundColor Gray
+    Write-Host "       - Export analysis results as 'graphpad_exports/GraphPad_Bias_Regression_Random.csv'" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "     Additional Regression Metrics (Phase 3):" -ForegroundColor Cyan
-    Write-Host "     • Repeat regression analysis for Top1Accuracy and Top3Accuracy vs TrialSeq" -ForegroundColor Gray
-    Write-Host "     • Compare slope, intercept, R-squared, and p-values with framework calculations" -ForegroundColor Gray
-    Write-Host "     • Export all regression analyses for comprehensive bias validation" -ForegroundColor Gray
+    Write-Host "     Top-1 Accuracy Regression Metrics:" -ForegroundColor Cyan
+    Write-Host "     • Repeat import and analysis for 'graphpad_imports/Phase_B_Bias_Regression_Top1.csv'" -ForegroundColor Gray
+    Write-Host "     • Export analysis results as 'graphpad_exports/GraphPad_Bias_Regression_Top1.csv'" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "     Top-3 Accuracy Regression Metrics:" -ForegroundColor Cyan
+    Write-Host "     • Repeat import and analysis for 'graphpad_imports/Phase_B_Bias_Regression_Top3.csv'" -ForegroundColor Gray
+    Write-Host "     • Export analysis results as 'graphpad_exports/GraphPad_Bias_Regression_Top3.csv'" -ForegroundColor Gray
     
-    Write-Host "`nAFTER COMPLETING COMPREHENSIVE GRAPHPAD ANALYSIS (Phase 1 + 2 + 3):" -ForegroundColor Cyan
+    Write-Host "`nAFTER COMPLETING GRAPHPAD ANALYSIS:" -ForegroundColor Cyan
     Write-Host "Run Step 4 validation:" -ForegroundColor White
     Write-Host "pdm run test-stats-results" -ForegroundColor Gray
     
-    Write-Host "`nSUCCESS CRITERIA (COMPREHENSIVE - Phase 1 + 2 + 3):" -ForegroundColor Green
+    Write-Host "`nSUCCESS CRITERIA:" -ForegroundColor Green
     Write-Host "Step 4 will validate within established tolerances:" -ForegroundColor White
-    Write-Host "• Phase 1: MRR, Top-1, Top-3 accuracy calculations and Wilcoxon p-values (±0.0001)" -ForegroundColor White
-    Write-Host "• Phase 2: ANOVA F-statistics (±0.01) and eta-squared effect sizes (±0.01)" -ForegroundColor White
-    Write-Host "• Phase 3: Linear regression slopes (±0.0001), R-values (±0.01), p-values (±0.001)" -ForegroundColor White
+    Write-Host "• MRR, Top-1, Top-3 accuracy calculations and Wilcoxon p-values (±0.0001)" -ForegroundColor White
+    Write-Host "• ANOVA F-statistics (±0.01) and eta-squared effect sizes (±0.01)" -ForegroundColor White
+    Write-Host "• Linear regression slopes (±0.0001), R-values (±0.01), p-values (±0.001)" -ForegroundColor White
     Write-Host "Citation ready: 'Statistical analyses were validated against GraphPad Prism 10.6.1'" -ForegroundColor White
     
-    Write-Host "`nVALIDATION SUMMARY (COMPREHENSIVE - Phase 1 + 2 + 3):" -ForegroundColor Cyan
+    Write-Host "`nVALIDATION SUMMARY:" -ForegroundColor Cyan
     Write-Host "Replications to validate: $($ExportStats.ReplicationCount)" -ForegroundColor White
     Write-Host "Total trials analyzed: $($ExportStats.TrialCount)" -ForegroundColor White
     Write-Host "Export files: 15+ total (6 K-specific + 3 ANOVA + 3+ Bias + 3+ reference files)" -ForegroundColor White
@@ -831,7 +824,7 @@ function Show-Phase3ValidationInstructions {
 function Generate-GraphPadExports {
     param($TestStudyPath)
     
-    Write-TestStep "Generating Enhanced GraphPad Prism Import Files (Phase 1 + 2 + 3)"
+    Write-TestStep "Generating Enhanced GraphPad Prism Import Files"
     
     # Create export directory
     New-Item -ItemType Directory -Path $GraphPadImportsDir -Force | Out-Null
@@ -1201,11 +1194,11 @@ try {
     
     # Step 4: Generate Enhanced GraphPad Exports (Phase 1)
     Write-Host ""
-    Write-TestStep "Step 4: Generate Enhanced GraphPad Export Files (Phase 1 + 2 + 3)"
+    Write-TestStep "Step 4: Generate Enhanced GraphPad Export Files"
     
     $exportStats = Generate-GraphPadExports -TestStudyPath $finalStudyPath
     
-    # Step 5: Show Enhanced Validation Instructions (Phase 1)
+    # Step 5: Show Enhanced Validation Instructions
     if (-not $ExportOnly) {
         Show-Phase3ValidationInstructions -ExportStats $exportStats
         
@@ -1235,15 +1228,15 @@ finally {
     }
 }
 
-Write-Host "`nCOMPREHENSIVE GRAPHPAD PRISM VALIDATION EXPORTS GENERATED SUCCESSFULLY (Phase 1 + 2 + 3)" -ForegroundColor Green
+Write-Host "`nGRAPHPAD PRISM VALIDATION EXPORTS GENERATED SUCCESSFULLY" -ForegroundColor Green
 
 if ($ExportOnly) {
-    Write-Host "Comprehensive import files available in: $GraphPadImportsDir" -ForegroundColor Cyan
+    Write-Host "Import files available in: $GraphPadImportsDir" -ForegroundColor Cyan
     Write-Host "Phase 1: 6 K-specific accuracy validation files" -ForegroundColor Cyan
     Write-Host "Phase 2: Enhanced ANOVA with effect size validation" -ForegroundColor Cyan
     Write-Host "Phase 3: Bias regression analysis validation" -ForegroundColor Cyan
 } else {
-    Write-Host "Ready for comprehensive GraphPad Prism validation - follow instructions above" -ForegroundColor Cyan
+    Write-Host "Ready for GraphPad Prism validation - follow instructions above" -ForegroundColor Cyan
     Write-Host "Phase 1: Added Top-1 and Top-3 accuracy validation" -ForegroundColor Green
     Write-Host "Phase 2: Added ANOVA effect size (eta-squared) validation" -ForegroundColor Green
     Write-Host "Phase 3: Added bias regression (slope, intercept, R-value) validation" -ForegroundColor Green
