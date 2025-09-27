@@ -101,7 +101,7 @@ DEFAULT_QUERY_IDENTIFIER_INTERACTIVE = "interactive_test"
 
 # --- Spinner constants ---
 SPINNER_FRAMES = ['-', '\\', '|', '/']
-SPINNER_INTERVAL = 0.1 
+SPINNER_INTERVAL = 1.0  # Update every 1 second to reduce console spam 
 CLEANUP_DELAY = 0.1
 
 # --- Global CONFIG object & Logging Setup ---

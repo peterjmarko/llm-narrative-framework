@@ -83,7 +83,7 @@ if (-not [string]::IsNullOrEmpty($ConfigPath)) { $pythonArgs += "--config-path",
 $pythonExitCode = $LASTEXITCODE
 
 if ($pythonExitCode -ne 0) {
-    Write-Host "`n!!! The experiment manager exited with an error. Check the output above. !!!" -ForegroundColor Red
+    Write-Host "`n!!! The experiment manager exited with an error. Check the output above. !!!`n" -ForegroundColor Red
     exit $pythonExitCode
 }
 

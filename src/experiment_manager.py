@@ -186,7 +186,7 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
                 raise subprocess.CalledProcessError(proc.returncode, proc.args)
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
-            logging.error(f"Orchestrator for replication {rep_num} failed or was interrupted.")
+            print(f"\n{C_YELLOW}Orchestrator for replication {rep_num} failed or was interrupted.{C_RESET}\n")
             # No need to print e.stderr here, as it has already been displayed.
             if isinstance(e, KeyboardInterrupt):
                 # If interrupted, exit the manager immediately.
@@ -644,20 +644,26 @@ def main():
                     force_reprocess_once = False
 
                 elif state_name == "AGGREGATION_NEEDED":
-                    print(f"{C_GREEN}--- All replications complete. Running finalization. ---{C_RESET}")
+                    print(f"{C_GREEN}\n--- All replications complete. Running finalization. ---{C_RESET}")
                     break  # Exit loop and proceed to finalization
 
                 elif state_name == "COMPLETE":
-                    print(f"{C_GREEN}--- Experiment is VALIDATED. Proceeding to finalization. ---{C_RESET}")
+                    print(f"{C_GREEN}\n--- Experiment is VALIDATED. Proceeding to finalization. ---{C_RESET}")
                     break
 
                 if not success:
-                    print(f"{C_RED}--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
-                    pipeline_successful = False
-                    break
+                    if state_name == "REPAIR_NEEDED":
+                        # For repair failures, continue to show final experiment status
+                        print(f"{C_YELLOW}\n--- Repair step failed, but continuing to final audit to show overall experiment status. ---{C_RESET}")
+                        pipeline_successful = False
+                        # Don't break - let the loop continue to check final state
+                    else:
+                        print(f"{C_RED}\n--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
+                        pipeline_successful = False
+                        break
 
             if loop_count >= args.max_loops:
-                print(f"{C_RED}--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
+                print(f"{C_RED}\n--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
                 pipeline_successful = False
             
             if pipeline_successful:

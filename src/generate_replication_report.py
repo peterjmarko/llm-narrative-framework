@@ -27,7 +27,8 @@ generating the final, comprehensive `replication_report.txt`.
 
 It reads the final, authoritative `replication_metrics.json` file and the
 `config.ini.archived` file from a given run directory. It then assembles a
-complete report containing a detailed header, the base LLM query, a human-readable
+complete report containing a detailed header, the base LLM query, parsing 
+diagnostics showing success/failure status for each response, a human-readable
 summary of key results, and the full, machine-parsable JSON block of all metrics.
 
 This modular approach ensures that report generation is a distinct, testable
@@ -93,12 +94,20 @@ def main():
     
     # Using f-string padding to align values at column 25.
     # The label (e.g., 'Date:') is left-aligned in a 24-character space.
+    # Determine actual status based on pipeline completion
+    n_valid = metrics.get('n_valid_responses', 0)
+    total_trials = config.getint('Study', 'num_trials', fallback=0)
+    
+    final_status = "COMPLETED" if n_valid > 0 else "FAILED"
+    parsing_status = "COMPLETED" if n_valid > 0 else ("PARTIAL" if n_valid < total_trials else "FAILED")
+    validation_status = "COMPLETED" if metrics else "FAILED"
+    
     header_lines = [
         "="*80, " REPLICATION RUN REPORT", "="*80,
         f"{'Date:':<24}{run_date_display}",
-        f"Final Status:                  PENDING",
-        f"{'Parsing Status:':<24}PENDING",
-        f"{'Validation Status:':<24}PENDING",
+        f"{'Final Status:':<24}{final_status}",
+        f"{'Parsing Status:':<24}{parsing_status}",
+        f"{'Validation Status:':<24}{validation_status}",
         f"{'Replication Number:':<24}{args.replication_num}",
         f"{'Run Directory:':<24}{os.path.basename(run_specific_dir_path)}",
         f"{'Report File:':<24}{os.path.basename(report_path)}",
@@ -129,9 +138,21 @@ def main():
         """Format a metric value, showing 'N/A' for None values."""
         return f"{value:{format_spec}}" if value is not None else "N/A"
 
+    # Add parsing summary before the results
+    parsing_summary_lines = []
+    parsing_summary_path = os.path.join(run_specific_dir_path, 'analysis_inputs', 'parsing_summary.txt')
+    if os.path.exists(parsing_summary_path):
+        with open(parsing_summary_path, 'r', encoding='utf-8') as f_parse:
+            parsing_summary_lines = [f_parse.read().strip()]
+    else:
+        parsing_summary_lines = ["--- Response Parsing Summary ---\nParsing summary not available"]
+    
     summary_lines = [
         "="*80, "### OVERALL META-ANALYSIS RESULTS ###", "="*80,
         f"Number of Valid Responses: {metrics.get('n_valid_responses', 0)}",
+        ""
+    ] + parsing_summary_lines + [
+        ""
         f"\n1. Overall Ranking Performance (MRR) (vs Chance={calculate_mrr_chance(k_per_query):.4f}):",
         f"   Mean: {format_metric(metrics.get('mean_mrr'), '.4f')}, Wilcoxon p-value: p = {format_metric(metrics.get('mrr_p'), '.4f')}",
         f"\n2. Overall Ranking Performance (Top-1 Accuracy) (vs Chance={1/k_per_query:.2%}):",

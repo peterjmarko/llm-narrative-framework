@@ -27,9 +27,13 @@ raw, potentially inconsistent text responses from the LLM and transforms them
 into clean, validated, and structured numerical data ready for analysis.
 
 Key Features:
--   **Robust Parsing**: Employs a flexible parser to extract score matrices from
-    LLM text, correctly handling markdown fences, variable spacing, and
-    unexpected column order.
+-   **Robust Matrix Extraction**: Identifies exactly k consecutive lines containing
+    exactly k numeric values at the end of each line, extracting k×k score matrices
+    from diverse LLM response formats regardless of headers, explanations, or
+    column formatting variations.
+-   **Parsing Diagnostics**: Generates detailed parsing summaries showing success/failure
+    status for each response, saved to `parsing_summary.txt` and included in
+    replication reports for troubleshooting.
 -   **Ground-Truth Validation**: Before accepting a trial's data, it performs a
     critical validation by cross-referencing the master `mappings.txt` against
     the individual trial's `manifest.txt`, ensuring data integrity.
@@ -206,335 +210,62 @@ def get_list_a_details_from_query(query_filepath):
 
 def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_ordered_from_query, is_rank_based=False):
     """
-    Robustly parses LLM response text into a k x k numerical score matrix.
-
-    This parser uses a multi-stage strategy for maximum flexibility:
-    1.  **Table Isolation**: It first tries to find a markdown code block (```...```).
-        If not found, it falls back to parsing the last k+1 non-empty lines of the response.
-    2.  **Header Parsing**: It identifies the header, determines the visual order of
-        the 'ID X' columns, and builds a map to reorder them correctly. It handles
-        both tab-separated and flexible space/pipe-separated headers.
-    3.  **Data Row Parsing**: It uses the `(YYYY)` birth year in each data row as a
-        reliable anchor to separate the name from the score values. It then
-        parses the scores and uses the header map to place them in the correct
-        final order (ID 1, ID 2, ...).
-
-    The function gracefully handles malformed data, clamps scores to the [0.0, 1.0]
-    range, and returns the final matrix, a warning count, and a rejection status.
+    Extracts a k x k numerical score matrix from LLM response text.
+    
+    Finds exactly k consecutive lines that each contain exactly k numeric values at the end.
     """
-    warning_count = 0 # Initialize warning counter for this response
-    is_rejected = False # Initialize rejection flag
+    warning_count = 0
+    is_rejected = False
 
     try:
-        # 1. Isolate the table text.
-        # Primary Strategy: Look for a markdown code block.
-        table_text = ""
-        code_block_match = re.search(r"```(?:[a-zA-Z]+\n)?(.*?)```", response_text, re.DOTALL)
+        # Get all non-empty lines
+        all_lines = [line.strip() for line in response_text.split('\n') if line.strip()]
         
-        if code_block_match:
-            logging.debug("Found table in markdown code block.")
-            table_text = code_block_match.group(1).strip()
-        else:
-            # Check for markdown table format first
-            all_lines = [line.strip() for line in response_text.split('\n') if line.strip()]
-            markdown_table_lines = [line for line in all_lines if line.startswith('|') and '|' in line]
-            logging.warning(f"PARSER: Found {len(markdown_table_lines)} lines starting with '|' out of {len(all_lines)} total lines")
-            if markdown_table_lines:
-                logging.warning(f"PARSER: First markdown line: '{markdown_table_lines[0]}'")
+        if len(all_lines) < k_value:
+            logging.error(f"Insufficient lines: found {len(all_lines)}, need at least {k_value}")
+            return np.full((k_value, k_value), 0.0), 1, True
+
+        # Find k consecutive lines with exactly k numeric values at the end of each line
+        for start_idx in range(len(all_lines) - k_value + 1):
+            candidate_lines = all_lines[start_idx:start_idx + k_value]
+            valid_rows = []
             
-            if len(markdown_table_lines) >= k_value + 1:
-                # Filter out separator lines and convert to tab-separated format
-                table_lines = [line for line in markdown_table_lines if not '---' in line]
-                if len(table_lines) >= k_value + 1:
-                    # Convert markdown table to tab-separated format
-                    converted_lines = []
-                    for line in table_lines:
-                        parts = [p.strip() for p in line.strip('|').split('|')]
-                        parts = [p for p in parts if p]  # Remove empty parts
-                        converted_lines.append('\t'.join(parts))
-                    table_text = "\n".join(converted_lines)
-                    logging.warning(f"MARKDOWN TABLE DETECTED: Converted {len(table_lines)} lines to tab-separated format.")
-                    print(f"DEBUG: First converted line: '{converted_lines[0] if converted_lines else 'None'}'")
-                else:
-                    # Fall through to pattern detection
-                    logging.warning("Markdown table found but insufficient data rows. Attempting pattern detection.")
-                    warning_count += 1
-                    # Execute pattern detection logic
-                    table_lines = []
-                    for i in range(len(all_lines) - k_value):
-                        candidate_lines = all_lines[i:i + k_value + 1]
-                        if len(candidate_lines) == k_value + 1:
-                            tab_counts = [line.count('\t') for line in candidate_lines]
-                            space_counts = [len(line.split()) for line in candidate_lines]
-                            if len(set(tab_counts)) == 1 and tab_counts[0] > 1:
-                                table_lines = candidate_lines
-                                logging.debug(f"Found tab-separated table at lines {i}-{i+k_value}")
-                                break
-                            elif len(set(space_counts)) == 1 and space_counts[0] > k_value:
-                                table_lines = candidate_lines
-                                logging.debug(f"Found space-separated table at lines {i}-{i+k_value}")
-                                break
-                    
-                    if table_lines:
-                        table_text = "\n".join(table_lines)
-                    elif len(all_lines) >= k_value + 1:
-                        candidate_lines = all_lines[-(k_value + 1):]
-                        table_text = "\n".join(candidate_lines)
-                        logging.debug(f"Using last {k_value + 1} non-empty lines as table candidate.")
-                    else:
-                        logging.warning(f"Not enough non-empty lines ({len(all_lines)}) for fallback. Reverting to parse entire response.")
-                        table_text = response_text
-            else:
-                # No markdown table found - use pattern detection
-                logging.warning("No markdown block or table found. Attempting to detect table pattern.")
-                warning_count += 1
+            # Check if all k lines have exactly k numeric values at the end
+            for line in candidate_lines:
+                # Split by any whitespace
+                parts = line.replace('\t', ' ').split()
                 
-                # Strategy 1: Look for consecutive k+1 lines that look like table data
-                table_lines = []
-                for i in range(len(all_lines) - k_value):
-                    candidate_lines = all_lines[i:i + k_value + 1]
-                    if len(candidate_lines) == k_value + 1:
-                        tab_counts = [line.count('\t') for line in candidate_lines]
-                        space_counts = [len(line.split()) for line in candidate_lines]
-                        if len(set(tab_counts)) == 1 and tab_counts[0] > 1:
-                            table_lines = candidate_lines
-                            logging.debug(f"Found tab-separated table at lines {i}-{i+k_value}")
-                            break
-                        elif len(set(space_counts)) == 1 and space_counts[0] > k_value:
-                            table_lines = candidate_lines
-                            logging.debug(f"Found space-separated table at lines {i}-{i+k_value}")
-                            break
+                if len(parts) < k_value:
+                    break  # Not enough parts on this line
                 
-                if table_lines:
-                    table_text = "\n".join(table_lines)
-                elif len(all_lines) >= k_value + 1:
-                    candidate_lines = all_lines[-(k_value + 1):]
-                    table_text = "\n".join(candidate_lines)
-                    logging.debug(f"Using last {k_value + 1} non-empty lines as table candidate.")
-                else:
-                    logging.warning(f"Not enough non-empty lines ({len(all_lines)}) for fallback. Reverting to parse entire response.")
-                    table_text = response_text
-
-        raw_lines = table_text.split('\n')
-        
-        # Filter out empty lines and markdown table separators (like '---')
-        processed_lines = [line.strip() for line in raw_lines if line.strip() and not line.strip().startswith('---')]
-
-        if not processed_lines:
-            logging.warning("No parsable lines found in LLM response. Returning zero matrix.")
-            warning_count += 1
-            is_rejected = True # Critical: No data found
-            return np.full((k_value, k_value), 0.0), warning_count, is_rejected
-
-        # 2. Identify the header row and its column structure
-        # Check if first line is a header by examining the last k fields (score columns)
-        first_line = processed_lines[0]
-        first_line_parts = first_line.split('\t') if '\t' in first_line else first_line.split()
-        
-        # Check if the last k fields contain numerical data
-        has_header = True
-        if len(first_line_parts) >= k_value + 1:  # Need at least name + k scores
-            score_parts = first_line_parts[-k_value:]  # Last k fields (score columns)
-            try:
-                [float(part) for part in score_parts]
-                has_header = False  # Last k fields are numerical, so no header
-                logging.debug("Detected headerless table - score columns contain numerical data.")
-            except ValueError:
-                has_header = True  # Last k fields contain non-numerical data, so has header
-                logging.debug("Detected table with header - score columns contain non-numerical data.")
-        
-        if has_header:
-            # Standard header processing - skip first line
-            header_line_content = first_line
-            data_lines = processed_lines[1:]  # Skip header, use next k lines
-            header_parts_raw = []
-            header_split_method = None
-        else:
-            # Headerless table - use first k lines as data
-            data_lines = processed_lines[:k_value]  # Use first k lines
-            # Create synthetic header for parsing logic
-            header_line_content = f"Name\t" + "\t".join([f"ID {i+1}" for i in range(k_value)])
-            header_parts_raw = []
-            header_split_method = None
-
-        # Attempt 1: Tab-separated header (as per instruction: "single tab character")
-        parts_tab = header_line_content.split('\t')
-        # Check if it contains at least 'ID 1' and 'ID k_value' patterns
-        found_id_1_tab = False
-        found_id_k_tab = False
-        for p in parts_tab:
-            if re.match(r'ID\s*1', p, re.IGNORECASE): found_id_1_tab = True
-            if re.match(r'ID\s*' + str(k_value), p, re.IGNORECASE): found_id_k_tab = True
-        
-        if found_id_1_tab and found_id_k_tab:
-            header_parts_raw = parts_tab
-            header_split_method = 'tab'
-            logging.debug(f"Header identified by tab split. Raw parts: {header_parts_raw}")
-        else:
-            # Attempt 2: Flexible space/pipe splitting if tab-separated didn't yield clear IDs
-            logging.warning("Tab-separated header did not clearly contain 'ID 1' and 'ID k'. Trying flexible space/pipe splitting for header.")
-            warning_count += 1
-            header_parts_raw = [p for p in re.split(r'\s*\|\s*|\s+', header_line_content) if p]
-            header_split_method = 'flexible'
-            logging.debug(f"Header identified by flexible split. Raw parts: {header_parts_raw}")
-
-        # Now, build the id_column_map from the chosen header_parts_raw
-        id_column_map = {} # Maps ID number (1-k) to its column index in the raw parts
-        
-        j = 0
-        while j < len(header_parts_raw):
-            part = header_parts_raw[j]
-            
-            # Case 1: "ID X" is a single part (e.g., "ID1" or "ID 1" if flexible split made it one token)
-            match = re.match(r'ID\s*(\d+)', part, re.IGNORECASE)
-            if match:
-                id_num = int(match.group(1))
-                if 1 <= id_num <= k_value:
-                    id_column_map[id_num] = j
-                j += 1
-            # Case 2: "ID" is one part, and "X" is the next part (e.g., "ID", "1" from flexible split)
-            elif part.lower() == 'id' and j + 1 < len(header_parts_raw):
+                # Extract last k parts and try to convert to floats
+                last_k_parts = parts[-k_value:]
                 try:
-                    id_num = int(header_parts_raw[j+1])
-                    if 1 <= id_num <= k_value:
-                        id_column_map[id_num] = j + 1 # The score is under the number part
-                    j += 2 # Skip both 'ID' and the number
+                    scores = [float(part) for part in last_k_parts]
+                    # Clamp scores to [0.0, 1.0] range
+                    scores = [max(0.0, min(1.0, score)) for score in scores]
+                    valid_rows.append(scores)
                 except ValueError:
-                    j += 1 # Not a number after ID, just move to next part
-            else:
-                j += 1 # Regular part, move to next
-
-        logging.debug(f"Constructed ID column map: {id_column_map}")
-
-        # Ensure we found all k_value ID columns. If not, the structure is too malformed.
-        if len(id_column_map) != k_value:
-            logging.error(f"Could not find exactly {k_value} 'ID X' columns in header. Found {len(id_column_map)}. Header parts: {header_parts_raw}. Returning zero matrix.")
-            is_rejected = True # Critical: Header structure not as expected
-            return np.full((k_value, k_value), 0.0), warning_count, is_rejected
-
-        # Create an ordered list of column indices to extract scores from.
-        score_col_indices_ordered = [id_column_map[i] for i in range(1, k_value + 1)]
-        logging.debug(f"Ordered score column indices: {score_col_indices_ordered}")
-
-        # 3. Extract score data rows using a more robust strategy
-        collected_score_data = []
-        # data_lines already defined above based on header detection
-        
-        if len(data_lines) != k_value:
-             logging.warning(f"  Expected {k_value} data rows, but found {len(data_lines)}. The response may be incomplete or malformed.")
-             warning_count +=1
-             is_rejected = True
-
-        for line in data_lines:
-            logging.debug(f"Processing data line: '{line}'")
+                    break  # Non-numeric data in last k positions
             
-            # Handle markdown table format by removing pipes first
-            if line.startswith('|'):
-                parts = [p.strip() for p in line.strip('|').split('|')]
-                line = '\t'.join([p for p in parts if p])  # Convert to tab-separated
-                logging.debug(f"Converted markdown line to: '{line}'")
-            
-            # Find where numerical scores begin by looking for the first tab followed by a number
-            # This handles malformed names like "Jackie (1927) Robinson" correctly
-            scores_match = re.search(r'\t(\d+\.?\d*)', line)
-            if not scores_match:
-                logging.warning(f"  Could not find numerical scores in line. Skipping line: '{line}'")
-                warning_count += 1
-                is_rejected = True
-                continue
-            
-            # Split at the tab before the first numerical score
-            split_point = scores_match.start()
-            scores_part_of_line = line[split_point:].strip()
-            scores_part_of_line = line[split_point:].strip()
-            
-            # Split only the scores part using the flexible regex
-            score_parts = [p for p in re.split(r'\s*\|\s*|\s+', scores_part_of_line) if p]
+            # If we found exactly k valid rows, we have our matrix
+            if len(valid_rows) == k_value:
+                score_matrix = np.array(valid_rows)
+                
+                # Convert ranks to scores if needed
+                if is_rank_based:
+                    score_matrix = (k_value + 1 - score_matrix) / k_value
 
-            if len(score_parts) < k_value:
-                logging.warning(f"  Line contains too few score columns ({len(score_parts)} found, {k_value} expected). Line: '{line}'")
-                warning_count += 1
-                is_rejected = True
-                continue
+                logging.debug(f"Successfully parsed {k_value}x{k_value} matrix from lines {start_idx+1}-{start_idx+k_value}")
+                return score_matrix, warning_count, is_rejected
 
-            # The header map tells us which ID is in which original column position.
-            # We must use this map to reorder the scores into the correct final order (ID 1, ID 2, ...).
-            current_row_scores_ordered = [0.0] * k_value
-            is_row_valid = True
-            
-            # Create a map from a header column's index to the ID number it represents.
-            header_col_to_id_map = {v: k for k, v in id_column_map.items()}
-            # Get the indices of only the score columns, sorted by their visual appearance in the header.
-            sorted_score_header_indices = sorted(id_column_map.values())
-
-            # Iterate through the scores in the order they appear in the line.
-            for i, score_part in enumerate(score_parts):
-                try:
-                    # Find the original header column index for this score's visual position.
-                    header_col_index = sorted_score_header_indices[i]
-                    # Use the reverse map to find which ID this column corresponds to.
-                    id_num = header_col_to_id_map[header_col_index]
-                    
-                    score_val = float(score_part)
-                    # Place the score in the correct final position (id_num is 1-based).
-                    current_row_scores_ordered[id_num - 1] = score_val
-                except (ValueError, IndexError, KeyError):
-                    logging.warning(f"  Non-numeric, missing, or unmappable score at visual position {i+1}. Using 0.0. Line: '{line}'")
-                    warning_count += 1
-                    is_rejected = True
-                    is_row_valid = False
-                    break # Stop processing this invalid row
-            
-            if is_row_valid:
-                collected_score_data.append(current_row_scores_ordered)
-
-        # 4. Convert collected scores to a NumPy array and ensure k x k shape
-        if not collected_score_data:
-            logging.warning("No valid numerical score data rows found after parsing. Returning zero matrix.")
-            warning_count += 1
-            is_rejected = True # Critical: No valid data rows
-            return np.full((k_value, k_value), 0.0), warning_count, is_rejected
-
-        scores_array = np.array(collected_score_data, dtype=float)
-
-        if scores_array.shape[0] < k_value or scores_array.shape[1] < k_value:
-            logging.warning(f"  Parsed matrix shape {scores_array.shape} is smaller than expected {k_value}x{k_value}. Padding with zeros.")
-            warning_count += 1
-            is_rejected = True # Critical: Incomplete matrix from LLM
-            final_scores = np.full((k_value, k_value), 0.0)
-            final_scores[:scores_array.shape[0], :scores_array.shape[1]] = scores_array
-        else:
-            final_scores = scores_array[:k_value, :k_value] 
-
-        # 5. Replace any remaining NaNs (should be minimal with manual parsing, but as a safeguard)
-        final_scores = np.nan_to_num(final_scores, nan=0.0)
-
-        # 6. Handle rank conversion FIRST if the LLM output is ranks.
-        if is_rank_based:
-            if k_value > 1:
-                final_scores = np.where(
-                    (final_scores >= 1) & (final_scores <= k_value),
-                    (k_value - final_scores) / (k_value - 1),
-                    0.0
-                )
-            else:
-                final_scores = np.where(final_scores == 1, 1.0, 0.0)
-            logging.info(f"  Converted ranks to scores (0-1 range).")
-
-        # 7. Validate scores are within the [0.0, 1.0] range and clamp if necessary.
-        if np.any(final_scores < 0.0) or np.any(final_scores > 1.0):
-            logging.warning(f"  Score matrix contains values outside [0.0, 1.0] range. Clamping scores.")
-            warning_count += 1
-            is_rejected = True # Critical: Scores outside expected range
-            final_scores = np.clip(final_scores, 0.0, 1.0)
-
-        return final_scores, warning_count, is_rejected
+        # If we get here, no valid k×k block was found
+        logging.error(f"No valid {k_value}×{k_value} block found in response")
+        return np.full((k_value, k_value), 0.0), 1, True
 
     except Exception as e:
-        logging.error(f"  A critical error occurred during manual parsing or matrix extraction: {e}. Returning zero matrix.", exc_info=True)
-        warning_count += 1
-        is_rejected = True # Any unhandled exception is critical
-        return np.full((k_value, k_value), 0.0), warning_count, is_rejected
+        logging.error(f"Unexpected parsing error: {e}")
+        return np.full((k_value, k_value), 0.0), 1, True
 
 def validate_all_scores_file_content(filepath, expected_matrices_map, k_value):
     """
@@ -765,7 +496,7 @@ def main():
             current_response_rejected = False
 
             if not response_content.strip():
-                logging.warning(f"  Response file {base_filename} is empty. Generating zero matrix.")
+                logging.warning(f"  Response {base_filename}: EMPTY - contains no content")
                 response_warnings = 1
                 current_response_rejected = True # Empty response is a rejection
             else:
@@ -776,18 +507,16 @@ def main():
             total_parsing_warnings += response_warnings # Aggregate warnings from this response
 
             if current_response_rejected:
-                logging.error(f"  Response {base_filename} rejected due to critical parsing errors. Total warnings for this response: {response_warnings}")
+                logging.error(f"  Response {base_filename}: REJECTED - parsing failed")
                 error_count += 1
                 # Do NOT add to all_parsed_score_matrices or successful_indices
-                # The score_matrix will remain the default zero matrix if needed for debugging,
-                # but it won't be saved to all_scores.txt
             else:
                 all_parsed_score_matrices.append(score_matrix)
                 successful_indices.append(query_index_int)
                 processed_count += 1
                 # Store the parsed matrix in the dictionary for validation
                 parsed_matrices_for_validation[query_index_int] = score_matrix
-                logging.debug(f"  Successfully parsed {base_filename}. Matrix shape: {score_matrix.shape}. Warnings: {response_warnings}")
+                logging.info(f"  Response {base_filename}: SUCCESS - parsed {k}x{k} matrix")
 
         except FileNotFoundError:
             logging.error(f"  Response file not found: {resp_filepath}. Skipping."); error_count += 1
@@ -847,6 +576,28 @@ def main():
         logging.info(f"Successfully wrote {len(successful_indices)} successful indices to {successful_indices_path}")
     except IOError as e:
         logging.error(f"Error writing successful indices file to {successful_indices_path}: {e}")
+
+    # Create parsing summary file for the report generator
+    parsing_summary_path = os.path.join(analysis_inputs_dir, "parsing_summary.txt")
+    try:
+        with open(parsing_summary_path, 'w', encoding='utf-8') as f_summary:
+            f_summary.write("--- Response Parsing Summary ---\n")
+            # Get all response files that were found
+            all_response_indices = []
+            for resp_filepath in response_files:
+                match = re.search(r"llm_response_(\d+)\.txt", os.path.basename(resp_filepath))
+                if match:
+                    all_response_indices.append(int(match.group(1)))
+            
+            # Write status for each response file
+            for index in sorted(all_response_indices):
+                filename = f"llm_response_{index:03d}.txt"
+                if index in successful_indices:
+                    f_summary.write(f"{filename}: SUCCESS - parsed matrix\n")
+                else:
+                    f_summary.write(f"{filename}: REJECTED - parsing failed\n")
+    except IOError as e:
+        logging.error(f"Error writing parsing summary file to {parsing_summary_path}: {e}")
 
     logging.info(f"Processing complete. Successfully processed: {processed_count}, Errors/Skipped: {error_count}")
 

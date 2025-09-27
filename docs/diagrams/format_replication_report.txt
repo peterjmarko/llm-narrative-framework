@@ -3,6 +3,14 @@
 ================================================================================
 Number of Valid Responses: <n_valid_responses>
 
+--- Response Parsing Summary ---
+llm_response_001.txt: SUCCESS - parsed matrix
+llm_response_002.txt: SUCCESS - parsed matrix
+llm_response_003.txt: REJECTED - parsing failed
+llm_response_004.txt: SUCCESS - parsed matrix
+llm_response_005.txt: SUCCESS - parsed matrix
+llm_response_006.txt: SUCCESS - parsed matrix
+
 1. Overall Ranking Performance (MRR) (vs Chance=<chance_val>):
    Mean: <mean_val>, Wilcoxon p-value: p = <p_value>
 

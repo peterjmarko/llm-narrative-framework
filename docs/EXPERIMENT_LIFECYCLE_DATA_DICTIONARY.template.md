@@ -129,13 +129,21 @@ All statistical tests use the Wilcoxon signed-rank test for non-parametric compa
 
 #### Execution Artifacts
 
-**`replication_report_[timestamp].txt`** - Human-readable summary with embedded JSON metrics:
+**`replication_report_[timestamp].txt`** - Human-readable summary with parsing diagnostics and embedded JSON metrics:
 
 ```
 ================================================================================
 ### OVERALL META-ANALYSIS RESULTS ###
 ================================================================================
 Number of Valid Responses: 100
+
+--- Response Parsing Summary ---
+llm_response_001.txt: SUCCESS - parsed matrix
+llm_response_002.txt: SUCCESS - parsed matrix
+llm_response_003.txt: REJECTED - parsing failed
+llm_response_004.txt: SUCCESS - parsed matrix
+llm_response_005.txt: SUCCESS - parsed matrix
+llm_response_006.txt: SUCCESS - parsed matrix
 
 1. Overall Ranking Performance (MRR) (vs Chance=0.100):
    Mean: 0.156, Wilcoxon p-value: p = 0.001
@@ -180,6 +188,8 @@ Number of Valid Responses: 100
 ```
 
 **Report Structure:**
+- **Run parameters and configuration** with timestamps and model details
+- **Response parsing diagnostics** showing success/failure status for each trial
 - **Human-readable summary** with performance vs. chance comparisons
 - **Embedded JSON block** with exact delimiters for programmatic extraction
 - **Bias analysis results** integrated into both text and JSON sections

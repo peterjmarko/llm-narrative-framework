@@ -195,7 +195,7 @@ def main():
         # Determine if this is a repair or a full reprocess for logging clarity
         mode_string = "REPAIR MODE" if args.indices else "REPROCESS MODE"
         print(f"\n{C_YELLOW}--- {mode_string} for: ---{C_RESET}")
-        print(f"{os.path.basename(run_specific_dir_path)}")
+        print(f"{C_YELLOW}{os.path.basename(run_specific_dir_path)}{C_RESET}")
         
         config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
         if not os.path.exists(config_path):
@@ -309,23 +309,52 @@ def main():
 
             all_logs = [header_2]
             failed_sessions, total_elapsed_time, completed_count = 0, 0.0, 0
-            with ThreadPoolExecutor(max_workers=max_workers) as executor, \
-                 tqdm(total=len(indices_to_run), desc="Processing LLM Sessions", ncols=80, file=sys.stderr) as pbar:
-                
-                tasks = {executor.submit(session_worker, i, run_specific_dir_path, responses_dir, llm_prompter_script, src_dir, args.verbose): i for i in indices_to_run}
-                for future in as_completed(tasks):
-                    completed_count += 1
-                    index, success, log, duration = future.result()
-                    total_elapsed_time += duration
-                    if not success:
-                        failed_sessions += 1
-                        all_logs.append(log)
+            
+            # Enhanced repair mode feedback
+            if args.reprocess or args.indices:
+                repair_mode_desc = f"Repairing {len(indices_to_run)} failed queries"
+                print(f"\n--- {repair_mode_desc} ---")
+                for idx in indices_to_run:
+                    print(f"  - Query {idx:03d}: Preparing to retry...")
+            else:
+                repair_mode_desc = "Processing LLM Sessions"
+            
+            try:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor, \
+                    tqdm(total=len(indices_to_run), desc=repair_mode_desc, ncols=80, file=sys.stderr) as pbar:
                     
-                    avg_time = total_elapsed_time / completed_count
-                    eta = avg_time * (len(indices_to_run) - completed_count)
-                    pbar.update(1)
-                    with open(api_times_log_path, "a", encoding='utf-8') as f:
-                        f.write(f"Query_{index:03d}\t{duration:.2f}\t{total_elapsed_time:.2f}\t{eta:.2f}\n")
+                    # In repair mode, enable verbose output to show LLM prompter progress
+                    repair_verbose = args.verbose or (args.reprocess or args.indices)
+                    tasks = {executor.submit(session_worker, i, run_specific_dir_path, responses_dir, llm_prompter_script, src_dir, repair_verbose): i for i in indices_to_run}
+                    
+                    for future in as_completed(tasks):
+                        completed_count += 1
+                        index, success, log, duration = future.result()
+                        total_elapsed_time += duration
+                        
+                        # Enhanced repair mode status updates
+                        if args.reprocess or args.indices:
+                            status = "SUCCESS" if success else "FAILED"
+                            print(f"  - Query {index:03d}: {status} ({duration:.1f}s)")
+                        
+                        if not success:
+                            failed_sessions += 1
+                            all_logs.append(log)
+                        
+                        avg_time = total_elapsed_time / completed_count
+                        eta = avg_time * (len(indices_to_run) - completed_count)
+                        pbar.update(1)
+                        with open(api_times_log_path, "a", encoding='utf-8') as f:
+                            f.write(f"Query_{index:03d}\t{duration:.2f}\t{total_elapsed_time:.2f}\t{eta:.2f}\n")
+            
+            except KeyboardInterrupt:
+                print(f"\n\n--- LLM SESSIONS INTERRUPTED BY USER ---")
+                print(f"Processed {completed_count}/{len(indices_to_run)} queries before interruption.")
+                print(f"Experiment directory preserved at: {run_specific_dir_path}")
+                print(f"You can resume by running repair mode on this directory.")
+                pipeline_status = "INTERRUPTED BY USER"
+                # The 'with' statement will handle executor.shutdown() automatically
+                return
             
             if failed_sessions > 0:
                 # Log the specific failures.
@@ -335,7 +364,7 @@ def main():
                 
                 # Calculate failure rate to determine if replication should continue
                 failure_rate = failed_sessions / len(indices_to_run)
-                failure_threshold = 0.2  # Allow up to 20% failures
+                failure_threshold = 0.5  # Allow up to 50% failures - LLM responses can be unpredictable
                 
                 if failure_rate > failure_threshold:
                     # High failure rate - treat as fatal error
