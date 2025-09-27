@@ -1,5 +1,23 @@
 # Changelog
 
+## 11.3.0 (2025-09-27)
+
+### Bump
+
+- **version 11.2.3 → 11.3.0**
+
+### Features
+
+- **implement comprehensive parsing diagnostics and enhanced error handling**
+  This commit implements comprehensive response processing diagnostics and enhanced error handling to improve framework robustness and user experience across the experimental pipeline.
+  
+  - Add trial-by-trial parsing status tracking in process_llm_responses.py with detailed success/failure logging and error categorization
+  - Integrate parsing summary into replication reports showing which trials contributed valid data versus parsing failures
+  - Enhance matrix parsing logic to handle edge cases and malformed responses
+  - Improve HTTP error handling in llm_prompter.py with specific guidance for common issues (400/401/429 errors, invalid model names, API key problems)
+  - Clean up error message propagation in experiment_manager.py to reduce redundant failure reporting
+  - Update documentation including data dictionary, framework manual, and report format specifications to reflect new diagnostics capabilities
+
 ## 11.2.3 (2025-09-26)
 
 ### Bump
