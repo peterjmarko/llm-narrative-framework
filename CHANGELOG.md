@@ -1,5 +1,26 @@
 # Changelog
 
+## 11.5.0 (2025-09-28)
+
+### Bump
+
+- **version 11.4.0 → 11.5.0**
+
+### Features
+
+- **enhance statistical validation scripts with improved UX and reliability**
+  Comprehensive improvements to PowerShell validation scripts for better user experience and operational reliability. Enhanced both create_statistical_study.ps1 and generate_graphpad_imports.ps1 with professional output formatting, bug fixes, safety features, and improved user feedback mechanisms.
+  
+  - Added Write-TestHeader function to create_statistical_study.ps1 for professional bordered output
+  - Fixed experimental condition counting bug showing correct replication counts (6 per condition vs 1)
+  - Implemented safety confirmation prompt for -Force flag to prevent accidental data loss
+  - Added 30-minute timeout protection for new_experiment.ps1 calls to prevent indefinite hanging
+  - Enhanced generate_graphpad_imports.ps1 with upfront study parameter display (model, design, counts)
+  - Added progress indicators for bias regression processing to eliminate silent long waits
+  - Refined color scheme throughout console output reducing visual noise with targeted green summaries
+  - Removed unused duplicate functions and cleaned up code organization
+  - Updated Developer's Guide with streamlined commit/release workflow documentation
+
 ## 11.4.0 (2025-09-28)
 
 ### Bump
