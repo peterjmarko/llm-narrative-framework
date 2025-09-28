@@ -1,5 +1,26 @@
 # Changelog
 
+## 11.4.0 (2025-09-28)
+
+### Bump
+
+- **version 11.3.0 → 11.4.0**
+
+### Features
+
+- **enhance error reporting and repair reliability across LLM pipeline**
+  Implement comprehensive improvements to error handling, user feedback, and repair functionality:
+  
+  - Add preprocessing to handle mixed formatting in LLM responses (pipe characters with tabs)
+  - Implement 3-cycle repair limits to prevent infinite loops during persistent failures
+  - Add colored error output with specific guidance for common issues (invalid models)
+  - Enhance progress tracking with consistent timing feedback (elapsed/remaining/ETA)
+  - Streamline exception handling to reduce verbose stack traces and duplicate messages
+  - Update docstrings to reflect current architecture and new capabilities
+  - Add troubleshooting documentation for new error handling features
+  
+  These changes improve user experience during failures while maintaining scientific rigor and measuring true LLM performance rather than parser-corrected results.
+
 ## 11.3.0 (2025-09-27)
 
 ### Bump
