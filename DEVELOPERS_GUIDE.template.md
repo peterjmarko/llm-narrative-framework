@@ -321,25 +321,51 @@ This project uses a standardized workflow to ensure all code is clean, documente
 
 Before committing, please perform the following steps in order. For detailed explanations, see the guide below.
 
+##### Quick Workflow (Using Shortcuts)
+
+For regular development work, you can use these PDM shortcuts for a streamlined workflow:
+```bash
+# 1. Fix script headers and check docstrings
+pdm lint-fix
+
+# 2. Build documentation with diagrams and Word documents  
+pdm build-docs
+
+# 3. Sync project assets (Claude development only)
+pdm sync-project
+
+# 4. Review and stage changes
+git status
+git add .
+
+# 5. Commit with interactive tool
+pdm commit
+
+# 6. Release (maintainers only)
+pdm release
+```
+
+##### Detailed Workflow
+
 1.  **Run Linters**:
-    ```bash
+```bash
     pdm run python scripts/lint_file_headers.py
     pdm run python scripts/lint_docstrings.py --deep
-    ```
+```
 
 2.  **Build Documentation**:
-    ```bash
+```bash
     pdm run build-docs
-    ```
+```
 
 3.  **Review and Stage Changes**:
     Review your work with `git status`, then stage all changes with `git add .`.
 
 4.  **Commit with Commitizen**:
     Use the interactive tool to create a compliant commit message.
-    ```bash
+```bash
     pdm run commit
-    ```
+```
 
 #### Detailed Workflow Guide
 

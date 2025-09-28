@@ -64,7 +64,7 @@ param(
     [string]$OutputPath = "tests/assets/statistical_validation_study",
     [int]$ReplicationsPerExperiment = 6,
     [int]$TrialsPerReplication = 32,
-    [string]$Model = "meta-llama/llama-4-maverick",
+    [string]$Model = "openai/gpt-4.1-mini",
     [array]$MappingStrategies = @("correct", "random"),
     [array]$GroupSizes = @(4, 10),
     [switch]$Force,
@@ -74,7 +74,16 @@ param(
 # Script initialization and validation
 if ($Verbose) { $VerbosePreference = "Continue" }
 
-Write-Host "`n=== Statistical Validation Study Generator ===" -ForegroundColor Magenta
+# Header formatting function
+function Write-TestHeader {
+    param($Message, $Color = 'Cyan')
+    $line = "=" * 80
+    Write-Host "`n$line" -ForegroundColor $Color
+    Write-Host $Message -ForegroundColor $Color
+    Write-Host "$line`n" -ForegroundColor $Color
+}
+
+Write-TestHeader "Statistical Validation Study Generator" "Magenta"
 Write-Host "Focus: GraphPad Prism Statistical Validation" -ForegroundColor Green
 Write-Host "Approach: Real framework execution with controlled parameters" -ForegroundColor White
 Write-Host "Parameters: m = $TrialsPerReplication trials, $ReplicationsPerExperiment replications per experiment, Model = $Model" -ForegroundColor White
@@ -113,6 +122,16 @@ foreach ($Script in $FrameworkScripts) {
 # Ensure output directory is clean
 if (Test-Path $OutputPath) {
     if ($Force) {
+        Write-Host "`nWARNING: Output directory '$OutputPath' already exists." -ForegroundColor Yellow
+        Write-Host "This will permanently delete all existing data in this directory.`n" -ForegroundColor Red
+        $confirmation = Read-Host "Are you sure you want to continue? (Y/N)"
+        
+        if ($confirmation -notmatch '^[Yy]$') {
+            Write-Host "Operation cancelled by user." -ForegroundColor Yellow
+            exit 0
+        }
+        
+        Write-Host "Removing existing directory..." -ForegroundColor Yellow
         Remove-Item $OutputPath -Recurse -Force 2>$null
     } else {
         Write-Host ""
@@ -143,7 +162,7 @@ $AllExperimentPaths = @()
 
 foreach ($MappingStrategy in $MappingStrategies) {
     foreach ($K in $GroupSizes) {
-        Write-Host "`n--- Creating Experiment ${ExperimentCounter}: ${MappingStrategy} mapping, k=${K} ---" -ForegroundColor Yellow
+        Write-Host "`n--- Creating Experiment ${ExperimentCounter}: ${MappingStrategy} mapping, k=${K} ---" -ForegroundColor Magenta
         
         Write-Host "  Generating experiment with $ReplicationsPerExperiment replications..." -ForegroundColor Blue
             
@@ -270,21 +289,22 @@ foreach ($MappingStrategy in $MappingStrategies) {
 
 # Verify all experiments were created successfully
 Write-Host "`nValidating generated experiments..." -ForegroundColor White
-$TotalReplications = 0
+$TotalExperiments = 0
 $ExperimentsByCondition = @{}
 
 foreach ($ExpPath in $AllExperimentPaths) {
     if (Test-Path $ExpPath) {
-        $TotalReplications++
+        $TotalExperiments++
         
         # Extract condition from path name
         $ExpName = Split-Path $ExpPath -Leaf
         if ($ExpName -match "exp_(\d+)_(.+)_(.+)_k(\d+)_reps(\d+)") {
             $Condition = "$($Matches[3])_k$($Matches[4])"  # e.g., "correct_k4"
+            $Replications = [int]$Matches[5]  # Extract actual replication count
             if (-not $ExperimentsByCondition.ContainsKey($Condition)) {
                 $ExperimentsByCondition[$Condition] = 0
             }
-            $ExperimentsByCondition[$Condition]++
+            $ExperimentsByCondition[$Condition] = $Replications
         }
         
         Write-Verbose "  ✓ Validated: $(Split-Path $ExpPath -Leaf)"
@@ -326,9 +346,12 @@ try {
         Write-Host "  $Condition`: $Count replications" -ForegroundColor Gray
     }
 
+    $TotalReplications = ($ExperimentsByCondition.Values | Measure-Object -Sum).Sum
+
     Write-Host "`nStudy Statistics:" -ForegroundColor White
-    Write-Host "  Total experiments: $TotalReplications" -ForegroundColor Gray
-    Write-Host "  Trials per experiment: $TrialsPerReplication" -ForegroundColor Gray
+    Write-Host "  Total experiments: $TotalExperiments" -ForegroundColor Gray
+    Write-Host "  Total replications: $TotalReplications" -ForegroundColor Gray
+    Write-Host "  Trials per replication: $TrialsPerReplication" -ForegroundColor Gray
     Write-Host "  Total trials: $($TotalReplications * $TrialsPerReplication)" -ForegroundColor Gray
     Write-Host "  Expected statistical power: High (sufficient for full ANOVA)" -ForegroundColor Gray
 
