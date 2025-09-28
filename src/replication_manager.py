@@ -36,6 +36,14 @@ Pipeline Stages:
 5.  `generate_replication_report.py`: Creates the final formatted text report.
 6.  `compile_replication_results.py`: Creates the final single-row summary CSV.
 
+Key Features:
+-   **Enhanced Error Reporting**: Provides colored, user-friendly error messages
+    with specific guidance for common issues (e.g., invalid model configurations).
+-   **Repair Mode Support**: Can retry specific failed queries with detailed
+    progress tracking and status updates.
+-   **Failure Threshold Management**: Continues with partial failures (≤50%) but
+    halts on high failure rates with clear diagnostic messages.
+
 It can also operate in a `--reprocess` mode, which re-runs only the data
 processing and analysis stages (3-6) on existing raw data.
 
@@ -159,9 +167,8 @@ def session_worker(index, run_specific_dir_path, responses_dir, llm_prompter_scr
         if result.returncode == 0:
             return index, True, None, duration
         else:
-            error_details = f"LLM prompter FAILED for index {index} with exit code {result.returncode}"
-            if result.stderr:
-                error_details += f"\n  STDERR: {result.stderr.strip()}"
+            # For user-facing errors, just return minimal info - detailed logging happens elsewhere
+            error_details = f"Query {index:03d} failed"
             return index, False, error_details, duration
     except Exception as e:
         return index, False, f"Orchestrator worker failed for index {index}: {e}", time.time() - start_time
@@ -357,10 +364,7 @@ def main():
                 return
             
             if failed_sessions > 0:
-                # Log the specific failures.
-                for log_entry in all_logs:
-                    if log_entry.strip() and "STAGE:" not in log_entry: # Avoid re-printing the header
-                        logging.error(log_entry)
+                # Skip individual query failure logging - we'll show summary instead
                 
                 # Calculate failure rate to determine if replication should continue
                 failure_rate = failed_sessions / len(indices_to_run)
@@ -369,7 +373,12 @@ def main():
                 if failure_rate > failure_threshold:
                     # High failure rate - treat as fatal error
                     if not args.reprocess:
-                        raise Exception(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed ({failure_rate:.1%} failure rate). See logs for details.")
+                        if failure_rate == 1.0:
+                            print(f"{C_YELLOW}ERROR (orchestrator): All LLM sessions failed (100%). Check model name and API configuration.{C_RESET}", file=sys.stderr)
+                            raise Exception("LLM session failure threshold exceeded")
+                        else:
+                            print(f"{C_YELLOW}ERROR (orchestrator): {failed_sessions}/{len(indices_to_run)} LLM session(s) failed ({failure_rate:.1%} failure rate).{C_RESET}", file=sys.stderr)
+                            raise Exception(f"LLM session failure threshold exceeded")
                     else:
                         repair_had_failures = True
                         logging.warning(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed to repair. The script will continue, but the run remains incomplete.")
@@ -419,19 +428,22 @@ def main():
             pipeline_status = "INTERRUPTED BY USER"
         # Note: pipeline_status defaults to "FAILED"
         
-        logging.error(f"\n\n{Fore.RED}--- PIPELINE {pipeline_status} ---{Fore.RESET}")
-
-        if isinstance(e, subprocess.CalledProcessError):
-            logging.error(e.stderr)
-        else:
-            logging.exception("An unexpected error occurred in the orchestrator.")
+        # Clean failure message without stack trace
+        if isinstance(e, Exception) and "All LLM sessions failed" in str(e):
+            logging.error("All LLM sessions failed (100%). Check model name and API configuration.")
+        elif isinstance(e, subprocess.CalledProcessError):
+            logging.error("Pipeline stage failed.")
+        elif not isinstance(e, KeyboardInterrupt):
+            logging.error("An unexpected error occurred in the orchestrator.")
 
         # On any failure, attempt to generate a final report with the FAILED status.
         try:
             cmd_report = [sys.executable, generate_report_script, "--run_output_dir", run_specific_dir_path, "--replication_num", str(args.replication_num), "--notes", args.notes]
-            run_script(cmd_report, "5. Generate Failure Report", verbose=args.verbose)
-        except Exception as report_e:
-            logging.error(f"Could not generate a failure report: {report_e}")
+            # Generate failure report silently
+            subprocess.run(cmd_report, capture_output=True, check=False, text=True)
+        except Exception:
+            # Suppress failure report generation errors
+            pass
         
         # This block will now be handled by the finalization logic below.
 

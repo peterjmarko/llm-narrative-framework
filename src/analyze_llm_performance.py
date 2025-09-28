@@ -26,11 +26,21 @@ This script is the primary quantitative engine for a single replication. It take
 the clean, structured data from Stage 3 and computes a comprehensive suite of
 core performance metrics (MRR, Top-K accuracy, effect sizes, etc.).
 
+Key Features:
+-   **Comprehensive Statistical Analysis**: Calculates MRR, Top-K accuracy, mean rank,
+    and bias metrics with proper chance-level comparisons and significance testing.
+-   **Enhanced Validation**: Performs final validation by cross-referencing mappings
+    against individual trial manifests to ensure data integrity.
+-   **Robust Error Handling**: Gracefully handles edge cases like zero valid responses,
+    file parsing errors, and statistical computation failures.
+-   **Detailed Performance Tracking**: Includes positional bias analysis and lift
+    metrics to measure performance relative to chance levels.
+
 Its sole output is the initial `replication_metrics.json` file, which contains
 the calculated core metrics. This file is subsequently read and augmented by
 the bias analysis script (`run_bias_analysis.py`).
 
-It is called by `orchestrate_replication.py`.
+It is called by `replication_manager.py`.
 """
 
 # === Start of src/analyze_llm_performance.py ===

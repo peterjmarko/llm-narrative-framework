@@ -377,6 +377,9 @@ This section provides solutions to the most common issues researchers may encoun
 | **API Errors during an experiment run** | Network issues or API rate limits can cause individual LLM calls to fail. The framework is designed for this. Simply run the `fix_experiment.ps1` script on the experiment directory. It will automatically find and re-run only the failed API calls. |
 | **"Permission Denied" error when building DOCX files** | This error occurs if a `.docx` file is open in Microsoft Word while the `pdm run build-docs` script is running. Close the file in Word, and the script will automatically retry and continue. |
 | **`git` command not found** | The framework requires Git for versioning and reproducibility checks. Please install it from [git-scm.com](https://git-scm.com/downloads) and ensure it is available in your system's PATH. |
+| **All LLM sessions fail (100% failure rate)** | This indicates a model configuration problem. Verify the model name in `config.ini` matches available models and check your API credentials and permissions. |
+| **Repair process loops indefinitely** | The repair system automatically limits retry attempts to 3 cycles maximum. After 3 cycles, it proceeds with available data to prevent endless loops when external factors cause persistent failures. |
+| **Enhanced status messages** | The framework now provides colored error output and detailed progress tracking (elapsed time, remaining time, ETA) for better visibility during long-running operations. |
 
 ## Related Files
 

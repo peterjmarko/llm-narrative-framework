@@ -27,10 +27,12 @@ raw, potentially inconsistent text responses from the LLM and transforms them
 into clean, validated, and structured numerical data ready for analysis.
 
 Key Features:
--   **Robust Matrix Extraction**: Identifies exactly k consecutive lines containing
-    exactly k numeric values at the end of each line, extracting k×k score matrices
-    from diverse LLM response formats regardless of headers, explanations, or
-    column formatting variations.
+-   **Simplified Matrix Extraction**: Identifies exactly k consecutive lines containing
+    exactly k numeric values at the end of each line, extracting k×k score matrices.
+    Includes preprocessing to handle mixed formatting (removes "|" characters with
+    adjacent tabs) while maintaining focus on measuring true LLM performance.
+-   **Rank Conversion Support**: Preserves `is_rank_based` parameter for legitimate
+    experimental conditions where LLM outputs ranks instead of scores.
 -   **Parsing Diagnostics**: Generates detailed parsing summaries showing success/failure
     status for each response, saved to `parsing_summary.txt` and included in
     replication reports for troubleshooting.
@@ -44,7 +46,8 @@ Key Features:
     (e.g., `PROCESSOR_VALIDATION_SUCCESS`) for the calling script to interpret.
 
 This script's rigorous validation ensures that the final performance analysis
-is built upon a foundation of verifiably correct data.
+is built upon a foundation of verifiably correct data while measuring actual
+LLM capabilities rather than parser-corrected performance.
 """
 
 # === Start of src/process_llm_responses.py ===
@@ -232,8 +235,11 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
             
             # Check if all k lines have exactly k numeric values at the end
             for line in candidate_lines:
+                # Preprocessing: Remove any "|" characters together with adjacent tabs
+                cleaned_line = re.sub(r'\t*\|\t*', ' ', line)
+                
                 # Split by any whitespace
-                parts = line.replace('\t', ' ').split()
+                parts = cleaned_line.replace('\t', ' ').split()
                 
                 if len(parts) < k_value:
                     break  # Not enough parts on this line

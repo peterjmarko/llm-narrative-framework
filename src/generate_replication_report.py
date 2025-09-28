@@ -31,8 +31,18 @@ complete report containing a detailed header, the base LLM query, parsing
 diagnostics showing success/failure status for each response, a human-readable
 summary of key results, and the full, machine-parsable JSON block of all metrics.
 
+Key Features:
+-   **Comprehensive Status Reporting**: Includes Final Status, Parsing Status, and
+    Validation Status to provide clear visibility into pipeline completion.
+-   **Parsing Diagnostics Integration**: Embeds parsing summary showing which
+    responses succeeded or failed, essential for troubleshooting.
+-   **Statistical Summaries**: Provides human-readable performance metrics with
+    chance-level comparisons and statistical significance testing.
+-   **Machine-Readable JSON**: Includes complete metrics in JSON format for
+    automated analysis and aggregation.
+
 This modular approach ensures that report generation is a distinct, testable
-step in the pipeline. It is called by `orchestrate_replication.py`.
+step in the pipeline. It is called by `replication_manager.py`.
 
 Usage:
     python src/generate_replication_report.py --run_output_dir /path/to/run_dir ...

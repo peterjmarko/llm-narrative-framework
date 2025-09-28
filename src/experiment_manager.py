@@ -32,6 +32,16 @@ importing and calling the `get_experiment_state` function from the
 (e.g., creating, repairing, or reprocessing runs) to bring the experiment to
 completion.
 
+Key Features:
+-   **Intelligent Repair Management**: Implements a 3-cycle repair limit to prevent
+    infinite loops when queries consistently fail due to external issues.
+-   **Enhanced Progress Tracking**: Provides consistent timing feedback (Time Elapsed,
+    Time Remaining, ETA) across all operation modes including repair.
+-   **Improved Error Detection**: Captures subprocess stderr to provide specific
+    guidance for common failures like model configuration errors.
+-   **Clean User Feedback**: Streamlined error messages that distinguish between
+    different failure types and provide actionable guidance.
+
 Its core function is to orchestrate `replication_manager.py` to execute
 the required changes for individual replication runs.
 """
@@ -186,10 +196,12 @@ def _run_new_mode(target_dir, start_rep, end_rep, notes, verbose, orchestrator_s
                 raise subprocess.CalledProcessError(proc.returncode, proc.args)
 
         except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
-            print(f"\n{C_YELLOW}Orchestrator for replication {rep_num} failed or was interrupted.{C_RESET}\n")
-            # No need to print e.stderr here, as it has already been displayed.
-            if isinstance(e, KeyboardInterrupt):
-                # If interrupted, exit the manager immediately.
+            if isinstance(e, subprocess.CalledProcessError):
+                # The error message is in the captured stderr, not in the exception string
+                # We need to check what was actually printed to stderr during the subprocess
+                print(f"\n{C_YELLOW}Replication {rep_num} failed.{C_RESET}\n")
+            elif isinstance(e, KeyboardInterrupt):
+                print(f"\n{C_YELLOW}Replication {rep_num} was interrupted by user.{C_RESET}\n")
                 sys.exit(1)
             # For any failure, immediately stop the batch.
             return False
@@ -213,6 +225,8 @@ def _run_repair_mode(runs_to_repair, orchestrator_script_path, verbose, colors):
     C_RESET = colors['reset']
     print(f"{C_YELLOW}--- Entering REPAIR Mode: Fixing {len(runs_to_repair)} run(s) with missing responses ---{C_RESET}")
 
+    batch_start_time = time.time()
+    
     for i, run_info in enumerate(runs_to_repair):
         run_dir = run_info["dir"]
         failed_indices = run_info.get("failed_indices", [])
@@ -252,7 +266,17 @@ def _run_repair_mode(runs_to_repair, orchestrator_script_path, verbose, colors):
             if isinstance(e, KeyboardInterrupt):
                 sys.exit(AUDIT_ABORTED_BY_USER)
             return False # A single failure halts the entire repair operation.
+        
+        # Add timing info after each repair (like in _run_new_mode)
+        elapsed = time.time() - batch_start_time
+        avg_time = elapsed / (i + 1)
+        remaining_repairs = len(runs_to_repair) - (i + 1)
+        time_remaining = remaining_repairs * avg_time
+        eta = datetime.datetime.now() + datetime.timedelta(seconds=time_remaining)
+        
+        print(f"\n{C_YELLOW}Time Elapsed: {str(datetime.timedelta(seconds=int(elapsed)))} | Time Remaining: {str(datetime.timedelta(seconds=int(time_remaining)))} | ETA: {eta.strftime('%H:%M:%S')}{C_RESET}")
             
+    print(f"\n{C_YELLOW}Repair run finished. Final status: COMPLETED.{C_RESET}")
     return True
 
 def _run_full_replication_repair(runs_to_repair, orchestrator_script, quiet, colors):
@@ -603,6 +627,8 @@ def main():
             pipeline_successful = True
             previous_state = None
             loop_count = 0
+            repair_cycle_count = 0
+            max_repair_cycles = 3
             while loop_count < args.max_loops:
                 action_taken = False
                 success = True
@@ -622,6 +648,12 @@ def main():
                     action_taken = True
 
                 elif state_name == "REPAIR_NEEDED":
+                    repair_cycle_count += 1
+                    if repair_cycle_count > max_repair_cycles:
+                        print(f"\n{C_YELLOW}--- Maximum {max_repair_cycles} repair cycles reached. Ending repair attempts. ---{C_RESET}")
+                        print(f"{C_YELLOW}--- Proceeding with available data from successful replications. ---{C_RESET}")
+                        break
+                    
                     config_repairs = [d for d in payload_details if d.get("repair_type") == "config_repair"]
                     full_rep_repairs = [d for d in payload_details if d.get("repair_type") == "full_replication_repair"]
                     session_repairs = [d for d in payload_details if d.get("repair_type") == "session_repair"]

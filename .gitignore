@@ -59,7 +59,7 @@ archive/
 cleaner_archives/
 main_archive/
 output/
-tests/llm_validation/
+tests/llm_qualification/
 
 
 # ==============================================================================

@@ -356,6 +356,18 @@ The pipeline categorizes errors by type and severity to apply appropriate recove
 
 This multi-layered approach ensures that researchers can trust the framework to maintain scientific rigor and data integrity even when facing common real-world failures like network interruptions, storage errors, or process crashes.
 
+### Enhanced Error Reporting and Recovery
+
+The framework provides intelligent error detection and user-friendly guidance:
+
+- **Model Configuration Errors**: When all LLM sessions fail (100% failure rate), the system automatically detects likely model configuration issues and provides specific guidance to check model names and API credentials.
+
+- **Colored Error Output**: Error messages use color coding for improved visibility and categorization of different failure types.
+
+- **Repair Cycle Limits**: The repair system implements a 3-cycle maximum to prevent infinite loops when queries consistently fail due to external issues (e.g., API problems, invalid models).
+
+- **Progress Feedback**: All operations provide consistent timing information (Time Elapsed, Time Remaining, ETA) to keep users informed during long-running processes.
+
 ## Directory Structure
 
 This logical hierarchy is reflected in the physical layout of the repository:
