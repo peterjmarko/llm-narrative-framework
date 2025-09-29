@@ -1,5 +1,31 @@
 # Changelog
 
+## 11.5.1 (2025-09-29)
+
+### Bump
+
+- **version 11.5.0 → 11.5.1**
+
+### Fixes
+
+- **resolve correctness issues in GraphPad validation scripts**
+  Multiple correctness issues were identified and systematically resolved across both GraphPad validation companion scripts.
+  
+  WHAT: Fixed critical correctness issues in generate_graphpad_imports.ps1 and validate_graphpad_results.ps1 including path configuration problems, filename inconsistencies, step numbering mismatches, and array syntax errors.
+  
+  WHY: These issues could cause validation failures, path reference errors, and maintenance difficulties when filenames change or GraphPad export naming conventions are updated.
+  
+  HOW:
+  - Moved $GraphPadExportsDir path definition to actual creation point to prevent premature references
+  - Added comprehensive filename constants (15 files) to both scripts as single source of truth
+  - Replaced all hardcoded filenames with variables in export paths, validation mappings, and instruction text
+  - Added GraphPad export filename prefixes to handle their naming convention ("Descriptive statistics of ", etc.)
+  - Fixed step numbering inconsistency (step5Passed vs step6Passed mismatch)
+  - Corrected PowerShell array syntax errors (missing/extra commas)
+  - Updated validation mappings to use consistent filename references
+  
+  IMPACT: Scripts now provide reliable GraphPad Prism validation with maintainable code structure, consistent file naming, and proper error handling for academic statistical validation workflows.
+
 ## 11.5.0 (2025-09-28)
 
 ### Bump
