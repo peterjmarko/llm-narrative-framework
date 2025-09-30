@@ -191,8 +191,9 @@ function Export-ReplicationDataForGraphPad {
             
             # Extract key metrics for GraphPad validation
             $replicationData = [PSCustomObject]@{
-                Experiment = $ExperimentName
+                ExperimentName = $ExperimentName
                 Replication = $repCounter++  # Sequential numbering for validation
+                RunName = (Split-Path $filePath -Parent | Split-Path -Parent | Split-Path -Leaf)  # e.g., "run_1"
                 Model = $config['LLM:model_name'] -as [string]
                 MappingStrategy = $config['Study:mapping_strategy'] -as [string]
                 GroupSize = [int]$config['Study:group_size']
@@ -329,6 +330,21 @@ function Generate-KSpecificAccuracyExports {
     # MRR K-SPECIFIC EXPORTS
     # =============================================================================
     
+    # CRITICAL: MRR chance levels use HARMONIC MEAN, not 1/k
+    #
+    # MRR (Mean Reciprocal Rank) rewards partial credit at each rank position:
+    #   Rank 1: 1/1 = 1.0, Rank 2: 1/2 = 0.5, Rank 3: 1/3 = 0.333, etc.
+    #
+    # Under uniform random selection across k positions, the expected MRR is:
+    #   E[MRR] = (1/k) × Σ(1/j) for j=1 to k  [harmonic mean formula]
+    #
+    # This differs from Top-1 accuracy (chance = 1/k) and Top-3 accuracy
+    # (chance = min(3,k)/k) because MRR gives fractional credit for non-first ranks.
+    #
+    # Concrete examples:
+    #   K=4:  (1/4) × (1 + 0.5 + 0.333 + 0.25) = 0.25 × 2.083 = 0.5208
+    #   K=10: (1/10) × (1 + 0.5 + 0.333 + ... + 0.1) = 0.1 × 2.929 = 0.2929
+    
     $k4MRRData = $k4Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.5208}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
     $k10MRRData = $k10Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.2929}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
 
@@ -341,8 +357,8 @@ function Generate-KSpecificAccuracyExports {
     $exportStats.K4_MRR_Count = $k4MRRData.Count
     $exportStats.K10_MRR_Count = $k10MRRData.Count
 
-    Write-Host "  Generated: Phase_A_MRR_K4.csv ($($k4MRRData.Count) replications, chance = 0.5208)"
-    Write-Host "  Generated: Phase_A_MRR_K10.csv ($($k10MRRData.Count) replications, chance = 0.2929)"
+    Write-Host "  Generated: Phase_A_MRR_K4.csv ($($k4MRRData.Count) replications, chance = 0.5208 [harmonic mean])"
+    Write-Host "  Generated: Phase_A_MRR_K10.csv ($($k10MRRData.Count) replications, chance = 0.2929 [harmonic mean])"
     
     # =============================================================================
     # TOP-1 ACCURACY K-SPECIFIC EXPORTS
@@ -724,13 +740,14 @@ $csvData | ForEach-Object { $_.Trial = [int]$_.Trial }
     return $csvData
 }
 
-function Show-Phase3ValidationInstructions {
+function Show-ValidationInstructions {
     param($ExportStats)
     
     Write-TestHeader "GraphPad Prism Manual Analysis Instructions (Step 3 of 4)" 'Yellow'
     
+    $relativeExportPath = Resolve-Path -Path $ExportStats.ExportDirectory -Relative
     Write-Host "Import files generated in: " -NoNewline -ForegroundColor White
-    Write-Host $ExportStats.ExportDirectory -ForegroundColor Cyan
+    Write-Host $relativeExportPath -ForegroundColor Cyan
     
     Write-Host "`nComplete 4-Step Validation Workflow:" -ForegroundColor Magenta
     Write-Host "✓ Step 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
@@ -738,27 +755,37 @@ function Show-Phase3ValidationInstructions {
     Write-Host "→ Step 3: Manual GraphPad Analysis - FOLLOW INSTRUCTIONS BELOW" -ForegroundColor Yellow
     Write-Host "  Step 4: validate_graphpad_results.ps1 - PENDING" -ForegroundColor Gray
     
-    Write-Host "`nSTEP 3: MANUAL GRAPHPAD PRISM ANALYSIS" -ForegroundColor Magenta
-    Write-Host "Target: Independent validation of framework calculations including bias analysis." -ForegroundColor Cyan
+    Write-Host "`nSTEP 3: MANUAL GRAPHPAD PRISM ANALYSIS - DUAL METHODOLOGY" -ForegroundColor Magenta
+    Write-Host "Primary: Individual replication validation (8 selected replications)" -ForegroundColor Cyan
+    Write-Host "Comprehensive: Full dataset validation (all 24 replications)" -ForegroundColor Cyan
+    Write-Host ""
     
-    Write-Host "`nGraphPad Step 3.1:" -ForegroundColor Yellow
-    Write-Host "   Open GraphPad Prism and create a new project:" -ForegroundColor Cyan
-    Write-Host "     - File → New → New Project File."
-    Write-Host "     - CREATE 'Multiple variables' → 'Enter or import data into a new table', then save the project file."
-    Write-Host "     - Select 'Project info 1' in the Info section and enter project details."
-    Write-Host "     - Note: The steps below are organized by file for clarity. Alternatively," -ForegroundColor Blue
-    Write-Host "             all imports, all analyses, and all exports can be performed together in 3 steps." -ForegroundColor Blue
+    Write-Host "`nGraphPad Step 3.1 - Individual Replication Validation (PRIMARY):" -ForegroundColor Yellow
+    Write-Host "   Process 8 files from individual_replications/ folder:" -ForegroundColor Cyan
+    Write-Host "   1. Open GraphPad Prism and create a new project" -ForegroundColor White
+    Write-Host "   2. For each of the 8 CSV files:" -ForegroundColor White
+    Write-Host "      - Import CSV → Analyze → One sample t test → Wilcoxon signed rank test" -ForegroundColor Gray
+    Write-Host "      - Set theoretical mean to MRR chance level (see Selected_Replications_Metadata.csv)" -ForegroundColor Gray
+    Write-Host "      - Export results as GraphPad_[ReplicationName]_Results.csv" -ForegroundColor Gray
+    Write-Host "   3. Compare p-values with framework (tolerance: ±0.001)" -ForegroundColor White
     
-    Write-Host "`nGraphPad Step 3.2:" -ForegroundColor Yellow
+    Write-Host "`nGraphPad Step 3.2 - Spot-Check Validation (SECONDARY):" -ForegroundColor Yellow
+    Write-Host "   Review remaining 16 replications:" -ForegroundColor Cyan
+    Write-Host "   1. Open spot_check_summaries/Remaining_16_Replications_Summary.csv" -ForegroundColor White
+    Write-Host "   2. Verify descriptive statistics (N, medians) are reasonable" -ForegroundColor White
+    Write-Host "   3. Visual inspection of distributions (optional)" -ForegroundColor White
+    
+    Write-Host "`nGraphPad Step 3.3 - Comprehensive Validation (REFERENCE):" -ForegroundColor Yellow
     Write-Host "   Process raw MRR scores:" -ForegroundColor Cyan
     Write-Host "     - Select the 'Data 1' table and import '$RAW_SCORES_FILE' from 'tests/assets/statistical_validation_study/graphpad_imports/'."
     Write-Host "       with the following options: 'insert and maintain link', auto-update, and 'separate adjacent columns' for commas."
     Write-Host "       Check the box for setting these as the default."
     Write-Host "     - Analyze Data → Multiple variable analyses → Descriptive statistics." -ForegroundColor Gray
     Write-Host "     - Deselect 'A:Trial' (leave all MRR columns selected), then calculate the 'Basics' set of 4 stats groups for each replication." -ForegroundColor Gray
-    Write-Host "     - Export analysis results using the default filename ('Descriptive statistics of $RAW_SCORES_FILE') to 'tests/assets/statistical_validation_study/graphpad_exports/'." -ForegroundColor Gray
+    Write-Host "     - Export analysis results using the default filename ('Descriptive statistics of $RAW_SCORES_FILE') to" -ForegroundColor Gray
+    Write-Host "      'tests/assets/statistical_validation_study/graphpad_exports/'." -ForegroundColor Gray
     
-    Write-Host "`nGraphPad Step 3.3:" -ForegroundColor Yellow
+    Write-Host "`nGraphPad Step 3.4 - K-Specific Wilcoxon Tests (REFERENCE):" -ForegroundColor Yellow
     Write-Host "   Process Wilcoxon test results using K-specific datasets:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "     MRR Analysis:" -ForegroundColor Blue
@@ -788,7 +815,7 @@ function Show-Phase3ValidationInstructions {
     Write-Host "       - Repeat import and analysis for '$TOP3_K10_FILE' → hypothetical = 0.3."
     Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $TOP3_K10_FILE')."
     
-    Write-Host "`nGraphPad Step 3.4:" -ForegroundColor Yellow
+    Write-Host "`nGraphPad Step 3.5 - ANOVA Analysis (REFERENCE):" -ForegroundColor Yellow
     Write-Host "   Process ANOVA with Effect Size Validation:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "     MRR ANOVA Analysis with Effect Size:" -ForegroundColor Blue
@@ -807,7 +834,7 @@ function Show-Phase3ValidationInstructions {
     Write-Host "     • Export analysis results using the default filename ('2way ANOVA of $ANOVA_TOP3_FILE')." -ForegroundColor Gray
     
     # Bias Regression Analysis Instructions
-    Write-Host "`nGraphPad Step 3.5:" -ForegroundColor Yellow
+    Write-Host "`nGraphPad Step 3.6 - Bias Regression Analysis (REFERENCE):" -ForegroundColor Yellow
     Write-Host "   Process Bias Regression Analysis:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "     Overall Bias Regression Analysis:" -ForegroundColor Blue
@@ -833,21 +860,39 @@ function Show-Phase3ValidationInstructions {
     Write-Host "       - Repeat import and analysis for '$BIAS_REGRESSION_RANDOM_MRR_FILE'." -ForegroundColor Gray
     Write-Host "       - Export analysis results using the default filename ('Simple linear regression of $BIAS_REGRESSION_RANDOM_MRR_FILE')." -ForegroundColor Gray
     Write-Host ""
+    
+    Write-Host "`nVALIDATION PRIORITY:" -ForegroundColor Magenta
+    Write-Host "PRIMARY: Focus on Steps 3.1-3.2 for methodologically sound validation" -ForegroundColor Yellow
+    Write-Host "REFERENCE: Steps 3.3-3.6 provide comprehensive verification of all calculations" -ForegroundColor Yellow
+    Write-Host ""
+    
     Write-Host "`nAFTER COMPLETING GRAPHPAD ANALYSIS:" -ForegroundColor Cyan
     Write-Host "Run Step 4 validation:" -ForegroundColor Yellow
     Write-Host "pdm run test-stats-results" -ForegroundColor Gray
     
     Write-Host "`nSUCCESS CRITERIA:" -ForegroundColor Green
     Write-Host "Step 4 will validate within established tolerances:" -ForegroundColor Cyan
+    Write-Host "• Individual replication validation (methodologically sound sampling)" -ForegroundColor White
     Write-Host "• MRR, Top-1, Top-3 accuracy calculations and Wilcoxon p-values (±0.0001)" -ForegroundColor White
     Write-Host "• ANOVA F-statistics (±0.01) and eta-squared effect sizes (±0.01)" -ForegroundColor White
     Write-Host "• Linear regression slopes (±0.0001), R-values (±0.01), p-values (±0.001)" -ForegroundColor White
-    Write-Host "Citation ready: 'Statistical analyses were validated against GraphPad Prism 10.6.1'" -ForegroundColor Yellow
+    Write-Host "Citation ready: 'Statistical calculations were validated against GraphPad Prism 10.6.1" -ForegroundColor Yellow
+    Write-Host "using representative sampling of individual replications (8 of 24 replications," -ForegroundColor Yellow
+    Write-Host "2 per experimental condition) and comprehensive dataset validation.'" -ForegroundColor Yellow
     
     Write-Host "`nVALIDATION SUMMARY:" -ForegroundColor Cyan
-    Write-Host "Replications to validate: $($ExportStats.ReplicationCount)" -ForegroundColor White
+    Write-Host "Individual replication files: 8 (primary validation)" -ForegroundColor White
+    Write-Host "Spot-check replications: 16 (secondary validation)" -ForegroundColor White
+    Write-Host "Total replications: $($ExportStats.ReplicationCount)" -ForegroundColor White
     Write-Host "Total trials analyzed: $($ExportStats.TrialCount)" -ForegroundColor White
-    Write-Host "Export files: 15+ total (6 K-specific + 3 ANOVA + 3+ Bias + 3+ reference files)" -ForegroundColor White
+    Write-Host "Export files: 20+ total (8 individual + 1 spot-check + 6 K-specific + 3 ANOVA + 5+ Bias)" -ForegroundColor White
+    
+    $individualStats = $ExportStats.IndividualStats
+    if ($individualStats) {
+        Write-Host "Individual validation files:" -ForegroundColor White
+        Write-Host "  Selected replications: $($individualStats.ExportedFiles.Count)" -ForegroundColor Gray
+        Write-Host "  Export directory: $(Split-Path $individualStats.ExportDirectory -Leaf)" -ForegroundColor Gray
+    }
     
     $kStats = $ExportStats.KSpecificStats
     if ($kStats) {
@@ -945,13 +990,15 @@ function Generate-GraphPadExports {
     
     Write-Host "✓ Replication-level exports completed`n" -ForegroundColor Green
     
-    # Generate K-specific accuracy datasets for Wilcoxon testing
+    # Generate individual replication exports for manual validation
+    $individualStats = Export-IndividualReplicationsForManualValidation -AllReplicationData $allReplicationData -TestStudyPath $TestStudyPath
+    
+    # Generate spot-check summaries for remaining replications
+    $spotCheckStats = Export-SpotCheckSummaries -AllReplicationData $allReplicationData -SelectedReplications $individualStats.SelectedReplications
+    
+    # Core validation exports
     $kSpecificStats = Generate-KSpecificAccuracyExports -AllReplicationData $allReplicationData
-    
-    # Generate ANOVA exports with effect size validation
     $anovaStats = Generate-ANOVAExports -TestStudyPath $TestStudyPath
-    
-    # Generate bias regression exports for linear regression validation (Phase 3)
     $biasStats = Export-BiasRegressionDataForGraphPad -TestStudyPath $TestStudyPath
     
     $studyResultsPath = Join-Path $TestStudyPath "STUDY_results.csv"
@@ -1036,9 +1083,162 @@ function Generate-GraphPadExports {
         ReplicationCount = $allReplicationData.Count
         TrialCount = $allRawScores.Count
         ExportDirectory = $GraphPadImportsDir
+        IndividualStats = $individualStats
+        SpotCheckStats = $spotCheckStats
         KSpecificStats = $kSpecificStats
         ANOVAStats = $anovaStats
         BiasStats = $biasStats
+    }
+}
+
+function Export-IndividualReplicationsForManualValidation {
+    param($AllReplicationData, $TestStudyPath)
+    
+    Write-Host "Generating individual replication files for manual validation..." -ForegroundColor Cyan
+    
+    # Create directory structure
+    $IndividualRepsDir = Join-Path $GraphPadImportsDir "individual_replications"
+    New-Item -ItemType Directory -Path $IndividualRepsDir -Force | Out-Null
+    
+    # Select 2 replications per condition (8 total)
+    $selectedReplications = Select-RepresentativeReplications -AllReplicationData $AllReplicationData
+    
+    $exportedFiles = @()
+    $sequenceNum = 1
+    foreach ($replication in $selectedReplications) {
+        # Extract trial-level data for this specific replication
+        $trialData = Get-TrialDataForReplication -TestStudyPath $TestStudyPath -ReplicationInfo $replication
+        
+        if ($trialData -and $trialData.Count -gt 0) {
+            # Use short sequential naming: Rep_01_Correct_K4.csv through Rep_08_Random_K10.csv
+            $filename = "Rep_{0:D2}_{1}.csv" -f $sequenceNum, $replication.Condition
+            $filepath = Join-Path $IndividualRepsDir $filename
+            $sequenceNum++
+            
+            # Export in GraphPad format: Trial, MRR, Top1, Top3
+            $graphPadData = $trialData | Select-Object @{N='Trial';E={$_.Trial}}, @{N='MRR';E={$_.MRR}}, @{N='Top1';E={$_.Top1Accuracy}}, @{N='Top3';E={$_.Top3Accuracy}}
+            $graphPadData | Export-Csv -Path $filepath -NoTypeInformation
+            
+            $exportedFiles += @{
+                Filename = $filename
+                Condition = $replication.Condition
+                ExperimentName = $replication.ExperimentName
+                RunName = $replication.RunName
+                TrialCount = $trialData.Count
+                MRRChanceLevel = if ($replication.GroupSize -eq 4) { 0.5208 } else { 0.2929 }
+            }
+            
+            Write-Host "  Generated: $filename ($($trialData.Count) trials)" -ForegroundColor Gray
+        }
+    }
+    
+    # Export metadata file
+    $metadataPath = Join-Path (Join-Path $GraphPadImportsDir "reference_data") "Selected_Replications_Metadata.csv"
+    $exportedFiles | Export-Csv -Path $metadataPath -NoTypeInformation
+    
+    Write-Host "✓ Individual replication exports completed (8 files)" -ForegroundColor Green
+    
+    return @{
+        ExportedFiles = $exportedFiles
+        SelectedReplications = $selectedReplications
+        ExportDirectory = $IndividualRepsDir
+    }
+}
+
+function Select-RepresentativeReplications {
+    param($AllReplicationData)
+    
+    # Group by experimental condition
+    $correctK4 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "correct" -and $_.GroupSize -eq 4 }
+    $correctK10 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "correct" -and $_.GroupSize -eq 10 }
+    $randomK4 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "random" -and $_.GroupSize -eq 4 }
+    $randomK10 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "random" -and $_.GroupSize -eq 10 }
+    
+    $selected = @()
+    
+    # Select 2 replications per condition (balanced across experiments)
+    $selected += Select-BalancedReplications -Replications $correctK4 -Condition "Correct_K4" -Count 2
+    $selected += Select-BalancedReplications -Replications $correctK10 -Condition "Correct_K10" -Count 2
+    $selected += Select-BalancedReplications -Replications $randomK4 -Condition "Random_K4" -Count 2
+    $selected += Select-BalancedReplications -Replications $randomK10 -Condition "Random_K10" -Count 2
+    
+    return $selected
+}
+
+function Select-BalancedReplications {
+    param($Replications, $Condition, $Count)
+    
+    # Sort experiments and runs deterministically
+    $byExperiment = $Replications | 
+        Group-Object ExperimentName | 
+        Sort-Object Name
+    
+    $selected = @()
+    $usedReplications = @()
+    $experimentIndex = 0
+    
+    for ($i = 0; $i -lt $Count; $i++) {
+        if ($byExperiment.Count -gt 0) {
+            $experiment = $byExperiment[$experimentIndex % $byExperiment.Count]
+            # Sort runs deterministically and select first available that hasn't been used
+            $availableRuns = $experiment.Group | 
+                Where-Object { "$($_.ExperimentName)_$($_.RunName)" -notin $usedReplications } |
+                Sort-Object RunName
+            
+            if ($availableRuns.Count -gt 0) {
+                $replication = $availableRuns[0]
+                $selected += $replication | Select-Object *, @{N='Condition';E={$Condition}}
+                # Track used replications
+                $usedReplications += "$($replication.ExperimentName)_$($replication.RunName)"
+            }
+            $experimentIndex++
+        }
+    }
+    
+    return $selected
+}
+
+function Get-TrialDataForReplication {
+    param($TestStudyPath, $ReplicationInfo)
+    
+    # Find the specific replication directory
+    $experimentPath = Join-Path $TestStudyPath $ReplicationInfo.ExperimentName
+    $replicationPath = Join-Path $experimentPath $ReplicationInfo.RunName
+    
+    if (-not (Test-Path $replicationPath)) {
+        Write-Warning "Replication path not found: $replicationPath"
+        return $null
+    }
+    
+    # Use existing function to extract trial data
+    return Export-TrialByTrialPerformance -ReplicationPath $replicationPath -ExperimentName $ReplicationInfo.ExperimentName -ReplicationName $ReplicationInfo.RunName
+}
+
+function Export-SpotCheckSummaries {
+    param($AllReplicationData, $SelectedReplications)
+    
+    Write-Host "Generating spot-check summaries for remaining replications..." -ForegroundColor Cyan
+    
+    # Create directory
+    $SpotCheckDir = Join-Path $GraphPadImportsDir "spot_check_summaries"
+    New-Item -ItemType Directory -Path $SpotCheckDir -Force | Out-Null
+    
+    # Get remaining replications (not selected for manual validation)
+    $selectedIds = $SelectedReplications | ForEach-Object { "$($_.ExperimentName)_$($_.Replication)" }
+    $remainingReplications = $AllReplicationData | Where-Object { 
+        "$($_.ExperimentName)_$($_.Replication)" -notin $selectedIds 
+    }
+    
+    # Export summary statistics for spot-checking
+    $summaryPath = Join-Path $SpotCheckDir "Remaining_16_Replications_Summary.csv"
+    $remainingReplications | Select-Object ExperimentName, RunName, MappingStrategy, GroupSize, TrialCount, MeanMRR, MedianMRR, MeanTop1, MeanTop3 | 
+        Export-Csv -Path $summaryPath -NoTypeInformation
+    
+    Write-Host "✓ Spot-check summaries completed ($($remainingReplications.Count) replications)" -ForegroundColor Green
+    
+    return @{
+        RemainingCount = $remainingReplications.Count
+        SummaryFile = $summaryPath
     }
 }
 
@@ -1182,7 +1382,7 @@ try {
     
     # Step 5: Show Enhand Validation Instructions
     if (-not $ExportOnly) {
-        Show-Phase3ValidationInstructions -ExportStats $exportStats
+        Show-ValidationInstructions -ExportStats $exportStats
         
         if ($Interactive) {
             Write-Host "`n${C_YELLOW}Next Steps:${C_RESET}"

@@ -45,107 +45,129 @@ class ProjectSyncer:
         self.previous_staging = {}  # Initialize the missing attribute
         
         # Define asset categories based on your framework structure
-        self.stable_assets = {
-            "./": [
-                "README.template.md",
-                "DEVELOPERS_GUIDE.template.md", 
-                "config.ini",
-                "pyproject.toml",
-                ".gitignore",
-                "new_experiment.ps1",
-                "audit_experiment.ps1",
-                "fix_experiment.ps1", 
-                "audit_study.ps1",
-                "compile_study.ps1",
-                "prepare_data.ps1"
-            ],
+        self.asset_categories = {
+            'stable': {
+                'emoji': '📋',
+                'description': 'for Claude project repository',
+                'assets': {
+                    "./": [
+                        "README.template.md",
+                        "DEVELOPERS_GUIDE.template.md", 
+                        "config.ini",
+                        "pyproject.toml",
+                        ".gitignore",
+                        "new_experiment.ps1",
+                        "audit_experiment.ps1",
+                        "fix_experiment.ps1", 
+                        "audit_study.ps1",
+                        "compile_study.ps1",
+                        "prepare_data.ps1"
+                    ],
+                    
+                    "docs/": [
+                        "DATA_PREPARATION_DATA_DICTIONARY.template.md",
+                        "EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.template.md",
+                        "FRAMEWORK_MANUAL.template.md",
+                        "TESTING_GUIDE.template.md", 
+                        "LIFECYCLE_GUIDE.template.md",
+                        "article_main_text.template.md",
+                        "REPLICATION_GUIDE.template.md",
+                        "PROJECT_ROADMAP.md"
+                    ],
+                    
+                    "data/": [
+                        "base_query.txt"
+                    ],
+                    
+                    "data/foundational_assets/": [
+                        "point_weights.csv",
+                        "balance_thresholds.csv",
+                        "country_codes.csv",
+                        "sf_delineations_library.txt"
+                    ],
+                    
+                    "src/": [
+                        "config_loader.py"
+                    ],
+                    
+                    "src/utils/": [
+                        "file_utils.py"
+                    ],
+                    
+                    "scripts/analysis/": [
+                        "analyze_cutoff_parameters.py",
+                        "get_docstring_summary.py"
+                    ],
+                    
+                    "scripts/maintenance/": [
+                        "clean_project.py",
+                        "generate_scope_report.py",
+                        "list_project_files.py",
+                        "sync_project_assets.py"
+                    ],
+                    
+                    "scripts/build/": [
+                        "build_docs.py"
+                    ],
+                    
+                    "output/project_reports/": [
+                        "project_scope_report.md"
+                    ]
+                }
+            },
             
-            "docs/": [
-                "DATA_PREPARATION_DATA_DICTIONARY.template.md",
-                "EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.template.md",
-                "FRAMEWORK_MANUAL.template.md",
-                "TESTING_GUIDE.template.md", 
-                "LIFECYCLE_GUIDE.template.md",
-                "article_main_text.template.md",
-                "REPLICATION_GUIDE.template.md",
-                "PROJECT_ROADMAP.md"
-            ],
+            'development': {
+                'emoji': '🔧',
+                'description': 'for session-specific uploads',
+                'assets': {
+                    "src/": [
+                        # Core experiment lifecycle (actively developed)
+                        "experiment_manager.py",
+                        "replication_manager.py",
+                        "experiment_auditor.py",
+                        "analyze_study_results.py",
+                        "compile_study_results.py",
+                        "compile_experiment_results.py",
+                        "compile_replication_results.py",
+                        
+                        # Data preparation pipeline
+                        "fetch_adb_data.py",
+                        "find_wikipedia_links.py", 
+                        "validate_wikipedia_pages.py",
+                        "select_eligible_candidates.py",
+                        "generate_eminence_scores.py",
+                        "generate_ocean_scores.py",
+                        "select_final_candidates.py",
+                        "create_subject_db.py",
+                        "generate_personalities_db.py",
+                        "neutralize_delineations.py",
+                        "prepare_sf_import.py",
+                        
+                        # LLM interaction and processing
+                        "llm_prompter.py",
+                        "build_llm_queries.py",
+                        "process_llm_responses.py",
+                        "analyze_llm_performance.py",
+                        "run_bias_analysis.py",
+                        
+                        # Report generation
+                        "generate_replication_report.py",
+                        "manage_experiment_log.py"
+                    ]
+                }
+            },
             
-            "data/": [
-                "base_query.txt"
-            ],
-            
-            "data/foundational_assets/": [
-                "point_weights.csv",
-                "balance_thresholds.csv",
-                "country_codes.csv",
-                "sf_delineations_library.txt"
-            ],
-            
-            "src/": [
-                "config_loader.py"
-            ],
-            
-            "src/utils/": [
-                "file_utils.py"
-            ],
-            
-            "scripts/analysis/": [
-                "analyze_cutoff_parameters.py",
-                "get_docstring_summary.py"
-            ],
-            
-            "scripts/maintenance/": [
-                "clean_project.py",
-                "generate_scope_report.py",
-                "list_project_files.py",
-                "sync_project_assets.py"
-            ],
-            
-            "scripts/build/": [
-                "build_docs.py"
-            ],
-            
-            "output/project_reports/": [
-                "project_scope_report.md"
-            ]
-        }
-
-        self.development_assets = {
-            "src/": [
-                # Core experiment lifecycle (actively developed)
-                "experiment_manager.py",
-                "replication_manager.py",
-                "experiment_auditor.py",
-                "analyze_study_results.py",
-                "compile_study_results.py",
-                "compile_experiment_results.py",
-                "compile_replication_results.py",
-                
-                # Data preparation pipeline
-                "fetch_adb_data.py",
-                "find_wikipedia_links.py", 
-                "validate_wikipedia_pages.py",
-                "select_eligible_candidates.py",
-                "generate_eminence_scores.py",
-                "generate_ocean_scores.py",
-                "select_final_candidates.py",
-                "create_subject_db.py",
-                "generate_personalities_db.py",
-                "neutralize_delineations.py",
-                "prepare_sf_import.py",
-                
-                # LLM interaction and processing
-                "llm_prompter.py",
-                "build_llm_queries.py",
-                "process_llm_responses.py",
-                "analyze_llm_performance.py",
-                "run_bias_analysis.py",
-                
-                # Report generation
-                "generate_replication_report.py",
-                "manage_experiment_log.py"
-            ]
+            'test': {
+                'emoji': '🧪',
+                'description': 'for validation workflows',
+                'assets': {
+                    "tests/algorithm_validation/": [
+                        "create_statistical_study.ps1",
+                        "generate_graphpad_imports.ps1",
+                        "validate_graphpad_results.ps1"
+                    ]
+                }
+            }
         }
 
     def create_staging_structure(self):
@@ -158,9 +180,11 @@ class ProjectSyncer:
         # Create staging directory if it doesn't exist
         self.staging_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create subdirectories if they don't exist
-        (self.staging_dir / "stable").mkdir(exist_ok=True)
-        (self.staging_dir / "development").mkdir(exist_ok=True)
+        # Create subdirectories for each asset category
+        for category_name in self.asset_categories.keys():
+            (self.staging_dir / category_name).mkdir(exist_ok=True)
+        
+        # Create config directory
         (self.staging_dir / "config").mkdir(exist_ok=True)
         
         # Clear only the changed_files directory
@@ -172,7 +196,8 @@ class ProjectSyncer:
         """Store checksums of existing staging files for change detection."""
         import hashlib
         
-        for subdir in ["stable", "development", "config"]:
+        subdirs = list(self.asset_categories.keys()) + ["config"]
+        for subdir in subdirs:
             subdir_path = self.staging_dir / subdir
             if subdir_path.exists():
                 for file_path in subdir_path.rglob("*"):
@@ -192,59 +217,33 @@ class ProjectSyncer:
         
         changed_files = []
         
-        # Check stable files
-        for source_dir, files in self.stable_assets.items():
-            for file_name in files:
-                source_path = self.project_root / source_dir / file_name
-                if not source_path.exists():
-                    continue
-                
-                # Calculate destination name
-                if source_dir != "./":
-                    safe_dir = source_dir.replace("/", "_").replace("\\", "_").rstrip("_")
-                    dest_name = f"{safe_dir}_{file_name}"
-                else:
-                    dest_name = file_name
-                
-                relative_path = f"stable/{dest_name}".replace("/", "\\")
-                
-                # Calculate source file hash
-                try:
-                    with open(source_path, 'rb') as f:
-                        source_hash = hashlib.md5(f.read()).hexdigest()
+        # Check files for each asset category
+        for category_name, category_data in self.asset_categories.items():
+            for source_dir, files in category_data['assets'].items():
+                for file_name in files:
+                    source_path = self.project_root / source_dir / file_name
+                    if not source_path.exists():
+                        continue
                     
-                    # Check if file is new or changed
-                    if relative_path not in self.previous_staging or self.previous_staging[relative_path] != source_hash:
-                        changed_files.append((source_path, dest_name))
-                except (OSError, IOError):
-                    pass
-        
-        # Check development files
-        for source_dir, files in self.development_assets.items():
-            for file_name in files:
-                source_path = self.project_root / source_dir / file_name
-                if not source_path.exists():
-                    continue
-                
-                # Calculate destination name
-                if source_dir != "./":
-                    safe_dir = source_dir.replace("/", "_").replace("\\", "_").rstrip("_")
-                    dest_name = f"{safe_dir}_{file_name}"
-                else:
-                    dest_name = file_name
-                
-                relative_path = f"development/{dest_name}".replace("/", "\\")
-                
-                # Calculate source file hash
-                try:
-                    with open(source_path, 'rb') as f:
-                        source_hash = hashlib.md5(f.read()).hexdigest()
+                    # Calculate destination name
+                    if source_dir != "./":
+                        safe_dir = source_dir.replace("/", "_").replace("\\", "_").rstrip("_")
+                        dest_name = f"{safe_dir}_{file_name}"
+                    else:
+                        dest_name = file_name
                     
-                    # Check if file is new or changed
-                    if relative_path not in self.previous_staging or self.previous_staging[relative_path] != source_hash:
-                        changed_files.append((source_path, dest_name))
-                except (OSError, IOError):
-                    pass
+                    relative_path = f"{category_name}/{dest_name}".replace("/", "\\")
+                    
+                    # Calculate source file hash
+                    try:
+                        with open(source_path, 'rb') as f:
+                            source_hash = hashlib.md5(f.read()).hexdigest()
+                        
+                        # Check if file is new or changed
+                        if relative_path not in self.previous_staging or self.previous_staging[relative_path] != source_hash:
+                            changed_files.append((source_path, dest_name))
+                    except (OSError, IOError):
+                        pass
         
         # Note: Config files are excluded from change detection since they're generated fresh each time
         
@@ -343,7 +342,7 @@ class ProjectSyncer:
         
         return copied_files, missing_files
 
-    def generate_manifest(self, stable_copied, stable_missing, dev_copied, dev_missing, changed_files):
+    def generate_manifest(self, results, changed_files):
         """Generate a manifest file describing what was copied."""
         manifest_path = self.staging_dir / "SYNC_MANIFEST.md"
         
@@ -363,31 +362,38 @@ class ProjectSyncer:
                 f.write("## 🔄 Changed Files\n\n")
                 f.write("No files have changed since the last sync.\n\n")
             
-            f.write("## Stable Assets (for Claude project repository)\n\n")
-            f.write("These files should be uploaded to the Claude project repository for persistent access across sessions:\n\n")
-            for file_info in stable_copied:
-                f.write(f"- {file_info}\n")
+            # Write section for each asset category
+            for category_name, category_data in self.asset_categories.items():
+                emoji = category_data['emoji']
+                description = category_data['description']
+                copied = results[category_name]['copied']
+                missing = results[category_name]['missing']
+                
+                f.write(f"## {emoji} {category_name.capitalize()} Assets ({description})\n\n")
+                
+                if category_name == 'stable':
+                    f.write("These files should be uploaded to the Claude project repository for persistent access across sessions:\n\n")
+                elif category_name == 'development':
+                    f.write("These files should be uploaded to individual chat sessions as needed:\n\n")
+                elif category_name == 'test':
+                    f.write("These files are validation scripts used for statistical analysis verification:\n\n")
+                
+                for file_info in copied:
+                    f.write(f"- {file_info}\n")
+                
+                if missing:
+                    f.write(f"\n### Missing {category_name.capitalize()} Assets:\n")
+                    for missing_file in missing:
+                        f.write(f"- ❌ {missing_file}\n")
+                
+                f.write("\n")
             
-            if stable_missing:
-                f.write("\n### Missing Stable Assets:\n")
-                for missing in stable_missing:
-                    f.write(f"- ❌ {missing}\n")
-            
-            f.write("\n## Development Assets (for session-specific uploads)\n\n")
-            f.write("These files should be uploaded to individual chat sessions as needed:\n\n")
-            for file_info in dev_copied:
-                f.write(f"- {file_info}\n")
-            
-            if dev_missing:
-                f.write("\n### Missing Development Assets:\n")
-                for missing in dev_missing:
-                    f.write(f"- ❌ {missing}\n")
-            
-            f.write("\n## Usage Notes\n\n")
+            f.write("## Usage Notes\n\n")
             f.write("1. **Upload changed_files/ contents first** for immediate updates\n")
             f.write("2. **Upload stable/ contents to Claude project repository** for persistent access\n")
             f.write("3. **Upload development/ files to individual sessions** as needed\n")
-            f.write("4. **Re-run this script** after major changes to sync latest versions\n")
+            f.write("4. **Upload test/ files when running validation workflows**\n")
+            f.write("5. **Re-run this script** after major changes to sync latest versions\n")
 
     def create_config_snapshot(self):
         """Create a snapshot of current configuration for reference."""
@@ -433,13 +439,13 @@ class ProjectSyncer:
         else:
             print("  No changed files detected")
         
-        # Copy stable assets
-        print("Copying stable assets...")
-        stable_copied, stable_missing = self.copy_assets(self.stable_assets, "stable")
-        
-        # Copy development assets  
-        print("Copying development assets...")
-        dev_copied, dev_missing = self.copy_assets(self.development_assets, "development")
+        # Copy assets for each category
+        results = {}
+        for category_name, category_data in self.asset_categories.items():
+            emoji = category_data['emoji']
+            print(f"Copying {category_name} assets...")
+            copied, missing = self.copy_assets(category_data['assets'], category_name)
+            results[category_name] = {'copied': copied, 'missing': missing}
         
         # Create config snapshot
         print("Creating configuration snapshot...")
@@ -450,20 +456,27 @@ class ProjectSyncer:
         
         # Generate manifest
         print("Generating manifest...")
-        self.generate_manifest(stable_copied, stable_missing, dev_copied, dev_missing, changed_files)
+        self.generate_manifest(results, changed_files)
         
         # Summary
         print(f"\n✅ Sync complete!")
         print(f"📁 Staging directory: {self.staging_dir}")
-        print(f"📋 Stable assets: {len(stable_copied)} copied, {len(stable_missing)} missing")
-        print(f"🔧 Development assets: {len(dev_copied)} copied, {len(dev_missing)} missing")
+        
+        for category_name, category_data in self.asset_categories.items():
+            emoji = category_data['emoji']
+            copied = results[category_name]['copied']
+            missing = results[category_name]['missing']
+            print(f"{emoji} {category_name.capitalize()} assets: {len(copied)} copied, {len(missing)} missing")
+        
         print(f"🔄 Changed files: {len(changed_files)} identified")
         print(f"📄 See SYNC_MANIFEST.md for details")
         
         if changed_files:
             print(f"\n📤 Priority upload: {len(changed_files)} changed files in changed_files/ folder")
         
-        if stable_missing or dev_missing:
+        # Check if any category has missing files
+        any_missing = any(len(results[cat]['missing']) > 0 for cat in self.asset_categories.keys())
+        if any_missing:
             print(f"\n⚠️  Some files were missing - check manifest for details")
         
         print()
@@ -494,34 +507,22 @@ def main():
         print(f"Would sync from: {project_root}")
         print(f"Would stage to: {syncer.staging_dir}")
         
-        # Show what would be copied
-        print("\nStable assets that would be copied:")
-        for source_dir, files in syncer.stable_assets.items():
-            for file_name in files:
-                source_path = project_root / source_dir / file_name
-                status = "✓" if source_path.exists() else "✗"
-                print(f"  {status} {source_dir}{file_name}")
+        # Show what would be copied for each category
+        total_missing_count = 0
+        for category_name, category_data in syncer.asset_categories.items():
+            print(f"\n{category_name.capitalize()} assets that would be copied:")
+            category_missing_count = 0
+            for source_dir, files in category_data['assets'].items():
+                for file_name in files:
+                    source_path = project_root / source_dir / file_name
+                    status = "✓" if source_path.exists() else "✗"
+                    if not source_path.exists():
+                        category_missing_count += 1
+                    print(f"  {status} {source_dir}{file_name}")
+            total_missing_count += category_missing_count
         
-        print("\nDevelopment assets that would be copied:")
-        dev_missing_count = 0
-        for source_dir, files in syncer.development_assets.items():
-            for file_name in files:
-                source_path = project_root / source_dir / file_name
-                status = "✓" if source_path.exists() else "✗"
-                if not source_path.exists():
-                    dev_missing_count += 1
-                print(f"  {status} {source_dir}{file_name}")
-        
-        # Count missing stable assets too
-        stable_missing_count = 0
-        for source_dir, files in syncer.stable_assets.items():
-            for file_name in files:
-                source_path = project_root / source_dir / file_name
-                if not source_path.exists():
-                    stable_missing_count += 1
-        
-        if stable_missing_count > 0 or dev_missing_count > 0:
-            print(f"\n⚠️  Some files were missing - check paths for {stable_missing_count + dev_missing_count} missing files")
+        if total_missing_count > 0:
+            print(f"\n⚠️  Some files were missing - check paths for {total_missing_count} missing files")
         
         # Simulate change detection for dry run
         print(f"\n🔄 Files that would be identified as changed:")
@@ -531,18 +532,19 @@ def main():
             
             # Simulate copying to detect changes
             all_files = []
-            for source_dir, files in syncer.stable_assets.items():
-                for file_name in files:
-                    source_path = project_root / source_dir / file_name
-                    if source_path.exists():
-                        if source_dir != "./":
-                            safe_dir = source_dir.replace("/", "_").replace("\\", "_").rstrip("_")
-                            dest_name = f"{safe_dir}_{file_name}"
-                        else:
-                            dest_name = file_name
-                        all_files.append(f"{source_dir}{file_name} -> {dest_name}")
+            for category_name, category_data in syncer.asset_categories.items():
+                for source_dir, files in category_data['assets'].items():
+                    for file_name in files:
+                        source_path = project_root / source_dir / file_name
+                        if source_path.exists():
+                            if source_dir != "./":
+                                safe_dir = source_dir.replace("/", "_").replace("\\", "_").rstrip("_")
+                                dest_name = f"{safe_dir}_{file_name}"
+                            else:
+                                dest_name = file_name
+                            all_files.append(f"{source_dir}{file_name} -> {dest_name}")
             
-            for source_dir, files in syncer.development_assets.items():
+            for source_dir, files in syncer.test_assets.items():
                 for file_name in files:
                     source_path = project_root / source_dir / file_name
                     if source_path.exists():

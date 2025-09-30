@@ -71,7 +71,7 @@ This standalone test provides mathematical proof of the mapping and randomizatio
 
 This 4-stage validation workflow provides external validation of the entire statistical analysis pipeline against GraphPad Prism 10.6.1. Uses real framework execution with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis).
 
-**Implementation:** 4-stage validation process using real framework execution with deterministic parameters (temperature=0.0, gemini-1.5-flash) and framework's built-in seeded randomization. 2×2 factorial design with 6 replications per condition = 24 total experiments.
+**Implementation:** 4-stage validation process using real framework execution with deterministic parameters (temperature=0.0, gemini-2.5-flash-lite-preview-06-17) and framework's built-in seeded randomization. 2×2 factorial design with 6 replications per condition = 24 total experiments.
 
 **Validation Methodology:** Representative sampling approach - full manual validation of 2 replications per condition (8 total), with automated spot-checks of descriptive statistics for remaining 16 replications. This validates the calculation engine without exhaustive manual checking of all replications.
 
@@ -90,9 +90,9 @@ pdm run test-stats-imports
 pdm run test-stats-results
 ```
 
-**Current Status: In Progress**
+**Current Status: Ready for Validation**
 - ✓ **Stage 1**: Statistical study creation completed (24 replications, 768 trials)
-- ✓ **Stage 2**: Export generation with corrected MRR chance levels (harmonic mean)
+- ✓ **Stage 2**: Export generation with individual replication sampling (8 of 24)
 - ⏳ **Stage 3**: Manual GraphPad processing of 8 selected replications
 - ⏳ **Stage 4**: Automated validation comparison pending
 
