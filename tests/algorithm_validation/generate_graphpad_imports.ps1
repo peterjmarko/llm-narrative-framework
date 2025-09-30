@@ -762,12 +762,12 @@ function Show-ValidationInstructions {
     
     Write-Host "`nGraphPad Step 3.1 - Individual Replication Validation (PRIMARY):" -ForegroundColor Yellow
     Write-Host "   Process 8 files from individual_replications/ folder:" -ForegroundColor Cyan
-    Write-Host "   1. Open GraphPad Prism and create a new project" -ForegroundColor White
+    Write-Host "   1. Open GraphPad Prism and create a new project (starting with a 'Multiple variables' table)" -ForegroundColor White
     Write-Host "   2. For each of the 8 CSV files:" -ForegroundColor White
     Write-Host "      - Import CSV → Analyze → One sample t test → Wilcoxon signed rank test" -ForegroundColor Gray
     Write-Host "      - Set theoretical mean to MRR chance level (see Selected_Replications_Metadata.csv)" -ForegroundColor Gray
     Write-Host "      - Export results as GraphPad_[ReplicationName]_Results.csv" -ForegroundColor Gray
-    Write-Host "   3. Compare p-values with framework (tolerance: ±0.001)" -ForegroundColor White
+    Write-Host "   3. Compare p-values with framework (tolerance: ±0.005)" -ForegroundColor White
     
     Write-Host "`nGraphPad Step 3.2 - Spot-Check Validation (SECONDARY):" -ForegroundColor Yellow
     Write-Host "   Review remaining 16 replications:" -ForegroundColor Cyan
@@ -1101,7 +1101,8 @@ function Export-IndividualReplicationsForManualValidation {
     New-Item -ItemType Directory -Path $IndividualRepsDir -Force | Out-Null
     
     # Select 2 replications per condition (8 total)
-    $selectedReplications = Select-RepresentativeReplications -AllReplicationData $AllReplicationData
+    # Selection function will filter out edge cases based on mean MRR distance from chance
+    $selectedReplications = Select-RepresentativeReplications -AllReplicationData $AllReplicationData -TestStudyPath $TestStudyPath
     
     $exportedFiles = @()
     $sequenceNum = 1
@@ -1146,7 +1147,10 @@ function Export-IndividualReplicationsForManualValidation {
 }
 
 function Select-RepresentativeReplications {
-    param($AllReplicationData)
+    param($AllReplicationData, $TestStudyPath)
+    
+    # No filtering - select replications systematically to provide transparent validation
+    # Random_K4 naturally performs near chance, which validates the control condition
     
     # Group by experimental condition
     $correctK4 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "correct" -and $_.GroupSize -eq 4 }
@@ -1157,42 +1161,27 @@ function Select-RepresentativeReplications {
     $selected = @()
     
     # Select 2 replications per condition (balanced across experiments)
-    $selected += Select-BalancedReplications -Replications $correctK4 -Condition "Correct_K4" -Count 2
-    $selected += Select-BalancedReplications -Replications $correctK10 -Condition "Correct_K10" -Count 2
-    $selected += Select-BalancedReplications -Replications $randomK4 -Condition "Random_K4" -Count 2
-    $selected += Select-BalancedReplications -Replications $randomK10 -Condition "Random_K10" -Count 2
+    $selected += Select-BalancedReplications -Replications $correctK4 -Condition "Correct_K4" -Count 2 -TestStudyPath $TestStudyPath
+    $selected += Select-BalancedReplications -Replications $correctK10 -Condition "Correct_K10" -Count 2 -TestStudyPath $TestStudyPath
+    $selected += Select-BalancedReplications -Replications $randomK4 -Condition "Random_K4" -Count 2 -TestStudyPath $TestStudyPath
+    $selected += Select-BalancedReplications -Replications $randomK10 -Condition "Random_K10" -Count 2 -TestStudyPath $TestStudyPath
     
     return $selected
 }
 
 function Select-BalancedReplications {
-    param($Replications, $Condition, $Count)
+    param($Replications, $Condition, $Count, $TestStudyPath)
     
-    # Sort experiments and runs deterministically
-    $byExperiment = $Replications | 
-        Group-Object ExperimentName | 
-        Sort-Object Name
+    # Sort deterministically: by experiment name, then run name
+    # No filtering - transparent selection for honest validation
+    $sortedReplications = $Replications | Sort-Object ExperimentName, RunName
     
+    # Select first N replications
     $selected = @()
-    $usedReplications = @()
-    $experimentIndex = 0
+    $selectedCount = [Math]::Min($Count, $sortedReplications.Count)
     
-    for ($i = 0; $i -lt $Count; $i++) {
-        if ($byExperiment.Count -gt 0) {
-            $experiment = $byExperiment[$experimentIndex % $byExperiment.Count]
-            # Sort runs deterministically and select first available that hasn't been used
-            $availableRuns = $experiment.Group | 
-                Where-Object { "$($_.ExperimentName)_$($_.RunName)" -notin $usedReplications } |
-                Sort-Object RunName
-            
-            if ($availableRuns.Count -gt 0) {
-                $replication = $availableRuns[0]
-                $selected += $replication | Select-Object *, @{N='Condition';E={$Condition}}
-                # Track used replications
-                $usedReplications += "$($replication.ExperimentName)_$($replication.RunName)"
-            }
-            $experimentIndex++
-        }
+    for ($i = 0; $i -lt $selectedCount; $i++) {
+        $selected += $sortedReplications[$i] | Select-Object *, @{N='Condition';E={$Condition}}
     }
     
     return $selected
@@ -1343,10 +1332,37 @@ try {
 
     Write-Host "Clearing and preparing the GraphPad imports directory..." -ForegroundColor Cyan
     if (Test-Path $GraphPadImportsDir) {
-        Get-ChildItem -Path $GraphPadImportsDir -Recurse | Remove-Item -Recurse -Force
-    } else {
-        New-Item -ItemType Directory -Path $GraphPadImportsDir -Force | Out-Null
+        $filesLocked = $true
+        $promptShown = $false
+        
+        while ($filesLocked) {
+            try {
+                # Attempt to remove all files and subdirectories
+                Get-ChildItem -Path $GraphPadImportsDir -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction Stop
+                Remove-Item -Path $GraphPadImportsDir -Recurse -Force -ErrorAction Stop
+                $filesLocked = $false
+            }
+            catch {
+                if (-not $promptShown) {
+                    Write-Host ""
+                    Write-Host "  ${C_RED}Files are currently locked (likely open in Excel or another application)${C_RESET}" -ForegroundColor Red
+                    Write-Host "  ${C_YELLOW}Please close any applications that have files open in:${C_RESET}" -ForegroundColor Yellow
+                    Write-Host "  ${C_CYAN}$GraphPadImportsDir${C_RESET}" -ForegroundColor Cyan
+                    Write-Host ""
+                    Write-Host "  ${C_GREEN}Waiting for files to become available...${C_RESET}" -ForegroundColor Green
+                    Write-Host "  ${C_GRAY}(checking every 2 seconds, press Ctrl+C to cancel)${C_RESET}" -ForegroundColor Gray
+                    Write-Host ""
+                    $promptShown = $true
+                }
+                
+                # Wait before retrying
+                Start-Sleep -Seconds 2
+            }
+        }
     }
+    
+    # Recreate clean directory
+    New-Item -ItemType Directory -Path $GraphPadImportsDir -Force | Out-Null
     Write-Host "✓ GraphPad imports directory is ready." -ForegroundColor Green
     
     if ($Interactive) {

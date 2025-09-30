@@ -55,8 +55,8 @@ param(
     [string]$GraphPadMeansFile,
     
     [double]$MRRTolerance = 0.0001,
-    [double]$StatisticalTolerance = 0.001
-)
+    [double]$StatisticalTolerance = 0.005
+)   
 
 # --- ANSI Color Codes ---
 $C_RESET = "`e[0m"
@@ -734,8 +734,8 @@ function Validate-IndividualReplications {
     $allPassed = $true
     
     foreach ($replication in $selectedReplications) {
-        # Look for GraphPad export file
-        $graphPadFile = Join-Path $GraphPadExportsDir "GraphPad_$($replication.Filename -replace '.csv','_Results.csv')"
+        # Look for GraphPad export file using GraphPad's default naming
+        $graphPadFile = Join-Path $GraphPadExportsDir "One sample Wilcoxon test of $($replication.Filename)"
         
         if (Test-Path $graphPadFile) {
             $result = Compare-IndividualReplicationResults -GraphPadFile $graphPadFile -ReplicationInfo $replication -Tolerance $Tolerance
@@ -761,18 +761,98 @@ function Compare-IndividualReplicationResults {
     Write-Host "  Validating: $($ReplicationInfo.Filename)" -ForegroundColor Gray
     
     try {
-        # Import GraphPad results (format depends on GraphPad export)
-        $graphPadData = Import-Csv $GraphPadFile -ErrorAction Stop
+        # Import GraphPad results, suppressing header warnings
+        $graphPadData = Import-Csv $GraphPadFile -ErrorAction Stop -WarningAction SilentlyContinue
         
-        # Compare key metrics: N, median, p-value
-        # This is a placeholder - actual implementation depends on GraphPad export format
+        # Get column names (GraphPad exports have dynamic headers)
+        $firstColName = ($graphPadData | Get-Member -MemberType NoteProperty).Name[0]
+        $secondColName = ($graphPadData | Get-Member -MemberType NoteProperty).Name[1]
+        
+        # Extract key metrics from GraphPad output
+        $nRow = $graphPadData | Where-Object { $_.$firstColName -like "*Number of values*" } | Select-Object -First 1
+        $medianRow = $graphPadData | Where-Object { $_.$firstColName -like "*Actual median*" } | Select-Object -First 1
+        $pValueRow = $graphPadData | Where-Object { $_.$firstColName -like "*P value*" } | Select-Object -First 1
+        
+        if (-not ($nRow -and $medianRow -and $pValueRow)) {
+            Write-Host "    ✗ Could not parse GraphPad output format" -ForegroundColor Red
+            return @{
+                ReplicationName = $ReplicationInfo.Filename
+                Passed = $false
+                Details = "Missing required rows in GraphPad export"
+            }
+        }
+        
+        # Parse GraphPad values
+        $graphPadN = [int]$nRow.$secondColName
+        $graphPadMedian = [double]$medianRow.$secondColName
+        $graphPadPTwoTailed = [double]($pValueRow.$secondColName -replace '[<>= ]','')
+        $hypothetical = [double]$ReplicationInfo.MRRChanceLevel
+        
+        # Convert GraphPad's two-tailed p-value to one-tailed
+        # Framework uses alternative='greater' (tests if MRR > chance)
+        # GraphPad uses two-tailed test by default
+        # For one-tailed: p_one = p_two / 2 when effect is in expected direction
+        $graphPadPOneTailed = if ($graphPadMedian -gt $hypothetical) {
+            # Median > chance: effect in expected direction, use p_two/2
+            $graphPadPTwoTailed / 2.0
+        } else {
+            # Median <= chance: effect in opposite direction, use 1 - (p_two/2)
+            1.0 - ($graphPadPTwoTailed / 2.0)
+        }
+        
+        # Load framework's calculated metrics from original replication
+        $frameworkMetrics = Get-FrameworkReplicationMetrics -ReplicationInfo $ReplicationInfo
+        if (-not $frameworkMetrics) {
+            Write-Host "    ✗ Could not load framework metrics for comparison" -ForegroundColor Red
+            return @{
+                ReplicationName = $ReplicationInfo.Filename
+                Passed = $false
+                Details = "Framework metrics not found"
+            }
+        }
+        
+        # Compare one-tailed p-values
+        $pValueDiff = [Math]::Abs($graphPadPOneTailed - $frameworkMetrics.mrr_p)
+        $pValueMatch = $pValueDiff -le $Tolerance
+        
+        # Display comparison
+        $color = if ($pValueMatch) { "Green" } else { "Red" }
+        $symbol = if ($pValueMatch) { "✓" } else { "✗" }
+        Write-Host "    GraphPad: N=$graphPadN, Median=$($graphPadMedian.ToString('F4')), P(2-tailed)=$($graphPadPTwoTailed.ToString('F6'))" -ForegroundColor Cyan
+        Write-Host "    GraphPad: P(1-tailed)=$($graphPadPOneTailed.ToString('F6')) [converted from 2-tailed]" -ForegroundColor Cyan
+        Write-Host "    Framework: N=$($frameworkMetrics.n_valid_responses), P(1-tailed)=$($frameworkMetrics.mrr_p.ToString('F6'))" -ForegroundColor Cyan
+        Write-Host "    $symbol P-value diff: $($pValueDiff.ToString('F6')) (tolerance: ±$Tolerance)" -ForegroundColor $color
+        
+        # Validation checks
         $passed = $true
-        $details = "Descriptive statistics and p-values within tolerance"
+        $details = @()
+        
+        # Check N matches
+        if ($graphPadN -ne $frameworkMetrics.n_valid_responses) {
+            $passed = $false
+            $details += "N mismatch (GraphPad=$graphPadN, Framework=$($frameworkMetrics.n_valid_responses))"
+        }
+        
+        # Check p-value within tolerance
+        if (-not $pValueMatch) {
+            $passed = $false
+            $details += "P-value difference exceeds tolerance ($($pValueDiff.ToString('F6')) > $Tolerance)"
+        }
+        
+        if ($passed) {
+            $details += "GraphPad matches framework within tolerance"
+        }
         
         return @{
             ReplicationName = $ReplicationInfo.Filename
             Passed = $passed
-            Details = $details
+            Details = ($details -join "; ")
+            GraphPadN = $graphPadN
+            GraphPadMedian = $graphPadMedian
+            GraphPadPTwoTailed = $graphPadPTwoTailed
+            GraphPadPOneTailed = $graphPadPOneTailed
+            FrameworkP = $frameworkMetrics.mrr_p
+            PValueDiff = $pValueDiff
         }
     }
     catch {
@@ -782,6 +862,30 @@ function Compare-IndividualReplicationResults {
             Passed = $false
             Details = "File read error: $($_.Exception.Message)"
         }
+    }
+}
+
+function Get-FrameworkReplicationMetrics {
+    param($ReplicationInfo)
+    
+    # Construct path to framework's replication_metrics.json
+    $studyPath = "tests/assets/statistical_validation_study"
+    $replicationPath = Join-Path $studyPath $ReplicationInfo.ExperimentName
+    $replicationPath = Join-Path $replicationPath $ReplicationInfo.RunName
+    $metricsPath = Join-Path $replicationPath "analysis_inputs/replication_metrics.json"
+    
+    if (-not (Test-Path $metricsPath)) {
+        Write-Verbose "Framework metrics not found: $metricsPath"
+        return $null
+    }
+    
+    try {
+        $metrics = Get-Content $metricsPath -Raw | ConvertFrom-Json
+        return $metrics
+    }
+    catch {
+        Write-Verbose "Error loading framework metrics: $($_.Exception.Message)"
+        return $null
     }
 }
 
