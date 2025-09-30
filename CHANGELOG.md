@@ -1,5 +1,28 @@
 # Changelog
 
+## 11.6.0 (2025-09-30)
+
+### Bump
+
+- **version 11.5.2 → 11.6.0**
+
+### Features
+
+- **implement dual-methodology statistical validation with representative sampling**
+  This commit implements a practical validation approach using representative sampling instead of exhaustive manual processing, then completes cleanup of all development artifacts.
+  
+  - Implement dual-methodology validation: primary (8 selected replications), secondary (spot-check 16 replications), reference (comprehensive 24 replications)
+  - Add validation functions: Validate-IndividualReplications, Compare-IndividualReplicationResults, Validate-SpotCheckSummaries
+  - Add export functions: Export-IndividualReplicationsForManualValidation, Select-RepresentativeReplications, Select-BalancedReplications, Get-TrialDataForReplication, Export-SpotCheckSummaries
+  - Implement deterministic selection algorithm using round-robin sampling across experiments
+  - Create directory structure: individual_replications/, spot_check_summaries/, reference_data/
+  - Fix path construction issues: RunName extraction, field name standardization, read-only Group property handling
+  - Shorten individual replication filenames using sequential numbering (Rep_01_Correct_K4.csv format)
+  - Update model reference in Testing Guide to gemini-2.5-flash-lite-preview-06-17
+  - Remove 11 lines of debug output and 14 temporary markers ("NEW:", "EXISTING:")
+  - Change export path display from absolute to relative format
+  - Update academic citation to reflect representative sampling methodology
+
 ## 11.5.2 (2025-09-29)
 
 ### Bump
