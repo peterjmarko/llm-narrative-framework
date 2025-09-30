@@ -64,7 +64,7 @@ param(
     [string]$OutputPath = "tests/assets/statistical_validation_study",
     [int]$ReplicationsPerExperiment = 6,
     [int]$TrialsPerReplication = 32,
-    [string]$Model = "openai/gpt-4.1-mini",
+    [string]$Model = "google/gemini-2.5-flash-lite-preview-06-17",
     [array]$MappingStrategies = @("correct", "random"),
     [array]$GroupSizes = @(4, 10),
     [switch]$Force,
@@ -77,13 +77,13 @@ if ($Verbose) { $VerbosePreference = "Continue" }
 # Header formatting function
 function Write-TestHeader {
     param($Message, $Color = 'Cyan')
-    $line = "=" * 80
+    $line = "=" * 75
     Write-Host "`n$line" -ForegroundColor $Color
     Write-Host $Message -ForegroundColor $Color
     Write-Host "$line`n" -ForegroundColor $Color
 }
 
-Write-TestHeader "Statistical Validation Study Generator" "Magenta"
+Write-TestHeader "Validation of Statistical Analysis & Reporting - Stage 1/4: Study Generator" "Magenta"
 Write-Host "Focus: GraphPad Prism Statistical Validation" -ForegroundColor Green
 Write-Host "Approach: Real framework execution with controlled parameters" -ForegroundColor White
 Write-Host "Parameters: m = $TrialsPerReplication trials, $ReplicationsPerExperiment replications per experiment, Model = $Model" -ForegroundColor White
@@ -127,7 +127,7 @@ if (Test-Path $OutputPath) {
         $confirmation = Read-Host "Are you sure you want to continue? (Y/N)"
         
         if ($confirmation -notmatch '^[Yy]$') {
-            Write-Host "Operation cancelled by user." -ForegroundColor Yellow
+            Write-Host "Operation cancelled by user.`n" -ForegroundColor Yellow
             exit 0
         }
         
@@ -399,12 +399,12 @@ if (Test-Path "config.ini.backup") {
 
 if (-not $compilationFailed) {
     Write-Host "`n=== Next Steps for GraphPad Validation ===" -ForegroundColor Cyan
-    Write-Host "`n=== 4-Step GraphPad Validation Workflow ===" -ForegroundColor Cyan
-    Write-Host "✓ Step 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
-    Write-Host "→ Step 2: Generate GraphPad export files" -ForegroundColor Yellow
+    Write-Host "`n=== 4-Stage GraphPad Validation Workflow ===" -ForegroundColor Cyan
+    Write-Host "✓ Stage 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
+    Write-Host "→ Stage 2: Generate GraphPad export files" -ForegroundColor Yellow
     Write-Host "   pwsh -File ./tests/algorithm_validation/generate_graphpad_exports.ps1" -ForegroundColor Gray
-    Write-Host "  Step 3: Manual GraphPad Prism analysis (import, analyze, export)" -ForegroundColor Gray
-    Write-Host "  Step 4: Validate results against framework" -ForegroundColor Gray
+    Write-Host "  Stage 3: Manual GraphPad Prism analysis (import, analyze, export)" -ForegroundColor Gray
+    Write-Host "  Stage 4: Validate results against framework" -ForegroundColor Gray
     Write-Host "2. Follow GraphPad Prism comparison instructions" -ForegroundColor Gray
     Write-Host "3. Document validation results for publication" -ForegroundColor Gray
 

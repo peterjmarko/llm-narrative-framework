@@ -101,7 +101,7 @@ $BIAS_REGRESSION_RANDOM_MRR_FILE = "Phase_B_Bias_Regression_Random_MRR.csv"
 # --- Helper Functions ---
 function Write-TestHeader { 
     param($Message, $Color = 'Cyan') 
-    $line = "=" * 80
+    $line = "=" * 85
     Write-Host "`n$line" -ForegroundColor $Color
     Write-Host $Message -ForegroundColor $Color
     Write-Host "$line`n" -ForegroundColor $Color
@@ -294,13 +294,14 @@ function Export-RawScoresForGraphPadWide {
     for ($trial = 1; $trial -le $maxTrials; $trial++) {
         $row = [PSCustomObject]@{ Trial = $trial }
         
+        $repCounter = 1
         foreach ($rep in $replications) {
-            $repId = $rep.Name
             $trialData = $rep.Group | Where-Object { $_.Trial -eq $trial }
             
-            # Add MRR column for this specific replication
+            # Add MRR column for this specific replication with a sequential name
             $mrrValue = if ($trialData) { $trialData.MRR -as [double] } else { $null }
-            $row | Add-Member -NotePropertyName "MRR_$repId" -NotePropertyValue $mrrValue
+            $row | Add-Member -NotePropertyName "MRR_$($repCounter.ToString('00'))" -NotePropertyValue $mrrValue
+            $repCounter++
         }
         
         $wideData += $row
@@ -328,8 +329,8 @@ function Generate-KSpecificAccuracyExports {
     # MRR K-SPECIFIC EXPORTS
     # =============================================================================
     
-    $k4MRRData = $k4Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.25}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
-    $k10MRRData = $k10Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.1}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k4MRRData = $k4Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.5208}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k10MRRData = $k10Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.2929}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
 
     $k4MRRExport = Join-Path $GraphPadImportsDir $MRR_K4_FILE
     $k10MRRExport = Join-Path $GraphPadImportsDir $MRR_K10_FILE
@@ -340,8 +341,8 @@ function Generate-KSpecificAccuracyExports {
     $exportStats.K4_MRR_Count = $k4MRRData.Count
     $exportStats.K10_MRR_Count = $k10MRRData.Count
 
-    Write-Host "  Generated: Phase_A_MRR_K4.csv ($($k4MRRData.Count) replications, chance = 0.25)"
-    Write-Host "  Generated: Phase_A_MRR_K10.csv ($($k10MRRData.Count) replications, chance = 0.1)"
+    Write-Host "  Generated: Phase_A_MRR_K4.csv ($($k4MRRData.Count) replications, chance = 0.5208)"
+    Write-Host "  Generated: Phase_A_MRR_K10.csv ($($k10MRRData.Count) replications, chance = 0.2929)"
     
     # =============================================================================
     # TOP-1 ACCURACY K-SPECIFIC EXPORTS
@@ -753,7 +754,7 @@ function Show-Phase3ValidationInstructions {
     Write-Host "     - Select the 'Data 1' table and import '$RAW_SCORES_FILE' from 'tests/assets/statistical_validation_study/graphpad_imports/'."
     Write-Host "       with the following options: 'insert and maintain link', auto-update, and 'separate adjacent columns' for commas."
     Write-Host "       Check the box for setting these as the default."
-    Write-Host "     - Analyze Data → Column analyses → Descriptive statistics." -ForegroundColor Gray
+    Write-Host "     - Analyze Data → Multiple variable analyses → Descriptive statistics." -ForegroundColor Gray
     Write-Host "     - Deselect 'A:Trial' (leave all MRR columns selected), then calculate the 'Basics' set of 4 stats groups for each replication." -ForegroundColor Gray
     Write-Host "     - Export analysis results using the default filename ('Descriptive statistics of $RAW_SCORES_FILE') to 'tests/assets/statistical_validation_study/graphpad_exports/'." -ForegroundColor Gray
     
@@ -765,10 +766,10 @@ function Show-Phase3ValidationInstructions {
     Write-Host "       - Create a new 'Multiple variables' data table and select the 'enter or import data' option."
     Write-Host "       - Import '$MRR_K4_FILE' into this new table."
     Write-Host "       - Analyze Data → Column analyses → One sample t test and Wilcoxon test."
-    Write-Host "       - Select the MRR column only, then choose 'Wilcoxon signed-rank test' with hypothetical value = 0.25."
+    Write-Host "       - Select the MRR column only, then choose 'Wilcoxon signed-rank test' with hypothetical value = 0.5208."
     Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $MRR_K4_FILE')."
     Write-Host "     • K=10 MRR:" -ForegroundColor Gray
-    Write-Host "       - Repeat import and analysis for '$MRR_K10_FILE' → hypothetical = 0.1."
+    Write-Host "       - Repeat import and analysis for '$MRR_K10_FILE' → hypothetical = 0.2929."
     Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $MRR_K10_FILE')."
     Write-Host ""
     Write-Host "     Top-1 Accuracy Analysis:" -ForegroundColor Blue
@@ -1046,7 +1047,7 @@ function Generate-GraphPadExports {
 # =============================================================================
 
 try {
-    Write-TestHeader "Statistical Analysis & Reporting - Step 2/4: GraphPad Import Generation" 'Magenta'
+    Write-TestHeader "Validation of Statistical Analysis & Reporting - Step 2/4: GraphPad Import Generator" 'Magenta'
     
     if ($Interactive) {
         Write-Host "${C_BLUE}Two-Phase GraphPad Prism Validation Strategy:${C_RESET}"
@@ -1121,27 +1122,32 @@ try {
     # Step 2: Setup Test Environment
     Write-Host ""
     Write-TestStep "Step 2: Setup Test Environment"
-    
-    if (Test-Path $TempTestDir) {
-        Remove-Item -Path $TempTestDir -Recurse -Force
-    }
-    New-Item -ItemType Directory -Path $TempTestDir -Force | Out-Null
-    
-    # Copy statistical study to test environment
-    $testStudyPath = Join-Path $TempTestDir "statistical_study"
-    Write-Host "Copying statistical study data..." -ForegroundColor Cyan
-    $sourceFiles = Get-ChildItem -Path $StatisticalStudyPath -Recurse -File
-    $totalFiles = $sourceFiles.Count
-    $currentFile = 0
 
-    Copy-Item -Path $StatisticalStudyPath -Destination $testStudyPath -Recurse -Force | ForEach-Object {
-        $currentFile++
-        $percentComplete = [math]::Round(($currentFile / $totalFiles) * 100)
-        Write-Progress -Activity "Setting up test environment" -Status "Copying files... ($currentFile of $totalFiles)" -PercentComplete $percentComplete
-    }
-    Write-Progress -Activity "Setting up test environment" -Completed
+    # Always ask for confirmation before clearing the directory
+    $leafDir = Split-Path $GraphPadImportsDir -Leaf
+    $parentDir = Split-Path (Split-Path $GraphPadImportsDir -Parent) -Leaf
+    $folderToClear = "$parentDir/$leafDir" # Force forward slash for display
+
+    # Only show the destructive warning prompt if the directory actually exists
+    if (Test-Path $GraphPadImportsDir) {
+        Write-Host "${C_YELLOW}WARNING: Output directory '$folderToClear' already exists."
+        Write-Host "${C_RED}This will permanently delete all existing data in this directory.${C_RESET}"
+        Write-Host "" # Blank line
+        $choice = Read-Host "Are you sure you want to continue? (Y/N):"
         
-    Write-Host "✓ Test environment prepared" -ForegroundColor Green
+        if ($choice.ToLower() -ne 'y') {
+            Write-Host "${C_YELLOW}Operation cancelled by user.${C_RESET}"
+            exit 1
+        }
+    }
+
+    Write-Host "Clearing and preparing the GraphPad imports directory..." -ForegroundColor Cyan
+    if (Test-Path $GraphPadImportsDir) {
+        Get-ChildItem -Path $GraphPadImportsDir -Recurse | Remove-Item -Recurse -Force
+    } else {
+        New-Item -ItemType Directory -Path $GraphPadImportsDir -Force | Out-Null
+    }
+    Write-Host "✓ GraphPad imports directory is ready." -ForegroundColor Green
     
     if ($Interactive) {
         Read-Host "Press Enter to continue..." | Out-Null
@@ -1152,20 +1158,16 @@ try {
     Write-TestStep "Step 3: Verify Analysis Readiness"
     
     # Check if study is already compiled (has STUDY_results.csv)
-    $studyResultsPath = Join-Path $testStudyPath "STUDY_results.csv"
+    $studyResultsPath = Join-Path $StatisticalStudyPath "STUDY_results.csv"
     if (Test-Path $studyResultsPath) {
         Write-Host "✓ Study already compiled - using existing analysis" -ForegroundColor Green
-        $finalStudyPath = $testStudyPath
     } elseif (-not $ExportOnly) {
-        Write-Host "Compiling study..." -ForegroundColor Cyan
-        $compileResult = & "$ProjectRoot\compile_study.ps1" -StudyDirectory $testStudyPath
+        Write-Host "Compiling study in source directory: '$StatisticalStudyPath'..." -ForegroundColor Cyan
+        $compileResult = & "$ProjectRoot\compile_study.ps1" -StudyDirectory $StatisticalStudyPath
         if ($LASTEXITCODE -ne 0) {
             throw "Study compilation failed with exit code $LASTEXITCODE"
         }
         Write-Host "✓ Analysis pipeline completed" -ForegroundColor Green
-        $finalStudyPath = $testStudyPath
-    } else {
-        $finalStudyPath = $testStudyPath
     }
 
     if ($Interactive) {
@@ -1176,7 +1178,7 @@ try {
     Write-Host ""
     Write-TestStep "Step 4: Generate GraphPad Export Files"
     
-    $exportStats = Generate-GraphPadExports -TestStudyPath $finalStudyPath
+    $exportStats = Generate-GraphPadExports -TestStudyPath $StatisticalStudyPath
     
     # Step 5: Show Enhand Validation Instructions
     if (-not $ExportOnly) {

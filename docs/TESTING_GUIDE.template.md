@@ -67,46 +67,49 @@ This standalone test provides mathematical proof of the mapping and randomizatio
 -   **Prerequisites:**
     This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3-default` once to bootstrap these assets. If the assets are not present, the test will be skipped.
 
-#### Statistical Analysis & Reporting Validation**
+#### Statistical Analysis & Reporting Validation
 
-This 4-step validation workflow provides external validation of the entire statistical analysis pipeline against GraphPad Prism 10.6.1. Uses real framework execution with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis).
+This 4-stage validation workflow provides external validation of the entire statistical analysis pipeline against GraphPad Prism 10.6.1. Uses real framework execution with sufficient replications to trigger full statistical analysis (ANOVA, post-hoc tests, Bayesian analysis).
 
-**Implementation:** 4-step validation process using real framework execution with deterministic parameters (temperature=0.0, gemini-1.5-flash) and framework's built-in seeded randomization. 2×2 factorial design with 6 replications per condition = 24 total experiments.
+**Implementation:** 4-stage validation process using real framework execution with deterministic parameters (temperature=0.0, gemini-1.5-flash) and framework's built-in seeded randomization. 2×2 factorial design with 6 replications per condition = 24 total experiments.
 
-**4-Step Validation Workflow:**
+**Validation Methodology:** Representative sampling approach - full manual validation of 2 replications per condition (8 total), with automated spot-checks of descriptive statistics for remaining 16 replications. This validates the calculation engine without exhaustive manual checking of all replications.
+
+**4-Stage Validation Workflow:**
 ```powershell
-# Step 1: Create statistical validation study using real framework
+# Stage 1: Create statistical validation study using real framework
 pdm run test-stats-study
 
-# Step 2: Generate GraphPad import files  
+# Stage 2: Generate GraphPad import files
 pdm run test-stats-imports
 
-# Step 3: Manual GraphPad Prism processing - COMPLETED
-# (Manual import, analyze, export of 15 validation files)
+# Stage 3: Manual GraphPad Prism processing
+# (Manual import, analyze, export for 8 selected replications)
 
-# Step 4: Validate GraphPad results against framework calculations - PENDING
+# Stage 4: Validate GraphPad results against framework calculations
 pdm run test-stats-results
 ```
 
-**Current Status: All 4 Steps Complete**
-- ✅ **Steps 1-3**: Statistical study creation, export generation, and manual GraphPad processing completed
-- ✅ **Step 4**: Automated validation comparison **COMPLETED**
-  - **Core MRR Calculations: VALIDATED** (Perfect match with GraphPad Prism 10.6.1)
-  - 24/24 comparisons successful, zero validation errors, maximum difference 0.000050
-  - Supplementary analyses show expected methodological differences
-- **Validation Coverage**: 15 files processed and validated against GraphPad Prism
+**Current Status: In Progress**
+- ✓ **Stage 1**: Statistical study creation completed (24 replications, 768 trials)
+- ✓ **Stage 2**: Export generation with corrected MRR chance levels (harmonic mean)
+- ⏳ **Stage 3**: Manual GraphPad processing of 8 selected replications
+- ⏳ **Stage 4**: Automated validation comparison pending
 
 **Prerequisites:** Requires `data/personalities_db.txt` from data preparation pipeline.
 
 **Comprehensive Validation Coverage:**
 - **6 Wilcoxon signed-rank tests**: K-specific validation (K=4, K=10) for MRR, Top-1, and Top-3 accuracy
-- **3 Two-way ANOVA analyses**: MRR, Top-1, and Top-3 with eta-squared effect sizes  
+  - MRR uses harmonic mean chance levels: K=4: 0.5208, K=10: 0.2929
+  - Top-1 uses 1/k: K=4: 0.25, K=10: 0.1
+  - Top-3 uses min(3,k)/k: K=4: 0.75, K=10: 0.3
+- **3 Two-way ANOVA analyses**: MRR, Top-1, and Top-3 with eta-squared effect sizes
 - **5 Bias regression analyses**: Overall and condition-specific linear regression validation
 - **Purpose-built GraphPad formats**: Two-column XY files for regression, grouped tables for ANOVA
 
 **Academic Citation:** "Core statistical calculations were validated against GraphPad Prism 10.6.1"
 
-**Validation Results:** The framework's novel algorithmic contributions (MRR calculations) demonstrate perfect mathematical agreement with established statistical software, providing academic defensibility for publication.
+**Validation Results:** Individual replication validation approach ensures the framework's algorithmic calculations (MRR, Top-K accuracy, Wilcoxon tests) match established statistical software, providing academic defensibility for publication. Sampling 8 of 24 replications is methodologically sound for validating computational correctness.
 
 ### Unit Testing
 

@@ -156,7 +156,7 @@ def analyze_metric_distribution(metric_values, chance_level, metric_name):
     if len(metric_values) >= 2:
         try:
             # For rank metrics, 'less' is better. For others, 'greater' is better.
-            alt_hypothesis = 'less' if 'rank' in metric_name.lower() else 'greater'
+            alt_hypothesis = 'less' if metric_name == 'Mean Rank of Correct ID' else 'greater'
             stat, p_val = ttest_1samp(metric_values, chance_level, alternative=alt_hypothesis, nan_policy='omit')
             base_return['ttest_1samp_stat'], base_return['ttest_1samp_p'] = stat, p_val
         except Exception as e: logging.error(f"Error during t-test for {metric_name}: {e}")
@@ -849,17 +849,6 @@ def main():
     mean_ranks = [res['mean_rank_of_correct_id'] for res in all_test_results if res.get('mean_rank_of_correct_id') is not None]
     mean_rank_chance = calculate_mean_rank_chance(k_to_use)
     mean_rank_analysis = analyze_metric_distribution(mean_ranks, mean_rank_chance, "Mean Rank of Correct ID")
-    # For rank metrics, lower values indicate better performance, so we test
-    # alternative='less' to detect if observed ranks are significantly below chance
-    if mean_ranks:
-        try:
-            w_stat, w_p = wilcoxon(np.array(mean_ranks) - mean_rank_chance, alternative='less')
-            mean_rank_analysis['wilcoxon_signed_rank_p'] = w_p
-        except ValueError as e:
-            logging.warning(f"Wilcoxon test failed for mean rank analysis: {e}")
-            mean_rank_analysis['wilcoxon_signed_rank_p'] = None
-    else:
-        mean_rank_analysis['wilcoxon_signed_rank_p'] = None
         
     # --- Saving Section ---
     data_output_dir = os.path.dirname(scores_filepath_abs)
