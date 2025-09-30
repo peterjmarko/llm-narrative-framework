@@ -1,5 +1,40 @@
 # Changelog
 
+## 11.5.2 (2025-09-29)
+
+### Bump
+
+- **version 11.5.1 → 11.5.2**
+
+### Fixes
+
+- **correct MRR chance levels and hypothesis testing logic**
+  Fixes critical statistical validation issues affecting framework accuracy and validation methodology.
+  
+  **Framework Bug Fix (analyze_llm_performance.py):**
+  - Fixed hypothesis direction logic in analyze_metric_distribution function
+  - Changed from substring matching ('rank' in metric_name) to exact matching (metric_name == 'Mean Rank of Correct ID')
+  - This prevented MRR from being incorrectly treated as a rank metric and using wrong hypothesis direction
+  - Ensures 'alternative=greater' is correctly applied to all performance metrics (MRR, Top-1, Top-3 accuracy)
+  
+  **MRR Chance Level Corrections:**
+  - Corrected MRR chance levels from incorrect 1/k to proper harmonic mean calculation
+  - K=4: 0.25  0.5208, K=10: 0.1  0.2929
+  - Formula: (1/k)  Σ(1/j) for j=1 to k
+  - Updated in generate_graphpad_imports.ps1, validate_graphpad_results.ps1, and user instructions
+  - Top-1 and Top-3 accuracy chance levels verified correct (min(K,k)/k)
+  
+  **Validation Methodology Updates:**
+  - Implemented representative sampling approach: 8 of 24 replications (2 per condition)
+  - Added zero-padding to column names (MRR_01 vs MRR_1) for natural sort compatibility
+  - Enhanced validation script with robust CSV parsing and median verification debug output
+  - Updated documentation to reflect individual replication validation vs aggregated tests
+  
+  **Additional Changes:**
+  - Added GraphPad Prism project file for reproducibility
+  - Updated TESTING_GUIDE.template.md with corrected validation approach
+  - Removed references to mirrored data methodology (reverted approach)
+
 ## 11.5.1 (2025-09-29)
 
 ### Bump
