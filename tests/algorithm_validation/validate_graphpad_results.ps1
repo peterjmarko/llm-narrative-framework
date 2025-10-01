@@ -21,12 +21,21 @@
 
 <#
 .SYNOPSIS
-    GraphPad Prism Validation Results Comparator
+    GraphPad Prism Validation Results Comparator - Stage 4/4
 
 .DESCRIPTION
-    This script validates framework statistical calculations against GraphPad Prism results.
-    It compares exported GraphPad results with framework-generated metrics to ensure
-    academic validation for publication.
+    This script validates framework statistical calculations against GraphPad Prism 10.6.1.
+    It performs comprehensive validation across multiple analytical approaches:
+    
+    PRIMARY VALIDATION (Individual Replication Approach):
+    - Step 1: Individual replications (8 selected) - Validates core Wilcoxon implementation
+    - Step 2: Spot-check summaries (16 remaining) - Verifies descriptive statistics
+    
+    COMPREHENSIVE VALIDATION (Full Dataset Approach):
+    - Step 3: MRR calculations (24 replications) - Validates mean calculations
+    - Step 4: K-specific Wilcoxon tests (6 tests) - Validates grouped statistical tests
+    - Step 5: ANOVA results (3 analyses) - Validates factorial experimental design
+    - Step 6: Bias regression (5 analyses) - Validates linear regression implementation
 
 .PARAMETER GraphPadExportsDir
     Directory containing GraphPad export files and framework results
@@ -163,8 +172,8 @@ function Compare-MRRCalculations {
         
         Write-Host "Found $($graphPadColumns.Count) GraphPad MRR columns and $($frameworkData.Count) framework replications" -ForegroundColor White
         
-        # Sort framework data consistently
-        $frameworkSorted = $frameworkData | Sort-Object Experiment, Replication
+        # Sort framework data consistently (extract experiment number from ExperimentName)
+        $frameworkSorted = $frameworkData | Sort-Object @{Expression={[int]($_.ExperimentName -replace '.*exp_(\d+).*','$1')}}, Replication
         
         # Compare each replication
         for ($i = 0; $i -lt [Math]::Min($frameworkSorted.Count, $graphPadColumns.Count); $i++) {
@@ -321,16 +330,36 @@ function Validate-KSpecificWilcoxonTests {
                 }
 
                 # Convert GraphPad's two-tailed p-value to the one-tailed value for 'greater' alternative
+                # Use GraphPad's actual median (not script-calculated) to determine direction
                 # When observed > hypothesized: use lower tail = p/2
                 # When observed < hypothesized: use upper tail = 1 - (p/2)
-                $scriptPValue1T = if ($scriptMedian -ge $hypothesizedMedian) { 
+                $scriptPValue1T = if ($graphPadMedian -ge $hypothesizedMedian) { 
                     $graphPadPValue2T / 2.0 
                 } else { 
                     1.0 - ($graphPadPValue2T / 2.0) 
                 }
                 
-                # --- 3. Get Framework Value ---
-                $frameworkPValue = ($frameworkData | Where-Object { [int]$_.GroupSize -eq $mapping.K } | ForEach-Object { [double]$_.$($mapping.FrameworkColumn) } | Measure-Object -Average).Average
+                # --- 3. Calculate Framework Value using framework's analyze_metric_distribution ---
+                $importsDir = $GraphPadExportsDir -replace "graphpad_exports", "graphpad_imports"
+                $importFile = Join-Path $importsDir $mapping.File.Replace($GRAPHPAD_WILCOXON_PREFIX, "")
+                
+                $metricColumn = switch ($mapping.Metric) {
+                    "MRR" { "MRR" }
+                    "Top1" { "Top1Accuracy" }
+                    "Top3" { "Top3Accuracy" }
+                }
+                
+                $pythonScript = Join-Path $PSScriptRoot "calculate_k_specific_stats.py"
+                $pythonResult = python $pythonScript $importFile $hypothesizedMedian $metricColumn $mapping.Metric
+                
+                if ($pythonResult -match "^(\d+),([0-9.]+),([0-9.]+)$") {
+                    $frameworkN = [int]$matches[1]
+                    $frameworkMedian = [double]$matches[2]
+                    $frameworkPValue = [double]$matches[3]
+                } else {
+                    Write-Host "    ✗ ERROR: Could not compute framework stats: $pythonResult" -ForegroundColor Red
+                    continue
+                }
                 
                 # --- 4. Perform and Display Validations ---
                 # Check N
@@ -377,7 +406,6 @@ function Validate-ANOVAResults {
         $frameworkResults = @{}
         $currentMetric = $null
         $inAnovaBlock = $false
-        $headerMap = @{}
 
         if (-not (Test-Path $LogPath)) { return $null }
 
@@ -385,48 +413,64 @@ function Validate-ANOVAResults {
             # Detect which metric block we are in
             if ($_ -match "ANALYSIS FOR METRIC: '(.*)'") {
                 $metricName = $matches[1]
-                if ($metricName -like "*Reciprocal Rank*") { $currentMetric = "MRR" }
-                elseif ($metricName -like "*Top-1*") { $currentMetric = "Top1" }
-                elseif ($metricName -like "*Top-3*") { $currentMetric = "Top3" }
-                $frameworkResults[$currentMetric] = @{}
+                $prevMetric = $currentMetric
+                
+                if ($metricName -like "*Reciprocal Rank*") { 
+                    $currentMetric = "MRR"
+                }
+                elseif ($metricName -like "*Top-1 Accuracy*") { 
+                    $currentMetric = "Top1"
+                }
+                elseif ($metricName -like "*Top-3 Accuracy*") { 
+                    $currentMetric = "Top3"
+                }
+                else {
+                    $currentMetric = $null  # Don't process other metrics
+                }
+                
+                # Only initialize dictionary for metrics we're tracking
+                if ($currentMetric) {
+                    if (-not $frameworkResults.ContainsKey($currentMetric)) {
+                        $frameworkResults[$currentMetric] = @{}
+                    }
+                }
                 $inAnovaBlock = $false
             }
 
-            # Detect the start of the ANOVA table
+            # Detect the start of the ANOVA table (only for metrics we care about)
             if ($currentMetric -and $_ -like "--- ANOVA Summary*") {
                 $inAnovaBlock = $true
-                return # Skip the header line itself
+                return
+            }
+            
+            # Skip processing if we're not tracking this metric
+            if (-not $currentMetric) {
+                return
             }
 
             if ($inAnovaBlock) {
                 $line = $_.Trim()
-                # Stop parsing if we leave the block
-                if ($line -eq "" -or $line -like "Conclusion:*") {
+                
+                # Stop if we hit conclusion, Bayesian analysis, or empty line after data
+                if ($line -like "Conclusion:*" -or $line -like "--- Bayesian Analysis*" -or ($line -eq "" -and $frameworkResults[$currentMetric].Count -gt 0)) {
                     $inAnovaBlock = $false
-                    $headerMap = @{}
                     return
                 }
-
-                # Parse the header to get column indices
-                if (-not $headerMap.Count) {
-                    $columns = $line -split '\s+'
-                    for ($i = 0; $i -lt $columns.Count; $i++) {
-                        if ($columns[$i] -eq 'sum_sq') { $headerMap['sum_sq'] = $i + 1 }
-                        if ($columns[$i] -eq 'df') { $headerMap['df'] = $i + 1 }
-                        if ($columns[$i] -eq 'F') { $headerMap['F'] = $i + 1 }
-                        if ($columns[$i] -eq 'PR(>F)') { $headerMap['P'] = $i + 1 }
-                        if ($columns[$i] -eq 'eta_sq') { $headerMap['eta_sq'] = $i + 1 }
-                    }
-                } else { # Parse the data rows
-                    $parts = $line -split '\s+'
-                    $factorName = $parts[0]
-                    if ($factorName -like "C(*" -or $factorName -like "Residual") {
-                        $frameworkResults[$currentMetric][$factorName] = [PSCustomObject]@{
-                            DF = [double]$parts[$headerMap['df']]
-                            F = [double]$parts[$headerMap['F']]
-                            P = [double]$parts[$headerMap['P']]
-                            EtaSq = [double]$parts[$headerMap['eta_sq']]
-                        }
+                
+                # Skip NOTE line and header line
+                if ($line -like "NOTE:*" -or $line -match '^\s*sum_sq\s+df\s+F\s+') {
+                    return
+                }
+                
+                # Parse data rows - factor name is everything before first number
+                if ($line -match '^([^\s].*?)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+|NaN)\s+([\d.]+|NaN)\s+([\d.]+)\s+([\d.]+|NaN)') {
+                    $factorName = $matches[1].Trim()
+                    
+                    $frameworkResults[$currentMetric][$factorName] = [PSCustomObject]@{
+                        DF = if ($matches[3] -eq 'NaN') { [double]::NaN } else { [double]$matches[3] }
+                        F = if ($matches[4] -eq 'NaN') { [double]::NaN } else { [double]$matches[4] }
+                        P = if ($matches[5] -eq 'NaN') { [double]::NaN } else { [double]$matches[5] }
+                        EtaSq = if ($matches[6] -eq 'NaN') { [double]::NaN } else { [double]$matches[6] }
                     }
                 }
             }
@@ -457,8 +501,8 @@ function Validate-ANOVAResults {
         # Map GraphPad's term names to the framework's internal names
         $factorNameMap = @{
             "Interaction" = "C(mapping_strategy):C(k)"
-            "mapping_strategy" = "C(mapping_strategy)"
-            "k" = "C(k)"
+            "Row Factor" = "C(mapping_strategy)"
+            "Column Factor" = "C(k)"
             "Residual" = "Residual"
         }
 
@@ -473,22 +517,41 @@ function Validate-ANOVAResults {
                 continue
             }
             
-            $graphPadData = Import-Csv $graphPadFile -WarningAction SilentlyContinue
-            
-            # Find the start of the ANOVA table in the GraphPad CSV
-            $tableStartIndex = 0
-            for($i = 0; $i -lt $graphPadData.Count; $i++) {
-                if ($graphPadData[$i].PSObject.Properties.Value -contains "ANOVA table") {
-                    $tableStartIndex = $i + 2 # Data starts 2 rows after the title
+            # Read all lines and find the ANOVA table header row
+            $allLines = Get-Content $graphPadFile
+            $headerIndex = -1
+            for ($i = 0; $i -lt $allLines.Count; $i++) {
+                if ($allLines[$i] -match '^ANOVA table') {
+                    $headerIndex = $i
                     break
                 }
             }
             
-            # Loop through the data rows of the table
-            for ($i = $tableStartIndex; $i -lt $graphPadData.Count; $i++) {
-                $row = $graphPadData[$i]
-                $source = $row.'Two-way ANOVA'
-                if (-not $source -or $source -eq "") { break } # End of table
+            if ($headerIndex -eq -1) {
+                Write-Host "    ✗ ERROR: Could not find 'ANOVA table' header in GraphPad export" -ForegroundColor Red
+                continue
+            }
+            
+            # Extract just the ANOVA table section (header + 4 data rows)
+            $anovaSection = $allLines[$headerIndex..($headerIndex + 4)]
+            $tempFile = [System.IO.Path]::GetTempFileName()
+            $anovaSection | Set-Content $tempFile
+            
+            # Import with correct header
+            $anovaData = Import-Csv $tempFile -WarningAction SilentlyContinue
+            Remove-Item $tempFile
+            
+            if (-not $anovaData) {
+                Write-Host "    ✗ ERROR: Could not parse ANOVA table section" -ForegroundColor Red
+                continue
+            }
+            
+            # Get column names
+            $sourceCol = ($anovaData | Get-Member -MemberType NoteProperty).Name[0]
+            
+            # Loop through the ANOVA data rows
+            foreach ($row in $anovaData) {
+                $source = $row.$sourceCol
 
                 $frameworkFactorName = $factorNameMap[$source]
                 if (-not $frameworkFactorName) { continue }
@@ -500,21 +563,44 @@ function Validate-ANOVAResults {
                     Write-Host "      ✗ Framework stats not found for factor '$frameworkFactorName' in metric '$metric'" -ForegroundColor Red
                     continue
                 }
+                
+                # Get all column names to find F-stat and P-value columns
+                $allColumns = ($row | Get-Member -MemberType NoteProperty).Name
+                $fColumn = $allColumns | Where-Object { $_ -match "F.*DFn.*DFd" } | Select-Object -First 1
+                $pColumn = $allColumns | Where-Object { $_ -like "*P value*" } | Select-Object -First 1
 
                 # Compare DF
-                $totalChecks++; $dfPassed = ([int]$frameworkStats.DF -eq [int]$row.DF); if ($dfPassed) { $passedChecks++ }
+                $totalChecks++
+                $dfPassed = ([int]$frameworkStats.DF -eq [int]$row.DF)
+                if ($dfPassed) { $passedChecks++ }
                 Write-Host "      $(if ($dfPassed) {'✓'} else {'✗'}) DF Validation: Framework=$([int]$frameworkStats.DF), GraphPad=$([int]$row.DF)" -ForegroundColor $(if ($dfPassed) {'Green'} else {'Red'})
 
                 # Compare F-statistic (skip for Residuals)
-                if ($source -ne "Residual") {
-                    $totalChecks++; $fDiff = [Math]::Abs($frameworkStats.F - [double]$row.'F (DFn, DFd)'); $fPassed = ($fDiff -le ($Tolerance * 10)); if ($fPassed) { $passedChecks++ }
-                    Write-Host "      $(if ($fPassed) {'✓'} else {'✗'}) F-Stat Validation: Framework=$($frameworkStats.F.ToString('F4')), GraphPad=$([double]$row.'F (DFn, DFd)'.ToString('F4')), Diff=$($fDiff.ToString('F4'))" -ForegroundColor $(if ($fPassed) {'Green'} else {'Red'})
+                if ($source -ne "Residual" -and $fColumn) {
+                    # The F-column contains text like "F (1, 20) = 0.09777" or "F (1, 20) = 435.0"
+                    # Extract the number after the equals sign
+                    if ($row.$fColumn -match '=\s*([\d.]+)') {
+                        $graphPadF = [double]$matches[1]
+                    } else {
+                        Write-Host "      DEBUG: Could not extract F-stat from '$($row.$fColumn)'" -ForegroundColor Gray
+                        continue
+                    }
+                    
+                    $totalChecks++
+                    $fDiff = [Math]::Abs($frameworkStats.F - $graphPadF)
+                    $fPassed = ($fDiff -le ($Tolerance * 10))
+                    if ($fPassed) { $passedChecks++ }
+                    Write-Host "      $(if ($fPassed) {'✓'} else {'✗'}) F-Stat Validation: Framework=$($frameworkStats.F.ToString('F4')), GraphPad=$($graphPadF.ToString('F4')), Diff=$($fDiff.ToString('F4'))" -ForegroundColor $(if ($fPassed) {'Green'} else {'Red'})
                 }
                 
                 # Compare P-value (skip for Residuals)
-                if ($source -ne "Residual") {
-                    $totalChecks++; $pDiff = [Math]::Abs($frameworkStats.P - [double]$row.'P value'); $pPassed = ($pDiff -le $Tolerance); if ($pPassed) { $passedChecks++ }
-                    Write-Host "      $(if ($pPassed) {'✓'} else {'✗'}) P-Value Validation: Framework=$($frameworkStats.P.ToString('F6')), GraphPad=$([double]$row.'P value'.ToString('F6')), Diff=$($pDiff.ToString('F6'))" -ForegroundColor $(if ($pPassed) {'Green'} else {'Red'})
+                if ($source -ne "Residual" -and $pColumn) {
+                    $graphPadP = [double]($row.$pColumn -replace '[<>=P ]','')
+                    $totalChecks++
+                    $pDiff = [Math]::Abs($frameworkStats.P - $graphPadP)
+                    $pPassed = ($pDiff -le $Tolerance)
+                    if ($pPassed) { $passedChecks++ }
+                    Write-Host "      $(if ($pPassed) {'✓'} else {'✗'}) P-Value Validation: Framework=$($frameworkStats.P.ToString('F6')), GraphPad=$($graphPadP.ToString('F6')), Diff=$($pDiff.ToString('F6'))" -ForegroundColor $(if ($pPassed) {'Green'} else {'Red'})
                 }
             }
         }
