@@ -316,8 +316,8 @@ function Validate-KSpecificWilcoxonTests {
                         # because MRR rewards being "closer" to rank 1, not just "in the top K"
                         #
                         # Examples:
-                        #   K=8:  (1/8) × (1/1 + 1/2 + ... + 1/8) = 0.125 × 2.718 = 0.3521
-                        #   K=12: (1/12) × (1/1 + 1/2 + ... + 1/12) = 0.083 × 3.103 = 0.2701
+                        #   K=8:  (1/8) × (1/1 + 1/2 + ... + 1/8) = 0.125 × 2.7179 = 0.3397
+                        #   K=12: (1/12) × (1/1 + 1/2 + ... + 1/12) = 0.0833 × 3.1032 = 0.2586
                         
                         $harmonicSum = 0.0
                         for ($j = 1; $j -le $mapping.K; $j++) {
@@ -979,8 +979,8 @@ function Validate-SpotCheckSummaries {
     # Count by condition
     $correctCount = 0
     $randomCount = 0
-    $k4Count = 0
-    $k10Count = 0
+    $k8Count = 0
+    $k12Count = 0
     
     foreach ($replication in $remainingReplications) {
         $repId = "$($replication.MappingStrategy)_K$($replication.GroupSize)"
@@ -1001,8 +1001,8 @@ function Validate-SpotCheckSummaries {
         # Count conditions
         if ($replication.MappingStrategy -eq "correct") { $correctCount++ }
         if ($replication.MappingStrategy -eq "random") { $randomCount++ }
-        if ($replication.GroupSize -eq 4) { $k4Count++ }
-        if ($replication.GroupSize -eq 10) { $k10Count++ }
+        if ($replication.GroupSize -eq 8) { $k8Count++ }
+        if ($replication.GroupSize -eq 12) { $k12Count++ }
         
         # Validation checks
         $hasError = $false
@@ -1086,7 +1086,7 @@ function Validate-SpotCheckSummaries {
     Write-Host ""
     Write-Host "  Experimental Design Balance:" -ForegroundColor Cyan
     Write-Host "    • Mapping strategies: correct=$correctCount, random=$randomCount" -ForegroundColor Gray
-    Write-Host "    • Group sizes: K=4 ($k4Count), K=10 ($k10Count)" -ForegroundColor Gray
+    Write-Host "    • Group sizes: K=8 ($k8Count), K=12 ($k12Count)" -ForegroundColor Gray
     
     # Display pass/fail summary at the end (matches pattern from other validation sections)
     Write-Host ""

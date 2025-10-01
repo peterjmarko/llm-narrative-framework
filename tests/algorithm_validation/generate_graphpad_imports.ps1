@@ -339,11 +339,11 @@ function Generate-KSpecificAccuracyExports {
     # (chance = min(3,k)/k) because MRR gives fractional credit for non-first ranks.
     #
     # Concrete examples:
-    #   K=8:  (1/8) × (1 + 0.5 + 0.333 + ... + 0.125) = 0.125 × 2.718 = 0.3521
-    #   K=12: (1/12) × (1 + 0.5 + 0.333 + ... + 0.083) = 0.083 × 3.103 = 0.2701
+    #   K=8:  (1/8) × (1 + 0.5 + 0.333 + ... + 0.125) = 0.125 × 2.7179 = 0.3397
+    #   K=12: (1/12) × (1 + 0.5 + 0.333 + ... + 0.083) = 0.0833 × 3.1032 = 0.2586
     
-    $k8MRRData = $k8Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.3521}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
-    $k12MRRData = $k12Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.2701}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k8MRRData = $k8Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.3397}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k12MRRData = $k12Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.2586}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
 
     $k8MRRExport = Join-Path $GraphPadImportsDir $MRR_K8_FILE
     $k12MRRExport = Join-Path $GraphPadImportsDir $MRR_K12_FILE
@@ -354,8 +354,8 @@ function Generate-KSpecificAccuracyExports {
     $exportStats.K8_MRR_Count = $k8MRRData.Count
     $exportStats.K12_MRR_Count = $k12MRRData.Count
 
-    Write-Host "  Generated: Phase_A_MRR_K8.csv ($($k8MRRData.Count) replications, chance = 0.3521 [harmonic mean])"
-    Write-Host "  Generated: Phase_A_MRR_K12.csv ($($k12MRRData.Count) replications, chance = 0.2701 [harmonic mean])"
+    Write-Host "  Generated: Phase_A_MRR_K8.csv ($($k8MRRData.Count) replications, chance = 0.3397 [harmonic mean])"
+    Write-Host "  Generated: Phase_A_MRR_K12.csv ($($k12MRRData.Count) replications, chance = 0.2586 [harmonic mean])"
     
     # =============================================================================
     # TOP-1 ACCURACY K-SPECIFIC EXPORTS
