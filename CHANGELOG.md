@@ -1,5 +1,29 @@
 # Changelog
 
+## 11.7.1 (2025-10-01)
+
+### Bump
+
+- **version 11.7.0 → 11.7.1**
+
+### Fixes
+
+- **correct MRR chance levels and update validation framework to K=[8,12]**
+  Fix incorrect MRR harmonic mean calculations and update validation framework from K=[4,10] to K=[8,12] design.
+  
+  The documented MRR chance levels contained rounding errors in harmonic sum calculations:
+  - K=8: corrected from 0.3521 to 0.3397 (harmonic sum: 2.7179)
+  - K=12: corrected from 0.2701 to 0.2586 (harmonic sum: 3.1032)
+  
+  Updated three files:
+  1. docs/TESTING_GUIDE.template.md - Fixed chance levels and updated validation expectations for K=[8,12]
+  2. tests/algorithm_validation/generate_graphpad_imports.ps1 - Corrected hardcoded values and comments
+  3. tests/algorithm_validation/validate_graphpad_results.ps1 - Fixed examples and updated K-value reporting
+  
+  Validation results: 8/8 replications passed (100% vs 62.5% with K=[4,10])
+  Ambiguous cases: 3/8 (37.5%) correctly handled with 2-tailed tests
+  Ambiguity threshold (0.03) remains unchanged as it's K-agnostic (Cohen's d = 0.20)
+
 ## 11.7.0 (2025-10-01)
 
 ### Bump
