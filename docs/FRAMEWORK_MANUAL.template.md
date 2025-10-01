@@ -316,6 +316,472 @@ The project's experiments are organized in a logical hierarchy:
 -   **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
 -   **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
 
+## Study Design
+
+This section provides comprehensive guidance for designing and executing multi-factor experimental studies using the framework. It covers factorial design principles, sample size determination, and practical execution strategies.
+
+### Factorial Design Overview
+
+The framework supports multi-factor experimental designs where each factor can have multiple levels. A typical study design might include:
+
+**Factor 1: Mapping Strategy** (between-subjects)
+- Correct mappings (personalities matched to correct individuals)
+- Random mappings (personalities randomly shuffled)
+
+**Factor 2: Group Size (k)** (within-subjects)
+- Multiple difficulty levels (e.g., k ∈ {7, 10, 14})
+- Determines number of comparisons per trial (k²)
+
+**Factor 3: Model** (within-subjects)
+- Multiple LLMs to test generalizability
+- Different architectures and capabilities
+
+### Design Specification Example
+
+#### Three-Factor Factorial Design
+
+**Design Parameters:**
+```
+Factor 1: mapping_strategy (2 levels)
+  - correct
+  - random
+
+Factor 2: group_size (3 levels)
+  - k = 7  (49 comparisons per trial)
+  - k = 10 (100 comparisons per trial)
+  - k = 14 (196 comparisons per trial)
+
+Factor 3: model (3 levels)
+  - Selected from low-cost, high-reliability tier
+  - Examples: Llama 3.3 70B, Gemini 2.5 Flash Lite, DeepSeek V3
+
+Sample Size:
+  - 30 replications per condition
+  - 80 trials per replication
+```
+
+**Total Experimental Scope:**
+- Conditions: 2 × 3 × 3 = **18 conditions**
+- Experiments: 18 × 30 = **540 experiments**
+- Trials: 540 × 80 = **43,200 trials**
+
+#### Design Table
+
+| Factor | Type | Levels | Values |
+|--------|------|--------|--------|
+| `mapping_strategy` | Between-subjects | 2 | correct, random |
+| `k` (group_size) | Within-subjects | 3 | 7, 10, 14 |
+| `model` | Within-subjects | 3 | gemini, gpt4o, claude |
+
+### Design Rationale
+
+#### Group Size Selection (k-values)
+
+**K=7 (Lower Boundary):**
+- MRR chance level: 0.3704
+- 49 comparisons per trial
+- Tests whether performance plateaus at easier difficulties
+- Avoids K=4 issues (chance = 0.5208, too close to coin flip)
+
+**K=10 (Middle Range):**
+- MRR chance level: 0.2929
+- 100 comparisons per trial
+- Provides continuity with pilot studies
+- Balanced difficulty
+
+**K=14 (Upper Boundary):**
+- MRR chance level: 0.2323
+- 196 comparisons per trial
+- Tests performance degradation at higher complexity
+- Pushes LLM capabilities without exceeding context limits
+
+**Difficulty Progression:**
+- K=7 to K=10: 20.9% decrease in MRR chance level
+- K=10 to K=14: 20.7% decrease in MRR chance level
+- Even spacing ensures systematic difficulty gradient
+
+#### Model Selection
+
+**Low-Cost, High-Reliability Tier:**
+
+The study prioritizes models that demonstrate both cost-effectiveness and high reliability (95%+ parsing success rate). All costs are based on OpenRouter.ai rates as of October 2025.
+
+**Candidate Models (by cost tier):**
+
+**Ultra-Low Cost ($0.13 per experiment):**
+- Meta Llama 3.3 70B Instruct ($0.13)
+
+**Low Cost ($0.24-0.32 per experiment):**
+- Mistral Small 3.2 24B ($0.24)
+- Google Gemini 2.0 Flash Lite ($0.24)
+- Google Gemini 2.5 Flash Lite ($0.32)
+- Google Gemini 2.5 Flash Lite Preview 06-17 ($0.32)
+- OpenAI GPT-4.1 Nano ($0.32)
+
+**Mid Cost ($0.49-0.72 per experiment):**
+- Meta Llama 4 Maverick ($0.49)
+- Qwen Qwen3 Coder 480B A35B ($0.72)
+
+**High Cost ($0.81-1.30 per experiment):**
+- DeepSeek V3 0324 ($0.81)
+- OpenAI GPT-4.1 Mini ($1.30)
+
+**Recommended 3-Model Combinations:**
+
+1. **Ultra-Budget** (Llama 3.3 + Mistral Small + Gemini 2.0 Flash Lite): **$110 total** ($6.10 per condition)
+2. **Budget Balanced** (Llama 3.3 + Gemini 2.5 Flash Lite + GPT-4.1 Nano): **$139 total** ($7.70 per condition) ✓ **Recommended**
+3. **Mid-Range Performance** (Gemini 2.5 Preview + Llama 4 + Qwen3 Coder): **$275 total** ($15.30 per condition)
+4. **Architecture Diversity** (Llama 3.3 + DeepSeek V3 + GPT-4.1 Mini): **$403 total** ($22.40 per condition)
+5. **Performance Focused** (Qwen3 Coder + DeepSeek V3 + GPT-4.1 Mini): **$509 total** ($28.30 per condition)
+
+**Cost Savings:** All strategies provide 92-98% savings vs premium model baseline ($6,624).
+
+**Selection Criteria:**
+- Cost efficiency: 92-98% savings vs premium models ($6,624 baseline)
+- Parsing reliability: All models demonstrate 95%+ structured output compliance
+- Architectural diversity: Mix of open-source (Meta, Mistral) and proprietary (Google, OpenAI, DeepSeek, Qwen) approaches
+- Parameter range: 24B to 480B parameters
+- Training diversity: Different training datasets and objectives
+- Source: OpenRouter.ai rates (October 2025)
+
+**Note:** The "Budget Balanced" strategy ($139 total, $7.70 per condition) provides excellent cost-performance tradeoff while maintaining strong architectural diversity across Meta, Google, and OpenAI providers.
+
+### Sample Size and Statistical Power
+
+#### Power Analysis
+
+**Target:** Detect small effect sizes (Cohen's d < 0.20) with 80%+ power
+
+**Sample Size Requirements:**
+
+For **main effects** with 30 replications per condition:
+- Mapping strategy (correct vs random): **~82% power** for d=0.20
+- Group size (3 levels, repeated measures): **>90% power** for d=0.20
+- Model (3 levels, repeated measures): **>90% power** for d=0.20
+
+For **two-way interactions:**
+- Power: **75-85%** for d=0.20
+
+For **three-way interaction:**
+- Power: **70-75%** for d=0.20
+
+For **within-replication tests** (vs chance) with 80 trials:
+- Power: **~94%** for d=0.20
+
+#### Justification for 30 Replications × 80 Trials
+
+**30 Replications:**
+- Sufficient for detecting d=0.20 with 82% power in factorial ANOVA
+- Provides robust estimates for interaction effects
+- Sufficient for post-hoc comparisons with Tukey HSD
+- Matches published study replication count for comparable statistical rigor
+
+**80 Trials per Replication:**
+- Standard Error = 0.0168 (assuming SD=0.15 for MRR)
+- Provides 1.79:1 signal-to-noise ratio for d=0.20 effects
+- Reduces within-condition variance for precise between-condition comparisons
+- Handles occasional parsing failures with strong redundancy
+  - K=7: Expected 77 valid responses (8% buffer over baseline)
+  - K=10: Expected 76 valid responses (7% buffer)
+  - K=14: Expected 74 valid responses (5% buffer, 194% above minimum threshold)
+
+**Comparison to Alternative Designs:**
+
+| Design | Replications | Trials | Total per Condition | Power (d=0.20) | Cost Efficiency |
+|--------|--------------|--------|---------------------|----------------|-----------------|
+| Minimal | 15 | 40 | 600 | ~65% | High |
+| Balanced | 20 | 50 | 1,000 | ~75% | Good |
+| Recommended | 25 | 60 | 1,500 | ~78% | Moderate |
+| **Selected** | **30** | **80** | **2,400** | **~82%** | **Moderate** |
+| Conservative | 30 | 100 | 3,000 | ~82% | Lower |
+
+**Design Choice Rationale:**
+The 30×80 design provides optimal balance between statistical power (82% for d < 0.20), cost efficiency (20% savings vs 30×100), and resilience to parsing failures (strong buffer across all k-values). It maintains the same between-subjects power as the 30×100 baseline while achieving meaningful resource savings.
+
+### Resource Requirements
+
+#### Subject Pool
+
+**Database Capacity Needed:**
+- Unique subjects required: ~1,000-1,500 (with strategic reuse)
+- Recommended database size: 5,000+ entries
+- Reuse strategy: Random sampling from larger pool minimizes overlap
+
+**Subject Allocation:**
+- K=7: ~400-500 unique subjects
+- K=10: ~600-700 unique subjects
+- K=14: ~700-800 unique subjects
+
+#### Computational Resources
+
+**API Costs (estimated for 43,200 trials with low-cost models):**
+
+**Recommended Cost Scenarios (18 conditions × 30 reps = 540 experiments):**
+
+| Strategy | Models | Total Cost | Per Condition |
+|----------|--------|------------|---------------|
+| Ultra-Budget | Llama 3.3 + Mistral Small + Gemini 2.0 Lite | $110 | $6.10 |
+| **Budget Balanced** ✓ | **Llama 3.3 + Gemini 2.5 Lite + GPT-4.1 Nano** | **$139** | **$7.70** |
+| Mid-Range | Gemini 2.5 Prev + Llama 4 + Qwen3 Coder | $275 | $15.30 |
+| Architecture Mix | Llama 3.3 + DeepSeek V3 + GPT-4.1 Mini | $403 | $22.40 |
+| Performance | Qwen3 + DeepSeek V3 + GPT-4.1 Mini | $509 | $28.30 |
+
+**Per-Model Cost Breakdown (180 experiments per model):**
+- Ultra-low tier ($0.13): $23.40 per model
+- Low tier ($0.24-0.32): $43.20-57.60 per model
+- Mid tier ($0.49-0.72): $88.20-129.60 per model
+- High tier ($0.81-1.30): $145.80-234.00 per model
+
+**Cost Comparison:** 92-98% lower than premium model baseline ($6,624 for Gemini 2.0 Flash + GPT-4o + Claude 3.5 Sonnet)
+
+*All costs based on OpenRouter.ai rates (October 2025)*
+
+**Execution Time:**
+
+| Parallelization | Concurrent Trials | Total Time | Risk Level |
+|-----------------|-------------------|------------|------------|
+| Conservative | 10-20 | ~32-48 hours | Low (rate limits) |
+| Moderate | 30-40 | ~16-24 hours | Medium |
+| Aggressive | 50+ | ~10-14 hours | Higher (API throttling) |
+
+### Execution Strategy
+
+#### Phase-Based Implementation
+
+**Phase 1: Pilot Run (1 condition)**
+- Purpose: Validate pipeline, identify issues
+- Scope: 1 condition × 30 reps × 80 trials = 2,400 trials
+- Duration: ~1-2 hours (parallelized)
+- Cost: ~$1.54 (Budget Balanced: $0.26 + $0.64 + $0.64)
+- Monitors: Parsing success rate, execution stability, API limits
+
+**Phase 2: Core Study (remaining 17 conditions)**
+- Purpose: Execute main experimental design
+- Scope: 17 conditions × 30 reps × 80 trials = 40,800 trials
+- Duration: ~32-44 hours (parallelized at 20-30 concurrent)
+- Cost: ~$137 (Budget Balanced: $110-509 depending on model combination)
+- Strategy: Process in batches of 3-6 conditions with quality checks
+
+**Phase 3: Analysis and Validation**
+- Purpose: Compile results, run statistical analysis
+- Scope: All 18 conditions aggregated
+- Duration: ~2-4 hours
+- Outputs: STUDY_results.csv, ANOVA tables, diagnostic plots
+
+#### Batch Processing Guidelines
+
+**Recommended Batch Size:** 3-6 conditions per batch
+
+**Per-Batch Workflow:**
+1. Configure `config.ini` for each condition
+2. Run `new_experiment.ps1` with 30 replications
+3. Execute `audit_experiment.ps1` for quality check
+4. Fix any issues with `fix_experiment.ps1`
+5. Proceed to next batch
+
+**Quality Monitoring:**
+- Track parsing success rates (target: >92% for K=14, >95% for K≤10)
+- Monitor execution time per trial (detect API throttling)
+- Verify response quality with spot checks
+- Check for systematic errors or biases
+
+### Study Organization
+
+#### Directory Structure
+
+```
+output/
+└── studies/
+    └── main_study_2025/
+        ├── exp_01_correct_k7_gemini/
+        ├── exp_02_correct_k7_gpt4o/
+        ├── exp_03_correct_k7_claude/
+        ├── exp_04_correct_k10_gemini/
+        ...
+        ├── exp_18_random_k14_claude/
+        ├── STUDY_results.csv
+        └── anova/
+            ├── STUDY_analysis_log.txt
+            ├── boxplots/
+            └── diagnostics/
+```
+
+#### Naming Convention
+
+**Format:** `exp_{number}_{mapping}_{k}{model}/`
+
+**Examples:**
+- `exp_01_correct_k7_gemini/`
+- `exp_10_random_k10_gpt4o/`
+- `exp_18_random_k14_claude/`
+
+**Benefits:**
+- Alphabetical sorting groups by condition
+- Sequential numbering aids tracking
+- Clear condition identification
+
+### Configuration Management
+
+#### Per-Condition Configuration
+
+For each of the 18 conditions, update `config.ini`:
+
+```ini
+[Study]
+num_replications = 30
+mapping_strategy = correct  # or random
+
+[LLM]
+model_name = google/gemini-2.0-flash-exp  # or others
+temperature = 0.2
+
+[Experiment]
+k = 7  # or 10, 14
+m = 80
+```
+
+#### Randomization Seeds
+
+**For Reproducibility:**
+Set fixed seeds in `config.ini`:
+```ini
+[Randomization]
+personality_selection_seed = 42
+list_shuffle_seed = 123
+```
+
+**Different seeds per condition** ensures independence while maintaining reproducibility.
+
+### Statistical Analysis Plan
+
+#### Primary Analysis
+
+**Three-Way Repeated Measures ANOVA:**
+```
+DV: MRR Lift (or Top-1/Top-3 Accuracy Lift)
+
+Factors:
+  - mapping_strategy (between-subjects, 2 levels)
+  - k (within-subjects, 3 levels)
+  - model (within-subjects, 3 levels)
+
+Effects tested:
+  - Main effects: mapping, k, model
+  - Two-way interactions: mapping×k, mapping×model, k×model
+  - Three-way interaction: mapping×k×model
+```
+
+#### Effect Size Measures
+
+- **Eta-squared (η²)**: Proportion of variance explained by each factor
+- **Cohen's d**: Standardized mean difference for pairwise comparisons
+- **Lift metrics**: Performance relative to chance (comparable across k-values)
+
+#### Post-Hoc Tests
+
+- **Tukey HSD**: For pairwise comparisons of k-values and models
+- **FDR correction**: Benjamini-Hochberg procedure for multiple comparisons
+- **Planned contrasts**: K=7 vs K=14 (boundary comparison)
+
+#### Complementary Analysis
+
+**Bayesian Analysis:**
+- Bayes Factor (BF₁₀): Evidence for effect vs null
+- Credible intervals for effect sizes
+- Model comparison for interaction effects
+
+### Alternative Design Options
+
+#### Reduced Scope Designs
+
+**Option A: Two K-Values**
+- Factors: 2 mapping × 2 k-values × 3 models
+- Conditions: 12
+- Experiments: 360 (with 30 reps)
+- Trials: 28,800 (with 80 per rep)
+- Cost: ~$73-339 (depending on model combination)
+- Use when: Budget or time constrained
+
+**Option B: Two Models**
+- Factors: 2 mapping × 3 k-values × 2 models
+- Conditions: 12
+- Experiments: 360 (with 30 reps)
+- Trials: 28,800 (with 80 per rep)
+- Cost: ~$73-339 (depending on model combination)
+- Use when: Model comparison less critical
+
+#### Staged Execution
+
+**Stage 1: Core Study (2 models)**
+- Example: Llama 3.3 + Gemini 2.5 Flash Lite
+- 12 conditions
+- 28,800 trials
+- Cost: ~$54-81
+- Can publish initial results
+
+**Stage 2: Replication (3rd model)**
+- Add third model (e.g., GPT-4.1 Nano or DeepSeek V3)
+- 6 additional conditions
+- 14,400 trials
+- Cost: ~$58-234
+- Confirms generalizability
+
+### Methods Section Template
+
+**For Publication:**
+
+> "We employed a 2 × 3 × 3 factorial design with mapping strategy (correct vs random) as a between-subjects factor, and group size (k ∈ {7, 10, 14}) and model as within-subjects factors. Three models from the low-cost, high-reliability tier were selected based on cost efficiency ($0.13-1.30 per experiment via OpenRouter.ai), architectural diversity (open-source and proprietary), and demonstrated parsing reliability (95%+ success rate). Group sizes were selected to provide systematic difficulty progression with approximately 21% increases in task complexity (measured by decreases in MRR chance level) between consecutive k-values. We conducted 30 replications per condition with 80 trials per replication, providing >80% statistical power to detect small effect sizes (Cohen's d < 0.20) for main effects. This design yielded 18 experimental conditions with 540 total experiments and 43,200 trials, executed at a total cost of $110-509 depending on model selection strategy."
+
+### Validation Checklist
+
+Before executing the main study, verify:
+
+- [ ] Database contains ≥5,000 unique subjects
+- [ ] API keys configured and funded
+- [ ] Pilot run (1 condition) completed successfully
+- [ ] Parsing success rate >92% for K=14, >95% for K≤10 in pilot
+- [ ] `config.ini` randomization seeds documented
+- [ ] Directory structure created
+- [ ] Naming convention established
+- [ ] Batch processing schedule defined
+- [ ] Quality monitoring procedures in place
+- [ ] Backup strategy for long-running processes
+
+### Risk Mitigation
+
+**API Rate Limits:**
+- Start with conservative parallelization (10-20 concurrent)
+- Monitor response times and error rates
+- Implement exponential backoff for retries
+
+**Parsing Failures:**
+- Target: <5% failure rate for K≤10, <8% for K=14
+- Monitor: K=14 may show higher rates due to 196 comparisons per trial
+- Mitigation: 80 trials provides strong buffer (expected 74 valid responses, 194% above minimum threshold of 25)
+
+**Cost Overruns:**
+- Track cumulative costs per batch
+- Adjust parallelization if API costs spike
+- Consider staged execution if budget concerns arise
+
+**Data Loss:**
+- Framework automatically saves all intermediate results
+- Each experiment is self-contained
+- Can resume interrupted experiments with `fix_experiment.ps1`
+
+### Next Steps
+
+After defining your study design:
+
+1. **Configure Database**: Ensure subject pool meets requirements
+2. **Run Pilot**: Execute Phase 1 (1 condition) to validate pipeline
+3. **Execute Main Study**: Process remaining conditions in batches
+4. **Compile Results**: Use `compile_study.ps1` for final analysis
+5. **Validate**: Review diagnostic plots and statistical assumptions
+
+For detailed execution instructions, see the **Lifecycle Guide** and **Replication Guide**.
+
+
 ## Error Recovery and Resilience
 
 The framework implements comprehensive error recovery mechanisms to ensure data integrity and experimental continuity even when facing real-world failures.

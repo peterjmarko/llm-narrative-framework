@@ -765,15 +765,16 @@ function Show-ValidationInstructions {
     Write-Host "   3. Select the 'Data 1' table and import 'Rep_01_Correct_K8.csv' with the following options:"
     Write-Host "      'insert and maintain link', 'automatically update', and 'commas: separate adjacent columns'"
     Write-Host "      (check the box for making these the default settings)."
-    Write-Host "      - Analyze → Column analyses: One sample t and Wilcoxon test." -ForegroundColor Gray
-    Write-Host "      - Select the MRR column only, then select 'Wilcoxon signed rank test' and set hypothetical value to MRR chance level" -ForegroundColor Gray
-    Write-Host "        (see 'MRRChanceLevel' column in 'graphpad_imports/reference_data/Selected_Replications_Metadata.csv')." -ForegroundColor Gray
-    Write-Host "      - Export analysis results using the default filename ('One sample Wilcoxon test of Rep_01_Correct_K8.csv') to 'graphpad_exports/'." -ForegroundColor Gray
+    Write-Host "        - Analyze → Column analyses: One sample t and Wilcoxon test." -ForegroundColor Gray
+    Write-Host "        - Select the MRR column only, then select 'Wilcoxon signed rank test' and set hypothetical value to MRR chance level" -ForegroundColor Gray
+    Write-Host "          (see 'MRRChanceLevel' column in 'graphpad_imports/reference_data/Selected_Replications_Metadata.csv')." -ForegroundColor Gray
+    Write-Host "        - Export analysis results using the default filename ('One sample Wilcoxon test of Rep_01_Correct_K8.csv') to 'graphpad_exports/'." -ForegroundColor Gray
     Write-Host "   4. Repeat for the remaining 7 'Rep_*' CSV files by creating a new 'multiple variables' table each time"
     Write-Host "      (the creation, import, analysis, and export tasks can each be done in bulk to speed up the process)."
 
     
     Write-Host "`nGraphPad Step 3.2 - Spot-Check Validation (SECONDARY):" -ForegroundColor Yellow
+    Write-Host "   NOTE: This step is entirely optional; validation will be automatically performed in Stage 4."
     Write-Host "   Review remaining 16 replications:" -ForegroundColor Cyan
     Write-Host "   1. Open spot_check_summaries/Remaining_16_Replications_Summary.csv"
     Write-Host "   2. Verify descriptive statistics (N, medians) are reasonable"
@@ -781,13 +782,12 @@ function Show-ValidationInstructions {
     
     Write-Host "`nGraphPad Step 3.3 - Comprehensive Validation (REFERENCE):" -ForegroundColor Yellow
     Write-Host "   Process raw MRR scores:" -ForegroundColor Cyan
-    Write-Host "     - Select the 'Data 1' table and import '$RAW_SCORES_FILE' from 'tests/assets/statistical_validation_study/graphpad_imports/'."
-    Write-Host "       with the following options: 'insert and maintain link', auto-update, and 'separate adjacent columns' for commas."
-    Write-Host "       Check the box for setting these as the default."
+    Write-Host "     - Create a new 'Multiple variables' table and import '$RAW_SCORES_FILE' with the following options:"
+    Write-Host "       'insert and maintain link', 'automatically update', and 'commas: separate adjacent columns'"
+    Write-Host "       (check the box for making these the default settings)."
     Write-Host "     - Analyze Data → Multiple variable analyses → Descriptive statistics." -ForegroundColor Gray
-    Write-Host "     - Deselect 'A:Trial' (leave all MRR columns selected), then calculate the 'Basics' set of 4 stats groups for each replication." -ForegroundColor Gray
-    Write-Host "     - Export analysis results using the default filename ('Descriptive statistics of $RAW_SCORES_FILE') to" -ForegroundColor Gray
-    Write-Host "      'tests/assets/statistical_validation_study/graphpad_exports/'." -ForegroundColor Gray
+    Write-Host "     - Deselect 'A:Trial' (leave all MRR columns selected), then calculate the 'Basics' set of 4 statistics groups." -ForegroundColor Gray
+    Write-Host "     - Export analysis results using the default filename ('Descriptive statistics of $RAW_SCORES_FILE') to 'graphpad_exports/'." -ForegroundColor Gray
     
     Write-Host "`nGraphPad Step 3.4 - K-Specific Wilcoxon Tests (REFERENCE):" -ForegroundColor Yellow
     Write-Host "   Process Wilcoxon test results using K-specific datasets:" -ForegroundColor Cyan
