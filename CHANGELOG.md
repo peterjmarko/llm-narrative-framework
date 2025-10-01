@@ -1,5 +1,26 @@
 # Changelog
 
+## 11.6.2 (2025-09-30)
+
+### Bump
+
+- **version 11.6.1 → 11.6.2**
+
+### Fixes
+
+- **fix ANOVA validation parser for GraphPad Prism exports**
+  Fixed PowerShell script failing to validate framework ANOVA results against GraphPad exports.
+  
+  - Rewrote CSV parser to extract 5-line ANOVA table section from malformed GraphPad exports
+  - Fixed F-statistic extraction regex to parse "F (1, 20) = 0.09777" format correctly
+  - Changed metric name matching from broad "*Top-1*" to specific "*Top-1 Accuracy*" to prevent cross-metric contamination
+  - Added parser boundary control to stop at "--- Bayesian Analysis ---" line
+  - Implemented dynamic column detection for F-statistic and P-value columns
+  - Added factor name mappings: "Row Factor"  "C(mapping_strategy)", "Column Factor"  "C(k)"
+  - Fixed metric dictionary initialization to prevent null reference errors
+  
+  Result: 21/21 ANOVA validation checks now pass (DF and p-values match within 0.005 tolerance for MRR, Top-1, and Top-3 metrics)
+
 ## 11.6.1 (2025-09-30)
 
 ### Bump
