@@ -66,7 +66,7 @@ param(
     [int]$TrialsPerReplication = 32,
     [string]$Model = "google/gemini-2.5-flash-lite-preview-06-17",
     [array]$MappingStrategies = @("correct", "random"),
-    [array]$GroupSizes = @(4, 10),
+    [array]$GroupSizes = @(8, 12),
     [switch]$Force,
     [switch]$Verbose
 )

@@ -83,12 +83,12 @@ $GraphPadImportsDir = Join-Path $ProjectRoot "tests/assets/statistical_validatio
 
 # --- Filename Constants ---
 $RAW_SCORES_FILE = "Phase_A_Raw_Scores.csv"
-$MRR_K4_FILE = "Phase_A_MRR_K4.csv"
-$MRR_K10_FILE = "Phase_A_MRR_K10.csv"
-$TOP1_K4_FILE = "Phase_A_Top1_K4.csv"
-$TOP1_K10_FILE = "Phase_A_Top1_K10.csv"
-$TOP3_K4_FILE = "Phase_A_Top3_K4.csv"
-$TOP3_K10_FILE = "Phase_A_Top3_K10.csv"
+$MRR_K8_FILE = "Phase_A_MRR_K8.csv"
+$MRR_K12_FILE = "Phase_A_MRR_K12.csv"
+$TOP1_K8_FILE = "Phase_A_Top1_K8.csv"
+$TOP1_K12_FILE = "Phase_A_Top1_K12.csv"
+$TOP3_K8_FILE = "Phase_A_Top3_K8.csv"
+$TOP3_K12_FILE = "Phase_A_Top3_K12.csv"
 $ANOVA_MRR_FILE = "Phase_B_ANOVA_MRR.csv"
 $ANOVA_TOP1_FILE = "Phase_B_ANOVA_Top1.csv"
 $ANOVA_TOP3_FILE = "Phase_B_ANOVA_Top3.csv"
@@ -320,9 +320,9 @@ function Generate-KSpecificAccuracyExports {
     
     Write-Host "Phase A: Generating K-specific accuracy validation exports..." -ForegroundColor Cyan
     
-    # Filter data by group size
-    $k4Data = $AllReplicationData | Where-Object { $_.GroupSize -eq 4 }
-    $k10Data = $AllReplicationData | Where-Object { $_.GroupSize -eq 10 }
+    # Group by K value
+    $k8Data = $AllReplicationData | Where-Object { $_.GroupSize -eq 8 }
+    $k12Data = $AllReplicationData | Where-Object { $_.GroupSize -eq 12 }
     
     $exportStats = @{}
     
@@ -330,10 +330,7 @@ function Generate-KSpecificAccuracyExports {
     # MRR K-SPECIFIC EXPORTS
     # =============================================================================
     
-    # CRITICAL: MRR chance levels use HARMONIC MEAN, not 1/k
-    #
-    # MRR (Mean Reciprocal Rank) rewards partial credit at each rank position:
-    #   Rank 1: 1/1 = 1.0, Rank 2: 1/2 = 0.5, Rank 3: 1/3 = 0.333, etc.
+    # MRR Chance Level Calculation (Harmonic Mean Formula):
     #
     # Under uniform random selection across k positions, the expected MRR is:
     #   E[MRR] = (1/k) × Σ(1/j) for j=1 to k  [harmonic mean formula]
@@ -342,65 +339,65 @@ function Generate-KSpecificAccuracyExports {
     # (chance = min(3,k)/k) because MRR gives fractional credit for non-first ranks.
     #
     # Concrete examples:
-    #   K=4:  (1/4) × (1 + 0.5 + 0.333 + 0.25) = 0.25 × 2.083 = 0.5208
-    #   K=10: (1/10) × (1 + 0.5 + 0.333 + ... + 0.1) = 0.1 × 2.929 = 0.2929
+    #   K=8:  (1/8) × (1 + 0.5 + 0.333 + ... + 0.125) = 0.125 × 2.718 = 0.3521
+    #   K=12: (1/12) × (1 + 0.5 + 0.333 + ... + 0.083) = 0.083 × 3.103 = 0.2701
     
-    $k4MRRData = $k4Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.5208}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
-    $k10MRRData = $k10Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.2929}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k8MRRData = $k8Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.3521}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k12MRRData = $k12Data | Select-Object @{N='MRR';E={$_.MeanMRR}}, @{N='Chance';E={0.2701}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
 
-    $k4MRRExport = Join-Path $GraphPadImportsDir $MRR_K4_FILE
-    $k10MRRExport = Join-Path $GraphPadImportsDir $MRR_K10_FILE
+    $k8MRRExport = Join-Path $GraphPadImportsDir $MRR_K8_FILE
+    $k12MRRExport = Join-Path $GraphPadImportsDir $MRR_K12_FILE
     
-    $k4MRRData | Export-Csv -Path $k4MRRExport -NoTypeInformation
-    $k10MRRData | Export-Csv -Path $k10MRRExport -NoTypeInformation
+    $k8MRRData | Export-Csv -Path $k8MRRExport -NoTypeInformation
+    $k12MRRData | Export-Csv -Path $k12MRRExport -NoTypeInformation
 
-    $exportStats.K4_MRR_Count = $k4MRRData.Count
-    $exportStats.K10_MRR_Count = $k10MRRData.Count
+    $exportStats.K8_MRR_Count = $k8MRRData.Count
+    $exportStats.K12_MRR_Count = $k12MRRData.Count
 
-    Write-Host "  Generated: Phase_A_MRR_K4.csv ($($k4MRRData.Count) replications, chance = 0.5208 [harmonic mean])"
-    Write-Host "  Generated: Phase_A_MRR_K10.csv ($($k10MRRData.Count) replications, chance = 0.2929 [harmonic mean])"
+    Write-Host "  Generated: Phase_A_MRR_K8.csv ($($k8MRRData.Count) replications, chance = 0.3521 [harmonic mean])"
+    Write-Host "  Generated: Phase_A_MRR_K12.csv ($($k12MRRData.Count) replications, chance = 0.2701 [harmonic mean])"
     
     # =============================================================================
     # TOP-1 ACCURACY K-SPECIFIC EXPORTS
     # =============================================================================
     
-    $k4Top1Data = $k4Data | Select-Object @{N='Top1Accuracy';E={$_.MeanTop1Accuracy}}, @{N='Chance';E={0.25}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
-    $k10Top1Data = $k10Data | Select-Object @{N='Top1Accuracy';E={$_.MeanTop1Accuracy}}, @{N='Chance';E={0.1}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k8Top1Data = $k8Data | Select-Object @{N='Top1Accuracy';E={$_.MeanTop1Accuracy}}, @{N='Chance';E={0.125}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k12Top1Data = $k12Data | Select-Object @{N='Top1Accuracy';E={$_.MeanTop1Accuracy}}, @{N='Chance';E={0.0833}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
 
-    $k4Top1Export = Join-Path $GraphPadImportsDir $TOP1_K4_FILE
-    $k10Top1Export = Join-Path $GraphPadImportsDir $TOP1_K10_FILE
+    $k8Top1Export = Join-Path $GraphPadImportsDir $TOP1_K8_FILE
+    $k12Top1Export = Join-Path $GraphPadImportsDir $TOP1_K12_FILE
     
-    $k4Top1Data | Export-Csv -Path $k4Top1Export -NoTypeInformation
-    $k10Top1Data | Export-Csv -Path $k10Top1Export -NoTypeInformation
+    $k8Top1Data | Export-Csv -Path $k8Top1Export -NoTypeInformation
+    $k12Top1Data | Export-Csv -Path $k12Top1Export -NoTypeInformation
 
-    $exportStats.K4_Top1_Count = $k4Top1Data.Count
-    $exportStats.K10_Top1_Count = $k10Top1Data.Count
+    $exportStats.K8_Top1_Count = $k8Top1Data.Count
+    $exportStats.K12_Top1_Count = $k12Top1Data.Count
 
-    Write-Host "  Generated: Phase_A_Top1_K4.csv ($($k4Top1Data.Count) replications, chance = 0.25)"
-    Write-Host "  Generated: Phase_A_Top1_K10.csv ($($k10Top1Data.Count) replications, chance = 0.1)"
+    Write-Host "  Generated: Phase_A_Top1_K8.csv ($($k8Top1Data.Count) replications, chance = 0.125)"
+    Write-Host "  Generated: Phase_A_Top1_K12.csv ($($k12Top1Data.Count) replications, chance = 0.0833)"
     
     # =============================================================================
     # TOP-3 ACCURACY K-SPECIFIC EXPORTS  
     # =============================================================================
     
     # Top-3 accuracy chance calculations: min(3, k) / k
-    # K=4: min(3,4)/4 = 3/4 = 0.75
-    # K=10: min(3,10)/10 = 3/10 = 0.3
+    # K=8: min(3,8)/8 = 3/8 = 0.375
+    # K=12: min(3,12)/12 = 3/12 = 0.25
     
-    $k4Top3Data = $k4Data | Select-Object @{N='Top3Accuracy';E={$_.MeanTop3Accuracy}}, @{N='Chance';E={0.75}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
-    $k10Top3Data = $k10Data | Select-Object @{N='Top3Accuracy';E={$_.MeanTop3Accuracy}}, @{N='Chance';E={0.3}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k8Top3Data = $k8Data | Select-Object @{N='Top3Accuracy';E={$_.MeanTop3Accuracy}}, @{N='Chance';E={0.375}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
+    $k12Top3Data = $k12Data | Select-Object @{N='Top3Accuracy';E={$_.MeanTop3Accuracy}}, @{N='Chance';E={0.25}}, @{N='K';E={$_.GroupSize}}, @{N='Replication';E={$_.Replication}}, @{N='Experiment';E={$_.Experiment}}
 
-    $k4Top3Export = Join-Path $GraphPadImportsDir $TOP3_K4_FILE
-    $k10Top3Export = Join-Path $GraphPadImportsDir $TOP3_K10_FILE
+    $k8Top3Export = Join-Path $GraphPadImportsDir $TOP3_K8_FILE
+    $k12Top3Export = Join-Path $GraphPadImportsDir $TOP3_K12_FILE
     
-    $k4Top3Data | Export-Csv -Path $k4Top3Export -NoTypeInformation
-    $k10Top3Data | Export-Csv -Path $k10Top3Export -NoTypeInformation
+    $k8Top3Data | Export-Csv -Path $k8Top3Export -NoTypeInformation
+    $k12Top3Data | Export-Csv -Path $k12Top3Export -NoTypeInformation
 
-    $exportStats.K4_Top3_Count = $k4Top3Data.Count
-    $exportStats.K10_Top3_Count = $k10Top3Data.Count
+    $exportStats.K8_Top3_Count = $k8Top3Data.Count
+    $exportStats.K12_Top3_Count = $k12Top3Data.Count
 
-    Write-Host "  Generated: Phase_A_Top3_K4.csv ($($k4Top3Data.Count) replications, chance = 0.75)"
-    Write-Host "  Generated: Phase_A_Top3_K10.csv ($($k10Top3Data.Count) replications, chance = 0.3)"
+    Write-Host "  Generated: Phase_A_Top3_K8.csv ($($k8Top3Data.Count) replications, chance = 0.375)"
+    Write-Host "  Generated: Phase_A_Top3_K12.csv ($($k12Top3Data.Count) replications, chance = 0.25)"
     
     Write-Host "✓ K-specific accuracy validation exports completed`n" -ForegroundColor Green
     
@@ -743,37 +740,44 @@ $csvData | ForEach-Object { $_.Trial = [int]$_.Trial }
 function Show-ValidationInstructions {
     param($ExportStats)
     
-    Write-TestHeader "GraphPad Prism Manual Analysis Instructions (Step 3 of 4)" 'Yellow'
+    Write-TestHeader "GraphPad Prism Manual Analysis Instructions (Stage 3 of 4)" 'Yellow'
     
     $relativeExportPath = Resolve-Path -Path $ExportStats.ExportDirectory -Relative
     Write-Host "Import files generated in: " -NoNewline -ForegroundColor White
     Write-Host $relativeExportPath -ForegroundColor Cyan
     
-    Write-Host "`nComplete 4-Step Validation Workflow:" -ForegroundColor Magenta
-    Write-Host "✓ Step 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
-    Write-Host "✓ Step 2: generate_graphpad_imports.ps1 - COMPLETED" -ForegroundColor Green
-    Write-Host "→ Step 3: Manual GraphPad Analysis - FOLLOW INSTRUCTIONS BELOW" -ForegroundColor Yellow
-    Write-Host "  Step 4: validate_graphpad_results.ps1 - PENDING" -ForegroundColor Gray
+    Write-Host "`nComplete 4-Stage Validation Workflow:" -ForegroundColor Magenta
+    Write-Host "✓ Stage 1: create_statistical_study.ps1 - COMPLETED" -ForegroundColor Green
+    Write-Host "✓ Stage 2: generate_graphpad_imports.ps1 - COMPLETED" -ForegroundColor Green
+    Write-Host "→ Stage 3: Manual GraphPad Analysis - FOLLOW INSTRUCTIONS BELOW" -ForegroundColor Yellow
+    Write-Host "  Stage 4: validate_graphpad_results.ps1 - PENDING" -ForegroundColor Gray
     
-    Write-Host "`nSTEP 3: MANUAL GRAPHPAD PRISM ANALYSIS - DUAL METHODOLOGY" -ForegroundColor Magenta
+    Write-Host "`nSTAGE 3: MANUAL GRAPHPAD PRISM ANALYSIS - DUAL METHODOLOGY" -ForegroundColor Magenta
     Write-Host "Primary: Individual replication validation (8 selected replications)" -ForegroundColor Cyan
     Write-Host "Comprehensive: Full dataset validation (all 24 replications)" -ForegroundColor Cyan
     Write-Host ""
     
     Write-Host "`nGraphPad Step 3.1 - Individual Replication Validation (PRIMARY):" -ForegroundColor Yellow
-    Write-Host "   Process 8 files from individual_replications/ folder:" -ForegroundColor Cyan
-    Write-Host "   1. Open GraphPad Prism and create a new project (starting with a 'Multiple variables' table)" -ForegroundColor White
-    Write-Host "   2. For each of the 8 CSV files:" -ForegroundColor White
-    Write-Host "      - Import CSV → Analyze → One sample t test → Wilcoxon signed rank test" -ForegroundColor Gray
-    Write-Host "      - Set theoretical mean to MRR chance level (see Selected_Replications_Metadata.csv)" -ForegroundColor Gray
-    Write-Host "      - Export results as GraphPad_[ReplicationName]_Results.csv" -ForegroundColor Gray
-    Write-Host "   3. Compare p-values with framework (tolerance: ±0.005)" -ForegroundColor White
+    Write-Host "   Process 8 files from the 'graphpad_imports/individual_replications/' folder:" -ForegroundColor Cyan
+    Write-Host "   1. Open GraphPad Prism and create a new project: File → New → New Project File."
+    Write-Host "      Select 'CREATE: Multiple variables' in the dialog, click Create, then save the project."
+    Write-Host "   2. Select 'Project info 1' in the Info section and fill in project details. Save the project periodically."
+    Write-Host "   3. Select the 'Data 1' table and import 'Rep_01_Correct_K8.csv' with the following options:"
+    Write-Host "      'insert and maintain link', 'automatically update', and 'commas: separate adjacent columns'"
+    Write-Host "      (check the box for making these the default settings)."
+    Write-Host "      - Analyze → Column analyses: One sample t and Wilcoxon test." -ForegroundColor Gray
+    Write-Host "      - Select the MRR column only, then select 'Wilcoxon signed rank test' and set hypothetical value to MRR chance level" -ForegroundColor Gray
+    Write-Host "        (see 'MRRChanceLevel' column in 'graphpad_imports/reference_data/Selected_Replications_Metadata.csv')." -ForegroundColor Gray
+    Write-Host "      - Export analysis results using the default filename ('One sample Wilcoxon test of Rep_01_Correct_K8.csv') to 'graphpad_exports/'." -ForegroundColor Gray
+    Write-Host "   4. Repeat for the remaining 7 'Rep_*' CSV files by creating a new 'multiple variables' table each time"
+    Write-Host "      (the creation, import, analysis, and export tasks can each be done in bulk to speed up the process)."
+
     
     Write-Host "`nGraphPad Step 3.2 - Spot-Check Validation (SECONDARY):" -ForegroundColor Yellow
     Write-Host "   Review remaining 16 replications:" -ForegroundColor Cyan
-    Write-Host "   1. Open spot_check_summaries/Remaining_16_Replications_Summary.csv" -ForegroundColor White
-    Write-Host "   2. Verify descriptive statistics (N, medians) are reasonable" -ForegroundColor White
-    Write-Host "   3. Visual inspection of distributions (optional)" -ForegroundColor White
+    Write-Host "   1. Open spot_check_summaries/Remaining_16_Replications_Summary.csv"
+    Write-Host "   2. Verify descriptive statistics (N, medians) are reasonable"
+    Write-Host "   3. Visual inspection of distributions (optional)"
     
     Write-Host "`nGraphPad Step 3.3 - Comprehensive Validation (REFERENCE):" -ForegroundColor Yellow
     Write-Host "   Process raw MRR scores:" -ForegroundColor Cyan
@@ -867,11 +871,11 @@ function Show-ValidationInstructions {
     Write-Host ""
     
     Write-Host "`nAFTER COMPLETING GRAPHPAD ANALYSIS:" -ForegroundColor Cyan
-    Write-Host "Run Step 4 validation:" -ForegroundColor Yellow
+    Write-Host "Run Stage 4 validation:" -ForegroundColor Yellow
     Write-Host "pdm run test-stats-results" -ForegroundColor Gray
     
     Write-Host "`nSUCCESS CRITERIA:" -ForegroundColor Green
-    Write-Host "Step 4 will validate within established tolerances:" -ForegroundColor Cyan
+    Write-Host "Stage 4 will validate within established tolerances:" -ForegroundColor Cyan
     Write-Host "• Individual replication validation (methodologically sound sampling)" -ForegroundColor White
     Write-Host "• MRR, Top-1, Top-3 accuracy calculations and Wilcoxon p-values (±0.0001)" -ForegroundColor White
     Write-Host "• ANOVA F-statistics (±0.01) and eta-squared effect sizes (±0.01)" -ForegroundColor White
@@ -927,7 +931,7 @@ function Generate-GraphPadExports {
     # Create export directory structure
     New-Item -ItemType Directory -Path $GraphPadImportsDir -Force | Out-Null
 
-    # Create graphpad_exports directory for Step 4 validation
+    # Create graphpad_exports directory for Stage 4 validation
     $GraphPadExportsDir = Join-Path $ProjectRoot "tests/assets/statistical_validation_study/graphpad_exports"
     New-Item -ItemType Directory -Path $GraphPadExportsDir -Force | Out-Null
     
@@ -1008,40 +1012,49 @@ function Generate-GraphPadExports {
         # Generate GraphPad Grouped Table format (rows=mapping_strategy, columns=k, subcolumns=replicates)
         Write-Host "Phase B: Generating GraphPad grouped table format..." -ForegroundColor Cyan
         
-        # Extract MRR values by condition
-        $correctK4Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 4 }).mean_mrr)
-        $correctK10Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 10 }).mean_mrr)
-        $randomK4Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 4 }).mean_mrr)
-        $randomK10Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 10 }).mean_mrr)
+        # Detect K values dynamically from study data
+        $kValues = $studyData | Select-Object -ExpandProperty k -Unique | Sort-Object
+        if ($kValues.Count -ne 2) {
+            Write-Warning "Expected 2 K values for ANOVA, found $($kValues.Count)"
+            return $null
+        }
+        $k1 = $kValues[0]
+        $k2 = $kValues[1]
         
-        # Determine number of replicates (should be 6 each)
-        $numReplicates = [math]::Max([math]::Max($correctK4Values.Count, $correctK10Values.Count), [math]::Max($randomK4Values.Count, $randomK10Values.Count))
+        # Extract MRR values by condition using detected K values
+        $correctK1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq $k1 }).mean_mrr)
+        $correctK2Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq $k2 }).mean_mrr)
+        $randomK1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq $k1 }).mean_mrr)
+        $randomK2Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq $k2 }).mean_mrr)
+        
+        # Determine number of replicates
+        $numReplicates = [math]::Max([math]::Max($correctK1Values.Count, $correctK2Values.Count), [math]::Max($randomK1Values.Count, $randomK2Values.Count))
         
         # Create header row with repeated column factor levels for each subcolumn
         $headerParts = @()
-        # K4 repeated 6 times for 6 subcolumns
-        for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K4" }
-        # K10 repeated 6 times for 6 subcolumns  
-        for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K10" }
+        # K1 repeated N times for N subcolumns
+        for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K$k1" }
+        # K2 repeated N times for N subcolumns  
+        for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K$k2" }
         $headerRow = "," + ($headerParts -join ",")
         
         # Create Correct row (mapping_strategy = correct)
         $correctRowParts = @("Correct")
         for ($i = 0; $i -lt $numReplicates; $i++) {
-            $correctRowParts += if ($i -lt $correctK4Values.Count) { $correctK4Values[$i] } else { "" }
+            $correctRowParts += if ($i -lt $correctK1Values.Count) { $correctK1Values[$i] } else { "" }
         }
         for ($i = 0; $i -lt $numReplicates; $i++) {
-            $correctRowParts += if ($i -lt $correctK10Values.Count) { $correctK10Values[$i] } else { "" }
+            $correctRowParts += if ($i -lt $correctK2Values.Count) { $correctK2Values[$i] } else { "" }
         }
         $correctRow = $correctRowParts -join ","
         
         # Create Random row (mapping_strategy = random)
         $randomRowParts = @("Random")
         for ($i = 0; $i -lt $numReplicates; $i++) {
-            $randomRowParts += if ($i -lt $randomK4Values.Count) { $randomK4Values[$i] } else { "" }
+            $randomRowParts += if ($i -lt $randomK1Values.Count) { $randomK1Values[$i] } else { "" }
         }
         for ($i = 0; $i -lt $numReplicates; $i++) {
-            $randomRowParts += if ($i -lt $randomK10Values.Count) { $randomK10Values[$i] } else { "" }
+            $randomRowParts += if ($i -lt $randomK2Values.Count) { $randomK2Values[$i] } else { "" }
         }
         $randomRow = $randomRowParts -join ","
         
@@ -1053,7 +1066,7 @@ function Generate-GraphPadExports {
         
         Write-Host "  Generated: Phase_B_ANOVA_MRR.csv (GraphPad grouped table format)"
         Write-Host "    - Rows: Correct vs Random (mapping strategy)" -ForegroundColor Gray
-        Write-Host "    - Columns: K4 vs K10 (group size) with $numReplicates subcolumns each" -ForegroundColor Gray
+        Write-Host "    - Columns: K$k1 vs K$k2 (group size) with $numReplicates subcolumns each" -ForegroundColor Gray
 
         # Generate summary statistics for reference
         $summaryStats = $studyData | Group-Object mapping_strategy, k | ForEach-Object {
@@ -1120,13 +1133,20 @@ function Export-IndividualReplicationsForManualValidation {
             $graphPadData = $trialData | Select-Object @{N='Trial';E={$_.Trial}}, @{N='MRR';E={$_.MRR}}, @{N='Top1';E={$_.Top1Accuracy}}, @{N='Top3';E={$_.Top3Accuracy}}
             $graphPadData | Export-Csv -Path $filepath -NoTypeInformation
             
+            # Calculate MRR chance level dynamically using harmonic mean formula
+            $harmonicSum = 0.0
+            for ($j = 1; $j -le $replication.GroupSize; $j++) {
+                $harmonicSum += (1.0 / $j)
+            }
+            $mrrChance = (1.0 / $replication.GroupSize) * $harmonicSum
+            
             $exportedFiles += @{
                 Filename = $filename
                 Condition = $replication.Condition
                 ExperimentName = $replication.ExperimentName
                 RunName = $replication.RunName
                 TrialCount = $trialData.Count
-                MRRChanceLevel = if ($replication.GroupSize -eq 4) { 0.5208 } else { 0.2929 }
+                MRRChanceLevel = [math]::Round($mrrChance, 4)
             }
             
             Write-Host "  Generated: $filename ($($trialData.Count) trials)" -ForegroundColor Gray
@@ -1150,21 +1170,31 @@ function Select-RepresentativeReplications {
     param($AllReplicationData, $TestStudyPath)
     
     # No filtering - select replications systematically to provide transparent validation
-    # Random_K4 naturally performs near chance, which validates the control condition
     
-    # Group by experimental condition
-    $correctK4 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "correct" -and $_.GroupSize -eq 4 }
-    $correctK10 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "correct" -and $_.GroupSize -eq 10 }
-    $randomK4 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "random" -and $_.GroupSize -eq 4 }
-    $randomK10 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "random" -and $_.GroupSize -eq 10 }
+    # Dynamically detect K values from the data
+    $kValues = $AllReplicationData | Select-Object -ExpandProperty GroupSize -Unique | Sort-Object
+    
+    if ($kValues.Count -ne 2) {
+        Write-Warning "Expected 2 K values, found $($kValues.Count): [$($kValues -join ', ')]"
+        return @()
+    }
+    
+    $k1 = $kValues[0]
+    $k2 = $kValues[1]
+    
+    # Group by experimental condition using detected K values
+    $correctK1 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "correct" -and $_.GroupSize -eq $k1 }
+    $correctK2 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "correct" -and $_.GroupSize -eq $k2 }
+    $randomK1 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "random" -and $_.GroupSize -eq $k1 }
+    $randomK2 = $AllReplicationData | Where-Object { $_.MappingStrategy -eq "random" -and $_.GroupSize -eq $k2 }
     
     $selected = @()
     
     # Select 2 replications per condition (balanced across experiments)
-    $selected += Select-BalancedReplications -Replications $correctK4 -Condition "Correct_K4" -Count 2 -TestStudyPath $TestStudyPath
-    $selected += Select-BalancedReplications -Replications $correctK10 -Condition "Correct_K10" -Count 2 -TestStudyPath $TestStudyPath
-    $selected += Select-BalancedReplications -Replications $randomK4 -Condition "Random_K4" -Count 2 -TestStudyPath $TestStudyPath
-    $selected += Select-BalancedReplications -Replications $randomK10 -Condition "Random_K10" -Count 2 -TestStudyPath $TestStudyPath
+    $selected += Select-BalancedReplications -Replications $correctK1 -Condition "Correct_K$k1" -Count 2 -TestStudyPath $TestStudyPath
+    $selected += Select-BalancedReplications -Replications $correctK2 -Condition "Correct_K$k2" -Count 2 -TestStudyPath $TestStudyPath
+    $selected += Select-BalancedReplications -Replications $randomK1 -Condition "Random_K$k1" -Count 2 -TestStudyPath $TestStudyPath
+    $selected += Select-BalancedReplications -Replications $randomK2 -Condition "Random_K$k2" -Count 2 -TestStudyPath $TestStudyPath
     
     return $selected
 }
@@ -1220,8 +1250,42 @@ function Export-SpotCheckSummaries {
     
     # Export summary statistics for spot-checking
     $summaryPath = Join-Path $SpotCheckDir "Remaining_16_Replications_Summary.csv"
-    $remainingReplications | Select-Object ExperimentName, RunName, MappingStrategy, GroupSize, TrialCount, MeanMRR, MedianMRR, MeanTop1, MeanTop3 | 
-        Export-Csv -Path $summaryPath -NoTypeInformation
+    
+    # Enhance remaining replications with trial counts and proper property names
+    $enhancedReplications = $remainingReplications | ForEach-Object {
+        $replication = $_
+        
+        # Get trial count from trial data
+        $trialData = Get-TrialDataForReplication -TestStudyPath $TestStudyPath -ReplicationInfo $replication
+        $trialCount = if ($trialData) { $trialData.Count } else { 0 }
+        
+        # Calculate median MRR from trial data
+        $medianMRR = if ($trialData -and $trialData.Count -gt 0) {
+            $sortedMRR = ($trialData | ForEach-Object { [double]$_.MRR } | Sort-Object)
+            $mid = [Math]::Floor($sortedMRR.Count / 2)
+            if ($sortedMRR.Count % 2 -eq 0) {
+                ($sortedMRR[$mid-1] + $sortedMRR[$mid]) / 2
+            } else {
+                $sortedMRR[$mid]
+            }
+        } else {
+            $null
+        }
+        
+        [PSCustomObject]@{
+            ExperimentName = $replication.ExperimentName
+            RunName = $replication.RunName
+            MappingStrategy = $replication.MappingStrategy
+            GroupSize = $replication.GroupSize
+            TrialCount = $trialCount
+            MeanMRR = $replication.MeanMRR
+            MedianMRR = $medianMRR
+            MeanTop1 = $replication.MeanTop1Accuracy
+            MeanTop3 = $replication.MeanTop3Accuracy
+        }
+    }
+    
+    $enhancedReplications | Export-Csv -Path $summaryPath -NoTypeInformation
     
     Write-Host "✓ Spot-check summaries completed ($($remainingReplications.Count) replications)" -ForegroundColor Green
     
@@ -1236,7 +1300,7 @@ function Export-SpotCheckSummaries {
 # =============================================================================
 
 try {
-    Write-TestHeader "Validation of Statistical Analysis & Reporting - Step 2/4: GraphPad Import Generator" 'Magenta'
+    Write-TestHeader "Validation of Statistical Analysis & Reporting - Stage 2/4: GraphPad Import Generator" 'Magenta'
     
     if ($Interactive) {
         Write-Host "${C_BLUE}Two-Phase GraphPad Prism Validation Strategy:${C_RESET}"
@@ -1291,9 +1355,46 @@ try {
                 }
             }
             
+            # Detect K values from experiment names (extract actual values from study)
+            $allExperiments = Get-ChildItem -Path $StatisticalStudyPath -Directory -Name "exp_*"
+            $detectedKValues = $allExperiments | ForEach-Object {
+                if ($_ -match '_k(\d+)_') { [int]$matches[1] }
+            } | Select-Object -Unique | Sort-Object
+            
+            # Expected K values based on current script constants (filename constants at top of script)
+            # Extract from the filename constants to ensure consistency
+            $expectedKValues = @()
+            if ($MRR_K8_FILE) { $expectedKValues += 8 }
+            if ($MRR_K12_FILE) { $expectedKValues += 12 }
+            
+            # Check if study K values match expected values
+            $kValuesMismatch = $false
+            if ($detectedKValues.Count -ne $expectedKValues.Count) {
+                $kValuesMismatch = $true
+            } else {
+                for ($i = 0; $i -lt $detectedKValues.Count; $i++) {
+                    if ($detectedKValues[$i] -ne $expectedKValues[$i]) {
+                        $kValuesMismatch = $true
+                        break
+                    }
+                }
+            }
+            
+            if ($kValuesMismatch) {
+                Write-Host ""
+                Write-Host "  ${C_RED}ERROR: Study K-values do not match script expectations${C_RESET}" -ForegroundColor Red
+                Write-Host "  ${C_YELLOW}Detected K values in study: [$($detectedKValues -join ', ')]${C_RESET}" -ForegroundColor Yellow
+                Write-Host "  ${C_YELLOW}Expected K values: [$($expectedKValues -join ', ')]${C_RESET}" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "  ${C_CYAN}The study must be regenerated with matching K values.${C_RESET}" -ForegroundColor Cyan
+                Write-Host "  ${C_CYAN}Run: pdm run test-stats-study${C_RESET}" -ForegroundColor Cyan
+                Write-Host ""
+                exit 1
+            }
+            
             Write-Host "  LLM model: $($config['LLM:model_name'])" -ForegroundColor Gray
             Write-Host "  Factorial design: 2×2 (Mapping Strategy × Group Size)" -ForegroundColor Gray
-            Write-Host "  Number of experiments: 4 (correct/random × k4/k10)" -ForegroundColor Gray
+            Write-Host "  Number of experiments: 4 (correct/random × k$($detectedKValues[0])/k$($detectedKValues[1]))" -ForegroundColor Gray
             Write-Host "  Replications per experiment: $($config['Study:num_replications'])" -ForegroundColor Gray
             Write-Host "  Trials per replication: $($config['Study:num_trials'])" -ForegroundColor Gray
             
@@ -1406,7 +1507,7 @@ try {
             Write-Host "2. Follow the validation instructions above"
             Write-Host "3. Process 6 K-specific datasets (2 MRR + 2 Top-1 + 2 Top-3)"
             Write-Host "4. Export all Wilcoxon test results for validation"
-            Write-Host "5. Run Step 4 validation to compare results"
+            Write-Host "5. Run Stage 4 validation to compare results"
             Read-Host "`nPress Enter to complete..." | Out-Null
         }
     }

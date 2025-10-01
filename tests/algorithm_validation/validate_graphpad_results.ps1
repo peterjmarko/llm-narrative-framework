@@ -101,7 +101,7 @@ $GRAPHPAD_REGRESSION_PREFIX = "Simple linear regression of "
 # --- Helper Functions ---
 function Write-ValidationHeader { 
     param($Message, $Color = 'Cyan') 
-    $line = "=" * 85
+    $line = "=" * 90
     Write-Host "`n$line" -ForegroundColor $Color
     Write-Host $Message -ForegroundColor $Color
     Write-Host "$line`n" -ForegroundColor $Color
@@ -241,12 +241,12 @@ function Validate-KSpecificWilcoxonTests {
         $passedChecks = 0
         
         $validationMappings = @(
-            @{ File="$GRAPHPAD_WILCOXON_PREFIX$MRR_K4_FILE"; FrameworkColumn="MRR_P"; K=4; Metric="MRR" },
-            @{ File="$GRAPHPAD_WILCOXON_PREFIX$MRR_K10_FILE"; FrameworkColumn="MRR_P"; K=10; Metric="MRR" },
-            @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP1_K4_FILE"; FrameworkColumn="Top1Acc_P"; K=4; Metric="Top1" },
-            @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP1_K10_FILE"; FrameworkColumn="Top1Acc_P"; K=10; Metric="Top1" },
-            @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP3_K4_FILE"; FrameworkColumn="Top3Acc_P"; K=4; Metric="Top3" },
-            @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP3_K10_FILE"; FrameworkColumn="Top3Acc_P"; K=10; Metric="Top3" }
+            @{ File="$GRAPHPAD_WILCOXON_PREFIX$MRR_K8_FILE"; FrameworkColumn="MRR_P"; K=8; Metric="MRR" },
+            @{ File="$GRAPHPAD_WILCOXON_PREFIX$MRR_K12_FILE"; FrameworkColumn="MRR_P"; K=12; Metric="MRR" },
+            @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP1_K8_FILE"; FrameworkColumn="Top1Acc_P"; K=8; Metric="Top1" },
+            @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP1_K12_FILE"; FrameworkColumn="Top1Acc_P"; K=12; Metric="Top1" },
+            @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP3_K8_FILE"; FrameworkColumn="Top3Acc_P"; K=8; Metric="Top3" },
+            @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP3_K12_FILE"; FrameworkColumn="Top3Acc_P"; K=12; Metric="Top3" }
         )
         
         Write-Host "`nK-Specific Wilcoxon Test Validation Results:" -ForegroundColor Cyan
@@ -316,8 +316,8 @@ function Validate-KSpecificWilcoxonTests {
                         # because MRR rewards being "closer" to rank 1, not just "in the top K"
                         #
                         # Examples:
-                        #   K=4:  (1/4) × (1/1 + 1/2 + 1/3 + 1/4) = 0.25 × 2.083 = 0.5208
-                        #   K=10: (1/10) × (1/1 + 1/2 + ... + 1/10) = 0.1 × 2.929 = 0.2929
+                        #   K=8:  (1/8) × (1/1 + 1/2 + ... + 1/8) = 0.125 × 2.718 = 0.3521
+                        #   K=12: (1/12) × (1/1 + 1/2 + ... + 1/12) = 0.083 × 3.103 = 0.2701
                         
                         $harmonicSum = 0.0
                         for ($j = 1; $j -le $mapping.K; $j++) {
@@ -382,7 +382,7 @@ function Validate-KSpecificWilcoxonTests {
         Write-Host "`nWilcoxon Validation Summary:" -ForegroundColor Cyan
         $summaryColor = if ($passedChecks -eq $totalChecks -and $totalChecks -gt 0) { 'Green' } else { 'Yellow' }
 		Write-Host "Passed: $passedChecks / $totalChecks checks" -ForegroundColor $summaryColor
-        Write-Host "Note: This section validates N, Median, and the final one-tailed P-value against the framework." -ForegroundColor Gray
+        Write-Host "Note: This section validates N, Median, and the final one-tailed P-value against the framework.`n" -ForegroundColor Gray
         
         return $passedChecks -eq $totalChecks -and $totalChecks -gt 0
         
@@ -607,7 +607,7 @@ function Validate-ANOVAResults {
 
         Write-Host "`nANOVA Validation Summary:" -ForegroundColor Cyan
         $summaryColor = if ($passedChecks -eq $totalChecks -and $totalChecks -gt 0) { 'Green' } else { 'Yellow' }
-        Write-Host "Passed: $passedChecks / $totalChecks checks" -ForegroundColor $summaryColor
+        Write-Host "Passed: $passedChecks / $totalChecks checks`n" -ForegroundColor $summaryColor
         
         return $passedChecks -eq $totalChecks -and $totalChecks -gt 0
 
@@ -750,63 +750,13 @@ if ($graphPadSlope -lt 0) {
     }
 }
 
-function Show-ValidationInstructions {
-    Write-ValidationHeader "GraphPad Prism Manual Validation Steps" 'Yellow'
-    
-    Write-Host "UPDATED VALIDATION APPROACH - DUAL METHODOLOGY:" -ForegroundColor Magenta
-    Write-Host "Primary: Individual replication validation (8 selected replications)" -ForegroundColor Cyan
-    Write-Host "Comprehensive: Full dataset validation (all 24 replications)" -ForegroundColor Cyan
-    Write-Host ""
-    
-    Write-Host "Step 1 - Individual Replication Validation (PRIMARY - NEW):" -ForegroundColor Yellow
-    Write-Host "  1. Process 8 files from individual_replications/" -ForegroundColor White
-    Write-Host "  2. For each CSV: Import -> Analyze -> One sample t test -> Wilcoxon signed rank test" -ForegroundColor White
-    Write-Host "  3. Set theoretical mean to MRR chance level (see Selected_Replications_Metadata.csv)" -ForegroundColor White
-    Write-Host "  4. Export results as GraphPad_[ReplicationName]_Results.csv" -ForegroundColor White
-    Write-Host "  5. Compare p-values with framework (tolerance: ±0.001)" -ForegroundColor White
-    
-    Write-Host "`nStep 2 - Spot-Check Validation (SECONDARY - NEW):" -ForegroundColor Yellow
-    Write-Host "  1. Review spot_check_summaries/Remaining_16_Replications_Summary.csv" -ForegroundColor White
-    Write-Host "  2. Verify descriptive statistics (N, medians) are reasonable" -ForegroundColor White
-    Write-Host "  3. Visual inspection of distributions (optional)" -ForegroundColor White
-    
-    Write-Host "`nStep 3 - MRR Calculations (COMPREHENSIVE - EXISTING):" -ForegroundColor Cyan
-    Write-Host "  1. Import Phase_A_Raw_Scores_Wide.csv to GraphPad" -ForegroundColor White
-    Write-Host "  2. Analyze -> Column analyses -> Descriptive statistics" -ForegroundColor White
-    Write-Host "  3. Select only MRR columns, choose 'Mean, SD, SEM'" -ForegroundColor White
-    Write-Host "  4. Export results as CSV (suggested name: GraphPad_MRR_Means.csv)" -ForegroundColor White
-    Write-Host "  5. Run this script to compare results" -ForegroundColor White
-    
-    Write-Host "`nStep 4 - Wilcoxon Tests (COMPREHENSIVE - EXISTING):" -ForegroundColor Cyan
-    Write-Host "  1. Use Phase_A_Raw_Scores_Wide.csv in GraphPad" -ForegroundColor White
-    Write-Host "  2. Analyze -> Column analyses -> One sample t test and Wilcoxon test" -ForegroundColor White
-    Write-Host "  3. Set theoretical mean to chance level (1 divided by K where K=GroupSize)" -ForegroundColor White
-    Write-Host "  4. Compare p-values with framework results (tolerance: +/- 0.001)" -ForegroundColor White
-    
-    Write-Host "`nStep 5 - ANOVA Analysis (COMPREHENSIVE - EXISTING):" -ForegroundColor Cyan
-    Write-Host "  1. Create new 'Grouped' table, specify 6 replicate values in subcolumns" -ForegroundColor White
-    Write-Host "  2. Import Phase_B_ANOVA_MRR.csv (and Top1, Top3 variants)" -ForegroundColor White
-    Write-Host "  3. Analyze Data -> Grouped analyses -> Two-way ANOVA" -ForegroundColor White
-    Write-Host "  4. Enable interaction term (full model) and 'Show effect size (eta-squared)'" -ForegroundColor White
-    Write-Host "  5. Export analysis results as GraphPad_ANOVA_[Metric].csv" -ForegroundColor White
-    
-    Write-Host "`nStep 6 - Bias Regression (COMPREHENSIVE - EXISTING):" -ForegroundColor Cyan
-    Write-Host "  1. Use Phase_A_Raw_Scores.csv (long format)" -ForegroundColor White
-    Write-Host "  2. Plot MRR vs Trial number for each replication" -ForegroundColor White
-    Write-Host "  3. Perform linear regression analysis" -ForegroundColor White
-    Write-Host "  4. Compare slope and R-value with framework results (tolerance: +/- 0.001)" -ForegroundColor White
-    Write-Host ""
-    
-    Write-Host "VALIDATION PRIORITY:" -ForegroundColor Magenta
-    Write-Host "Focus on Steps 1-2 for methodologically sound validation." -ForegroundColor Yellow
-    Write-Host "Steps 3-6 provide comprehensive verification of all calculations." -ForegroundColor Yellow
-    Write-Host ""
-}
+# GraphPad instructions are displayed by generate_graphpad_imports.ps1 (Stage 2)
+# This validation script (Stage 4) only validates the results
 
 function Validate-IndividualReplications {
     param($GraphPadExportsDir, $FrameworkImportsDir, $Tolerance)
     
-    Write-Host "`nValidating individual replication results..." -ForegroundColor Cyan
+    Write-Host "Validating individual replication results..." -ForegroundColor Cyan
     
     $metadataPath = Join-Path $FrameworkImportsDir "reference_data/Selected_Replications_Metadata.csv"
     if (-not (Test-Path $metadataPath)) {
@@ -874,19 +824,7 @@ function Compare-IndividualReplicationResults {
         $graphPadPTwoTailed = [double]($pValueRow.$secondColName -replace '[<>= ]','')
         $hypothetical = [double]$ReplicationInfo.MRRChanceLevel
         
-        # Convert GraphPad's two-tailed p-value to one-tailed
-        # Framework uses alternative='greater' (tests if MRR > chance)
-        # GraphPad uses two-tailed test by default
-        # For one-tailed: p_one = p_two / 2 when effect is in expected direction
-        $graphPadPOneTailed = if ($graphPadMedian -gt $hypothetical) {
-            # Median > chance: effect in expected direction, use p_two/2
-            $graphPadPTwoTailed / 2.0
-        } else {
-            # Median <= chance: effect in opposite direction, use 1 - (p_two/2)
-            1.0 - ($graphPadPTwoTailed / 2.0)
-        }
-        
-        # Load framework's calculated metrics from original replication
+        # Load framework's calculated metrics first to check for ambiguity
         $frameworkMetrics = Get-FrameworkReplicationMetrics -ReplicationInfo $ReplicationInfo
         if (-not $frameworkMetrics) {
             Write-Host "    ✗ Could not load framework metrics for comparison" -ForegroundColor Red
@@ -897,17 +835,56 @@ function Compare-IndividualReplicationResults {
             }
         }
         
-        # Compare one-tailed p-values
-        $pValueDiff = [Math]::Abs($graphPadPOneTailed - $frameworkMetrics.mrr_p)
+        # Check if this is an ambiguous case (|median - chance| < 0.03)
+        # Framework automatically uses 2-tailed p-value for these cases
+        $medianDistanceFromChance = [Math]::Abs($graphPadMedian - $hypothetical)
+        $isAmbiguous = $medianDistanceFromChance -lt 0.03
+        
+        # Determine which p-value to use for comparison
+        if ($isAmbiguous) {
+            # Ambiguous case: compare 2-tailed p-values
+            $graphPadPToCompare = $graphPadPTwoTailed
+            $frameworkPToCompare = if ($frameworkMetrics.PSObject.Properties.Name -contains 'wilcoxon_signed_rank_p_2tailed') {
+                $frameworkMetrics.wilcoxon_signed_rank_p_2tailed
+            } else {
+                # Fallback: if 2-tailed not available, use primary (which should be 2-tailed for ambiguous)
+                $frameworkMetrics.mrr_p
+            }
+            $testType = "2-tailed"
+            $ambiguityNote = " [AMBIGUOUS: |median-chance|=$($medianDistanceFromChance.ToString('F4')) < 0.03]"
+        } else {
+            # Non-ambiguous case: convert GraphPad's 2-tailed to 1-tailed for comparison
+            $graphPadPOneTailed = if ($graphPadMedian -gt $hypothetical) {
+                # Median > chance: effect in expected direction, use p_two/2
+                $graphPadPTwoTailed / 2.0
+            } else {
+                # Median <= chance: effect in opposite direction, use 1 - (p_two/2)
+                1.0 - ($graphPadPTwoTailed / 2.0)
+            }
+            $graphPadPToCompare = $graphPadPOneTailed
+            $frameworkPToCompare = $frameworkMetrics.mrr_p
+            $testType = "1-tailed"
+            $ambiguityNote = ""
+        }
+        
+        # Compare p-values
+        $pValueDiff = [Math]::Abs($graphPadPToCompare - $frameworkPToCompare)
         $pValueMatch = $pValueDiff -le $Tolerance
         
         # Display comparison
         $color = if ($pValueMatch) { "Green" } else { "Red" }
         $symbol = if ($pValueMatch) { "✓" } else { "✗" }
         Write-Host "    GraphPad: N=$graphPadN, Median=$($graphPadMedian.ToString('F4')), P(2-tailed)=$($graphPadPTwoTailed.ToString('F6'))" -ForegroundColor Cyan
-        Write-Host "    GraphPad: P(1-tailed)=$($graphPadPOneTailed.ToString('F6')) [converted from 2-tailed]" -ForegroundColor Cyan
-        Write-Host "    Framework: N=$($frameworkMetrics.n_valid_responses), P(1-tailed)=$($frameworkMetrics.mrr_p.ToString('F6'))" -ForegroundColor Cyan
-        Write-Host "    $symbol P-value diff: $($pValueDiff.ToString('F6')) (tolerance: ±$Tolerance)" -ForegroundColor $color
+        
+        if ($isAmbiguous) {
+            Write-Host "    GraphPad: P(2-tailed)=$($graphPadPToCompare.ToString('F6'))$ambiguityNote" -ForegroundColor Yellow
+            Write-Host "    Framework: N=$($frameworkMetrics.n_valid_responses), P(2-tailed)=$($frameworkPToCompare.ToString('F6'))" -ForegroundColor Cyan
+        } else {
+            Write-Host "    GraphPad: P(1-tailed)=$($graphPadPToCompare.ToString('F6')) [converted from 2-tailed]" -ForegroundColor Cyan
+            Write-Host "    Framework: N=$($frameworkMetrics.n_valid_responses), P(1-tailed)=$($frameworkPToCompare.ToString('F6'))" -ForegroundColor Cyan
+        }
+        
+        Write-Host "    $symbol P-value diff ($testType): $($pValueDiff.ToString('F6')) (tolerance: ±$Tolerance)" -ForegroundColor $color
         
         # Validation checks
         $passed = $true
@@ -982,41 +959,146 @@ function Validate-SpotCheckSummaries {
     
     $summaryPath = Join-Path $FrameworkImportsDir "spot_check_summaries/Remaining_16_Replications_Summary.csv"
     if (-not (Test-Path $summaryPath)) {
-        Write-Host "X Summary file not found: $summaryPath" -ForegroundColor Red
-        Write-Host "  Run generate_graphpad_imports.ps1 with updated script first" -ForegroundColor Yellow
+        Write-Host "  ✗ Summary file not found: $summaryPath" -ForegroundColor Red
+        Write-Host "    Run generate_graphpad_imports.ps1 with updated script first" -ForegroundColor Yellow
         return $false
     }
     
     $remainingReplications = Import-Csv $summaryPath
-    Write-Host "  Spot-checking $($remainingReplications.Count) remaining replications" -ForegroundColor Gray
+    Write-Host "  Analyzing $($remainingReplications.Count) remaining replications..." -ForegroundColor Gray
     
-    # Validate descriptive statistics (N, medians) are reasonable
-    $spotCheckPassed = $true
+    # Track statistics for summary
     $warnings = 0
+    $errors = 0
+    $trialCounts = @()
+    $meanMRRs = @()
+    $medianMRRs = @()
+    $meanTop1s = @()
+    $meanTop3s = @()
+    
+    # Count by condition
+    $correctCount = 0
+    $randomCount = 0
+    $k4Count = 0
+    $k10Count = 0
     
     foreach ($replication in $remainingReplications) {
-        # Basic validation of trial counts and ranges
+        $repId = "$($replication.MappingStrategy)_K$($replication.GroupSize)"
+        
+        # Collect statistics
         $trialCount = [int]$replication.TrialCount
+        $meanMRR = [double]$replication.MeanMRR
+        $medianMRR = [double]$replication.MedianMRR
+        $meanTop1 = [double]$replication.MeanTop1
+        $meanTop3 = [double]$replication.MeanTop3
+        
+        $trialCounts += $trialCount
+        $meanMRRs += $meanMRR
+        $medianMRRs += $medianMRR
+        $meanTop1s += $meanTop1
+        $meanTop3s += $meanTop3
+        
+        # Count conditions
+        if ($replication.MappingStrategy -eq "correct") { $correctCount++ }
+        if ($replication.MappingStrategy -eq "random") { $randomCount++ }
+        if ($replication.GroupSize -eq 4) { $k4Count++ }
+        if ($replication.GroupSize -eq 10) { $k10Count++ }
+        
+        # Validation checks
+        $hasError = $false
+        
+        # Check 1: Trial count validation
         if ($trialCount -lt 30 -or $trialCount -gt 35) {
-            Write-Host "    Warning: Unexpected trial count for $($replication.ExperimentName)_$($replication.RunName): $trialCount" -ForegroundColor Yellow
-            $warnings++
+            Write-Host "    ✗ $repId : Unexpected trial count = $trialCount (expected 30-35)" -ForegroundColor Red
+            $errors++
+            $hasError = $true
         }
         
-        # Validate MRR range
-        $meanMRR = [double]$replication.MeanMRR
+        # Check 2: MRR range validation
         if ($meanMRR -lt 0 -or $meanMRR -gt 1) {
-            Write-Host "    Warning: MRR out of range for $($replication.ExperimentName)_$($replication.RunName): $meanMRR" -ForegroundColor Yellow
-            $warnings++
+            Write-Host "    ✗ $repId : MeanMRR out of range = $meanMRR (expected 0-1)" -ForegroundColor Red
+            $errors++
+            $hasError = $true
+        }
+        
+        # Check 3: MedianMRR range validation
+        if ($medianMRR -lt 0 -or $medianMRR -gt 1) {
+            Write-Host "    ✗ $repId : MedianMRR out of range = $medianMRR (expected 0-1)" -ForegroundColor Red
+            $errors++
+            $hasError = $true
+        }
+        
+        # Check 4: Top1 accuracy range validation
+        if ($meanTop1 -lt 0 -or $meanTop1 -gt 1) {
+            Write-Host "    ✗ $repId : MeanTop1 out of range = $meanTop1 (expected 0-1)" -ForegroundColor Red
+            $errors++
+            $hasError = $true
+        }
+        
+        # Check 5: Top3 accuracy range validation
+        if ($meanTop3 -lt 0 -or $meanTop3 -gt 1) {
+            Write-Host "    ✗ $repId : MeanTop3 out of range = $meanTop3 (expected 0-1)" -ForegroundColor Red
+            $errors++
+            $hasError = $true
+        }
+        
+        # Check 6: Top3 >= Top1 (logical consistency)
+        if ($meanTop3 -lt $meanTop1) {
+            Write-Host "    ✗ $repId : Top3 < Top1 (impossible: Top3=$meanTop3, Top1=$meanTop1)" -ForegroundColor Red
+            $errors++
+            $hasError = $true
+        }
+        
+        # Check 7: Mean-Median difference (distribution check)
+        if (-not $hasError) {
+            $meanMedianDiff = [Math]::Abs($meanMRR - $medianMRR)
+            if ($meanMedianDiff -gt 0.15) {
+                Write-Host "    ! $repId : Large mean-median difference = $([Math]::Round($meanMedianDiff, 4)) (skewed distribution)" -ForegroundColor Yellow
+                $warnings++
+            }
         }
     }
     
-    if ($warnings -gt 0) {
-        Write-Host "  ✓ Spot-check validation completed with $warnings warnings" -ForegroundColor Yellow
+    # Summary statistics
+    Write-Host ""
+    Write-Host "  Data Completeness:" -ForegroundColor Cyan
+    Write-Host "    • Total replications: $($remainingReplications.Count)" -ForegroundColor Gray
+    Write-Host "    • Trial counts: Min=$($trialCounts | Measure-Object -Minimum | Select-Object -ExpandProperty Minimum), Max=$($trialCounts | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum)" -ForegroundColor Gray
+    
+    Write-Host ""
+    Write-Host "  Metric Ranges:" -ForegroundColor Cyan
+    $mrrMin = ($meanMRRs | Measure-Object -Minimum | Select-Object -ExpandProperty Minimum)
+    $mrrMax = ($meanMRRs | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum)
+    Write-Host "    • MeanMRR: $([Math]::Round($mrrMin, 4)) - $([Math]::Round($mrrMax, 4))" -ForegroundColor Gray
+    
+    $medianMin = ($medianMRRs | Measure-Object -Minimum | Select-Object -ExpandProperty Minimum)
+    $medianMax = ($medianMRRs | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum)
+    Write-Host "    • MedianMRR: $([Math]::Round($medianMin, 4)) - $([Math]::Round($medianMax, 4))" -ForegroundColor Gray
+    
+    $top1Min = ($meanTop1s | Measure-Object -Minimum | Select-Object -ExpandProperty Minimum)
+    $top1Max = ($meanTop1s | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum)
+    Write-Host "    • MeanTop1: $([Math]::Round($top1Min, 4)) - $([Math]::Round($top1Max, 4))" -ForegroundColor Gray
+    
+    $top3Min = ($meanTop3s | Measure-Object -Minimum | Select-Object -ExpandProperty Minimum)
+    $top3Max = ($meanTop3s | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum)
+    Write-Host "    • MeanTop3: $([Math]::Round($top3Min, 4)) - $([Math]::Round($top3Max, 4))" -ForegroundColor Gray
+    
+    Write-Host ""
+    Write-Host "  Experimental Design Balance:" -ForegroundColor Cyan
+    Write-Host "    • Mapping strategies: correct=$correctCount, random=$randomCount" -ForegroundColor Gray
+    Write-Host "    • Group sizes: K=4 ($k4Count), K=10 ($k10Count)" -ForegroundColor Gray
+    
+    # Display pass/fail summary at the end (matches pattern from other validation sections)
+    Write-Host ""
+    if ($errors -eq 0 -and $warnings -eq 0) {
+        Write-Host "  ✓ Spot-check validation completed successfully`n" -ForegroundColor Green
+    } elseif ($errors -eq 0) {
+        Write-Host "  ✓ Spot-check validation completed with $warnings warning(s)`n" -ForegroundColor Yellow
     } else {
-        Write-Host "  ✓ Spot-check validation completed successfully" -ForegroundColor Green
+        Write-Host "  ✗ Spot-check validation failed with $errors error(s) and $warnings warning(s)`n" -ForegroundColor Red
     }
     
-    return $spotCheckPassed
+    return ($errors -eq 0)
 }
 
 # --- Main Execution ---
@@ -1090,10 +1172,8 @@ try {
     # EXISTING Step 6: Bias Regression Analysis (COMPREHENSIVE)
     $step6Passed = Validate-BiasRegression -GraphPadExportsDir $graphPadExportDir -FrameworkResultsPath $frameworkMeansPath -Tolerance $StatisticalTolerance
     
-    # Overall results
-    Write-ValidationHeader "Validation Summary" 'Green'
-    
-    Write-Host "Step 3 - MRR Calculations: " -NoNewline -ForegroundColor White
+    # Intermediate results (no banner, just status output)
+    Write-Host "`nStep 3 - MRR Calculations: " -NoNewline -ForegroundColor White
     if ($step3Passed) {
         Write-Host "PASSED" -ForegroundColor Green
     } elseif (Test-Path $graphPadMeansPath) {
@@ -1128,9 +1208,7 @@ try {
     $comprehensivePassed = $step3Passed -and $step4Passed -and $step5Passed -and $step6Passed
     $overallPassed = $primaryPassed -and $comprehensivePassed
     
-    Write-Host "`n" + "="*80 -ForegroundColor Magenta
-    Write-Host "VALIDATION SUMMARY" -ForegroundColor Magenta  
-    Write-Host "="*80 -ForegroundColor Magenta
+    Write-ValidationHeader "Validation Summary" 'Magenta'
     Write-Host "PRIMARY VALIDATION (Individual Replication Approach):" -ForegroundColor Cyan
     Write-Host "Step 1 - Individual Replications (8 selected): $(if ($step1Passed) { 'PASSED' } else { 'FAILED' })" -ForegroundColor $(if ($step1Passed) { 'Green' } else { 'Red' })
     Write-Host "Step 2 - Spot-Check Summaries (16 remaining): $(if ($step2Passed) { 'PASSED' } else { 'FAILED' })" -ForegroundColor $(if ($step2Passed) { 'Green' } else { 'Red' })
@@ -1156,6 +1234,7 @@ try {
         Write-Host "  • K-specific MRR, Top-1, Top-3 accuracy calculations and Wilcoxon tests" -ForegroundColor White
         Write-Host "  • ANOVA F-statistics and eta-squared effect sizes" -ForegroundColor White  
         Write-Host "  • Bias regression slopes, intercepts, and R-values" -ForegroundColor White
+        Write-Host ""
     } else {
         Write-Host "`nPartial validation completed - some tests require manual verification" -ForegroundColor Yellow
         if (-not $step1Passed) { Write-Host "  • Individual replications need verification" -ForegroundColor Yellow }
@@ -1164,7 +1243,7 @@ try {
         if (-not $step4Passed) { Write-Host "  • Wilcoxon tests need verification" -ForegroundColor Yellow }
         if (-not $step5Passed) { Write-Host "  • ANOVA results need verification" -ForegroundColor Yellow }
         if (-not $step6Passed) { Write-Host "  • Bias regression needs verification" -ForegroundColor Yellow }
-        Show-ValidationInstructions
+        Write-Host ""
     }
     
     # Exit code

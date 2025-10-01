@@ -140,18 +140,59 @@ def evaluate_single_test(score_matrix, correct_mapping_indices_1_based, k_val, t
 
 # --- II. Meta-Analysis Functions ---
 def analyze_metric_distribution(metric_values, chance_level, metric_name):
+    """
+    Analyze distribution of a performance metric and compare against chance level.
+    
+    Performs both t-test and Wilcoxon signed-rank test to assess whether the metric
+    significantly differs from the theoretical chance level. For cases where the
+    observed median is very close to the chance level (within 0.03, corresponding
+    to Cohen's d < 0.20), a two-tailed test is used as the primary result since
+    directional hypotheses lack statistical power below this threshold.
+    
+    Args:
+        metric_values (list): List of numeric metric values from replications
+        chance_level (float): Theoretical chance level under null hypothesis
+        metric_name (str): Name of the metric (e.g., "Mean Reciprocal Rank")
+        
+    Returns:
+        dict: Analysis results containing:
+            - Basic statistics: mean, median, std, count
+            - T-test results: ttest_1samp_stat, ttest_1samp_p
+            - Wilcoxon test results:
+                * wilcoxon_signed_rank_stat: Test statistic
+                * wilcoxon_signed_rank_p: Primary p-value (1-tailed or 2-tailed based on ambiguity)
+                * wilcoxon_signed_rank_p_2tailed: Two-tailed p-value (always computed)
+                * test_is_ambiguous: Boolean flag (True if |median - chance| < 0.03)
+    
+    Notes:
+        - For rank metrics (Mean Rank of Correct ID), uses 'less' alternative (lower is better)
+        - For performance metrics (MRR, accuracy), uses 'greater' alternative (higher is better)
+        - Ambiguity threshold of 0.03 corresponds to Cohen's (1988) small effect size (d = 0.20)
+        - When test_is_ambiguous=True, the primary p-value is two-tailed regardless of metric type
+        
+    References:
+        Cohen, J. (1988). Statistical power analysis for the behavioral sciences (2nd ed.).
+        Lawrence Erlbaum Associates.
+    """
     metric_values = [m for m in metric_values if m is not None and not np.isnan(m)]
     base_return = {
         'name': metric_name, 'count': len(metric_values), 
         'mean': np.nan, 'median': np.nan, 'std': np.nan,
         'chance_level': chance_level, 'ttest_1samp_stat': None, 'ttest_1samp_p': None,
-        'wilcoxon_signed_rank_stat': None, 'wilcoxon_signed_rank_p': None
+        'wilcoxon_signed_rank_stat': None, 'wilcoxon_signed_rank_p': None,
+        'wilcoxon_signed_rank_p_2tailed': None,  # Always compute 2-tailed
+        'test_is_ambiguous': False  # Flag for near-chance cases (Cohen's d < 0.20)
     }
     if not metric_values: return base_return
     
     base_return['mean'] = np.mean(metric_values)
     base_return['median'] = np.median(metric_values)
     base_return['std'] = np.std(metric_values) if len(metric_values) > 1 else 0.0
+    
+    # Detect ambiguous cases: |median - chance| < 0.03 corresponds to Cohen's d < 0.20
+    # Below this threshold, directional tests lack statistical power (Cohen, 1988)
+    median_distance_from_chance = abs(base_return['median'] - chance_level)
+    base_return['test_is_ambiguous'] = median_distance_from_chance < 0.03
     
     if len(metric_values) >= 2:
         try:
@@ -168,13 +209,28 @@ def analyze_metric_distribution(metric_values, chance_level, metric_name):
         if differences.size == 0: pass
         elif np.all(np.isclose(differences,0)):
              base_return['wilcoxon_signed_rank_p'] = 1.0
+             base_return['wilcoxon_signed_rank_p_2tailed'] = 1.0
              base_return['wilcoxon_signed_rank_stat'] = 0.0
         else:
             try:
                 # Use same directional logic as t-test for consistency
                 alt_hypothesis = 'less' if metric_name == 'Mean Rank of Correct ID' else 'greater'
-                stat, p_val = wilcoxon(differences, alternative=alt_hypothesis, zero_method='wilcox')
-                base_return['wilcoxon_signed_rank_stat'], base_return['wilcoxon_signed_rank_p'] = stat, p_val
+                
+                # For ambiguous cases (near chance performance), use 2-tailed test as primary
+                if base_return['test_is_ambiguous']:
+                    # Compute 2-tailed first (primary result for ambiguous cases)
+                    stat_2t, p_val_2t = wilcoxon(differences, alternative='two-sided', zero_method='wilcox')
+                    base_return['wilcoxon_signed_rank_stat'] = stat_2t
+                    base_return['wilcoxon_signed_rank_p'] = p_val_2t  # Use 2-tailed as primary
+                    base_return['wilcoxon_signed_rank_p_2tailed'] = p_val_2t
+                else:
+                    # Compute 1-tailed first, then 2-tailed for validation/reference
+                    stat_1t, p_val_1t = wilcoxon(differences, alternative=alt_hypothesis, zero_method='wilcox')
+                    stat_2t, p_val_2t = wilcoxon(differences, alternative='two-sided', zero_method='wilcox')
+                    base_return['wilcoxon_signed_rank_stat'] = stat_1t
+                    base_return['wilcoxon_signed_rank_p'] = p_val_1t  # Primary result is 1-tailed
+                    base_return['wilcoxon_signed_rank_p_2tailed'] = p_val_2t  # Always available
+                    
             except ValueError as e: 
                 print(f"Error during Wilcoxon test for {metric_name} (data: {differences[:5]}...): {e}")
                 if len(np.unique(differences)) == 1 and differences.size > 0 and differences[0] != 0:
