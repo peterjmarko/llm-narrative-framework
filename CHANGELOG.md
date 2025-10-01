@@ -1,5 +1,44 @@
 # Changelog
 
+## 11.7.0 (2025-10-01)
+
+### Bump
+
+- **version 11.6.2 → 11.7.0**
+
+### Features
+
+- **update statistical validation framework for K=[8,12] design with dynamic K-value detection**
+  Redesigned validation study from K=[4,10] to K=[8,12] to improve signal detection and eliminated all hardcoded K-value dependencies for maintainability.
+  - Changed experimental design from K=[4,10] to K=[8,12] for better balance
+    * K=8: MRR chance=0.3521, Top-3=37.5% (meaningful task difficulty)
+    * K=12: MRR chance=0.2701, Top-3=25% (balanced challenge)
+    * Expected to reduce ambiguous cases from 75% to 12-25%
+  
+  - Added Cohen (1988) ambiguity threshold (
+  median-chance
+  < 0.03)
+    * Corresponds to small effect size (d = 0.20)
+    * Automatic 2-tailed test selection for near-chance performance
+    * Both 1-tailed and 2-tailed p-values always computed and stored
+  
+  - Eliminated all hardcoded K-value references in validation scripts
+    * Dynamic K-value detection from study data
+    * K-value mismatch detection with early exit and clear error messages
+    * Dynamic MRR chance calculation using harmonic mean formula
+    * Dynamic ANOVA generation supporting any K-value pair
+  
+  - Enhanced statistical analysis pipeline
+    * Updated analyze_metric_distribution() with academic justification
+    * Added test_is_ambiguous flag and wilcoxon_signed_rank_p_2tailed field
+    * Improved docstrings with Cohen (1988) references
+  
+  - Updated validation infrastructure
+    * Fixed Select-RepresentativeReplications for dynamic K detection
+    * Updated all filename constants (K4K8, K10K12)
+    * Enhanced validation script ambiguity handling
+    * Updated documentation with academic precedents
+
 ## 11.6.2 (2025-09-30)
 
 ### Bump
