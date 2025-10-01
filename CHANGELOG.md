@@ -1,5 +1,44 @@
 # Changelog
 
+## 12.0.0 (2025-10-01)
+
+### Bump
+
+- **version 11.7.1 → 12.0.0**
+
+### Documentation
+
+- **optimize sample size and model selection for main study**
+  Refine main study design from 30100 to 3080 trials and transition to low-cost model tier, update validation instructions for K=[8,12].
+  
+  BREAKING CHANGE: Study design parameters updated - 30 replications  80 trials (43,200 total), low-cost models ($139 vs $6,624, 97.9% savings), maintains 82% power for d<0.20.
+  
+  Key changes:
+  - Sample size: 30100  3080 (20% reduction, maintains statistical power)
+  - Models: Premium tier  Low-cost tier (10 candidates: $0.13-1.30 per experiment)
+  - Total cost: $6,624  $139 (Budget Balanced: Llama 3.3 + Gemini 2.5 Lite + GPT-4.1 Nano)
+  - Statistical properties: SE=0.0168, SNR=1.79:1, 82% power for d=0.20
+  - Parsing buffers: K=14 expected 74 valid responses (194% above minimum)
+  - Model strategies: 5 combinations documented ($110-509 range)
+  - All costs based on OpenRouter.ai rates (October 2025)
+  
+  Study Design section now includes:
+  - 10-model low-cost candidate pool with tier categorization
+  - 5 recommended 3-model combination strategies
+  - Detailed cost breakdowns by phase (pilot: $1.54, core: $137)
+  - Updated power analysis and parsing buffer calculations
+  - Alternative design options with revised costs
+  - Methods section template for publication
+  
+  Validation updates:
+  - GraphPad import instructions updated to reflect K=[8,12] validation design
+  - Clarified MRR chance level calculations (K=8: 0.3397, K=12: 0.2586)
+  - Updated file references and step numbering for consistency
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 11.7.1 (2025-10-01)
 
 ### Bump
