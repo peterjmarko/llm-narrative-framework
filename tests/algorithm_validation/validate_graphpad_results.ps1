@@ -77,12 +77,12 @@ $C_MAGENTA = "`e[95m"
 
 # --- Filename Constants (matching generate_graphpad_imports.ps1) ---
 $RAW_SCORES_FILE = "Phase_A_Raw_Scores.csv"
-$MRR_K4_FILE = "Phase_A_MRR_K4.csv"
-$MRR_K10_FILE = "Phase_A_MRR_K10.csv"
-$TOP1_K4_FILE = "Phase_A_Top1_K4.csv"
-$TOP1_K10_FILE = "Phase_A_Top1_K10.csv"
-$TOP3_K4_FILE = "Phase_A_Top3_K4.csv"
-$TOP3_K10_FILE = "Phase_A_Top3_K10.csv"
+$MRR_K8_FILE = "Phase_A_MRR_K8.csv"
+$MRR_K12_FILE = "Phase_A_MRR_K12.csv"
+$TOP1_K8_FILE = "Phase_A_Top1_K8.csv"
+$TOP1_K12_FILE = "Phase_A_Top1_K12.csv"
+$TOP3_K8_FILE = "Phase_A_Top3_K8.csv"
+$TOP3_K12_FILE = "Phase_A_Top3_K12.csv"
 $ANOVA_MRR_FILE = "Phase_B_ANOVA_MRR.csv"
 $ANOVA_TOP1_FILE = "Phase_B_ANOVA_Top1.csv"
 $ANOVA_TOP3_FILE = "Phase_B_ANOVA_Top3.csv"
@@ -232,6 +232,7 @@ function Validate-KSpecificWilcoxonTests {
     )
     
     Write-ValidationStep "Step 4: K-Specific Wilcoxon Test Validation"
+    Write-Host "Note: This section validates N, Median, and the final one-tailed P-value against the framework.`n" -ForegroundColor Gray
     
     try {
         $frameworkData = Import-Csv $FrameworkResultsPath
@@ -249,7 +250,7 @@ function Validate-KSpecificWilcoxonTests {
             @{ File="$GRAPHPAD_WILCOXON_PREFIX$TOP3_K12_FILE"; FrameworkColumn="Top3Acc_P"; K=12; Metric="Top3" }
         )
         
-        Write-Host "`nK-Specific Wilcoxon Test Validation Results:" -ForegroundColor Cyan
+        Write-Host "K-Specific Wilcoxon Test Validation Results:" -ForegroundColor Cyan
         
         foreach ($mapping in $validationMappings) {
             $testName = "$($mapping.Metric) K=$($mapping.K)"
@@ -381,8 +382,7 @@ function Validate-KSpecificWilcoxonTests {
         
         Write-Host "`nWilcoxon Validation Summary:" -ForegroundColor Cyan
         $summaryColor = if ($passedChecks -eq $totalChecks -and $totalChecks -gt 0) { 'Green' } else { 'Yellow' }
-		Write-Host "Passed: $passedChecks / $totalChecks checks" -ForegroundColor $summaryColor
-        Write-Host "Note: This section validates N, Median, and the final one-tailed P-value against the framework.`n" -ForegroundColor Gray
+		Write-Host "Passed: $passedChecks / $totalChecks checks`n" -ForegroundColor $summaryColor
         
         return $passedChecks -eq $totalChecks -and $totalChecks -gt 0
         
@@ -624,125 +624,126 @@ function Validate-BiasRegression {
         [double]$Tolerance
     )
     
-    Write-ValidationStep "Step 6: Enhanced Bias Regression Validation"
+    Write-ValidationStep "Step 6: Per-Replication Bias Regression Validation"
+    Write-Host "Note: Validates bias analysis using the same 8 replications from Step 1.`n" -ForegroundColor Gray
     
     try {
         $frameworkData = Import-Csv $FrameworkResultsPath
-        $validationResults = @()
-        $totalValidations = 0
-        $passedValidations = 0
         
-        # Define regression validation mappings
-        $regressionMappings = @(
-            @{ File="$GRAPHPAD_REGRESSION_PREFIX$BIAS_REGRESSION_MRR_FILE"; Condition="Overall"; Metric="MRR" },
-            @{ File="$GRAPHPAD_REGRESSION_PREFIX$BIAS_REGRESSION_TOP1_FILE"; Condition="Overall"; Metric="Top1" },
-            @{ File="$GRAPHPAD_REGRESSION_PREFIX$BIAS_REGRESSION_TOP3_FILE"; Condition="Overall"; Metric="Top3" },
-            @{ File="$GRAPHPAD_REGRESSION_PREFIX$BIAS_REGRESSION_CORRECT_MRR_FILE"; Condition="Correct"; Metric="MRR" },
-            @{ File="$GRAPHPAD_REGRESSION_PREFIX$BIAS_REGRESSION_RANDOM_MRR_FILE"; Condition="Random"; Metric="MRR" }
-        )
+        # Load metadata to get the selected replications
+        $studyPath = Split-Path $GraphPadExportsDir -Parent
+        $metadataPath = Join-Path $studyPath "graphpad_imports/reference_data/Bias_Replications_Metadata.csv"
         
-        foreach ($mapping in $regressionMappings) {
-            $graphPadFile = Join-Path $GraphPadExportsDir $mapping.File
-            $totalValidations++
+        if (-not (Test-Path $metadataPath)) {
+            Write-Host "X Bias replication metadata not found at: $metadataPath" -ForegroundColor Red
+            Write-Host "  Run Stage 2 (generate_graphpad_imports.ps1) to generate bias replication files." -ForegroundColor Yellow
+            return $false
+        }
+        
+        $biasMetadata = Import-Csv $metadataPath
+        $totalChecks = 0
+        $passedChecks = 0
+        $graphPadSlopes = @()
+        $graphPadRValues = @()
+        $frameworkSlopes = @()
+        $frameworkRValues = @()
+        
+        Write-Host "Bias Regression Validation Results:" -ForegroundColor Cyan
+        
+        foreach ($repInfo in $biasMetadata) {
+            $graphPadFile = Join-Path $GraphPadExportsDir "$GRAPHPAD_REGRESSION_PREFIX$($repInfo.Filename)"
             
             if (Test-Path $graphPadFile) {
                 try {
                     $graphPadData = Import-Csv $graphPadFile -WarningAction SilentlyContinue
                     
-                    # Find regression statistics in GraphPad results
-                    # Handle GraphPad format where first column contains row labels
+                    # Find slope and R-squared in GraphPad results
                     $firstColumnName = ($graphPadData | Get-Member -MemberType NoteProperty).Name[0]
                     $secondColumnName = ($graphPadData | Get-Member -MemberType NoteProperty).Name[1]
                     
-                    $regressionRow = $graphPadData | Where-Object { 
-                        $_.$firstColumnName -eq "    Slope" -or
-                        $_.$firstColumnName -eq "Slope" -or
-                        $_.Parameter -eq "Slope" -or 
-                        $_."Best-fit values" -eq "Slope" -or
-                        $_.Statistic -like "*Slope*"
+                    # Verify we're analyzing MeanRank (not MRR) per documented methodology
+                    if ($secondColumnName -ne "MeanRank") {
+                        Write-Host "    ✗ WARNING: Expected MeanRank column, found $secondColumnName" -ForegroundColor Yellow
+                        Write-Host "      Bias validation requires rank-based data (see methodology documentation)" -ForegroundColor Yellow
+                        continue
+                    }
+                    
+                    $slopeRow = $graphPadData | Where-Object { 
+                        $_.$firstColumnName -match "Slope"
                     } | Select-Object -First 1
                     
                     $rSquareRow = $graphPadData | Where-Object {
-                        $_.$firstColumnName -eq "    R squared" -or
-                        $_.$firstColumnName -eq "R squared" -or
-                        $_.Parameter -eq "R square" -or
-                        $_."Goodness of Fit" -eq "R square" -or
-                        $_.Statistic -like "*R*square*"
+                        $_.$firstColumnName -match "R.*square"
                     } | Select-Object -First 1
                     
-                    if ($regressionRow -and $rSquareRow) {
-                        # Extract values from GraphPad - handle their format
-                        try {
-                            $graphPadSlope = [double]$regressionRow.$secondColumnName
-                        } catch {
-                            $graphPadSlope = [double]($regressionRow.$secondColumnName -replace '[^\d\.-]', '')
-                        }
+                    if ($slopeRow -and $rSquareRow) {
+                        $graphPadSlope = [double]($slopeRow.$secondColumnName -replace '[^\d\.-]', '')
+                        $graphPadRSquare = [double]($rSquareRow.$secondColumnName -replace '[^\d\.-]', '')
                         
-                        try {
-                            $graphPadRSquare = [double]$rSquareRow.$secondColumnName
-                        } catch {
-                            $graphPadRSquare = [double]($rSquareRow.$secondColumnName -replace '[^\d\.-]', '')
-                        }
+                        # Calculate R-value from R-squared with correct sign from slope
+                        $graphPadRValue = [Math]::Sqrt([Math]::Abs($graphPadRSquare))
+                        if ($graphPadSlope -lt 0) { $graphPadRValue = -$graphPadRValue }
                         
-                        # Calculate R-value from R-squared and apply the correct sign from the slope
-$graphPadRValue = [Math]::Sqrt([Math]::Abs($graphPadRSquare))
-if ($graphPadSlope -lt 0) {
-    $graphPadRValue = -$graphPadRValue
-}
+                        # Find matching framework replication
+                        Write-Host "    Looking for framework data: Exp=$($repInfo.Experiment), Rep=$($repInfo.Replication)" -ForegroundColor Gray
                         
-                        # Get corresponding framework values
-                        $frameworkSubset = if ($mapping.Condition -eq "Overall") {
-                            $frameworkData
-                        } else {
-                            $frameworkData | Where-Object { $_.MappingStrategy -eq $mapping.Condition.ToLower() }
-                        }
+                        $frameworkRep = $frameworkData | Where-Object {
+                            $_.ExperimentName -eq $repInfo.Experiment -and
+                            $_.RunName -eq $repInfo.Replication
+                        } | Select-Object -First 1
                         
-                        if ($frameworkSubset.Count -gt 0) {
-                            $avgFrameworkSlope = ($frameworkSubset | ForEach-Object { [double]$_.BiasSlope } | Measure-Object -Average).Average
-                            $avgFrameworkRValue = ($frameworkSubset | ForEach-Object { [double]$_.BiasRValue } | Measure-Object -Average).Average
+                        if ($frameworkRep) {
+                            $frameworkSlope = [double]$frameworkRep.BiasSlope
+                            $frameworkRValue = [double]$frameworkRep.BiasRValue
                             
-                            $slopeDifference = [Math]::Abs($avgFrameworkSlope - $graphPadSlope)
-                            $rValueDifference = [Math]::Abs($avgFrameworkRValue - $graphPadRValue)
+                            $slopeDiff = [Math]::Abs($frameworkSlope - $graphPadSlope)
+                            $rValueDiff = [Math]::Abs($frameworkRValue - $graphPadRValue)
                             
-                            $slopePassed = $slopeDifference -le $Tolerance
-                            $rValuePassed = $rValueDifference -le ($Tolerance * 10)  # More lenient for R-values
-                            $overallPassed = $slopePassed -and $rValuePassed
+                            $slopePassed = $slopeDiff -le $Tolerance
+                            $rValuePassed = $rValueDiff -le ($Tolerance * 10)
                             
-                            if ($overallPassed) { $passedValidations++ }
+                            $totalChecks += 2
+                            if ($slopePassed) { $passedChecks++ }
+                            if ($rValuePassed) { $passedChecks++ }
                             
-                            $validationResults += [PSCustomObject]@{
-                                Test = "$($mapping.Condition) $($mapping.Metric) Regression"
-                                GraphPadSlope = $graphPadSlope.ToString("F6")
-                                FrameworkSlope = $avgFrameworkSlope.ToString("F6")
-                                GraphPadR = $graphPadRValue.ToString("F4")
-                                FrameworkR = $avgFrameworkRValue.ToString("F4")
-                                SlopeDiff = $slopeDifference.ToString("F6")
-                                RDiff = $rValueDifference.ToString("F4")
-                                Status = if ($overallPassed) { "PASS" } else { "FAIL" }
-                                Color = if ($overallPassed) { "Green" } else { "Red" }
-                            }
+                            $status = if ($slopePassed -and $rValuePassed) { "✓" } else { "✗" }
+                            $color = if ($slopePassed -and $rValuePassed) { "Green" } else { "Red" }
+                            
+                            Write-Host "  $status $($repInfo.Filename):" -ForegroundColor $color
+                            Write-Host "    Slope: GraphPad=$($graphPadSlope.ToString('F6')), Framework=$($frameworkSlope.ToString('F6')), Diff=$($slopeDiff.ToString('F6'))" -ForegroundColor Gray
+                            Write-Host "    R-value: GraphPad=$($graphPadRValue.ToString('F4')), Framework=$($frameworkRValue.ToString('F4')), Diff=$($rValueDiff.ToString('F4'))" -ForegroundColor Gray
+                            
+                            # Collect for averaging
+                            $graphPadSlopes += $graphPadSlope
+                            $graphPadRValues += $graphPadRValue
+                            $frameworkSlopes += $frameworkSlope
+                            $frameworkRValues += $frameworkRValue
                         }
                     }
                 } catch {
-                    Write-Host "  Warning: Could not parse $($mapping.File): $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "  Warning: Could not parse $($repInfo.Filename): $($_.Exception.Message)" -ForegroundColor Yellow
                 }
             } else {
-                Write-Host "  Warning: GraphPad file not found: $($mapping.File)" -ForegroundColor Yellow
+                Write-Host "  ✗ SKIPPED: GraphPad file not found: $($repInfo.Filename)" -ForegroundColor Yellow
             }
         }
         
-        # Display results
-        Write-Host "`nBias Regression Validation Results:" -ForegroundColor Cyan
-        foreach ($result in $validationResults) {
-            Write-Host "  $($result.Status) $($result.Test):" -ForegroundColor $result.Color
-            Write-Host "    Slope: GraphPad=$($result.GraphPadSlope), Framework=$($result.FrameworkSlope), Diff=$($result.SlopeDiff)" -ForegroundColor Gray
-            Write-Host "    R-value: GraphPad=$($result.GraphPadR), Framework=$($result.FrameworkR), Diff=$($result.RDiff)" -ForegroundColor Gray
+        # Display averages
+        if ($graphPadSlopes.Count -gt 0) {
+            $avgGraphPadSlope = ($graphPadSlopes | Measure-Object -Average).Average
+            $avgGraphPadRValue = ($graphPadRValues | Measure-Object -Average).Average
+            $avgFrameworkSlope = ($frameworkSlopes | Measure-Object -Average).Average
+            $avgFrameworkRValue = ($frameworkRValues | Measure-Object -Average).Average
+            
+            Write-Host "`nAverage Across 8 Replications:" -ForegroundColor Cyan
+            Write-Host "  Slope: GraphPad=$($avgGraphPadSlope.ToString('F6')), Framework=$($avgFrameworkSlope.ToString('F6'))" -ForegroundColor White
+            Write-Host "  R-value: GraphPad=$($avgGraphPadRValue.ToString('F4')), Framework=$($avgFrameworkRValue.ToString('F4'))" -ForegroundColor White
         }
         
-        Write-Host "`nBias Regression Summary:" -ForegroundColor Cyan
-        Write-Host "Passed: $passedValidations / $totalValidations tests" -ForegroundColor $(if ($passedValidations -eq $totalValidations) { 'Green' } else { 'Yellow' })
+        Write-Host "`nBias Regression Validation Summary:" -ForegroundColor Cyan
+        Write-Host "Passed: $passedChecks / $totalChecks checks`n" -ForegroundColor $(if ($passedChecks -eq $totalChecks -and $totalChecks -gt 0) { 'Green' } else { 'Yellow' })
         
-        return $passedValidations -gt 0  # Return true if any validations passed
+        return $passedChecks -eq $totalChecks -and $totalChecks -gt 0
         
     } catch {
         Write-Host "X Error during bias regression validation: $($_.Exception.Message)" -ForegroundColor Red

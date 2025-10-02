@@ -652,6 +652,37 @@ list_shuffle_seed = 123
 
 **Different seeds per condition** ensures independence while maintaining reproducibility.
 
+### Performance Metrics and Bias Analysis
+
+#### Primary Performance Metrics
+
+The framework calculates three main performance metrics for each replication:
+
+- **Mean Reciprocal Rank (MRR)**: Average of 1/rank across all trials, emphasizing top-ranked performance
+- **Top-K Accuracy**: Proportion of trials where correct answer appears in top K positions
+- **Mean Rank of Correct ID**: Average position of correct answer across all trials
+
+All metrics are compared against theoretical chance levels using Wilcoxon signed-rank tests.
+
+#### Positional Bias Detection Methodology
+
+**Purpose**: Detect whether LLMs exhibit position bias in their choices - systematic preference for certain positions in the ranked list regardless of correctness, similar to how human users favor top-ranked search results even when relevance is controlled.
+
+**Metric Choice - Rank vs MRR**:
+
+The framework uses `mean_rank_of_correct_id` (not MRR) for positional bias regression analysis:
+
+- **Linear scale**: Rank values (1, 2, 3, ..., k) are linearly spaced, satisfying linear regression assumptions
+- **Uniform sensitivity**: A 1-rank shift is equally detectable at all performance levels (rank 1→2 has same weight as rank 10→11)
+- **Direct interpretability**: Slope values represent "ranks per trial" (e.g., slope of 0.3 means "correct answer drifts by 0.3 rank positions per trial")
+- **Matches bias mechanism**: Position bias manifests as systematic drift in where the correct answer appears in the ranked list
+
+**Why not MRR**: MRR = 1/rank creates non-linear compression (1.0→0.5→0.33→0.25), making shifts at lower performance less detectable and complicating slope interpretation in practical terms.
+
+**Analysis Approach**: Linear regression is performed on mean_rank_of_correct_id values across trials within each replication. The resulting slope, r-value, and p-value characterize whether the LLM's selection behavior shows systematic positional preferences. A non-zero slope suggests position-dependent choice behavior rather than purely content-based decisions.
+
+**Note**: This differs from the framework's primary performance metric (MRR), which remains appropriate for aggregated performance reporting. Rank is used specifically for detecting positional choice bias within replications due to its superior statistical properties for linear regression analysis.
+
 ### Statistical Analysis Plan
 
 #### Primary Analysis

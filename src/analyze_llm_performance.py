@@ -420,15 +420,20 @@ def read_mappings_and_deduce_k(filepath, k_override=None, specified_delimiter_ke
 
 def calculate_positional_bias(performance_scores):
     """
-    Performs a linear regression on a list of performance scores over time (trials).
-
+    Detect positional bias via linear regression on mean_rank_of_correct_id over trials.
+    
+    Uses rank (not MRR) for bias detection because:
+    - Linear scale satisfies regression assumptions
+    - Uniform sensitivity across performance levels  
+    - Direct interpretability (slope = ranks/trial)
+    - Matches bias mechanism (linear rank drift)
+    
     Args:
-        performance_scores (list of float): A list of performance metrics (e.g., MRR, rank)
-                                            for each trial in chronological order.
-
+        performance_scores: List of mean_rank_of_correct_id values in chronological order
+        
     Returns:
-        dict: A dictionary containing the slope, intercept, p-value, and r-value
-              of the linear regression. Returns NaNs if input is insufficient.
+        dict: bias_slope, bias_intercept, bias_p_value, bias_r_value, bias_std_err
+              Returns NaN if insufficient data (<2 trials)
     """
     if not performance_scores or len(performance_scores) < 2:
         return {

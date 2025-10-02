@@ -98,6 +98,9 @@ $BIAS_REGRESSION_TOP3_FILE = "Phase_B_Bias_Regression_Top3.csv"
 $BIAS_REGRESSION_CORRECT_MRR_FILE = "Phase_B_Bias_Regression_Correct_MRR.csv"
 $BIAS_REGRESSION_RANDOM_MRR_FILE = "Phase_B_Bias_Regression_Random_MRR.csv"
 
+# Individual replication bias files (for Step 6 validation)
+$BIAS_REP_01_FILE = "BiasReg_01_Correct_K8.csv"
+
 # --- Helper Functions ---
 function Write-TestHeader { 
     param($Message, $Color = 'Cyan') 
@@ -443,35 +446,44 @@ function Generate-ANOVAExports {
     
     $studyData = Import-Csv $studyResultsPath
     
-    # Generate standard ANOVA export
-    $correctK4Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 4 }).mean_mrr)
-    $correctK10Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 10 }).mean_mrr)
-    $randomK4Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 4 }).mean_mrr)
-    $randomK10Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 10 }).mean_mrr)
+    # Dynamically detect K values from study data
+    $kValues = $studyData | Select-Object -ExpandProperty k -Unique | Sort-Object
+    if ($kValues.Count -ne 2) {
+        Write-Warning "Expected 2 K values for ANOVA, found $($kValues.Count)"
+        return $null
+    }
+    $k1 = $kValues[0]
+    $k2 = $kValues[1]
     
-    $numReplicates = [math]::Max([math]::Max($correctK4Values.Count, $correctK10Values.Count), [math]::Max($randomK4Values.Count, $randomK10Values.Count))
+    # Generate standard ANOVA export using detected K values
+    $correctK1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq $k1 }).mean_mrr)
+    $correctK2Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq $k2 }).mean_mrr)
+    $randomK1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq $k1 }).mean_mrr)
+    $randomK2Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq $k2 }).mean_mrr)
     
-    # Create standard ANOVA export
+    $numReplicates = [math]::Max([math]::Max($correctK1Values.Count, $correctK2Values.Count), [math]::Max($randomK1Values.Count, $randomK2Values.Count))
+    
+    # Create standard ANOVA export with detected K values
     $headerParts = @()
-    for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K4" }
-    for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K10" }
+    for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K$k1" }
+    for ($i = 1; $i -le $numReplicates; $i++) { $headerParts += "K$k2" }
     $headerRow = "," + ($headerParts -join ",")
     
     $correctRowParts = @("Correct")
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $correctRowParts += if ($i -lt $correctK4Values.Count) { $correctK4Values[$i] } else { "" }
+        $correctRowParts += if ($i -lt $correctK1Values.Count) { $correctK1Values[$i] } else { "" }
     }
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $correctRowParts += if ($i -lt $correctK10Values.Count) { $correctK10Values[$i] } else { "" }
+        $correctRowParts += if ($i -lt $correctK2Values.Count) { $correctK2Values[$i] } else { "" }
     }
     $correctRow = $correctRowParts -join ","
     
     $randomRowParts = @("Random")
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $randomRowParts += if ($i -lt $randomK4Values.Count) { $randomK4Values[$i] } else { "" }
+        $randomRowParts += if ($i -lt $randomK1Values.Count) { $randomK1Values[$i] } else { "" }
     }
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $randomRowParts += if ($i -lt $randomK10Values.Count) { $randomK10Values[$i] } else { "" }
+        $randomRowParts += if ($i -lt $randomK2Values.Count) { $randomK2Values[$i] } else { "" }
     }
     $randomRow = $randomRowParts -join ","
     
@@ -482,34 +494,34 @@ function Generate-ANOVAExports {
     
     Write-Host "  Generated: Phase_B_ANOVA_MRR.csv (GraphPad grouped table format)"
     Write-Host "    - Rows: Correct vs Random (mapping strategy)" -ForegroundColor Gray
-    Write-Host "    - Columns: K4 vs K10 (group size) with $numReplicates subcolumns each" -ForegroundColor Gray
+    Write-Host "    - Columns: K$k1 vs K$k2 (group size) with $numReplicates subcolumns each" -ForegroundColor Gray
     
     # Generate grouped format files for effect size verification
     
-    # Top-1 Accuracy ANOVA export (grouped format)
-    $correctK4Top1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 4 }).mean_top_1_acc)
-    $correctK10Top1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 10 }).mean_top_1_acc)
-    $randomK4Top1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 4 }).mean_top_1_acc)
-    $randomK10Top1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 10 }).mean_top_1_acc)
+    # Top-1 Accuracy ANOVA export (grouped format) using detected K values
+    $correctK1Top1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq $k1 }).mean_top_1_acc)
+    $correctK2Top1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq $k2 }).mean_top_1_acc)
+    $randomK1Top1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq $k1 }).mean_top_1_acc)
+    $randomK2Top1Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq $k2 }).mean_top_1_acc)
     
     # Create Top-1 accuracy grouped format
     $top1HeaderRow = "," + ($headerParts -join ",")
     
     $correctTop1RowParts = @("Correct")
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $correctTop1RowParts += if ($i -lt $correctK4Top1Values.Count) { $correctK4Top1Values[$i] } else { "" }
+        $correctTop1RowParts += if ($i -lt $correctK1Top1Values.Count) { $correctK1Top1Values[$i] } else { "" }
     }
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $correctTop1RowParts += if ($i -lt $correctK10Top1Values.Count) { $correctK10Top1Values[$i] } else { "" }
+        $correctTop1RowParts += if ($i -lt $correctK2Top1Values.Count) { $correctK2Top1Values[$i] } else { "" }
     }
     $correctTop1Row = $correctTop1RowParts -join ","
     
     $randomTop1RowParts = @("Random")
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $randomTop1RowParts += if ($i -lt $randomK4Top1Values.Count) { $randomK4Top1Values[$i] } else { "" }
+        $randomTop1RowParts += if ($i -lt $randomK1Top1Values.Count) { $randomK1Top1Values[$i] } else { "" }
     }
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $randomTop1RowParts += if ($i -lt $randomK10Top1Values.Count) { $randomK10Top1Values[$i] } else { "" }
+        $randomTop1RowParts += if ($i -lt $randomK2Top1Values.Count) { $randomK2Top1Values[$i] } else { "" }
     }
     $randomTop1Row = $randomTop1RowParts -join ","
     
@@ -518,30 +530,30 @@ function Generate-ANOVAExports {
     $top1AnovaExport = Join-Path $GraphPadImportsDir $ANOVA_TOP1_FILE
     $top1CsvContent | Out-File -FilePath $top1AnovaExport -Encoding UTF8
     
-    # Top-3 Accuracy ANOVA export (grouped format)
-    $correctK4Top3Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 4 }).mean_top_3_acc)
-    $correctK10Top3Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq 10 }).mean_top_3_acc)
-    $randomK4Top3Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 4 }).mean_top_3_acc)
-    $randomK10Top3Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq 10 }).mean_top_3_acc)
+    # Top-3 Accuracy ANOVA export (grouped format) using detected K values
+    $correctK1Top3Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq $k1 }).mean_top_3_acc)
+    $correctK2Top3Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "correct" -and $_.k -eq $k2 }).mean_top_3_acc)
+    $randomK1Top3Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq $k1 }).mean_top_3_acc)
+    $randomK2Top3Values = @(($studyData | Where-Object { $_.mapping_strategy -eq "random" -and $_.k -eq $k2 }).mean_top_3_acc)
     
     # Create Top-3 accuracy grouped format  
     $top3HeaderRow = "," + ($headerParts -join ",")
     
     $correctTop3RowParts = @("Correct")
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $correctTop3RowParts += if ($i -lt $correctK4Top3Values.Count) { $correctK4Top3Values[$i] } else { "" }
+        $correctTop3RowParts += if ($i -lt $correctK1Top3Values.Count) { $correctK1Top3Values[$i] } else { "" }
     }
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $correctTop3RowParts += if ($i -lt $correctK10Top3Values.Count) { $correctK10Top3Values[$i] } else { "" }
+        $correctTop3RowParts += if ($i -lt $correctK2Top3Values.Count) { $correctK2Top3Values[$i] } else { "" }
     }
     $correctTop3Row = $correctTop3RowParts -join ","
     
     $randomTop3RowParts = @("Random")
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $randomTop3RowParts += if ($i -lt $randomK4Top3Values.Count) { $randomK4Top3Values[$i] } else { "" }
+        $randomTop3RowParts += if ($i -lt $randomK1Top3Values.Count) { $randomK1Top3Values[$i] } else { "" }
     }
     for ($i = 0; $i -lt $numReplicates; $i++) {
-        $randomTop3RowParts += if ($i -lt $randomK10Top3Values.Count) { $randomK10Top3Values[$i] } else { "" }
+        $randomTop3RowParts += if ($i -lt $randomK2Top3Values.Count) { $randomK2Top3Values[$i] } else { "" }
     }
     $randomTop3Row = $randomTop3RowParts -join ","
     
@@ -624,24 +636,28 @@ function Export-BiasRegressionDataForGraphPad {
     $allBiasData = $allBiasDataWithSeq
     
     # Generate purpose-built two-column files for GraphPad XY regression
+    # These are REFERENCE files (pooled across all replications) - saved to subfolder
     
-    # Overall regression: TrialSeq vs MRR (ensure numeric sequencing)
-    $overallMRRData = $allBiasData | Select-Object @{N='TrialSeq';E={[int]$_.TrialSeq}}, @{N='MRR';E={[double]$_.MRR}}
-    $overallMRRExport = Join-Path $GraphPadImportsDir $BIAS_REGRESSION_MRR_FILE
+    $BiasReferenceDir = Join-Path $GraphPadImportsDir "bias_reference"
+    New-Item -ItemType Directory -Path $BiasReferenceDir -Force | Out-Null
+    
+    # Overall regression: TrialSeq vs MeanRank (rank-based per methodology)
+    $overallRankData = $allBiasData | Select-Object @{N='TrialSeq';E={[int]$_.TrialSeq}}, @{N='MeanRank';E={[double]$_.MeanRank}}
+    $overallRankExport = Join-Path $BiasReferenceDir $BIAS_REGRESSION_MRR_FILE
     $overallMRRData | Export-Csv -Path $overallMRRExport -NoTypeInformation
-    Write-Host "  Generated: $BIAS_REGRESSION_MRR_FILE (TrialSeq vs MRR, $($overallMRRData.Count) points)"
+    Write-Host "`n  Generated: bias_reference/$BIAS_REGRESSION_MRR_FILE (TrialSeq vs MRR, $($overallMRRData.Count) points)"
     
     # Overall regression: TrialSeq vs Top1Accuracy
     $overallTop1Data = $allBiasData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='Top1Accuracy';E={$_.Top1Accuracy}}
-    $overallTop1Export = Join-Path $GraphPadImportsDir $BIAS_REGRESSION_TOP1_FILE
+    $overallTop1Export = Join-Path $BiasReferenceDir $BIAS_REGRESSION_TOP1_FILE
     $overallTop1Data | Export-Csv -Path $overallTop1Export -NoTypeInformation
-    Write-Host "  Generated: $BIAS_REGRESSION_TOP1_FILE (TrialSeq vs Top1Accuracy, $($overallTop1Data.Count) points)"
+    Write-Host "  Generated: bias_reference/$BIAS_REGRESSION_TOP1_FILE (TrialSeq vs Top1Accuracy, $($overallTop1Data.Count) points)"
     
     # Overall regression: TrialSeq vs Top3Accuracy
     $overallTop3Data = $allBiasData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='Top3Accuracy';E={$_.Top3Accuracy}}
-    $overallTop3Export = Join-Path $GraphPadImportsDir $BIAS_REGRESSION_TOP3_FILE
+    $overallTop3Export = Join-Path $BiasReferenceDir $BIAS_REGRESSION_TOP3_FILE
     $overallTop3Data | Export-Csv -Path $overallTop3Export -NoTypeInformation
-    Write-Host "  Generated: $BIAS_REGRESSION_TOP3_FILE (TrialSeq vs Top3Accuracy, $($overallTop3Data.Count) points)"
+    Write-Host "  Generated: bias_reference/$BIAS_REGRESSION_TOP3_FILE (TrialSeq vs Top3Accuracy, $($overallTop3Data.Count) points)"
     
     # Condition-specific analysis
     $correctData = $allBiasData | Where-Object { $_.MappingStrategy -eq "correct" }
@@ -650,20 +666,23 @@ function Export-BiasRegressionDataForGraphPad {
     if ($correctData.Count -gt 0) {
         # Correct condition: TrialSeq vs MRR
         $correctMRRData = $correctData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='MRR';E={$_.MRR}}
-        $correctMRRExport = Join-Path $GraphPadImportsDir $BIAS_REGRESSION_CORRECT_MRR_FILE
+        $correctMRRExport = Join-Path $BiasReferenceDir $BIAS_REGRESSION_CORRECT_MRR_FILE
         $correctMRRData | Export-Csv -Path $correctMRRExport -NoTypeInformation
-        Write-Host "  Generated: $BIAS_REGRESSION_CORRECT_MRR_FILE ($($correctMRRData.Count) points)"
+        Write-Host "  Generated: bias_reference/$BIAS_REGRESSION_CORRECT_MRR_FILE ($($correctMRRData.Count) points)"
     }
     
     if ($randomData.Count -gt 0) {
         # Random condition: TrialSeq vs MRR
         $randomMRRData = $randomData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='MRR';E={$_.MRR}}
-        $randomMRRExport = Join-Path $GraphPadImportsDir $BIAS_REGRESSION_RANDOM_MRR_FILE
+        $randomMRRExport = Join-Path $BiasReferenceDir $BIAS_REGRESSION_RANDOM_MRR_FILE
         $randomMRRData | Export-Csv -Path $randomMRRExport -NoTypeInformation
-        Write-Host "  Generated: $BIAS_REGRESSION_RANDOM_MRR_FILE ($($randomMRRData.Count) points)"
+        Write-Host "  Generated: bias_reference/$BIAS_REGRESSION_RANDOM_MRR_FILE ($($randomMRRData.Count) points)"
     }
     
-    Write-Host "    - All files are two-column format optimized for GraphPad XY regression" -ForegroundColor Gray
+    Write-Host "    - Reference files use pooled data across all replications (for comparison only)`n" -ForegroundColor Gray
+    
+    # Also generate per-replication bias files for proper validation (matching Step 1 methodology)
+    $perRepStats = Export-IndividualReplicationBiasFiles -AllBiasData $allBiasData
     
     Write-Host "✓ Bias regression validation exports completed`n" -ForegroundColor Green
     
@@ -671,6 +690,104 @@ function Export-BiasRegressionDataForGraphPad {
         TotalTrials = $allBiasData.Count
         CorrectTrials = $correctData.Count
         RandomTrials = $randomData.Count
+        PerReplicationFiles = $perRepStats
+    }
+}
+
+function Export-IndividualReplicationBiasFiles {
+    param($AllBiasData)
+    
+    Write-Host "  Generating per-replication bias regression files (matching Step 1 methodology)..." -ForegroundColor Cyan
+    
+    # Create directory for individual bias files
+    $BiasRepsDir = Join-Path $GraphPadImportsDir "bias_replications"
+    New-Item -ItemType Directory -Path $BiasRepsDir -Force | Out-Null
+    
+    # Group by replication (Experiment + Replication)
+    $replicationGroups = $AllBiasData | Group-Object { "$($_.Experiment)_$($_.Replication)" }
+    
+    # Get the same 8 replications selected for Step 1 validation
+    # We need to match the selection from Export-IndividualReplicationsForManualValidation
+    # For simplicity, select first 2 from each condition (matching the selection logic)
+    
+    $kValues = $AllBiasData | Select-Object -ExpandProperty GroupSize -Unique | Sort-Object
+    if ($kValues.Count -ne 2) {
+        Write-Warning "Expected 2 K values for bias replication exports"
+        return $null
+    }
+    $k1 = $kValues[0]
+    $k2 = $kValues[1]
+    
+    # Group by condition
+    $correctK1Reps = $replicationGroups | Where-Object { 
+        $rep = $_.Group[0]
+        $rep.MappingStrategy -eq "correct" -and $rep.GroupSize -eq $k1
+    } | Sort-Object Name | Select-Object -First 2
+    
+    $correctK2Reps = $replicationGroups | Where-Object { 
+        $rep = $_.Group[0]
+        $rep.MappingStrategy -eq "correct" -and $rep.GroupSize -eq $k2
+    } | Sort-Object Name | Select-Object -First 2
+    
+    $randomK1Reps = $replicationGroups | Where-Object { 
+        $rep = $_.Group[0]
+        $rep.MappingStrategy -eq "random" -and $rep.GroupSize -eq $k1
+    } | Sort-Object Name | Select-Object -First 2
+    
+    $randomK2Reps = $replicationGroups | Where-Object { 
+        $rep = $_.Group[0]
+        $rep.MappingStrategy -eq "random" -and $rep.GroupSize -eq $k2
+    } | Sort-Object Name | Select-Object -First 2
+    
+    $selectedReps = @() + $correctK1Reps + $correctK2Reps + $randomK1Reps + $randomK2Reps
+    
+    $exportedFiles = @()
+    $sequenceNum = 1
+    
+    foreach ($repGroup in $selectedReps) {
+        $repData = $repGroup.Group
+        $firstRecord = $repData[0]
+        
+        # Reset trial sequence for each replication (0-indexed for regression)
+        # CRITICAL: Sort by Trial to match framework's chronological processing
+        # Uses MeanRank (not MRR) per documented methodology for bias detection
+        $trialSeq = 0
+        $regressionData = $repData | Sort-Object { [int]$_.Trial } | ForEach-Object {
+            [PSCustomObject]@{
+                Trial = $trialSeq++
+                MeanRank = [double]$_.MeanRank
+            }
+        }
+        
+        # Generate filename matching Step 1 convention (Rank-based per methodology)
+        $condition = if ($firstRecord.MappingStrategy -eq "correct") { "Correct" } else { "Random" }
+        $filename = "BiasReg_Rank_{0:D2}_{1}_K{2}.csv" -f $sequenceNum, $condition, $firstRecord.GroupSize
+        $filepath = Join-Path $BiasRepsDir $filename
+        
+        $regressionData | Export-Csv -Path $filepath -NoTypeInformation
+        
+        $exportedFiles += @{
+            Filename = $filename
+            Condition = $condition
+            K = $firstRecord.GroupSize
+            Experiment = $firstRecord.Experiment
+            Replication = $firstRecord.Replication
+            TrialCount = $regressionData.Count
+        }
+        
+        Write-Host "    Generated: $filename ($($regressionData.Count) trials, MeanRank-based)" -ForegroundColor Gray
+        $sequenceNum++
+    }
+    
+    # Export metadata
+    $metadataPath = Join-Path (Join-Path $GraphPadImportsDir "reference_data") "Bias_Replications_Metadata.csv"
+    $exportedFiles | Export-Csv -Path $metadataPath -NoTypeInformation
+    
+    Write-Host "  ✓ Per-replication bias files completed (8 files)`n" -ForegroundColor Green
+    
+    return @{
+        ExportedFiles = $exportedFiles
+        ExportDirectory = $BiasRepsDir
     }
 }
 
@@ -757,7 +874,7 @@ function Show-ValidationInstructions {
     Write-Host "Comprehensive: Full dataset validation (all 24 replications)" -ForegroundColor Cyan
     Write-Host ""
     
-    Write-Host "`nGraphPad Step 3.1 - Individual Replication Validation (PRIMARY):" -ForegroundColor Yellow
+    Write-Host "GraphPad Step 3.1 - Individual Replication Validation (PRIMARY):" -ForegroundColor Yellow
     Write-Host "   Process 8 files from the 'graphpad_imports/individual_replications/' folder:" -ForegroundColor Cyan
     Write-Host "   1. Open GraphPad Prism and create a new project: File → New → New Project File."
     Write-Host "      Select 'CREATE: Multiple variables' in the dialog, click Create, then save the project."
@@ -767,7 +884,7 @@ function Show-ValidationInstructions {
     Write-Host "      (check the box for making these the default settings)."
     Write-Host "        - Analyze → Column analyses: One sample t and Wilcoxon test." -ForegroundColor Gray
     Write-Host "        - Select the MRR column only, then select 'Wilcoxon signed rank test' and set hypothetical value to MRR chance level" -ForegroundColor Gray
-    Write-Host "          (see 'MRRChanceLevel' column in 'graphpad_imports/reference_data/Selected_Replications_Metadata.csv')." -ForegroundColor Gray
+    Write-Host "          (see 'MRRChanceLevel' column in 'Selected_Replications_Metadata.csv': 0.3397 for K=8 and 0.2586 for K=12)." -ForegroundColor Gray
     Write-Host "        - Export analysis results using the default filename ('One sample Wilcoxon test of Rep_01_Correct_K8.csv') to 'graphpad_exports/'." -ForegroundColor Gray
     Write-Host "   4. Repeat for the remaining 7 'Rep_*' CSV files by creating a new 'multiple variables' table each time"
     Write-Host "      (the creation, import, analysis, and export tasks can each be done in bulk to speed up the process)."
@@ -793,79 +910,54 @@ function Show-ValidationInstructions {
     Write-Host "   Process Wilcoxon test results using K-specific datasets:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "     MRR Analysis:" -ForegroundColor Blue
-    Write-Host "     • K=4 MRR:" -ForegroundColor Gray
+    Write-Host "     • K=8 MRR:" -ForegroundColor Gray
     Write-Host "       - Create a new 'Multiple variables' data table and select the 'enter or import data' option."
-    Write-Host "       - Import '$MRR_K4_FILE' into this new table."
+    Write-Host "       - Import '$MRR_K8_FILE' into this new table."
     Write-Host "       - Analyze Data → Column analyses → One sample t test and Wilcoxon test."
-    Write-Host "       - Select the MRR column only, then choose 'Wilcoxon signed-rank test' with hypothetical value = 0.5208."
-    Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $MRR_K4_FILE')."
-    Write-Host "     • K=10 MRR:" -ForegroundColor Gray
-    Write-Host "       - Repeat import and analysis for '$MRR_K10_FILE' → hypothetical = 0.2929."
-    Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $MRR_K10_FILE')."
+    Write-Host "       - Select the MRR column only, then choose 'Wilcoxon signed-rank test' set hypothetical value to MRR chance level (0.3397)."
+    Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $MRR_K8_FILE')."
+    Write-Host "     • K=12 MRR:" -ForegroundColor Gray
+    Write-Host "       - Repeat for '$MRR_K12_FILE' using corresponding hypothetical value (0.2586)."
     Write-Host ""
-    Write-Host "     Top-1 Accuracy Analysis:" -ForegroundColor Blue
-    Write-Host "     • K=4 Top-1:" -ForegroundColor Gray
-    Write-Host "       - Repeat import and analysis for '$TOP1_K4_FILE' → hypothetical = 0.25."
-    Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $TOP1_K4_FILE')."
-    Write-Host "     • K=10 Top-1:" -ForegroundColor Gray
-    Write-Host "       - Repeat import and analysis for '$TOP1_K10_FILE' → hypothetical = 0.1."
-    Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $TOP1_K10_FILE')."
+    Write-Host "     Top-1 Accuracy Analysis, K=8 and 12:" -ForegroundColor Blue
+    Write-Host "     • Repeat for '$TOP1_K8_FILE' and '$TOP1_K12_FILE' using corresponding hypothetical values (0.125 and 0.0833)."
     Write-Host ""
-    Write-Host "     Top-3 Accuracy Analysis:" -ForegroundColor Blue
-    Write-Host "     • K=4 Top-3:" -ForegroundColor Gray
-    Write-Host "       - Repeat import and analysis for '$TOP3_K4_FILE' → hypothetical = 0.75."
-    Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $TOP3_K4_FILE')."
-    Write-Host "     • K=10 Top-3:" -ForegroundColor Gray
-    Write-Host "       - Repeat import and analysis for '$TOP3_K10_FILE' → hypothetical = 0.3."
-    Write-Host "       - Export analysis results using the default filename ('One sample Wilcoxon test of $TOP3_K10_FILE')."
+    Write-Host "     Top-3 Accuracy Analysis, K=8 and 12:" -ForegroundColor Blue
+    Write-Host "     • Repeat for '$TOP3_K8_FILE' and '$TOP3_K12_FILE' using corresponding hypothetical values (0.375 and 0.25)."
     
     Write-Host "`nGraphPad Step 3.5 - ANOVA Analysis (REFERENCE):" -ForegroundColor Yellow
     Write-Host "   Process ANOVA with Effect Size Validation:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "     MRR ANOVA Analysis with Effect Size:" -ForegroundColor Blue
-    Write-Host "     • Create new 'Grouped' table, specify 6 replicate values in subcolumns." -ForegroundColor Gray
+    Write-Host "     • Create new 'Grouped' table and specify 6 replicate values in subcolumns." -ForegroundColor Gray
     Write-Host "     • Import '$ANOVA_MRR_FILE'." -ForegroundColor Gray
     Write-Host "     • Analyze Data → Grouped analyses → Two-way ANOVA." -ForegroundColor Gray
     Write-Host "     • Enable interaction term (full model) and 'Show effect size (eta-squared)'" -ForegroundColor Gray
     Write-Host "     • Export analysis results using the default filename ('2way ANOVA of $ANOVA_MRR_FILE')." -ForegroundColor Gray
     Write-Host ""
     Write-Host "     Top-1 Accuracy ANOVA Analysis with Effect Size:" -ForegroundColor Blue
-    Write-Host "     • Repeat import and analysis for '$ANOVA_TOP1_FILE'." -ForegroundColor Gray
-    Write-Host "     • Export analysis results using the default filename ('2way ANOVA of $ANOVA_TOP1_FILE')." -ForegroundColor Gray
+    Write-Host "     • Repeat for '$ANOVA_TOP1_FILE'." -ForegroundColor Gray
     Write-Host ""
     Write-Host "     Top-3 Accuracy ANOVA Analysis with Effect Size:" -ForegroundColor Blue
-    Write-Host "     • Repeat import and analysis for '$ANOVA_TOP3_FILE'." -ForegroundColor Gray
-    Write-Host "     • Export analysis results using the default filename ('2way ANOVA of $ANOVA_TOP3_FILE')." -ForegroundColor Gray
+    Write-Host "     • Repeat for '$ANOVA_TOP3_FILE'." -ForegroundColor Gray
     
     # Bias Regression Analysis Instructions
-    Write-Host "`nGraphPad Step 3.6 - Bias Regression Analysis (REFERENCE):" -ForegroundColor Yellow
-    Write-Host "   Process Bias Regression Analysis:" -ForegroundColor Cyan
+    Write-Host "`nGraphPad Step 3.6 - Individual Replication Bias Regression Validation (PRIMARY):" -ForegroundColor Yellow
+    Write-Host "   Process 8 files from the 'graphpad_imports/bias_replications/' folder:" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "     Overall Bias Regression Analysis:" -ForegroundColor Blue
-    Write-Host "     • Create new 'XY' data table with numbers for X and single values for Y." -ForegroundColor Gray
-    Write-Host "     • Import '$BIAS_REGRESSION_MRR_FILE'." -ForegroundColor Gray
-    Write-Host "     • Analyze Data → XY analyses → Simple linear regression." -ForegroundColor Gray
-    Write-Host "     • Include 'Test departure from linearity with runs test' and change sifnificant digits to 6; check 'make default'." -ForegroundColor Gray
-    Write-Host "     • Export analysis results using the default filename ('Simple linear regression of $BIAS_REGRESSION_MRR_FILE')." -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "     Top-1 Accuracy Regression Metrics:" -ForegroundColor Blue
-    Write-Host "     • Repeat import and analysis for '$BIAS_REGRESSION_TOP1_FILE'." -ForegroundColor Gray
-    Write-Host "     • Export analysis results using the default filename ('Simple linear regression of $BIAS_REGRESSION_TOP1_FILE')." -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "     Top-3 Accuracy Regression Metrics:" -ForegroundColor Blue
-    Write-Host "     • Repeat import and analysis for '$BIAS_REGRESSION_TOP3_FILE'." -ForegroundColor Gray
-    Write-Host "     • Export analysis results using the default filename ('Simple linear regression of $BIAS_REGRESSION_TOP3_FILE')." -ForegroundColor Gray
-    
-    Write-Host "     Condition-Specific Bias Analysis:" -ForegroundColor Blue
-    Write-Host "     • Correct Condition:" -ForegroundColor Gray
-    Write-Host "       - Repeat import and analysis for '$BIAS_REGRESSION_CORRECT_MRR_FILE'." -ForegroundColor Gray
-    Write-Host "       - Export analysis results using the default filename ('Simple linear regression of $BIAS_REGRESSION_CORRECT_MRR_FILE')." -ForegroundColor Gray
-    Write-Host "     • Random Condition:" -ForegroundColor Gray
-    Write-Host "       - Repeat import and analysis for '$BIAS_REGRESSION_RANDOM_MRR_FILE'." -ForegroundColor Gray
-    Write-Host "       - Export analysis results using the default filename ('Simple linear regression of $BIAS_REGRESSION_RANDOM_MRR_FILE')." -ForegroundColor Gray
+    Write-Host "   NOTE: Files use MeanRank (not MRR) per framework's documented bias methodology." -ForegroundColor Gray
+    Write-Host "   1. Create a new 'XY' data table: choose 'Numbers for X' and 'Enter and plot a single Y value', then click Create."
+    Write-Host "   2. Import '$BIAS_REP_01_FILE' with the following options:"
+    Write-Host "      'insert and maintain link', 'automatically update', and 'commas: separate adjacent columns'"
+    Write-Host "      (check the box for making these the default settings)."
+    Write-Host "        - Analyze Data → XY analyses → Simple linear regression." -ForegroundColor Gray
+    Write-Host "        - Include 'Test departure from linearity with runs test' and change significant digits to 6; check 'make default'." -ForegroundColor Gray
+    Write-Host "        - Export analysis results using the default filename ('Simple linear regression of BiasReg_01_Correct_K8.csv') to 'graphpad_exports/'." -ForegroundColor Gray
+    Write-Host "   3. Repeat for the remaining 7 'BiasReg_*' CSV files by creating a new 'XY' table each time"
+    Write-Host "      (the creation, import, analysis, and export tasks can each be done in bulk to speed up the process)."
     Write-Host ""
     
-    Write-Host "`nVALIDATION PRIORITY:" -ForegroundColor Magenta
+    Write-Host "VALIDATION PRIORITY:" -ForegroundColor Magenta
     Write-Host "PRIMARY: Focus on Steps 3.1-3.2 for methodologically sound validation" -ForegroundColor Yellow
     Write-Host "REFERENCE: Steps 3.3-3.6 provide comprehensive verification of all calculations" -ForegroundColor Yellow
     Write-Host ""
@@ -880,6 +972,7 @@ function Show-ValidationInstructions {
     Write-Host "• MRR, Top-1, Top-3 accuracy calculations and Wilcoxon p-values (±0.0001)" -ForegroundColor White
     Write-Host "• ANOVA F-statistics (±0.01) and eta-squared effect sizes (±0.01)" -ForegroundColor White
     Write-Host "• Linear regression slopes (±0.0001), R-values (±0.01), p-values (±0.001)" -ForegroundColor White
+    Write-Host ""
     Write-Host "Citation ready: 'Statistical calculations were validated against GraphPad Prism 10.6.1" -ForegroundColor Yellow
     Write-Host "using representative sampling of individual replications (8 of 24 replications," -ForegroundColor Yellow
     Write-Host "2 per experimental condition) and comprehensive dataset validation.'" -ForegroundColor Yellow
@@ -890,19 +983,21 @@ function Show-ValidationInstructions {
     Write-Host "Total replications: $($ExportStats.ReplicationCount)" -ForegroundColor White
     Write-Host "Total trials analyzed: $($ExportStats.TrialCount)" -ForegroundColor White
     Write-Host "Export files: 20+ total (8 individual + 1 spot-check + 6 K-specific + 3 ANOVA + 5+ Bias)" -ForegroundColor White
+    Write-Host ""
     
     $individualStats = $ExportStats.IndividualStats
     if ($individualStats) {
         Write-Host "Individual validation files:" -ForegroundColor White
         Write-Host "  Selected replications: $($individualStats.ExportedFiles.Count)" -ForegroundColor Gray
+        Write-Host ""
         Write-Host "  Export directory: $(Split-Path $individualStats.ExportDirectory -Leaf)" -ForegroundColor Gray
     }
     
     $kStats = $ExportStats.KSpecificStats
     if ($kStats) {
         Write-Host "K-specific validation counts:" -ForegroundColor White
-        Write-Host "  K=4: $($kStats.K4_MRR_Count) MRR, $($kStats.K4_Top1_Count) Top-1, $($kStats.K4_Top3_Count) Top-3" -ForegroundColor Gray
-        Write-Host "  K=10: $($kStats.K10_MRR_Count) MRR, $($kStats.K10_Top1_Count) Top-1, $($kStats.K10_Top3_Count) Top-3" -ForegroundColor Gray
+        Write-Host "  K=8: $($kStats.K8_MRR_Count) MRR, $($kStats.K8_Top1_Count) Top-1, $($kStats.K8_Top3_Count) Top-3" -ForegroundColor Gray
+        Write-Host "  K=12: $($kStats.K12_MRR_Count) MRR, $($kStats.K12_Top1_Count) Top-1, $($kStats.K12_Top3_Count) Top-3" -ForegroundColor Gray
     }
     
     $anovaStats = $ExportStats.ANOVAStats
@@ -1124,7 +1219,7 @@ function Export-IndividualReplicationsForManualValidation {
         $trialData = Get-TrialDataForReplication -TestStudyPath $TestStudyPath -ReplicationInfo $replication
         
         if ($trialData -and $trialData.Count -gt 0) {
-            # Use short sequential naming: Rep_01_Correct_K4.csv through Rep_08_Random_K10.csv
+            # Use short sequential naming: Rep_01_Correct_K8.csv through Rep_08_Random_K12.csv
             $filename = "Rep_{0:D2}_{1}.csv" -f $sequenceNum, $replication.Condition
             $filepath = Join-Path $IndividualRepsDir $filename
             $sequenceNum++
@@ -1157,7 +1252,7 @@ function Export-IndividualReplicationsForManualValidation {
     $metadataPath = Join-Path (Join-Path $GraphPadImportsDir "reference_data") "Selected_Replications_Metadata.csv"
     $exportedFiles | Export-Csv -Path $metadataPath -NoTypeInformation
     
-    Write-Host "✓ Individual replication exports completed (8 files)" -ForegroundColor Green
+    Write-Host "✓ Individual replication exports completed (8 files)`n" -ForegroundColor Green
     
     return @{
         ExportedFiles = $exportedFiles
@@ -1287,7 +1382,7 @@ function Export-SpotCheckSummaries {
     
     $enhancedReplications | Export-Csv -Path $summaryPath -NoTypeInformation
     
-    Write-Host "✓ Spot-check summaries completed ($($remainingReplications.Count) replications)" -ForegroundColor Green
+    Write-Host "✓ Spot-check summaries completed ($($remainingReplications.Count) replications)`n" -ForegroundColor Green
     
     return @{
         RemainingCount = $remainingReplications.Count
