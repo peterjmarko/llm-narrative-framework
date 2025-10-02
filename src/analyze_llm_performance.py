@@ -939,12 +939,15 @@ def main():
     summary_data = {
         # MRR
         'mean_mrr': mrr_analysis.get('mean'),
+        'median_mrr': mrr_analysis.get('median'),
         'mrr_p': mrr_analysis.get('wilcoxon_signed_rank_p'),
         # Top-1 Accuracy
         'mean_top_1_acc': top_1_analysis.get('mean'),
+        'median_top_1_acc': top_1_analysis.get('median'),
         'top_1_acc_p': top_1_analysis.get('wilcoxon_signed_rank_p'),
         # Top-K Accuracy
         f'mean_top_{args.top_k_acc}_acc': top_k_analysis.get('mean'),
+        f'median_top_{args.top_k_acc}_acc': top_k_analysis.get('median'),
         f'top_{args.top_k_acc}_acc_p': top_k_analysis.get('wilcoxon_signed_rank_p'),
         # Lift vs. Chance Metrics
         'mean_mrr_lift': mrr_lift,

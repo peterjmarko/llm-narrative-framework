@@ -670,7 +670,7 @@ All metrics are compared against theoretical chance levels using Wilcoxon signed
 
 **Metric Choice - Rank vs MRR**:
 
-The framework uses `mean_rank_of_correct_id` (not MRR) for positional bias regression analysis:
+The framework uses `mean_rank_of_correct_id` (not MRR) for positional bias detection via linear regression:
 
 - **Linear scale**: Rank values (1, 2, 3, ..., k) are linearly spaced, satisfying linear regression assumptions
 - **Uniform sensitivity**: A 1-rank shift is equally detectable at all performance levels (rank 1→2 has same weight as rank 10→11)

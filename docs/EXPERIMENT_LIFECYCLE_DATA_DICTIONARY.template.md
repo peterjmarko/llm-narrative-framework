@@ -85,10 +85,13 @@ bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err
 ```json
 {
   "mean_mrr": 0.1234,
+  "median_mrr": 0.1156,
   "mrr_p": 0.0567,
   "mean_top_1_acc": 0.0890,
+  "median_top_1_acc": 0.0823,
   "top_1_acc_p": 0.1234,
   "mean_top_3_acc": 0.2345,
+  "median_top_3_acc": 0.2201,
   "top_3_acc_p": 0.0123,
   "mean_mrr_lift": 1.456,
   "mean_top_1_acc_lift": 1.234,
@@ -110,7 +113,7 @@ bias_slope,bias_intercept,bias_r_value,bias_p_value,bias_std_err
 
 **Key Metric Explanations:**
 - **Lift Metrics**: Performance relative to chance (e.g., `mean_mrr_lift = actual_mrr / chance_mrr`)
-- **Positional Bias**: Linear regression analysis of performance degradation over trial sequence
+- **Positional Bias**: Linear trend analysis detecting systematic position preferences over trial sequence
 - **Bias Analysis**: Standard deviation of top-1 predictions across positions and true vs. false match scoring differences
 
 **Statistical Assumptions and Chance Level Calculations:**
@@ -314,10 +317,13 @@ csv_header_order = run_directory,replication,n_valid_responses,model,mapping_str
 
 #### Primary Performance Metrics
 - `mean_mrr` - Mean Reciprocal Rank across all trials (float, 0.0-1.0)
+- `median_mrr` - Median Reciprocal Rank across all trials (float, 0.0-1.0)
 - `mrr_p` - P-value for MRR Wilcoxon signed-rank test against chance
 - `mean_top_1_acc` - Mean Top-1 accuracy (exact matches, float 0.0-1.0)
+- `median_top_1_acc` - Median Top-1 accuracy (float, 0.0-1.0)
 - `top_1_acc_p` - P-value for Top-1 accuracy test
 - `mean_top_3_acc` - Mean Top-3 accuracy (float 0.0-1.0)
+- `median_top_3_acc` - Median Top-3 accuracy (float, 0.0-1.0)
 - `top_3_acc_p` - P-value for Top-3 accuracy test
 
 #### Enhanced Performance Metrics (Lift Analysis)
@@ -326,7 +332,7 @@ csv_header_order = run_directory,replication,n_valid_responses,model,mapping_str
 - `mean_top_3_acc_lift` - Lift calculation: actual_top3 / chance_top3
 
 #### Positional and Bias Analysis
-- `bias_slope` - Linear regression slope for positional bias (performance degradation over trials)
+- `bias_slope` - Linear trend slope for positional bias detection (systematic position drift over trials)
 - `bias_intercept` - Linear regression intercept
 - `bias_r_value` - Correlation coefficient for bias analysis
 - `bias_p_value` - P-value for bias significance test

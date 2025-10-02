@@ -32,7 +32,7 @@
     - Top-1 accuracy calculations with K-specific validation
     - Top-3 accuracy calculations with K-specific validation 
     - Wilcoxon signed-rank test p-values for all metrics
-    - Bias regression analysis (slope, R-value)
+    - Positional bias detection (linear trend analysis)
     
     Phase B (Study-Level): Validates standard statistical analyses (Two-Way ANOVA, post-hoc tests)
     
@@ -611,11 +611,11 @@ function Export-BiasRegressionDataForGraphPad {
     }
     
     if ($allBiasData.Count -eq 0) {
-        Write-Host "  ! No trial-by-trial data found for bias regression analysis" -ForegroundColor Yellow
+        Write-Host "  ! No trial-by-trial data found for positional bias analysis" -ForegroundColor Yellow
         return $null
     }
     
-    # Create sequential trial numbering for regression analysis
+    # Create sequential trial numbering for positional bias analysis
     $trialSequence = 1
     $allBiasDataWithSeq = @()
     foreach ($record in $allBiasData) {
@@ -635,7 +635,7 @@ function Export-BiasRegressionDataForGraphPad {
     }
     $allBiasData = $allBiasDataWithSeq
     
-    # Generate purpose-built two-column files for GraphPad XY regression
+    # Generate purpose-built two-column files for GraphPad linear trend analysis
     # These are REFERENCE files (pooled across all replications) - saved to subfolder
     
     $BiasReferenceDir = Join-Path $GraphPadImportsDir "bias_reference"
@@ -644,8 +644,8 @@ function Export-BiasRegressionDataForGraphPad {
     # Overall regression: TrialSeq vs MeanRank (rank-based per methodology)
     $overallRankData = $allBiasData | Select-Object @{N='TrialSeq';E={[int]$_.TrialSeq}}, @{N='MeanRank';E={[double]$_.MeanRank}}
     $overallRankExport = Join-Path $BiasReferenceDir $BIAS_REGRESSION_MRR_FILE
-    $overallMRRData | Export-Csv -Path $overallMRRExport -NoTypeInformation
-    Write-Host "`n  Generated: bias_reference/$BIAS_REGRESSION_MRR_FILE (TrialSeq vs MRR, $($overallMRRData.Count) points)"
+    $overallRankData | Export-Csv -Path $overallRankExport -NoTypeInformation
+    Write-Host "`n  Generated: bias_reference/$BIAS_REGRESSION_MRR_FILE (TrialSeq vs MeanRank, $($overallRankData.Count) points)"
     
     # Overall regression: TrialSeq vs Top1Accuracy
     $overallTop1Data = $allBiasData | Select-Object @{N='TrialSeq';E={$_.TrialSeq}}, @{N='Top1Accuracy';E={$_.Top1Accuracy}}
@@ -684,7 +684,7 @@ function Export-BiasRegressionDataForGraphPad {
     # Also generate per-replication bias files for proper validation (matching Step 1 methodology)
     $perRepStats = Export-IndividualReplicationBiasFiles -AllBiasData $allBiasData
     
-    Write-Host "✓ Bias regression validation exports completed`n" -ForegroundColor Green
+    Write-Host "✓ Positional bias detection exports completed`n" -ForegroundColor Green
     
     return @{
         TotalTrials = $allBiasData.Count
@@ -697,7 +697,7 @@ function Export-BiasRegressionDataForGraphPad {
 function Export-IndividualReplicationBiasFiles {
     param($AllBiasData)
     
-    Write-Host "  Generating per-replication bias regression files (matching Step 1 methodology)..." -ForegroundColor Cyan
+    Write-Host "  Generating per-replication positional bias files (matching Step 1 methodology)..." -ForegroundColor Cyan
     
     # Create directory for individual bias files
     $BiasRepsDir = Join-Path $GraphPadImportsDir "bias_replications"
@@ -748,7 +748,7 @@ function Export-IndividualReplicationBiasFiles {
         $repData = $repGroup.Group
         $firstRecord = $repData[0]
         
-        # Reset trial sequence for each replication (0-indexed for regression)
+        # Reset trial sequence for each replication (0-indexed for linear trend analysis)
         # CRITICAL: Sort by Trial to match framework's chronological processing
         # Uses MeanRank (not MRR) per documented methodology for bias detection
         $trialSeq = 0
@@ -941,8 +941,8 @@ function Show-ValidationInstructions {
     Write-Host "     Top-3 Accuracy ANOVA Analysis with Effect Size:" -ForegroundColor Blue
     Write-Host "     • Repeat for '$ANOVA_TOP3_FILE'." -ForegroundColor Gray
     
-    # Bias Regression Analysis Instructions
-    Write-Host "`nGraphPad Step 3.6 - Individual Replication Bias Regression Validation (PRIMARY):" -ForegroundColor Yellow
+    # Positional Bias Detection Instructions
+    Write-Host "`nGraphPad Step 3.6 - Individual Replication Positional Bias Detection (PRIMARY):" -ForegroundColor Yellow
     Write-Host "   Process 8 files from the 'graphpad_imports/bias_replications/' folder:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "   NOTE: Files use MeanRank (not MRR) per framework's documented bias methodology." -ForegroundColor Gray
@@ -971,7 +971,7 @@ function Show-ValidationInstructions {
     Write-Host "• Individual replication validation (methodologically sound sampling)" -ForegroundColor White
     Write-Host "• MRR, Top-1, Top-3 accuracy calculations and Wilcoxon p-values (±0.0001)" -ForegroundColor White
     Write-Host "• ANOVA F-statistics (±0.01) and eta-squared effect sizes (±0.01)" -ForegroundColor White
-    Write-Host "• Linear regression slopes (±0.0001), R-values (±0.01), p-values (±0.001)" -ForegroundColor White
+    Write-Host "• Positional bias detection slopes (±0.0001), R-values (±0.01)" -ForegroundColor White
     Write-Host ""
     Write-Host "Citation ready: 'Statistical calculations were validated against GraphPad Prism 10.6.1" -ForegroundColor Yellow
     Write-Host "using representative sampling of individual replications (8 of 24 replications," -ForegroundColor Yellow
@@ -1405,7 +1405,7 @@ try {
         Write-Host "  • Top-1 accuracy calculations and Wilcoxon tests"
         Write-Host "  • Top-3 accuracy calculations and Wilcoxon tests"
         Write-Host "  • K-specific validation datasets for comprehensive coverage"
-        Write-Host "  • Bias regression analysis (slope, R-value)"
+        Write-Host "  • Positional bias detection (linear trend analysis)"
         Write-Host "  • Effect size calculations (Cohen's r)"
         Write-Host ""
         Write-Host "Phase B: Standard statistical analyses validation against GraphPad"
@@ -1628,7 +1628,7 @@ if ($ExportOnly) {
     Write-Host "Import files available in: $GraphPadImportsDir" -ForegroundColor Cyan
     Write-Host "6 K-specific accuracy validation files" -ForegroundColor Cyan
     Write-Host "ANOVA with effect size validation" -ForegroundColor Cyan
-    Write-Host "Bias regression analysis validation" -ForegroundColor Cyan
+    Write-Host "Positional bias detection validation" -ForegroundColor Cyan
 } else {
     Write-Host "Ready for GraphPad Prism validation - follow instructions above" -ForegroundColor Yellow
     Write-Host ""
