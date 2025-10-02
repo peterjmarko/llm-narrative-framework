@@ -1,5 +1,37 @@
 # Changelog
 
+## 12.2.0 (2025-10-02)
+
+### Bump
+
+- **version 12.1.0 → 12.2.0**
+
+### Features
+
+- **add median metrics and complete validation suite formatting**
+  This commit completes the statistical validation suite with three major improvements:
+  
+  1. Framework Enhancement - Median Metrics:
+     - Added median_mrr, median_top_1_acc, and median_top_3_acc to analyze_llm_performance.py
+     - Non-breaking change that preserves backward compatibility
+     - Updated data dictionary with complete median field documentation
+  
+  2. Bug Fix - Bias Export:
+     - Fixed variable mismatch in generate_graphpad_imports.ps1
+     - Corrected overallMRRData/overallRankData confusion in Export-IndividualReplicationBiasFiles
+     - Enables proper generation of BiasReg_Rank_*.csv files
+  
+  3. Validation Suite Formatting:
+     - Applied consistent formatting across all 6 validation steps in validate_graphpad_results.ps1
+     - Standardized use of checkmarks/X symbols with conditional coloring (green/red)
+     - Added explanatory Notes under step headers
+     - Cyan coloring for section headers, default color for validation details
+     - Step 1 now validates N, Median, and P-value (8/8 passing)
+     - Steps 5 and 6 restructured with improved hierarchical display
+  
+  All validation steps now follow a unified presentation pattern, improving readability and
+  consistency for academic publication readiness.
+
 ## 12.1.0 (2025-10-01)
 
 ### Bump
