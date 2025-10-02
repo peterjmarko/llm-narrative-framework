@@ -1,5 +1,52 @@
 # Changelog
 
+## 12.1.0 (2025-10-01)
+
+### Bump
+
+- **version 12.0.0 → 12.1.0**
+
+### Features
+
+- **document rank-based approach for bias detection and update validation to use mean_rank**
+  POSITION BIAS METRIC ANALYSIS:
+  - Academic literature review: No consensus on MRR vs Rank for positional choice bias detection
+  - Purpose clarification: Framework tests LLM position bias (systematic preference for certain ranked positions), analogous to human user behavior in search results
+  - Methodological assessment: Rank is statistically appropriate (linear scale, uniform sensitivity, interpretable slopes, matches bias mechanism)
+  - Issue: Framework's choice lacked documentation despite being technically sound
+  
+  DOCUMENTATION ADDITIONS:
+  Framework Manual - Added "Performance Metrics and Bias Analysis" section:
+  - Purpose: Detecting LLM position bias in choice behavior (not performance degradation)
+  - Rank justification: Linear scale for regression, uniform sensitivity across performance levels, direct interpretability (ranks/trial), matches bias mechanism
+  - MRR limitation: Non-linear compression (1.00.50.330.25) reduces sensitivity at lower performance
+  
+  Python source (analyze_llm_performance.py):
+  - Enhanced calculate_positional_bias() docstring with methodology explanation
+  
+  Data Dictionary:
+  - Added "Positional Bias Methodology" section to bias column definitions
+  
+  VALIDATION IMPLEMENTATION UPDATES:
+  Stage 2 (generate_graphpad_imports.ps1):
+  - Modified Export-IndividualReplicationBiasFiles to export MeanRank column instead of MRR
+  - Updated filename pattern: BiasReg_*.csv  BiasReg_Rank_*.csv (8 files)
+  - Updated $BIAS_REP_01_FILE constant: BiasReg_01_Correct_K8.csv  BiasReg_Rank_01_Correct_K8.csv
+  - Added methodology note to GraphPad instructions
+  - Updated console output to indicate "MeanRank-based" files
+  
+  Stage 4 (validate_graphpad_results.ps1):
+  - Added column validation in Validate-BiasRegression to verify MeanRank presence
+  - Warning message if incorrect column detected with methodology reference
+  - Validation now skips non-compliant files with clear error messaging
+  
+  K-SPECIFIC WILCOXON VALIDATION COMPLETION:
+  - Fixed legacy K=4/K=10  K=8/K=12 references throughout
+  - Step 4: K-specific Wilcoxon tests (18/18 checks passed)
+  - Step 5: ANOVA validation (21/21 checks passed)
+  - Step 6: Refactored to per-replication analysis with rank-based data (ready for GraphPad re-processing)
+  - Moved pooled regression reference files to bias_reference/ subfolder
+
 ## 12.0.0 (2025-10-01)
 
 ### Bump
