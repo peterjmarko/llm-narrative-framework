@@ -342,7 +342,7 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         
         # --- Act ---
         # The metric_name contains "rank", which should trigger the 'less' hypothesis.
-        results = analyze_llm_performance.analyze_metric_distribution(ranks, chance_level, "mean_rank")
+        results = analyze_llm_performance.analyze_metric_distribution(ranks, chance_level, "Mean Rank of Correct ID")
         
         # --- Assert ---
         # If alternative='less' was used correctly, the p-value should be very small.
@@ -398,6 +398,32 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         # Edge case: negative k should return 0.0
         self.assertEqual(analyze_llm_performance.calculate_mean_rank_chance(-1), 0.0)
 
+    def test_calculate_mrr_chance_edge_cases(self):
+        """Test MRR chance calculation with edge case inputs."""
+        # k=0 should return 0.0
+        self.assertEqual(analyze_llm_performance.calculate_mrr_chance(0), 0.0)
+        
+        # negative k should return 0.0
+        self.assertEqual(analyze_llm_performance.calculate_mrr_chance(-5), 0.0)
+        
+        # k=1 should return 1.0 (only one position, reciprocal rank = 1/1)
+        self.assertEqual(analyze_llm_performance.calculate_mrr_chance(1), 1.0)
+
+    def test_calculate_top_k_accuracy_chance_edge_cases(self):
+        """Test Top-K accuracy chance calculation with edge case inputs."""
+        # K=0, k=5 should return 0.0
+        self.assertEqual(analyze_llm_performance.calculate_top_k_accuracy_chance(0, 5), 0.0)
+        
+        # K=3, k=0 should return 0.0
+        self.assertEqual(analyze_llm_performance.calculate_top_k_accuracy_chance(3, 0), 0.0)
+        
+        # K > k: should cap at k/k = 1.0
+        self.assertEqual(analyze_llm_performance.calculate_top_k_accuracy_chance(10, 5), 1.0)
+        
+        # negative values should return 0.0
+        self.assertEqual(analyze_llm_performance.calculate_top_k_accuracy_chance(-1, 5), 0.0)
+        self.assertEqual(analyze_llm_performance.calculate_top_k_accuracy_chance(3, -5), 0.0)
+
     # --- Group 3: File Parsing Tests ---
 
     def test_read_score_matrices_markdown_format(self):
@@ -452,6 +478,53 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         self.assertEqual(delim, ',')
         self.assertEqual(len(mappings), 2)
         self.assertEqual(mappings[0], [1, 2, 3])
+
+    def test_read_mappings_auto_detects_delimiter_from_header(self):
+        """Test lines 313-315: Verify delimiter detection from header structure."""
+        # Test tab-delimited header detection
+        tab_content = "Header1\tHeader2\tHeader3\n1\t2\t3\n3\t1\t2\n"
+        (self.analysis_dir / "tab_mappings.txt").write_text(tab_content)
+        
+        mappings, k, delim = analyze_llm_performance.read_mappings_and_deduce_k(
+            self.analysis_dir / "tab_mappings.txt"
+        )
+        
+        self.assertEqual(k, 3)
+        self.assertEqual(delim, '\t')
+        self.assertEqual(len(mappings), 2)
+        
+        # Test comma-delimited header detection
+        comma_content = "Header1,Header2,Header3\n1,2,3\n3,1,2\n"
+        (self.analysis_dir / "comma_mappings.txt").write_text(comma_content)
+        
+        mappings, k, delim = analyze_llm_performance.read_mappings_and_deduce_k(
+            self.analysis_dir / "comma_mappings.txt"
+        )
+        
+        self.assertEqual(k, 3)
+        self.assertEqual(delim, ',')
+        self.assertEqual(len(mappings), 2)
+        
+    def test_read_mappings_falls_back_to_whitespace_when_detection_fails(self):
+        """Test lines 406-412: Verify fallback to whitespace when delimiter auto-detection fails."""
+        # Ambiguous content that won't trigger tab or comma detection
+        ambiguous_content = "1 2 3\n3 1 2\n"
+        (self.analysis_dir / "space_mappings.txt").write_text(ambiguous_content)
+        
+        with patch('builtins.print') as mock_print:
+            mappings, k, delim = analyze_llm_performance.read_mappings_and_deduce_k(
+                self.analysis_dir / "space_mappings.txt"
+            )
+            
+            # Should fall back to None (whitespace splitting)
+            self.assertIsNone(delim)
+            self.assertEqual(k, 3)
+            self.assertEqual(len(mappings), 2)
+            
+            # Verify the fallback message was printed
+            print_calls = [str(call) for call in mock_print.call_args_list]
+            fallback_message_found = any("Could not auto-detect comma or tab" in call for call in print_calls)
+            self.assertTrue(fallback_message_found, "Expected fallback message not found")
 
     def test_read_mappings_and_deduce_k_skips_non_permutations(self):
         """Verify the mapping parser skips lines that are not valid permutations."""
@@ -702,17 +775,10 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
         metric_values = [0.2, 0.3, 0.4] 
         
         with patch('src.analyze_llm_performance.wilcoxon', side_effect=ValueError("Test Wilcoxon ValueError")), \
-             patch('builtins.print') as mock_print:
+             patch('src.analyze_llm_performance.logging.warning') as mock_log_warning:
             result = analyze_llm_performance.analyze_metric_distribution(metric_values, 0.1, "test_metric")
             self.assertIsNotNone(result)
-            # Manually check print calls for the error message
-            error_found = False
-            for call_args, _ in mock_print.call_args_list:
-                if call_args and isinstance(call_args[0], str) and "Error during Wilcoxon test for test_metric" in call_args[0]:
-                    self.assertRegex(call_args[0], r"Error during Wilcoxon test for test_metric \(data: .*\): Test Wilcoxon ValueError")
-                    error_found = True
-                    break
-            self.assertTrue(error_found, "Expected Wilcoxon error message not found in print calls.")
+            mock_log_warning.assert_called_once_with("Wilcoxon test failed for test_metric: Test Wilcoxon ValueError")
             self.assertIsNone(result['wilcoxon_signed_rank_p']) # Should be None if the Wilcoxon test itself failed
 
     @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -1085,7 +1151,7 @@ class TestAnalyzeLLMPerformance(unittest.TestCase):
             analyze_llm_performance.main()
             
             # Verify the enhanced error logging was called
-            mock_log_warning.assert_called_with("Wilcoxon test failed for mean rank analysis: Test wilcoxon error")
+            mock_log_warning.assert_called_with("Wilcoxon test failed for Mean Rank of Correct ID: Test wilcoxon error")
             
             # The script should complete successfully, but the p-value will be None
             metrics_file = self.analysis_dir / "replication_metrics.json"

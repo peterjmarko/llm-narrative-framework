@@ -232,7 +232,7 @@ def analyze_metric_distribution(metric_values, chance_level, metric_name):
                     base_return['wilcoxon_signed_rank_p_2tailed'] = p_val_2t  # Always available
                     
             except ValueError as e: 
-                print(f"Error during Wilcoxon test for {metric_name} (data: {differences[:5]}...): {e}")
+                logging.warning(f"Wilcoxon test failed for {metric_name}: {e}")
                 if len(np.unique(differences)) == 1 and differences.size > 0 and differences[0] != 0:
                     print(f"  Wilcoxon edge case: all non-zero differences are '{differences[0]}'.")
                     if differences[0] > 0: base_return['wilcoxon_signed_rank_p'] = 0.0 if len(differences) >= 6 else 0.5 # Min N for significance in Wilcoxon often ~6
@@ -252,7 +252,7 @@ def calculate_top_k_accuracy_chance(K, k_val):
     Calculate expected top-K accuracy under null hypothesis.
     For uniform random selection: P(correct in top K) = min(K, k) / k
     """
-    if k_val <= 0: return 0.0
+    if k_val <= 0 or K <= 0: return 0.0
     return min(float(K), float(k_val)) / float(k_val)
 
 def calculate_mean_rank_chance(k_val):

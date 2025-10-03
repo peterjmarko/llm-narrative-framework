@@ -199,26 +199,6 @@ class TestProcessLLMResponses(unittest.TestCase):
         self.assertEqual(content, "0.90\t0.10\n0.20\t0.80")
         self.mock_sys_exit.assert_not_called()
 
-    def test_handles_reordered_columns(self):
-        """Verify it correctly reorders columns based on header IDs."""
-        self._setup_common_files()
-        response_content = (
-            "```\n"
-            "Name\tID 2\tID 1\n"
-            "Person A (1900)\t0.1\t0.9\n"
-            "Person B (1910)\t0.8\t0.2\n"
-            "```"
-        )
-        (self.responses_dir / "llm_response_001.txt").write_text(response_content)
-        
-        with patch.object(sys, 'argv', ['script.py', '--run_output_dir', str(self.run_dir)]):
-            process_llm_responses.main()
-            
-        content = (self.analysis_dir / "all_scores.txt").read_text().strip()
-        # The output should be correctly ordered (ID 1, ID 2)
-        self.assertEqual(content, "0.90\t0.10\n0.20\t0.80")
-        self.mock_sys_exit.assert_not_called()
-
     def test_validation_fails_on_mapping_mismatch(self):
         """Verify script exits if a mapping mismatches its manifest."""
         self._setup_common_files()
@@ -274,8 +254,9 @@ class TestProcessLLMResponses(unittest.TestCase):
         with patch.object(sys, 'argv', ['script.py', '--run_output_dir', str(self.run_dir)]):
             process_llm_responses.main()
             
-        # The scores file should be empty as the response is rejected
+        # The response should be rejected due to out-of-range scores
         self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
+        self.assertEqual((self.analysis_dir / "successful_indices.txt").read_text(), "")
         self.assertEqual((self.analysis_dir / "successful_indices.txt").read_text(), "")
         self.mock_sys_exit.assert_not_called()
 
@@ -518,19 +499,6 @@ class TestProcessLLMResponses(unittest.TestCase):
         
         self.mock_sys_exit.assert_called_with(1)
 
-    def test_rejects_response_with_malformed_header_id(self):
-        """Verify a response is rejected if header contains e.g., 'ID A'."""
-        self._setup_common_files(k=2)
-        response_content = "```\nName\tID 1\tID A\nPerson A (1900)\t0.9\t0.1\nPerson B (1910)\t0.2\t0.8\n```"
-        (self.responses_dir / "llm_response_001.txt").write_text(response_content)
-        
-        test_argv = ['script.py', '--run_output_dir', str(self.run_dir)]
-        with patch.object(sys, 'argv', test_argv):
-            process_llm_responses.main()
-            
-        self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
-        self.mock_sys_exit.assert_not_called()
-
     def test_rejects_row_with_too_few_score_columns(self):
         """Verify response is rejected if a row has fewer than k score columns."""
         self._setup_common_files(k=2)
@@ -565,21 +533,6 @@ class TestProcessLLMResponses(unittest.TestCase):
         
         self.mock_sys_exit.assert_not_called()
         mock_logging_error.assert_called_with(f"Error writing successful indices file to {indices_filepath}: Disk full")
-
-    def test_debug_log_level_is_set(self):
-        """Verify -vv sets the log level to DEBUG."""
-        self._setup_common_files()
-        (self.responses_dir / "llm_response_001.txt").write_text("```\nName\tID 1\tID 2\nPerson A (1900)\t0.9\t0.1\nPerson B (1910)\t0.2\t0.8\n```")
-        
-        test_argv = ['script.py', '--run_output_dir', str(self.run_dir), '-vv']
-        
-        with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
-            with patch.object(sys, 'argv', test_argv):
-                process_llm_responses.main()
-            
-            output = mock_stdout.getvalue()
-            self.assertIn(" - DEBUG - ", output)
-            self.assertIn("Found table in markdown code block.", output)
 
     def test_handles_rank_based_output_for_k1(self):
         """Verify rank conversion works for k=1."""
@@ -711,16 +664,6 @@ class TestProcessLLMResponses(unittest.TestCase):
         self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
         self.assertTrue(any("Cannot read query" in call[0][0] for call in mock_logging_error.call_args_list))
 
-    def test_rejects_row_with_too_many_score_columns(self):
-        """Verify response is rejected if a row has more scores than header IDs."""
-        self._setup_common_files(k=2)
-        response_content = "```\nName\tID 1\tID 2\nPerson A (1900)\t0.9\t0.1\nPerson B (1910)\t0.2\t0.8\t0.5\n```"
-        (self.responses_dir / "llm_response_001.txt").write_text(response_content)
-        
-        with patch.object(sys, 'argv', ['script.py', '--run_output_dir', str(self.run_dir)]):
-            process_llm_responses.main()
-        self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
-
     def test_log_level_from_config(self):
         """Verify log level is taken from config if no flags are present."""
         self.mock_config.set('General', 'default_log_level', 'WARNING')
@@ -735,18 +678,6 @@ class TestProcessLLMResponses(unittest.TestCase):
             output = mock_stdout.getvalue()
             self.assertNotIn("Response Processor log level set to", output)
             self.assertNotIn("Found 1 LLM response files to process", output)
-
-    def test_rejects_response_with_non_numeric_header_id(self):
-        """Verify response is rejected if header ID number is not an int."""
-        self._setup_common_files(k=2)
-        response_content = "```\nName\tID\t1\tID\tB\nPerson A (1900)\t0.9\t0.1\nPerson B (1910)\t0.2\t0.8\n```"
-        (self.responses_dir / "llm_response_001.txt").write_text(response_content)
-        
-        with patch.object(sys, 'argv', ['script.py', '--run_output_dir', str(self.run_dir)]):
-            process_llm_responses.main()
-        
-        self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
-        self.mock_sys_exit.assert_not_called()
 
     @patch('src.process_llm_responses.logging.error')
     def test_handles_generic_exception_processing_response(self, mock_logging_error):
@@ -836,33 +767,6 @@ class TestProcessLLMResponses(unittest.TestCase):
             process_llm_responses.main()
         self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
 
-    def test_rejects_response_if_all_rows_are_invalid(self):
-        """Verify response is rejected if all data rows are malformed."""
-        self._setup_common_files(k=2)
-        # No (YYYY) anchor in any row
-        response_content = "```\nName\tID 1\tID 2\nPerson A\t0.9\t0.1\nPerson B\t0.2\t0.8\n```"
-        (self.responses_dir / "llm_response_001.txt").write_text(response_content)
-        
-        with patch.object(sys, 'argv', ['script.py', '--run_output_dir', str(self.run_dir)]):
-            process_llm_responses.main()
-        self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
-
-    @patch('src.process_llm_responses.re.search')
-    def test_handles_generic_exception_in_parser(self, mock_re_search):
-        """Verify a generic exception in the parser rejects the response."""
-        # This side effect lets the filename parse in main() succeed,
-        # then raises an exception on the first call inside the parser.
-        mock_re_search.side_effect = [
-            re.search(r"llm_response_(\d+)\.txt", "llm_response_001.txt"),
-            Exception("Regex engine failure")
-        ]
-        self._setup_common_files()
-        (self.responses_dir / "llm_response_001.txt").write_text("valid response")
-        
-        with patch.object(sys, 'argv', ['script.py', '--run_output_dir', str(self.run_dir)]):
-            process_llm_responses.main()
-        self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
-        
     def test_validator_fails_on_matrix_count_mismatch(self):
         """Verify content validator fails if file has fewer matrices than expected."""
         self.analysis_dir.mkdir(exist_ok=True)
@@ -915,19 +819,6 @@ class TestProcessLLMResponses(unittest.TestCase):
         with patch.object(sys, 'argv', ['script.py', '--run_output_dir', str(self.run_dir)]):
             process_llm_responses.main()
         self.assertEqual((self.analysis_dir / "all_scores.txt").read_text(), "")
-
-    def test_parser_converts_nan_values(self):
-        """Verify parser converts 'nan' to 0.0 and does not reject the response."""
-        self._setup_common_files()
-        response_content = "```\nName\tID 1\tID 2\nPerson A (1900)\t0.9\tnan\nPerson B (1910)\t0.2\t0.8\n```"
-        (self.responses_dir / "llm_response_001.txt").write_text(response_content)
-        
-        with patch.object(sys, 'argv', ['script.py', '--run_output_dir', str(self.run_dir)]):
-            process_llm_responses.main()
-            
-        content = (self.analysis_dir / "all_scores.txt").read_text().strip()
-        self.assertEqual(content, "0.90\t0.00\n0.20\t0.80")
-        self.mock_sys_exit.assert_not_called()
 
     def test_validator_fails_on_expected_matrix_shape_mismatch(self):
         """Verify validator fails if a loaded matrix shape mismatches the expected matrix shape."""

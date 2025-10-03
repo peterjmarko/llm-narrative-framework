@@ -248,8 +248,6 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
                 last_k_parts = parts[-k_value:]
                 try:
                     scores = [float(part) for part in last_k_parts]
-                    # Clamp scores to [0.0, 1.0] range
-                    scores = [max(0.0, min(1.0, score)) for score in scores]
                     valid_rows.append(scores)
                 except ValueError:
                     break  # Non-numeric data in last k positions
@@ -260,7 +258,15 @@ def parse_llm_response_table_to_matrix(response_text, k_value, list_a_names_orde
                 
                 # Convert ranks to scores if needed
                 if is_rank_based:
-                    score_matrix = (k_value + 1 - score_matrix) / k_value
+                    if k_value == 1:
+                        score_matrix = np.ones((1, 1))  # Single rank maps to 1.0
+                    else:
+                        score_matrix = (k_value - score_matrix) / (k_value - 1)
+                else:
+                    # Reject if any score is out of [0, 1] range
+                    if np.any((score_matrix < 0.0) | (score_matrix > 1.0)):
+                        logging.error(f"Score out of range [0, 1] detected")
+                        return np.full((k_value, k_value), 0.0), 1, True
 
                 logging.debug(f"Successfully parsed {k_value}x{k_value} matrix from lines {start_idx+1}-{start_idx+k_value}")
                 return score_matrix, warning_count, is_rejected
