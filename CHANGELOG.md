@@ -1,5 +1,53 @@
 # Changelog
 
+## 12.2.3 (2025-10-03)
+
+### Bump
+
+- **version 12.2.2 → 12.2.3**
+
+### Documentation
+
+- **restructure Testing Guide with comprehensive 4-pillar architecture**
+  Completely restructure TESTING_GUIDE.template.md from 3-section to 8-section
+  architecture for improved clarity and usability.
+  
+  NEW SECTIONS:
+  - Test Suite Architecture: Explains 4 testing pillars, layers (2-5), modes
+    (Default/Bypass/Interactive/Automated), and sandbox architecture
+  - Typical Testing Sequence: Practical 7-stage workflow with dependencies,
+    expected outcomes, and troubleshooting guide
+  - Unified Test Status Matrix: Consolidates 3 previous tables into single
+    comprehensive matrix with 70+ tests
+  
+  EXPANDED SECTIONS:
+  - Unit Testing: Added detailed subsections for Data Preparation Pipeline
+    (10 subsections) and Experiment & Study Lifecycle (7 subsections) with
+    coverage percentages and test descriptions for each module
+  - Integration Testing: Reorganized by layers (2-5) with detailed descriptions
+    of Default/Bypass/Interactive modes for each layer
+  
+  REORGANIZED SECTIONS:
+  - Algorithm Validation: Renamed from "Core Algorithm Validation", maintains
+    3 algorithms (Personality Assembly, Qualification & Selection, Query
+    Generation & Randomization)
+  - Statistical Analysis & Reporting Validation: Extracted to standalone
+    top-level section, updated to show all 4 stages COMPLETE
+  
+  IMPROVEMENTS:
+  - Testing Philosophy updated to reflect 4 pillars (was 3)
+  - Clear hierarchical structure matching actual testing workflow
+  - Educational guided tour emphasis throughout
+  - Better organization separating algorithm validation from statistical
+    validation
+  - Consolidated status information with summary statistics
+  - All GraphPad validation stages marked COMPLETE
+  - 63 tests (90%) complete, 12 tests (17%) planned for post-publication
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 12.2.2 (2025-10-03)
 
 ### Bump
