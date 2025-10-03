@@ -629,7 +629,7 @@ def main():
             loop_count = 0
             repair_cycle_count = 0
             max_repair_cycles = 3
-            while loop_count < args.max_loops:
+            while True:
                 action_taken = False
                 success = True
 
@@ -638,6 +638,10 @@ def main():
                 # Only count loops when we repeat the same state (indicating a problem)
                 if state_name == previous_state:
                     loop_count += 1
+                    if loop_count >= args.max_loops:
+                        print(f"{C_RED}\n--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
+                        pipeline_successful = False
+                        break
                 else:
                     loop_count = 0  # Reset counter for new state
                 
@@ -693,11 +697,7 @@ def main():
                         print(f"{C_RED}\n--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
                         pipeline_successful = False
                         break
-
-            if loop_count >= args.max_loops:
-                print(f"{C_RED}\n--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
-                pipeline_successful = False
-            
+          
             if pipeline_successful:
                 _run_finalization(final_output_dir, script_paths, colors)
                 relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)

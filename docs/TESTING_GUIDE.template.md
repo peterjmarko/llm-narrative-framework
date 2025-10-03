@@ -408,7 +408,7 @@ Module                                  Cov. (%)        Status & Justification
 **MULTI-EXPERIMENT MANAGEMENT**
 **Primary Orchestrator**
 
-**`src/experiment_manager.py`**             `97%`           COMPLETE. Target exceeded. Comprehensive unit tests validate the core state
+**`src/experiment_manager.py`**             `94%`           COMPLETE. Target exceeded. Comprehensive unit tests validate the core state
                                                         machine, all helper functions, argument parsing, and critical
                                                         failure paths. The end-to-end `new`/`audit`/`fix` workflows are
                                                         validated by the Layer 4 integration test.
@@ -434,7 +434,7 @@ Module                                  Cov. (%)        Status & Justification
 **SINGLE REPLICATION PIPELINE**
 **Primary Orchestrator**
 
-**`src/replication_manager.py`**            `95%`           COMPLETE. The script was refactored for testability by
+**`src/replication_manager.py`**            `91%`           COMPLETE. The script was refactored for testability by
                                                         extracting the `session_worker` to the module level. This
                                                         enabled a simple, reliable testing strategy using direct
                                                         patching, replacing complex and brittle `ThreadPoolExecutor`

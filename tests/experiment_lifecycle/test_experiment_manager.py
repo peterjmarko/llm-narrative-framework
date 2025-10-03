@@ -56,7 +56,7 @@ class TestExperimentManagerStateTransitions(unittest.TestCase):
                 'new_experiments_subdir': 'new_exps',
                 'experiment_dir_prefix': 'exp_'
             },
-            'Filenames': {'batch_run_log': 'batch_run_log.csv'}
+            'Filenames': {'batch_run_log': 'experiment_log.csv'}
         })
 
     def tearDown(self):
@@ -370,13 +370,13 @@ class TestExperimentManagerStateTransitions(unittest.TestCase):
         mock_get_state.return_value = ("REPAIR_NEEDED", payload, "")
 
         with self.assertRaises(SystemExit) as cm:
-            with patch.object(sys, 'argv', ['script.py', self.test_dir]):
+            with patch.object(sys, 'argv', ['script.py', self.test_dir, '--max-loops=3']):
                 experiment_manager.main()
 
         self.assertEqual(cm.exception.code, 1)
-        mock_config_repair.assert_called_once()
-        mock_full_repair.assert_not_called()
-        mock_session_repair.assert_not_called()
+        self.assertEqual(mock_config_repair.call_count, 3)  # Called 3 times before max_loops
+        mock_full_repair.assert_not_called()  # Never called due to config repair failure
+        mock_session_repair.assert_not_called()  # Never called due to config repair failure
         mock_finalize.assert_not_called()
 
 
@@ -905,7 +905,7 @@ class TestHelperFunctions(unittest.TestCase):
         mock_exists.return_value = False
         is_complete, details = experiment_manager._verify_experiment_level_files(target_dir)
         self.assertFalse(is_complete)
-        self.assertIn("MISSING: batch_run_log.csv", details)
+        self.assertIn("MISSING: experiment_log.csv", details)
         self.assertIn("MISSING: EXPERIMENT_results.csv", details)
         
         # --- Test Failure Case: Unfinalized Log ---
@@ -913,14 +913,14 @@ class TestHelperFunctions(unittest.TestCase):
         mock_open.return_value.__enter__.return_value.read.return_value = "Header\nNoSummary"
         is_complete, details = experiment_manager._verify_experiment_level_files(target_dir)
         self.assertFalse(is_complete)
-        self.assertEqual(details, ["batch_run_log.csv NOT FINALIZED"])
+        self.assertEqual(details, ["experiment_log.csv NOT FINALIZED"])
 
         # --- Test Failure Case: Unreadable Log ---
         mock_exists.return_value = True
         mock_open.side_effect = IOError("Cannot read file")
         is_complete, details = experiment_manager._verify_experiment_level_files(target_dir)
         self.assertFalse(is_complete)
-        self.assertEqual(details, ["batch_run_log.csv UNREADABLE"])
+        self.assertEqual(details, ["experiment_log.csv UNREADABLE"])
 
 class TestMigrationHelpers(unittest.TestCase):
     """Tests for the migration-related helper functions."""

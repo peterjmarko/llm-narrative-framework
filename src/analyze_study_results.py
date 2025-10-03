@@ -695,8 +695,12 @@ def main():
             else:
                 logging.warning(f"\nWarning: Metric column '{metric_key}' not found. Skipping analysis.")
     finally:
-        # This block ensures that logging is always shut down, releasing file
-        # handles even if the function returns early or an error occurs.
+        # Remove all handlers and shutdown logging to release file handles
+        root_logger = logging.getLogger()
+        handlers = root_logger.handlers[:]
+        for handler in handlers:
+            handler.close()
+            root_logger.removeHandler(handler)
         logging.shutdown()
 
 if __name__ == "__main__":

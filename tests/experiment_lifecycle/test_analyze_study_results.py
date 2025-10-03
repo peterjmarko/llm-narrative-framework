@@ -282,7 +282,7 @@ class TestAnalyzeStudyResults(unittest.TestCase):
             'n_valid_responses': [30, 31, 29, 30, 30, 31, 29, 30]
         }
         self._create_mock_csv(mock_data)
-        test_argv = ['analyze_study_results.py', str(self.study_dir)]
+        test_argv = ['analyze_study_results.py', str(self.study_dir), '--verbose']
 
         with patch.object(sys, 'argv', test_argv):
             analyze_study_results.main()
@@ -309,7 +309,7 @@ class TestAnalyzeStudyResults(unittest.TestCase):
             'mean_mrr': [0.8], 'n_valid_responses': [10]
         }
         self._create_mock_csv(mock_data)
-        test_argv = ['analyze_study_results.py', str(self.study_dir)]
+        test_argv = ['analyze_study_results.py', str(self.study_dir), '--verbose']
         with patch.object(sys, 'argv', test_argv):
             analyze_study_results.main()
         log_content = self.log_stream.getvalue()
@@ -342,7 +342,7 @@ class TestAnalyzeStudyResults(unittest.TestCase):
             'mean_mrr': [0.8, 0.1, 0.5], 'n_valid_responses': [30, 30, 30]
         }
         self._create_mock_csv(mock_data)
-        with patch.object(sys, 'argv', ['py', str(self.study_dir)]):
+        with patch.object(sys, 'argv', ['py', str(self.study_dir), '--verbose']):
             analyze_study_results.main()
         log_content = self.log_stream.getvalue()
         self.assertIn("Tukey HSD failed", log_content)
@@ -355,7 +355,7 @@ class TestAnalyzeStudyResults(unittest.TestCase):
             'mean_mrr': [0.8, 0.82], 'n_valid_responses': [30, 30]
         }
         self._create_mock_csv(mock_data)
-        with patch.object(sys, 'argv', ['py', str(self.study_dir)]):
+        with patch.object(sys, 'argv', ['py', str(self.study_dir), '--verbose']):
             analyze_study_results.main()
         self.assertIn("Only one experimental group found.", self.log_stream.getvalue())
         self.assertTrue(self.mock_plt.savefig.called)
@@ -377,7 +377,7 @@ class TestAnalyzeStudyResults(unittest.TestCase):
             'model': ['test'], 'mapping_strategy': ['c'],
             'mean_mrr': [1], 'n_valid_responses': [30]
         })
-        with patch.object(sys, 'argv', ['py', str(self.study_dir)]):
+        with patch.object(sys, 'argv', ['py', str(self.study_dir), '--verbose']):
             analyze_study_results.main()
         self.mock_shutil.move.assert_called_once()
         self.assertIn("Archiving 1 file(s)", self.log_stream.getvalue())
