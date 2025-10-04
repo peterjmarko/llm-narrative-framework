@@ -1,5 +1,42 @@
 # Changelog
 
+## 12.3.1 (2025-10-04)
+
+### Bump
+
+- **version 12.3.0 → 12.3.1**
+
+### Documentation
+
+- **Fix and restructure Replication Guide with separate workflow diagrams**
+  This commit fixes the corrupted Replication Guide by:
+  
+  1. Restoring missing sections (Stage 2 and Stage 3 of The Data Preparation Pipeline)
+  2. Reorganizing misplaced sections (Prerequisites, Setup and Installation, Configuration)
+  3. Fixing corrupted sections (Stage 4 of The Data Preparation Pipeline)
+  4. Adding missing content (Final Database Generation section)
+  5. Creating two separate workflow diagrams for better clarity:
+     - Data Preparation Pipeline diagram
+     - Experiment & Study Workflow diagram
+  6. Applying special coloring to personalities_db.txt in the Experiment & Study Workflow
+  7. Renumbering all figures as S1, S2, S3, etc.
+
+### Fixes
+
+- **Fix DOCX generation duplicates and exclusions**
+  **Fixed issues with DOCX generation in build_docs.py:**
+  
+  1. **Prevented duplicate DOCX files** - Added tracking to avoid processing the same filename multiple times
+  2. **Added file exclusions** - Skip temporary, duplicate, and legacy files that don't need DOCX versions
+  3. **Maintained user-friendly filenames** - Kept original names (README.docx) instead of path-based names
+  
+  **Files excluded from DOCX generation:**
+  - COMMIT_RECOMMENDATIONS.md (temporary)
+  - docs_PROJECT_ROADMAP.md (duplicate)
+  - docs_ROADMAP.md (legacy)
+  - output_project_reports_project_scope_report.md (duplicate)
+  - WORK_SUMMARY_v12.2.3.md (temporary)
+
 ## 12.3.0 (2025-10-04)
 
 ### Bump
