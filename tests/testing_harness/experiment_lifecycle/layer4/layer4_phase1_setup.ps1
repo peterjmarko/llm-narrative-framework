@@ -102,7 +102,7 @@ group_size = 4
 mapping_strategy = random
 
 [LLM]
-model_name = google/gemini-flash-1.5
+model_name = google/gemini-2.0-flash-lite-001
 temperature = 0.2
 max_parallel_sessions = 10
 

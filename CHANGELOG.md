@@ -1,3 +1,12 @@
+<!--
+================================================================================
+!!! DO NOT EDIT 'CHANGELOG.md' DIRECTLY !!!
+
+This file is automatically updated as part of the release process.
+
+To make changes, run 'pdm run release' which will update this file.
+================================================================================
+-->
 # Changelog
 
 ## 12.5.2 (2025-10-04)
