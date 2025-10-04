@@ -109,8 +109,11 @@ $originalLocation = Get-Location
 
 try {
     Write-Host ""
-    Write-Host "--- VALIDATING QUERY GENERATION ALGORITHM ---" -ForegroundColor Yellow
-    Write-Host "STATISTICAL RIGOR: To achieve $($Power)% power (β = $Beta) for k=$($groupSize), the test will run $NumIterations iterations." -ForegroundColor Magenta
+    Write-Host "================================================================================" -ForegroundColor Magenta
+    Write-Host "                     VALIDATING QUERY GENERATION ALGORITHM" -ForegroundColor Magenta
+    Write-Host "================================================================================" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "STATISTICAL RIGOR: To achieve $($Power)% power (β = $Beta) for k=$($groupSize), the test will run $NumIterations iterations." -ForegroundColor Yellow
 
     # --- STAGE 1: SETUP ---
     Write-Host "`n--- STAGE 1: Preparing Test Sandbox ---`n" -ForegroundColor Cyan
@@ -182,9 +185,13 @@ finally {
     # Final success/failure message
     Write-Host ""
     if ($?) { # Checks if the last command in the try block was successful
-        Write-Host "✅ OVERALL RESULT: SUCCESS" -ForegroundColor Green
+        Write-Host "================================================================================" -ForegroundColor Green
+        Write-Host "                          ✅ OVERALL RESULT: SUCCESS" -ForegroundColor Green
+        Write-Host "================================================================================" -ForegroundColor Green
     } else {
-        Write-Host "❌ OVERALL RESULT: FAILED" -ForegroundColor Red
+        Write-Host "================================================================================" -ForegroundColor Red
+        Write-Host "                          ❌ OVERALL RESULT: FAILED" -ForegroundColor Red
+        Write-Host "================================================================================" -ForegroundColor Red
     }
     Write-Host ""
 }

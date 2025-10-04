@@ -53,7 +53,10 @@ $SandboxParentDir = Join-Path $ProjectRoot "temp_test_environment"
 $SandboxDir = Join-Path $SandboxParentDir "large_seed_sandbox"
 $largeSeedDir = Join-Path $ProjectRoot "tests/assets/large_seed"
 
-Write-Host "`n--- Running Large-Scale Algorithm Validation ---" -ForegroundColor Magenta
+Write-Host "`n================================================================================" -ForegroundColor Magenta
+Write-Host "                    Running Large-Scale Algorithm Validation" -ForegroundColor Magenta
+Write-Host "================================================================================" -ForegroundColor Magenta
+Write-Host ""
 Write-Host "Validates core data filtering and selection algorithms at scale." -ForegroundColor Yellow
 
 if (-not (Test-Path (Join-Path $largeSeedDir "data/sources/adb_raw_export.txt"))) {
@@ -86,10 +89,10 @@ try {
     if (-not (Test-Path $largeOutput4a)) { throw "Eligible candidate logic test failed: Output file was not created." }
     $largeOutputCount4a = (Get-Content $largeOutput4a | Select-Object -Skip 1).Length
     if ($largeOutputCount4a -ge $largeInput4a) { throw "Eligible candidate logic test failed: The number of eligible candidates ($largeOutputCount4a) was not less than the input ($largeInput4a)." }
-    Write-Host "`n  -> ✓ Eligible Candidate Logic: Successfully validated ($largeInput4a -> $largeOutputCount4a subjects)." -ForegroundColor Green
+    Write-Host "  -> ✓ Eligible Candidate Logic: Successfully validated ($largeInput4a -> $largeOutputCount4a subjects)." -ForegroundColor Green
 
     # --- 3. Execute: Validate Final Candidate Cutoff Logic ---
-    $stepHeader7a = "`n>>> Validate Cutoff Logic <<<"
+    $stepHeader7a = ">>> Validate Cutoff Logic <<<"
     Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader7a -ForegroundColor Cyan; Write-Host "Validates the subject cutoff algorithm using a large seed dataset." -ForegroundColor Cyan
     Copy-Item -Path (Join-Path $largeSeedDir "data/foundational_assets/eminence_scores.csv") -Destination (Join-Path $SandboxDir "data/foundational_assets/")
     Copy-Item -Path (Join-Path $largeSeedDir "data/foundational_assets/ocean_scores.csv") -Destination (Join-Path $SandboxDir "data/foundational_assets/")
@@ -103,12 +106,18 @@ try {
     if (-not (Test-Path $largeOutput7a)) { throw "Cutoff logic test failed: Output file was not created." }
     $largeOutputCount7a = (Get-Content $largeOutput7a | Select-Object -Skip 1).Length
     if ($largeOutputCount7a -ge $largeInput7a) { throw "Cutoff logic test failed: The number of final candidates ($largeOutputCount7a) was not less than the input ($largeInput7a)." }
-    Write-Host "`n  -> ✓ Cutoff Logic: Successfully validated ($largeInput7a -> $largeOutputCount7a subjects)." -ForegroundColor Green
+    Write-Host "  -> ✓ Cutoff Logic: Successfully validated ($largeInput7a -> $largeOutputCount7a subjects)." -ForegroundColor Green
 
-    Write-Host "`nSUCCESS: Large-scale algorithm validation completed successfully." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "================================================================================" -ForegroundColor Green
+    Write-Host "          SUCCESS: Large-scale algorithm validation completed successfully." -ForegroundColor Green
+    Write-Host "================================================================================" -ForegroundColor Green
 }
 catch {
-    Write-Host "`nERROR: Large-scale algorithm validation failed." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "================================================================================" -ForegroundColor Red
+    Write-Host "              ERROR: Large-scale algorithm validation failed." -ForegroundColor Red
+    Write-Host "================================================================================" -ForegroundColor Red
     Write-Host "$($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
@@ -119,7 +128,7 @@ finally {
         $ProgressPreference = 'SilentlyContinue'
         Remove-Item -Path $SandboxDir -Recurse -Force
         $ProgressPreference = 'Continue'
-        Write-Host "Validation sandbox removed." -ForegroundColor Green
+        Write-Host "Validation sandbox removed.`n" -ForegroundColor Green
     }
 }
 
