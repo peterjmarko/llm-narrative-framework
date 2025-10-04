@@ -576,6 +576,10 @@ def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, lis
     if runs_needing_session_repair:
         return "REPAIR_NEEDED", runs_needing_session_repair, granular
 
+    if any(status == "ANALYSIS_ISSUE" for status, _ in fails.values()):
+        analysis_fails = [{"dir": str(run_paths_by_name[name])} for name, (status, _) in fails.items() if status == "ANALYSIS_ISSUE"]
+        return "REPROCESS_NEEDED", analysis_fails, granular
+
     if not fails and len(run_dirs) < expected_reps:
         return "NEW_NEEDED", [], granular
 
@@ -584,10 +588,6 @@ def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, lis
         if not is_complete:
             return "AGGREGATION_NEEDED", [], granular
         return "COMPLETE", [], granular
-
-    if any(status == "ANALYSIS_ISSUE" for status, _ in fails.values()):
-        analysis_fails = [{"dir": str(run_paths_by_name[name])} for name, (status, _) in fails.items() if status == "ANALYSIS_ISSUE"]
-        return "REPROCESS_NEEDED", analysis_fails, granular
         
     return "UNKNOWN", [], granular
 

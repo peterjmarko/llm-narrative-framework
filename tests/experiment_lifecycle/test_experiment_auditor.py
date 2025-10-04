@@ -169,6 +169,7 @@ personalities_src = personalities_db.txt
     "top_3_acc_p": 0, "mean_rank_of_correct_id": 0, "rank_of_correct_id_p": 0,
     "bias_slope": 0, "bias_intercept": 0, "bias_r_value": 0, "bias_p_value": 0, "bias_std_err": 0,
     "mean_mrr_lift": 0, "mean_top_1_acc_lift": 0, "mean_top_3_acc_lift": 0,
+    "median_mrr": 0, "median_top_1_acc": 0, "median_top_3_acc": 0,
     "positional_bias_metrics": {pos_bias_json}
 }}
 <<<METRICS_JSON_END>>>
@@ -433,7 +434,14 @@ personalities_src = personalities_db.txt
         set_active_report(report_content_missing)
         self.assertIn("REPORT_INCOMPLETE_METRICS: mean_mrr", experiment_auditor._check_report(run_dir))
         
-        # Case 3: Extra key
+        # Case 3: Missing median key
+        missing_median_metrics = perfect_metrics.copy()
+        del missing_median_metrics['median_mrr']
+        report_content_missing_median = f'<<<METRICS_JSON_START>>>\n{json.dumps(missing_median_metrics)}\n<<<METRICS_JSON_END>>>'
+        set_active_report(report_content_missing_median)
+        self.assertIn("REPORT_INCOMPLETE_METRICS: median_mrr", experiment_auditor._check_report(run_dir))
+        
+        # Case 4: Extra key
         extra_key_metrics = perfect_metrics.copy()
         extra_key_metrics['obsolete_metric'] = 123
         report_content_extra = f'<<<METRICS_JSON_START>>>\n{json.dumps(extra_key_metrics)}\n<<<METRICS_JSON_END>>>'
