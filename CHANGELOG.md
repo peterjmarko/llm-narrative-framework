@@ -1,5 +1,24 @@
 # Changelog
 
+## 12.3.0 (2025-10-04)
+
+### Bump
+
+- **version 12.2.3 → 12.3.0**
+
+### Features
+
+- **enhance testing framework with 4-pillar architecture and improved assembly logic workflow**
+  This update significantly enhances the testing framework by transitioning from a 3-pillar to a 4-pillar architecture and improving the assembly logic validation workflow. The changes include updated diagrams, streamlined documentation, new PDM shortcuts, and an interactive script that guides users through the complex assembly logic validation process.
+  
+  Additional contextual information:
+  - Added "Statistical Analysis & Reporting Validation" as the 4th pillar
+  - Created an interactive script that pauses for manual Solar Fire processing
+  - Fixed import path issues that were causing script failures
+  - Improved error messaging with colored banners and helpful tips
+  - Ensured cross-platform compatibility with forward slash paths
+  - Streamlined what was previously a multi-command process into a single interactive experience
+
 ## 12.2.3 (2025-10-03)
 
 ### Bump
