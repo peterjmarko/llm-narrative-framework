@@ -1,0 +1,47 @@
+graph TD
+    %% Invisible link to force side-by-side layout
+    A6 ~~~ B1
+
+    %% Left side - Data Preparation Pipeline
+    subgraph A [Data Preparation Pipeline]
+        direction TB
+        A1[ADB Online Database]
+        A2[Stage 1: Data Sourcing<br/>and Validation]
+        A3[Stage 2: Pre-filtering<br/>and Scoring]
+        A4[Stage 3: Final Subject<br/>Selection]
+        A5[Stage 4: Profile Generation]
+        A6[personalities_db.txt]
+        
+        A1 -- consumes --> A2
+        A2 -- produces --> A3
+        A3 -- produces --> A4
+        A4 -- produces --> A5
+        A5 -- produces --> A6
+    end
+
+    %% Right side - Experiment & Study Workflow
+    subgraph B [Experiment & Study Workflow]
+        direction TB
+        B1[personalities_db.txt]
+        B2[Stage 1: Generate Data for<br/>Each Experimental Condition]
+        B3[Stage 2: Compile and<br/>Analyze the Study]
+        B4[Statistical Analysis Reports]
+        B5[Publication-Quality Plots]
+        B6[Study Results CSV]
+        
+        B1 -- consumes --> B2
+        B2 -- produces --> B3
+        B3 -- produces --> B4
+        B3 -- produces --> B5
+        B3 -- produces --> B6
+    end
+
+    %% Styling
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style A1 fill:#e8f5e8
+    style A6 fill:#fff3e0
+    style B1 fill:#fff3e0
+    style B4 fill:#fff3e0
+    style B5 fill:#fff3e0
+    style B6 fill:#fff3e0

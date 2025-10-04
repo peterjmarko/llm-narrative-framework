@@ -1,0 +1,44 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#cce5ff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#0066cc', 'lineColor': '#0066cc', 'sectionBkgColor': '#cce5ff', 'altSectionBkgColor': '#e6f2ff', 'gridColor': '#d9e6ff'}}}%%
+flowchart TD
+    %% Experiment & Study Workflow
+    subgraph ExperimentStudyWorkflow [Experiment & Study Workflow]
+        direction TB
+        
+        %% Input Database
+        InputDB[personalities_db.txt<br/>Final research database<br/>Input for experiments]:::palegreen
+        
+        %% Experiment Steps
+        NewExp[new_experiment.ps1<br/>Creates new experiment configuration]:::stage
+        BuildQueries[build_llm_queries.py<br/>Generates LLM prompts]:::stage
+        LLM[LLM Processing<br/>External LLM service]:::external
+        ProcessResp[process_llm_responses.py<br/>Processes LLM responses]:::stage
+        CompileExp[compile_experiment_results.py<br/>Compiles experiment results]:::stage
+        
+        %% Study Steps
+        AuditExp[audit_experiment.ps1<br/>Audits experiment results]:::stage
+        FixExp[fix_experiment.ps1<br/>Fixes identified issues]:::stage
+        CompileStudy[compile_study_results.py<br/>Compiles final study results]:::stage
+        AuditStudy[audit_study.ps1<br/>Audits final study]:::stage
+        
+        %% Outputs
+        Reports[Research Reports<br/>Statistical analysis<br/>Performance metrics]:::output
+        
+        %% Connections
+        InputDB -->|consumes| NewExp
+        NewExp -->|produces| BuildQueries
+        BuildQueries -->|produces| LLM
+        LLM -->|produces| ProcessResp
+        ProcessResp -->|produces| CompileExp
+        CompileExp -->|produces| AuditExp
+        AuditExp -->|produces| FixExp
+        FixExp -->|produces| CompileStudy
+        CompileStudy -->|produces| AuditStudy
+        AuditStudy -->|produces| Reports
+    end
+    
+    %% Class definitions
+    classDef input fill:#e6ffe6,stroke:#00cc00,stroke-width:2px,color:#000000
+    classDef external fill:#e6e6ff,stroke:#6666cc,stroke-width:2px,color:#000000
+    classDef stage fill:#cce5ff,stroke:#0066cc,stroke-width:2px,color:#000000
+    classDef output fill:#ffffcc,stroke:#cc9900,stroke-width:2px,color:#000000
+    classDef palegreen fill:#ccffcc,stroke:#00cc00,stroke-width:2px,color:#000000

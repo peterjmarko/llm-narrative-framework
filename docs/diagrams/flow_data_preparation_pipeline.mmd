@@ -1,0 +1,48 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffcccc', 'primaryTextColor': '#000000', 'primaryBorderColor': '#cc0000', 'lineColor': '#cc0000', 'sectionBkgColor': '#ffcccc', 'altSectionBkgColor': '#ffeeee', 'gridColor': '#ffdddd'}}}%%
+flowchart TD
+    %% Data Preparation Pipeline
+    subgraph DataPrepPipeline [Data Preparation Pipeline]
+        direction TB
+        
+        %% External Source
+        ADB[ADB Online Database<br/>https://astro.com/astro-databank<br/>External source of raw birth data]:::external
+        
+        %% Stage 1
+        Stage1[Stage 1: Qualification<br/>fetch_adb_data.py<br/>Downloads raw data from ADB]:::stage
+        
+        %% Stage 2
+        Stage2[Stage 2: Pre-filtering & Scoring<br/>select_eligible_candidates.py<br/>Filters and scores ADB entries]:::stage
+        
+        %% Stage 3
+        Stage3[Stage 3: Final Subject Selection<br/>select_final_candidates.py<br/>Applies final selection criteria]:::stage
+        
+        %% Stage 4a
+        Stage4a[Stage 4a: Wikipedia Links<br/>find_wikipedia_links.py<br/>Finds Wikipedia pages for subjects]:::stage
+        
+        %% Stage 4b
+        Stage4b[Stage 4b: Wikipedia Validation<br/>validate_wikipedia_pages.py<br/>Validates Wikipedia page content]:::stage
+        
+        %% Stage 4c
+        Stage4c[Stage 4c: OCEAN Scores<br/>generate_ocean_scores.py<br/>Generates personality scores]:::stage
+        
+        %% Stage 4d
+        Stage4d[Stage 4d: Final Database<br/>generate_personalities_db.py<br/>Creates final research database]:::stage
+        
+        %% Final Output
+        FinalDB[personalities_db.txt<br/>Final research database<br/>Used for experiments]:::output
+        
+        %% Connections
+        ADB -->|consumes| Stage1
+        Stage1 -->|produces| Stage2
+        Stage2 -->|produces| Stage3
+        Stage3 -->|produces| Stage4a
+        Stage4a -->|produces| Stage4b
+        Stage4b -->|produces| Stage4c
+        Stage4c -->|produces| Stage4d
+        Stage4d -->|produces| FinalDB
+    end
+    
+    %% Class definitions
+    classDef external fill:#ffeeee,stroke:#cc0000,stroke-width:2px,color:#000000
+    classDef stage fill:#ffcccc,stroke:#cc0000,stroke-width:2px,color:#000000
+    classDef output fill:#ccffcc,stroke:#00cc00,stroke-width:2px,color:#000000
