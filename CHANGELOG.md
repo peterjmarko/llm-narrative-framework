@@ -1,5 +1,23 @@
 # Changelog
 
+## 12.5.0 (2025-10-04)
+
+### Bump
+
+- **version 12.4.0 → 12.5.0**
+
+### Features
+
+- **enhance test output formatting with colored banners**
+  This commit enhances the visual presentation of test output across multiple validation scripts by adding formatted, colored banners for headers and results. The changes improve user experience by making test results more visually distinct and easier to interpret at a glance.
+  
+  Key improvements include:
+  - Added centered, colored banners for test headers and results
+  - Implemented consistent color coding (magenta for headers, green for success, red for failure)
+  - Enhanced test-assembly, test-query-gen, and test-l3-selection commands
+  - Created a wrapper script for test-assembly with improved output formatting
+  - Added proper spacing and centering for better visual hierarchy
+
 ## 12.4.0 (2025-10-04)
 
 ### Bump
