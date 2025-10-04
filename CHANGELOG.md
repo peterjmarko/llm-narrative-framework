@@ -1,5 +1,24 @@
 # Changelog
 
+## 12.4.0 (2025-10-04)
+
+### Bump
+
+- **version 12.3.1 → 12.4.0**
+
+### Features
+
+- **automate file transfers between project and Solar Fire directories**
+  This commit improves the assembly logic validation workflow by automating file transfers between the project sandbox and Solar Fire's user directories. The changes make the process more user-friendly and reduce the chance of errors when working with Solar Fire software.
+  
+  Key improvements:
+  - Added automatic copying of import files to Solar Fire imports directory
+  - Added automatic copying of export files from Solar Fire exports directory
+  - Added automatic copying of interpretation reports from Solar Fire exports directory
+  - Updated user instructions to reference the correct directories
+  - Enhanced Replication Guide with detailed interpretation report export instructions
+  - Renamed script for clarity and updated PDM configuration accordingly
+
 ## 12.3.1 (2025-10-04)
 
 ### Bump
