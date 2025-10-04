@@ -273,8 +273,8 @@ Solar Fire stores its user files in the standard Windows Documents folder. Under
 *   **Solar Fire User Files:** `Documents\Solar Fire User Files`
 *   **Subdirectories:**
     *   **Charts:** Chart ('*.sfcht') files accessible within Solar Fire
-    *   **Imports:** Imported birth data files (various formats)
-    *   **Exports:** Exported astrological data (various formats)
+    *   **Import:** Imported birth data files (various formats)
+    *   **Export:** Exported astrological data (various formats)
     *   **Points & Colors:** Settings ('*.pts') file for Displayed Points
     *   **Interpretations:** Delineations library ('*.def') files
 
@@ -288,7 +288,7 @@ You must define which astrological points are included in the calculations.
 
 *   **Menu:** `Chart Options > Displayed Points...`
 *   **Action:**
-    1.  Create a new `.pts` file (e.g., `10_planets_2_angles.pts`).
+    1.  Create a new `.pts` file (e.g., `llm_narrative_dp12.pts`).
     2.  Edit this file to include exactly these 12 points: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, and Midheaven.
     3.  Save the file and ensure it is selected as the active set.
 
@@ -341,7 +341,7 @@ If you are re-running the import process, you must first clear the existing char
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
-    1.  In the 'Chart Database' dialog, select your charts file (e.g., `adb_candidates.sfcht`).
+    1.  In the **'Chart Database'** dialog, select your charts file (e.g., `adb_candidates.sfcht`).
     2.  Click the **'All'** button to highlight every chart in the file.
     3.  Click the **'Delete...'** button, then select **'Selected Charts...'**.
     4.  A dialog will ask: "Do you wish to confirm the deletion of each chart individually?". Click **'No'** to delete all charts at once.
@@ -350,10 +350,11 @@ If you are re-running the import process, you must first clear the existing char
 {{grouped_figure:docs/images/replication_guide/sf_workflow_1_clear_charts.png | width=95% | caption=Figure S11: The Solar Fire "Chart Database" dialog with all charts selected for deletion.}}
 
 #### Step 1: Import Birth Data
+The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, choose `sf_data_import.assembly_logic.txt` in the Solar Fire import folder for #2 and save to `adb_candidates.assembly_logic` for #3.
 
 *   **Menu:** `Utilities > Chart Import/Export...`
 *   **Action:**
-    1.  If a "Confirm" dialog appears immediately, click **'OK'**.
+    1.  If a **"Confirm"** dialog appears immediately, click **'OK'**.
     2.  On the **'Import From' tab**, select `ASCII files` and choose `data/intermediate/sf_data_import.txt`.
     3.  On the **'Save To' tab**, ensure your `adb_candidates.sfcht` file is selected.
     4.  On the **'Options' tab**, select your `CQD Import` format.
@@ -363,6 +364,7 @@ If you are re-running the import process, you must first clear the existing char
 {{grouped_figure:docs/images/replication_guide/sf_workflow_2_import_dialog.png | width=95% | caption=Figure S12: The Solar Fire "Chart Import/Export" dialog configured to import the prepared data.}}
 
 #### Step 2: Calculate All Charts
+The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, select `adb_candidates.assembly_logic` for #1.
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
@@ -373,14 +375,15 @@ If you are re-running the import process, you must first clear the existing char
 > **A Note on Character Encoding:** In the "Calculated Charts" list, you may notice that some names with international characters appear corrupted (e.g., `PelÃ©` instead of `Pelé`). This is an expected display issue within Solar Fire. **Do not attempt to fix these names manually.** The automated scripts are designed to detect and repair these encoding errors in the next stage, ensuring the final database is clean.
 
 #### Step 3: Export Chart Data
+The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, browse to the Solar Fire export folder and set the filename to `sf_data_import.assembly_logic.txt` for #6.
 
 *   **Menu:** `Chart > Export Charts as Text...`
 *   **Action:**
     1.  In the "Calculated Charts" window, select all calculated charts.
-    2.  In the "Export Chart Data" dialog, check the **'Chart Details'** and **'Column Types'** boxes.
-    3.  Under 'Select types of points', ensure **'Chart Points'** is selected.
+    2.  In the menu item's **"Export Chart Data" dialog**, check the **'Chart Details'** and **'Column Types'** boxes.
+    3.  Under **'Select types of points'**, ensure **'Chart Points'** is selected.
     4.  For the ASCII format, select your custom `CQD Export` format.
-    5.  Set 'Field Delimiters' to `Comma Quote (CQD)` and 'Destination' to `Export to File`.
+    5.  Set **'Field Delimiters'** to `Comma Quote (CQD)` and 'Destination' to `Export to File`.
     6.  Browse to the `data/foundational_assets/` directory, set the filename to `sf_chart_export.csv`, and click **Save**. Note: 'Save as type' cannot be set in this dialog.
     7.  **Warning:** Solar Fire will overwrite this file without confirmation. Click **'Export'**.
     8.  Once the export completes successfully, click the **'Quit'** button to close the dialog.
@@ -396,6 +399,20 @@ The exported file consists of a repeating 14-line block for each subject. The st
 | 3-14 | `Point Name`, `Point Abbr`, `Zodiacal Longitude` | The data for each of the 12 chart points (Sun, Moon, ..., Midheaven). |
 
 The entire file consists of `N * 14` lines, where `N` is the final number of subjects.
+
+#### Special Step: Generate Interpretation Reports
+
+This procedure is not part of the production workflow and only applies to the last manual item ('Generate and save interpretation reports...') of validating the Personality Assembly Algorithm ('test-assembly-setup'). The first 3 stages of the 5-stage validation process should be completed at this point.
+
+*   **Menu:** `Interps > Full Report...`
+*   **Action:**
+    1.  In the "Calculated Charts" window, select the first calculated chart.
+    2.  In the menu item's "Select Text for Report" dialog, select only 'Balances' and 'Chart Points' for the 'Text Categories' section.
+    3.  Click View. The report is generated and opened in your default word processor.
+    4.  Save As a 'Plain Text' file in the 'Documents/Solar Fire User Files/Export' directory with the following filename: 'sf_raw_report.assembly_logic_[SN]', where "[SN]" is a sequence number from 1 to 17. For example: 'sf_raw_report.assembly_logic_1'. If a 'File Conversion' dialog is shown, accept the default 'Windows' text encoding (leave boxes unchecked). Close the file and do not save if asked.
+    5.  Click Cancel in the "Select Text for Report" dialog and select the next chart.
+    6.  Go through steps 2 to 5 for all charts in sequence (#2 to #17) using the sequence number as the suffix in the filename. Save last report as 'sf_raw_report.assembly_logic_17'.
+    7.  Once all reports have been exported, click Cancel in the "Select Text for Report" dialog and continue with executing stage 4 and 5 of the validation (i.e., resume 'test-assembly-setup').
 
 ## Final Database Generation
 

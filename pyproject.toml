@@ -93,7 +93,7 @@ test-assembly-step2 = {cmd = "python scripts/workflows/assembly_logic/2_select_a
 test-assembly-step3 = {cmd = "python scripts/workflows/assembly_logic/3_prepare_assembly_logic_import.py", help = "Step 3: Prepare import file for Solar Fire."}
 test-assembly-step4 = {cmd = "python scripts/workflows/assembly_logic/4_extract_assembly_logic_text.py", help = "Step 5: Extract and assemble the ground truth database."}
 test-assembly-step5 = {cmd = "python scripts/workflows/assembly_logic/5_validate_assembly_logic_subjects.py", help = "Step 6: Validate the assembled ground truth database."}
-test-assembly-setup = {cmd = "python scripts/workflows/assembly_logic/test_assembly_setup_with_pause.py", help = "Run all steps with interactive pause for manual Solar Fire processing."}
+test-assembly-setup = {cmd = "python scripts/workflows/assembly_logic/test_assembly_setup.py", help = "Run all steps with interactive pause for manual Solar Fire processing."}
 test-assembly = {cmd = "pytest tests/algorithm_validation/test_profile_generation_algorithm.py", help = "Run the personality assembly algorithm validation."}
 test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.ps1"
 test-l3-selection = "pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"
