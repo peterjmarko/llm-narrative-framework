@@ -29,7 +29,7 @@ The **Data & Artifacts** component manages all inputs and outputs, including sou
 
 The production codebase implements two principal workflows that form the backbone of the research process: the Data Preparation Pipeline and the Experiment & Study Workflow. These workflows are sequentially dependent but architecturally distinct, with the data preparation pipeline creating the foundational datasets that the experiment workflow consumes.
 
-> **Note on Understanding the Workflows:** Researchers wishing to understand the workflows in detail are advised to refer to the interactive Guided Tours. These step-by-step walkthroughs are an excellent way to learn how the various scripts work together. Full instructions for running the tours can be found in the project's 🧪 Testing Guide (TESTING_GUIDE.md).
+> **Note on Understanding the Workflows:** Researchers wishing to understand the workflows in detail are advised to refer to the interactive Guided Tours. These step-by-step walkthroughs are an excellent way to learn how the various scripts work together. Full instructions for running the tours can be found in the project's **[🧪 Testing Guide (docs/TESTING_GUIDE.md)](docs/TESTING_GUIDE.md)**.
 
 ### Data Preparation Pipeline
 

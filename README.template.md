@@ -1,5 +1,5 @@
 # A Framework for Testing Complex Narrative Systems
-
+ 
 This project provides a framework for the resilient and reproducible testing of large-scale LLM experiments with complex narrative systems. It offers a fully automated, end-to-end pipeline that manages the entire experimental lifecycle, from data preparation to final statistical analysis.
 
 This README provides a high-level overview of the framework and guides new users to the detailed documentation that best suits their needs.

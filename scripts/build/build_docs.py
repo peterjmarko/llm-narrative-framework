@@ -852,15 +852,38 @@ def main():
         }
         
         exclude_dirs = {'.git', '.venv', 'node_modules', 'docs/word_docs'}
+        # Files to exclude from DOCX generation
+        exclude_files = {
+            'COMMIT_RECOMMENDATIONS.md',  # Temporary file
+            'docs_PROJECT_ROADMAP.md',    # Duplicate
+            'docs_ROADMAP.md',            # Legacy file
+            'output_project_reports_project_scope_report.md',  # Duplicate
+            'WORK_SUMMARY_v12.2.3.md',    # Temporary file
+        }
         all_md_files = {p for p in project_root.glob('**/*.md')}
+        
+        # Track processed filenames to avoid duplicates
+        processed_filenames = set()
         
         # Use a context manager for robust cleanup of temporary files
         with tempfile.TemporaryDirectory() as temp_dir:
             for source_path in sorted(list(all_md_files)):
                 if any(part in exclude_dirs for part in source_path.parts) or source_path.name.endswith('.template.md'):
                     continue
+                
+                # Skip specific files that shouldn't have DOCX versions
+                if source_path.name in exclude_files:
+                    continue
 
+                # Use just the filename for user-friendly output
                 output_filename = source_path.with_suffix(".docx").name
+                
+                # Skip if we've already processed a file with this name
+                # This avoids duplicates while keeping user-friendly names
+                if output_filename in processed_filenames:
+                    continue
+                processed_filenames.add(output_filename)
+                
                 output_path = os.path.join(word_docs_dir, output_filename)
                 
                 should_build = False
