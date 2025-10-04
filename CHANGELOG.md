@@ -1,5 +1,16 @@
 # Changelog
 
+## 12.5.2 (2025-10-04)
+
+### Bump
+
+- **version 12.5.1 → 12.5.2**
+
+### Fixes
+
+- **Fix experiment auditor tests after metrics update**
+  After adding median metrics to the required metrics list in the auditor, the tests were failing because the mock reports didn't include these new metrics. This fix updates the test helper functions to include the median metrics (median_mrr, median_top_1_acc, median_top_3_acc) in the mock reports and adds a test case to verify that missing median metrics are properly detected.
+
 ## 12.5.1 (2025-10-04)
 
 ### Bump
