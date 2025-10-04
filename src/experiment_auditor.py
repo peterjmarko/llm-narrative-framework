@@ -100,7 +100,8 @@ REPORT_REQUIRED_METRICS = {
     "mean_top_3_acc", "top_3_acc_p", "mean_rank_of_correct_id",
     "rank_of_correct_id_p", "bias_slope", "bias_intercept", "bias_r_value",
     "bias_p_value", "bias_std_err", "mean_mrr_lift", "mean_top_1_acc_lift",
-    "mean_top_3_acc_lift", "top1_pred_bias_std", "true_false_score_diff"
+    "mean_top_3_acc_lift", "top1_pred_bias_std", "true_false_score_diff",
+    "median_mrr", "median_top_1_acc", "median_top_3_acc"
 }
 
 # --- Verification Helper Functions ---
@@ -575,10 +576,6 @@ def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, lis
     if runs_needing_session_repair:
         return "REPAIR_NEEDED", runs_needing_session_repair, granular
 
-    if any(status == "ANALYSIS_ISSUE" for status, _ in fails.values()):
-        analysis_fails = [{"dir": str(run_paths_by_name[name])} for name, (status, _) in fails.items() if status == "ANALYSIS_ISSUE"]
-        return "REPROCESS_NEEDED", analysis_fails, granular
-
     if not fails and len(run_dirs) < expected_reps:
         return "NEW_NEEDED", [], granular
 
@@ -587,6 +584,10 @@ def get_experiment_state(target_dir: Path, expected_reps: int) -> tuple[str, lis
         if not is_complete:
             return "AGGREGATION_NEEDED", [], granular
         return "COMPLETE", [], granular
+
+    if any(status == "ANALYSIS_ISSUE" for status, _ in fails.values()):
+        analysis_fails = [{"dir": str(run_paths_by_name[name])} for name, (status, _) in fails.items() if status == "ANALYSIS_ISSUE"]
+        return "REPROCESS_NEEDED", analysis_fails, granular
         
     return "UNKNOWN", [], granular
 
