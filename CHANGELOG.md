@@ -1,5 +1,16 @@
 # Changelog
 
+## 12.5.1 (2025-10-04)
+
+### Bump
+
+- **version 12.5.0 → 12.5.1**
+
+### Fixes
+
+- **Fix infinite reprocess loop after creating new replications**
+  Fixes an issue where the experiment creation workflow would get stuck in an infinite reprocess loop after successfully creating all replications. The problem was that the replication reports included median metrics (median_mrr, median_top_1_acc, median_top_3_acc) that weren't in the expected metrics list in the auditor, causing all replications to be flagged as having analysis issues.
+
 ## 12.5.0 (2025-10-04)
 
 ### Bump
