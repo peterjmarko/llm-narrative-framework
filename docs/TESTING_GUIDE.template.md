@@ -8,6 +8,8 @@ This document outlines the testing philosophy, procedures, and coverage strategy
 
 The project's testing strategy is organized into a clear, four-part hierarchy designed to ensure both scientific validity and software robustness. This approach allows for rigorous, independent verification at every level of the framework.
 
+{{diagram:docs/diagrams/test_strategy_overview.mmd | scale=2.5 | width=100% | caption=The Four Pillars of the Testing Strategy: A hierarchical approach to validating the framework.}}
+
 1.  **Unit Testing:** Focuses on the internal logic of individual Python scripts, validating each component in isolation.
 2.  **Integration Testing:** A suite of end-to-end tests that validate the complete, live execution flows for the project's two main functional domains: the data preparation pipeline and the experiment/study lifecycle.
 3.  **Algorithm Validation:** A set of standalone, high-precision tests that provide scientific proof for the framework's core methodological claims (e.g., bit-for-bit accuracy of data generation, statistical integrity of analysis).
@@ -15,11 +17,11 @@ The project's testing strategy is organized into a clear, four-part hierarchy de
 
 This structure ensures that we can verify that our individual components are correct (Unit Testing), our workflows execute properly end-to-end (Integration Testing), our scientific method is sound (Algorithm Validation), and our statistical analyses meet academic standards (Statistical Validation).
 
-{{diagram:docs/diagrams/test_strategy_overview.mmd | scale=2.5 | width=100% | caption=The Four Pillars of the Testing Strategy: A hierarchical approach to validating the framework.}}
-
 ## Test Suite Architecture
 
 The framework's testing strategy is built on four complementary pillars that work together to ensure both scientific validity and software reliability. Each pillar serves a distinct purpose and validates different aspects of the framework.
+
+{{diagram:docs/diagrams/test_philosophy_overview.mmd | scale=2.5 | width=100% | caption=The Four Testing Pillars: A comprehensive overview of the testing philosophy and how each pillar breaks down into specific validation areas.}}
 
 ### The Four Testing Pillars
 
@@ -36,21 +38,25 @@ The framework's testing strategy is built on four complementary pillars that wor
 The integration tests are organized into a layered architecture that mirrors the framework's workflow:
 
 **Layer 2: Data Pipeline State Machine Validation**
+
 - Tests the orchestrator's halt/resume logic using lightweight mock scripts
 - Validates state transitions without requiring expensive LLM calls
 - Command: `pdm run test-l2`
 
 **Layer 3: Complete Data Pipeline**
+
 - Tests the full data preparation workflow from raw data to final profiles
 - Runs in three modes: default, bypass, and interactive
 - Commands: `pdm run test-l3-default`, `pdm run test-l3-bypass`, `pdm run test-l3-interactive`
 
 **Layer 4: Experiment Lifecycle**
+
 - Tests the complete `new -> audit -> break -> fix` workflow
 - Includes deliberate corruption scenarios and automated repair validation
 - Commands: `pdm run test-l4`, `pdm run test-l4-interactive`
 
 **Layer 5: Study Compilation**
+
 - Tests multi-experiment aggregation and statistical analysis
 - Validates the complete study workflow using realistic test data
 - Command: `pdm run test-l5`
@@ -68,6 +74,7 @@ The integration tests are organized into a layered architecture that mirrors the
 ### Sandbox Architecture
 
 All integration tests run in isolated `temp_test_environment` directories at the project root. This ensures tests are:
+
 - **Non-destructive**: Never modify production files or directories
 - **Reproducible**: Start from a clean state every time
 - **Parallel-safe**: Multiple tests can run without interfering
@@ -82,24 +89,20 @@ This section provides a practical walkthrough of running the complete test suite
 For thorough validation during development, follow this staged approach:
 
 #### Stage 1: Unit Tests - Data Preparation Pipeline
-Start by testing data preparation components individually:
+Start by testing data preparation components:
 
 ```bash
 # Test all data preparation unit tests
-pytest tests/data_preparation/ -v
-
-# If failures occur, test individual scripts:
-pytest tests/data_preparation/test_fetch_adb_data.py -v
-pytest tests/data_preparation/test_find_wikipedia_links.py -v
-pytest tests/data_preparation/test_validate_wikipedia_pages.py -v
-pytest tests/data_preparation/test_select_eligible_candidates.py -v
-pytest tests/data_preparation/test_create_subject_db.py -v
-pytest tests/data_preparation/test_generate_personalities_db.py -v
+pdm run test-data-prep
+# or simply:
+pdm test-data-prep
 ```
 
 **Expected outcome:** All data preparation unit tests pass, demonstrating that individual components handle their inputs correctly and manage errors appropriately.
 
 **Why first?** These are the foundation tests—fast, isolated validation of core data processing logic before testing workflows.
+
+**If failures occur:** Run individual test files with pytest directly to isolate issues, or use the focused coverage tool to debug specific modules.
 
 #### Stage 2: Data Pipeline Integration (Layer 2-3)
 Validate the complete data preparation workflow:
@@ -107,19 +110,27 @@ Validate the complete data preparation workflow:
 **State Machine Logic (Layer 2):**
 ```bash
 pdm run test-l2
+# or simply:
+pdm test-l2
 ```
 **Expected outcome:** Orchestrator halt/resume logic validated with mock scripts (< 30 seconds).
 
 **Complete Pipeline (Layer 3):**
 ```bash
 # Standard test with LLM selection
-pdm run test-l3-default
+pdm run test-l3
+# or simply:
+pdm test-l3
 
 # Control test without LLM selection
 pdm run test-l3-bypass
+# or simply:
+pdm test-l3-bypass
 
 # Educational walkthrough
 pdm run test-l3-interactive
+# or simply:
+pdm test-l3-interactive
 ```
 **Expected outcome:** Full pipeline execution from raw data to final personality database. Default and bypass modes produce valid output files with different selection logic.
 
@@ -131,41 +142,89 @@ pdm run test-l3-interactive
 Validate the framework's core methodological contributions:
 
 **Personality Assembly Algorithm:**
+
+This is the project's most rigorous validation. It requires running a 5-step workflow first to generate the ground truth dataset needed by the automated test. The scripts are located in `scripts/workflows/assembly_logic/` and must be run in the numbered order.
+
+**Note on PDM commands:** PDM allows two syntaxes for running custom scripts: `pdm run <script-name>` and `pdm <script-name>`. Both achieve the same result. This documentation uses `pdm run` for clarity, but you can use either form.
+
+**Option 1: Interactive mode with automatic pause (Recommended):**
 ```bash
-pytest tests/algorithm_validation/test_profile_generation_algorithm.py -v
+pdm run test-assembly-setup
+# or simply:
+pdm test-assembly-setup
 ```
+*Note: This command runs steps 1-3 automatically, then pauses and waits for you to complete step 4 manually in Solar Fire. After confirming completion, it automatically continues with steps 4-5.*
+
+**Option 2: Run steps individually:**
+```bash
+# Step 1: Generate coverage map
+pdm run test-assembly-step1
+# or simply:
+pdm test-assembly-step1
+
+# Step 2: Select optimal subject set
+pdm run test-assembly-step2
+# or simply:
+pdm test-assembly-step2
+
+# Step 3: Prepare import file for Solar Fire
+pdm run test-assembly-step3
+# or simply:
+pdm test-assembly-step3
+
+# Step 4: Manual step - Import and export in Solar Fire
+# Follow the instructions in the script output to manually process the data
+# in Solar Fire software and place the exported file in the specified location
+
+# Step 5: Extract and assemble the ground truth database
+pdm run test-assembly-step4
+# or simply:
+pdm test-assembly-step4
+
+# Optional validation step:
+pdm run test-assembly-step5
+# or simply:
+pdm test-assembly-step5
+```
+
+After completing the 5-step workflow, run the automated validation test:
+
+```bash
+pdm run test-assembly
+# or simply:
+pdm test-assembly
+```
+
 **Expected outcome:** Bit-for-bit validation against ground truth dataset.
 
 **Query Generation & Randomization:**
 ```bash
 pdm run test-query-gen
+# or simply:
+pdm test-query-gen
 ```
 **Expected outcome:** Statistical proof of determinism for `correct` mapping and non-determinism for `random` mapping.
 
 **Qualification & Selection Algorithms:**
 ```bash
 pdm run test-l3-selection
+# or simply:
+pdm test-l3-selection
 ```
 **Expected outcome:** Validation of filtering rules and cutoff algorithm at scale.
 
-**Prerequisites:** Some algorithm validation tests require assets generated by Layer 3 tests. Run `pdm run test-l3-default` first if encountering "prerequisites not found" errors.
+**Prerequisites:** Some algorithm validation tests require assets generated by Layer 3 tests. Run `pdm run test-l3` first if encountering "prerequisites not found" errors.
 
 **Why third?** These tests validate scientific correctness and depend on assets from Layer 3 tests.
 
 #### Stage 4: Unit Tests - Experiment Lifecycle
-Test experiment workflow components individually:
+Test experiment workflow components:
 
 ```bash
 # Test all experiment lifecycle unit tests
-pytest tests/experiment_lifecycle/ -v
-
-# If failures occur, test individual scripts:
-pytest tests/experiment_lifecycle/test_orchestrator.py -v
-pytest tests/experiment_lifecycle/test_query_generator.py -v
-pytest tests/experiment_lifecycle/test_batch_executor.py -v
-pytest tests/experiment_lifecycle/test_replication_manager.py -v
-pytest tests/experiment_lifecycle/test_process_llm_responses.py -v
-pytest tests/experiment_lifecycle/test_analyzer.py -v
+pdm run test-exp-lc
+# or simply:
+pdm test-exp-lc
 ```
 
 **Expected outcome:** All experiment lifecycle unit tests pass, verifying that query generation, LLM interaction, and analysis components function correctly.
@@ -179,15 +238,21 @@ Validate complete experiment and study workflows:
 ```bash
 # Automated validation
 pdm run test-l4
+# or simply:
+pdm test-l4
 
 # Educational guided tour
 pdm run test-l4-interactive
+# or simply:
+pdm test-l4-interactive
 ```
 **Expected outcome:** Complete `new -> audit -> break -> fix` lifecycle with 4 corruption scenarios and automated repair. All experiments restore to valid state.
 
 **Study Compilation (Layer 5):**
 ```bash
 pdm run test-l5
+# or simply:
+pdm test-l5
 ```
 **Expected outcome:** Complete study compilation from Layer 4 experiments, including aggregation, statistical analysis, and artifact generation.
 
@@ -199,9 +264,13 @@ Once confident in individual components, run the complete unit test suite:
 ```bash
 # Run all Python tests with coverage
 pdm run cov
+# or simply:
+pdm cov
 
 # Or just run all tests quickly
 pdm run test
+# or simply:
+pdm test
 ```
 
 **Expected outcome:** All unit tests pass with coverage reports showing 80-90% coverage for standard modules and 85%+ for critical modules.
@@ -214,15 +283,21 @@ Validate statistical calculations against GraphPad Prism:
 ```bash
 # Stage 1: Create validation study (24 experiments, ~2 hours)
 pdm run test-stats-study
+# or simply:
+pdm test-stats-study
 
 # Stage 2: Generate GraphPad import files
 pdm run test-stats-imports
+# or simply:
+pdm test-stats-imports
 
 # Stage 3: Manual GraphPad Prism processing
 # (Follow instructions from Stage 2 output)
 
 # Stage 4: Validate results
 pdm run test-stats-results
+# or simply:
+pdm test-stats-results
 ```
 
 **Expected outcome:** Statistical calculations match GraphPad within established tolerances (±0.0001 for p-values, ±0.01 for effect sizes).
@@ -249,7 +324,9 @@ Stage 7: Statistical Validation (optional)
 
 ### Troubleshooting Common Issues
 
-**"Prerequisites not found" errors:** Run Layer 3 tests first (`pdm run test-l3-default`) to generate required assets for algorithm validation tests.
+**"Prerequisites not found" errors:** Run Layer 3 tests first (`pdm run test-l3` or `pdm test-l3`) to generate required assets for algorithm validation tests.
+
+**"Assembly logic sandbox was not found" errors:** Run the 5-step Personality Assembly Algorithm workflow first to generate the required ground truth dataset.
 
 **API key errors:** Ensure `.env` file is configured with OpenRouter API key for tests requiring LLM calls.
 
@@ -267,9 +344,13 @@ This foundational layer focuses on validating the internal logic of individual P
 ```bash
 # Test data preparation components
 pdm run test-data-prep
+# or simply:
+pdm test-data-prep
 
-# Test experiment lifecycle components  
+# Test experiment lifecycle components
 pdm run test-exp-lc
+# or simply:
+pdm test-exp-lc
 ```
 
 **Test specific modules:**
@@ -283,9 +364,13 @@ pdm report-cov src/analyze_llm_performance.py
 ```bash
 # Quick test run
 pdm run test
+# or simply:
+pdm test
 
 # With coverage report
 pdm run cov
+# or simply:
+pdm cov
 ```
 
 ### Data Preparation Pipeline
@@ -301,6 +386,7 @@ Validates the automated extraction of birth data from the live Astro-Databank we
 **Test file:** `tests/data_preparation/test_fetch_adb_data.py`
 
 **What's tested:**
+
 - HTTP session management and connection handling
 - API query construction with proper timezone calculations
 - Data parsing from JSON responses
@@ -321,6 +407,7 @@ These tests validate the deterministic filtering rules that create the pool of e
 **Test file:** `tests/data_preparation/test_find_wikipedia_links.py`
 
 **What's tested:**
+
 - Web scraping logic for ADB pages
 - Wikipedia search API fallback mechanism
 - URL extraction and validation
@@ -334,6 +421,7 @@ These tests validate the deterministic filtering rules that create the pool of e
 **Test file:** `tests/data_preparation/test_validate_wikipedia_pages.py`
 
 **What's tested:**
+
 - Content validation (name and death date confirmation)
 - Redirect handling and resolution
 - Disambiguation page detection and handling
@@ -348,6 +436,7 @@ These tests validate the deterministic filtering rules that create the pool of e
 **Test file:** `tests/data_preparation/test_select_eligible_candidates.py`
 
 **What's tested:**
+
 - Sequential application of all deterministic filters:
   - Wikipedia validation status
   - Entry type (Person vs Event)
@@ -372,6 +461,7 @@ These tests validate the LLM-based scoring and data-driven cutoff algorithm that
 **Test file:** `tests/data_preparation/test_generate_eminence_scores.py`
 
 **What's tested:**
+
 - Batch processing logic and queue management
 - LLM API interaction patterns
 - Response parsing and score extraction
@@ -386,6 +476,7 @@ These tests validate the LLM-based scoring and data-driven cutoff algorithm that
 **Test file:** `tests/data_preparation/test_generate_ocean_scores.py`
 
 **What's tested:**
+
 - Text processing and prompt construction
 - LLM API interaction and rate limiting
 - OCEAN score extraction and validation
@@ -400,6 +491,7 @@ These tests validate the LLM-based scoring and data-driven cutoff algorithm that
 **Test file:** `tests/data_preparation/test_select_final_candidates.py`
 
 **What's tested:**
+
 - Cumulative variance curve calculation
 - Smoothing algorithm (moving average)
 - Slope analysis for plateau detection
@@ -422,6 +514,7 @@ These tests validate the components that assemble the final neutralized personal
 **Test file:** `tests/data_preparation/test_prepare_sf_import.py`
 
 **What's tested:**
+
 - File formatting for Solar Fire import
 - Data transformation and encoding
 - ID encoding into timezone abbreviations
@@ -435,6 +528,7 @@ These tests validate the components that assemble the final neutralized personal
 **Test file:** `tests/data_preparation/test_create_subject_db.py`
 
 **What's tested:**
+
 - Solar Fire export parsing (14-line repeating blocks)
 - ID decoding from timezone abbreviations
 - Data merging with final candidates list
@@ -451,6 +545,7 @@ These tests validate the components that assemble the final neutralized personal
 **Test file:** `tests/data_preparation/test_neutralize_delineations.py`
 
 **What's tested:**
+
 - Text processing workflow (fast and robust modes)
 - Complex regular expression patterns for text extraction
 - LLM API interaction for text rewriting
@@ -469,6 +564,7 @@ These tests validate the components that assemble the final neutralized personal
 **Test file:** `tests/data_preparation/test_generate_personalities_db.py`
 
 **What's tested:**
+
 - Complete profile generation workflow
 - Point weight calculations
 - Balance threshold classifications (strong/weak)
@@ -492,6 +588,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_experiment_manager.py`
 
 **What's tested:**
+
 - New experiment creation workflow
 - Directory structure generation
 - Config archival and parameter capture
@@ -511,6 +608,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_experiment_auditor.py`
 
 **What's tested:**
+
 - Completeness detection logic
 - Corruption classification (severity levels)
 - Validation status determination
@@ -528,6 +626,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_config_loader.py`
 
 **What's tested:**
+
 - Config file parsing and validation
 - Type conversion and default values
 - Section and key existence checks
@@ -540,6 +639,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_restore_experiment_config.py`
 
 **What's tested:**
+
 - Archived config restoration
 - Parameter extraction and validation
 - Error handling for missing archives
@@ -551,6 +651,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_replication_manager.py`
 
 **What's tested:**
+
 - Six-stage replication pipeline execution
 - Parallel session management with ThreadPoolExecutor
 - Session worker control flow
@@ -570,6 +671,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_build_llm_queries.py`
 
 **What's tested:**
+
 - Query file generation for all trials
 - Manifest creation (trial-to-subject mappings)
 - Data loading from personalities database
@@ -582,6 +684,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_query_generator.py`
 
 **What's tested:**
+
 - Mapping strategy implementation (correct vs random)
 - Subject selection and randomization
 - Manifest structure validation
@@ -595,6 +698,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_llm_prompter.py`
 
 **What's tested:**
+
 - API call construction and execution
 - Rate limiting logic
 - Timeout handling
@@ -610,6 +714,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_process_llm_responses.py`
 
 **What's tested:**
+
 - k×k matrix extraction from text responses
 - Rank conversion and validation
 - Score range validation (1 to k)
@@ -629,6 +734,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_analyze_llm_performance.py`
 
 **What's tested:**
+
 - Core statistical calculations (MRR, Top-K accuracy)
 - Wilcoxon signed-rank test implementation
 - Chance calculation and documentation
@@ -644,6 +750,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_run_bias_analysis.py`
 
 **What's tested:**
+
 - Linear regression for positional bias detection
 - Slope, R-value, and p-value calculations
 - Rank-based analysis (not MRR)
@@ -657,6 +764,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_generate_replication_report.py`
 
 **What's tested:**
+
 - Report assembly from analysis results
 - Human-readable summary formatting
 - Machine-parsable JSON block generation
@@ -669,6 +777,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_manage_experiment_log.py`
 
 **What's tested:**
+
 - Log file creation and updates
 - Timestamp handling
 - Status message formatting
@@ -683,6 +792,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_compile_replication_results.py`
 
 **What's tested:**
+
 - Single replication CSV generation
 - Data extraction from reports
 - Error handling for missing files
@@ -692,6 +802,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_compile_experiment_results.py`
 
 **What's tested:**
+
 - Multi-replication aggregation
 - Experiment-level CSV generation
 - Data validation and formatting
@@ -701,6 +812,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_compile_study_results.py`
 
 **What's tested:**
+
 - Multi-experiment aggregation
 - Study-level CSV generation
 - Cross-experiment validation
@@ -712,6 +824,7 @@ These tests validate the components that manage experiment execution, LLM intera
 **Test file:** `tests/experiment_lifecycle/test_analyze_study_results.py`
 
 **What's tested:**
+
 - Two-way ANOVA implementation
 - Post-hoc test calculations
 - Effect size computations (eta-squared)
@@ -731,6 +844,7 @@ These shared utility modules provide common functionality across the framework.
 **Test file:** `tests/test_id_encoder.py`
 
 **What's tested:**
+
 - ID encoding into timezone abbreviations
 - Decoding back to original IDs
 - Round-trip validation
@@ -741,6 +855,7 @@ These shared utility modules provide common functionality across the framework.
 **Test file:** `tests/utils/test_file_utils.py`
 
 **What's tested:**
+
 - Path resolution and validation
 - File existence checks
 - Directory creation
@@ -748,7 +863,7 @@ These shared utility modules provide common functionality across the framework.
 
 #### User Entry Points (Wrappers)
 
-PowerShell wrapper scripts are not measured by Python code coverage. Their correctness is validated through end-to-end integration tests (Layer 4-5).
+PowerShell wrapper scripts are not measured by Python code coverage; their correctness is validated through end-to-end integration tests (Layer 4-5).
 
 **Tested wrappers:**
 - `new_experiment.ps1` - Test file: `tests/experiment_lifecycle/new_experiment.Tests.ps1`
@@ -758,6 +873,7 @@ PowerShell wrapper scripts are not measured by Python code coverage. Their corre
 - `audit_study.ps1` - Test file: `tests/experiment_lifecycle/audit_study.Tests.ps1`
 
 **What's tested:**
+
 - Parameter handling and validation
 - Script execution workflows
 - Error handling and exit codes
@@ -792,9 +908,12 @@ These tests validate the complete data preparation workflow from raw Astro-Datab
 **Command:**
 ```powershell
 pdm run test-l2
+# or simply:
+pdm test-l2
 ```
 
 **What's tested:**
+
 - Halt/resume logic without expensive LLM calls
 - State transition correctness
 - Step completion detection
@@ -821,9 +940,12 @@ Runs the full pipeline with LLM-based candidate selection active.
 **Command:**
 ```powershell
 pdm run test-l3-default
+# or simply:
+pdm test-l3-default
 ```
 
 **What's tested:**
+
 - Complete 4-stage pipeline execution:
   1. Data Sourcing (fetch_adb_data.py)
   2. Candidate Qualification (find_wikipedia_links.py, validate_wikipedia_pages.py, select_eligible_candidates.py)
@@ -845,9 +967,12 @@ Tests the pipeline with `bypass_candidate_selection` flag enabled, skipping LLM-
 **Command:**
 ```powershell
 pdm run test-l3-bypass
+# or simply:
+pdm test-l3-bypass
 ```
 
 **What's tested:**
+
 - Data Sourcing stage
 - Candidate Qualification stage
 - Profile Generation stage (without LLM selection)
@@ -866,9 +991,12 @@ Provides a step-by-step educational walkthrough of the data pipeline.
 **Command:**
 ```powershell
 pdm run test-l3-interactive
+# or simply:
+pdm test-l3-interactive
 ```
 
 **What's tested:**
+
 - Same technical validation as Default Mode
 - Pause-and-explain at each pipeline stage
 - Intermediate file inspection opportunities
@@ -901,6 +1029,8 @@ Rapid validation suitable for CI/CD pipelines.
 **Command:**
 ```powershell
 pdm run test-l4
+# or simply:
+pdm test-l4
 ```
 
 **What's tested:**
@@ -936,9 +1066,12 @@ Comprehensive educational experience with detailed explanations at each step.
 **Command:**
 ```powershell
 pdm run test-l4-interactive
+# or simply:
+pdm test-l4-interactive
 ```
 
 **What's tested:**
+
 - Same technical validation as Automated Mode
 - Detailed explanations before each phase
 - Opportunity to inspect experiment state
@@ -982,6 +1115,8 @@ For granular control or debugging:
 **Command:**
 ```powershell
 pdm run test-l5
+# or simply:
+pdm test-l5
 ```
 
 **What's tested:**
@@ -1033,8 +1168,8 @@ This is a developer-run, five-step workflow that uses the source expert system (
 1.  **`1_generate_coverage_map.py`**: Pre-computes which delineation keys are triggered by each subject.
 2.  **`2_select_assembly_logic_subjects.py`**: Uses a greedy algorithm to select the smallest set of subjects that provides maximum coverage of all delineation keys.
 3.  **`3_prepare_assembly_logic_import.py`**: Formats the selected subjects for manual import into the Solar Fire software.
-4.  **`4_manual_export_instructions.md`**: Provides detailed instructions for manually exporting the required data from Solar Fire.
-5.  **`5_build_ground_truth_db.py`**: Processes the exported Solar Fire data to create a ground-truth personality database.
+4.  **`4_extract_assembly_logic_text.py`**: Processes the Solar Fire export to extract the delineation text components and assembles the ground truth database.
+5.  **`5_validate_assembly_logic_subjects.py`**: Validates the integrity of the data round-trip through Solar Fire.
 
 #### Part 2: The Automated Validation Test
 
@@ -1042,7 +1177,9 @@ Once the ground truth dataset is generated, the automated test (`tests/algorithm
 
 **To run the test:**
 ```powershell
-pytest tests/algorithm_validation/test_profile_generation_algorithm.py -v
+pdm run test-assembly
+# or simply:
+pdm test-assembly
 ```
 
 **Prerequisites:**
@@ -1057,6 +1194,7 @@ This standalone test validates the core filtering and cutoff algorithms at scale
 Validates the deterministic filtering rules applied to create the "eligible candidates" pool from raw Astro-Databank data.
 
 **What's tested:**
+
 - Sequential application of all filtering criteria
 - Deduplication logic
 - Wikipedia validation integration
@@ -1070,6 +1208,7 @@ Validates the deterministic filtering rules applied to create the "eligible cand
 Validates the sophisticated variance-based cutoff algorithm that determines the optimal cohort size.
 
 **What's tested:**
+
 - Cumulative variance curve calculation at scale
 - Moving average smoothing algorithm
 - Slope analysis for plateau detection
@@ -1079,6 +1218,8 @@ Validates the sophisticated variance-based cutoff algorithm that determines the 
 **To run the test:**
 ```powershell
 pdm run test-l3-selection
+# or simply:
+pdm test-l3-selection
 ```
 
 **Prerequisites:**
@@ -1104,13 +1245,17 @@ This standalone test provides mathematical proof of the mapping and randomizatio
 ```powershell
 # Run with default 99.9999% power (Beta = 0.000001), which requires 9 iterations for k=3.
 pdm run test-query-gen
+# or simply:
+pdm test-query-gen
 
 # Run with a custom 99.9% power (Beta = 0.001), which requires 5 iterations.
 pdm run test-query-gen -Beta 0.001
+# or simply:
+pdm test-query-gen -Beta 0.001
 ```
 
 **Prerequisites:**
-This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3-default` once to bootstrap these assets. If the assets are not present, the test will be skipped.
+This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3-default` (or `pdm test-l3-default`) once to bootstrap these assets. If the assets are not present, the test will be skipped.
 
 ## Statistical Analysis & Reporting Validation
 
@@ -1125,15 +1270,21 @@ This 4-stage validation workflow provides external validation of the entire stat
 ```powershell
 # Stage 1: Create statistical validation study using real framework
 pdm run test-stats-study
+# or simply:
+pdm test-stats-study
 
 # Stage 2: Generate GraphPad import files
 pdm run test-stats-imports
+# or simply:
+pdm test-stats-imports
 
 # Stage 3: Manual GraphPad Prism processing
 # (Manual import, analyze, export for 8 selected replications)
 
 # Stage 4: Validate GraphPad results against framework calculations
 pdm run test-stats-results
+# or simply:
+pdm test-stats-results
 ```
 
 **Current Status: Complete**

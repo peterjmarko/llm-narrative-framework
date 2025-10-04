@@ -234,9 +234,9 @@ The project's documentation is managed through three distinct methods. For a com
 
 This project includes tests that must pass before a pull request will be merged. The pre-commit hooks do not run these tests automatically, so you must run them manually.
 
-The test suite is divided into three parts: a `pytest` suite for the Python source code, a lightweight integration harness for the PowerShell orchestration scripts, and external validation against GraphPad Prism for statistical analysis verification.
+The test suite is organized into four complementary pillars that work together to ensure both scientific validity and software reliability. For a complete overview of the testing strategy, see the Testing Guide.
 
-{{grouped_figure:docs/diagrams/arch_test_suite.mmd | scale=1.5 | width=60% | caption=Test Suite Architecture.}}
+{{grouped_figure:docs/diagrams/test_strategy_overview.mmd | scale=2.0 | width=75% | caption=The Four Pillars of the Testing Strategy.}}
 
 *   **Python Tests (Pytest)**: These tests cover the core data processing, analysis, and utility functions in the `src/` directory.
 

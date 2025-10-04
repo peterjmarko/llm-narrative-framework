@@ -1,24 +1,56 @@
 graph TD
-    subgraph "Overall Testing Philosophy"
+    subgraph "The Four Testing Pillars"
         direction LR
-        A["<b>Core Algorithm Validation</b><br><i>Verifies the scientific and logical integrity of key methodological claims.</i>"]
-        B["<b>Lifecycle & Pipeline Validation</b><br><i>Verifies the end-to-end execution flow and software plumbing.</i>"]
+        P1["<b>Unit Testing</b><br><i>Validates individual components in isolation.</i>"]
+        P2["<b>Integration Testing</b><br><i>Validates complete workflows end-to-end.</i>"]
+        P3["<b>Algorithm Validation</b><br><i>Provides mathematical proof of methodological correctness.</i>"]
+        P4["<b>Statistical Validation</b><br><i>External verification against GraphPad Prism 10.6.1.</i>"]
     end
 
-    subgraph "Standalone, High-Precision Tests"
+    subgraph "Unit Testing Coverage"
         direction TB
-        C["<b>Personality Assembly Algorithm</b><br>Ensures bit-for-bit deterministic accuracy against a ground-truth dataset."]
-        D["<b>Large-Scale Selection Algorithms</b><br>Ensures statistical validity of filtering and cutoff logic on a large, realistic dataset."]
+        U1["Data Preparation Pipeline Components"]
+        U2["Experiment & Study Lifecycle Components"]
     end
     
-    subgraph "The Seven Layers of Validation"
+    subgraph "Integration Testing Layers"
         direction TB
-        L1["<b>Layer 1:</b> Unit Testing"]
-        L2["<b>Layer 2:</b> Orchestration Testing"]
-        L3["<b>Layer 3:</b> Pipeline Integration"]
-        L4_7["<b>Layers 4-7:</b><br>Full Experiment Lifecycle Workflows"]
+        L2["<b>Layer 2:</b> State Machine Logic<br><i>(Mock-based)</i>"]
+        L3["<b>Layer 3:</b> Data Pipeline<br><i>(Complete live testing)</i>"]
+        L4["<b>Layer 4:</b> Experiment Lifecycle<br><i>(new → audit → break → fix)</i>"]
+        L5["<b>Layer 5:</b> Study Compilation<br><i>(Multi-experiment aggregation)</i>"]
     end
 
-    A --> C
-    A --> D
-    B --> L1 --> L2 --> L3 --> L4_7
+    subgraph "Algorithm Validation Tests"
+        direction TB
+        A1["<b>Personality Assembly</b><br>Bit-for-bit validation vs Solar Fire"]
+        A2["<b>Qualification & Selection</b><br>Large-scale filtering & cutoff logic"]
+        A3["<b>Query Generation</b><br>Determinism & randomization proof"]
+    end
+
+    subgraph "Statistical Validation Workflow"
+        direction TB
+        S1["Stage 1: Create validation study"]
+        S2["Stage 2: Generate GraphPad imports"]
+        S3["Stage 3: Manual GraphPad processing"]
+        S4["Stage 4: Validate results"]
+    end
+
+    P1 --> U1
+    P1 --> U2
+    P2 --> L2
+    L2 --> L3
+    L3 --> L4
+    L4 --> L5
+    P3 --> A1
+    P3 --> A2
+    P3 --> A3
+    P4 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+
+    style P1 fill:#e1f5ff
+    style P2 fill:#fff3e0
+    style P3 fill:#f3e5f5
+    style P4 fill:#e8f5e9

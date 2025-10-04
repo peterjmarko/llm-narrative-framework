@@ -39,16 +39,6 @@ pythonpath = ["src"]
 
 [tool.pdm.scripts]
 # ==============================================================================
-# === PRIMARY TEST RUNNERS ===
-# ==============================================================================
-# This is the main entry point for all tests (Python and PowerShell).
-test = {cmd = "python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
-cov = {shell = "pytest --cov=src --cov-report=term-missing", help = "Run all tests with coverage analysis."}
-test-cov = {shell = "pytest --cov=src --cov-report= {args}", help = "Run tests for a specific file to update .coverage data."}
-report-cov = {shell = "coverage report -m --no-skip-covered {args}", help = "Generate a focused coverage report for specific source file(s)."}
-cov-html = {shell = "pytest --cov=src --cov-report=html", help = "Run all tests and generate an HTML coverage report."}
-
-# ==============================================================================
 # === MAINTENANCE, LINTING & REPORTING ===
 # ==============================================================================
 clean = {cmd = "python scripts/maintenance/clean_project.py", help = "Clean up temporary and generated files."}
@@ -82,43 +72,63 @@ com-stu = "pwsh -ExecutionPolicy Bypass -File ./compile_study.ps1"
 aud-stu = "pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"
 
 # ==============================================================================
-# === DETAILED TEST SUITES ===
+# === TESTING WORKFLOW (Organized by Typical Testing Sequence) ===
 # ==============================================================================
-# --- Python Unit Tests ---
-test-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
-test-exp-lc = {cmd = "pytest tests/experiment_lifecycle/", help = "Run all experiment lifecycle unit tests."}
-cov-exp-lc = {shell = "coverage erase && coverage run -m pytest -p no:cov tests/experiment_lifecycle/ && coverage report --skip-covered", help = "Run experiment lifecycle tests with a focused coverage report."}
-test-assembly = {cmd = "pytest tests/algorithm_validation/test_profile_generation_algorithm.py", help = "Run the core assembly algorithm integration test."}
-test-cov-report = {cmd = "pwsh -File ./scripts/testing/run_targeted_coverage.ps1 {args}", help = "Run a test file and generate a focused coverage report for its corresponding source file."}
+# For the complete testing workflow and sequence details, see:
+# docs/TESTING_GUIDE.md - "Typical Testing Sequence" section
 
-# --- Integration Tests (All Layers) ---
+# --- Stage 1: Unit Tests - Data Preparation Pipeline ---
+test-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+
+# --- Stage 2: Data Pipeline Integration (Layer 2-3) ---
 test-l2 = "pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"
 test-l3 = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"
-test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"
 test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"
+test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"
+
+# --- Stage 3: Algorithm Validation ---
+# Prerequisite steps for test-assembly (Personality Assembly Algorithm Validation)
+test-assembly-step1 = {cmd = "python scripts/workflows/assembly_logic/1_generate_coverage_map.py", help = "Step 1: Generate coverage map for assembly logic validation."}
+test-assembly-step2 = {cmd = "python scripts/workflows/assembly_logic/2_select_assembly_logic_subjects.py", help = "Step 2: Select optimal subject set for assembly logic validation."}
+test-assembly-step3 = {cmd = "python scripts/workflows/assembly_logic/3_prepare_assembly_logic_import.py", help = "Step 3: Prepare import file for Solar Fire."}
+test-assembly-step4 = {cmd = "python scripts/workflows/assembly_logic/4_extract_assembly_logic_text.py", help = "Step 5: Extract and assemble the ground truth database."}
+test-assembly-step5 = {cmd = "python scripts/workflows/assembly_logic/5_validate_assembly_logic_subjects.py", help = "Step 6: Validate the assembled ground truth database."}
+test-assembly-setup = {cmd = "python scripts/workflows/assembly_logic/test_assembly_setup_with_pause.py", help = "Run all steps with interactive pause for manual Solar Fire processing."}
+test-assembly = {cmd = "pytest tests/algorithm_validation/test_profile_generation_algorithm.py", help = "Run the personality assembly algorithm validation."}
+test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.ps1"
 test-l3-selection = "pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"
+
+# --- Stage 4: Unit Tests - Experiment Lifecycle ---
+test-exp-lc = {cmd = "pytest tests/experiment_lifecycle/", help = "Run all experiment lifecycle unit tests."}
+
+# --- Stage 5: Experiment & Study Integration (Layer 4-5) ---
 test-l4 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer4/run_layer4_test.ps1"
 test-l4-interactive = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer4/run_layer4_test.ps1 -Interactive"
 test-l5 = "pwsh -File ./tests/testing_harness/experiment_lifecycle/layer5/run_layer5_test.ps1"
-test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.ps1"
 
-# --- Statistical Analysis Validation Workflow ---
+# --- Stage 6: All Unit Tests Together ---
+test = {cmd = "python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
+cov = {shell = "pytest --cov=src --cov-report=term-missing", help = "Run all tests with coverage analysis."}
+cov-html = {shell = "pytest --cov=src --cov-report=html", help = "Run all tests and generate an HTML coverage report."}
+test-cov = {shell = "pytest --cov=src --cov-report= {args}", help = "Run tests for a specific file to update .coverage data."}
+report-cov = {shell = "coverage report -m --no-skip-covered {args}", help = "Generate a focused coverage report for specific source file(s)."}
+
+# --- Stage 7: Statistical Validation ---
 test-stats-study = "pwsh -File ./tests/algorithm_validation/create_statistical_study.ps1"
 test-stats-imports = "pwsh -File ./tests/algorithm_validation/generate_graphpad_imports.ps1" 
 test-stats-results = "pwsh -File ./tests/algorithm_validation/validate_graphpad_results.ps1"
 
-# --- PowerShell Tests (By Suite) ---
-# Experiment Lifecycle
+# --- PowerShell Wrapper Tests (Used by Integration Tests) ---
 test-ps-new-exp = "pwsh ./tests/experiment_lifecycle/new_experiment.Tests.ps1"
 test-ps-audit-exp = "pwsh ./tests/experiment_lifecycle/audit_experiment.Tests.ps1"
 test-ps-fix-exp = "pwsh ./tests/experiment_lifecycle/fix_experiment.Tests.ps1"
-test-ps-exp = {composite = ["test-ps-new-exp", "test-ps-audit-exp", "test-ps-fix-exp", "test-ps-migr-exp"], help = "Run all PowerShell tests for the experiment lifecycle."}
-# Study Lifecycle
 test-ps-comp-study = "pwsh ./tests/experiment_lifecycle/compile_study.Tests.ps1"
 test-ps-audit-study = "pwsh ./tests/experiment_lifecycle/audit_study.Tests.ps1"
-# Composite Runners
 test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
-test-exp-all = {composite = ["test-py-exp", "test-ps-exp"], help = "Run all Python and PowerShell tests for the experiment lifecycle."}
+
+# --- Composite Test Runners ---
+test-ps-exp = {composite = ["test-ps-new-exp", "test-ps-audit-exp", "test-ps-fix-exp"], help = "Run all PowerShell tests for the experiment lifecycle."}
+test-exp-all = {composite = ["test-exp-lc", "test-ps-exp"], help = "Run all Python and PowerShell tests for the experiment lifecycle."}
 
 [tool.commitizen]
 name = "cz_conventional_commits"
