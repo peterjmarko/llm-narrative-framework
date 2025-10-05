@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 12.6.0 (2025-10-04)
+
+### Bump
+
+- **version 12.5.4 → 12.6.0**
+
+### Features
+
+- **automate solar fire file transfer operations**
+  Enhanced the data preparation pipeline with automatic file transfer between the project and Solar Fire software. This improvement streamlines the workflow by eliminating manual file copying steps while maintaining flexibility with optional skip flags.
+  
+  Additional contextual information:
+  - Added automatic copying of generated import files to the Solar Fire import folder
+  - Added automatic fetching of chart export files from the Solar Fire export directory
+  - Made colorama dependency optional for better compatibility
+  - Updated documentation to reflect the new automated workflow
+  - Updated project roadmap to mark all statistical validation tests as completed
+
 ## 12.5.4 (2025-10-04)
 
 ### Bump
