@@ -2,6 +2,17 @@
 
 # Changelog
 
+## 12.8.1 (2025-10-05)
+
+### Bump
+
+- **version 12.8.0 → 12.8.1**
+
+### Fixes
+
+- **fix test configuration section name**
+  Fixed the Layer 4 integration test failure by correcting the configuration section name from [Study] to [Experiment] in the test setup script. The replication_manager.py was looking for the group_size parameter in the [Experiment] section, but the test configuration had it in the [Study] section, causing a TypeError when the parameter was None.
+
 ## 12.8.0 (2025-10-05)
 
 ### Bump
