@@ -242,7 +242,7 @@ This script formats the final candidates list for import into Solar Fire, encodi
 # Prepare the final list for the manual import step
 pdm run prep-sf-import
 ```
-This produces `data/intermediate/sf_data_import.txt`, the input for the next stage.
+This produces `data/intermediate/sf_data_import.txt`, the input for the next stage. Note: to facilitate the Solar Fire import process, this file is copied to the Solar Fire import folder once it's created in its original location (see the 'File Locations' section in 'Importing to and Exporting from Solar Fire' below).
 
 ### Stage 4: Profile Generation
 
@@ -254,7 +254,7 @@ The process consists of three main parts:
 
 2.  **Solar Fire Import/Calculate/Export Process:** This is a manual process that involves importing the data into Solar Fire, calculating all charts, and exporting the chart data. This process is detailed in the next section.
 
-3.  **Final Database Generation:** Once the chart data is exported from Solar Fire, the `create_subject_db.py` and `generate_personalities_db.py` scripts assemble the final personalities database. This process is detailed in the "Final Database Generation" section.
+3.  **Final Database Generation:** Once the `sf_chart_export.csv` charts file is exported from Solar Fire, the `create_subject_db.py` and `generate_personalities_db.py` scripts assemble the final personalities database. This process is detailed in the "Final Database Generation" section. Note: to facilitate the Solar Fire export process, the exported charts file is copied from the Solar Fire export folder to its permanent location at `data/foundational_assets/` (see the 'File Locations' section in 'Importing to and Exporting from Solar Fire' chapter below).
 
 ## Importing to and Exporting from Solar Fire
 
@@ -355,7 +355,7 @@ The procedure below is for the production workflow. When validating the Personal
 *   **Menu:** `Utilities > Chart Import/Export...`
 *   **Action:**
     1.  If a **"Confirm"** dialog appears immediately, click **'OK'**.
-    2.  On the **'Import From' tab**, select `ASCII files` and choose `data/intermediate/sf_data_import.txt`.
+    2.  On the **'Import From' tab**, select `ASCII files` and choose `sf_data_import.txt` in the import folder.
     3.  On the **'Save To' tab**, ensure your `adb_candidates.sfcht` file is selected.
     4.  On the **'Options' tab**, select your `CQD Import` format.
     5.  Click the **'Convert'** button.
@@ -384,7 +384,7 @@ The procedure below is for the production workflow. When validating the Personal
     3.  Under **'Select types of points'**, ensure **'Chart Points'** is selected.
     4.  For the ASCII format, select your custom `CQD Export` format.
     5.  Set **'Field Delimiters'** to `Comma Quote (CQD)` and 'Destination' to `Export to File`.
-    6.  Browse to the `data/foundational_assets/` directory, set the filename to `sf_chart_export.csv`, and click **Save**. Note: 'Save as type' cannot be set in this dialog.
+    6.  Browse to the export directory, set the filename to `sf_chart_export.csv`, and click **Save**. Note: 'Save as type' cannot be set in this dialog.
     7.  **Warning:** Solar Fire will overwrite this file without confirmation. Click **'Export'**.
     8.  Once the export completes successfully, click the **'Quit'** button to close the dialog.
 

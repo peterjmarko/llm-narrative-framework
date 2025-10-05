@@ -4,26 +4,7 @@ This document outlines planned development tasks and tracks known issues for the
 
 ## Tasks Prior to Publication
 
-### 1. Framework Validation and Stabilization
-
-This phase focuses on achieving a fully validated and stable codebase before the final data generation run.
-
-#### A. Execute Statistical Analysis Validation
-- [x] **Create GraphPad Validation Workflow** - 4-step process: Create → Generate → Process → Validate
-- [x] **Execute Step 1**: `create_statistical_study.ps1` - Generated real statistical study using framework
-- [x] **Execute Step 2**: `generate_graphpad_exports.ps1` - Created comprehensive export files for GraphPad
-- [x] **Execute Step 3**: Manual GraphPad Prism processing - COMPLETED
-  - [x] Processed 15 comprehensive validation files
-  - [x] 6 Wilcoxon tests, 3 ANOVA analyses, 5 bias regression analyses 
-  - [x] Generated GraphPad export results for automated comparison
-- [x] **Execute Step 4**: `validate_graphpad_results.ps1` - **COMPLETED**
-  - [x] **Core MRR Calculations: VALIDATED** (24/24 comparisons, zero errors, max difference 0.000050)
-  - [x] Resolved PowerShell parsing errors and GraphPad format compatibility issues
-  - [x] Supplementary validations show methodological differences (expected, not calculation errors)
-- [x] **Document validation results** and confirm academic citation readiness
-  - [x] **Academic Citation Ready**: "Core statistical calculations were validated against GraphPad Prism 10.6.1"
-
-### 2. Final Data Generation and Study Execution
+### 1. Final Data Generation and Study Execution
 
 - [ ] **Execute Final Data Preparation**
   - [ ] Run the complete `prepare_data.ps1` pipeline to generate a fresh, final dataset from live sources.
@@ -34,55 +15,12 @@ This phase focuses on achieving a fully validated and stable codebase before the
   - [ ] Manually create a final study directory (e.g., `output/studies/publication_run/`).
   - [ ] Move all generated experiment folders into the study directory.
   - [ ] Run `compile_study.ps1` to produce the definitive analysis and plots for the manuscript.
-
-## Tasks Completed in This Phase
-
-### Framework Validation Achievements
-
-- ✅ **Layer 5 Integration Test**: Successfully implemented and validated the complete study compilation workflow
-  - Validates 2x2 factorial design from Layer 4 experiments
-  - Tests study compilation with `STUDY_results.csv` generation  
-  - Handles statistical analysis filtering for insufficient test data appropriately
-  - Demonstrates full study compilation lifecycle with proper cleanup
-  - Includes both automated and validation modes
-
-- ✅ **Statistical Analysis Validation Workflow**: Created complete 4-step GraphPad Prism validation process
-  - ✅ Step 1: `create_statistical_study.ps1` - Real framework execution completed
-  - ✅ Step 2: `generate_graphpad_exports.ps1` - Export generation completed
-  - ⏳ Step 3: Manual GraphPad Prism processing - IN PROGRESS
-  - ⏳ Step 4: `validate_graphpad_results.ps1` - Pending Step 3 completion
-  - Created statistical validation study generator using actual `new_experiment.ps1` workflow
-  - Real LLM responses with deterministic parameters (temperature=0.0, gemini-1.5-flash)
-  - Framework's built-in seeded randomization for personality selection (no parallel implementation)
-  - 2×2 factorial design with sufficient replications to trigger full statistical analysis
-  - Complete GraphPad Prism validation workflow with export generation and comparison instructions
-
-### Key Technical Solutions Implemented
-
-- **Config Path Consistency**: Unified approach between Layer 4 and Layer 5 for test configuration management
-- **Complete Config Sections**: Full project config integration with proper sections for analysis
-- **Realistic Data Expectations**: Correctly expects 4 experiment rows rather than 12 replication rows
-- **Flexible Analysis Validation**: Accepts either full statistical analysis or filtered-out messages for test data scenarios
-
-## Validation Achievements
-
-### Statistical Analysis Coverage
-The framework now has complete validation coverage for the statistical analysis pipeline:
-
-**Layer 5 Integration Test**: Validates appropriate handling of insufficient data scenarios (filtered statistical models).
-
-**GraphPad Prism Validation**: Validates the full statistical analysis pipeline when sufficient replications are available, including complete ANOVA, post-hoc tests, and Bayesian analysis.
-
-**Coverage**: Both common test scenarios and production data volumes are now validated against academic standards.
-
-**Academic Rigor**: External validation against GraphPad Prism 10.6.1 provides publication-ready validation methodology.
-
 - [ ] **Perform and Report Correction for Multiple Comparisons**
   - [ ] Add a footnote or supplementary note to the article reporting the Benjamini-Hochberg FDR-corrected p-values to demonstrate statistical rigor.
 - [ ] **Tag Publication Commit**
   - [ ] Create a permanent Git tag (e.g., `v1.0-publication`) to mark the exact version of the code used to generate the paper's results.
 
-### 3. Final Documentation Polish
+### 2. Final Documentation Polish
 
 - [ ] **Update All Documents with Final Results**
   - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.

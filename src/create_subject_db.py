@@ -34,6 +34,8 @@ Its key function is to bridge the manual software step deterministically:
     with the master filtered list, eliminating any need for fuzzy name matching.
 4.  The final output is a clean `subject_db.csv` file, which serves as the
     primary input for the final database generation script.
+5.  Fetches the chart export file from the Solar Fire export directory and
+    copies it to the project's data/foundational_assets folder before processing.
 """
 
 import argparse
@@ -46,7 +48,20 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from colorama import Fore, init
+# --- Local Imports ---
+try:
+    from colorama import Fore, init
+    HAS_COLORAMA = True
+except ImportError:
+    HAS_COLORAMA = False
+    # Create dummy Fore class with empty strings if colorama is not available
+    class DummyFore:
+        YELLOW = ""
+        CYAN = ""
+        GREEN = ""
+        RED = ""
+        RESET = ""
+    Fore = DummyFore()
 
 # Ensure the src directory is in the Python path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -55,8 +70,9 @@ from config_loader import get_path  # noqa: E402
 from id_encoder import from_base58  # noqa: E402
 from utils.file_utils import backup_and_remove  # noqa: E402
 
-# Initialize colorama
-init(autoreset=True, strip=False)
+# Initialize colorama if available
+if HAS_COLORAMA:
+    init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -148,6 +164,7 @@ def main():
         help="Path to the sandbox directory for testing.",
     )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
+    parser.add_argument("--no-fetch", action="store_true", help="Skip fetching the chart export file from Solar Fire export directory.")
     args = parser.parse_args()
 
     if args.sandbox_path:
@@ -156,6 +173,36 @@ def main():
     chart_export_path = Path(get_path("data/foundational_assets/sf_chart_export.csv"))
     final_candidates_path = Path(get_path("data/intermediate/adb_final_candidates.txt"))
     output_path = Path(get_path("data/processed/subject_db.csv"))
+    
+    # Fetch chart export file from Solar Fire export directory if not skipped
+    if not args.no_fetch:
+        sf_export_csv = Path(r"C:\Users\peter\Documents\Solar Fire User Files\Export\sf_chart_export.csv")
+        sf_export_dat = Path(r"C:\Users\peter\Documents\Solar Fire User Files\Export\SFChartExport.dat")
+        
+        # Try CSV first, then DAT
+        sf_export_source = None
+        if sf_export_csv.exists():
+            sf_export_source = sf_export_csv
+        elif sf_export_dat.exists():
+            sf_export_source = sf_export_dat
+            print(f"{Fore.YELLOW}NOTE: Found .dat file in export directory. Please ensure it has been converted to CSV format.{Fore.RESET}")
+        
+        if sf_export_source:
+            try:
+                chart_export_path.parent.mkdir(parents=True, exist_ok=True)
+                # If it's a DAT file, we'll copy it but with a warning
+                if sf_export_source.suffix.lower() == '.dat':
+                    print(f"{Fore.YELLOW}WARNING: Copying .dat file. Manual conversion to CSV may be required.{Fore.RESET}")
+                    shutil.copy2(sf_export_source, chart_export_path.with_suffix('.dat'))
+                else:
+                    shutil.copy2(sf_export_source, chart_export_path)
+                    print(f"{Fore.CYAN}Fetched chart export file from Solar Fire export directory.{Fore.RESET}")
+            except Exception as e:
+                print(f"{Fore.YELLOW}WARNING: Could not fetch chart export file from Solar Fire: {e}{Fore.RESET}")
+        else:
+            print(f"{Fore.YELLOW}WARNING: No chart export file (.csv or .dat) found in Solar Fire export directory.{Fore.RESET}")
+    else:
+        print(f"{Fore.YELLOW}Skipping fetch from Solar Fire export directory as requested.{Fore.RESET}")
 
     # --- Intelligent Startup Logic ---
     is_stale = False

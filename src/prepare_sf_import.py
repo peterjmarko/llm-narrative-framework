@@ -37,6 +37,7 @@ Its primary functions are:
     passed through the software without modification and is not used in any
     astrological calculations, making it a safe channel for this data.
 4.  Assembles and writes the final 9-field CQD records to `sf_data_import.txt`.
+5.  Copies the generated import file to the Solar Fire import folder for easy access.
 """
 
 import argparse
@@ -51,7 +52,19 @@ from datetime import datetime
 from pathlib import Path
 
 # --- Local Imports ---
-from colorama import Fore, init
+try:
+    from colorama import Fore, init
+    HAS_COLORAMA = True
+except ImportError:
+    HAS_COLORAMA = False
+    # Create dummy Fore class with empty strings if colorama is not available
+    class DummyFore:
+        YELLOW = ""
+        CYAN = ""
+        GREEN = ""
+        RED = ""
+        RESET = ""
+    Fore = DummyFore()
 
 # Ensure the src directory is in the Python path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -59,8 +72,9 @@ from config_loader import get_path  # noqa: E402
 from id_encoder import to_base58  # noqa: E402
 from utils.file_utils import backup_and_remove # noqa: E402
 
-# Initialize colorama
-init(autoreset=True, strip=False)
+# Initialize colorama if available
+if HAS_COLORAMA:
+    init(autoreset=True, strip=False)
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -143,6 +157,7 @@ def main():
         help="Path to the sandbox directory for testing.",
     )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
+    parser.add_argument("--no-copy", action="store_true", help="Skip copying the file to the Solar Fire import folder.")
     args = parser.parse_args()
 
     if args.sandbox_path:
@@ -166,7 +181,7 @@ def main():
             args.force = True
 
     if not args.force and output_path.exists() and not is_stale:
-        print(f"\n{Fore.YELLOW}WARNING: The import file at '{output_path}' is already up to date. ✨")
+        print(f"\n{Fore.YELLOW}WARNING: The import file at '{output_path}' is already up to date.")
         print(f"{Fore.YELLOW}If you decide to go ahead with the update, a backup of the existing file will be created.{Fore.RESET}")
         confirm = input("Do you wish to proceed? (Y/N): ").lower().strip()
         if confirm == 'y':
@@ -214,6 +229,18 @@ def main():
                 f"\n{Fore.GREEN}SUCCESS: {key_metric}. Solar Fire import file "
                 f"created successfully.{Fore.RESET}\n"
             )
+            
+            # Copy to Solar Fire import folder if not skipped
+            if not args.no_copy:
+                sf_import_path = Path(r"C:\Users\peter\Documents\Solar Fire User Files\Import\sf_data_import.txt")
+                try:
+                    sf_import_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(output_path, sf_import_path)
+                    print(f"{Fore.CYAN} - File copied to Solar Fire import folder: {sf_import_path}{Fore.RESET}")
+                except Exception as e:
+                    print(f"{Fore.YELLOW}WARNING: Could not copy file to Solar Fire import folder: {e}{Fore.RESET}")
+            else:
+                print(f"{Fore.YELLOW}Skipping copy to Solar Fire import folder as requested.{Fore.RESET}")
         else:
             print(
                 f"\n{Fore.RED}FAILURE: {key_metric}. No records were processed.{Fore.RESET}\n"
