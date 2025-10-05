@@ -95,7 +95,7 @@ $dbContent | Set-Content -Path $TestDbPath -Encoding UTF8
     # --- Create a minimal, test-specific config.ini ---
     # FIXED: The personalities_db_file path must be relative to the sandbox directory, not project root
 $configContent = @"
-[Study]
+[Experiment]
 num_replications = 1
 num_trials = 2
 group_size = 4
