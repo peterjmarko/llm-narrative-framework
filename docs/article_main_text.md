@@ -11,7 +11,7 @@ To make changes, please edit the template file and then run 'pdm run build-docs'
 ---
 title: "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology"
 author: "Peter J. Marko and Kenneth McRitchie"
-date: "[Date]"
+date: "October 5, 2025"
 abstract: |
   **Background:** Psychology has struggled to empirically validate complex, holistic systems that produce narrative-based claims. This methodological gap highlights the need for new, more rigorous, and transparent research paradigms.
   **Objective:** This paper introduces and validates a novel, fully automated, and open-source framework for testing for weak signals in complex narratives. Using astrology as a challenging case study, we demonstrate a reproducible method for assessing the construct validity of a symbolic system against biographical data.

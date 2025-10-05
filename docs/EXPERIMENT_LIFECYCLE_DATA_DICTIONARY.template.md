@@ -221,7 +221,7 @@ mapping_strategy = correct
 k = 10
 m = 100
 
-[Study]
+[Experiment]
 k_per_query = 10
 num_iterations = 100
 

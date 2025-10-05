@@ -50,7 +50,7 @@ class TestExperimentManagerStateTransitions(unittest.TestCase):
         self.output_dir = os.path.join(self.test_dir, "output")
         os.makedirs(self.output_dir)
         self.mock_config.read_dict({
-            'Study': {'num_replications': '1'},
+            'Experiment': {'num_replications': '1'},
             'General': {
                 'base_output_dir': 'output',
                 'new_experiments_subdir': 'new_exps',
@@ -1293,7 +1293,7 @@ class TestMainFunctionEdgeCases(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp(prefix="exp_manager_main_")
         self.mock_config = configparser.ConfigParser()
         self.mock_config.read_dict({
-            'Study': {'num_replications': '1'},
+            'Experiment': {'num_replications': '1'},
         })
     
     def tearDown(self):
@@ -1380,7 +1380,7 @@ class TestMainFunctionEdgeCases(unittest.TestCase):
         # Create a dummy config file
         config_path = os.path.join(self.test_dir, 'test_config.ini')
         with open(config_path, 'w') as f:
-            f.write('[Study]\nnum_replications = 5\n')
+            f.write('[Experiment]\nnum_replications = 5\n')
         
         # Reload the experiment_manager module to test the early parsing logic
         import importlib
@@ -1413,7 +1413,7 @@ class TestMainFunctionEdgeCases(unittest.TestCase):
 
         config_path = os.path.join(self.test_dir, 'test_config.ini')
         with open(config_path, 'w') as f:
-            f.write('[Study]\nnum_replications = 5\n')
+            f.write('[Experiment]\nnum_replications = 5\n')
         
         # Patch sys.modules with our mock. The 'from' imports will still work because
         # they use __getitem__, which is handled by the base dict.

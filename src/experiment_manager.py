@@ -606,7 +606,7 @@ def main():
                 sys.exit(1)
             final_output_dir = _create_new_experiment_directory(colors)
 
-        config_num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+        config_num_reps = get_config_value(APP_CONFIG, 'Experiment', 'num_replications', value_type=int, fallback=30)
         end_rep = args.end_rep if args.end_rep is not None else config_num_reps
 
         # --- Workflow Branching: Handle --migrate as a special one-shot process ---

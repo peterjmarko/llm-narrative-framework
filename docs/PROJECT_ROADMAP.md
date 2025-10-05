@@ -23,8 +23,10 @@ This document outlines planned development tasks and tracks known issues for the
 ### 2. Final Documentation Polish
 
 - [ ] **Update All Documents with Final Results**
+  - [ ] Consolidate documentation: justify each document and sharply define scope and relationships.
+    - [ ] Merge Lifecycle Guide into main README.
   - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
-  - [ ] Update all tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
+  - [ ] Update all dates, tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
   - [ ] Replace the text placeholder in `article_main_text.md` with the final, generated interaction plot (`interaction_plot_mean_rank.png`).
 - [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
   - [ ] Check all tables and diagrams.
@@ -105,7 +107,7 @@ This document outlines planned development tasks and tracks known issues for the
   - [ ] Create a new utility in `src/utils/` to provide a standardized, shared `tqdm` progress bar.
   - [ ] Refactor `generate_eminence_scores.py` and `generate_ocean_scores.py` to use this shared utility for a consistent user experience during long-running LLM calls.
 - [ ] **Implement Automated Study Lifecycle Management**
-  - [ ] Restructure `config.ini` to accommodate study parameters (like for Layer 4). Implies '[Study]' will be renamed to '[Experiment]' (for experiment config) and '[Study]' used for studies. Sync with Layer 4 approach.
+  - [ ] Restructure `config.ini` to accommodate [Study] parameters (like for Layer 4). Sync with Layer 4 approach.
   - [ ] Implement a `new_study.ps1` orchestrator to automate the creation of multi-experiment studies based on a factor matrix in `config.ini`.
   - [ ] Develop a corresponding Layer 7 test harness to validate the full `new -> audit -> break -> fix` study lifecycle.
   - [ ] Implement `fix_study.ps1` to provide an automated repair workflow for entire studies.

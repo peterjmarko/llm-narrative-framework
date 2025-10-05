@@ -87,6 +87,7 @@ import unicodedata
 import tempfile
 import contextlib
 import tempfile
+from datetime import datetime
 
 # Add the script's own directory ('src') to the Python path.
 # This ensures that sibling modules (like docx_postprocessor) can be imported
@@ -394,6 +395,11 @@ def process_markdown_content(content, project_root, template_path_str, flavor='v
         toc_content = generate_toc(content)
         content = content.replace('{{toc}}', toc_content, 1)
 
+    # --- Process [Date] placeholder ---
+    if '[Date]' in content:
+        current_date = datetime.now().strftime("%B %-d, %Y") if os.name != 'nt' else datetime.now().strftime("%B %#d, %Y")
+        content = content.replace('[Date]', current_date)
+
     return content
 
 def build_doc_content(project_root, template_path_str, flavor='viewer'):
@@ -569,8 +575,19 @@ def is_doc_up_to_date(project_root, final_md_path_str, template_path_str):
         if os.path.getmtime(template_path_str) > final_mtime:
             return False
 
+        # Check if the document contains a [Date] placeholder
         with open(template_path_str, 'r', encoding='utf-8') as f:
             content = f.read()
+        
+        # If the template contains a [Date] placeholder, we need to check if the document was built today
+        if '[Date]' in content:
+            # Get the current date
+            current_date = datetime.now().strftime("%B %-d, %Y") if os.name != 'nt' else datetime.now().strftime("%B %#d, %Y")
+            # Check if the document contains today's date
+            with open(final_md_path_str, 'r', encoding='utf-8') as f:
+                final_content = f.read()
+            if current_date not in final_content:
+                return False
 
         # Regex to find any placeholder that points to a source file for a diagram/image.
         placeholder_regex = r'\{\{(?:diagram|grouped_figure):(.+?)(?:\||\})'
@@ -642,6 +659,7 @@ def main():
             # The final expected content is the combination of both.
             expected_content = header + '\n' + viewer_content
             
+            
             try:
                 with open(final_path, 'r', encoding='utf-8') as f:
                     current_content = f.read()
@@ -653,6 +671,19 @@ def main():
             # Normalize line endings for a robust comparison before the final check.
             normalized_current = current_content.replace('\r\n', '\n')
             normalized_expected = expected_content.replace('\r\n', '\n')
+            
+            # Get the current date for comparison
+            current_date = datetime.now().strftime("%B %-d, %Y") if os.name != 'nt' else datetime.now().strftime("%B %#d, %Y")
+            
+            # Replace the date in both current and expected content for comparison
+            # Handle both date: "..." YAML format and inline [Date] placeholders
+            normalized_current = re.sub(r'date: "[^"]+"', 'date: "[DATE_PLACEHOLDER]"', normalized_current)
+            normalized_current = normalized_current.replace(current_date, '[DATE_PLACEHOLDER]')
+            normalized_current = re.sub(r'\[Date\]', '[DATE_PLACEHOLDER]', normalized_current)
+            normalized_expected = re.sub(r'date: "[^"]+"', 'date: "[DATE_PLACEHOLDER]"', normalized_expected)
+            normalized_expected = normalized_expected.replace(current_date, '[DATE_PLACEHOLDER]')
+            normalized_expected = normalized_expected.replace('[Date]', '[DATE_PLACEHOLDER]')
+            
 
             if normalized_current != normalized_expected:
                 print(f"    - {Colors.RED}OUTDATED:{Colors.RESET} {final_rel_path} content does not match template.")

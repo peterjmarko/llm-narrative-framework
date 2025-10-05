@@ -100,7 +100,7 @@ class TestPipelineRobustness(unittest.TestCase):
             self.mock_config['General'] = {'base_output_dir': 'output'}
             self.mock_config['LLM'] = {'model_name': 'test-model'} # No temperature key
             self.mock_config['Filenames'] = {'personalities_src': 'db.txt'}
-            self.mock_config['Study'] = {'num_trials': '1', 'group_size': '1'}
+            self.mock_config['Experiment'] = {'num_trials': '1', 'group_size': '1'}
             mock_run_script.return_value = ("Mocked success", 0, None)
 
             with open(os.path.join(self.test_project_root, 'config.ini'), 'w') as f:
@@ -120,7 +120,7 @@ class TestPipelineRobustness(unittest.TestCase):
             self.mock_config['General'] = {'base_output_dir': 'output'}
             self.mock_config['LLM'] = {'model_name': 'test-model', 'temperature': 'not-a-float'}
             self.mock_config['Filenames'] = {'personalities_src': 'db.txt'}
-            self.mock_config['Study'] = {'num_trials': '1', 'group_size': '1'}
+            self.mock_config['Experiment'] = {'num_trials': '1', 'group_size': '1'}
             mock_run_script.return_value = ("Mocked success", 0, None)
 
             with open(os.path.join(self.test_project_root, 'config.ini'), 'w') as f:

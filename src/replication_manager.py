@@ -210,17 +210,17 @@ def main():
             sys.exit(1)
         config = configparser.ConfigParser()
         config.read(config_path)
-        args.num_iterations = config.getint('Study', 'num_trials', fallback=100)
-        args.k_per_query = config.getint('Study', 'group_size', fallback=10)
+        args.num_iterations = config.getint('Experiment', 'num_trials', fallback=100)
+        args.k_per_query = config.getint('Experiment', 'group_size', fallback=10)
     else:
         # --- Robust Parameter Reading ---
         model_name = get_config_value(APP_CONFIG, 'LLM', 'model_name', fallback_key='model')
         temp = get_config_value(APP_CONFIG, 'LLM', 'temperature', value_type=float)
         db_file = get_config_value(APP_CONFIG, 'Filenames', 'personalities_src')
-        args.num_iterations = get_config_value(APP_CONFIG, 'Study', 'num_trials', fallback_key='num_iterations', value_type=int)
-        args.k_per_query = get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int)
-        num_replications = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int)
-        mapping_strategy = get_config_value(APP_CONFIG, 'Study', 'mapping_strategy')
+        args.num_iterations = get_config_value(APP_CONFIG, 'Experiment', 'num_trials', fallback_key='num_iterations', value_type=int)
+        args.k_per_query = get_config_value(APP_CONFIG, 'Experiment', 'group_size', fallback_key='k_per_query', value_type=int)
+        num_replications = get_config_value(APP_CONFIG, 'Experiment', 'num_replications', value_type=int)
+        mapping_strategy = get_config_value(APP_CONFIG, 'Experiment', 'mapping_strategy')
         
         run_dir_name = generate_run_dir_name(model_name, temp, args.num_iterations, args.k_per_query, db_file, args.replication_num, num_replications, mapping_strategy)
 
@@ -407,7 +407,7 @@ def main():
 
         # Sub-stage 4b: Positional bias metrics
         print("   - Calculating positional bias metrics...")
-        k_val = int(get_config_value(APP_CONFIG, 'Study', 'group_size', fallback_key='k_per_query', value_type=int, fallback=10))
+        k_val = int(get_config_value(APP_CONFIG, 'Experiment', 'group_size', fallback_key='k_per_query', value_type=int, fallback=10))
         cmd_bias = [sys.executable, bias_script, run_specific_dir_path, "--k_value", str(k_val)]
         if args.verbose: cmd_bias.append("--verbose")
         run_script(cmd_bias, "4b. Positional Bias Metrics", verbose=args.verbose)

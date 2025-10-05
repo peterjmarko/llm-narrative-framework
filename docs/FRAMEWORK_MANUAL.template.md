@@ -361,6 +361,7 @@ Sample Size:
 ```
 
 **Total Experimental Scope:**
+
 - Conditions: 2 × 3 × 3 = **18 conditions**
 - Experiments: 18 × 30 = **540 experiments**
 - Trials: 540 × 80 = **43,200 trials**
@@ -371,7 +372,7 @@ Sample Size:
 |--------|------|--------|--------|
 | `mapping_strategy` | Between-subjects | 2 | correct, random |
 | `k` (group_size) | Within-subjects | 3 | 7, 10, 14 |
-| `model` | Within-subjects | 3 | gemini, gpt4o, claude |
+| `model` | Within-subjects | 3 | gemini-2.5-flash-lite, gpt-4.1-nano, llama-3.3-70b-instruct |
 
 ### Design Rationale
 
@@ -471,12 +472,14 @@ For **within-replication tests** (vs chance) with 80 trials:
 #### Justification for 30 Replications × 80 Trials
 
 **30 Replications:**
+
 - Sufficient for detecting d=0.20 with 82% power in factorial ANOVA
 - Provides robust estimates for interaction effects
 - Sufficient for post-hoc comparisons with Tukey HSD
 - Matches published study replication count for comparable statistical rigor
 
 **80 Trials per Replication:**
+
 - Standard Error = 0.0168 (assuming SD=0.15 for MRR)
 - Provides 1.79:1 signal-to-noise ratio for d=0.20 effects
 - Reduces within-condition variance for precise between-condition comparisons
@@ -909,7 +912,7 @@ The `config.ini` file is the central hub for defining all parameters for your ex
 
 | Section | Parameter | Description | Example Value |
 | :--- | :--- | :--- | :--- |
-| **`[Study]`** | `num_replications` | The number of times the experiment will be repeated (`r`). | `2` |
+| **`[Experiment]`** | `num_replications` | The number of times the experiment will be repeated (`r`). | `2` |
 | | `num_trials` | The number of trials for each replication (`m`). | `3` |
 | | `group_size` | The number of subjects in each group (`k`). | `4` |
 | | `mapping_strategy` | A key experimental variable; can be `correct` or `random`. | `correct` |

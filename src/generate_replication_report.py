@@ -81,7 +81,7 @@ def main():
         # Load run parameters from the archived config.
         config = configparser.ConfigParser()
         config.read(os.path.join(run_specific_dir_path, 'config.ini.archived'))
-        k_per_query = config.getint('Study', 'group_size', fallback=0)
+        k_per_query = config.getint('Experiment', 'group_size', fallback=0)
 
     except FileNotFoundError as e:
         print(f"Error: A required file was not found. {e}", file=sys.stderr)
@@ -106,7 +106,7 @@ def main():
     # The label (e.g., 'Date:') is left-aligned in a 24-character space.
     # Determine actual status based on pipeline completion
     n_valid = metrics.get('n_valid_responses', 0)
-    total_trials = config.getint('Study', 'num_trials', fallback=0)
+    total_trials = config.getint('Experiment', 'num_trials', fallback=0)
     
     final_status = "COMPLETED" if n_valid > 0 else "FAILED"
     parsing_status = "COMPLETED" if n_valid > 0 else ("PARTIAL" if n_valid < total_trials else "FAILED")
@@ -122,9 +122,9 @@ def main():
         f"{'Run Directory:':<24}{os.path.basename(run_specific_dir_path)}",
         f"{'Report File:':<24}{os.path.basename(report_path)}",
         "\n--- Run Parameters ---",
-        f"{'Number of Trials (m):':<24}{config.getint('Study', 'num_trials', fallback=0)}",
+        f"{'Number of Trials (m):':<24}{config.getint('Experiment', 'num_trials', fallback=0)}",
         f"{'Group Size (k):':<24}{k_per_query}",
-        f"{'Mapping Strategy:':<24}{config.get('Study', 'mapping_strategy', fallback='N/A')}",
+        f"{'Mapping Strategy:':<24}{config.get('Experiment', 'mapping_strategy', fallback='N/A')}",
         f"{'Personalities Source:':<24}{config.get('Filenames', 'personalities_src', fallback='N/A')}",
         f"{'LLM Model:':<24}{config.get('LLM', 'model_name', fallback='N/A')}",
         f"{'Run Notes:':<24}{args.notes}",

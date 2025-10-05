@@ -89,10 +89,10 @@ def parse_config_params(config_path):
             return default
 
         params['model'] = get_robust(['Model', 'LLM'], ['model_name', 'model'], default='unknown_model')
-        params['mapping_strategy'] = get_robust(['Study'], ['mapping_strategy'], default='unknown_strategy')
+        params['mapping_strategy'] = get_robust(['Experiment'], ['mapping_strategy'], default='unknown_strategy')
         params['temperature'] = get_robust(['Model', 'LLM'], ['temperature'], value_type=float, default=0.0)
-        params['k'] = get_robust(['Study'], ['k_per_query', 'num_subjects', 'group_size'], value_type=int, default=0)
-        params['m'] = get_robust(['Study'], ['num_iterations', 'num_trials'], value_type=int, default=0)
+        params['k'] = get_robust(['Experiment'], ['k_per_query', 'num_subjects', 'group_size'], value_type=int, default=0)
+        params['m'] = get_robust(['Experiment'], ['num_iterations', 'num_trials'], value_type=int, default=0)
         db_path = get_robust(['General', 'Filenames'], ['personalities_db_path', 'personalities_src'], default='unknown_db.file')
         params['db'] = os.path.basename(db_path)
 

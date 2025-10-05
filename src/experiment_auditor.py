@@ -75,9 +75,9 @@ FILE_MANIFEST = {
         "required_keys": {
             "model_name": {"type": str, "paths": [("LLM", "model_name"), ("LLM", "model")]},
             "temperature": {"type": float, "paths": [("LLM", "temperature")]},
-            "mapping_strategy": {"type": str, "paths": [("Study", "mapping_strategy")]},
-            "num_subjects": {"type": int, "paths": [("Study", "group_size"), ("Study", "k_per_query")]},
-            "num_trials": {"type": int, "paths": [("Study", "num_trials"), ("Study", "num_iterations")]},
+            "mapping_strategy": {"type": str, "paths": [("Experiment", "mapping_strategy")]},
+            "num_subjects": {"type": int, "paths": [("Experiment", "group_size"), ("Experiment", "k_per_query")]},
+            "num_trials": {"type": int, "paths": [("Experiment", "num_trials"), ("Experiment", "num_iterations")]},
             "personalities_db_path": {"type": str, "paths": [("Filenames", "personalities_src")]},
         },
     },
@@ -627,13 +627,13 @@ def main():
             archived_config = ConfigParser()
             with open(archived_config_path, 'r', encoding='utf-8') as f:
                 archived_config.read_file(f)
-            num_reps = archived_config.getint('Study', 'num_replications', fallback=30)
+            num_reps = archived_config.getint('Experiment', 'num_replications', fallback=30)
         except Exception:
             # If archived config is corrupted or missing the key, use global config as fallback
-            num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+            num_reps = get_config_value(APP_CONFIG, 'Experiment', 'num_replications', value_type=int, fallback=30)
     else:
         # If no archived config exists, use global config (for new/incomplete experiments)
-        num_reps = get_config_value(APP_CONFIG, 'Study', 'num_replications', value_type=int, fallback=30)
+        num_reps = get_config_value(APP_CONFIG, 'Experiment', 'num_replications', value_type=int, fallback=30)
     
     # Use the definitive state-checking function
     state_name, _, granular_details = get_experiment_state(target_dir, num_reps)
@@ -678,7 +678,7 @@ def main():
                             if config_path.exists():
                                 config = configparser.ConfigParser()
                                 config.read(config_path)
-                                n_total = config.getint('Study', 'num_trials', fallback=0)
+                                n_total = config.getint('Experiment', 'num_trials', fallback=0)
                                 trial_info = f" ({n_valid}/{n_total} trials)"
                     except Exception:
                         pass  # Ignore errors, just don't show trial info

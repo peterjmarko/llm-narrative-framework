@@ -304,7 +304,7 @@ def main():
     # 1. Setup Argparse (using config values for defaults)
     default_k_cfg = get_config_value(APP_CONFIG, 'General', 'default_k', fallback=6, value_type=int)
     default_qgen_prefix_cfg = get_config_value(APP_CONFIG, 'Filenames', 'qgen_temp_prefix', fallback="", value_type=str)
-    default_mapping_strategy_cfg = get_config_value(APP_CONFIG, 'Study', 'mapping_strategy', fallback='correct')
+    default_mapping_strategy_cfg = get_config_value(APP_CONFIG, 'Experiment', 'mapping_strategy', fallback='correct')
 
     parser = argparse.ArgumentParser(
         description="Generates LLM query files and mappings from a source personalities file.",

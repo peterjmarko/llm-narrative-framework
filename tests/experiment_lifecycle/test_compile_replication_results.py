@@ -88,7 +88,7 @@ class TestCompileReplicationResults(unittest.TestCase):
         # Create archived config with all expected fields
         config = configparser.ConfigParser()
         config['LLM'] = {'model_name': 'test-model/test-v1', 'temperature': '0.5'}
-        config['Study'] = {
+        config['Experiment'] = {
             'group_size': '10',
             'num_trials': '100',
             'mapping_strategy': 'correct'
@@ -191,7 +191,7 @@ class TestCompileReplicationResults(unittest.TestCase):
         config = configparser.ConfigParser()
         # Use legacy section and key names (e.g., [Model] instead of [LLM])
         config['Model'] = {'model': 'legacy-model/test-v1'}
-        # Omit 'Study' section entirely to test defaults
+        # Omit 'Experiment' section entirely to test defaults
         config_path = self.run_dir / "legacy_config.ini.archived"
         with open(config_path, 'w') as f:
             config.write(f)

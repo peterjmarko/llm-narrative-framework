@@ -126,7 +126,7 @@ def main():
         'model_name': params['model_name'],
         'temperature': params['temperature']
     }
-    config['Study'] = {
+    config['Experiment'] = {
         'mapping_strategy': params['mapping_strategy'],
         'group_size': str(int(params['group_size'])),
         'num_trials': str(int(params['num_trials']))

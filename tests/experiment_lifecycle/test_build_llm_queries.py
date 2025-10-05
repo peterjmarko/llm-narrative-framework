@@ -133,7 +133,7 @@ class TestBuildLLMQueries(unittest.TestCase):
         # Mock config_loader
         self.mock_config = configparser.ConfigParser()
         self.mock_config.read_dict({
-            'Study': {'num_trials': '2', 'group_size': '3'},
+            'Experiment': {'num_trials': '2', 'group_size': '3'},
             'Filenames': {
                 'personalities_src': 'personalities.txt', 'base_query_src': 'base_query.txt',
                 'used_indices_log': 'used_indices.txt',

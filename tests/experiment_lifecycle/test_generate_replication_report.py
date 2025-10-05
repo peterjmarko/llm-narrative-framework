@@ -70,7 +70,7 @@ class TestGenerateReplicationReport(unittest.TestCase):
             
         # Create archived config
         config = configparser.ConfigParser()
-        config['Study'] = {'group_size': '10', 'num_trials': '100', 'mapping_strategy': 'correct'}
+        config['Experiment'] = {'group_size': '10', 'num_trials': '100', 'mapping_strategy': 'correct'}
         config['Filenames'] = {'personalities_src': 'personalities_db.txt'}
         config['LLM'] = {'model_name': 'test-model/test-1.0'}
         with open(self.run_dir / "config.ini.archived", 'w') as f:

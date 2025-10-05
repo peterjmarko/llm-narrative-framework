@@ -106,7 +106,7 @@ class TestReplicationManager(unittest.TestCase):
 
         self.mock_config = configparser.ConfigParser()
         self.mock_config.read_dict({
-            'Study': {'num_replications': '2', 'num_trials': '3', 'group_size': '4', 'mapping_strategy': 'correct'},
+            'Experiment': {'num_replications': '2', 'num_trials': '3', 'group_size': '4', 'mapping_strategy': 'correct'},
             'LLM': {'model_name': 'test/model', 'temperature': '0.5', 'max_parallel_sessions': '2'},
             'Filenames': {'personalities_src': 'db.txt', 'api_times_log': 'api.log'},
             'General': {'base_output_dir': 'output', 'responses_subdir': 'session_responses'}
@@ -202,7 +202,7 @@ class TestReplicationManager(unittest.TestCase):
         (run_dir / "session_queries").mkdir(parents=True)
         
         with (run_dir / "config.ini.archived").open("w") as f:
-            f.write("[Study]\nnum_trials = 3\ngroup_size = 4\n") # Matches glob mock
+            f.write("[Experiment]\nnum_trials = 3\ngroup_size = 4\n") # Matches glob mock
             f.write("[LLM]\nmax_parallel_sessions=2\n")
             f.write("[General]\nresponses_subdir=session_responses\n")
             f.write("[Filenames]\napi_times_log=api.log\n")
@@ -293,7 +293,7 @@ class TestReplicationManager(unittest.TestCase):
         run_dir = self.output_dir / "existing_run"
         (run_dir / "session_queries").mkdir(parents=True)
         with (run_dir / "config.ini.archived").open("w") as f:
-            f.write("[Study]\nnum_trials = 3\ngroup_size = 4\n")
+            f.write("[Experiment]\nnum_trials = 3\ngroup_size = 4\n")
             f.write("[LLM]\nmax_parallel_sessions=2\n")
             f.write("[General]\nresponses_subdir=session_responses\n")
             f.write("[Filenames]\napi_times_log=api.log\n")
@@ -418,7 +418,7 @@ class TestReplicationManagerCoverage(TestReplicationManager):
         """Verify Stage 2 is skipped if all response files are present."""
         run_dir = self.output_dir / "run_dir"
         (run_dir / "session_queries").mkdir(parents=True)
-        (run_dir / "config.ini.archived").open("w").write("[Study]\nnum_trials=3")
+        (run_dir / "config.ini.archived").open("w").write("[Experiment]\nnum_trials=3")
 
         with self.assertLogs(level='INFO') as cm:
             with patch.object(sys, 'argv', ['script.py', '--reprocess', '--run_output_dir', str(run_dir)]):
@@ -447,7 +447,7 @@ class TestReplicationManagerCoverage(TestReplicationManager):
         run_dir = self.output_dir / "existing_run"
         (run_dir / "session_queries").mkdir(parents=True)
         with (run_dir / "config.ini.archived").open("w") as f:
-            f.write("[Study]\nnum_trials=3\n[General]\nresponses_subdir=r")
+            f.write("[Experiment]\nnum_trials=3\n[General]\nresponses_subdir=r")
 
         with self.assertLogs(level='WARNING') as cm:
             with patch.object(sys, 'argv', ['script.py', '--reprocess', '--run_output_dir', str(run_dir), '--indices', '1']):

@@ -34,7 +34,7 @@ VALID_CONFIG_CONTENT = """
 default_k = 10
 base_output_dir = output
 
-[Study]
+[Experiment]
 num_replications = 30
 mapping_strategy = correct
 """
@@ -64,7 +64,7 @@ def test_get_config_value_happy_path(mock_config_file):
     assert isinstance(k_val, int)
 
     # Test getting a string
-    strategy = get_config_value(config, 'Study', 'mapping_strategy', value_type=str)
+    strategy = get_config_value(config, 'Experiment', 'mapping_strategy', value_type=str)
     assert strategy == 'correct'
     assert isinstance(strategy, str)
 

@@ -51,7 +51,7 @@ Usage by other scripts:
     from config_loader import APP_CONFIG, get_config_value, PROJECT_ROOT
 
     # Get a typed value with a fallback
-    num_trials = get_config_value(APP_CONFIG, 'Study', 'num_trials',
+    num_trials = get_config_value(APP_CONFIG, 'Experiment', 'num_trials',
                                   value_type=int, fallback=100)
 
     # Get a list

@@ -186,10 +186,10 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("-m", "--num_iterations", type=int,
-                        default=get_config_value(APP_CONFIG, 'Study', 'num_trials', fallback=100, value_type=int),
+                        default=get_config_value(APP_CONFIG, 'Experiment', 'num_trials', fallback=100, value_type=int),
                         help="Number of unique query sets to generate in this run.")
     parser.add_argument("-k", "--k_per_query", type=int,
-                        default=get_config_value(APP_CONFIG, 'Study', 'group_size', fallback=10, value_type=int),
+                        default=get_config_value(APP_CONFIG, 'Experiment', 'group_size', fallback=10, value_type=int),
                         help="Number of items (k) per individual query set.")
     parser.add_argument("--master_personalities_file", default=DEFAULT_MASTER_PERSONALITIES_FN,
                         help=f"Filename of the master personalities file (expected in PROJECT_ROOT/data/). Default: {DEFAULT_MASTER_PERSONALITIES_FN}")

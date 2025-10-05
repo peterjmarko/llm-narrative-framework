@@ -49,7 +49,15 @@ EXCLUDE_DIRS = {
     ".git", ".pdm-build", ".pytest_cache", ".venv", "__pycache__",
     "build", "config", "data/backup", "dist", "htmlcov", "images",
     "linter_backups", "llm-narrative-framework.egg-info",
-    "main_archive", "node_modules", "output", "src/archive", "venv"
+    "main_archive", "node_modules", "output", "src/archive", "tests/assets", "venv",
+    # Additional directories to exclude to reduce file count
+    "backup", "graphpad_prism",
+    # Exclude more directories with many files
+    ".github",
+    # Exclude the largest directories to get file count to hundreds
+    "linter_backups", "temp_assembly_logic_validation", "_archive", "debug",
+    # Exclude additional directories to keep file count in hundreds
+    "data/foundational_assets"
 }
 
 # File extensions to exclude.
@@ -125,8 +133,14 @@ def should_exclude_dir(root_path: pathlib.Path, dir_name: str) -> bool:
             return True
         if rel_path == excluded:
             return True
+        # Check if the directory path starts with the excluded path
         if rel_path.startswith(excluded + '/'):
             return True
+        # Check if the directory name matches any excluded directory name
+        if dir_name == excluded.split('/')[-1]:
+            # Additional check to ensure we're at the right level
+            if rel_path.startswith(excluded.split('/')[0] + '/'):
+                return True
     
     return False
 
@@ -187,6 +201,9 @@ def main(quiet=False):
 
     documents = []
     active_scripts = []
+    data_preparation_scripts = []
+    experiment_lifecycle_scripts = []
+    test_scripts = []
     archived_scripts = []
     diagrams = []
     data_files = []
@@ -216,7 +233,15 @@ def main(quiet=False):
                 continue
             
             if not is_ignored(path, gitignore_patterns) and path.suffix not in EXCLUDE_EXTS:
-                all_files.append(path)
+                # Additional check to exclude files in the specified directories
+                rel_path = str(path.relative_to(PROJECT_ROOT)).replace('\\', '/')
+                if not (rel_path.startswith('src/archive/') or rel_path.startswith('data/backup/') or
+                        rel_path.startswith('tests/assets/') or rel_path.startswith('backup/') or
+                        rel_path.startswith('graphpad_prism/') or rel_path.startswith('.github/') or
+                        rel_path.startswith('linter_backups/') or rel_path.startswith('temp_assembly_logic_validation/') or
+                        rel_path.startswith('_archive/') or rel_path.startswith('debug/') or
+                        rel_path.startswith('data/foundational_assets/')):
+                    all_files.append(path)
 
     # --- Categorize all found files ---
     for path in all_files:
@@ -227,6 +252,16 @@ def main(quiet=False):
             if '_archive' in path.parts:
                 archived_scripts.append([f"`{rel_path}`", lines])
             else:
+                # Categorize active scripts
+                if rel_path.startswith('src/') or rel_path.startswith('scripts/workflows/assembly_logic/'):
+                    # Most data preparation scripts are in src/ or assembly_logic
+                    data_preparation_scripts.append([f"`{rel_path}`", lines])
+                elif rel_path.startswith('tests/'):
+                    # All test scripts are in tests/
+                    test_scripts.append([f"`{rel_path}`", lines])
+                else:
+                    # PowerShell scripts and other experiment lifecycle scripts
+                    experiment_lifecycle_scripts.append([f"`{rel_path}`", lines])
                 active_scripts.append([f"`{rel_path}`", lines])
         elif path.name.endswith(".md"):
             words = count_words(path)
@@ -325,10 +360,38 @@ def main(quiet=False):
     total_lines_active = sum(row[1] for row in active_scripts)
     report_content.append(f"-   **Total Files:** {len(active_scripts)}")
     report_content.append(f"-   **Total Lines of Code:** {total_lines_active:,}\n")
+    
+    # --- Data Preparation Pipeline Subsection ---
+    report_content.append("#### Data Preparation Pipeline\n")
+    total_lines_data_prep = sum(row[1] for row in data_preparation_scripts)
+    report_content.append(f"-   **Total Files:** {len(data_preparation_scripts)}")
+    report_content.append(f"-   **Total Lines of Code:** {total_lines_data_prep:,}\n")
     report_content.append(generate_table(
         ["File", "Lines of Code"],
-        sorted(active_scripts),
-        ["Total", f"{total_lines_active:,}"]
+        sorted(data_preparation_scripts),
+        ["Total", f"{total_lines_data_prep:,}"]
+    ))
+    
+    # --- Experiment & Study Lifecycle Subsection ---
+    report_content.append("\n#### Experiment & Study Lifecycle\n")
+    total_lines_experiment = sum(row[1] for row in experiment_lifecycle_scripts)
+    report_content.append(f"-   **Total Files:** {len(experiment_lifecycle_scripts)}")
+    report_content.append(f"-   **Total Lines of Code:** {total_lines_experiment:,}\n")
+    report_content.append(generate_table(
+        ["File", "Lines of Code"],
+        sorted(experiment_lifecycle_scripts),
+        ["Total", f"{total_lines_experiment:,}"]
+    ))
+    
+    # --- Test Scripts Subsection ---
+    report_content.append("\n#### Test Scripts\n")
+    total_lines_test = sum(row[1] for row in test_scripts)
+    report_content.append(f"-   **Total Files:** {len(test_scripts)}")
+    report_content.append(f"-   **Total Lines of Code:** {total_lines_test:,}\n")
+    report_content.append(generate_table(
+        ["File", "Lines of Code"],
+        sorted(test_scripts),
+        ["Total", f"{total_lines_test:,}"]
     ))
 
     # --- Archived Scripts Subsection ---

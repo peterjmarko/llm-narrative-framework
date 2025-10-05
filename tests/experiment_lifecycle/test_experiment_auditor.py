@@ -84,7 +84,7 @@ run_20250101_120001_rep-002_sbj-10_trl-010_model-name,2,10,mock-model,correct,0.
         """Creates a mock config and applies it to the module."""
         mock_app_config = configparser.ConfigParser()
         mock_app_config.read_dict({
-            'Study': {'num_replications': '2'}
+            'Experiment': {'num_replications': '2'}
         })
         
         self.mock_config = mock_app_config
@@ -120,7 +120,7 @@ run_20250101_120001_rep-002_sbj-10_trl-010_model-name,2,10,mock-model,correct,0.
 
         # Create config.ini.archived with all required keys
         (run_dir / "config.ini.archived").write_text(f"""
-[Study]
+[Experiment]
 group_size = {k}
 num_trials = {m}
 mapping_strategy = correct
@@ -326,7 +326,7 @@ personalities_src = personalities_db.txt
         
         # Overwrite the config with a mismatched k value
         (run_dir / "config.ini.archived").write_text(
-            "[Study]\ngroup_size = 5\nnum_trials = 10\n"
+            "[Experiment]\ngroup_size = 5\nnum_trials = 10\n"
         )
 
         # --- Act ---
@@ -364,7 +364,7 @@ personalities_src = personalities_db.txt
         # Create valid CSV files with matching run name
         (self.exp_dir / "EXPERIMENT_results.csv").write_text(self._create_valid_experiment_results_csv_single(run_dir.name))
         (self.exp_dir / "experiment_log.csv").write_text(self._create_valid_experiment_log_csv())
-        self.mock_config.set('Study', 'num_replications', '1')
+        self.mock_config.set('Experiment', 'num_replications', '1')
         test_argv = ['experiment_auditor.py', str(self.exp_dir)]
         
         # --- Act ---
@@ -468,7 +468,7 @@ personalities_src = personalities_db.txt
         """Verify the CLI uses --config-path and reloads the config module."""
         # Create a temp config file setting reps to 1
         test_config_file = self.exp_dir / "test_config.ini"
-        test_config_file.write_text("[Study]\nnum_replications = 1\n")
+        test_config_file.write_text("[Experiment]\nnum_replications = 1\n")
         
         # Create 1 complete run with valid CSV files
         run_dir = self._create_mock_run_dir(rep_num=1)
@@ -479,7 +479,7 @@ personalities_src = personalities_db.txt
         
         # This side effect simulates the config being reloaded with the new value.
         def reload_side_effect(module):
-            self.mock_config.set('Study', 'num_replications', '1')
+            self.mock_config.set('Experiment', 'num_replications', '1')
 
         with patch('importlib.reload', side_effect=reload_side_effect) as mock_reload:
             with self.assertRaises(SystemExit) as cm:
@@ -500,7 +500,7 @@ personalities_src = personalities_db.txt
         """Verify repair state for a config with a bad value type."""
         run_dir = self._create_mock_run_dir(rep_num=1)
         # group_size should be an integer
-        (run_dir / "config.ini.archived").write_text("[Study]\ngroup_size=bad_value\n")
+        (run_dir / "config.ini.archived").write_text("[Experiment]\ngroup_size=bad_value\n")
         state_name, _, _ = experiment_auditor.get_experiment_state(self.exp_dir, 1)
         self.assertEqual(state_name, "REPAIR_NEEDED")
 
@@ -566,7 +566,7 @@ personalities_src = personalities_db.txt
         """Verify CLI output and exit code for REPROCESS_NEEDED state."""
         self._create_mock_run_dir(rep_num=1, analysis_complete=False)
         test_argv = ['auditor.py', str(self.exp_dir)]
-        self.mock_config.set('Study', 'num_replications', '1')
+        self.mock_config.set('Experiment', 'num_replications', '1')
         with self.assertRaises(SystemExit) as cm:
             with patch.object(sys, 'argv', test_argv):
                 experiment_auditor.main()
@@ -578,7 +578,7 @@ personalities_src = personalities_db.txt
         """Verify CLI output and exit code for AGGREGATION_NEEDED state."""
         self._create_mock_run_dir(rep_num=1) # One complete run
         # Do not create experiment-level files
-        self.mock_config.set('Study', 'num_replications', '1')
+        self.mock_config.set('Experiment', 'num_replications', '1')
         test_argv = ['auditor.py', str(self.exp_dir)]
         with self.assertRaises(SystemExit) as cm:
             with patch.object(sys, 'argv', test_argv):
@@ -631,7 +631,7 @@ personalities_src = personalities_db.txt
         """Verify CLI output and exit code for REPAIR_NEEDED state."""
         self._create_mock_run_dir(rep_num=1, m=2)
         (self.exp_dir / "run_20250101_120000_rep-001_sbj-10_trl-002_model-name" / "session_responses" / "llm_response_001.txt").unlink()
-        self.mock_config.set('Study', 'num_replications', '1')
+        self.mock_config.set('Experiment', 'num_replications', '1')
         test_argv = ['auditor.py', str(self.exp_dir)]
         with self.assertRaises(SystemExit) as cm:
             with patch.object(sys, 'argv', test_argv):
@@ -750,7 +750,7 @@ personalities_src = personalities_db.txt
         """Verify repair state for a config with a non-float temperature."""
         run_dir = self._create_mock_run_dir(rep_num=1)
         config_content = (
-            "[Study]\ngroup_size = 10\nnum_trials = 10\nmapping_strategy=correct\n"
+            "[Experiment]\ngroup_size = 10\nnum_trials = 10\nmapping_strategy=correct\n"
             "[LLM]\nmodel_name=mock\ntemperature=not-a-float\n"
             "[Filenames]\npersonalities_src=db.txt\n"
         )
@@ -777,7 +777,7 @@ personalities_src = personalities_db.txt
     def test_main_cli_loads_config_if_not_in_sys_modules(self):
         """Verify main() loads config_loader if it's not already imported."""
         test_config_file = self.exp_dir / "test_config.ini"
-        test_config_file.write_text("[Study]\nnum_replications = 0\n")
+        test_config_file.write_text("[Experiment]\nnum_replications = 0\n")
         test_argv = ['auditor.py', str(self.exp_dir), '--config-path', str(test_config_file)]
         
         real_config_loader = sys.modules.pop('config_loader', None)

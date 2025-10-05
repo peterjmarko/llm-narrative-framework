@@ -94,9 +94,9 @@ Personalities DB:           {params['personalities_src']}
         
         self.assertEqual(parser.get('LLM', 'model_name'), mock_params['model_name'])
         self.assertEqual(parser.get('LLM', 'temperature'), mock_params['temperature'])
-        self.assertEqual(parser.get('Study', 'mapping_strategy'), mock_params['mapping_strategy'])
-        self.assertEqual(parser.get('Study', 'group_size'), mock_params['group_size'])
-        self.assertEqual(parser.get('Study', 'num_trials'), mock_params['num_trials'])
+        self.assertEqual(parser.get('Experiment', 'mapping_strategy'), mock_params['mapping_strategy'])
+        self.assertEqual(parser.get('Experiment', 'group_size'), mock_params['group_size'])
+        self.assertEqual(parser.get('Experiment', 'num_trials'), mock_params['num_trials'])
         self.assertEqual(parser.get('Filenames', 'personalities_src'), mock_params['personalities_src'])
 
     def test_main_exits_if_directory_not_found(self):

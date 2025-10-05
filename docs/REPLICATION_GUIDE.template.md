@@ -5,7 +5,7 @@ author: "Peter J. Marko"
 date: "[Date]"
 ---
 
-This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers who wish to replicate or extend the original study's findings.
+This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers who wish to replicate or extend the original study's findings. For detailed information on the components of the framework, please refer to the **[📖 Framework Manual (docs/FRAMEWORK_MANUAL.md)](docs/FRAMEWORK_MANUAL.md)**.
 
 This guide defines the three primary replication paths (Direct, Methodological, and Conceptual) and provides a complete walkthrough of the end-to-end workflow, from initial setup and data preparation to running the main experiments and producing the final statistical analysis.
 
@@ -29,7 +29,7 @@ The **Data & Artifacts** component manages all inputs and outputs, including sou
 
 The production codebase implements two principal workflows that form the backbone of the research process: the Data Preparation Pipeline and the Experiment & Study Workflow. These workflows are sequentially dependent but architecturally distinct, with the data preparation pipeline creating the foundational datasets that the experiment workflow consumes.
 
-> **Note on Understanding the Workflows:** Researchers wishing to understand the workflows in detail are advised to refer to the interactive Guided Tours. These step-by-step walkthroughs are an excellent way to learn how the various scripts work together. Full instructions for running the tours can be found in the project's **[🧪 Testing Guide (docs/TESTING_GUIDE.md)](docs/TESTING_GUIDE.md)**.
+> **Note on the Principal Workflows:** Researchers wishing to experience the workflows in detail are advised to refer to the interactive Guided Tours. These step-by-step walkthroughs are an excellent way to learn how the various scripts work together. Full instructions for running the tours can be found in the project's **[🧪 Testing Guide (docs/TESTING_GUIDE.md)](docs/TESTING_GUIDE.md)**.
 
 ### Data Preparation Pipeline
 
@@ -41,7 +41,7 @@ The **Data Preparation Pipeline** is a fully automated, multi-stage workflow tha
 
 The **Experiment & Study Workflow** consumes the prepared data to generate experimental results across multiple conditions, then compiles these results into comprehensive statistical analyses. This workflow supports factorial experimental designs, automated result aggregation, and publication-ready statistical reporting.
 
-These workflows are connected through well-defined data interfaces, with the output of the data preparation pipeline serving as the input to the experiment workflow. This modular design allows researchers to update or extend either workflow independently while maintaining reproducibility.
+The two workflows are connected through well-defined data interfaces, with the output of the data preparation pipeline serving as the input to the experiment workflow. This modular design allows researchers to update or extend either workflow independently while maintaining reproducibility.
 
 {{grouped_figure:docs/diagrams/flow_experiment_study_workflow.mmd | scale=2.0 | width=35% | caption=Figure S3: Experiment & Study Workflow. The workflow uses personalities_db.txt to run experiments and compile study results.}}
 
@@ -54,6 +54,7 @@ The framework was developed and validated on a specific stack of technologies. V
     *   **PowerShell:** Version 7.0 or higher.
     *   **Git:** For cloning the repository.
     *   **Solar Fire:** A licensed copy of version 9.
+    *   **GraphPad Prism:** Version 10.6.1 for validating statistical analysis and reporting functionalities.
 
 *   **Accounts & Services:**
     *   **OpenRouter:** An account with a valid API key and sufficient funds to cover the cost of LLM queries.
@@ -61,7 +62,7 @@ The framework was developed and validated on a specific stack of technologies. V
 
 ## Setup and Installation
 
-This project uses **PDM** for dependency and environment management.
+This project uses **PDM** for dependency and environment management. Please see the **[🤝 Developer's Guide (DEVELOPERS_GUIDE.md)](DEVELOPERS_GUIDE.md)** for detailed information on the project environment and its maintenance.
 
 1.  **Install PDM (One-Time Setup)**:
     If you don't have PDM, install it once with pip.
@@ -86,12 +87,14 @@ To run any project command, prefix it with `pdm run`.
 
 All experimental parameters are defined in the `config.ini` file. For a direct replication, the key settings to verify are:
 
-*   **`[Study]`**:
-    *   `num_replications = 30`
+*   **`[Experiment]`**:
+    *   `num_replications = 30`: Selected to have 80% statistical power for small effects (Cohen's d < 0.20).
+    *   `num_trials = 80`: Provides 1.80:1 signal-to-noise ratio for d > 0.20 effects.
+    *   `group_size`: Should be set to `7`, `10`, or `14` depending on the experiment you wish to replicate.
     *   `mapping_strategy`: Should be set to `correct` or `random` depending on the experiment you wish to replicate.
 *   **`[LLM]`**:
-    *   `model_name`: The API identifier for the LLM to be tested (e.g., `google/gemini-flash-1.5`).
-    *   `temperature`: `0.2` was used in the original study for deterministic output.
+    *   `model_name`: The API identifier for the LLM to be tested (e.g., `google/gemini-2.0-flash-lite-001`).
+    *   `temperature`: `0.0` was used in the original study for deterministic output.
 
 The framework automatically archives this file with the results for guaranteed reproducibility.
 
