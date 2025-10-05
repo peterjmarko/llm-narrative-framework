@@ -11,7 +11,7 @@ The project's testing strategy is organized into a clear, four-part hierarchy de
 {{diagram:docs/diagrams/test_strategy_overview.mmd | scale=2.5 | width=100% | caption=The Four Pillars of the Testing Strategy: A hierarchical approach to validating the framework.}}
 
 1.  **Unit Testing:** Focuses on the internal logic of individual Python scripts, validating each component in isolation.
-2.  **Integration Testing:** A suite of end-to-end tests that validate the complete, live execution flows for the project's two main functional domains: the data preparation pipeline and the experiment/study lifecycle.
+2.  **Integration Testing:** A suite of end-to-end tests that validate the complete, live execution flows for the project's two main functional domains: the data preparation pipeline and the experiment/study workflow.
 3.  **Algorithm Validation:** A set of standalone, high-precision tests that provide scientific proof for the framework's core methodological claims (e.g., bit-for-bit accuracy of data generation, statistical integrity of analysis).
 4.  **Statistical Analysis & Reporting Validation:** External validation of the complete statistical analysis pipeline against GraphPad Prism 10.6.1, establishing academic credibility and publication readiness.
 
@@ -221,13 +221,13 @@ pdm test-l3-selection
 Test experiment workflow components:
 
 ```bash
-# Test all experiment lifecycle unit tests
+# Test all experiment workflow unit tests
 pdm run test-exp-lc
 # or simply:
 pdm test-exp-lc
 ```
 
-**Expected outcome:** All experiment lifecycle unit tests pass, verifying that query generation, LLM interaction, and analysis components function correctly.
+**Expected outcome:** All experiment workflow unit tests pass, verifying that query generation, LLM interaction, and analysis components function correctly.
 
 **Why fourth?** Validates experiment components before running expensive end-to-end integration tests.
 
@@ -246,7 +246,7 @@ pdm run test-l4-interactive
 # or simply:
 pdm test-l4-interactive
 ```
-**Expected outcome:** Complete `new -> audit -> break -> fix` lifecycle with 4 corruption scenarios and automated repair. All experiments restore to valid state.
+**Expected outcome:** Complete `new -> audit -> break -> fix` workflow with 4 corruption scenarios and automated repair. All experiments restore to valid state.
 
 **Study Compilation (Layer 5):**
 ```bash
@@ -347,7 +347,7 @@ pdm run test-data-prep
 # or simply:
 pdm test-data-prep
 
-# Test experiment lifecycle components
+# Test experiment workflow components
 pdm run test-exp-lc
 # or simply:
 pdm test-exp-lc
@@ -356,7 +356,7 @@ pdm test-exp-lc
 **Test specific modules:**
 ```bash
 # Run test file and generate focused coverage report
-pdm test-cov tests/experiment_lifecycle/test_analyze_llm_performance.py
+pdm test-cov tests/experiment_workflow/test_analyze_llm_performance.py
 pdm report-cov src/analyze_llm_performance.py
 ```
 
@@ -585,7 +585,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/experiment_manager.py` | **Coverage:** 94% (Critical) | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_experiment_manager.py`
+**Test file:** `tests/experiment_workflow/test_experiment_manager.py`
 
 **What's tested:**
 
@@ -599,13 +599,13 @@ These tests validate the components that manage experiment execution, LLM intera
 - Non-interactive mode
 - All execution pathways
 
-**Key validation:** Ensures the primary orchestrator correctly manages the entire experiment lifecycle, from directory creation through batch completion.
+**Key validation:** Ensures the primary orchestrator correctly manages the entire experiment workflow, from directory creation through batch completion.
 
 ##### Experiment Auditor (Diagnostic Tool)
 
 **Module:** `src/experiment_auditor.py` | **Coverage:** 95% (Critical) | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_experiment_auditor.py`
+**Test file:** `tests/experiment_workflow/test_experiment_auditor.py`
 
 **What's tested:**
 
@@ -623,7 +623,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/config_loader.py` | **Coverage:** 85% (Utility) | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_config_loader.py`
+**Test file:** `tests/experiment_workflow/test_config_loader.py`
 
 **What's tested:**
 
@@ -636,7 +636,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/restore_experiment_config.py` | **Coverage:** Target met | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_restore_experiment_config.py`
+**Test file:** `tests/experiment_workflow/test_restore_experiment_config.py`
 
 **What's tested:**
 
@@ -648,7 +648,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/replication_manager.py` | **Coverage:** 91% (Critical) | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_replication_manager.py`
+**Test file:** `tests/experiment_workflow/test_replication_manager.py`
 
 **What's tested:**
 
@@ -668,7 +668,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/build_llm_queries.py` | **Coverage:** 84% | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_build_llm_queries.py`
+**Test file:** `tests/experiment_workflow/test_build_llm_queries.py`
 
 **What's tested:**
 
@@ -681,7 +681,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/query_generator.py` | **Coverage:** Target met | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_query_generator.py`
+**Test file:** `tests/experiment_workflow/test_query_generator.py`
 
 **What's tested:**
 
@@ -695,7 +695,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/llm_prompter.py` | **Coverage:** 85% | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_llm_prompter.py`
+**Test file:** `tests/experiment_workflow/test_llm_prompter.py`
 
 **What's tested:**
 
@@ -711,7 +711,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/process_llm_responses.py` | **Coverage:** 94% | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_process_llm_responses.py`
+**Test file:** `tests/experiment_workflow/test_process_llm_responses.py`
 
 **What's tested:**
 
@@ -731,7 +731,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/analyze_llm_performance.py` | **Coverage:** 83% (Critical) | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_analyze_llm_performance.py`
+**Test file:** `tests/experiment_workflow/test_analyze_llm_performance.py`
 
 **What's tested:**
 
@@ -747,7 +747,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/run_bias_analysis.py` | **Coverage:** 86% | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_run_bias_analysis.py`
+**Test file:** `tests/experiment_workflow/test_run_bias_analysis.py`
 
 **What's tested:**
 
@@ -761,7 +761,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/generate_replication_report.py` | **Coverage:** 90% | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_generate_replication_report.py`
+**Test file:** `tests/experiment_workflow/test_generate_replication_report.py`
 
 **What's tested:**
 
@@ -774,7 +774,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/manage_experiment_log.py` | **Coverage:** Target met | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_manage_experiment_log.py`
+**Test file:** `tests/experiment_workflow/test_manage_experiment_log.py`
 
 **What's tested:**
 
@@ -789,7 +789,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/compile_replication_results.py` | **Coverage:** Target met | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_compile_replication_results.py`
+**Test file:** `tests/experiment_workflow/test_compile_replication_results.py`
 
 **What's tested:**
 
@@ -799,7 +799,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/compile_experiment_results.py` | **Coverage:** Target met | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_compile_experiment_results.py`
+**Test file:** `tests/experiment_workflow/test_compile_experiment_results.py`
 
 **What's tested:**
 
@@ -809,7 +809,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/compile_study_results.py` | **Coverage:** Target met | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_compile_study_results.py`
+**Test file:** `tests/experiment_workflow/test_compile_study_results.py`
 
 **What's tested:**
 
@@ -821,7 +821,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Module:** `src/analyze_study_results.py` | **Coverage:** 82% (Critical) | **Status:** COMPLETE
 
-**Test file:** `tests/experiment_lifecycle/test_analyze_study_results.py`
+**Test file:** `tests/experiment_workflow/test_analyze_study_results.py`
 
 **What's tested:**
 
@@ -866,11 +866,11 @@ These shared utility modules provide common functionality across the framework.
 PowerShell wrapper scripts are not measured by Python code coverage; their correctness is validated through end-to-end integration tests (Layer 4-5).
 
 **Tested wrappers:**
-- `new_experiment.ps1` - Test file: `tests/experiment_lifecycle/new_experiment.Tests.ps1`
-- `audit_experiment.ps1` - Test file: `tests/experiment_lifecycle/audit_experiment.Tests.ps1`
-- `fix_experiment.ps1` - Test file: `tests/experiment_lifecycle/fix_experiment.Tests.ps1`
-- `compile_study.ps1` - Test file: `tests/experiment_lifecycle/compile_study.Tests.ps1`
-- `audit_study.ps1` - Test file: `tests/experiment_lifecycle/audit_study.Tests.ps1`
+- `new_experiment.ps1` - Test file: `tests/experiment_workflow/new_experiment.Tests.ps1`
+- `audit_experiment.ps1` - Test file: `tests/experiment_workflow/audit_experiment.Tests.ps1`
+- `fix_experiment.ps1` - Test file: `tests/experiment_workflow/fix_experiment.Tests.ps1`
+- `compile_study.ps1` - Test file: `tests/experiment_workflow/compile_study.Tests.ps1`
+- `audit_study.ps1` - Test file: `tests/experiment_workflow/audit_study.Tests.ps1`
 
 **What's tested:**
 
@@ -1016,7 +1016,7 @@ These tests validate the complete workflows for creating experiments and compili
 
 #### Layer 4: Core Workflow (new → audit → break → fix)
 
-**Purpose:** Validates the complete experiment lifecycle with deliberate corruption scenarios and automated repair.
+**Purpose:** Validates the complete experiment workflow with deliberate corruption scenarios and automated repair.
 
 **System Under Test:** `new_experiment.ps1`, `audit_experiment.ps1`, `fix_experiment.ps1`
 
@@ -1078,7 +1078,7 @@ pdm test-l4-interactive
 - Live demonstration of corruption and repair
 
 **Use cases:**
-- Learning the experiment lifecycle
+- Learning the experiment workflow
 - Understanding audit and repair logic
 - Training new developers
 - Debugging complex experiment issues
@@ -1318,7 +1318,7 @@ pdm test-stats-results
 - Positional bias slopes: ±0.0001
 - R-values: ±0.01
 
-This ensures validation tests the **actual framework code** used during the experiment lifecycle, not a reimplementation in the validation script.
+This ensures validation tests the **actual framework code** used during the experiment workflow, not a reimplementation in the validation script.
 
 ## Test Status Matrix
 
@@ -1350,7 +1350,7 @@ This comprehensive table provides the current status of all tests in the framewo
 | Layer 3: Interactive Mode | Integration | **COMPLETE** | Educational guided tour of data pipeline |
 | **Experiment Lifecycle** | Integration | **COMPLETE** | Validates full `new → audit → break → fix` lifecycle in isolated sandbox |
 | Layer 4: Automated Mode | Integration | **COMPLETE** | Tests 4 corruption scenarios with automated repair |
-| Layer 4: Interactive Mode | Integration | **COMPLETE** | Educational guided tour of experiment lifecycle |
+| Layer 4: Interactive Mode | Integration | **COMPLETE** | Educational guided tour of experiment workflow |
 | **Study Compilation** | Integration | **COMPLETE** | Validates complete study compilation workflow using Layer 4 experiments |
 | Layer 5: Automated Mode | Integration | **COMPLETE** | Tests study aggregation, statistical analysis, artifact generation |
 

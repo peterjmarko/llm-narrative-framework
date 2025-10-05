@@ -109,7 +109,7 @@ This document outlines planned development tasks and tracks known issues for the
 - [ ] **Implement Automated Study Lifecycle Management**
   - [ ] Restructure `config.ini` to accommodate [Study] parameters (like for Layer 4). Sync with Layer 4 approach.
   - [ ] Implement a `new_study.ps1` orchestrator to automate the creation of multi-experiment studies based on a factor matrix in `config.ini`.
-  - [ ] Develop a corresponding Layer 7 test harness to validate the full `new -> audit -> break -> fix` study lifecycle.
+  - [ ] Develop a corresponding Layer 7 test harness to validate the full `new -> audit -> break -> fix` study workflow.
   - [ ] Implement `fix_study.ps1` to provide an automated repair workflow for entire studies.
 - [ ] **Implement Provenance Capture**
   - [ ] Modify `new_experiment.ps1` to generate a `provenance.json` file in each new experiment directory.

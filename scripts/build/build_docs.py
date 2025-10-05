@@ -624,9 +624,8 @@ def main():
             ('README.template.md', 'README.md'),
             ('DEVELOPERS_GUIDE.template.md', 'DEVELOPERS_GUIDE.md'),
             ('docs/DATA_PREPARATION_DATA_DICTIONARY.template.md', 'docs/DATA_PREPARATION_DATA_DICTIONARY.md'),
-            ('docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.template.md', 'docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md'),
+            ('docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.template.md', 'docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md'),
             ('docs/FRAMEWORK_MANUAL.template.md', 'docs/FRAMEWORK_MANUAL.md'),
-            ('docs/LIFECYCLE_GUIDE.template.md', 'docs/LIFECYCLE_GUIDE.md'),
             ('docs/PROJECT_ROADMAP.md', 'docs/PROJECT_ROADMAP.md'),
             ('docs/article_main_text.template.md', 'docs/article_main_text.md'),
             ('docs/REPLICATION_GUIDE.template.md', 'docs/REPLICATION_GUIDE.md'),
@@ -701,9 +700,8 @@ def main():
         'README.template.md',
         'DEVELOPERS_GUIDE.template.md',
         'docs/DATA_PREPARATION_DATA_DICTIONARY.template.md',
-        'docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.template.md',
+        'docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.template.md',
         'docs/FRAMEWORK_MANUAL.template.md',
-        'docs/LIFECYCLE_GUIDE.template.md',
         'docs/PROJECT_ROADMAP.md',
         'docs/article_main_text.template.md',
         'docs/REPLICATION_GUIDE.template.md',
@@ -810,42 +808,27 @@ def main():
         make_readonly(data_final_path)
         print(f"    - {Colors.GREEN}Successfully built DATA_PREPARATION_DATA_DICTIONARY.md!{Colors.RESET}")
 
-    # --- 7. Build EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md ---
-    experiment_template_path = os.path.join(project_root, 'docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.template.md')
-    experiment_final_path = os.path.join(project_root, 'docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md')
+    # --- 7. Build EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md ---
+    experiment_template_path = os.path.join(project_root, 'docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.template.md')
+    experiment_final_path = os.path.join(project_root, 'docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md')
     if not do_force_documents and is_doc_up_to_date(project_root, experiment_final_path, experiment_template_path):
-         print(f"    - Skipping {Colors.CYAN}EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md{Colors.RESET} build (up-to-date).")
+         print(f"    - Skipping {Colors.CYAN}EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md{Colors.RESET} build (up-to-date).")
     else:
         viewer_content = build_doc_content(project_root, experiment_template_path, flavor='viewer')
-        header = generate_warning_header('docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md', '/docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.template.md')
+        header = generate_warning_header('docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md', '/docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.template.md')
         final_content = header + '\n' + viewer_content
 
         make_writable(experiment_final_path)
         with open(experiment_final_path, 'w', encoding='utf-8') as f:
             f.write(final_content)
         make_readonly(experiment_final_path)
-        print(f"    - {Colors.GREEN}Successfully built EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md!{Colors.RESET}")
+        print(f"    - {Colors.GREEN}Successfully built EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md!{Colors.RESET}")
 
-    # --- 8. Build LIFECYCLE_GUIDE.md ---
-    lifecycle_template_path = os.path.join(project_root, 'docs/LIFECYCLE_GUIDE.template.md')
-    lifecycle_final_path = os.path.join(project_root, 'docs/LIFECYCLE_GUIDE.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, lifecycle_final_path, lifecycle_template_path):
-         print(f"    - Skipping {Colors.CYAN}LIFECYCLE_GUIDE.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, lifecycle_template_path, flavor='viewer')
-        header = generate_warning_header('docs/LIFECYCLE_GUIDE.md', '/docs/LIFECYCLE_GUIDE.template.md')
-        final_content = header + '\n' + viewer_content
-
-        make_writable(lifecycle_final_path)
-        with open(lifecycle_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(lifecycle_final_path)
-        print(f"    - {Colors.GREEN}Successfully built LIFECYCLE_GUIDE.md!{Colors.RESET}")
-
-    # --- 9. Build PROJECT_ROADMAP.md ---
+    # --- 8. Build PROJECT_ROADMAP.md ---
     roadmap_template_path = os.path.join(project_root, 'docs/PROJECT_ROADMAP.md') # Note: Not a template, but needs to be in the build flow
     roadmap_final_path = os.path.join(project_root, 'docs/PROJECT_ROADMAP.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, roadmap_final_path, roadmap_template_path):
+    # For non-template files, just check if they exist
+    if os.path.exists(roadmap_final_path):
          print(f"    - Skipping {Colors.CYAN}PROJECT_ROADMAP.md{Colors.RESET} build (up-to-date).")
     else:
         # Since PROJECT_ROADMAP.md is not a template, we just ensure it exists for the DOCX conversion
@@ -920,8 +903,31 @@ def main():
                 should_build = False
                 if do_force_documents or not os.path.exists(output_path):
                     should_build = True
-                elif os.path.getmtime(output_path) < os.path.getmtime(source_path):
-                    should_build = True
+                else:
+                    # Check if the source MD file is newer than the DOCX file
+                    source_mtime = os.path.getmtime(source_path)
+                    docx_mtime = os.path.getmtime(output_path)
+                    if source_mtime > docx_mtime:
+                        should_build = True
+                    
+                    # Also check if any diagram images referenced in the MD are newer
+                    try:
+                        with open(source_path, 'r', encoding='utf-8') as f:
+                            md_content = f.read()
+                        
+                        # Check for diagram references
+                        placeholder_regex = r'\{\{(?:diagram|grouped_figure):(.+?)(?:\||\})'
+                        for match in re.finditer(placeholder_regex, md_content):
+                            diagram_source_rel_path = match.group(1).strip()
+                            base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
+                            image_path = os.path.join(project_root, 'docs', 'images', f"{base_name}.png")
+                            
+                            if os.path.exists(image_path) and os.path.getmtime(image_path) > docx_mtime:
+                                should_build = True
+                                break
+                    except (OSError, FileNotFoundError):
+                        # If we can't read the source file, rebuild to be safe
+                        should_build = True
 
                 if not should_build:
                     print(f"    - Skipping DOCX conversion for {Colors.CYAN}{output_filename}{Colors.RESET} (up-to-date).")

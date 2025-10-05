@@ -1,6 +1,6 @@
 # A Framework for Testing Complex Narrative Systems
 
-This document is the **Framework Manual** for the project. It provides a comprehensive technical guide to the framework, which is designed for the resilient and reproducible testing of large-scale LLM experiments with complex narrative systems. It offers a fully automated, end-to-end pipeline that manages the entire experimental lifecycle, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
+This document is the **Framework Manual** for the project. It provides a comprehensive technical guide to the framework, which is designed for the resilient and reproducible testing of large-scale LLM experiments with complex narrative systems. It offers a fully automated, end-to-end pipeline that manages the entire experimental workflow, from data preparation and query generation to LLM interaction, response parsing, hierarchical data aggregation, and final statistical analysis.
 
 This manual is intended for developers, contributors, and researchers who wish to understand the system's architecture or use the framework for several types of scientific validation, including **direct, methodological, and conceptual replication, as well as for new research**.
 
@@ -196,7 +196,7 @@ These diagrams illustrate the internal decision-making logic and control flow of
 The main pipeline's architecture can be understood through four different views: the code architecture, the workflows, the data flow, and the experimental logic.
 
 #### Code Architecture Diagram
-The codebase for the experiment lifecycle and analysis is organized into a clear hierarchy:
+The codebase for the experiment workflow and analysis is organized into a clear hierarchy:
 
 1.  **Main User Entry Points**: User-facing PowerShell scripts (`.ps1`) that orchestrate high-level workflows like creating, auditing, or fixing experiments and studies.
 2.  **Experiment Lifecycle Management**: The core Python backend for managing a single experiment. This includes primary orchestrators (`experiment_manager.py`, `experiment_auditor.py`) and dedicated finalization scripts (`manage_experiment_log.py`, `compile_experiment_results.py`).
@@ -293,9 +293,9 @@ Based on the combined results from both audits, it presents a consolidated summa
 {{pagebreak}}
 #### Data Flow Diagram
 
-This diagram shows how data artifacts (files) are created and transformed by the experiment lifecycle and analysis scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
+This diagram shows how data artifacts (files) are created and transformed by the experiment workflow and analysis scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
 
-{{grouped_figure:docs/diagrams/data_main_flow.mmd | scale=2.5 | width=80% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the experiment lifecycle and analysis scripts.}}
+{{grouped_figure:docs/diagrams/data_main_flow.mmd | scale=2.5 | width=80% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the experiment workflow and analysis scripts.}}
 
 #### Logic Flowcharts
 
@@ -874,7 +874,7 @@ This logical hierarchy is reflected in the physical layout of the repository:
 
 {{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
 
-Data dictionaries provide detailed explanations for all files: [📁 Data Preparation Data Dictionary](../docs/DATA_PREPARATION_DATA_DICTIONARY.md) covers the `data/` directory, and [📊 Experiment Lifecycle Data Dictionary](../output/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md) covers the `output/` directory structure and experimental results.
+Data dictionaries provide detailed explanations for all files: [📁 Data Preparation Data Dictionary](../docs/DATA_PREPARATION_DATA_DICTIONARY.md) covers the `data/` directory, and [📊 Experiment Workflow Data Dictionary](../output/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md) covers the `output/` directory structure and experimental results.
 
 ## Setup and Installation
 

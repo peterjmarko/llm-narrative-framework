@@ -20,11 +20,11 @@
 # Filename: tests/run_all_ps_tests.ps1
 
 $TestSuites = @(
-    "experiment_lifecycle\new_experiment.Tests.ps1",
-    "experiment_lifecycle\audit_experiment.Tests.ps1",
-    "experiment_lifecycle\fix_experiment.Tests.ps1",
-    "experiment_lifecycle\compile_study.Tests.ps1",
-    "experiment_lifecycle\audit_study.Tests.ps1"
+    "experiment_workflow\new_experiment.Tests.ps1",
+    "experiment_workflow\audit_experiment.Tests.ps1",
+    "experiment_workflow\fix_experiment.Tests.ps1",
+    "experiment_workflow\compile_study.Tests.ps1",
+    "experiment_workflow\audit_study.Tests.ps1"
 )
 
 $allResults = @()

@@ -36,7 +36,7 @@ The primary goal is to determine if a fully automated pipeline can serve as a se
 
 The framework is designed to support three distinct research paths. For **direct replication**, researchers can use the static data files and randomization seeds included in the project's public repository to ensure computational reproducibility of the original findings. For **methodological replication**, the framework's automated tools can be used to generate a fresh dataset from the live Astro-Databank (ADB) to test the robustness of the findings. Finally, for **conceptual replication**, researchers can modify the framework itself (e.g., by using a different LLM or analysis script) to extend the research.
 
-The final study sample was derived from a multi-stage data preparation pipeline, as illustrated in Figure 1. This section provides a conceptual overview of the workflow; a detailed, step-by-step guide for the entire data preparation pipeline and experiment lifecycle is available in the **Supplementary Materials**. The first stage, **Data Sourcing**, involved an initial query of the Astro-Databank (ADB) which selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**.
+The final study sample was derived from a multi-stage data preparation pipeline, as illustrated in Figure 1. This section provides a conceptual overview of the workflow; a detailed, step-by-step guide for the entire data preparation pipeline and experiment workflow is available in the **Supplementary Materials**. The first stage, **Data Sourcing**, involved an initial query of the Astro-Databank (ADB) which selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**.
 
 <div align="center">
   <p>Figure 1: Flowchart of the sample derivation process, showing the number of subjects retained at each stage of the data preparation pipeline.</p>
@@ -76,7 +76,7 @@ The study employed a 2 x 6 factorial design, as detailed in Table 2. The end-to-
 
 <div align="center">
   <p>Figure 2: The end-to-end research workflow, showing the generation of individual experiments and their final compilation into a study.</p>
-  <img src="images/flow_research_lifecycle.png" width="70%">
+  <img src="images/flow_research_workflow.png" width="70%">
 </div>
 
 *Table 2: Experimental Design*

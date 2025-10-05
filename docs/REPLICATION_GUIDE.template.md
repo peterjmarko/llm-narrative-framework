@@ -467,7 +467,7 @@ pdm run gen-db
 ```
 The output is `personalities_db.txt`, a tab-delimited file with the fields: `Index`, `Name`, `BirthYear`, and `DescriptionText`.
 
-With the `personalities_db.txt` file generated, the data preparation phase is complete. The following sections describe how to run the experiment lifecycle and analysis.
+With the `personalities_db.txt` file generated, the data preparation phase is complete. The following sections describe how to run the experiment workflow and analysis.
 
 ## Experiment and Study Workflow
 
