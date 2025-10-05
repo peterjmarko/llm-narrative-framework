@@ -2,6 +2,26 @@
 
 # Changelog
 
+## 12.8.0 (2025-10-05)
+
+### Bump
+
+- **version 12.7.0 → 12.8.0**
+
+### Features
+
+- **Standardize terminology to "workflow" and improve build system**
+  This commit implements a comprehensive refactoring of the framework to standardize terminology from "lifecycle" to "workflow" throughout the codebase, improves the documentation build system, and updates configuration management.
+  - Renamed [Study] section to [Experiment] in config.ini with backward compatibility
+  - Updated all source code and tests to use [Experiment] section
+  - Standardized terminology from "lifecycle" to "workflow" throughout the framework
+  - Renamed directories: tests/experiment_lifecycle/  tests/experiment_workflow/
+  - Renamed files: flow_research_lifecycle.mmd  flow_research_workflow.mmd
+  - Merged LIFECYCLE_GUIDE.template.md into README.template.md
+  - Fixed build_docs.py timestamp comparison logic for efficient rebuilding
+  - Added GraphPad Prism 10.6.1 to REPLICATION_GUIDE prerequisites
+  - Implemented automatic date updating for [Date] placeholders in templates
+
 ## 12.7.0 (2025-10-05)
 
 ### Bump
