@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 12.7.0 (2025-10-05)
+
+### Bump
+
+- **version 12.6.0 → 12.7.0**
+
+### Features
+
+- **refactor config section and improve documentation**
+  This commit includes two major improvements to the framework:
+  
+  1. Refactored the "[Study]" section to "[Experiment]" in config.ini for semantic clarity, since the section contains experiment-level parameters, not study-level parameters. This change aligns with the existing naming in the codebase and addresses a planned item mentioned in the PROJECT_ROADMAP.md.
+  
+  2. Enhanced the documentation build process to automatically update "[Date]" placeholders with the current date when documents are rebuilt due to changes. This ensures documentation always shows the correct date without manual updates.
+  
+  3. Added GraphPad Prism 10.6.1 to the Prerequisites section in REPLICATION_GUIDE.template.md for validating statistical analysis and reporting functionalities.
+  
+  4. Fixed the documentation check functionality to properly handle date comparisons when checking if documentation is up-to-date.
+  
+  The refactoring was implemented incrementally with backward compatibility maintained through the ConfigCompatibility section, ensuring that any code or scripts that still reference the old "[Study]" section will continue to work.
+
 ## 12.6.0 (2025-10-04)
 
 ### Bump
