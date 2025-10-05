@@ -2,6 +2,29 @@
 
 # Changelog
 
+## 12.5.4 (2025-10-04)
+
+### Bump
+
+- **version 12.5.3 → 12.5.4**
+
+### Fixes
+
+- **fix test suite issues and improve output formatting**
+  This commit addresses multiple issues with the test suite and improves the visual formatting of test output.
+  
+  - Fixed CHANGELOG.md header to work with the release script while preventing manual edits
+  - Updated pytest configuration to exclude backup and archive directories, preventing test collection errors
+  - Fixed PowerShell test file paths to correctly locate Test-Harness.ps1
+  - Resolved spinner character encoding issues by replacing Unicode characters with ASCII-compatible ones
+  - Improved cosmetic formatting of test output banners and headers
+    - Changed initial banner text to "RUNNING ALL PYTHON AND POWERSHELL TESTS"
+    - Removed header markers and centered text in banners
+    - Applied appropriate colors to different banner types
+    - Extended banners to cover text width
+    - Removed duplicate headers
+    - Added proper spacing between sections
+
 ## 12.5.3 (2025-10-04)
 
 ### Bump
