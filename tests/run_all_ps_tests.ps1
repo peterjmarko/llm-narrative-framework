@@ -20,23 +20,26 @@
 # Filename: tests/run_all_ps_tests.ps1
 
 $TestSuites = @(
-    "run_experiment.Tests.ps1",
-    "audit_experiment.Tests.ps1",
-    "update_experiment.Tests.ps1",
-    "migrate_experiment.Tests.ps1",
-    "analyze_study.Tests.ps1"
+    "experiment_lifecycle\new_experiment.Tests.ps1",
+    "experiment_lifecycle\audit_experiment.Tests.ps1",
+    "experiment_lifecycle\fix_experiment.Tests.ps1",
+    "experiment_lifecycle\compile_study.Tests.ps1",
+    "experiment_lifecycle\audit_study.Tests.ps1"
 )
 
 $allResults = @()
 
-Write-Host "--- Starting All PowerShell Test Suites ---" -ForegroundColor Magenta
+Write-Host ""
+Write-Host "==============================================================" -ForegroundColor Cyan
+Write-Host "Starting All PowerShell Test Suites".PadLeft(46).PadRight(62) -ForegroundColor Cyan
+Write-Host "==============================================================" -ForegroundColor Cyan
 
 # --- Main Execution Loop ---
 foreach ($suite in $TestSuites) {
     $suitePath = Join-Path $PSScriptRoot $suite
-    Write-Host "`n======================================================" -ForegroundColor Cyan
-    Write-Host "  EXECUTING SUITE: $suite" -ForegroundColor Cyan
-    Write-Host "======================================================`n" -ForegroundColor Cyan
+    Write-Host "`n======================================================" -ForegroundColor Blue
+    Write-Host "  EXECUTING SUITE: $suite" -ForegroundColor Blue
+    Write-Host "======================================================`n" -ForegroundColor Blue
 
     # Use Tee-Object to both display the live (colored) output and capture it.
     $capturedOutput = "" # Initialize variable to receive the tee'd output
@@ -50,7 +53,7 @@ foreach ($suite in $TestSuites) {
     $testsPassed = ($outputString | Select-String "Tests Passed: (\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }) | Select-Object -First 1
     $testsFailed = ($outputString | Select-String "Tests Failed: (\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }) | Select-Object -First 1
     $totalTests  = ($outputString | Select-String "Total Tests: (\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }) | Select-Object -First 1
-
+    
     $allResults += [PSCustomObject]@{
         TestSuite = $suite
         Status    = if ($exitCode -eq 0) { "PASS" } else { "FAIL" }
@@ -61,7 +64,7 @@ foreach ($suite in $TestSuites) {
 }
 
 # --- Final Consolidated Summary ---
-Write-Host "`n--- PowerShell Test Suite Summary ---" -ForegroundColor Cyan
+Write-Host "`n--- PowerShell Test Suite Summary ---" -ForegroundColor Yellow
 
 $maxNameLen = ($allResults.TestSuite | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
 # Use right-alignment for numeric columns to match Python output

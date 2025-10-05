@@ -36,6 +36,19 @@ venv.in-project = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = [
+    "--ignore=tests/archive",
+    "--ignore=tests/_archive",
+    "--ignore=linter_backups",
+    "--ignore=_archive",
+    "--ignore=tests/scripts/test_clean_project.py",
+    "--ignore=tests/test_build_docs.py",
+    "--ignore=tests/test_convert_py_to_txt.py",
+    "--ignore=tests/test_list_project_files.py",
+    "--ignore=tests/test_robustness.py",
+    "--ignore=tests/test_smoke.py"
+]
 
 [tool.pdm.scripts]
 # ==============================================================================

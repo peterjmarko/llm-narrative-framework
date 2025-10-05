@@ -19,7 +19,7 @@
 #
 # Filename: tests/experiment_lifecycle/new_experiment.Tests.ps1
 
-. (Join-Path $PSScriptRoot "Test-Harness.ps1")
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "Test-Harness.ps1")
 
 # --- Test-Specific Function Definitions ---
 

@@ -19,7 +19,7 @@
 #
 # Filename: tests/experiment_lifecycle/compile_study.Tests.ps1
 
-. (Join-Path $PSScriptRoot "Test-Harness.ps1")
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "Test-Harness.ps1")
 
 # --- Mock Implementations ---
 $script:FailOnStep = $null

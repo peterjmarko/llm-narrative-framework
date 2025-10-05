@@ -32,24 +32,32 @@ import threading
 C_GREEN = '\033[92m'
 C_RED = '\033[91m'
 C_CYAN = '\033[96m'
+C_YELLOW = '\033[93m'
+C_BLUE = '\033[94m'
+C_MAGENTA = '\033[95m'
 C_RESET = '\033[0m'
 
 def show_spinner(message, stop_event):
     """Shows a rotating spinner with message until stop_event is set."""
-    spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    spinner_chars = ['|', '/', '-', '\\']
     i = 0
     while not stop_event.is_set():
         print(f"\r{spinner_chars[i % len(spinner_chars)]} {message}", end='', flush=True)
         i += 1
         time.sleep(0.1)
-    print(f"\r✓ {message}", end='', flush=True)  # Show checkmark when done
+    print(f"\r+ {message}", end='', flush=True)  # Show checkmark when done
 
 def _clean_parallel_coverage_files(is_start):
     """Finds and deletes only parallel .coverage.* files, leaving .coverage intact."""
     if is_start:
-        print(f"{C_CYAN}--- Cleaning up old parallel coverage data... ---{C_RESET}", flush=True)
+        print()
+        print(f"{C_MAGENTA}{'#' * 80}{C_RESET}")
+        print(f"{C_MAGENTA}#{' RUNNING ALL PYTHON AND POWERSHELL TESTS '.center(78)}#{C_RESET}")
+        print(f"{C_MAGENTA}{'#' * 80}{C_RESET}")
+        print()
+        print(f"{C_YELLOW}--- Cleaning up old parallel coverage data... ---{C_RESET}", flush=True)
     else:
-        print(f"\n{C_CYAN}--- Cleaning up post-run parallel coverage data... ---{C_RESET}", flush=True)
+        print(f"\n{C_YELLOW}--- Cleaning up post-run parallel coverage data... ---{C_RESET}", flush=True)
         
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     parallel_files = glob.glob(os.path.join(project_root, '.coverage.*'))
@@ -69,7 +77,7 @@ def run_pytest(args):
     """Runs the Python pytest suite, captures results, and prints a per-file summary."""
     border = "="*62
     print(f"\n{C_CYAN}{border}{C_RESET}", flush=True)
-    print(f"{C_CYAN}--- Running Python Unit Tests (pytest) ---{C_RESET}")
+    print(f"{C_CYAN}{' Running Python Unit Tests (pytest) '.center(62)}{C_RESET}")
     print(f"{C_CYAN}{border}{C_RESET}", flush=True)
     
     # Start spinner
@@ -109,40 +117,42 @@ def run_pytest(args):
     
     print('\n'.join(filtered_lines))
 
-    # --- New Per-File Parsing Logic ---
-    file_results = defaultdict(lambda: {'passed': 0, 'failed': 0})
-    test_line_re = re.compile(r"^(tests[/\\](test_.+?\.py))::.*?\s+(PASSED|FAILED|SKIPPED)")
-
-    for line in pytest_output.split('\n'):
-        match = test_line_re.match(line)
-        if match:
-            filename = os.path.basename(match.group(1))
-            status = match.group(3)
-            if status == "PASSED":
-                file_results[filename]['passed'] += 1
-            elif status == "FAILED":
-                file_results[filename]['failed'] += 1
-
-    print(f"\n{C_CYAN}--- Pytest Suite Summary ---{C_RESET}")
-    max_len = max((len(f) for f in file_results.keys()), default=25)
-    header = f"{'Test Suite':<{max_len}} {'Status':>8} {'Passed':>8} {'Failed':>8} {'Total':>8}"
-    print(f"{C_CYAN}{header}{C_RESET}")
-    print(f"{C_CYAN}{'-' * len(header)}{C_RESET}")
-
-    overall_passed, overall_failed = 0, 0
-    for filename, counts in sorted(file_results.items()):
-        passed, failed = counts['passed'], counts['failed']
-        total = passed + failed
-        overall_passed += passed
-        overall_failed += failed
-        status_str = f"{C_GREEN}PASS{C_RESET}" if failed == 0 else f"{C_RED}FAIL{C_RESET}"
-        print(f"{filename:<{max_len}} {status_str:>8} {passed:>8} {failed:>8} {total:>8}")
+    # --- Parse pytest output for total test count ---
+    # Look for the "=== X passed in Y.Zs ===" line to get the total count
+    total_passed = 0
+    total_failed = 0
     
-    print(f"{C_CYAN}{'-' * len(header)}{C_RESET}")
-    # Skip Status column, right-align numbers in their proper columns
-    print(f"{C_CYAN}{'OVERALL TOTALS':<{max_len}} {' ':>8} {overall_passed:>8} {overall_failed:>8} {overall_passed + overall_failed:>8}{C_RESET}")
+    # First try to get the totals from the final summary line
+    for line in pytest_output.split('\n'):
+        if " passed in " in line and "s" in line:
+            # Example: "=== 621 passed in 28.03s ==="
+            match = re.search(r"=== (\d+) passed in", line)
+            if match:
+                total_passed = int(match.group(1))
+                break
+    
+    # If we didn't find the summary, try to count individual test results
+    if total_passed == 0:
+        test_line_re = re.compile(r"^(tests[/\\].+?\.py)::.*?\s+(PASSED|FAILED|SKIPPED)")
+        for line in pytest_output.split('\n'):
+            match = test_line_re.match(line)
+            if match:
+                status = match.group(2)
+                if status == "PASSED":
+                    total_passed += 1
+                elif status == "FAILED":
+                    total_failed += 1
+    
+    # Print a simple summary
+    print(f"\n{C_YELLOW}--- Pytest Suite Summary ---{C_RESET}")
+    print(f"{'Test Suite':<25} {'Status':>8} {'Passed':>8} {'Failed':>8} {'Total':>8}")
+    print(f"{'-' * 62}")
+    status_str = f"{C_GREEN}PASS{C_RESET}" if total_failed == 0 else f"{C_RED}FAIL{C_RESET}"
+    print(f"{'Python Tests':<25} {status_str:<15} {total_passed:>8} {total_failed:>8} {total_passed + total_failed:>8}")
+    print(f"{'-' * 62}")
+    print(f"{'OVERALL TOTALS':<25} {'':>8} {total_passed:>8} {total_failed:>8} {total_passed + total_failed:>8}")
 
-    return overall_passed, overall_failed, (overall_passed + overall_failed)
+    return total_passed, total_failed, (total_passed + total_failed)
 
 def run_coverage_report():
     """Combines coverage data and prints a summary report."""
@@ -159,23 +169,32 @@ def run_coverage_report():
 
 def run_pwsh_tests():
     """Runs the PowerShell test suite and extracts results."""
-    border = "="*62
-    print(f"\n{C_CYAN}{border}{C_RESET}", flush=True)
-    print(f"{C_CYAN}--- Running PowerShell Script Tests ---{C_RESET}")
-    print(f"{C_CYAN}{border}{C_RESET}", flush=True)
+    # Let the PowerShell script handle its own headers
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     ps_script_path = os.path.join(script_dir, 'run_all_ps_tests.ps1')
     
     result = subprocess.run(["pwsh", "-File", ps_script_path], capture_output=True, text=True, encoding='utf-8')
     
-    # Add cyan coloring to PowerShell output headers and tables
+    # Add coloring to PowerShell output headers and tables
     ps_output = result.stdout
     colored_lines = []
     for line in ps_output.split('\n'):
-        if (line.strip().startswith('--- PowerShell Test Suite Summary ---') or
-            line.strip().startswith('Test Suite') and 'Status' in line and 'Passed' in line or
-            line.strip().startswith('---') and '---' in line):
+        if line.strip().startswith('======================================================'):
+            # This is a suite header line
+            colored_lines.append(f"{C_BLUE}{line}{C_RESET}")
+        elif line.strip().startswith('  EXECUTING SUITE:'):
+            # Center the suite name in 80 columns
+            suite_name = line.strip()[17:]  # Remove "  EXECUTING SUITE: "
+            centered = f"  EXECUTING SUITE: {suite_name}  ".center(80)
+            colored_lines.append(f"{C_BLUE}{centered}{C_RESET}")
+        # Skip the duplicate Test Summary headers
+        elif line.strip().startswith('--- Test Summary ---'):
+            continue
+        elif line.strip().startswith('--- PowerShell Test Suite Summary ---'):
+            colored_lines.append(f"{C_YELLOW}{line}{C_RESET}")
+        elif (line.strip().startswith('Test Suite') and 'Status' in line and 'Passed' in line or
+              line.strip().startswith('---') and '---' in line and not line.strip().startswith('--- Test')):
             colored_lines.append(f"{C_CYAN}{line}{C_RESET}")
         elif line.strip().startswith('OVERALL TOTALS'):
             colored_lines.append(f"{C_CYAN}{line}{C_RESET}")
@@ -235,11 +254,18 @@ def main():
 
     _clean_parallel_coverage_files(is_start=False)
 
+    print()
     if total_failed == 0:
-        print(f"{C_GREEN}All Python and PowerShell test suites passed successfully!{C_RESET}")
+        print(f"{C_GREEN}{'#' * 80}{C_RESET}")
+        print(f"{C_GREEN}#{' ALL PYTHON AND POWERSHELL TEST SUITES PASSED SUCCESSFULLY! '.center(78)}#{C_RESET}")
+        print(f"{C_GREEN}{'#' * 80}{C_RESET}")
+        print()
         sys.exit(0)
     else:
-        print(f"{C_RED}One or more test suites failed.{C_RESET}", file=sys.stderr)
+        print(f"{C_RED}{'#' * 80}{C_RESET}")
+        print(f"{C_RED}#{' ONE OR MORE TEST SUITES FAILED. '.center(78)}#{C_RESET}")
+        print(f"{C_RED}{'#' * 80}{C_RESET}")
+        print()
         sys.exit(1)
 
 if __name__ == "__main__":

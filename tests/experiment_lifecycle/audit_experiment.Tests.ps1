@@ -19,7 +19,7 @@
 #
 # Filename: tests/experiment_lifecycle/audit_experiment.Tests.ps1
 
-. (Join-Path $PSScriptRoot "Test-Harness.ps1")
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "Test-Harness.ps1")
 
 # --- Test-Specific Mock Function ---
 # Mock the pdm executable to intercept the call from the script.
