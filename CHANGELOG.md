@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 12.8.2 (2025-10-05)
+
+### Bump
+
+- **version 12.8.1 → 12.8.2**
+
+### Documentation
+
+- **Align Replication Guide and Framework Manual**
+  This update aligns all three primary documentation sources (Framework Manual, Replication Guide, and Article Main Text) to use the consistent 233 factorial design (18 conditions) as specified in the Framework Manual. The Replication Guide was restructured for better flow and conciseness while preserving essential information, with detailed Solar Fire content moved to the Framework Manual.
+  
+  Key changes include:
+  - Updated experimental design from 26 to 233 (18 conditions) in Replication Guide and Article
+  - Reorganized Replication Guide structure around three replication paths
+  - Moved detailed Solar Fire content from Replication Guide to Framework Manual
+  - Restructured data preparation workflow to match Framework Manual's 4 stages
+  - Ensured consistent terminology across all documents
+  
+  The documents now maintain distinct purposes while presenting a unified description of the experimental framework.
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 12.8.1 (2025-10-05)
 
 ### Bump
