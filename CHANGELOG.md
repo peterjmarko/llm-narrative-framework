@@ -2,6 +2,29 @@
 
 # Changelog
 
+## 12.9.0 (2025-10-06)
+
+### Bump
+
+- **version 12.8.2 → 12.9.0**
+
+### Features
+
+- **Align documentation structure and content across Framework Manual, Replication Guide, and Research Article**
+  This comprehensive update aligns the documentation structure and content across all three key documents to ensure consistency and clarity:
+  
+  1. **Restructured Replication Guide** to focus on procedural steps for the three replication paths (Direct, Methodological, Conceptual) with reference material moved to appropriate appendices
+  
+  2. **Enhanced Framework Manual** with detailed Solar Fire content, troubleshooting section, and related files reference
+  
+  3. **Identified Research Article inconsistencies** and added improvement tasks to the project roadmap
+  
+  4. **Standardized experimental design** descriptions to consistently reflect the 233 factorial design (18 conditions)
+  
+  5. **Updated model references** to include all three evaluation LLMs with October 2025 access dates
+  
+  6. **Improved document organization** with clear separation of concerns between the three documents
+
 ## 12.8.2 (2025-10-05)
 
 ### Bump
