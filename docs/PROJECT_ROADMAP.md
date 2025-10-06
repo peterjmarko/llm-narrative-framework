@@ -28,6 +28,14 @@ This document outlines planned development tasks and tracks known issues for the
   - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
   - [ ] Update all dates, tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
   - [ ] Replace the text placeholder in `article_main_text.md` with the final, generated interaction plot (`interaction_plot_mean_rank.png`).
+  - [ ] Address Research Article inconsistencies identified in documentation alignment:
+    - [ ] Clarify statistical analysis - either report Three-Way ANOVA results consistent with 2×3×3 design or explain why Two-Way was used
+    - [ ] Update model descriptions - specify all three evaluation LLMs or clarify scope of reported results
+    - [ ] Correct statistical reporting - ensure degrees of freedom match experimental design
+    - [ ] Add access dates - include October 2025 access dates for all LLMs
+    - [ ] Add specific references - reference Framework Manual and Replication Guide in Supplementary Materials
+    - [ ] Expand replication path descriptions - briefly describe each path with references to detailed guides
+    - [ ] Verify figure references - ensure all figures have proper descriptions and clear references
 - [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
   - [ ] Check all tables and diagrams.
   - [ ] Check counts and dates.

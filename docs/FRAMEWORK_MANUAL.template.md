@@ -89,12 +89,37 @@ The query only includes subjects who meet all of the following criteria:
 -   **Deceased Individuals:** Inclusion in the **Personal > Death** category.
 -   **Eminence:** Inclusion in the **Notable > Famous > Top 5% of Profession** category.
 
+##### Individual Script Execution
+
+While the `prepare_data.ps1` orchestrator is the recommended approach, individual scripts can be executed for development and debugging:
+
+```bash
+# Fetch a new dataset from the live ADB
+pdm run fetch-adb
+```
+
+This produces `data/sources/adb_raw_export.txt`.
+
 ##### Stage 2: Candidate Qualification
 
 This stage performs a rigorous, deterministic filtering pass on the raw data to create a high-quality cohort of "eligible candidates."
 
 1.  **Link Finding (`find_wikipedia_links.py`):** This script takes the raw ADB export and finds the best-guess English Wikipedia URL for each subject. It scrapes the ADB page and uses a Wikipedia search as a fallback. The output is an intermediate file, `adb_wiki_links.csv`.
+    
+    ```bash
+    # Find Wikipedia links for all raw records
+    pdm run find-links
+    ```
+
 2.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name, and confirms their death date. The final output is the detailed `adb_validation_report.csv`.
+    
+    **A Note on Reproducibility:** Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. For direct replication, the study's pipeline relies on the static report (`adb_validation_report.csv`) included in the repository.
+    
+    ```bash
+    # Validate the content of each found Wikipedia page
+    pdm run validate-pages
+    ```
+
 3.  **Final Filtering (`select_eligible_candidates.py`):** This script integrates the raw data with the Wikipedia validation report and applies the following additional criteria in order:
 
 | Criteria | Rule | Purpose |
@@ -107,26 +132,98 @@ This stage performs a rigorous, deterministic filtering pass on the raw data to 
 | **Deduplication** | Unique Name + Birth Date | Removes duplicate entries from the source database. |
     
     The final output of this stage is the `adb_eligible_candidates.txt` file.
+    
+    ```bash
+    # Create the list of eligible candidates
+    pdm run select-eligible
+    ```
 
 ##### Stage 3: LLM-based Candidate Selection (Optional)
 
 This stage is a second, optional filtering pass that uses LLMs to score the "eligible candidates" to determine the final, smaller subject pool. This entire stage can be skipped by setting `bypass_candidate_selection = true` in `config.ini`.
 
 1.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
+    
+    ```bash
+    # Generate eminence scores for all eligible candidates
+    pdm run gen-eminence
+    ```
+
 2.  **OCEAN Scoring (`generate_ocean_scores.py`):** A fully automated, resilient script that generates OCEAN personality scores for every subject in the eminence-ranked list.
+    
+    ```bash
+    # Generate OCEAN scores to determine the final cutoff
+    pdm run gen-ocean
+    ```
+
 3.  **Final Selection & Cutoff (`select_final_candidates.py`):** Performs the final filtering and selection. It takes the complete OCEAN scores list and applies a sophisticated, data-driven algorithm to determine the optimal cohort size. The script first calculates the cumulative personality variance curve for the entire cohort, smooths this curve using a moving average to eliminate local noise, and then performs a slope analysis to find the "plateau"—the point of diminishing returns where adding more subjects no longer meaningfully contributes to the psychological diversity of the pool. It then resolves country codes and sorts the final list by eminence.
+    
+    ```bash
+    # Create the final, transformed list of subjects
+    pdm run select-final
+    ```
+
+##### Determining the Optimal Cutoff Parameters
+
+To ensure the parameters for the final candidate selection algorithm were chosen objectively and were optimally tuned to the specific shape of the dataset's variance curve, a **systematic sensitivity analysis** was performed using the dedicated `scripts/analysis/analyze_cutoff_parameters.py` utility. The search space for the parameters was iteratively expanded to ensure a true global optimum was found.
+
+The script performed a grid search over a wide range of values for `cutoff_search_start_point` and `smoothing_window_size`. To avoid overfitting to a single "best" result, a sophisticated **stability-based recommendation algorithm** was used. This algorithm first identifies a cluster of high-performing parameter sets (those with a low error between the predicted and ideal cutoffs) and then calculates a "stability score" for each based on the average error of its neighbors in the parameter grid. The final recommendation is the parameter set with the best stability score, representing the center of the most stable, high-performing region.
+
+The final, expanded analysis revealed several key insights:
+
+*   **The Variance Curve Shape:** The cumulative variance curve has a distinct shape: a long, steep decline followed by a wide, shallow plateau containing long-wavelength, low-amplitude noise.
+*   **Justification for the Final Parameters:** A high `cutoff_search_start_point` (3500) was essential to force the analysis to begin *on the plateau*, isolating the region of interest. A large `smoothing_window_size` (800) was necessary to average out the long, shallow waves on the plateau, allowing the slope-based algorithm to detect the true global trend.
+
+Based on this comprehensive, data-driven analysis, the following optimal parameters were chosen and set in `config.ini`:
+
+*   `cutoff_search_start_point = 3500`
+*   `smoothing_window_size = 800`
+
+The plot of this analysis (see Figure S8) provides a clear visual justification for these choices. It shows how the algorithm, using these parameters, correctly identifies the start of the curve's final plateau, resulting in a final cutoff of 4,954 subjects.
+
+{{grouped_figure:data/reports/variance_curve_analysis.png | caption=Figure S8: Variance Curve Analysis for Optimal Cohort Selection. The plot shows the raw cumulative variance, the smoothed curve (800-pt moving average), the search start point (3500), and the final data-driven cutoff (4954).}}
 
 ##### Stage 4: Profile Generation
 
 This is the final stage, which assembles the personality profiles for the selected candidates. It involves a mix of automated and manual steps.
 
 1.  **Formatting (`prepare_sf_import.py`):** Formats the final subject list for import into the Solar Fire software. It performs a critical data integrity step by encoding each subject's unique `idADB` into a Base58 string and injecting it into the `ZoneAbbr` field. This technique allows a unique identifier to pass through the manual software step unharmed, ensuring a perfect data merge later. The `ZoneAbbr` field was specifically chosen as it is a text field that is passed through the software without modification and is not used in any astrological calculations, making it a safe channel for this data.
+    
+    ```bash
+    # Prepare the final list for the manual import step
+    pdm run prep-sf-import
+    ```
+
 2.  **Manual Processing (Solar Fire):** The formatted file is imported into Solar Fire, which calculates the required celestial data and exports it as `sf_chart_export.csv`.
+
 3.  **Neutralization (`neutralize_delineations.py`):** This script uses a powerful hybrid strategy to rewrite the esoteric source texts.
+    
     *   **Fast Mode (`--fast`):** For initial runs, this mode bundles tasks into large, high-speed API calls (e.g., all 12 "Sun in Signs" delineations at once). This is highly efficient but may fail on some large tasks.
     *   **Robust/Resume Mode (default):** For resuming or fixing failed runs, this mode processes each of the 149 delineations as a separate, atomic task. This granular approach is slower but guarantees completion by solving potential response truncation issues from the LLM.
+    
+    ```bash
+    # Perform the initial, high-speed neutralization
+    pdm run neutralize --fast
+    
+    # Automatically fix any failed tasks from the fast run
+    pdm run neutralize
+    ```
+
 4.  **Integration (`create_subject_db.py`):** Bridges the manual step by reading the Solar Fire chart export, decoding the unique `idADB` from the `ZoneAbbr` field, and merging the chart data with the final subject list to produce a clean master database.
+    
+    ```bash
+    # Integrate the manual chart data export
+    pdm run create-subject-db
+    ```
+
 5.  **Generation (`generate_personalities_db.py`):** Assembles the final `personalities_db.txt` by combining the subject data with the neutralized delineation library according to a deterministic algorithm.
+    
+    ```bash
+    # Generate the final personalities database
+    pdm run gen-db
+    ```
+    
+    The output is `personalities_db.txt`, a tab-delimited file with the fields: `Index`, `Name`, `BirthYear`, and `DescriptionText`.
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
 
@@ -1347,3 +1444,55 @@ The framework provides external validation against GraphPad Prism 10.6.1 for aca
 For complete validation procedures, see the **[Statistical Analysis & Reporting Validation section in the Testing Guide](TESTING_GUIDE.md#statistical-analysis--reporting-validation)**.
 
 **Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.6.1"
+
+---
+
+## Troubleshooting Common Issues
+
+This section provides solutions to the most common issues researchers may encounter when setting up the framework or running experiments.
+
+| Issue | Solution |
+| :--- | :--- |
+| **`pdm` command not found** | This usually means the Python scripts directory is not in your system's PATH. You can either add it, or use `python -m pdm` as a reliable alternative (e.g., `python -m pdm install -G dev`). |
+| **API Errors during an experiment run** | Network issues or API rate limits can cause individual LLM calls to fail. The framework is designed for this. Simply run the `fix_experiment.ps1` script on the experiment directory. It will automatically find and re-run only the failed API calls. |
+| **"Permission Denied" error when building DOCX files** | This error occurs if a `.docx` file is open in Microsoft Word while the `pdm run build-docs` script is running. Close the file in Word, and the script will automatically retry and continue. |
+| **`git` command not found** | The framework requires Git for versioning and reproducibility checks. Please install it from [git-scm.com](https://git-scm.com/downloads) and ensure it is available in your system's PATH. |
+| **All LLM sessions fail (100% failure rate)** | This indicates a model configuration problem. Verify the model name in `config.ini` matches available models and check your API credentials and permissions. |
+| **Repair process loops indefinitely** | The repair system automatically limits retry attempts to 3 cycles maximum. After 3 cycles, it proceeds with available data to prevent endless loops when external factors cause persistent failures. |
+| **Enhanced status messages** | The framework now provides colored error output and detailed progress tracking (elapsed time, remaining time, ETA) for better visibility during long-running operations. |
+| **Data preparation fails at fetch stage** | Verify your Astro-Databank credentials in the `.env` file. Check that your account has active access and that you can log in through the web interface. |
+| **Wikipedia validation fails** | This can occur due to Wikipedia rate limiting or page structure changes. The script includes automatic retry logic, but persistent failures may require manual intervention. |
+| **Solar Fire import issues** | Verify the file format matches the expected CQD format. Check that all required fields are present and correctly formatted. |
+| **Neutralization script fails** | Check your OpenRouter API key and ensure you have sufficient funds. The `--fast` mode may fail on large tasks; use the default mode for reliable completion. |
+
+---
+
+## Related Files Reference
+
+This section provides reference information for key data files used by the framework.
+
+### base_query.txt
+
+This file contains the final prompt template used for the LLM matching task. It is the product of a systematic, multi-stage piloting process. Various prompt structures and phrasing were tested to find the version that yielded the most reliable and consistently parsable structured output from the target LLM.
+
+### country_codes.csv
+
+This file provides a mapping from the country/state abbreviations used in the Astro-Databank to their full, standardized names. A sample is shown below. The complete file can be found at `data/foundational_assets/country_codes.csv`.
+
+| Abbreviation | Country |
+| :--- | :--- |
+| `AB (CAN)` | Canada |
+| `AK (US)` | United States |
+| `ENG (UK)` | United Kingdom |
+| `FR` | France |
+| `GER` | Germany |
+
+### Configuration Files
+
+#### point_weights.csv
+
+Defines the weights assigned to each astrological point when calculating balances. These weights determine the relative importance of each point in the overall personality profile.
+
+#### balance_thresholds.csv
+
+Defines the thresholds used to classify astrological factors as 'strong' or 'weak' based on their calculated values. These thresholds are used in the personality assembly algorithm.
