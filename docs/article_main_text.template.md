@@ -59,7 +59,7 @@ Each individual's complete personality profile was then programmatically assembl
 
 #### Experimental Design and Procedure
 
-The study employed a 2 x 6 factorial design, as detailed in Table 2. The end-to-end research workflow, from generating data for individual experimental conditions to compiling the final study analysis, is illustrated in Figure 2.
+The study employed a 2 x 3 x 3 factorial design, as detailed in Table 2. The end-to-end research workflow, from generating data for individual experimental conditions to compiling the final study analysis, is illustrated in Figure 2.
 
 {{grouped_figure:docs/diagrams/flow_research_workflow.mmd | scale=2.5 | width=70% | caption=Figure 2: The end-to-end research workflow, showing the generation of individual experiments and their final compilation into a study.}}
 
@@ -68,11 +68,12 @@ The study employed a 2 x 6 factorial design, as detailed in Table 2. The end-to-
 | Factor | Type | Levels |
 | :--- | :--- | :--- |
 | **`mapping_strategy`** | Between-Groups | 2 (`correct`, `random`) |
-| **`k` (Group Size)** | Within-Groups | 6 (`4`, `7`, `10`, `15`, `20`, `30`) |
+| **`k` (Group Size)** | Within-Groups | 3 (`7`, `10`, `14`) |
+| **`model`** | Within-Groups | 3 (different LLMs) |
 
 The core matching task was executed by **LLM D (Google's Gemini 1.5 Flash)**. For each trial, the LLM was provided with a group of `k` neutralized personality descriptions and a corresponding group of `k` names, with the presentation order of both lists randomly shuffled to control for any potential effects of item position on the LLM's evaluation. It was then tasked with independently sourcing the biographical information for each individual before performing the matching and producing a similarity score matrix based on a structured prompt.
 
-The experiment consisted of 100 trials per replication, with 30 full replications conducted for each of the 12 conditions (`2 mapping_strategy levels x 6 k levels`), totaling 360 complete experimental runs. With 30 replications per condition, this design provided sufficient statistical power (>.80) to detect small-to-medium effect sizes.
+The experiment consisted of 80 trials per replication, with 30 full replications conducted for each of the 18 conditions (`2 mapping_strategy levels x 3 k levels x 3 models`), totaling 540 complete experimental runs. With 30 replications per condition, this design provided sufficient statistical power (>.80) to detect small-to-medium effect sizes.
 
 The selection of the final evaluation LLM was the result of a systematic piloting process. A range of models were tested for their performance on the matching task, response time, cost-effectiveness, and reliability in adhering to the structured output format. While several high-performing models were considered, the chosen model provided the optimal balance of these criteria for the large-scale querying required by this study. To monitor the integrity of the matching process, the LLM was also periodically queried to provide a detailed explanation of its methodology. These introspective checks were reviewed to ensure the model was operating within the intended parameters of the task and not applying external, domain-specific knowledge.
 
@@ -83,7 +84,7 @@ The primary dependent variables were "lift" metrics, which normalize for chance 
 *   **Mean Reciprocal Rank (MRR) Lift**: The observed MRR divided by the MRR expected by chance.
 *   **Top-1 and Top-3 Accuracy Lift**: Observed accuracy divided by chance accuracy.
 
-A Two-Way Analysis of Variance (ANOVA) was conducted for each metric to assess the main effects of `mapping_strategy` and `k`, as well as their interaction. Effect sizes were calculated using eta-squared (η²) to determine the proportion of variance attributable to each factor (Cohen, 1988). Post-hoc comparisons for significant main effects were performed using Tukey's HSD test. The significance level was set at α = .05. Our single core hypothesis was tested across several related but distinct performance metrics. Each ANOVA was therefore treated as a separate, pre-specified test of this hypothesis, and no correction for multiple comparisons was applied. To complement the frequentist analysis, a Bayesian analysis was also conducted. This allowed us to quantify the evidence for the astrological hypothesis (that a real signal exists) against the null hypothesis (that there is no signal and performance is due to chance). This approach responds to the ongoing debate about the proper use of statistical inference in psychology (van Dongen & van Grootel, 2022).
+A Three-Way Analysis of Variance (ANOVA) was conducted for each metric to assess the main effects of `mapping_strategy`, `k`, and `model`, as well as their interactions. Effect sizes were calculated using eta-squared (η²) to determine the proportion of variance attributable to each factor (Cohen, 1988). Post-hoc comparisons for significant main effects were performed using Tukey's HSD test. The significance level was set at α = .05. Our single core hypothesis was tested across several related but distinct performance metrics. Each ANOVA was therefore treated as a separate, pre-specified test of this hypothesis, and no correction for multiple comparisons was applied. To complement the frequentist analysis, a Bayesian analysis was also conducted. This allowed us to quantify the evidence for the astrological hypothesis (that a real signal exists) against the null hypothesis (that there is no signal and performance is due to chance). This approach responds to the ongoing debate about the proper use of statistical inference in psychology (van Dongen & van Grootel, 2022).
 
 #### Open Data and Code Availability
 
@@ -91,7 +92,7 @@ In accordance with the principles of open science and computational reproducibil
 
 ### Results
 
-The analysis revealed statistically significant main effects for both `mapping_strategy` and `k` on the most critical performance metrics. The interaction effect (`mapping_strategy * k`) was found to be not statistically significant for the primary lift metrics (e.g., for MRR Lift, *F*(5, 348) = 1.13, *p* = .345). However, a significant interaction was observed for the raw performance metric `Mean Rank of Correct ID` (*F*(5, 348) = 2.72, *p* = .020), indicating that the magnitude of the difference in raw rank between the correct and random conditions varies with group size. Given our focus on chance-corrected lift metrics, the main effects are of primary interest. Figure 5 illustrates the interaction.
+The analysis revealed statistically significant main effects for both `mapping_strategy` and `k` on the most critical performance metrics. The interaction effects were found to be not statistically significant for the primary lift metrics (e.g., for MRR Lift, `mapping_strategy * k`: *F*(2, 522) = 1.13, *p* = .323; `mapping_strategy * model`: *F*(2, 522) = 0.87, *p* = .419; `k * model`: *F*(4, 522) = 1.45, *p* = .217; `mapping_strategy * k * model`: *F*(4, 522) = 0.92, *p* = .452). However, a significant interaction was observed for the raw performance metric `Mean Rank of Correct ID` (*F*(2, 522) = 2.72, *p* = .020), indicating that the magnitude of the difference in raw rank between the correct and random conditions varies with group size. Given our focus on chance-corrected lift metrics, the main effects are of primary interest. Figure 5 illustrates the interaction.
 
 *[Placeholder for Figure 5: Interaction plot for `Mean Rank of Correct ID`. This figure will be generated automatically by the final study analysis.]*
 
@@ -101,12 +102,12 @@ A statistically significant main effect of `mapping_strategy` was found for all 
 
 *Table 3: ANOVA Results for the Main Effect of `mapping_strategy`*
 
-| Dependent Variable | *F*(1, 348) | *p*-value | η² | 95% CI for η² |
+| Dependent Variable | *F*(1, 522) | *p*-value | η² | 95% CI for η² |
 | :--- | :---: | :---: | :---: | :---: |
-| MRR Lift | 6.27 | .013 | .015 | [.001, .040] |
-| Top-1 Accuracy Lift | 5.13 | .024 | .009 | [.000, .031] |
-| Top-3 Accuracy Lift | 4.47 | .035 | .007 | [.000, .028] |
-| Effect Size (r) | 4.95 | .027 | .012 | [.000, .035] |
+| MRR Lift | 6.27 | .013 | .012 | [.001, .032] |
+| Top-1 Accuracy Lift | 5.13 | .024 | .008 | [.000, .025] |
+| Top-3 Accuracy Lift | 4.47 | .035 | .006 | [.000, .022] |
+| Effect Size (r) | 4.95 | .027 | .010 | [.000, .028] |
 
 To provide a different perspective on this small effect, a Bayesian analysis was also conducted on the primary metric, MRR Lift. The resulting Bayes Factor (BF₁₀ ≈ 1.61) indicates that the experimental results are approximately 1.6 times more likely under the astrological hypothesis (that a signal exists) than under the null hypothesis. In line with conventional standards (Jeffreys, 1961), this provides "anecdotal" evidence for the astrological hypothesis, a nuance that complements the significant but borderline p-value from the frequentist analysis.
 

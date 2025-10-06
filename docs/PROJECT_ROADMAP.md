@@ -118,6 +118,15 @@ This document outlines planned development tasks and tracks known issues for the
 
 **Note**: This task is distinct from the "Generate an experiment parameters manifest (`parameters.json`) to permanently record all parameters used" task under "Improve Experiment Execution and Reproducibility" below. The current provenance capture focuses on environmental metadata only (via `provenance.json`), while the future parameters manifest (via `parameters.json`) will be part of CLI-driven experiments and replace config.ini as the parameter source.
 
+- [ ] **Implement Comprehensive Test Results Preservation System**
+  - [ ] Create centralized test results repository structure in `tests/results/` with archives, latest symlinks, and summaries
+  - [ ] Develop test results manager module (`src/utils/test_results_manager.py`) for consistent preservation across all test types
+  - [ ] Update all test harness scripts (Layer 2-5) to use the new preservation system
+  - [ ] Create test summary generator (`scripts/testing/generate_test_summary.py`) for aggregating and comparing results
+  - [ ] Implement test results viewer tool (`scripts/testing/view_test_results.py`) for browsing historical results
+  - [ ] Add PDM commands for accessing test results: `test-results-view` and `test-results-summary`
+  - [ ] Update testing guide to document the new preservation approach and usage
+
 - [ ] **Improve Experiment Execution and Reproducibility**
   - [ ] Refactor inter-script communication for robustness. Modify core Python scripts (`experiment_manager.py`, etc.) to send all human-readable logs to `stderr` and use `stdout` exclusively for machine-readable output (e.g., the final experiment path). Update PowerShell wrappers to correctly handle these separate streams.
   - [ ] Implement CLI-driven experiments where parameters are passed as arguments to `new_experiment.ps1` instead of being read from a global `config.ini`.

@@ -69,6 +69,7 @@ tests/llm_qualification/
 # The .template.md files are the source of truth and are tracked by Git.
 README.md
 DEVELOPERS_GUIDE.md
+docs/article_main_text.md
 docs/DATA_PREPARATION_DATA_DICTIONARY.md
 docs/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md
 docs/FRAMEWORK_MANUAL.md

@@ -79,10 +79,12 @@ The `prepare_data.ps1` script orchestrates a sequence of individual Python scrip
 ##### Stage 1: Data Sourcing
 
 This stage uses `fetch_adb_data.py` to create the initial raw dataset by querying the live Astro-Databank with a specific set of pre-filters. It performs two crucial transformations at the source:
+
 -   **Identifier Standardization:** It replaces the unstable, temporary record number (`ARN`) with a file-specific sequential `Index`, and renames the permanent Astro-Databank ID (`ADBNo`) to `idADB`.
 -   **Timezone Calculation:** It immediately processes the raw timezone code from the API into the final `ZoneAbbr` and `ZoneTimeOffset` values required by downstream software.
 
 The query only includes subjects who meet all of the following criteria:
+
 -   **High-Quality Birth Data:** The record must have a Rodden Rating of 'A' or 'AA', indicating the birth time is from a reliable source.
 -   **Deceased Individuals:** Inclusion in the **Personal > Death** category.
 -   **Eminence:** Inclusion in the **Notable > Famous > Top 5% of Profession** category.
@@ -127,6 +129,172 @@ This is the final stage, which assembles the personality profiles for the select
 5.  **Generation (`generate_personalities_db.py`):** Assembles the final `personalities_db.txt` by combining the subject data with the neutralized delineation library according to a deterministic algorithm.
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
+
+## Solar Fire Integration and Configuration
+
+This section provides detailed instructions for integrating Solar Fire astrology software into the data preparation pipeline. Solar Fire is used for calculating celestial positions and exporting chart data that serves as input for the personality generation algorithm.
+
+### Software Requirements
+
+Solar Fire v9.0.3 is the recommended version for this framework. The software is available at https://alabe.com/solarfireV9.html.
+
+### File Locations
+
+Solar Fire stores its user files in the standard Windows Documents folder. Understanding these locations is helpful for managing the import/export process:
+
+*   **Solar Fire User Files:** `Documents\Solar Fire User Files`
+*   **Subdirectories:**
+    *   **Charts:** Chart ('*.sfcht') files accessible within Solar Fire
+    *   **Import:** Imported birth data files (various formats)
+    *   **Export:** Exported astrological data (various formats)
+    *   **Points & Colors:** Settings ('*.pts') file for Displayed Points
+    *   **Interpretations:** Delineations library ('*.def') files
+
+### One-Time Software Setup
+
+The following configuration steps only need to be performed once. After the initial setup, you can proceed directly to the **Import/Export Workflow**.
+
+#### 1. Configure Chart Points
+
+You must define which astrological points are included in the calculations.
+
+*   **Menu:** `Chart Options > Displayed Points...`
+*   **Action:**
+    1.  Create a new `.pts` file (e.g., `llm_narrative_dp12.pts`).
+    2.  Edit this file to include exactly these 12 points: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, and Midheaven.
+    3.  Save the file and ensure it is selected as the active set.
+
+{{grouped_figure:docs/images/replication_guide/sf_setup_1_displayed_points.png | width=60% | caption=Solar Fire "Displayed Points" dialog configured with the 12 required chart points.}}
+
+#### 2. Configure Preferences
+
+Ensure the core calculation settings match the study's methodology.
+
+*   **Menu:** `Preferences > Edit Settings...`
+*   **Action:** Verify the following default settings are active:
+    *   **'Places' tab -> Atlas:** `ACS (Built-in)`
+    *   **'Calculations' tab -> MC in Polar Regions:** `Always above horizon`
+    *   **'Zodiac' tab -> Default Zodiac:** `Tropical`
+    *   **'AutoRun' tab -> Astrologer's Assistant:** Ensure this is cleared and no tasks run on startup.
+
+#### 3. Define Data Formats
+
+You must define the data structure for both importing and exporting. Solar Fire maintains **separate** format lists for each, so this process must be done twice.
+
+**a. Define Import Format**
+
+*   **Menu:** `Utilities > Chart Import/Export...`
+*   **Action:**
+    1.  Go to the **'Options' tab** and click **'Edit ASCII Formats...'**.
+    2.  Create a **new format definition**.
+    3.  Set **'Record Format'** to `Comma Quote Delimited`.
+    4.  Configure **'Fields in each record'** to contain exactly these 9 fields in this specific order: Name/Description, Date (String), Time (String), Zone Abbreviation, Zone Time (String), Place Name, Country/State Name, Latitude (String), Longitude (String).
+    5.  Save the format as `CQD Import`.
+
+{{grouped_figure:docs/images/replication_guide/sf_setup_2_import_format.png | width=80% | caption=Solar Fire "Edit ASCII Formats" dialog configured for the CQD Import format.}}
+
+**b. Define Export Format**
+
+*   **Menu:** `Chart > Export Charts as Text...`
+*   **Action:**
+    1.  Click the **'Edit ASCII...'** button to open the format definitions dialog.
+    2.  **This list is separate from the import list.** You must create another **new format definition**.
+    3.  Repeat the exact same configuration as the import format, set it to `Comma Quote Delimited`, and add the same 9 fields in the same order.
+    4.  Save the format as `CQD Export`. This ensures both workflows use an identical data structure.
+
+{{grouped_figure:docs/images/replication_guide/sf_setup_3_export_format.png | width=80% | caption=Solar Fire "Export Chart Data" format dialog configured for the CQD Export format.}}
+
+### Import/Export Workflow
+
+After completing the one-time setup, follow this workflow to process the data.
+
+#### Pre-flight Check: Clearing Existing Chart Data (For Re-runs)
+If you are re-running the import process, you must first clear the existing charts from your Solar Fire charts file to avoid duplicates.
+
+*   **Menu:** `Chart > Open...`
+*   **Action:**
+    1.  In the **'Chart Database'** dialog, select your charts file (e.g., `adb_candidates.sfcht`).
+    2.  Click the **'All'** button to highlight every chart in the file.
+    3.  Click the **'Delete...'** button, then select **'Selected Charts...'**.
+    4.  A dialog will ask: "Do you wish to confirm the deletion of each chart individually?". Click **'No'** to delete all charts at once.
+    5.  Click **'Cancel'** to close the 'Chart Database' dialog. The file is now empty and ready for a fresh import.
+
+{{grouped_figure:docs/images/replication_guide/sf_workflow_1_clear_charts.png | width=95% | caption=Solar Fire "Chart Database" dialog with all charts selected for deletion.}}
+
+#### Step 1: Import Birth Data
+The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, choose `sf_data_import.assembly_logic.txt` in the Solar Fire import folder for #2 and save to `adb_candidates.assembly_logic` for #3.
+
+*   **Menu:** `Utilities > Chart Import/Export...`
+*   **Action:**
+    1.  If a **"Confirm"** dialog appears immediately, click **'OK'**.
+    2.  On the **'Import From' tab**, select `ASCII files` and choose `sf_data_import.txt` in the import folder.
+    3.  On the **'Save To' tab**, ensure your `adb_candidates.sfcht` file is selected.
+    4.  On the **'Options' tab**, select your `CQD Import` format.
+    5.  Click the **'Convert'** button.
+    6.  Once the import completes, click the **'Quit'** button to close the dialog.
+
+{{grouped_figure:docs/images/replication_guide/sf_workflow_2_import_dialog.png | width=95% | caption=Solar Fire "Chart Import/Export" dialog configured to import the prepared data.}}
+
+#### Step 2: Calculate All Charts
+The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, select `adb_candidates.assembly_logic` for #1.
+
+*   **Menu:** `Chart > Open...`
+*   **Action:**
+    1.  Select the charts file you just created (e.g., `adb_candidates.sfcht`).
+    2.  Click the **'All'** button to select all charts in the file.
+    3.  Click the **'Open...'** button. This will calculate all charts and add them to the "Calculated Charts" list. The processing time will vary depending on the number of subjects (typically a few minutes for each set of 1,000 charts).
+
+> **A Note on Character Encoding:** In the "Calculated Charts" list, you may notice that some names with international characters appear corrupted (e.g., `PelÃ©` instead of `Pelé`). This is an expected display issue within Solar Fire. **Do not attempt to fix these names manually.** The automated scripts are designed to detect and repair these encoding errors in the next stage, ensuring the final database is clean.
+
+#### Step 3: Export Chart Data
+The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, browse to the Solar Fire export folder and set the filename to `sf_data_import.assembly_logic.txt` for #6.
+
+*   **Menu:** `Chart > Export Charts as Text...`
+*   **Action:**
+    1.  In the "Calculated Charts" window, select all calculated charts.
+    2.  In the menu item's **"Export Chart Data" dialog**, check the **'Chart Details'** and **'Column Types'** boxes.
+    3.  Under **'Select types of points'**, ensure **'Chart Points'** is selected.
+    4.  For the ASCII format, select your custom `CQD Export` format.
+    5.  Set **'Field Delimiters'** to `Comma Quote (CQD)` and 'Destination' to `Export to File`.
+    6.  Browse to the export directory, set the filename to `sf_chart_export.csv`, and click **Save**. Note: 'Save as type' cannot be set in this dialog.
+    7.  **Warning:** Solar Fire will overwrite this file without confirmation. Click **'Export'**.
+    8.  Once the export completes successfully, click the **'Quit'** button to close the dialog.
+
+{{grouped_figure:docs/images/replication_guide/sf_workflow_3_export_dialog.png | width=75% | caption=Solar Fire "Export Chart Data" dialog configured for the final chart data export.}}
+
+The exported file consists of a repeating 14-line block for each subject. The structure of this block is detailed below:
+
+| Line(s) | Content/Fields | Description |
+| :--- | :--- | :--- |
+| 1 | `Name`, `Date`, `Time`, `ZoneAbbr`, `ZoneOffset`, `Place`, `State`, `Lat`, `Lon` | The subject's core birth data. The `idADB` is critically encoded into the `ZoneAbbr` field. |
+| 2 | `"Body Name","Body Abbr","Longitude"` | The literal header line for the planetary data that follows. |
+| 3-14 | `Point Name`, `Point Abbr`, `Zodiacal Longitude` | The data for each of the 12 chart points (Sun, Moon, ..., Midheaven). |
+
+The entire file consists of `N * 14` lines, where `N` is the final number of subjects.
+
+#### Special Step: Generate Interpretation Reports
+
+This procedure is not part of the production workflow and only applies to the last manual item ('Generate and save interpretation reports...') of validating the Personality Assembly Algorithm ('test-assembly-setup'). The first 3 stages of the 5-stage validation process should be completed at this point.
+
+*   **Menu:** `Interps > Full Report...`
+*   **Action:**
+    1.  In the "Calculated Charts" window, select the first calculated chart.
+    2.  In the menu item's "Select Text for Report" dialog, select only 'Balances' and 'Chart Points' for the 'Text Categories' section.
+    3.  Click View. The report is generated and opened in your default word processor.
+    4.  Save As a 'Plain Text' file in the 'Documents/Solar Fire User Files/Export' directory with the following filename: 'sf_raw_report.assembly_logic_[SN]', where "[SN]" is a sequence number from 1 to 17. For example: 'sf_raw_report.assembly_logic_1'. If a 'File Conversion' dialog is shown, accept the default 'Windows' text encoding (leave boxes unchecked). Close the file and do not save if asked.
+    5.  Click Cancel in the "Select Text for Report" dialog and select the next chart.
+    6.  Go through steps 2 to 5 for all charts in sequence (#2 to #17) using the sequence number as the suffix in the filename. Save last report as 'sf_raw_report.assembly_logic_17'.
+    7.  Once all reports have been exported, click Cancel in the "Select Text for Report" dialog and continue with executing stage 4 and 5 of the validation (i.e., resume 'test-assembly-setup').
+
+### Exporting the Delineations Library (One-Time Task)
+
+The personality descriptions are assembled from a library of pre-written text components. This library must first be exported from Solar Fire.
+
+*   **Menu:** `Interps > Interpretation Files > Natal`
+*   **Action:**
+    1.  Select `Standard.int` and click **'Edit'**.
+    2.  In the 'Interpretations Editor', go to `File > Decompile...` and save the file. This creates `Standard.def` in the `Documents\Solar Fire User Files\Interpretations` directory.
+    3.  Copy this file to the `data/foundational_assets/` folder and rename it to `sf_delineations_library.txt`. Note: Filename extensions must be displayed for this rename.
 
 The pipeline can be understood through the following architecture, workflow, data flow, and logic diagrams.
 
@@ -362,8 +530,8 @@ Sample Size:
 
 **Total Experimental Scope:**
 
-- Conditions: 2 × 3 × 3 = **18 conditions**
-- Experiments: 18 × 30 = **540 experiments**
+- Experimental conditions: 2 × 3 × 3 = **18 conditions (experiments)**
+- Replications: 18 × 30 = **540 replications**
 - Trials: 540 × 80 = **43,200 trials**
 
 #### Design Table
@@ -379,24 +547,28 @@ Sample Size:
 #### Group Size Selection (k-values)
 
 **K=7 (Lower Boundary):**
+
 - MRR chance level: 0.3704
 - 49 comparisons per trial
 - Tests whether performance plateaus at easier difficulties
 - Avoids K=4 issues (chance = 0.5208, too close to coin flip)
 
 **K=10 (Middle Range):**
+
 - MRR chance level: 0.2929
 - 100 comparisons per trial
 - Provides continuity with pilot studies
 - Balanced difficulty
 
 **K=14 (Upper Boundary):**
+
 - MRR chance level: 0.2323
 - 196 comparisons per trial
 - Tests performance degradation at higher complexity
 - Pushes LLM capabilities without exceeding context limits
 
 **Difficulty Progression:**
+
 - K=7 to K=10: 20.9% decrease in MRR chance level
 - K=10 to K=14: 20.7% decrease in MRR chance level
 - Even spacing ensures systematic difficulty gradient
@@ -410,9 +582,11 @@ The study prioritizes models that demonstrate both cost-effectiveness and high r
 **Candidate Models (by cost tier):**
 
 **Ultra-Low Cost ($0.13 per experiment):**
+
 - Meta Llama 3.3 70B Instruct ($0.13)
 
 **Low Cost ($0.24-0.32 per experiment):**
+
 - Mistral Small 3.2 24B ($0.24)
 - Google Gemini 2.0 Flash Lite ($0.24)
 - Google Gemini 2.5 Flash Lite ($0.32)
@@ -420,10 +594,12 @@ The study prioritizes models that demonstrate both cost-effectiveness and high r
 - OpenAI GPT-4.1 Nano ($0.32)
 
 **Mid Cost ($0.49-0.72 per experiment):**
+
 - Meta Llama 4 Maverick ($0.49)
 - Qwen Qwen3 Coder 480B A35B ($0.72)
 
 **High Cost ($0.81-1.30 per experiment):**
+
 - DeepSeek V3 0324 ($0.81)
 - OpenAI GPT-4.1 Mini ($1.30)
 
@@ -438,6 +614,7 @@ The study prioritizes models that demonstrate both cost-effectiveness and high r
 **Cost Savings:** All strategies provide 92-98% savings vs premium model baseline ($6,624).
 
 **Selection Criteria:**
+
 - Cost efficiency: 92-98% savings vs premium models ($6,624 baseline)
 - Parsing reliability: All models demonstrate 95%+ structured output compliance
 - Architectural diversity: Mix of open-source (Meta, Mistral) and proprietary (Google, OpenAI, DeepSeek, Qwen) approaches
@@ -456,17 +633,21 @@ The study prioritizes models that demonstrate both cost-effectiveness and high r
 **Sample Size Requirements:**
 
 For **main effects** with 30 replications per condition:
+
 - Mapping strategy (correct vs random): **~82% power** for d=0.20
 - Group size (3 levels, repeated measures): **>90% power** for d=0.20
 - Model (3 levels, repeated measures): **>90% power** for d=0.20
 
 For **two-way interactions:**
+
 - Power: **75-85%** for d=0.20
 
 For **three-way interaction:**
+
 - Power: **70-75%** for d=0.20
 
 For **within-replication tests** (vs chance) with 80 trials:
+
 - Power: **~94%** for d=0.20
 
 #### Justification for 30 Replications × 80 Trials
@@ -506,11 +687,13 @@ The 30×80 design provides optimal balance between statistical power (82% for d 
 #### Subject Pool
 
 **Database Capacity Needed:**
+
 - Unique subjects required: ~1,000-1,500 (with strategic reuse)
 - Recommended database size: 5,000+ entries
 - Reuse strategy: Random sampling from larger pool minimizes overlap
 
 **Subject Allocation:**
+
 - K=7: ~400-500 unique subjects
 - K=10: ~600-700 unique subjects
 - K=14: ~700-800 unique subjects
@@ -519,7 +702,7 @@ The 30×80 design provides optimal balance between statistical power (82% for d 
 
 **API Costs (estimated for 43,200 trials with low-cost models):**
 
-**Recommended Cost Scenarios (18 conditions × 30 reps = 540 experiments):**
+**Recommended Cost Scenarios (18 conditions × 30 reps = 540 total replications):**
 
 | Strategy | Models | Total Cost | Per Condition |
 |----------|--------|------------|---------------|
@@ -530,6 +713,7 @@ The 30×80 design provides optimal balance between statistical power (82% for d 
 | Performance | Qwen3 + DeepSeek V3 + GPT-4.1 Mini | $509 | $28.30 |
 
 **Per-Model Cost Breakdown (180 experiments per model):**
+
 - Ultra-low tier ($0.13): $23.40 per model
 - Low tier ($0.24-0.32): $43.20-57.60 per model
 - Mid tier ($0.49-0.72): $88.20-129.60 per model
@@ -552,6 +736,7 @@ The 30×80 design provides optimal balance between statistical power (82% for d 
 #### Phase-Based Implementation
 
 **Phase 1: Pilot Run (1 condition)**
+
 - Purpose: Validate pipeline, identify issues
 - Scope: 1 condition × 30 reps × 80 trials = 2,400 trials
 - Duration: ~1-2 hours (parallelized)
@@ -559,6 +744,7 @@ The 30×80 design provides optimal balance between statistical power (82% for d 
 - Monitors: Parsing success rate, execution stability, API limits
 
 **Phase 2: Core Study (remaining 17 conditions)**
+
 - Purpose: Execute main experimental design
 - Scope: 17 conditions × 30 reps × 80 trials = 40,800 trials
 - Duration: ~32-44 hours (parallelized at 20-30 concurrent)
@@ -566,6 +752,7 @@ The 30×80 design provides optimal balance between statistical power (82% for d 
 - Strategy: Process in batches of 3-6 conditions with quality checks
 
 **Phase 3: Analysis and Validation**
+
 - Purpose: Compile results, run statistical analysis
 - Scope: All 18 conditions aggregated
 - Duration: ~2-4 hours
@@ -576,6 +763,7 @@ The 30×80 design provides optimal balance between statistical power (82% for d 
 **Recommended Batch Size:** 3-6 conditions per batch
 
 **Per-Batch Workflow:**
+
 1. Configure `config.ini` for each condition
 2. Run `new_experiment.ps1` with 30 replications
 3. Execute `audit_experiment.ps1` for quality check
@@ -583,6 +771,7 @@ The 30×80 design provides optimal balance between statistical power (82% for d 
 5. Proceed to next batch
 
 **Quality Monitoring:**
+
 - Track parsing success rates (target: >92% for K=14, >95% for K≤10)
 - Monitor execution time per trial (detect API throttling)
 - Verify response quality with spot checks
@@ -614,11 +803,13 @@ output/
 **Format:** `exp_{number}_{mapping}_{k}{model}/`
 
 **Examples:**
+
 - `exp_01_correct_k7_gemini/`
 - `exp_10_random_k10_gpt4o/`
 - `exp_18_random_k14_claude/`
 
 **Benefits:**
+
 - Alphabetical sorting groups by condition
 - Sequential numbering aids tracking
 - Clear condition identification
@@ -630,17 +821,17 @@ output/
 For each of the 18 conditions, update `config.ini`:
 
 ```ini
-[Study]
+[Experiment]
 num_replications = 30
+num_trials = 80
+group_size = 7  # or 10, 14
 mapping_strategy = correct  # or random
 
 [LLM]
-model_name = google/gemini-2.0-flash-exp  # or others
-temperature = 0.2
+model_name = google/gemini-2.5-flash-lite  # or others
+temperature = 0.0
 
-[Experiment]
-k = 7  # or 10, 14
-m = 80
+
 ```
 
 #### Randomization Seeds
@@ -729,6 +920,7 @@ Effects tested:
 #### Reduced Scope Designs
 
 **Option A: Two K-Values**
+
 - Factors: 2 mapping × 2 k-values × 3 models
 - Conditions: 12
 - Experiments: 360 (with 30 reps)
@@ -737,6 +929,7 @@ Effects tested:
 - Use when: Budget or time constrained
 
 **Option B: Two Models**
+
 - Factors: 2 mapping × 3 k-values × 2 models
 - Conditions: 12
 - Experiments: 360 (with 30 reps)
@@ -747,6 +940,7 @@ Effects tested:
 #### Staged Execution
 
 **Stage 1: Core Study (2 models)**
+
 - Example: Llama 3.3 + Gemini 2.5 Flash Lite
 - 12 conditions
 - 28,800 trials
@@ -754,6 +948,7 @@ Effects tested:
 - Can publish initial results
 
 **Stage 2: Replication (3rd model)**
+
 - Add third model (e.g., GPT-4.1 Nano or DeepSeek V3)
 - 6 additional conditions
 - 14,400 trials
@@ -764,7 +959,7 @@ Effects tested:
 
 **For Publication:**
 
-> "We employed a 2 × 3 × 3 factorial design with mapping strategy (correct vs random) as a between-subjects factor, and group size (k ∈ {7, 10, 14}) and model as within-subjects factors. Three models from the low-cost, high-reliability tier were selected based on cost efficiency ($0.13-1.30 per experiment via OpenRouter.ai), architectural diversity (open-source and proprietary), and demonstrated parsing reliability (95%+ success rate). Group sizes were selected to provide systematic difficulty progression with approximately 21% increases in task complexity (measured by decreases in MRR chance level) between consecutive k-values. We conducted 30 replications per condition with 80 trials per replication, providing >80% statistical power to detect small effect sizes (Cohen's d < 0.20) for main effects. This design yielded 18 experimental conditions with 540 total experiments and 43,200 trials, executed at a total cost of $110-509 depending on model selection strategy."
+> "We employed a 2 × 3 × 3 factorial design with mapping strategy (correct vs random) as a between-subjects factor, and group size (k ∈ {7, 10, 14}) and model as within-subjects factors. Three models from the low-cost, high-reliability tier were selected based on cost efficiency ($0.13-1.30 per experiment via OpenRouter.ai), architectural diversity (open-source and proprietary), and demonstrated parsing reliability (95%+ success rate). Group sizes were selected to provide systematic difficulty progression with approximately 21% increases in task complexity (measured by decreases in MRR chance level) between consecutive k-values. We conducted 30 replications per condition with 80 trials per replication, providing >80% statistical power to detect small effect sizes (Cohen's d < 0.20) for main effects. This design yielded 18 experimental conditions with 540 total replications and 43,200 trials, executed at a total cost of $110-509 depending on model selection strategy."
 
 ### Validation Checklist
 
