@@ -120,13 +120,13 @@ $env:PYTHONIOENCODING = "utf-8"
 # --- Define Pipeline Steps and Artifacts ---
 # This data structure drives the entire orchestration logic.
 $PipelineSteps = @(
-    @{ Stage="1. Data Sourcing";        Name="Fetch Raw ADB Data";         Script="src/fetch_adb_data.py";             Inputs=@("Live Astro-Databank Website");            Output="data/sources/adb_raw_export.txt";                   Type="Automated"; Description="Fetches the initial raw dataset from the live Astro-Databank." },
+    @{ Stage="1. Data Sourcing";        Name="Fetch Raw ADB Data";         Script="src/fetch_adb_data.py";             Inputs=@("Live Astro-Databank Website");            Output="data/sources/adb_raw_export.txt";                   Type="Automated"; Description="Fetches the initial raw dataset from the live Astro-Databank database." },
     @{ Stage="2. Candidate Qualification"; Name="Find Wikipedia Links";       Script="src/find_wikipedia_links.py";        Inputs=@("data/sources/adb_raw_export.txt");        Output="data/processed/adb_wiki_links.csv";                Type="Automated"; Description="Finds a best-guess Wikipedia URL for each subject." },
     @{ Stage="2. Candidate Qualification"; Name="Validate Wikipedia Pages";   Script="src/validate_wikipedia_pages.py";   Inputs=@("data/processed/adb_wiki_links.csv");      Output="data/reports/adb_validation_report.csv";           Type="Automated"; Description="Validates each Wikipedia page for content, language, and redirects." },
     @{ Stage="2. Candidate Qualification"; Name="Select Eligible Candidates"; Script="src/select_eligible_candidates.py"; Inputs=@("data/sources/adb_raw_export.txt", "data/reports/adb_validation_report.csv"); Output="data/intermediate/adb_eligible_candidates.txt";      Type="Automated"; Description="Applies deterministic data quality filters to create a pool of eligible candidates." },
     @{ Stage="3. Candidate Selection";   Name="Generate Eminence Scores";   Script="src/generate_eminence_scores.py";   Inputs=@("data/intermediate/adb_eligible_candidates.txt"); Output="data/foundational_assets/eminence_scores.csv";   Type="Automated"; Description="Generates a calibrated eminence score for each eligible candidate using an LLM." },
-    @{ Stage="3. Candidate Selection";   Name="Generate OCEAN Scores";      Script="src/generate_ocean_scores.py";      Inputs=@("data/foundational_assets/eminence_scores.csv"); Output="data/foundational_assets/ocean_scores.csv";        Type="Automated"; Description="Generates OCEAN personality scores and determines the final dataset size based on diversity." },
-    @{ Stage="3. Candidate Selection";   Name="Select Final Candidates";    Script="src/select_final_candidates.py";    Inputs=@("data/intermediate/adb_eligible_candidates.txt", "data/foundational_assets/eminence_scores.csv", "data/foundational_assets/ocean_scores.csv"); Output="data/intermediate/adb_final_candidates.txt";        Type="Automated"; Description="Filters, transforms, and sorts the final subject set based on the LLM scoring." },
+    @{ Stage="3. Candidate Selection";   Name="Generate OCEAN Scores";      Script="src/generate_ocean_scores.py";      Inputs=@("data/foundational_assets/eminence_scores.csv"); Output="data/foundational_assets/ocean_scores.csv";        Type="Automated"; Description="Generates OCEAN personality scores for each eligible candidate using an LLM." },
+    @{ Stage="3. Candidate Selection";   Name="Select Final Candidates";    Script="src/select_final_candidates.py";    Inputs=@("data/intermediate/adb_eligible_candidates.txt", "data/foundational_assets/eminence_scores.csv", "data/foundational_assets/ocean_scores.csv"); Output="data/intermediate/adb_final_candidates.txt";        Type="Automated"; Description="Determines the final subject set based on the LLM scoring." },
     @{ Stage="4. Profile Generation";    Name="Prepare SF Import File";     Script="src/prepare_sf_import.py";          Inputs=@("data/intermediate/adb_final_candidates.txt"); Output="data/intermediate/sf_data_import.txt";            Type="Automated"; Description="Formats the final subject list for import into the Solar Fire software." },
     @{ Stage="4. Profile Generation";    Name="Solar Fire Processing"; Inputs=@("data/intermediate/sf_data_import.txt"); Output="data/foundational_assets/sf_chart_export.csv"; Type="Manual"; Description="The pipeline is paused. Please perform the manual Solar Fire import, calculation, and chart export process." },
     @{ Stage="4. Profile Generation";    Name="Delineation Export";    Inputs=@("Solar Fire Software"); Output="data/foundational_assets/sf_delineations_library.txt"; Type="Manual"; Description="The pipeline is paused. Please perform the one-time Solar Fire delineation library export." },
@@ -285,9 +285,55 @@ function Show-PipelineStatus {
             default      { $status = if ($step.Type -eq 'Manual') { "$($C_YELLOW)[PENDING]$($C_RESET)" } else { "$($C_RED)[MISSING]$($C_RESET)" } }
         }
         $stepNameFormatted = "$($stepNumber). $($step.Name)"
-        Write-Host ("{0,-$nameWidth} {1}" -f $stepNameFormatted, $status)
+        # Shift the second column by 6 spaces to the left
+        Write-Host ("{0,-$($nameWidth-6)}{1}" -f $stepNameFormatted, $status)
     }
     Write-Host ""; return $filesExist
+}
+
+function Show-DataGenerationParameters {
+    param([string]$ConfigFilePath)
+    
+    Write-Host "`n${C_CYAN}Data Generation Configuration Parameters:${C_RESET}"
+    Write-Host ("-" * 59)
+    
+    # Get the critical parameters from DataGeneration section
+    $bypassSelection = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "bypass_candidate_selection" -DefaultValue "false"
+    $eminenceModel = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "eminence_model" -DefaultValue "Not configured"
+    $oceanModel = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "ocean_model" -DefaultValue "Not configured"
+    $neutralizationModel = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "neutralization_model" -DefaultValue "Not configured"
+    
+    # Display parameters with appropriate formatting (second column shifted by 2 spaces)
+    Write-Host ("{0,-30}  {1}" -f "Bypass Candidate Selection:", "$($C_YELLOW)$bypassSelection$($C_RESET)")
+    Write-Host ("{0,-30}  {1}" -f "Eminence Scoring Model:", "$($C_BLUE)$eminenceModel$($C_RESET)")
+    Write-Host ("{0,-30}  {1}" -f "OCEAN Scoring Model:", "$($C_BLUE)$oceanModel$($C_RESET)")
+    Write-Host ("{0,-30}  {1}" -f "Neutralization Model:", "$($C_BLUE)$neutralizationModel$($C_RESET)")
+    Write-Host ""
+}
+
+function Show-Parameters-And-Confirm {
+    param(
+        [string]$ConfigFilePath,
+        [bool]$PauseForConfirmation = $true
+    )
+    
+    # Display the parameters
+    Show-DataGenerationParameters -ConfigFilePath $ConfigFilePath
+    
+    # Pause for confirmation if required
+    if ($PauseForConfirmation) {
+        if ($env:UNDER_TEST_HARNESS -eq "true") {
+            # Signal to test harness and wait for response
+            $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
+            Write-Host "HARNESS_PROMPT:Review the configuration parameters above, then press Enter to continue...:$waitFile"
+            # Wait for test harness to create the response file
+            while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
+            Remove-Item $waitFile -ErrorAction SilentlyContinue
+        } else {
+            # Standard Read-Host for normal operation
+            Read-Host -Prompt "${C_ORANGE}Review the configuration parameters above, then press Enter to continue...${C_RESET}" | Out-Null
+        }
+    }
 }
 
 # --- Main Script Logic ---
@@ -354,17 +400,45 @@ try {
         Write-Host "" # Add a blank line for spacing
     }
 
+    # Display DataGeneration parameters for all modes
+    if ($ReportOnly.IsPresent) {
+        # In ReportOnly mode, show parameters first without pausing
+        Show-Parameters-And-Confirm -ConfigFilePath $configFile -PauseForConfirmation $false
+        
+        # Then show the pipeline status
+        $anyFileExists = $false
+        if (-not $SandboxMode) {
+            $anyFileExists = Show-PipelineStatus -Steps $PipelineSteps -BaseDirectory $WorkingDirectory
+        } else {
+            # In sandbox mode, we just need to know if any files exist to potentially prompt the user.
+            $anyFileExists = (Get-ChildItem -Path $WorkingDirectory -Recurse -File | Select-Object -First 1) -ne $null
+        }
+        
+        Write-Host "${C_CYAN}Report-only mode enabled. Exiting.${C_RESET}"; return
+    }
+    
+    # For Interactive and Normal modes, check if files exist without displaying the status table
     $anyFileExists = $false
     if (-not $SandboxMode) {
-        $anyFileExists = Show-PipelineStatus -Steps $PipelineSteps -BaseDirectory $WorkingDirectory
+        # Check if any output files exist without showing the status table
+        foreach ($step in $PipelineSteps) {
+            $outputFile = Join-Path $WorkingDirectory $step.Output
+            if ((Get-StepStatus -Step $step -BaseDirectory $WorkingDirectory) -eq "Complete") {
+                $anyFileExists = $true
+                break
+            }
+        }
     } else {
         # In sandbox mode, we just need to know if any files exist to potentially prompt the user.
         $anyFileExists = (Get-ChildItem -Path $WorkingDirectory -Recurse -File | Select-Object -First 1) -ne $null
     }
-    if ($ReportOnly.IsPresent) { Write-Host "${C_CYAN}Report-only mode enabled. Exiting.${C_RESET}"; return }
 
+    # Show parameters for Interactive mode and Normal mode
+    # This is displayed before the warning about existing files (if any) and before the pipeline starts
+    Show-Parameters-And-Confirm -ConfigFilePath $configFile -PauseForConfirmation $true
+    
     if ($anyFileExists -and -not $Force.IsPresent -and -not $Interactive -and -not $SandboxMode) {
-        Write-Host "${C_YELLOW}WARNING: One or more data files already exist."
+        Write-Host "${C_YELLOW}`nWARNING: One or more data files already exist."
         Write-Host "The pipeline will resume from the first incomplete step."
         $confirm = Read-Host "Do you wish to proceed? (Y/N)"
         if ($confirm.Trim().ToLower() -ne 'y') { throw "USER_CANCELLED: Operation cancelled by user." }
@@ -372,6 +446,9 @@ try {
 
     # Determine the first step of each stage for clean banner logging
     $firstStepNamesOfStages = ($PipelineSteps | Group-Object Stage | ForEach-Object { $_.Group[0].Name }) -as [string[]]
+
+    # Track whether we've shown the overwrite instruction
+    $overwriteInstructionShown = $false
 
     $totalSteps = $PipelineSteps.Count; $stepCounter = 0
     foreach ($step in $PipelineSteps) {
@@ -382,11 +459,45 @@ try {
         $isSkipped = $false
         if ($bypassScoring -and ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores")) {
             if (-not $Resumed.IsPresent) {
-                $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
-                Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
-                Write-Host "$C_BLUE$stepHeader$C_RESET"
-                Write-Host "$C_BLUE$($step.Description)$C_RESET"
-                Write-Host "`n${C_YELLOW}Bypass mode is active. Skipping step.${C_RESET}"
+                # Print the detailed step header for bypassed steps in Interactive mode
+                if ($Interactive) {
+                    $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
+                    Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+                    Write-Host "$C_BLUE$stepHeader$C_RESET"
+                    Write-Host "$C_BLUE$($step.Description)$C_RESET"
+                    Write-Host "`n${C_YELLOW}Bypass mode is active. Skipping step.${C_RESET}"
+                    
+                    # Show inputs and output information
+                    $infoBlock = New-Object System.Text.StringBuilder
+                    [void]$infoBlock.AppendLine("`n${C_RESET}  INPUTS:")
+                    $Step.Inputs | ForEach-Object { [void]$infoBlock.AppendLine("    - $_") }
+                    [void]$infoBlock.AppendLine("`n  OUTPUT:")
+                    [void]$infoBlock.Append("    - $($Step.Output)")
+                    [void]$infoBlock.AppendLine("`n${C_YELLOW}NOTE: This step will be skipped because bypass_candidate_selection is enabled in config.ini.${C_RESET}")
+                    
+                    # Piping to Out-Host forces the multi-line info block to flush immediately
+                    $infoBlock.ToString() | Out-Host
+                    
+                    # Handle interactive prompt
+                    if ($env:UNDER_TEST_HARNESS -eq "true") {
+                        # Signal to test harness and wait for response
+                        $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
+                        Write-Host "HARNESS_PROMPT:Step will be skipped due to bypass mode. Press Enter to continue...:$waitFile"
+                        # Wait for test harness to create the response file
+                        while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
+                        Remove-Item $waitFile -ErrorAction SilentlyContinue
+                    } else {
+                        # Standard Read-Host for normal operation
+                        Read-Host -Prompt "${C_ORANGE}Step will be skipped due to bypass mode. Press Enter to continue...${C_RESET}" | Out-Null
+                    }
+                } else {
+                    # Non-interactive mode just shows a simple message
+                    $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
+                    Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+                    Write-Host "$C_BLUE$stepHeader$C_RESET"
+                    Write-Host "$C_BLUE$($step.Description)$C_RESET"
+                    Write-Host "`n${C_YELLOW}Bypass mode is active. Skipping step.${C_RESET}"
+                }
             }
             $isSkipped = $true
         }
@@ -394,7 +505,45 @@ try {
         # Skip if the step is complete AND we are not in force-overwrite mode.
         if ((Get-StepStatus -Step $step -BaseDirectory $WorkingDirectory) -eq "Complete" -and -not $isInteractiveForceOverwrite) {
             if (-not $Resumed.IsPresent) {
-                Write-Host "Output exists for step '$($step.Name)'. Skipping." -ForegroundColor Yellow
+                # Print the detailed step header even for skipped steps in Interactive mode
+                if ($Interactive) {
+                    $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
+                    Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+                    Write-Host "$C_BLUE$stepHeader$C_RESET"
+                    Write-Host "$C_BLUE$($step.Description)$C_RESET"
+                    
+                    # Show inputs and output information
+                    $infoBlock = New-Object System.Text.StringBuilder
+                    [void]$infoBlock.AppendLine("`n${C_RESET}  INPUTS:")
+                    $Step.Inputs | ForEach-Object { [void]$infoBlock.AppendLine("    - $_") }
+                    [void]$infoBlock.AppendLine("`n  OUTPUT:")
+                    [void]$infoBlock.Append("    - $($Step.Output)")
+                    [void]$infoBlock.AppendLine("")
+                    [void]$infoBlock.AppendLine("")
+                    [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: This step will be skipped because the output file already exists.${C_RESET}")
+                    if (-not $overwriteInstructionShown) {
+                        [void]$infoBlock.AppendLine("If you wish to overwrite existing files, abort this run with Ctrl+C and execute the script with an added '-Force' parameter. For example: 'pdm run prep-data -Interactive -Force'.")
+                        $overwriteInstructionShown = $true
+                    }
+                    
+                    # Piping to Out-Host forces the multi-line info block to flush immediately
+                    $infoBlock.ToString() | Out-Host
+                    
+                    # Handle interactive prompt
+                    if ($env:UNDER_TEST_HARNESS -eq "true") {
+                        # Signal to test harness and wait for response
+                        $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
+                        Write-Host "HARNESS_PROMPT:Step will be skipped. Press Enter to continue...:$waitFile"
+                        # Wait for test harness to create the response file
+                        while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
+                        Remove-Item $waitFile -ErrorAction SilentlyContinue
+                    } else {
+                        # Standard Read-Host for normal operation
+                        Read-Host -Prompt "${C_ORANGE}Step will be skipped. Press Enter to continue...${C_RESET}" | Out-Null
+                    }
+                } else {
+                    Write-Host "Output exists for step '$($step.Name)'. Skipping." -ForegroundColor Yellow
+                }
             }
             $isSkipped = $true
         }
@@ -567,6 +716,16 @@ try {
         $runCompletedSuccessfully = $true
     }
 }
+catch [System.Management.Automation.PipelineStoppedException] {
+    # Handle Ctrl+C interrupt
+    $exitCode = 0
+    
+    if (-not $SilentHalt.IsPresent) {
+        Format-Banner "PIPELINE HALTED" $C_ORANGE
+        Write-Host "${C_ORANGE}REASON: Operation cancelled by user (Ctrl+C)${C_RESET}"
+        Write-Host ""
+    }
+}
 catch {
     $errorMessage = ""
     if ($_ -is [System.Management.Automation.ErrorRecord]) {
@@ -596,6 +755,7 @@ catch {
 
         Format-Banner "PIPELINE HALTED" $bannerColor
         Write-Host "${messageColor}REASON: $errorMessage${C_RESET}"
+        Write-Host ""
 
         if ($isManualPause) {
             Write-Host "`n${C_YELLOW}NEXT STEPS:${C_RESET}"

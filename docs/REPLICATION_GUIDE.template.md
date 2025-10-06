@@ -7,7 +7,7 @@ date: "[Date]"
 
 This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers who wish to replicate or extend the original study's findings. For detailed information on the components of the framework, please refer to the **[📖 Framework Manual (docs/FRAMEWORK_MANUAL.md)](docs/FRAMEWORK_MANUAL.md)**.
 
-This guide defines the three primary replication paths (Direct, Methodological, and Conceptual) and provides a complete walkthrough of the end-to-end workflow, from initial setup and data preparation to running the main experiments and producing the final statistical analysis.
+This guide defines the three primary replication paths (direct, methodological, and conceptual) and provides a complete walkthrough of the end-to-end workflow, from initial setup and data preparation to running the main experiments and producing the final statistical analysis.
 
 {{toc}}
 
@@ -89,10 +89,16 @@ This procedure tests the robustness of the findings by using the framework's aut
 
 1. **Set Up Environment**: Follow the setup instructions in Appendix A.2.
 
-2. **Generate Fresh Dataset**: Create a new dataset from the live Astro-Databank:
+2. **Generate Fresh Dataset**: Create a new dataset from the live Astro-Databank database:
    ```powershell
-   ./prepare_data.ps1
+   # Run the entire data preparation workflow
+    pdm run prep-data
+    # or simply:
+    pdm prep-data
    ```
+This executes `prepare_data.ps1`, which is a PowerShell wrapper calling the 13 individual Python modules of the data preparation pipeline. This script automatically checks the state of the pipeline and resumes from the first incomplete step. It will also pause with clear instructions when a manual user action is required.
+
+It is highly recommended that you first run this module in read-only mode to produce a report on current data files (use the '-ReportOnly' parameter). Subsequently, it is advisable to step through execution in interactive mode to understand what can be expected on a normal run (use the '-Interactive' paramater). Once the script's operation is clear, use the '-Force' parameter to overwrite existing data.
 
 3. **Configure Experiments**: Update `config.ini` for your experimental design.
 
@@ -299,9 +305,9 @@ For detailed troubleshooting, see the **[📖 Framework Manual (docs/FRAMEWORK_M
 | Eminence Scoring (LLM A) | OpenAI GPT-5 | `openai/gpt-5-chat` |
 | OCEAN Scoring (LLM B) | Anthropic Claude 4 Sonnet | `anthropic/claude-4-sonnet` |
 | Neutralization (LLM C) | Google Gemini 2.5 Pro | `google/gemini-2.5-pro` |
-| Evaluation (LLM D1) | Meta Llama 3.3 70B | `meta-llama/llama-3.3-70b-instruct` |
-| Evaluation (LLM D2) | Google Gemini 2.5 Flash Lite | `google/gemini-2.5-flash-lite` |
-| Evaluation (LLM D3) | OpenAI GPT-4.1 Nano | `openai/gpt-4.1-nano` |
+| Evaluation 1 (LLM D1) | Meta Llama 3.3 70B | `meta-llama/llama-3.3-70b-instruct` |
+| Evaluation 2 (LLM D2) | Google Gemini 2.5 Flash Lite | `google/gemini-2.5-flash-lite` |
+| Evaluation 3 (LLM D3) | OpenAI GPT-4.1 Nano | `openai/gpt-4.1-nano` |
 
 *Access Dates for LLMs: October 2025*
 
