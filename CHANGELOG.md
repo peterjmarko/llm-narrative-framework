@@ -2,6 +2,17 @@
 
 # Changelog
 
+## 12.11.0 (2025-10-06)
+
+### Bump
+
+- **version 12.10.0 → 12.11.0**
+
+### Features
+
+- **Data preparation pipeline and interactive mode**
+  Enhanced the prepare_data.ps1 script with comprehensive interactive mode functionality that displays DataGeneration parameters from config.ini before execution, with appropriate pausing behavior for different modes. Fixed progress bar display issues across all pipeline scripts by adding proper ANSI escape sequence support and resolving logging handler conflicts. Implemented a comprehensive file management system for the -Force operation that intelligently backs up and removes only the necessary files while preserving essential assets.
+
 ## 12.10.0 (2025-10-06)
 
 ### Bump
