@@ -2,6 +2,22 @@
 
 # Changelog
 
+## 12.12.0 (2025-10-07)
+
+### Bump
+
+- **version 12.11.0 → 12.12.0**
+
+### Features
+
+- **Implement tiered approach for handling missing subjects in LLM scoring steps**
+  This commit introduces a tiered approach for handling missing subjects in the eminence and OCEAN scoring steps, preventing the pipeline from stopping for minor issues while still providing visibility and guidance when more substantial problems occur. The implementation includes:
+  
+  1. Tiered completion rate thresholds (99%: continue with notification, 95-98%: continue with warning, <95%: stop with error)
+  2. Enhanced final pipeline report with data completeness information
+  3. Comprehensive documentation updates
+  4. Numerous usability improvements to the interactive mode and error handling
+
 ## 12.11.0 (2025-10-06)
 
 ### Bump
