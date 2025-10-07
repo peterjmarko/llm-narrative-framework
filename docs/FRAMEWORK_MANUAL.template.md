@@ -72,6 +72,7 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 ```
 > **Warning on Using `-Force`**: The `-Force` flag triggers a full, destructive re-run of the entire pipeline. It backs up and deletes all existing data, re-downloads the full raw dataset, and re-runs all expensive LLM scoring steps. This process is very time-consuming and will incur API costs.
 > **Interactive Mode (`-Interactive`)**: This mode provides a step-by-step "guided tour" of the entire pipeline. Before execution begins, it displays the relevant DataGeneration parameters from `config.ini` and pauses for user confirmation. During execution, it pauses before each step to show detailed information about inputs, outputs, and script summaries, allowing users to understand exactly what the pipeline is doing. This mode is highly recommended for new users or when troubleshooting issues.
+> **Data Completeness Reporting**: At the end of the pipeline, a comprehensive data completeness report is displayed that shows any missing subjects from the LLM scoring steps. This report provides clear visibility into data quality issues and includes actionable guidance on how to retry specific steps if needed.
 > **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING_GUIDE.md)](../TESTING_GUIDE.md)** for details on running the Layer 3 Interactive Mode.
 
 The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.
@@ -148,12 +149,30 @@ This stage is a second, optional filtering pass that uses LLMs to score the "eli
 
 1.  **Eminence Scoring (`generate_eminence_scores.py`):** Processes the eligible candidates list to generate a calibrated eminence score for each, producing a rank-ordered list that now includes `BirthYear`.
     
+    **Tiered Approach for Missing Subjects:**
+    The script implements a tiered approach for handling subjects that fail to receive scores due to API issues or other problems:
+    
+    - **≥99% completion**: The pipeline continues with a simple notification, treating minor missing data as acceptable
+    - **95-98% completion**: The pipeline continues but displays a prominent warning with recommended action
+    - **<95% completion**: The pipeline stops with an error, indicating significant data issues that need attention
+    
+    This approach prevents the pipeline from stopping for minor issues (e.g., missing 99 out of 7,194 subjects) while still providing visibility and guidance when more substantial issues occur.
+    
     ```bash
     # Generate eminence scores for all eligible candidates
     pdm run gen-eminence
     ```
 
 2.  **OCEAN Scoring (`generate_ocean_scores.py`):** A fully automated, resilient script that generates OCEAN personality scores for every subject in the eminence-ranked list.
+    
+    **Tiered Approach for Missing Subjects:**
+    Like the eminence scoring script, this implements the same tiered approach for handling incomplete scoring:
+    
+    - **≥99% completion**: The pipeline continues with a simple notification
+    - **95-98% completion**: The pipeline continues with a prominent warning
+    - **<95% completion**: The pipeline stops with an error
+    
+    Both scripts write completion information to a shared JSON file that is used by the final pipeline report to provide a comprehensive data completeness overview.
     
     ```bash
     # Generate OCEAN scores to determine the final cutoff
@@ -1468,6 +1487,7 @@ This section provides solutions to the most common issues researchers may encoun
 | **Wikipedia validation fails** | This can occur due to Wikipedia rate limiting or page structure changes. The script includes automatic retry logic, but persistent failures may require manual intervention. |
 | **Solar Fire import issues** | Verify the file format matches the expected CQD format. Check that all required fields are present and correctly formatted. |
 | **Neutralization script fails** | Check your OpenRouter API key and ensure you have sufficient funds. The `--fast` mode may fail on large tasks; use the default mode for reliable completion. |
+| **LLM scoring steps report missing subjects** | The eminence and OCEAN scoring steps use a tiered approach for handling missing subjects. If ≥99% of subjects are scored, the pipeline continues with a notification. If 95-98% are scored, it continues with a warning. If <95% are scored, it stops with an error. Check the data completeness report at the end of the pipeline for details on missing subjects and instructions on how to retry specific steps. |
 
 ---
 

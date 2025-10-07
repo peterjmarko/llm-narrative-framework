@@ -96,7 +96,10 @@ SESSION.mount("http://", adapter)
 class TqdmLoggingHandler(logging.Handler):
     def emit(self, record):
         try:
-            tqdm.write(self.format(record))
+            msg = self.format(record)
+            # Use print instead of tqdm.write to avoid interfering with progress bar
+            print(msg)
+            self.flush()
         except Exception:
             self.handleError(record)
 
@@ -625,7 +628,7 @@ def main():
     print(f"\n{Fore.YELLOW}--- Validating Wikipedia Pages ---")
     print(f"Found {processed_before:,} already processed records ({valid_before:,} valid).")
     print(f"Now processing {len(records_to_process):,} new records using {args.workers} workers.")
-    print(f"{Fore.YELLOW}NOTE: Each set of 1,000 records can take 1.5 minutes or more to process.")
+    print(f"{Fore.YELLOW}NOTE: Each set of 10,000 records can take 20 minutes or more to process.")
     print(f"You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     was_interrupted = False
@@ -640,7 +643,7 @@ def main():
         if output_file.tell() == 0:
             writer.writeheader()
 
-        with tqdm(total=len(records_to_process), desc="Validating pages", ncols=120, smoothing=0.01, disable=args.quiet) as pbar:
+        with tqdm(total=len(records_to_process), desc="Validating pages", ncols=100, smoothing=0.01, disable=args.quiet) as pbar:
             tasks = [(max_index_before + i + 1, rec) for i, rec in enumerate(records_to_process)]
             futures = {executor.submit(worker_task_with_timeout, rec, pbar, index) for index, rec in tasks}
             
@@ -657,11 +660,12 @@ def main():
                         pbar.update(1)
                         futures.remove(future)
                         
-                        # Update progress bar with total counts
-                        total_valid = valid_before + valid_this_session
-                        total_processed = processed_before + pbar.n
-                        percentage = (total_valid / total_processed) * 100 if total_processed > 0 else 0
-                        pbar.set_postfix_str(f"Validated: {total_valid:,}/{total_processed:,} ({percentage:.0f}%)")
+                        # Update progress bar with total counts (less frequently to avoid display issues)
+                        if pbar.n % 10 == 0 or pbar.n == len(records_to_process):  # Update every 10 items or at completion
+                            total_valid = valid_before + valid_this_session
+                            total_processed = processed_before + pbar.n
+                            percentage = (total_valid / total_processed) * 100 if total_processed > 0 else 0
+                            pbar.set_postfix_str(f"Validated: {total_valid:,}/{total_processed:,} ({percentage:.0f}%)")
                 except TimeoutError:
                     pass
 

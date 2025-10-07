@@ -612,26 +612,61 @@ def main():
             missing_report_path.parent.mkdir(parents=True, exist_ok=True)
             with open(missing_report_path, 'w', encoding='utf-8') as f:
                 f.write("Subjects missed by LLM during eminence scoring:\n")
-                for subject_id in sorted(missing_ids):
-                    f.write(f"{subject_id}\n")
-            tqdm.write(f"{Fore.YELLOW}Wrote report of {len(missing_ids)} missing subjects to '{missing_report_path}'.")
-
-        # --- Final Reconciliation and Reporting ---
-        final_processed_ids = load_processed_ids(output_path)
-        all_eligible_ids = {s['idADB'] for s in all_subjects} | processed_ids
-        missing_ids = all_eligible_ids - final_processed_ids
-        
-        if missing_ids:
-            missing_report_path = output_path.parent.parent / "reports" / "missing_eminence_scores.txt"
-            missing_report_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(missing_report_path, 'w', encoding='utf-8') as f:
-                f.write("Subjects missed by LLM during eminence scoring:\n")
                 for subject_id in sorted(list(missing_ids)):
                     f.write(f"{subject_id}\n")
+            tqdm.write(f"{Fore.YELLOW}Wrote report of {len(missing_ids)} missing subjects to '{missing_report_path}'.")
             
-            logging.error(f"Failed to retrieve scores for {len(missing_ids)} subject(s). See '{missing_report_path}' for details.")
-            logging.error("The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.")
-            sys.exit(1)
+            # Calculate completion rate
+            completion_rate = (len(final_processed_ids) / len(all_eligible_ids)) * 100 if all_eligible_ids else 0
+            
+            # Tiered approach based on completion rate
+            if completion_rate < 95.0:
+                # Critical: Stop the pipeline
+                logging.error(f"CRITICAL: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
+                logging.error(f"See '{missing_report_path}' for details.")
+                logging.error("The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.")
+                sys.exit(1)
+            elif completion_rate < 99.0:
+                # Warning: Continue but with prominent warning
+                logging.warning(f"WARNING: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
+                logging.warning(f"See '{missing_report_path}' for details.")
+                logging.warning("The pipeline will continue, but consider re-running to retrieve missing subjects for better results.")
+                logging.warning("")
+                logging.warning(f"{Fore.YELLOW}{'='*60}")
+                logging.warning(f"{'ACTION RECOMMENDED':^60}")
+                logging.warning(f"{'='*60}")
+                logging.warning(f"To retrieve missing subjects, re-run this step:")
+                logging.warning(f"  .\\prepare_data.ps1 -StopAfterStep 5")
+                logging.warning(f"{'='*60}{Fore.RESET}")
+            else:
+                # Minor: Continue with simple notification
+                logging.info(f"NOTE: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
+                logging.info(f"See '{missing_report_path}' for details. This is within acceptable limits.")
+
+            # Store completion info for final pipeline report
+            completion_info = {
+                'step_name': 'Generate Eminence Scores',
+                'completion_rate': completion_rate,
+                'missing_count': len(missing_ids),
+                'missing_report_path': str(missing_report_path) if missing_ids else None
+            }
+
+            # Write completion info to a shared file for final pipeline report
+            import json
+            completion_info_path = output_path.parent.parent / "reports" / "pipeline_completion_info.json"
+            completion_info_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Read existing info or create new
+            if completion_info_path.exists():
+                with open(completion_info_path, 'r') as f:
+                    all_completion_info = json.load(f)
+            else:
+                all_completion_info = {}
+
+            all_completion_info['eminence_scores'] = completion_info
+
+            with open(completion_info_path, 'w') as f:
+                json.dump(all_completion_info, f, indent=2)
 
         if was_interrupted:
             logging.warning("Eminence score generation terminated by user. Re-run to continue. ✨\n")

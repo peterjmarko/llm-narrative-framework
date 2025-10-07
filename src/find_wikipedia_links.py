@@ -661,7 +661,7 @@ def main():
         print("\n--- Finding Wikipedia Links ---")
         print(f"Processing {len(lines_to_process):,} records using {args.workers} workers.")
 
-    print(f"{Fore.YELLOW}NOTE: Each set of 1,000 records can take 3.5 minutes or more to process.{Fore.RESET}")
+    print(f"{Fore.YELLOW}NOTE: Each set of 10,000 records can take 40 minutes or more to process.{Fore.RESET}")
     print("You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     links_found_this_session, timeouts_this_session = 0, 0

@@ -301,6 +301,60 @@ function Show-PipelineStatus {
     Write-Host ""; return $filesExist
 }
 
+function Show-DataCompletenessReport {
+    param([string]$BaseDirectory = ".")
+    
+    $completionInfoPath = Join-Path $BaseDirectory "data/reports/pipeline_completion_info.json"
+    
+    if (Test-Path $completionInfoPath) {
+        try {
+            $completionInfo = Get-Content $completionInfoPath | ConvertFrom-Json
+            
+            # Check if any steps have missing data
+            $hasIssues = $false
+            foreach ($step in $completionInfo.PSObject.Properties) {
+                if ($step.Value.missing_count -gt 0) {
+                    $hasIssues = $true
+                    break
+                }
+            }
+            
+            if ($hasIssues) {
+                Write-Host "`n${C_YELLOW}--- Data Completeness Report ---${C_RESET}"
+                Write-Host "The following steps had missing subjects:"
+                
+                foreach ($step in $completionInfo.PSObject.Properties) {
+                    $info = $step.Value
+                    if ($info.missing_count -gt 0) {
+                        $statusColor = if ($info.completion_rate -ge 99) { $C_GREEN }
+                                       elseif ($info.completion_rate -ge 95) { $C_YELLOW }
+                                       else { $C_RED }
+                        
+                        Write-Host "  - $($info.step_name): $($info.completion_rate.ToString('F1'))% complete ($($info.missing_count) missing)" -ForegroundColor $statusColor
+                        
+                        if ($info.missing_report_path) {
+                            $relativePath = $info.missing_report_path -replace [regex]::Escape($BaseDirectory), "." -replace "\\", "/"
+                            Write-Host "    Details: $relativePath" -ForegroundColor $C_GRAY
+                        }
+                    }
+                }
+                
+                Write-Host ""
+                Write-Host "${C_YELLOW}To retry missing subjects for a specific step, run:${C_RESET}"
+                Write-Host "  .\\prepare_data.ps1 -StopAfterStep <step_number>"
+                Write-Host ""
+                Write-Host "${C_CYAN}Step numbers:${C_RESET}"
+                Write-Host "  5: Generate Eminence Scores"
+                Write-Host "  6: Generate OCEAN Scores"
+                Write-Host ""
+            }
+        }
+        catch {
+            Write-Host "${C_YELLOW}Warning: Could not read data completeness information.${C_RESET}"
+        }
+    }
+}
+
 function Show-DataGenerationParameters {
     param([string]$ConfigFilePath)
     
@@ -907,6 +961,9 @@ finally {
         Format-Banner "Data Preparation Pipeline Completed Successfully" $C_GREEN
         if (-not $NoFinalReport.IsPresent) {
             Write-Host "`n${C_YELLOW}--- Final Pipeline Status ---${C_RESET}"; Show-PipelineStatus -Steps $PipelineSteps -BaseDirectory $WorkingDirectory | Out-Null
+            
+            # Add data completeness report
+            Show-DataCompletenessReport -BaseDirectory $WorkingDirectory
         }
     }
     exit $exitCode

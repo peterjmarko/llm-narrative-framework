@@ -637,11 +637,58 @@ def main():
             missing_report_path, llm_missed_subjects, subjects_to_process, final_df_from_disk
         )
 
-        # If any subjects were not processed (either missed by LLM or unattempted due to error), halt.
+        # If any subjects were not processed (either missed by LLM or unattempted due to error), apply tiered approach.
         if missing_ids:
-            logging.error(f"Failed to retrieve scores for {len(missing_ids)} subject(s). See '{missing_report_path}' for details.")
-            logging.error("The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.")
-            sys.exit(1)
+            # Calculate completion rate
+            completion_rate = (len(final_processed_ids) / len(initial_ids)) * 100 if initial_ids else 0
+            
+            # Tiered approach based on completion rate
+            if completion_rate < 95.0:
+                # Critical: Stop the pipeline
+                logging.error(f"CRITICAL: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
+                logging.error(f"See '{missing_report_path}' for details.")
+                logging.error("The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.")
+                sys.exit(1)
+            elif completion_rate < 99.0:
+                # Warning: Continue but with prominent warning
+                logging.warning(f"WARNING: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
+                logging.warning(f"See '{missing_report_path}' for details.")
+                logging.warning("The pipeline will continue, but consider re-running to retrieve missing subjects for better results.")
+                logging.warning("")
+                logging.warning(f"{Fore.YELLOW}{'='*60}")
+                logging.warning(f"{'ACTION RECOMMENDED':^60}")
+                logging.warning(f"{'='*60}")
+                logging.warning(f"To retrieve missing subjects, re-run this step:")
+                logging.warning(f"  .\\prepare_data.ps1 -StopAfterStep 6")
+                logging.warning(f"{'='*60}{Fore.RESET}")
+            else:
+                # Minor: Continue with simple notification
+                logging.info(f"NOTE: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
+                logging.info(f"See '{missing_report_path}' for details. This is within acceptable limits.")
+
+            # Store completion info for final pipeline report
+            completion_info = {
+                'step_name': 'Generate OCEAN Scores',
+                'completion_rate': completion_rate,
+                'missing_count': len(missing_ids),
+                'missing_report_path': str(missing_report_path) if missing_ids else None
+            }
+
+            # Write completion info to a shared file for final pipeline report
+            completion_info_path = output_path.parent.parent / "reports" / "pipeline_completion_info.json"
+            completion_info_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Read existing info or create new
+            if completion_info_path.exists():
+                with open(completion_info_path, 'r') as f:
+                    all_completion_info = json.load(f)
+            else:
+                all_completion_info = {}
+
+            all_completion_info['ocean_scores'] = completion_info
+
+            with open(completion_info_path, 'w') as f:
+                json.dump(all_completion_info, f, indent=2)
 
         # Print final status message based on the exit condition
         if was_interrupted:
