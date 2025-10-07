@@ -92,6 +92,9 @@ param(
     [switch]$TestMode,
 
     [Parameter(Mandatory=$false)]
+    [switch]$SuppressConfigDisplay,
+
+    [Parameter(Mandatory=$false)]
     [switch]$Plot,
 
     [Parameter(Mandatory=$false)]
@@ -128,8 +131,8 @@ $PipelineSteps = @(
     @{ Stage="3. Candidate Selection";   Name="Generate OCEAN Scores";      Script="src/generate_ocean_scores.py";      Inputs=@("data/foundational_assets/eminence_scores.csv"); Output="data/foundational_assets/ocean_scores.csv";        Type="Automated"; Description="Generates OCEAN personality scores for each eligible candidate using an LLM." },
     @{ Stage="3. Candidate Selection";   Name="Select Final Candidates";    Script="src/select_final_candidates.py";    Inputs=@("data/intermediate/adb_eligible_candidates.txt", "data/foundational_assets/eminence_scores.csv", "data/foundational_assets/ocean_scores.csv"); Output="data/intermediate/adb_final_candidates.txt";        Type="Automated"; Description="Determines the final subject set based on the LLM scoring." },
     @{ Stage="4. Profile Generation";    Name="Prepare SF Import File";     Script="src/prepare_sf_import.py";          Inputs=@("data/intermediate/adb_final_candidates.txt"); Output="data/intermediate/sf_data_import.txt";            Type="Automated"; Description="Formats the final subject list for import into the Solar Fire software." },
-    @{ Stage="4. Profile Generation";    Name="Solar Fire Processing"; Inputs=@("data/intermediate/sf_data_import.txt"); Output="data/foundational_assets/sf_chart_export.csv"; Type="Manual"; Description="The pipeline is paused. Please perform the manual Solar Fire import, calculation, and chart export process." },
-    @{ Stage="4. Profile Generation";    Name="Delineation Export";    Inputs=@("Solar Fire Software"); Output="data/foundational_assets/sf_delineations_library.txt"; Type="Manual"; Description="The pipeline is paused. Please perform the one-time Solar Fire delineation library export." },
+    @{ Stage="4. Profile Generation";    Name="Astrology Data Export (Manual)"; Inputs=@("data/intermediate/sf_data_import.txt"); Output="data/foundational_assets/sf_chart_export.csv"; Type="Manual"; Description="The pipeline is paused. Please perform the manual Solar Fire import, calculation, and chart export process." },
+    @{ Stage="4. Profile Generation";    Name="Delineation Library Export (Manual)";    Inputs=@("Solar Fire Software"); Output="data/foundational_assets/sf_delineations_library.txt"; Type="Manual"; Description="The pipeline is paused. Please perform the one-time Solar Fire delineation library export." },
     @{ Stage="4. Profile Generation";    Name="Neutralize Delineations";    Script="src/neutralize_delineations.py";    Inputs=@("data/foundational_assets/sf_delineations_library.txt"); Output="data/foundational_assets/neutralized_delineations/balances_quadrants.csv"; Type="Automated"; Description="Rewrites esoteric texts into neutral psychological descriptions using an LLM." },
     @{ Stage="4. Profile Generation";    Name="Create Subject Database";    Script="src/create_subject_db.py";          Inputs=@("data/foundational_assets/sf_chart_export.csv", "data/intermediate/adb_final_candidates.txt"); Output="data/processed/subject_db.csv";                  Type="Automated"; Description="Integrates chart data with the final subject list to create a master database." },
     @{ Stage="4. Profile Generation";    Name="Generate Personalities DB";  Script="src/generate_personalities_db.py";  Inputs=@("data/processed/subject_db.csv", "data/foundational_assets/neutralized_delineations/"); Output="data/personalities_db.txt";            Type="Automated"; Description="Assembles the final personalities database from subject data and the neutralized text library." }
@@ -199,7 +202,7 @@ function Get-StepStatus {
                 $content = Get-Content $summaryFile -Raw
                 $scored = ($content | Select-String -Pattern "Total Scored:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
                 $total = ($content | Select-String -Pattern "Total in Source:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
-                if ($scored -eq $total) { return "Complete" }
+                if ($scored -eq $total -and (Test-Path $outputFile)) { return "Complete" }
             } catch {
                 # Fallback in case of parsing error
             }
@@ -214,7 +217,7 @@ function Get-StepStatus {
                 $content = Get-Content $summaryFile -Raw
                 $scored = ($content | Select-String -Pattern "Total Scored:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
                 $total = ($content | Select-String -Pattern "Total in Source:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
-                if ($scored -eq $total) { return "Complete" }
+                if ($scored -eq $total -and (Test-Path $outputFile)) { return "Complete" }
             } catch {
                 # Fallback in case of parsing error
             }
@@ -241,7 +244,13 @@ function Get-StepStatus {
 
 function Backup-And-Remove {
     param([string]$ItemPath)
-    if (-not (Test-Path $ItemPath)) { return }
+    # Convert to relative path for display
+    $relativePath = $ItemPath.Replace($ProjectRoot, "").Replace("\", "/").TrimStart("/")
+    
+    if (-not (Test-Path $ItemPath)) {
+        Write-Host "No file to backup at '$relativePath'" -ForegroundColor Gray
+        return
+    }
 
     try {
         $item = Get-Item $ItemPath
@@ -252,18 +261,20 @@ function Backup-And-Remove {
         if ($item.PSIsContainer) {
             $backupName = "$($item.Name)_$timestamp.zip"
             $backupPath = Join-Path $backupDir $backupName
+            $relativeBackupPath = $backupPath.Replace($ProjectRoot, "").Replace("\", "/").TrimStart("/")
             Compress-Archive -Path $item.FullName -DestinationPath $backupPath -ErrorAction Stop
-            Write-Host "Backed up directory '$($item.Name)' to '$($backupPath)'" -ForegroundColor Cyan
+            Write-Host "Backed up directory '$relativePath' to '$relativeBackupPath'" -ForegroundColor Cyan
             Remove-Item -Recurse -Force -Path $item.FullName
         } else {
             $backupName = "$($item.BaseName).$timestamp$($item.Extension).bak"
             $backupPath = Join-Path $backupDir $backupName
+            $relativeBackupPath = $backupPath.Replace($ProjectRoot, "").Replace("\", "/").TrimStart("/")
             Copy-Item -Path $item.FullName -Destination $backupPath
-            Write-Host "Backed up file '$($item.Name)' to '$($backupPath)'" -ForegroundColor Cyan
+            Write-Host "Backed up file '$relativePath' to '$relativeBackupPath'" -ForegroundColor Cyan
             Remove-Item -Path $item.FullName
         }
     } catch {
-        Write-Host "ERROR: Failed to back up and remove '$($item.Name)'. Reason: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "ERROR: Failed to back up and remove '$relativePath'. Reason: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
     }
 }
@@ -285,8 +296,7 @@ function Show-PipelineStatus {
             default      { $status = if ($step.Type -eq 'Manual') { "$($C_YELLOW)[PENDING]$($C_RESET)" } else { "$($C_RED)[MISSING]$($C_RESET)" } }
         }
         $stepNameFormatted = "$($stepNumber). $($step.Name)"
-        # Shift the second column by 6 spaces to the left
-        Write-Host ("{0,-$($nameWidth-6)}{1}" -f $stepNameFormatted, $status)
+        Write-Host ("{0,-$nameWidth} {1}" -f $stepNameFormatted, $status)
     }
     Write-Host ""; return $filesExist
 }
@@ -303,35 +313,86 @@ function Show-DataGenerationParameters {
     $oceanModel = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "ocean_model" -DefaultValue "Not configured"
     $neutralizationModel = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "neutralization_model" -DefaultValue "Not configured"
     
+    # Helper function to get display name for a model
+    function Get-ModelDisplayName {
+        param([string]$ModelName, [string]$ConfigFilePath)
+        
+        if ($ModelName -eq "Not configured" -or $ModelName -eq "") {
+            return "Not configured"
+        }
+        
+        # Convert the full OpenRouter ID to canonical format with dashes
+        # Replace all non-alphanumeric characters (except dash) with dashes
+        $canonicalName = $ModelName -replace '[^a-zA-Z0-9-]', '-'
+        
+        # Try to get the display name from ModelDisplayNames section
+        $displayName = Get-ConfigValue -FilePath $ConfigFilePath -Section "ModelDisplayNames" -Key $canonicalName -DefaultValue $null
+        
+        if ($displayName) {
+            return $displayName
+        } else {
+            # Try with just the model part (after the last slash)
+            if ($ModelName -match '/') {
+                $modelOnly = $ModelName.Split('/')[-1]
+                $modelOnlyCanonical = $modelOnly -replace '[^a-zA-Z0-9-]', '-'
+                $displayName = Get-ConfigValue -FilePath $ConfigFilePath -Section "ModelDisplayNames" -Key $modelOnlyCanonical -DefaultValue $null
+                if ($displayName) {
+                    return $displayName
+                }
+            }
+            
+            # If still no display name found, return a cleaned version of the original name
+            # Just replace slashes with a space for better readability
+            return $ModelName -replace '/', ' '
+        }
+    }
+    
+    # Get display names for the models
+    $eminenceDisplayName = Get-ModelDisplayName -ModelName $eminenceModel -ConfigFilePath $ConfigFilePath
+    $oceanDisplayName = Get-ModelDisplayName -ModelName $oceanModel -ConfigFilePath $ConfigFilePath
+    $neutralizationDisplayName = Get-ModelDisplayName -ModelName $neutralizationModel -ConfigFilePath $ConfigFilePath
+    
     # Display parameters with appropriate formatting (second column shifted by 2 spaces)
     Write-Host ("{0,-30}  {1}" -f "Bypass Candidate Selection:", "$($C_YELLOW)$bypassSelection$($C_RESET)")
-    Write-Host ("{0,-30}  {1}" -f "Eminence Scoring Model:", "$($C_BLUE)$eminenceModel$($C_RESET)")
-    Write-Host ("{0,-30}  {1}" -f "OCEAN Scoring Model:", "$($C_BLUE)$oceanModel$($C_RESET)")
-    Write-Host ("{0,-30}  {1}" -f "Neutralization Model:", "$($C_BLUE)$neutralizationModel$($C_RESET)")
+    Write-Host ("{0,-30}  {1}" -f "Eminence Scoring Model:", "$($C_BLUE)$eminenceDisplayName$($C_RESET)")
+    Write-Host ("{0,-30}  {1}" -f "OCEAN Scoring Model:", "$($C_BLUE)$oceanDisplayName$($C_RESET)")
+    Write-Host ("{0,-30}  {1}" -f "Neutralization Model:", "$($C_BLUE)$neutralizationDisplayName$($C_RESET)")
     Write-Host ""
 }
 
 function Show-Parameters-And-Confirm {
     param(
         [string]$ConfigFilePath,
-        [bool]$PauseForConfirmation = $true
+        [bool]$PauseForConfirmation = $true,
+        [bool]$SuppressDisplay = $false
     )
     
-    # Display the parameters
-    Show-DataGenerationParameters -ConfigFilePath $ConfigFilePath
+    # Only display the parameters if not suppressed
+    if (-not $SuppressDisplay) {
+        # Display the parameters
+        Show-DataGenerationParameters -ConfigFilePath $ConfigFilePath
+    }
     
     # Pause for confirmation if required
     if ($PauseForConfirmation) {
         if ($env:UNDER_TEST_HARNESS -eq "true") {
             # Signal to test harness and wait for response
             $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
-            Write-Host "HARNESS_PROMPT:Review the configuration parameters above, then press Enter to continue...:$waitFile"
+            if (-not $SuppressDisplay) {
+                Write-Host "HARNESS_PROMPT:Review the configuration parameters above, then press Enter to continue...:$waitFile"
+            } else {
+                Write-Host "HARNESS_PROMPT:Press Enter to continue...:$waitFile"
+            }
             # Wait for test harness to create the response file
             while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
             Remove-Item $waitFile -ErrorAction SilentlyContinue
         } else {
             # Standard Read-Host for normal operation
-            Read-Host -Prompt "${C_ORANGE}Review the configuration parameters above, then press Enter to continue...${C_RESET}" | Out-Null
+            if (-not $SuppressDisplay) {
+                Read-Host -Prompt "${C_ORANGE}Review the configuration parameters above, then press Enter to continue...${C_RESET}" | Out-Null
+            } else {
+                Read-Host -Prompt "${C_ORANGE}Press Enter to continue...${C_RESET}" | Out-Null
+            }
         }
     }
 }
@@ -374,36 +435,10 @@ try {
     # An "interactive force overwrite" is when a user, not a test script, forces a re-run.
     $isInteractiveForceOverwrite = $Force.IsPresent -and -not $TestMode.IsPresent
 
-    # --- Pre-run Cleanup for an INTERACTIVE force flag ---
-    if ($isInteractiveForceOverwrite) {
-        Write-Host "`n${C_YELLOW}WARNING: The -Force flag is active."
-        Write-Host "This will back up and delete all existing data artifacts to re-run the entire pipeline from scratch.${C_RESET}"
-        $confirm = Read-Host "Are you sure you want to proceed? (Y/N)"
-        if ($confirm.Trim().ToLower() -ne 'y') { throw "USER_CANCELLED: Operation cancelled by user." }
-
-        Write-Host "`n${C_YELLOW}Backing up and removing existing data files...${C_RESET}`n"
-        
-        # Special handling for neutralization directory, which contains multiple files
-        $neutralizationStep = $PipelineSteps | Where-Object { $_.Name -eq "Neutralize Delineations" }
-        if ($neutralizationStep) {
-            $repFile = Join-Path $WorkingDirectory $neutralizationStep.Output
-            $outputDir = Split-Path $repFile -Parent
-            Backup-And-Remove -ItemPath $outputDir
-        }
-        
-        # Handle all other individual files
-        foreach ($step in $PipelineSteps) {
-            if ($step.Name -ne "Neutralize Delineations") {
-                Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $step.Output)
-            }
-        }
-        Write-Host "" # Add a blank line for spacing
-    }
-
-    # Display DataGeneration parameters for all modes
+    # Display DataGeneration parameters for all modes (unless suppressed)
     if ($ReportOnly.IsPresent) {
-        # In ReportOnly mode, show parameters first without pausing
-        Show-Parameters-And-Confirm -ConfigFilePath $configFile -PauseForConfirmation $false
+        # In ReportOnly mode, show parameters first without pausing (unless suppressed)
+        Show-Parameters-And-Confirm -ConfigFilePath $configFile -PauseForConfirmation $false -SuppressDisplay $SuppressConfigDisplay.IsPresent
         
         # Then show the pipeline status
         $anyFileExists = $false
@@ -433,9 +468,107 @@ try {
         $anyFileExists = (Get-ChildItem -Path $WorkingDirectory -Recurse -File | Select-Object -First 1) -ne $null
     }
 
-    # Show parameters for Interactive mode and Normal mode
-    # This is displayed before the warning about existing files (if any) and before the pipeline starts
-    Show-Parameters-And-Confirm -ConfigFilePath $configFile -PauseForConfirmation $true
+    # Show parameters for Interactive mode and Normal mode BEFORE any other operations
+    # This ensures users see the configuration first, then the -Force warning, then backup
+    # (unless suppressed for test modes)
+    # In test modes with SuppressConfigDisplay, we also skip the pause to avoid halting automated tests
+    Show-Parameters-And-Confirm -ConfigFilePath $configFile -PauseForConfirmation (-not $SuppressConfigDisplay.IsPresent) -SuppressDisplay $SuppressConfigDisplay.IsPresent
+    
+    # --- Pre-run Cleanup for an INTERACTIVE force flag ---
+    # This is now moved after displaying the parameters
+    if ($isInteractiveForceOverwrite) {
+        Write-Host "`n${C_YELLOW}WARNING: The -Force flag is active."
+        Write-Host "This will back up and delete all existing data artifacts to re-run the entire pipeline from scratch.${C_RESET}"
+        $confirm = Read-Host "Are you sure you want to proceed? (Y/N)"
+        if ($confirm.Trim().ToLower() -ne 'y') { throw "USER_CANCELLED: Operation cancelled by user." }
+
+        Write-Host "`n${C_YELLOW}Backing up and removing existing data files...${C_RESET}`n"
+        
+        try {
+            # Special handling for neutralization directory, which contains multiple files
+            $neutralizationStep = $PipelineSteps | Where-Object { $_.Name -eq "Neutralize Delineations" }
+            if ($neutralizationStep) {
+                $repFile = Join-Path $WorkingDirectory $neutralizationStep.Output
+                $outputDir = Split-Path $repFile -Parent
+                Backup-And-Remove -ItemPath $outputDir
+            }
+            
+            # Handle all other individual files from pipeline steps
+            foreach ($step in $PipelineSteps) {
+                if ($step.Name -ne "Neutralize Delineations") {
+                    Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $step.Output)
+                }
+            }
+            
+            # Also backup summary files that will be overwritten
+            $summaryFiles = @(
+                "data/reports/eminence_scores_summary.txt",
+                "data/reports/ocean_scores_summary.txt"
+            )
+            
+            foreach ($summaryFile in $summaryFiles) {
+                Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $summaryFile)
+            }
+            
+            # Backup additional files that are not part of pipeline steps but should be removed
+            $additionalFiles = @(
+                "data/reports/adb_validation_summary.txt",
+                "data/reports/delineation_coverage_map.csv",
+                "data/reports/missing_eminence_scores.txt",
+                "data/reports/missing_ocean_scores.txt",
+                "data/reports/missing_sf_subjects.csv"
+            )
+            
+            foreach ($additionalFile in $additionalFiles) {
+                Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $additionalFile)
+            }
+            
+            # Handle sf_chart_export files with any extension (safest approach)
+            $sfChartExportPattern = Join-Path $WorkingDirectory "data/foundational_assets/sf_chart_export.*"
+            $sfChartExportFiles = Get-ChildItem -Path $sfChartExportPattern -ErrorAction SilentlyContinue
+            foreach ($file in $sfChartExportFiles) {
+                Backup-And-Remove -ItemPath $file.FullName
+            }
+            
+            # List of files to preserve (do not remove)
+            $preserveFiles = @(
+                "data/config/adb_research_categories.json",
+                "data/foundational_assets/adb_category_map.csv",
+                "data/foundational_assets/balance_thresholds.csv",
+                "data/foundational_assets/country_codes.csv",
+                "data/foundational_assets/point_weights.csv",
+                "data/base_query.txt",
+                "data/foundational_assets/assembly_logic/personalities_db.assembly_logic.txt",
+                "data/foundational_assets/assembly_logic/subject_db.assembly_logic.csv",
+                "data/reports/cutoff_parameter_analysis_results.csv",
+                "data/reports/variance_curve_analysis.png"
+            )
+            
+            Write-Host "${C_CYAN}Preserving the following essential files:${C_RESET}" -ForegroundColor Cyan
+            foreach ($preserveFile in $preserveFiles) {
+                $preservePath = Join-Path $WorkingDirectory $preserveFile
+                if (Test-Path $preservePath) {
+                    $relativePath = $preserveFile.Replace("\", "/")
+                    Write-Host "  Preserving: $relativePath" -ForegroundColor Green
+                }
+            }
+            
+            Write-Host "" # Add a blank line for spacing
+        }
+        catch [System.Management.Automation.PipelineStoppedException] {
+            # Handle Ctrl+C interrupt during backup operation
+            Write-Host "`n${C_YELLOW}WARNING: Backup operation was interrupted by user.${C_RESET}"
+            Write-Host "${C_YELLOW}Some files may have been backed up while others were not.${C_RESET}"
+            Write-Host "${C_YELLOW}Please check the data/backup directory and manually remove any remaining files if needed.${C_RESET}"
+            throw "USER_CANCELLED: Backup operation interrupted by user."
+        }
+        catch {
+            # Handle other errors during backup
+            Write-Host "`n${C_RED}ERROR: Backup operation failed.${C_RESET}"
+            Write-Host "${C_RED}Reason: $($_.Exception.Message)${C_RESET}"
+            throw "BACKUP_FAILED: Backup operation failed. $($_.Exception.Message)"
+        }
+    }
     
     if ($anyFileExists -and -not $Force.IsPresent -and -not $Interactive -and -not $SandboxMode) {
         Write-Host "${C_YELLOW}`nWARNING: One or more data files already exist."
@@ -562,9 +695,9 @@ try {
         
         $description = $step.Description
         if ($TestMode.IsPresent -and $step.Type -eq 'Manual') {
-            if ($step.Name -eq "Solar Fire Processing") {
+            if ($step.Name -eq "Astrology Data Export (Manual)") {
                 $description = "Simulating the manual Solar Fire import, calculation, and chart export process."
-            } elseif ($step.Name -eq "Delineation Export") {
+            } elseif ($step.Name -eq "Delineation Library Export (Manual)") {
                 $description = "Simulating the one-time Solar Fire delineation library export."
             }
         }
@@ -608,7 +741,7 @@ try {
 
             if (-not $TestMode.IsPresent) {
                 if ($Step.Name -eq "Fetch Raw ADB Data") {
-                    [void]$infoBlock.AppendLine("`n${C_YELLOW}WARNING: This process will connect to the live Astro-Databank website and may take about 1 minute to complete.${C_RESET}")
+                    [void]$infoBlock.AppendLine("`n${C_YELLOW}WARNING: This process quickly downloads a large amount of data from the Astro-Databank website.${C_RESET}")
                 } elseif ($Step.Name -eq "Generate Eminence Scores") {
                     [void]$infoBlock.AppendLine("`n${C_YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (2 minutes or more for each set of 1,000 records).${C_RESET}")
                 } elseif ($Step.Name -eq "Generate OCEAN Scores") {
@@ -674,16 +807,18 @@ try {
         }
 
         # Execute the python script within the correct working directory
-        # Execute the python script within the correct working directory
-        $pdmArgs = $arguments -join " "
-        $scriptBlock = [scriptblock]::Create("pdm $pdmArgs")
-        
-        $process = Start-Process -FilePath "pwsh" -ArgumentList "-NoProfile", "-Command", "$scriptBlock" -WorkingDirectory $WorkingDirectory -PassThru -Wait -NoNewWindow
-        $exitCode = $process.ExitCode
-        
-        if ($scriptOutput) {
-            # Pass through the Python script's own output, preserving its color codes.
-            $scriptOutput | ForEach-Object { Write-Host $_ }
+        # Use Invoke-Expression to preserve progress bar output
+        $originalLocation = Get-Location
+        try {
+            Set-Location $WorkingDirectory
+            
+            # Build command string and execute directly to preserve carriage returns
+            $commandString = "pdm " + ($arguments -join " ")
+            Invoke-Expression $commandString
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            Set-Location $originalLocation
         }
         
         if ($exitCode -ne 0) { 

@@ -228,6 +228,7 @@ def get_task_group(task: Dict) -> str:
 
 def main():
     """Main function to orchestrate the neutralization process."""
+    os.system('')
     # --- Config and Arguments ---
     default_model = get_config_value(APP_CONFIG, "DataGeneration", "neutralization_model", "anthropic/claude-3.5-sonnet")
     default_points_str = "Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, Midheaven"

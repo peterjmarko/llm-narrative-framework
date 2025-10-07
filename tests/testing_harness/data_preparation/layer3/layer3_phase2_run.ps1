@@ -381,7 +381,7 @@ try {
     # --- RUN 1: Execute pipeline through Step 3 ---
     $env:UNDER_TEST_HARNESS = "true"
     $run1Args = @{
-        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 3
+        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 3; SuppressConfigDisplay = $true
     }
     if ($Interactive) { $run1Args.Interactive = $true }
 
@@ -424,7 +424,7 @@ try {
 
     # --- RUN 2: Resume pipeline from Step 4 to the next manual step (9) ---
     Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming from Step 4... ---$($C_RESET)" -ForegroundColor Cyan
-    $run2Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true }
+    $run2Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; SuppressConfigDisplay = $true }
     if ($Interactive) { $run2Args.Interactive = $true }
 
     $run2Steps = [System.Collections.Generic.List[object]]::new()
@@ -446,7 +446,7 @@ try {
         $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = "SUCCESS"; 'Output File' = $step.'Output File' })
     }
 
-    # --- SIMULATE Manual Step 9: Solar Fire Processing ---
+    # --- SIMULATE Manual Step 9: Astrology Data Export (Manual) ---
     if ($Interactive) {
         # Manually print the info block for this step as the orchestrator has halted.
         $summary9 = "This is a manual step. It simulates the process of importing the `sf_data_import.txt` file into the Solar Fire software, running the necessary chart calculations, and exporting the results to `sf_chart_export.csv`."
@@ -478,7 +478,7 @@ try {
         Read-Host -Prompt "`n${C_ORANGE}Press Enter to simulate this manual step (Ctrl+C to exit)...${C_RESET}" | Out-Null
     }
 
-    Write-Host "`n--- SIMULATING: Solar Fire Processing... ---$($C_RESET)" -ForegroundColor Magenta
+    Write-Host "`n--- SIMULATING: Astrology Data Export (Manual)... ---$($C_RESET)" -ForegroundColor Magenta
 
     $idMap = @{}; Get-Content $sfImportFile | ForEach-Object { $f = $_.Split(',') | ForEach-Object { $_.Trim('"') }; if ($f.Length -ge 4) { $idMap[$f[0]] = $f[3] } }
     $destAssetDir = Join-Path $SandboxDir "data/foundational_assets"
@@ -500,7 +500,7 @@ try {
 
     # --- RUN 3: Resume pipeline from Step 10 to the next manual step (10) ---
     Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming from Step 10... ---$($C_RESET)" -ForegroundColor Cyan
-    $run3Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true }
+    $run3Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; SuppressConfigDisplay = $true }
     if ($Interactive) { $run3Args.Interactive = $true }
 
     $run3Steps = [System.Collections.Generic.List[object]]::new()
@@ -526,7 +526,7 @@ try {
     if ($run3ExitCode -ne 1) { throw "Pipeline Run 3 was expected to halt for Step 10 but did not." }
     if ($run3Steps.Count > 0) { $run3Steps.RemoveAt($run3Steps.Count - 1) } # Remove the halted step
 
-    # --- SIMULATE Manual Step 10: Delineation Export ---
+    # --- SIMULATE Manual Step 10: Delineation Library Export (Manual) ---
     if ($Interactive) {
         # Manually print the info block for this step as the orchestrator has halted.
         $summary10 = "This is a manual step. It simulates the one-time export of the complete delineation library from the Solar Fire software into a plain text file, `sf_delineations_library.txt`. This test automates this by creating a small, representative library file."
@@ -546,7 +546,7 @@ try {
         [Console]::ReadLine() | Out-Null
     }
 
-    Write-Host "`n--- SIMULATING: Delineation Export... ---$($C_RESET)" -ForegroundColor Magenta
+    Write-Host "`n--- SIMULATING: Delineation Library Export (Manual)... ---$($C_RESET)" -ForegroundColor Magenta
 
     @"
 *Quadrant Strong 1st
@@ -556,7 +556,7 @@ A self-motivated and independent nature.
 *Aries Strong
 Assertive and pioneering.
 "@ | Set-Content -Path $delineationLibPath -Encoding UTF8
-    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Delineation Export"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Delineation Library Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
 
     Write-Host "  -> Exported Solar Fire delineation library."
 
@@ -606,7 +606,7 @@ Assertive and pioneering.
 
     # --- RUN 4: Resume to completion ---
     Write-Host "`n--- EXECUTING PIPELINE (Part 4): Resuming to completion... ---$($C_RESET)" -ForegroundColor Cyan
-    $run4Args = @{ NoFinalReport = $true; Resumed = $true; TestMode = $true }
+    $run4Args = @{ NoFinalReport = $true; Resumed = $true; TestMode = $true; SuppressConfigDisplay = $true }
     if ($Interactive) { $run4Args.Interactive = $true }
 
     $run4Steps = [System.Collections.Generic.List[object]]::new()

@@ -114,7 +114,8 @@ class TqdmLoggingHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
-            tqdm.write(msg)
+            # Use print instead of tqdm.write to avoid interfering with progress bar
+            print(msg)
             self.flush()
         except Exception:
             self.handleError(record)
@@ -507,6 +508,7 @@ def finalize_and_report(output_path: Path, fieldnames: list, all_lines: list, wa
                 print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Link finding completed successfully. ✨{Fore.RESET}")
 
 def main():
+    os.system('')
     parser = argparse.ArgumentParser(description="Find Wikipedia links for subjects in the raw ADB export.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("-w", "--workers", type=int, default=MAX_WORKERS, help="Number of parallel worker threads.")
@@ -677,7 +679,7 @@ def main():
         if is_new_file:
             writer.writeheader()
 
-        with tqdm(total=len(lines_to_process), desc="Finding links", ncols=120, smoothing=0.01, disable=args.quiet) as pbar:
+        with tqdm(total=len(lines_to_process), desc="Finding links", ncols=100, smoothing=0.01, disable=args.quiet) as pbar:
             tasks = [(max_index_before + i + 1, line) for i, line in enumerate(lines_to_process)]
             futures = {executor.submit(worker_task_with_timeout, line, pbar, index) for index, line in tasks}
             
@@ -701,16 +703,17 @@ def main():
                         pbar.update(1)
                         futures.remove(future)
                         
-                        # Update progress bar with total counts
-                        total_links = links_found_before + links_found_this_session
-                        total_processed = len(processed_ids) + pbar.n
-                        total_timeouts = timeouts_before + timeouts_this_session
-                        percentage = (total_links / total_processed) * 100 if total_processed > 0 else 0
-                        
-                        postfix_str = f"Links found: {total_links:,}/{total_processed:,} ({percentage:.0f}%)"
-                        if total_timeouts > 0:
-                            postfix_str += f", Timeouts: {total_timeouts:,}"
-                        pbar.set_postfix_str(postfix_str)
+                        # Update progress bar with total counts (less frequently to avoid display issues)
+                        if pbar.n % 10 == 0 or pbar.n == len(lines_to_process):  # Update every 10 items or at completion
+                            total_links = links_found_before + links_found_this_session
+                            total_processed = len(processed_ids) + pbar.n
+                            total_timeouts = timeouts_before + timeouts_this_session
+                            percentage = (total_links / total_processed) * 100 if total_processed > 0 else 0
+                            
+                            postfix_str = f"Links found: {total_links:,}/{total_processed:,} ({percentage:.0f}%)"
+                            if total_timeouts > 0:
+                                postfix_str += f", Timeouts: {total_timeouts:,}"
+                            pbar.set_postfix_str(postfix_str)
                 except TimeoutError:
                     pass
 

@@ -61,6 +61,9 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 # Run the entire data preparation pipeline interactively
 .\prepare_data.ps1
 
+# Run in interactive mode with step-by-step guidance
+.\prepare_data.ps1 -Interactive
+
 # Force a full re-run, deleting all existing data
 .\prepare_data.ps1 -Force
 
@@ -68,6 +71,7 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 .\prepare_data.ps1 -ReportOnly
 ```
 > **Warning on Using `-Force`**: The `-Force` flag triggers a full, destructive re-run of the entire pipeline. It backs up and deletes all existing data, re-downloads the full raw dataset, and re-runs all expensive LLM scoring steps. This process is very time-consuming and will incur API costs.
+> **Interactive Mode (`-Interactive`)**: This mode provides a step-by-step "guided tour" of the entire pipeline. Before execution begins, it displays the relevant DataGeneration parameters from `config.ini` and pauses for user confirmation. During execution, it pauses before each step to show detailed information about inputs, outputs, and script summaries, allowing users to understand exactly what the pipeline is doing. This mode is highly recommended for new users or when troubleshooting issues.
 > **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING_GUIDE.md)](../TESTING_GUIDE.md)** for details on running the Layer 3 Interactive Mode.
 
 The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.

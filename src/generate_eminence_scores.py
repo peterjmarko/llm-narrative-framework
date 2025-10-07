@@ -369,6 +369,7 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
 
 def main():
     """Main function to orchestrate the eminence score generation."""
+    os.system('')
     # --- Load Defaults from Config ---
     default_input = get_config_value(APP_CONFIG, 'DataGeneration', 'eligible_candidates_input', 'data/intermediate/adb_eligible_candidates.txt')
     default_output = get_config_value(APP_CONFIG, 'DataGeneration', 'eminence_scores_output', 'data/foundational_assets/eminence_scores.csv')

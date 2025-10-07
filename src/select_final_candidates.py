@@ -118,6 +118,7 @@ def generate_variance_plot(x_values, raw_variances, smoothed_variances, cutoff_p
 
 def main():
     """Main function to orchestrate the final candidate selection."""
+    os.system('')
     parser = argparse.ArgumentParser(
         description="Select and transform the final set of candidates.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

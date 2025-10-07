@@ -562,6 +562,7 @@ def worker_task_with_timeout(row: dict, pbar: tqdm, index: int) -> dict:
 
 
 def main():
+    os.system('')
     parser = argparse.ArgumentParser(description="Validate Wikipedia page content for ADB subjects.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("-w", "--workers", type=int, default=MAX_WORKERS, help="Number of parallel worker threads.")

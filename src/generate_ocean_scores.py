@@ -354,6 +354,7 @@ def generate_summary_report(filepath: Path, total_subjects_overall: int):
 
 def main():
     """Main function to orchestrate the OCEAN score generation."""
+    os.system('')
     # This must be the first action to ensure the config is loaded correctly,
     # especially in a sandboxed test environment.
     from config_loader import APP_CONFIG, get_config_value
