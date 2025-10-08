@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 12.13.0 (2025-10-08)
+
+### Bump
+
+- **version 12.12.0 → 12.13.0**
+
+### Features
+
+- **Enhance pipeline state machines with configurable Solar Fire integration and comprehensive documentation**
+  This update significantly enhances the data preparation pipeline's state machine logic, adds configurable Solar Fire integration, and provides comprehensive documentation for complex pipeline behaviors.
+  
+  Key improvements include:
+  - Configurable Solar Fire file paths through new [SolarFire] section in config.ini
+  - Advanced state machine for Step 11 (Neutralize Delineations) with STALE status detection
+  - Enhanced status reporting for LLM scoring steps (5 & 6) with dual-file validation
+  - Improved pipeline status table with file information display
+  - Comprehensive Data Completeness Report integrated throughout the pipeline
+  - Automatic file copying from Solar Fire directories when files are detected
+  - Detailed documentation of all state machines and -Force mode behavior
+  - Fixed image references to use updated sf_images folder structure
+  - Updated multiple source files to support enhanced pipeline features
+  - Updated documentation files to reflect new pipeline capabilities
+  - Added Solar Fire delineations library file as foundational asset
+
 ## 12.12.0 (2025-10-07)
 
 ### Bump
