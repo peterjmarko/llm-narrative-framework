@@ -267,7 +267,9 @@ def main():
         print("Writing original delineation text directly to output files...")
         
         if not input_path.exists():
-            logging.error(f"\n{Fore.RED}FATAL: Input file not found for bypass: {input_path}\n")
+            from config_loader import PROJECT_ROOT
+            relative_path = os.path.relpath(input_path, PROJECT_ROOT)
+            logging.error(f"\n{Fore.RED}FATAL: Input file not found for bypass: {relative_path}\n")
             sys.exit(1)
         
         # The pytest fixture is responsible for creating a clean directory.
@@ -286,7 +288,9 @@ def main():
 
     # --- Regular Workflow File Check ---
     if not input_path.exists():
-        logging.error(f"\n{Fore.RED}FATAL: Input file not found: {input_path}\n")
+        from config_loader import PROJECT_ROOT
+        relative_path = os.path.relpath(input_path, PROJECT_ROOT)
+        logging.error(f"\n{Fore.RED}FATAL: Input file not found: {relative_path}\n")
         sys.exit(1)
 
     # --- Intelligent Startup Logic (Stale Check) ---
@@ -410,7 +414,7 @@ def main():
         print(f"\n{Fore.GREEN}All delineation files are already up to date. Nothing to do. ✨{Fore.RESET}\n")
         sys.exit(0)
         
-    print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs and could take an hour or more to complete.{Fore.RESET}")
+    print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take an hour or more to complete.{Fore.RESET}")
 
     is_interactive = sys.stdout.isatty()
 
@@ -542,6 +546,30 @@ def main():
         else:
             key_metric = f"Processed {processed_count} task(s)"
             print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Neutralization completed successfully.{Fore.RESET}\n")
+            
+            # Write completion info to a shared file for final pipeline report
+            completion_info = {
+                'llm_used': args.model,
+                'completion_rate': 100.0,  # If we get here, all tasks were processed successfully
+                'processed_count': processed_count,
+                'failed_count': failed_count
+            }
+            
+            import json
+            completion_info_path = output_dir.parent.parent / "reports" / "pipeline_completion_info.json"
+            completion_info_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Read existing info or create new
+            if completion_info_path.exists():
+                with open(completion_info_path, 'r') as f:
+                    all_completion_info = json.load(f)
+            else:
+                all_completion_info = {}
+            
+            all_completion_info['neutralize_delineations'] = completion_info
+            
+            with open(completion_info_path, 'w') as f:
+                json.dump(all_completion_info, f, indent=2)
 
 def debug_and_exit(prompt, worker_result, pbar, temp_dir):
     """Prints debug info and halts the script."""

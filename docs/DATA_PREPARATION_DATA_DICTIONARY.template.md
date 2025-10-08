@@ -24,6 +24,7 @@ data/
 │   ├── delineation_coverage_map.csv
 │   ├── eminence_scores_summary.txt
 │   ├── ocean_scores_summary.txt
+│   ├── pipeline_completion_info.json
 │   └── ... (other audit logs)
 │
 ├── foundational_assets/
@@ -66,6 +67,7 @@ These files are generated during the data validation and filtering stages.
 -   **`delineation_coverage_map.csv`**: A report used by the assembly logic validation workflow to ensure test subjects provide maximum coverage of all text components.
 -   **`eminence_scores_summary.txt`**: A human-readable summary of the eminence scoring run.
 -   **`ocean_scores_summary.txt`**: The detailed summary report from `generate_ocean_scores.py`, including the cutoff analysis and descriptive statistics.
+-   **`pipeline_completion_info.json`**: A JSON file that tracks completion status and metrics for critical pipeline steps. It contains completion rates, missing subject counts, and paths to missing subject reports for both eminence and OCEAN scoring steps. This file is used by the pipeline orchestrator to determine if a step completed successfully or requires intervention.
 -   Various other `missing_*.txt` files serve as audit logs for different pipeline stages.
 
 ### 3. `foundational_assets/` - Static Assets for Generation

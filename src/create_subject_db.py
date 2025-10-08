@@ -176,8 +176,11 @@ def main():
     
     # Fetch chart export file from Solar Fire export directory if not skipped
     if not args.no_fetch:
-        sf_export_csv = Path(r"C:\Users\peter\Documents\Solar Fire User Files\Export\sf_chart_export.csv")
-        sf_export_dat = Path(r"C:\Users\peter\Documents\Solar Fire User Files\Export\SFChartExport.dat")
+        # Dynamically determine the user's Documents folder
+        import os
+        documents_folder = Path(os.path.expanduser("~/Documents"))
+        sf_export_csv = documents_folder / "Solar Fire User Files" / "Export" / "sf_chart_export.csv"
+        sf_export_dat = documents_folder / "Solar Fire User Files" / "Export" / "SFChartExport.dat"
         
         # Try CSV first, then DAT
         sf_export_source = None

@@ -556,7 +556,7 @@ A self-motivated and independent nature.
 *Aries Strong
 Assertive and pioneering.
 "@ | Set-Content -Path $delineationLibPath -Encoding UTF8
-    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Delineation Library Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Delineations Library Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
 
     Write-Host "  -> Exported Solar Fire delineation library."
 

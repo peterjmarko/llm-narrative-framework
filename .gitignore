@@ -61,6 +61,7 @@ cleaner_archives/
 main_archive/
 output/
 tests/llm_qualification/
+data/foundational_assets/neutralized_delineations/
 
 
 # ==============================================================================

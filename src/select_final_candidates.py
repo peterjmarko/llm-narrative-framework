@@ -199,7 +199,9 @@ def main():
             logging.info(f"Loaded {len(eminence_df):,} records from {eminence_path.name}.")
             logging.info(f"Loaded {len(ocean_df):,} records from {ocean_path.name} (defines final set).")
     except FileNotFoundError as e:
-        logging.error(f"{Fore.RED}FATAL: Input file not found: {e.filename}")
+        from config_loader import PROJECT_ROOT
+        relative_path = os.path.relpath(e.filename, PROJECT_ROOT)
+        logging.error(f"{Fore.RED}FATAL: Input file not found: {relative_path}")
         sys.exit(1)
 
     print(f"\n{Fore.YELLOW}--- Selecting and Transforming Final Candidates ---")

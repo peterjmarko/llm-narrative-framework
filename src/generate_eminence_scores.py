@@ -22,6 +22,8 @@
 """
 Generates eminence scores for all "eligible candidates".
 
+NOTE: Each set of 10,000 records can take 15 minutes or more to process.
+
 This script is the first of two main components in the "LLM-based Candidate
 Selection" stage. It reads the pre-filtered list of eligible candidates,
 groups them into batches, and queries an LLM for a calibrated "eminence" score
@@ -431,7 +433,7 @@ def main():
     if not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
-            print("Automatically re-running full selection process...")
+            print("Automatically re-running full selection process..." + Fore.RESET)
             args.force = True
 
     # --- Handle --force flag ---
@@ -486,11 +488,12 @@ def main():
 
     # Display a non-interactive warning if the script is proceeding automatically
     if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
-         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will incur API transaction costs and could take some time (1.5 minutes or more for each set of 1,000 records).{Fore.RESET}")
+         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (15 minutes or more for a set of 7,000 records).{Fore.RESET}")
 
     print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
     print(f"Found {len(processed_ids):,} existing scores.")
-    print(f"Processing {total_to_process:,} new subjects (out of {total_subjects_in_source:,} total).")
+    total_batches = (total_to_process + args.batch_size - 1) // args.batch_size
+    print(f"Processing {total_to_process:,} new subjects (out of {total_subjects_in_source:,} total) in {total_batches} batches of {args.batch_size} subjects each.")
     
     # --- Create Temporary Config for Model Override ---
     temp_config = configparser.ConfigParser()
@@ -531,11 +534,26 @@ def main():
 
                 if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
                     error_msg = temp_error_file.read_text(encoding='utf-8').strip()
-                    tqdm.write(f"{Fore.RED}Worker failed for batch {batch_num}. Error: {error_msg}")
-                    consecutive_failures += 1
-                    if "401" in error_msg or "403" in error_msg:
+                    
+                    # Check if this is a network-related error that can be retried
+                    is_network_error = any(keyword in error_msg.lower() for keyword in [
+                        "connection", "timeout", "chunked encoding", "incomplete", "network", "dns", "ssl"
+                    ])
+                    
+                    # Check for authentication errors which are fatal
+                    is_auth_error = "401" in error_msg or "403" in error_msg
+                    
+                    if is_auth_error:
+                        tqdm.write(f"{Fore.RED}Authentication error for batch {batch_num}. Error: {error_msg}")
                         tqdm.write(f"{Fore.RED}Halting due to a fatal API authentication error.")
                         break
+                    elif is_network_error:
+                        tqdm.write(f"{Fore.YELLOW}Network error for batch {batch_num}. Error: {error_msg}")
+                        tqdm.write(f"{Fore.YELLOW}This is a temporary issue and can be retried.{Fore.RESET}")
+                    else:
+                        tqdm.write(f"{Fore.RED}Worker failed for batch {batch_num}. Error: {error_msg}")
+                    
+                    consecutive_failures += 1
                     if consecutive_failures >= max_consecutive_failures:
                         tqdm.write(f"{Fore.RED}Halting after {max_consecutive_failures} consecutive failures.")
                         break
@@ -596,7 +614,16 @@ def main():
                 print(f"\n{Fore.RED}FAILURE: {key_metric}. No scores were generated.{Fore.RESET}\n")
             else:
                 key_metric = f"Scored {total_scored:,} of {total_subjects_in_source:,} subjects"
-                print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Eminence scoring completed successfully. ✨{Fore.RESET}\n")
+                # Check if we have missing subjects to determine if this was truly successful
+                missing_count = total_subjects_in_source - total_scored
+                if missing_count > 0:
+                    completion_rate = (total_scored / total_subjects_in_source) * 100
+                    if completion_rate < 95.0:
+                        print(f"\n{Fore.RED}PARTIAL: {key_metric}. Eminence scoring is incomplete ({completion_rate:.1f}% complete).{Fore.RESET}\n")
+                    else:
+                        print(f"\n{Fore.YELLOW}PARTIAL: {key_metric}. Eminence scoring is mostly complete ({completion_rate:.1f}% complete).{Fore.RESET}\n")
+                else:
+                    print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Eminence scoring completed successfully. ✨{Fore.RESET}\n")
 
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
@@ -622,28 +649,36 @@ def main():
             # Tiered approach based on completion rate
             if completion_rate < 95.0:
                 # Critical: Stop the pipeline
-                logging.error(f"CRITICAL: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
-                logging.error(f"See '{missing_report_path}' for details.")
-                logging.error("The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.")
+                tqdm.write(f"{Fore.RED}CRITICAL: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).{Fore.RESET}")
+                from config_loader import PROJECT_ROOT
+                display_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
+                tqdm.write(f"See '{display_path}' for details.")
+                tqdm.write(f"{Fore.RED}The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.{Fore.RESET}")
                 sys.exit(1)
             elif completion_rate < 99.0:
                 # Warning: Continue but with prominent warning
-                logging.warning(f"WARNING: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
-                logging.warning(f"See '{missing_report_path}' for details.")
-                logging.warning("The pipeline will continue, but consider re-running to retrieve missing subjects for better results.")
-                logging.warning("")
-                logging.warning(f"{Fore.YELLOW}{'='*60}")
-                logging.warning(f"{'ACTION RECOMMENDED':^60}")
-                logging.warning(f"{'='*60}")
-                logging.warning(f"To retrieve missing subjects, re-run this step:")
-                logging.warning(f"  .\\prepare_data.ps1 -StopAfterStep 5")
-                logging.warning(f"{'='*60}{Fore.RESET}")
+                tqdm.write(f"{Fore.YELLOW}WARNING: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).{Fore.RESET}")
+                from config_loader import PROJECT_ROOT
+                display_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
+                tqdm.write(f"See '{display_path}' for details.")
+                tqdm.write("The pipeline will continue, but consider re-running to retrieve missing subjects for better results.")
+                tqdm.write("")
+                tqdm.write(f"{Fore.YELLOW}{'='*60}")
+                tqdm.write(f"{'RECOMMENDED ACTION':^60}")
+                tqdm.write(f"{'='*60}")
+                tqdm.write(f"To retrieve missing subjects, re-run the pipeline starting with this step:")
+                tqdm.write(f"  pdm run prep-data -StartWithStep 5")
+                tqdm.write(f"{'='*60}{Fore.RESET}")
             else:
                 # Minor: Continue with simple notification
-                logging.info(f"NOTE: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
-                logging.info(f"See '{missing_report_path}' for details. This is within acceptable limits.")
+                tqdm.write(f"{Fore.CYAN}NOTE: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).{Fore.RESET}")
+                from config_loader import PROJECT_ROOT
+                display_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
+                tqdm.write(f"See '{display_path}' for details. This is within acceptable limits.")
 
             # Store completion info for final pipeline report
+            # The missing_ids variable already contains the correct count of missing subjects
+            # This ensures consistency with the report file
             completion_info = {
                 'step_name': 'Generate Eminence Scores',
                 'completion_rate': completion_rate,

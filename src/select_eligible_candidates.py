@@ -149,7 +149,7 @@ def main():
         validation_stale = os.path.exists(validation_path) and os.path.getmtime(validation_path) > output_mtime
         if input_stale or validation_stale:
             print(f"{Fore.YELLOW}\nInput file(s) are newer than the existing output. Stale data detected.")
-            print("Automatically re-running full selection process...{Fore.RESET}")
+            print("Automatically re-running full selection process..." + Fore.RESET)
             backup_and_remove(output_path)
             args.force = True
 
@@ -158,7 +158,9 @@ def main():
         # The validation report is now the source of truth for Entry_Type
         validation_df = pd.read_csv(validation_path, usecols=['idADB', 'Status', 'Entry_Type'], dtype={'idADB': str})
     except FileNotFoundError as e:
-        logging.error(f"{Fore.RED}FATAL: Input file not found: {e.filename}")
+        from config_loader import PROJECT_ROOT
+        relative_path = os.path.relpath(e.filename, PROJECT_ROOT)
+        logging.error(f"{Fore.RED}FATAL: Input file not found: {relative_path}")
         sys.exit(1)
 
     # --- Step 1: Find ALL theoretically eligible candidates from source ---

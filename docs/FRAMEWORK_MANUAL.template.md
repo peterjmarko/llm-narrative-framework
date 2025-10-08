@@ -69,6 +69,9 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 
 # Get a read-only status report of the pipeline's progress
 .\prepare_data.ps1 -ReportOnly
+
+# Resume from a specific step if a failure occurs
+.\prepare_data.ps1 -StartWithStep 6
 ```
 > **Warning on Using `-Force`**: The `-Force` flag triggers a full, destructive re-run of the entire pipeline. It backs up and deletes all existing data, re-downloads the full raw dataset, and re-runs all expensive LLM scoring steps. This process is very time-consuming and will incur API costs.
 > **Interactive Mode (`-Interactive`)**: This mode provides a step-by-step "guided tour" of the entire pipeline. Before execution begins, it displays the relevant DataGeneration parameters from `config.ini` and pauses for user confirmation. During execution, it pauses before each step to show detailed information about inputs, outputs, and script summaries, allowing users to understand exactly what the pipeline is doing. This mode is highly recommended for new users or when troubleshooting issues.
@@ -76,6 +79,44 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 > **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING_GUIDE.md)](../TESTING_GUIDE.md)** for details on running the Layer 3 Interactive Mode.
 
 The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.
+
+#### Resuming from Failed Steps
+
+When a step fails due to network issues, API errors, or other problems, the pipeline will halt with an error message. The error message will include explicit instructions on how to resume from the failed step:
+
+```
+TO RESUME FROM THIS STEP:
+Run the following command to restart from the failed step:
+  .\prepare_data.ps1 -StartWithStep 6
+
+Alternatively, you can run the pipeline using pdm:
+  pdm run prep-data -StartWithStep 6
+```
+
+**Step Numbers Reference:**
+- Step 1: Fetch Raw ADB Data
+- Step 2: Find Wikipedia Links
+- Step 3: Validate Wikipedia Pages
+- Step 4: Select Eligible Candidates
+- Step 5: Generate Eminence Scores
+- Step 6: Generate OCEAN Scores
+- Step 7: Select Final Candidates
+- Step 8: Prepare Solar Fire Import File
+- Step 9: Delineations Library Export (Manual)
+- Step 10: Astrology Data Export (Manual)
+- Step 11: Neutralize Delineations
+- Step 12: Create Subject Database
+- Step 13: Generate Personalities Database
+
+**Common Scenarios for Resuming:**
+- **Network/API Failures**: If LLM scoring steps (5 or 6) fail due to network issues, resume from the failed step to continue processing only the remaining batches.
+- **Manual Step Interruption**: If you need to pause during manual steps (9 or 10), the pipeline can be resumed from the next automated step.
+- **Partial Completion**: When a step completes partially but doesn't finish, resuming from that step will continue from where it left off.
+- **Re-running Scoring Steps**: When you re-run eminence or OCEAN scoring steps (5 or 6) with different parameters or models, the pipeline will automatically force re-execution of all downstream steps (7 and 8) to ensure data consistency, even if their output files already exist.
+
+**Important Note on Data Dependencies**: When resuming from a scoring step (5 or 6), the pipeline automatically forces re-execution of all downstream steps to maintain data integrity. This is because downstream outputs depend on the scoring data and would be inconsistent with the new scoring results.
+
+The resume functionality is designed to be efficient and cost-effective, as it only processes the remaining work rather than re-running the entire pipeline.
 
 #### Individual Script Details
 
@@ -172,7 +213,7 @@ This stage is a second, optional filtering pass that uses LLMs to score the "eli
     - **95-98% completion**: The pipeline continues with a prominent warning
     - **<95% completion**: The pipeline stops with an error
     
-    Both scripts write completion information to a shared JSON file that is used by the final pipeline report to provide a comprehensive data completeness overview.
+    Both scripts write completion information to a shared JSON file (`data/reports/pipeline_completion_info.json`) that is used by the final pipeline report to provide a comprehensive data completeness overview. This file tracks completion status and metrics for critical pipeline steps, containing completion rates, missing subject counts, and paths to detailed missing subject reports. The pipeline orchestrator uses this file to determine if steps completed successfully or require intervention.
     
     ```bash
     # Generate OCEAN scores to determine the final cutoff
@@ -232,6 +273,180 @@ This is the final stage, which assembles the personality profiles for the select
     pdm run neutralize
     ```
 
+#### Advanced State Machine for Step 11: Neutralize Delineations
+
+Step 11 implements a sophisticated state machine that intelligently determines when re-processing is needed based on file timestamps, LLM model changes, and completion status. This ensures optimal efficiency while maintaining data integrity.
+
+**State Machine Rules:**
+
+1. **Preserve last-run information** in `data\reports\pipeline_completion_info.json`
+
+2. **Check conditions in the order that follows**
+
+3. **Complete Re-processing Required** - The step will back up and remove all files, then process the step fully if:
+   * The last modified timestamp (LMTS) of `sf_delineations_library.txt` is newer than the earliest LMTS of the files in the `data\foundational_assets\neutralized_delineations` folder
+   * The LLM is different from the LLM used the last time this step was executed
+
+4. **Partial Processing Allowed** - If `sf_delineations_library.txt` LMTS < MIN(LTSM of files in folder) AND last_LLM = current_LLM:
+   * If not all 6 files are complete in the directory, process only the missing/incomplete file(s)
+   * If all 6 files are complete in the folder, skip the step entirely
+
+**Status Types:**
+- **COMPLETE**: All 6 expected files are present with correct line counts
+- **PARTIAL**: Some files are present but others are missing or incomplete
+- **MISSING**: No files exist in the output directory
+- **STALE**: Files exist but need re-processing due to newer source or different LLM
+
+**Completeness Validation:**
+For each expected file, the system validates both existence and content completeness:
+
+| File | Required Lines | Description |
+|------|----------------|-------------|
+| `balances_elements.csv` | 8 lines | Element balance calculations |
+| `balances_hemispheres.csv` | 4 lines | Hemisphere balance calculations |
+| `balances_modes.csv` | 6 lines | Mode balance calculations |
+| `balances_quadrants.csv` | 4 lines | Quadrant balance calculations |
+| `balances_signs.csv` | 12 lines | Sign balance calculations |
+| `points_in_signs.csv` | 144 lines | Point-in-sign delineations |
+
+**Line Count Validation:**
+Completeness checks include validation of non-blank lines to ensure files contain the expected amount of processed content, not just empty or truncated files.
+
+**Dependency Chain:**
+When Step 11 is not COMPLETE, steps 12 (Create Subject Database) and 13 (Generate Personalities Database) will be automatically reprocessed to ensure data consistency throughout the pipeline.
+
+#### State Machines for Steps 5 (Generate Eminence Scores) and 6 (Generate OCEAN Scores)
+
+Steps 5 and 6 implement sophisticated state machines that track both the primary output files and summary files to determine completion status. These state machines ensure accurate detection of partial completion and provide detailed reporting for the Data Completeness Report.
+
+**State Machine Rules:**
+
+1. **Dual-File Validation** - Each step validates both:
+   - The primary output CSV file (`eminence_scores.csv` or `ocean_scores.csv`)
+   - The corresponding summary report file (`eminence_scores_summary.txt` or `ocean_scores_summary.txt`)
+
+2. **Completion Verification** - A step is considered COMPLETE only when:
+   - The summary file exists and is parseable
+   - The number of scored subjects equals the total number of subjects in the source
+   - The primary output file exists
+
+3. **Status Determination Logic:**
+   - **MISSING**: Neither summary file nor output file exists
+   - **INCOMPLETE**: Either the summary file doesn't exist, the scored count doesn't match the total, or the output file doesn't exist
+   - **COMPLETE**: All validation checks pass
+
+**Summary File Parsing:**
+The state machine parses the summary files to extract key metrics:
+- `Total Scored`: Number of subjects successfully processed
+- `Total in Source`: Total number of subjects in the input source
+
+**Example Summary File Format:**
+```
+Eminence Scoring Summary
+========================
+Total in Source: 7,234
+Total Scored: 7,229
+Success Rate: 99.9%
+Missing Subjects: 5
+...
+```
+
+**Tiered Response to Missing Subjects:**
+The state machine supports a tiered approach to handling incomplete scoring:
+
+| Completion Rate | Pipeline Response | Color Coding |
+|-----------------|------------------|--------------|
+| ≥99% | Continue with notification | Green |
+| 95-98% | Continue with prominent warning | Yellow |
+| <95% | Halt with error | Red |
+
+**Data Completeness Integration:**
+Both steps write completion information to the shared JSON file (`data/reports/pipeline_completion_info.json`) which includes:
+- Completion rate percentage
+- Count of missing subjects
+- Path to detailed missing subject report
+- LLM model used for scoring
+
+This information is used by the final Data Completeness Report to provide users with actionable guidance on how to address data quality issues.
+
+**Resumption Logic:**
+When a step is resumed:
+- The state machine first checks the summary file to determine completion status
+- If incomplete, the scoring scripts will automatically process only the missing subjects
+- This enables efficient resumption without re-scoring already processed subjects
+
+**Error Handling:**
+If the summary file is corrupted or unparseable, the state machine falls back to a conservative INCOMPLETE status, ensuring data integrity is maintained.
+
+#### Force Mode File Management
+
+When using the `-Force` flag with `prepare_data.ps1`, the pipeline performs a comprehensive backup and removal of existing data artifacts before re-running the entire pipeline from scratch. This section documents exactly which files are affected and which are preserved.
+
+**Files Backed Up and Removed:**
+
+The following files and directories are backed up to `data/backup/` with timestamps and then removed:
+
+**Primary Pipeline Outputs:**
+- `data/sources/adb_raw_export.txt` - Raw data from Astro-Databank
+- `data/processed/adb_wiki_links.csv` - Wikipedia links for candidates
+- `data/reports/adb_validation_report.csv` - Wikipedia validation results
+- `data/intermediate/adb_eligible_candidates.txt` - Filtered candidate list
+- `data/foundational_assets/eminence_scores.csv` - LLM-generated eminence scores
+- `data/foundational_assets/ocean_scores.csv` - LLM-generated OCEAN scores
+- `data/intermediate/adb_final_candidates.txt` - Final selected candidates
+- `data/intermediate/sf_data_import.txt` - Formatted data for Solar Fire
+- `data/foundational_assets/sf_chart_export.csv` - Export from Solar Fire
+- `data/foundational_assets/sf_delineations_library.txt` - Delineations library
+- `data/processed/subject_db.csv` - Integrated subject database
+- `data/personalities_db.txt` - Final personalities database
+
+**Special Handling:**
+- `data/foundational_assets/neutralized_delineations/` - Entire directory (backed up as ZIP)
+- `data/foundational_assets/sf_chart_export.*` - All file extensions (wildcard handling)
+
+**Summary and Report Files:**
+- `data/reports/adb_validation_summary.txt` - Validation summary
+- `data/reports/delineation_coverage_map.csv` - Coverage analysis
+- `data/reports/missing_eminence_scores.txt` - Missing eminence scores report
+- `data/reports/missing_ocean_scores.txt` - Missing OCEAN scores report
+- `data/reports/missing_sf_subjects.csv` - Missing Solar Fire subjects report
+- `data/reports/eminence_scores_summary.txt` - Eminence scoring summary
+- `data/reports/ocean_scores_summary.txt` - OCEAN scoring summary
+
+**Files Preserved (Not Removed):**
+
+The following essential configuration and analysis files are preserved during a force re-run:
+
+**Configuration Data:**
+- `data/config/adb_research_categories.json` - Research categories configuration
+- `data/foundational_assets/adb_category_map.csv` - Category mapping
+- `data/foundational_assets/balance_thresholds.csv` - Balance calculation thresholds
+- `data/foundational_assets/country_codes.csv` - Country code mappings
+- `data/foundational_assets/point_weights.csv` - Astrological point weights
+
+**Core Reference Files:**
+- `data/base_query.txt` - Base LLM query template
+
+**Assembly Logic Validation:**
+- `data/foundational_assets/assembly_logic/personalities_db.assembly_logic.txt`
+- `data/foundational_assets/assembly_logic/subject_db.assembly_logic.csv`
+
+**Analysis Results:**
+- `data/reports/cutoff_parameter_analysis_results.csv` - Cutoff analysis results
+- `data/reports/variance_curve_analysis.png` - Variance curve plot
+
+**Backup Process:**
+- All removed files are backed up to `data/backup/` with timestamps
+- Files are backed up individually with format: `filename.YYYYMMDD_HHMMSS.bak`
+- Directories are compressed to ZIP format: `directoryname.YYYYMMDD_HHMMSS.zip`
+- The backup process is atomic - if any backup fails, the entire force operation is halted
+
+**Rationale for File Selection:**
+- **Removed files** are all generated data artifacts that will be recreated by the pipeline
+- **Preserved files** are either external reference data, user configurations, or expensive analysis results that don't change during pipeline re-runs
+
+This selective approach ensures that expensive-to-generate analysis results and user configurations are preserved while still enabling a complete fresh run of the data generation pipeline.
+
 4.  **Integration (`create_subject_db.py`):** Bridges the manual step by reading the Solar Fire chart export, decoding the unique `idADB` from the `ZoneAbbr` field, and merging the chart data with the final subject list to produce a clean master database.
     
     ```bash
@@ -284,7 +499,7 @@ You must define which astrological points are included in the calculations.
     2.  Edit this file to include exactly these 12 points: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Ascendant, and Midheaven.
     3.  Save the file and ensure it is selected as the active set.
 
-{{grouped_figure:docs/images/replication_guide/sf_setup_1_displayed_points.png | width=60% | caption=Solar Fire "Displayed Points" dialog configured with the 12 required chart points.}}
+{{grouped_figure:docs/images/sf_images/sf_setup_1_displayed_points.png | width=60% | caption=Solar Fire "Displayed Points" dialog configured with the 12 required chart points.}}
 
 #### 2. Configure Preferences
 
@@ -311,7 +526,7 @@ You must define the data structure for both importing and exporting. Solar Fire 
     4.  Configure **'Fields in each record'** to contain exactly these 9 fields in this specific order: Name/Description, Date (String), Time (String), Zone Abbreviation, Zone Time (String), Place Name, Country/State Name, Latitude (String), Longitude (String).
     5.  Save the format as `CQD Import`.
 
-{{grouped_figure:docs/images/replication_guide/sf_setup_2_import_format.png | width=80% | caption=Solar Fire "Edit ASCII Formats" dialog configured for the CQD Import format.}}
+{{grouped_figure:docs/images/sf_images/sf_setup_2_import_format.png | width=80% | caption=Solar Fire "Edit ASCII Formats" dialog configured for the CQD Import format.}}
 
 **b. Define Export Format**
 
@@ -322,7 +537,7 @@ You must define the data structure for both importing and exporting. Solar Fire 
     3.  Repeat the exact same configuration as the import format, set it to `Comma Quote Delimited`, and add the same 9 fields in the same order.
     4.  Save the format as `CQD Export`. This ensures both workflows use an identical data structure.
 
-{{grouped_figure:docs/images/replication_guide/sf_setup_3_export_format.png | width=80% | caption=Solar Fire "Export Chart Data" format dialog configured for the CQD Export format.}}
+{{grouped_figure:docs/images/sf_images/sf_setup_3_export_format.png | width=80% | caption=Solar Fire "Export Chart Data" format dialog configured for the CQD Export format.}}
 
 ### Import/Export Workflow
 
@@ -339,7 +554,7 @@ If you are re-running the import process, you must first clear the existing char
     4.  A dialog will ask: "Do you wish to confirm the deletion of each chart individually?". Click **'No'** to delete all charts at once.
     5.  Click **'Cancel'** to close the 'Chart Database' dialog. The file is now empty and ready for a fresh import.
 
-{{grouped_figure:docs/images/replication_guide/sf_workflow_1_clear_charts.png | width=95% | caption=Solar Fire "Chart Database" dialog with all charts selected for deletion.}}
+{{grouped_figure:docs/images/sf_images/sf_workflow_1_clear_charts.png | width=95% | caption=Solar Fire "Chart Database" dialog with all charts selected for deletion.}}
 
 #### Step 1: Import Birth Data
 The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, choose `sf_data_import.assembly_logic.txt` in the Solar Fire import folder for #2 and save to `adb_candidates.assembly_logic` for #3.
@@ -353,7 +568,7 @@ The procedure below is for the production workflow. When validating the Personal
     5.  Click the **'Convert'** button.
     6.  Once the import completes, click the **'Quit'** button to close the dialog.
 
-{{grouped_figure:docs/images/replication_guide/sf_workflow_2_import_dialog.png | width=95% | caption=Solar Fire "Chart Import/Export" dialog configured to import the prepared data.}}
+{{grouped_figure:docs/images/sf_images/sf_workflow_2_import_dialog.png | width=95% | caption=Solar Fire "Chart Import/Export" dialog configured to import the prepared data.}}
 
 #### Step 2: Calculate All Charts
 The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, select `adb_candidates.assembly_logic` for #1.
@@ -380,7 +595,21 @@ The procedure below is for the production workflow. When validating the Personal
     7.  **Warning:** Solar Fire will overwrite this file without confirmation. Click **'Export'**.
     8.  Once the export completes successfully, click the **'Quit'** button to close the dialog.
 
-{{grouped_figure:docs/images/replication_guide/sf_workflow_3_export_dialog.png | width=75% | caption=Solar Fire "Export Chart Data" dialog configured for the final chart data export.}}
+**Important Note**: The pipeline will automatically detect and copy the `sf_chart_export.csv` file from your Solar Fire Export directory (typically `Documents\Solar Fire User Files\Export\`) to the project's data directory. You do not need to manually copy this file.
+
+The pipeline will also check for the existence of the Solar Fire export file in your Documents folder during the "Astrology Data Export (Manual)" step. The status of this step will be:
+
+- **[MISSING]**: If the file is not found in the Solar Fire Export directory. The pipeline will halt with instructions to complete the manual export.
+- **[PENDING]**: If the file is found in the Solar Fire Export directory but hasn't been processed yet. The step will be automatically skipped, with the file being fetched by the next step.
+- **[COMPLETE]**: If the file has already been processed and copied to the project's data directory. The step will be skipped.
+
+Similarly, for the "Delineations Library Export (Manual)" step:
+
+- **[MISSING]**: If the `Standard.def` file is not found in the Solar Fire Interpretations directory. The pipeline will halt with instructions to complete the manual export.
+- **[PENDING]**: If the file is found in the Solar Fire Interpretations directory but hasn't been processed yet. The step will be automatically skipped, with the file being fetched by the next step.
+- **[COMPLETE]**: If the file has already been processed and copied to the project's data directory. The step will be skipped.
+
+{{grouped_figure:docs/images/sf_images/sf_workflow_3_export_dialog.png | width=75% | caption=Solar Fire "Export Chart Data" dialog configured for the final chart data export.}}
 
 The exported file consists of a repeating 14-line block for each subject. The structure of this block is detailed below:
 

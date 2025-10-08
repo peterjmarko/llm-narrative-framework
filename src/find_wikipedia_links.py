@@ -599,7 +599,7 @@ def main():
     elif not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}Input file '{input_path.name}' is newer than the existing links file.")
-            print("Stale data detected. Automatically re-running link finding...{Fore.RESET}")
+            print("Stale data detected. Automatically re-running link finding..." + Fore.RESET)
             backup_and_remove(output_path)
             # Set force=True for the loader to ensure a full re-run
             args.force = True

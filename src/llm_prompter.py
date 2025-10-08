@@ -473,6 +473,20 @@ def main():
         with open(output_error_file_abs, 'w', encoding='utf-8') as f_err:
             f_err.write(err_message)
         sys.exit(1)
+    except requests.exceptions.ChunkedEncodingError as e_chunk:
+        # THIS BLOCK WILL CATCH CHUNK ENCODING ERRORS
+        logging.error(f"  LLM Prompter: Chunked Encoding Error: {e_chunk}")
+        err_message = f"API call failed due to connection issues for query {args.query_identifier}. The response was incomplete."
+        with open(output_error_file_abs, 'w', encoding='utf-8') as f_err:
+            f_err.write(err_message)
+        sys.exit(1)
+    except requests.exceptions.ConnectionError as e_conn:
+        # THIS BLOCK WILL CATCH CONNECTION ERRORS
+        logging.error(f"  LLM Prompter: Connection Error: {e_conn}")
+        err_message = f"API call failed due to connection problems for query {args.query_identifier}."
+        with open(output_error_file_abs, 'w', encoding='utf-8') as f_err:
+            f_err.write(err_message)
+        sys.exit(1)
     except FileNotFoundError as e_fnf:
         logging.error(f"  LLM Prompter: File error: {e_fnf}")
         with open(output_error_file_abs, 'w', encoding='utf-8') as f_err: f_err.write(str(e_fnf))

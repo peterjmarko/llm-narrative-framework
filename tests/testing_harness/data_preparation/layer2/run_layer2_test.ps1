@@ -157,7 +157,7 @@ sys.exit(0)
     New-Item -Path "data/foundational_assets/sf_chart_export.csv" -ItemType File | Out-Null
     $output = & .\prepare_data.ps1 -Force -TestMode -Resumed -SuppressConfigDisplay 2>&1
     if ($LASTEXITCODE -ne 1) { throw "Expected pipeline to halt with exit code 1, but got $($LASTEXITCODE)." }
-    # Verify that the pipeline has halted at the 'Delineation Library Export (Manual)' step, BEFORE running 'Neutralize Delineations'.
+    # Verify that the pipeline has halted at the 'Delineations Library Export (Manual)' step, BEFORE running 'Neutralize Delineations'.
     Test-OrchestratorState "Halt 2" -ShouldExist -Files "data/foundational_assets/sf_chart_export.csv"
     Test-OrchestratorState "Halt 2" -Files "data/foundational_assets/neutralized_delineations/balances_quadrants.csv" # Should NOT exist
 

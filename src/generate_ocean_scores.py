@@ -446,7 +446,7 @@ def main():
     if not args.force and output_path.exists() and input_path.exists():
         if os.path.getmtime(input_path) > os.path.getmtime(output_path):
             print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
-            print("Automatically re-running full scoring process...{Fore.RESET}")
+            print("Automatically re-running full scoring process..." + Fore.RESET)
             backup_and_overwrite_related_files(output_path)
             args.force = True
 
@@ -499,7 +499,7 @@ def main():
 
     # Display a non-interactive warning if the script is proceeding automatically
     if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
-        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls that will take some time and incur API transaction costs.{Fore.RESET}")
+        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (1 hour 45 minutes or more for a set of 7,000 records).{Fore.RESET}")
         
         if bypass_candidate_selection:
             print(f"{Fore.RED}BYPASS ACTIVE: The 'bypass_candidate_selection' flag is set to true in config.ini.{Fore.RESET}")
@@ -512,7 +512,8 @@ def main():
 
     print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
     print(f"Found {len(processed_ids):,} existing scores.")
-    print(f"Processing {total_to_process:,} new subjects (out of {total_possible_subjects:,} total).")
+    total_batches = (total_to_process + args.batch_size - 1) // args.batch_size
+    print(f"Processing {total_to_process:,} new subjects (out of {total_possible_subjects:,} total) in {total_batches} batches of {args.batch_size} subjects each.")
 
     llm_missed_subjects = []
     consecutive_failures = 0
@@ -546,7 +547,18 @@ def main():
                 # 3. Process response
                 if temp_error_file.exists() and temp_error_file.stat().st_size > 0:
                     error_msg = temp_error_file.read_text().strip()
-                    tqdm.write(f"{Fore.RED}Worker failed for batch {batch_num}. Error: {error_msg}")
+                    
+                    # Check if this is a network-related error that can be retried
+                    is_network_error = any(keyword in error_msg.lower() for keyword in [
+                        "connection", "timeout", "chunked encoding", "incomplete", "network", "dns", "ssl"
+                    ])
+                    
+                    if is_network_error:
+                        tqdm.write(f"{Fore.YELLOW}Network error for batch {batch_num}. Error: {error_msg}")
+                        tqdm.write(f"{Fore.YELLOW}This is a temporary issue and can be retried.{Fore.RESET}")
+                    else:
+                        tqdm.write(f"{Fore.RED}Worker failed for batch {batch_num}. Error: {error_msg}")
+                    
                     consecutive_failures += 1
                     if consecutive_failures >= max_consecutive_failures:
                         tqdm.write(f"{Fore.RED}Halting after {max_consecutive_failures} consecutive batch failures.")
@@ -645,33 +657,42 @@ def main():
             # Tiered approach based on completion rate
             if completion_rate < 95.0:
                 # Critical: Stop the pipeline
-                logging.error(f"CRITICAL: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
-                logging.error(f"See '{missing_report_path}' for details.")
-                logging.error("The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.")
+                tqdm.write(f"{Fore.RED}CRITICAL: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).{Fore.RESET}")
+                from config_loader import PROJECT_ROOT
+                display_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
+                tqdm.write(f"See '{display_path}' for details.")
+                tqdm.write(f"{Fore.RED}The pipeline will be halted. Please re-run the script to automatically retry the missing subjects.{Fore.RESET}")
                 sys.exit(1)
             elif completion_rate < 99.0:
                 # Warning: Continue but with prominent warning
-                logging.warning(f"WARNING: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
-                logging.warning(f"See '{missing_report_path}' for details.")
-                logging.warning("The pipeline will continue, but consider re-running to retrieve missing subjects for better results.")
-                logging.warning("")
-                logging.warning(f"{Fore.YELLOW}{'='*60}")
-                logging.warning(f"{'ACTION RECOMMENDED':^60}")
-                logging.warning(f"{'='*60}")
-                logging.warning(f"To retrieve missing subjects, re-run this step:")
-                logging.warning(f"  .\\prepare_data.ps1 -StopAfterStep 6")
-                logging.warning(f"{'='*60}{Fore.RESET}")
+                tqdm.write(f"{Fore.YELLOW}WARNING: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).{Fore.RESET}")
+                from config_loader import PROJECT_ROOT
+                display_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
+                tqdm.write(f"See '{display_path}' for details.")
+                tqdm.write("The pipeline will continue, but consider re-running to retrieve missing subjects for better results.")
+                tqdm.write("")
+                tqdm.write(f"{Fore.YELLOW}{'='*60}")
+                tqdm.write(f"{'RECOMMENDED ACTION':^60}")
+                tqdm.write(f"{'='*60}")
+                tqdm.write(f"To retrieve missing subjects, re-run the pipeline starting with this step:")
+                tqdm.write(f"  pdm run prep-data -StartWithStep 6")
+                tqdm.write(f"{'='*60}{Fore.RESET}")
             else:
                 # Minor: Continue with simple notification
-                logging.info(f"NOTE: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).")
-                logging.info(f"See '{missing_report_path}' for details. This is within acceptable limits.")
+                tqdm.write(f"{Fore.CYAN}NOTE: Failed to retrieve scores for {len(missing_ids)} subject(s) ({completion_rate:.1f}% completion).{Fore.RESET}")
+                from config_loader import PROJECT_ROOT
+                display_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
+                tqdm.write(f"See '{display_path}' for details. This is within acceptable limits.")
 
             # Store completion info for final pipeline report
+            # Calculate missing_count as the sum of llm_missed_subjects and unattempted_subjects
+            # This ensures consistency with the report file
+            missing_count = len(llm_missed_subjects) + len(unattempted_subjects)
             completion_info = {
                 'step_name': 'Generate OCEAN Scores',
                 'completion_rate': completion_rate,
-                'missing_count': len(missing_ids),
-                'missing_report_path': str(missing_report_path) if missing_ids else None
+                'missing_count': missing_count,
+                'missing_report_path': str(missing_report_path) if missing_count > 0 else None
             }
 
             # Write completion info to a shared file for final pipeline report
@@ -692,9 +713,9 @@ def main():
 
         # Print final status message based on the exit condition
         if was_interrupted:
-            logging.warning("OCEAN score generation terminated by user. ✨\n")
+            tqdm.write(f"{Fore.YELLOW}OCEAN score generation terminated by user. ✨\n{Fore.RESET}")
         elif stop_reason.startswith("Halted"):
-            logging.critical("OCEAN score generation halted due to critical errors. ✨\n")
+            tqdm.write(f"{Fore.RED}OCEAN score generation halted due to critical errors. ✨\n{Fore.RESET}")
         else:
             final_df = pd.read_csv(output_path) if output_path.exists() and output_path.stat().st_size > 0 else pd.DataFrame()
             
@@ -714,7 +735,16 @@ def main():
             if final_count == 0:
                 print(f"\n{Fore.RED}FAILURE: {key_metric}. No OCEAN scores were generated.{Fore.RESET}\n")
             else:
-                print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. OCEAN score generation completed as designed. ✨{Fore.RESET}\n")
+                # Check if we have missing subjects to determine if this was truly successful
+                missing_count = total_possible_subjects - final_count
+                if missing_count > 0:
+                    completion_rate = (final_count / total_possible_subjects) * 100
+                    if completion_rate < 95.0:
+                        print(f"\n{Fore.RED}PARTIAL: {key_metric}. OCEAN scoring is incomplete ({completion_rate:.1f}% complete).{Fore.RESET}\n")
+                    else:
+                        print(f"\n{Fore.YELLOW}PARTIAL: {key_metric}. OCEAN scoring is mostly complete ({completion_rate:.1f}% complete).{Fore.RESET}\n")
+                else:
+                    print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. OCEAN score generation completed as designed. ✨{Fore.RESET}\n")
 
 def generate_missing_scores_report(
     filepath: Path,

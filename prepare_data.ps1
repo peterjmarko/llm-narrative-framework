@@ -55,6 +55,12 @@
     If specified, the script will pause for confirmation before each step,
     allowing the user to inspect the state of the pipeline.
 
+.PARAMETER StopAfterStep
+    If specified, the script will stop after completing the specified step number.
+
+.PARAMETER StartWithStep
+    If specified, the script will start execution from the specified step number.
+
 .EXAMPLE
     # Run the full pipeline, resuming from the first incomplete step.
     .\prepare_data.ps1
@@ -66,6 +72,14 @@
 .EXAMPLE
     # Get a read-only status report of the data pipeline.
     .\prepare_data.ps1 -ReportOnly
+
+.EXAMPLE
+    # Start the pipeline from a specific step.
+    .\prepare_data.ps1 -StartWithStep 5
+
+.EXAMPLE
+    # Run only a specific step and then stop.
+    .\prepare_data.ps1 -StartWithStep 5 -StopAfterStep 5
 #>
 [CmdletBinding()]
 param(
@@ -98,7 +112,10 @@ param(
     [switch]$Plot,
 
     [Parameter(Mandatory=$false)]
-    [int]$StopAfterStep = 0
+    [int]$StopAfterStep = 0,
+
+    [Parameter(Mandatory=$false)]
+    [int]$StartWithStep = 0
 )
 
 # --- Pre-flight Cleanup ---
@@ -130,12 +147,12 @@ $PipelineSteps = @(
     @{ Stage="3. Candidate Selection";   Name="Generate Eminence Scores";   Script="src/generate_eminence_scores.py";   Inputs=@("data/intermediate/adb_eligible_candidates.txt"); Output="data/foundational_assets/eminence_scores.csv";   Type="Automated"; Description="Generates a calibrated eminence score for each eligible candidate using an LLM." },
     @{ Stage="3. Candidate Selection";   Name="Generate OCEAN Scores";      Script="src/generate_ocean_scores.py";      Inputs=@("data/foundational_assets/eminence_scores.csv"); Output="data/foundational_assets/ocean_scores.csv";        Type="Automated"; Description="Generates OCEAN personality scores for each eligible candidate using an LLM." },
     @{ Stage="3. Candidate Selection";   Name="Select Final Candidates";    Script="src/select_final_candidates.py";    Inputs=@("data/intermediate/adb_eligible_candidates.txt", "data/foundational_assets/eminence_scores.csv", "data/foundational_assets/ocean_scores.csv"); Output="data/intermediate/adb_final_candidates.txt";        Type="Automated"; Description="Determines the final subject set based on the LLM scoring." },
-    @{ Stage="4. Profile Generation";    Name="Prepare SF Import File";     Script="src/prepare_sf_import.py";          Inputs=@("data/intermediate/adb_final_candidates.txt"); Output="data/intermediate/sf_data_import.txt";            Type="Automated"; Description="Formats the final subject list for import into the Solar Fire software." },
+    @{ Stage="4. Profile Generation";    Name="Prepare Solar Fire Import File";     Script="src/prepare_sf_import.py";          Inputs=@("data/intermediate/adb_final_candidates.txt"); Output="data/intermediate/sf_data_import.txt";            Type="Automated"; Description="Formats the final subject list for import into the Solar Fire software." },
+    @{ Stage="4. Profile Generation";    Name="Delineations Library Export (Manual)";    Inputs=@("Solar Fire Software"); Output="data/foundational_assets/sf_delineations_library.txt"; Type="Manual"; Description="The pipeline is paused. Please perform the one-time Solar Fire delineation library export." },
     @{ Stage="4. Profile Generation";    Name="Astrology Data Export (Manual)"; Inputs=@("data/intermediate/sf_data_import.txt"); Output="data/foundational_assets/sf_chart_export.csv"; Type="Manual"; Description="The pipeline is paused. Please perform the manual Solar Fire import, calculation, and chart export process." },
-    @{ Stage="4. Profile Generation";    Name="Delineation Library Export (Manual)";    Inputs=@("Solar Fire Software"); Output="data/foundational_assets/sf_delineations_library.txt"; Type="Manual"; Description="The pipeline is paused. Please perform the one-time Solar Fire delineation library export." },
     @{ Stage="4. Profile Generation";    Name="Neutralize Delineations";    Script="src/neutralize_delineations.py";    Inputs=@("data/foundational_assets/sf_delineations_library.txt"); Output="data/foundational_assets/neutralized_delineations/balances_quadrants.csv"; Type="Automated"; Description="Rewrites esoteric texts into neutral psychological descriptions using an LLM." },
     @{ Stage="4. Profile Generation";    Name="Create Subject Database";    Script="src/create_subject_db.py";          Inputs=@("data/foundational_assets/sf_chart_export.csv", "data/intermediate/adb_final_candidates.txt"); Output="data/processed/subject_db.csv";                  Type="Automated"; Description="Integrates chart data with the final subject list to create a master database." },
-    @{ Stage="4. Profile Generation";    Name="Generate Personalities DB";  Script="src/generate_personalities_db.py";  Inputs=@("data/processed/subject_db.csv", "data/foundational_assets/neutralized_delineations/"); Output="data/personalities_db.txt";            Type="Automated"; Description="Assembles the final personalities database from subject data and the neutralized text library." }
+    @{ Stage="4. Profile Generation";    Name="Generate Personalities Database";  Script="src/generate_personalities_db.py";  Inputs=@("data/processed/subject_db.csv", "data/foundational_assets/neutralized_delineations/"); Output="data/personalities_db.txt";            Type="Automated"; Description="Assembles the final personalities database from subject data and the neutralized text library." }
 )
 
 # --- Helper Functions ---
@@ -189,7 +206,7 @@ function Get-ScriptDocstringSummary {
 }
 
 function Get-StepStatus {
-    param([hashtable]$Step, [string]$BaseDirectory)
+    param([hashtable]$Step, [string]$BaseDirectory, [string]$ConfigFilePath)
     $outputFile = Join-Path $BaseDirectory $Step.Output
     
     switch ($Step.Name) {
@@ -223,18 +240,168 @@ function Get-StepStatus {
             }
             return "Incomplete"
         }
+        "Astrology Data Export (Manual)" {
+            # Special case: Check for the file in the Solar Fire export directory using config parameters
+            # This is a manual step, but the create_subject_db.py script will fetch the file
+            $documentsFolder = [System.Environment]::GetFolderPath('Personal')
+            $userFilesBase = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "user_files_base" -DefaultValue "Solar Fire User Files"
+            $chartExportSubdir = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "chart_export_subdir" -DefaultValue "Export"
+            $chartExportFilename = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "chart_export_filename" -DefaultValue "sf_chart_export.csv"
+            
+            # Check if userFilesBase already includes the Documents folder
+            if ($userFilesBase.StartsWith("Documents\", [StringComparison]::OrdinalIgnoreCase)) {
+                # Remove "Documents\" prefix since we're already joining with the Documents folder
+                $userFilesBase = $userFilesBase.Substring(9)
+            }
+            
+            $sfExportPath = Join-Path $documentsFolder (Join-Path $userFilesBase (Join-Path $chartExportSubdir $chartExportFilename))
+            $projectFile = Join-Path $BaseDirectory $Step.Output
+            
+            if (Test-Path $sfExportPath) {
+                # File exists in Solar Fire directory, copy it to project directory if not already there
+                if (-not (Test-Path $projectFile)) {
+                    # Ensure the target directory exists
+                    $targetDir = Split-Path $projectFile -Parent
+                    if (-not (Test-Path $targetDir)) {
+                        New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+                    }
+                    Copy-Item -Path $sfExportPath -Destination $projectFile -Force
+                }
+                return "Complete"
+            } else {
+                # File doesn't exist anywhere
+                return "Pending"
+            }
+        }
+        "Delineations Library Export (Manual)" {
+            # Special case: Check for the file in the Solar Fire Interpretations directory using config parameters
+            $documentsFolder = [System.Environment]::GetFolderPath('Personal')
+            $userFilesBase = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "user_files_base" -DefaultValue "Solar Fire User Files"
+            $delinLibSubdir = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "delin_lib_subdir" -DefaultValue "Interpretations"
+            $delinLibFilename = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "delin_lib_filename" -DefaultValue "Standard.def"
+            
+            # Check if userFilesBase already includes the Documents folder
+            if ($userFilesBase.StartsWith("Documents\", [StringComparison]::OrdinalIgnoreCase)) {
+                # Remove "Documents\" prefix since we're already joining with the Documents folder
+                $userFilesBase = $userFilesBase.Substring(9)
+            }
+            
+            $sfDefPath = Join-Path $documentsFolder (Join-Path $userFilesBase (Join-Path $delinLibSubdir $delinLibFilename))
+            $projectFile = Join-Path $BaseDirectory $Step.Output
+            
+            if ((Test-Path $sfDefPath)) {
+                # File exists in Solar Fire directory, copy it to project directory if not already there
+                if (-not (Test-Path $projectFile)) {
+                    # Ensure the target directory exists
+                    $targetDir = Split-Path $projectFile -Parent
+                    if (-not (Test-Path $targetDir)) {
+                        New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+                    }
+                    Copy-Item -Path $sfDefPath -Destination $projectFile -Force
+                }
+                return "Complete"
+            } else {
+                # File doesn't exist anywhere
+                return "Pending"
+            }
+        }
         "Neutralize Delineations" {
             # This step's "Output" is one of its files, but it represents the whole directory.
             $delineationDir = Split-Path (Join-Path $BaseDirectory $Step.Output) -Parent
-            if (-not (Test-Path $delineationDir)) { return "Missing" }
-            $expectedFiles = @(
-                "balances_elements.csv", "balances_modes.csv", "balances_hemispheres.csv",
-                "balances_quadrants.csv", "balances_signs.csv", "points_in_signs.csv"
-            )
-            foreach ($file in $expectedFiles) {
-                if (-not (Test-Path (Join-Path $delineationDir $file))) { return "Incomplete" }
+            $sourceFile = Join-Path $BaseDirectory "data/foundational_assets/sf_delineations_library.txt"
+            
+            # Get current LLM from config
+            $currentLLM = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "neutralization_model" -DefaultValue ""
+            
+            # Define expected files and their line count requirements
+            $expectedFiles = @{
+                "balances_elements.csv" = 8
+                "balances_hemispheres.csv" = 4
+                "balances_modes.csv" = 6
+                "balances_quadrants.csv" = 4
+                "balances_signs.csv" = 12
+                "points_in_signs.csv" = 144
             }
-            return "Complete"
+            
+            # Check if source file exists
+            if (-not (Test-Path $sourceFile)) {
+                return "Missing"
+            }
+            
+            # Check if output directory exists
+            if (-not (Test-Path $delineationDir)) {
+                return "Missing"
+            }
+            
+            # Get last modified timestamps
+            $sourceLMTS = (Get-Item $sourceFile).LastWriteTime
+            
+            # Check if any output files exist
+            $outputFilesExist = $false
+            $earliestOutputLMTS = $null
+            foreach ($file in $expectedFiles.Keys) {
+                $filePath = Join-Path $delineationDir $file
+                if (Test-Path $filePath) {
+                    $outputFilesExist = $true
+                    $fileLMTS = (Get-Item $filePath).LastWriteTime
+                    if ($null -eq $earliestOutputLMTS -or $fileLMTS -lt $earliestOutputLMTS) {
+                        $earliestOutputLMTS = $fileLMTS
+                    }
+                }
+            }
+            
+            # If no output files exist, return Missing
+            if (-not $outputFilesExist) {
+                return "Missing"
+            }
+            
+            # Check if we need to re-process the entire step
+            # Rule 3: Re-process if source is newer than output OR LLM has changed
+            $lastLLM = ""
+            $completionInfoPath = Join-Path $BaseDirectory "data/reports/pipeline_completion_info.json"
+            if (Test-Path $completionInfoPath) {
+                try {
+                    $completionInfo = Get-Content $completionInfoPath | ConvertFrom-Json
+                    if ($completionInfo.PSObject.Properties.Name -contains "neutralize_delineations") {
+                        $lastLLM = $completionInfo.neutralize_delineations.llm_used
+                    }
+                } catch {
+                    # If we can't read the completion info, assume LLM has changed
+                    $lastLLM = ""
+                }
+            }
+            
+            if ($sourceLMTS -gt $earliestOutputLMTS -or $currentLLM -ne $lastLLM) {
+                # Source is newer or LLM changed, need to re-process
+                return "Stale"  # This will trigger a full re-run
+            }
+            
+            # Rule 4: Check if all files are complete
+            $allFilesComplete = $true
+            $incompleteFiles = @()
+            
+            foreach ($file in $expectedFiles.Keys) {
+                $filePath = Join-Path $delineationDir $file
+                if (Test-Path $filePath) {
+                    # Check line count
+                    $lineCount = (Get-Content $filePath | Where-Object { $_.Trim() -ne "" }).Count
+                    if ($lineCount -lt $expectedFiles[$file]) {
+                        $allFilesComplete = $false
+                        $incompleteFiles += $file
+                    }
+                } else {
+                    $allFilesComplete = $false
+                    $incompleteFiles += $file
+                }
+            }
+            
+            if ($allFilesComplete) {
+                # Rule 5: All files complete, skip
+                return "Complete"
+            } else {
+                # Rule 4: Some files incomplete, return Partial
+                return "Partial"
+            }
         }
         default {
             if (Test-Path $outputFile) { return "Complete" } else { return "Missing" }
@@ -282,21 +449,45 @@ function Backup-And-Remove {
 function Show-PipelineStatus {
     param([array]$Steps, [string]$BaseDirectory = ".")
     Format-Banner "Data Preparation Pipeline Status" $C_CYAN
-    $nameWidth = 40; $statusWidth = 12
-    Write-Host ("{0,-$nameWidth} {1}" -f "Step", "Status"); Write-Host ("-" * $nameWidth + " " + "-" * $statusWidth)
+    $nameWidth = 45; $statusWidth = 13; $fileWidth = 40
+    Write-Host ("{0,-$nameWidth} {1,-$statusWidth} {2}" -f "Step", "Status", "Output File");
+    Write-Host ("-" * $nameWidth + " " + "-" * $statusWidth + " " + "-" * $fileWidth)
     $filesExist = $false
     $stepNumber = 0
     foreach ($step in $Steps) {
         $stepNumber++
-        $stepStatus = Get-StepStatus -Step $step -BaseDirectory $BaseDirectory
+        $configFile = Join-Path $BaseDirectory "config.ini"
+        $stepStatus = Get-StepStatus -Step $step -BaseDirectory $BaseDirectory -ConfigFilePath $configFile
         
         switch ($stepStatus) {
-            "Complete"   { $status = "$($C_GREEN)[COMPLETE]$($C_RESET)"; $filesExist = $true }
+            "Complete"   { $status = "$($C_GREEN)[COMPLETE]   $($C_RESET)"; $filesExist = $true }
             "Incomplete" { $status = "$($C_YELLOW)[INCOMPLETE]$($C_RESET)"; $filesExist = $true }
-            default      { $status = if ($step.Type -eq 'Manual') { "$($C_YELLOW)[PENDING]$($C_RESET)" } else { "$($C_RED)[MISSING]$($C_RESET)" } }
+            "Partial"    { $status = "$($C_ORANGE)[PARTIAL]    $($C_RESET)"; $filesExist = $true }
+            "Pending"    { $status = "$($C_YELLOW)[PENDING]    $($C_RESET)"; $filesExist = $true }
+            "Stale"      { $status = "$($C_ORANGE)[STALE]      $($C_RESET)"; $filesExist = $true }
+            "Missing"    { $status = "$($C_RED)[MISSING]    $($C_RESET)"; $filesExist = $false }
+            default      { $status = if ($step.Type -eq 'Manual') { "$($C_RED)[MISSING]    $($C_RESET)" } else { "$($C_RED)[MISSING]    $($C_RESET)" } }
         }
         $stepNameFormatted = "$($stepNumber). $($step.Name)"
-        Write-Host ("{0,-$nameWidth} {1}" -f $stepNameFormatted, $status)
+        
+        # Special handling for step 11 (Neutralize Delineations) to show directory name
+        if ($step.Name -eq "Neutralize Delineations") {
+            $outputFile = "data/foundational_assets/neutralized_delineations/"
+        } elseif ($step.Name -eq "Delineations Library Export (Manual)") {
+            # Show the actual file name that we're looking for
+            $configFile = Join-Path $BaseDirectory "config.ini"
+            $delinLibFilename = Get-ConfigValue -FilePath $configFile -Section "SolarFire" -Key "delin_lib_filename" -DefaultValue "Standard.def"
+            $outputFile = $delinLibFilename
+        } else {
+            # Extract just the filename from the output path
+            $outputFile = Split-Path $step.Output -Leaf
+        }
+        
+        if ($outputFile.Length -gt $fileWidth) {
+            $outputFile = $outputFile.Substring(0, $fileWidth - 3) + "..."
+        }
+        
+        Write-Host ("{0,-$nameWidth} {1,-$statusWidth} {2}" -f $stepNameFormatted, $status, $outputFile)
     }
     Write-Host ""; return $filesExist
 }
@@ -313,9 +504,13 @@ function Show-DataCompletenessReport {
             # Check if any steps have missing data
             $hasIssues = $false
             foreach ($step in $completionInfo.PSObject.Properties) {
-                if ($step.Value.missing_count -gt 0) {
-                    $hasIssues = $true
-                    break
+                # Check if the step has missing_count property and if it's greater than 0
+                if ($step.Value.PSObject.Properties.Name -contains "missing_count") {
+                    $missingCount = $step.Value.missing_count
+                    if ($missingCount -and $missingCount -gt 0) {
+                        $hasIssues = $true
+                        break
+                    }
                 }
             }
             
@@ -325,16 +520,23 @@ function Show-DataCompletenessReport {
                 
                 foreach ($step in $completionInfo.PSObject.Properties) {
                     $info = $step.Value
-                    if ($info.missing_count -gt 0) {
-                        $statusColor = if ($info.completion_rate -ge 99) { $C_GREEN }
-                                       elseif ($info.completion_rate -ge 95) { $C_YELLOW }
-                                       else { $C_RED }
-                        
-                        Write-Host "  - $($info.step_name): $($info.completion_rate.ToString('F1'))% complete ($($info.missing_count) missing)" -ForegroundColor $statusColor
-                        
-                        if ($info.missing_report_path) {
-                            $relativePath = $info.missing_report_path -replace [regex]::Escape($BaseDirectory), "." -replace "\\", "/"
-                            Write-Host "    Details: $relativePath" -ForegroundColor $C_GRAY
+                    # Only show steps that have missing_count property and it's greater than 0
+                    if ($info.PSObject.Properties.Name -contains "missing_count") {
+                        $missingCount = $info.missing_count
+                        if ($missingCount -and $missingCount -gt 0) {
+                            # Ensure completion_rate is a valid number before using it
+                            $completionRate = if ($info.completion_rate -and $info.completion_rate -is [double]) { $info.completion_rate } else { 0 }
+                            # Use PowerShell ConsoleColor enum values, not ANSI codes
+                            $statusColor = if ($completionRate -ge 99) { "Green" }
+                                           elseif ($completionRate -ge 95) { "Yellow" }
+                                           else { "Red" }
+                            
+                            Write-Host "  - $($info.step_name): $($completionRate.ToString('F1'))% complete ($($missingCount) missing)" -ForegroundColor $statusColor
+                            
+                            if ($info.missing_report_path) {
+                                $relativePath = $info.missing_report_path -replace [regex]::Escape($BaseDirectory), "." -replace "\\", "/"
+                                Write-Host "    Details: $relativePath" -ForegroundColor DarkGray
+                            }
                         }
                     }
                 }
@@ -347,11 +549,22 @@ function Show-DataCompletenessReport {
                 Write-Host "  5: Generate Eminence Scores"
                 Write-Host "  6: Generate OCEAN Scores"
                 Write-Host ""
+            } else {
+                # All steps are complete, no missing subjects
+                Write-Host "`n${C_GREEN}--- Data Completeness Report ---${C_RESET}"
+                Write-Host "All steps are complete with no missing subjects."
+                Write-Host ""
             }
         }
         catch {
-            Write-Host "${C_YELLOW}Warning: Could not read data completeness information.${C_RESET}"
+            Write-Host "${C_YELLOW}Warning: Could not read data completeness information. Error: $($_.Exception.Message)${C_RESET}"
         }
+    } else {
+        # No completion info file exists
+        Write-Host "`n${C_YELLOW}--- Data Completeness Report ---${C_RESET}"
+        Write-Host "No data completeness information available."
+        Write-Host "Run the pipeline to generate completion information."
+        Write-Host ""
     }
 }
 
@@ -423,6 +636,15 @@ function Show-Parameters-And-Confirm {
     
     # Only display the parameters if not suppressed
     if (-not $SuppressDisplay) {
+        # Display an overview first
+        Write-Host "`n${C_CYAN}Data Preparation Pipeline Overview${C_RESET}"
+        Write-Host ("-" * 45)
+        Write-Host "This pipeline consists of 13 steps, including 2 manual steps that"
+        Write-Host "require your intervention. The entire process typically takes"
+        Write-Host "3 hours or more to complete, depending on the size of your dataset"
+        Write-Host "and the performance of the selected LLM models."
+        Write-Host ""
+        
         # Display the parameters
         Show-DataGenerationParameters -ConfigFilePath $ConfigFilePath
     }
@@ -443,7 +665,7 @@ function Show-Parameters-And-Confirm {
         } else {
             # Standard Read-Host for normal operation
             if (-not $SuppressDisplay) {
-                Read-Host -Prompt "${C_ORANGE}Review the configuration parameters above, then press Enter to continue...${C_RESET}" | Out-Null
+                Read-Host -Prompt "${C_ORANGE}Review the configuration parameters above, then press Enter to continue (Ctrl+C to exit)...${C_RESET}" | Out-Null
             } else {
                 Read-Host -Prompt "${C_ORANGE}Press Enter to continue...${C_RESET}" | Out-Null
             }
@@ -503,6 +725,9 @@ try {
             $anyFileExists = (Get-ChildItem -Path $WorkingDirectory -Recurse -File | Select-Object -First 1) -ne $null
         }
         
+        # Show data completeness report
+        Show-DataCompletenessReport -BaseDirectory $WorkingDirectory
+        
         Write-Host "${C_CYAN}Report-only mode enabled. Exiting.${C_RESET}"; return
     }
     
@@ -511,8 +736,8 @@ try {
     if (-not $SandboxMode) {
         # Check if any output files exist without showing the status table
         foreach ($step in $PipelineSteps) {
-            $outputFile = Join-Path $WorkingDirectory $step.Output
-            if ((Get-StepStatus -Step $step -BaseDirectory $WorkingDirectory) -eq "Complete") {
+            $stepStatus = Get-StepStatus -Step $step -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
+            if ($stepStatus -eq "Complete" -or $stepStatus -eq "Partial" -or $stepStatus -eq "Pending") {
                 $anyFileExists = $true
                 break
             }
@@ -625,10 +850,48 @@ try {
     }
     
     if ($anyFileExists -and -not $Force.IsPresent -and -not $Interactive -and -not $SandboxMode) {
-        Write-Host "${C_YELLOW}`nWARNING: One or more data files already exist."
-        Write-Host "The pipeline will resume from the first incomplete step."
-        $confirm = Read-Host "Do you wish to proceed? (Y/N)"
-        if ($confirm.Trim().ToLower() -ne 'y') { throw "USER_CANCELLED: Operation cancelled by user." }
+        Write-Host "${C_CYAN}`nINFO: One or more data files already exist."
+        
+        # Find the first incomplete step
+        $firstIncompleteStep = $null
+        $pendingManualStep = $null
+        for ($i = 0; $i -lt $PipelineSteps.Count; $i++) {
+            $stepStatus = Get-StepStatus -Step $PipelineSteps[$i] -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
+            $stepName = $PipelineSteps[$i].Name
+            
+            # Check for pending manual steps first
+            if ($stepStatus -eq "Pending" -and $PipelineSteps[$i].Type -eq "Manual") {
+                $pendingManualStep = $i + 1  # +1 to convert to 1-based indexing
+                break
+            }
+            
+            # Then check for other incomplete steps
+            if ($stepStatus -ne "Complete" -and $stepStatus -ne "Partial") {
+                $firstIncompleteStep = $i + 1  # +1 to convert to 1-based indexing
+                break
+            }
+        }
+        
+        if ($pendingManualStep) {
+            # We found a pending manual step, which takes precedence
+            $stepName = $PipelineSteps[$pendingManualStep - 1].Name
+            $stepStatus = Get-StepStatus -Step $PipelineSteps[$pendingManualStep - 1] -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
+            if ($stepName -eq "Astrology Data Export (Manual)") {
+                Write-Host "The pipeline will resume at Step ${pendingManualStep}: $stepName"
+                Write-Host "The Solar Fire export file has been detected and will be automatically fetched."
+            } else {
+                Write-Host "The pipeline will resume at Step ${pendingManualStep}: $stepName"
+            }
+        } elseif ($firstIncompleteStep) {
+            # We found an incomplete step that's not a pending manual step
+            $stepName = $PipelineSteps[$firstIncompleteStep - 1].Name
+            Write-Host "The pipeline will resume at Step ${firstIncompleteStep}: $stepName"
+        } else {
+            # All steps are complete, so inform the user
+            Write-Host "All steps are already complete. Use -Force to re-run the entire pipeline."
+        }
+        
+        Read-Host -Prompt "${C_ORANGE}Press Enter to continue (Ctrl+C to exit)...${C_RESET}" | Out-Null
     }
 
     # Determine the first step of each stage for clean banner logging
@@ -640,6 +903,12 @@ try {
     $totalSteps = $PipelineSteps.Count; $stepCounter = 0
     foreach ($step in $PipelineSteps) {
         $stepCounter++
+        
+        # Skip steps before the StartWithStep if specified
+        if ($StartWithStep -gt 0 -and $stepCounter -lt $StartWithStep) {
+            continue
+        }
+        
         $outputFile = Join-Path $WorkingDirectory $step.Output
         
         # --- Determine if the step should be skipped ---
@@ -689,8 +958,109 @@ try {
             $isSkipped = $true
         }
 
-        # Skip if the step is complete AND we are not in force-overwrite mode.
-        if ((Get-StepStatus -Step $step -BaseDirectory $WorkingDirectory) -eq "Complete" -and -not $isInteractiveForceOverwrite) {
+        # Skip if the step is complete AND we are not in force-overwrite mode AND we didn't start from a previous step
+        # If we resumed from a previous step, we need to force re-execution of all downstream steps
+        $shouldForceDownstream = ($StartWithStep -gt 0) -and ($stepCounter -ge $StartWithStep)
+        $stepStatus = Get-StepStatus -Step $step -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
+        
+        # Special handling: If Step 11 (Neutralize Delineations) is not COMPLETE, force reprocessing of steps 12 and 13
+        if ($stepCounter -gt 11 -and $step.Name -in @("Create Subject Database", "Generate Personalities Database")) {
+            $step11Status = Get-StepStatus -Step $PipelineSteps[10] -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
+            if ($step11Status -ne "Complete") {
+                $shouldForceDownstream = $true
+            }
+        }
+        
+        # For manual steps, halt the pipeline when status is PENDING
+        if ($step.Type -eq 'Manual' -and $stepStatus -eq "Pending" -and -not $isInteractiveForceOverwrite -and -not $shouldForceDownstream) {
+            if (-not $Resumed.IsPresent) {
+                # Print the detailed step header for pending manual steps
+                if ($Interactive) {
+                    $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
+                    Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+                    Write-Host "$C_BLUE$stepHeader$C_RESET"
+                    Write-Host "$C_BLUE$($step.Description)$C_RESET"
+                    Write-Host "`n${C_YELLOW}MANUAL STEP PENDING: The required file has been detected but needs to be processed.${C_RESET}"
+                    
+                    # Show inputs and output information
+                    $infoBlock = New-Object System.Text.StringBuilder
+                    [void]$infoBlock.AppendLine("`n${C_RESET}  INPUTS:")
+                    $Step.Inputs | ForEach-Object { [void]$infoBlock.AppendLine("    - $_") }
+                    [void]$infoBlock.AppendLine("`n  OUTPUT:")
+                    [void]$infoBlock.Append("    - $($Step.Output)")
+                    [void]$infoBlock.AppendLine("")
+                    [void]$infoBlock.AppendLine("")
+                    [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: The pipeline will halt at this manual step. Please complete the required action and then re-run the script to continue.${C_RESET}")
+                    
+                    # Piping to Out-Host forces the multi-line info block to flush immediately
+                    $infoBlock.ToString() | Out-Host
+                    
+                    # Handle interactive prompt
+                    if ($env:UNDER_TEST_HARNESS -eq "true") {
+                        # Signal to test harness and wait for response
+                        $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
+                        Write-Host "HARNESS_PROMPT:Manual step is pending. Press Enter to halt the pipeline...:$waitFile"
+                        # Wait for test harness to create the response file
+                        while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
+                        Remove-Item $waitFile -ErrorAction SilentlyContinue
+                    } else {
+                        # Standard Read-Host for normal operation
+                        Read-Host -Prompt "${C_ORANGE}Manual step is pending. Press Enter to halt the pipeline...${C_RESET}" | Out-Null
+                    }
+                } else {
+                    Write-Host "Step ${stepCounter}: '$($step.Name)' is pending. Halting pipeline." -ForegroundColor Yellow
+                }
+            }
+            # Halt the pipeline for pending manual steps
+            throw "The pipeline is paused because a manual step is incomplete. Please refer to the Framework Manual for detailed instructions on completing Step ${stepCounter}: '$($step.Name)'."
+        }
+        
+        # Special handling for Step 11 (Neutralize Delineations) when Partial
+        if ($step.Name -eq "Neutralize Delineations" -and $stepStatus -eq "Partial" -and -not $isInteractiveForceOverwrite -and -not $shouldForceDownstream) {
+            if (-not $Resumed.IsPresent) {
+                # Print the detailed step header for partial completion
+                if ($Interactive) {
+                    $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
+                    Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+                    Write-Host "$C_BLUE$stepHeader$C_RESET"
+                    Write-Host "$C_BLUE$($step.Description)$C_RESET"
+                    Write-Host "`n${C_YELLOW}PARTIAL COMPLETION DETECTED: Some output files are missing or incomplete.${C_RESET}"
+                    
+                    # Show inputs and output information
+                    $infoBlock = New-Object System.Text.StringBuilder
+                    [void]$infoBlock.AppendLine("`n${C_RESET}  INPUTS:")
+                    $Step.Inputs | ForEach-Object { [void]$infoBlock.AppendLine("    - $_") }
+                    [void]$infoBlock.AppendLine("`n  OUTPUT:")
+                    [void]$infoBlock.Append("    - $($Step.Output)")
+                    [void]$infoBlock.AppendLine("")
+                    [void]$infoBlock.AppendLine("")
+                    [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: This step will continue processing only the missing or incomplete files.${C_RESET}")
+                    
+                    # Piping to Out-Host forces the multi-line info block to flush immediately
+                    $infoBlock.ToString() | Out-Host
+                    
+                    # Handle interactive prompt
+                    if ($env:UNDER_TEST_HARNESS -eq "true") {
+                        # Signal to test harness and wait for response
+                        $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
+                        Write-Host "HARNESS_PROMPT:Step will process missing files. Press Enter to continue...:$waitFile"
+                        # Wait for test harness to create the response file
+                        while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
+                        Remove-Item $waitFile -ErrorAction SilentlyContinue
+                    } else {
+                        # Standard Read-Host for normal operation
+                        Read-Host -Prompt "${C_ORANGE}Step will process missing files. Press Enter to continue...${C_RESET}" | Out-Null
+                    }
+                } else {
+                    Write-Host "Step ${stepCounter}: '$($step.Name)' is partially complete. Processing missing files only." -ForegroundColor Yellow
+                }
+            }
+            # Don't skip - continue with execution to process missing files
+        }
+        # Skip if the step is complete AND we are not in force-overwrite mode AND we didn't start from a previous step
+        # If we resumed from a previous step, we need to force re-execution of all downstream steps
+        # Stale status is treated like Missing - it triggers re-processing
+        elseif (($stepStatus -eq "Complete" -or ($stepStatus -eq "Partial" -and $step.Name -ne "Neutralize Delineations")) -and $stepStatus -ne "Stale" -and -not $isInteractiveForceOverwrite -and -not $shouldForceDownstream) {
             if (-not $Resumed.IsPresent) {
                 # Print the detailed step header even for skipped steps in Interactive mode
                 if ($Interactive) {
@@ -707,7 +1077,13 @@ try {
                     [void]$infoBlock.Append("    - $($Step.Output)")
                     [void]$infoBlock.AppendLine("")
                     [void]$infoBlock.AppendLine("")
-                    [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: This step will be skipped because the output file already exists.${C_RESET}")
+                    if ($Step.Name -eq "Astrology Data Export (Manual)") {
+                        [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: This step will be skipped because the Solar Fire export file has been detected and will be automatically fetched by the next step.${C_RESET}")
+                    } elseif ($stepStatus -eq "Partial") {
+                        [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: This step will be skipped because it has been partially completed. Re-run with --force to process all files.${C_RESET}")
+                    } else {
+                        [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: This step will be skipped because the output file already exists.${C_RESET}")
+                    }
                     if (-not $overwriteInstructionShown) {
                         [void]$infoBlock.AppendLine("If you wish to overwrite existing files, abort this run with Ctrl+C and execute the script with an added '-Force' parameter. For example: 'pdm run prep-data -Interactive -Force'.")
                         $overwriteInstructionShown = $true
@@ -729,7 +1105,11 @@ try {
                         Read-Host -Prompt "${C_ORANGE}Step will be skipped. Press Enter to continue...${C_RESET}" | Out-Null
                     }
                 } else {
-                    Write-Host "Output exists for step '$($step.Name)'. Skipping." -ForegroundColor Yellow
+                    if ($stepStatus -eq "Partial") {
+                        Write-Host "Step ${stepCounter}: '$($step.Name)' is partially complete. Skipping. Use --force to process all files." -ForegroundColor Yellow
+                    } else {
+                        Write-Host "Output exists for Step ${stepCounter}: '$($step.Name)'. Skipping." -ForegroundColor Yellow
+                    }
                 }
             }
             $isSkipped = $true
@@ -851,12 +1231,13 @@ try {
         if ($step.Name -eq "Fetch Raw ADB Data") {
             $arguments += "--no-network-warning"
         }
-        if ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores") {
+        # Only suppress API warnings in test/sandbox mode, not in normal operation
+        if ($step.Name -in "Generate Eminence Scores", "Generate OCEAN Scores" -and ($TestMode.IsPresent -or $SandboxMode)) {
             $arguments += "--no-api-warning"
         }
 
         # For the final step, explicitly pass the correct output path in all modes
-        if ($step.Name -eq "Generate Personalities DB") {
+        if ($step.Name -eq "Generate Personalities Database") {
             $arguments += "-o", $outputFile
         }
 
@@ -951,6 +1332,16 @@ catch {
             Write-Host "1. Complete the manual step described in the message above."
             Write-Host "2. Once the required output file is in place, re-run this script."
             Write-Host "   The pipeline will automatically resume from where it stopped."
+            Write-Host ""
+        } elseif ($errorMessage -match "Script .* failed with exit code") {
+            # This is a script failure, provide instructions to resume from the failed step
+            $failedStep = $stepCounter
+            Write-Host "`n${C_YELLOW}TO RESUME FROM THIS STEP:${C_RESET}"
+            Write-Host "Run the following command to restart from the failed step:"
+            Write-Host "  .\prepare_data.ps1 -StartWithStep $failedStep" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "Alternatively, you can run the pipeline using pdm:"
+            Write-Host "  pdm run prep-data -StartWithStep $failedStep" -ForegroundColor Cyan
             Write-Host ""
         }
     }

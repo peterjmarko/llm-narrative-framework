@@ -26,7 +26,7 @@ This document outlines planned development tasks and tracks known issues for the
   - [ ] Consolidate documentation: justify each document and sharply define scope and relationships.
     - [ ] Merge Lifecycle Guide into main README.
   - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
-  - [ ] Update all dates, tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
+  - [ ] Update all dates (October 6 to ...), tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
   - [ ] Replace the text placeholder in `article_main_text.md` with the final, generated interaction plot (`interaction_plot_mean_rank.png`).
   - [ ] Address Research Article inconsistencies identified in documentation alignment:
     - [ ] Clarify statistical analysis - either report Three-Way ANOVA results consistent with 2×3×3 design or explain why Two-Way was used
