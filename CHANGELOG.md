@@ -2,6 +2,41 @@
 
 # Changelog
 
+## 12.14.0 (2025-10-10)
+
+### Bump
+
+- **version 12.13.0 → 12.14.0**
+
+### Features
+
+- **add data preparation summary report and fix testing infrastructure**
+  Add comprehensive data preparation summary report and fix testing issues.
+  New Features:
+  
+  Add generate_data_preparation_summary.py for pipeline status overview
+  Add detailed completeness reporting with actionable recommendations
+  Update FRAMEWORK_MANUAL with summary report documentation
+  Add --no-fetch flag to create_subject_db.py for testing isolation
+  
+  Test Fixes:
+  
+  Fix create_subject_db.py unit tests to use Base58-encoded IDs
+  Resolve Layer 2 test timestamp preservation using Move-Item
+  Fix STALE status detection with proper LLM completion tracking
+  Update mock scripts to create files with correct line counts
+  Fix step header display for manual steps in TestMode
+  Add test mode explanatory messages for clarity
+  
+  Bug Fixes:
+  
+  Fix convert_py_to_txt.py to handle .py.bak files correctly
+  Remove debug output from production code
+  
+  Documentation:
+  
+  Update PROJECT_ROADMAP.md with completed items
+
 ## 12.13.0 (2025-10-08)
 
 ### Bump
