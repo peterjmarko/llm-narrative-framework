@@ -274,11 +274,12 @@ function Get-StepStatus {
             }
         }
         "Delineations Library Export (Manual)" {
-            # Special case: Check for the file in the Solar Fire Interpretations directory using config parameters
+            # Special case: Check for the file in the Solar Fire Export directory
+            # Users export Standard.def from Interpretations, then copy and rename it to sf_delineations_library.txt in Export
             $documentsFolder = [System.Environment]::GetFolderPath('Personal')
             $userFilesBase = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "user_files_base" -DefaultValue "Solar Fire User Files"
-            $delinLibSubdir = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "delin_lib_subdir" -DefaultValue "Interpretations"
-            $delinLibFilename = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "delin_lib_filename" -DefaultValue "Standard.def"
+            $exportSubdir = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "delin_lib_subdir" -DefaultValue "Export"
+            $delinLibFilename = Get-ConfigValue -FilePath $ConfigFilePath -Section "SolarFire" -Key "delin_lib_filename" -DefaultValue "sf_delineations_library.txt"
             
             # Check if userFilesBase already includes the Documents folder
             if ($userFilesBase.StartsWith("Documents\", [StringComparison]::OrdinalIgnoreCase)) {
@@ -286,18 +287,18 @@ function Get-StepStatus {
                 $userFilesBase = $userFilesBase.Substring(9)
             }
             
-            $sfDefPath = Join-Path $documentsFolder (Join-Path $userFilesBase (Join-Path $delinLibSubdir $delinLibFilename))
+            $sfExportPath = Join-Path $documentsFolder (Join-Path $userFilesBase (Join-Path $exportSubdir $delinLibFilename))
             $projectFile = Join-Path $BaseDirectory $Step.Output
             
-            if ((Test-Path $sfDefPath)) {
-                # File exists in Solar Fire directory, copy it to project directory if not already there
+            if ((Test-Path $sfExportPath)) {
+                # File exists in Solar Fire Export directory, copy it to project directory if not already there
                 if (-not (Test-Path $projectFile)) {
                     # Ensure the target directory exists
                     $targetDir = Split-Path $projectFile -Parent
                     if (-not (Test-Path $targetDir)) {
                         New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
                     }
-                    Copy-Item -Path $sfDefPath -Destination $projectFile -Force
+                    Copy-Item -Path $sfExportPath -Destination $projectFile -Force
                 }
                 return "Complete"
             } else {
@@ -306,6 +307,11 @@ function Get-StepStatus {
             }
         }
         "Neutralize Delineations" {
+            # TEMPORARY DEBUG - Remove after testing
+            $sourceFile = Join-Path $BaseDirectory "data/foundational_assets/sf_delineations_library.txt"
+            if (Test-Path $sourceFile) {
+                $sourceLMTS = (Get-Item $sourceFile).LastWriteTime
+            }
             # This step's "Output" is one of its files, but it represents the whole directory.
             $delineationDir = Split-Path (Join-Path $BaseDirectory $Step.Output) -Parent
             $sourceFile = Join-Path $BaseDirectory "data/foundational_assets/sf_delineations_library.txt"
@@ -474,10 +480,9 @@ function Show-PipelineStatus {
         if ($step.Name -eq "Neutralize Delineations") {
             $outputFile = "data/foundational_assets/neutralized_delineations/"
         } elseif ($step.Name -eq "Delineations Library Export (Manual)") {
-            # Show the actual file name that we're looking for
+            # Show the actual file name from config
             $configFile = Join-Path $BaseDirectory "config.ini"
-            $delinLibFilename = Get-ConfigValue -FilePath $configFile -Section "SolarFire" -Key "delin_lib_filename" -DefaultValue "Standard.def"
-            $outputFile = $delinLibFilename
+            $outputFile = Get-ConfigValue -FilePath $configFile -Section "SolarFire" -Key "delin_lib_filename"
         } else {
             # Extract just the filename from the output path
             $outputFile = Split-Path $step.Output -Leaf
@@ -493,7 +498,7 @@ function Show-PipelineStatus {
 }
 
 function Show-DataCompletenessReport {
-    param([string]$BaseDirectory = ".")
+    param([string]$BaseDirectory = ".", [switch]$TestMode)
     
     $completionInfoPath = Join-Path $BaseDirectory "data/reports/pipeline_completion_info.json"
     
@@ -563,7 +568,11 @@ function Show-DataCompletenessReport {
         # No completion info file exists
         Write-Host "`n${C_YELLOW}--- Data Completeness Report ---${C_RESET}"
         Write-Host "No data completeness information available."
-        Write-Host "Run the pipeline to generate completion information."
+        if ($TestMode) {
+            Write-Host "${C_CYAN}[TEST MODE] This report is not generated in test mode (expected behavior).${C_RESET}"
+        } else {
+            Write-Host "Run the pipeline to generate completion information."
+        }
         Write-Host ""
     }
 }
@@ -973,43 +982,67 @@ try {
         
         # For manual steps, halt the pipeline when status is PENDING
         if ($step.Type -eq 'Manual' -and $stepStatus -eq "Pending" -and -not $isInteractiveForceOverwrite -and -not $shouldForceDownstream) {
-            if (-not $Resumed.IsPresent) {
-                # Print the detailed step header for pending manual steps
-                if ($Interactive) {
-                    $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
-                    Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
-                    Write-Host "$C_BLUE$stepHeader$C_RESET"
-                    Write-Host "$C_BLUE$($step.Description)$C_RESET"
-                    Write-Host "`n${C_YELLOW}MANUAL STEP PENDING: The required file has been detected but needs to be processed.${C_RESET}"
-                    
-                    # Show inputs and output information
-                    $infoBlock = New-Object System.Text.StringBuilder
-                    [void]$infoBlock.AppendLine("`n${C_RESET}  INPUTS:")
-                    $Step.Inputs | ForEach-Object { [void]$infoBlock.AppendLine("    - $_") }
-                    [void]$infoBlock.AppendLine("`n  OUTPUT:")
-                    [void]$infoBlock.Append("    - $($Step.Output)")
-                    [void]$infoBlock.AppendLine("")
-                    [void]$infoBlock.AppendLine("")
-                    [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: The pipeline will halt at this manual step. Please complete the required action and then re-run the script to continue.${C_RESET}")
-                    
-                    # Piping to Out-Host forces the multi-line info block to flush immediately
-                    $infoBlock.ToString() | Out-Host
-                    
-                    # Handle interactive prompt
-                    if ($env:UNDER_TEST_HARNESS -eq "true") {
-                        # Signal to test harness and wait for response
-                        $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
-                        Write-Host "HARNESS_PROMPT:Manual step is pending. Press Enter to halt the pipeline...:$waitFile"
-                        # Wait for test harness to create the response file
-                        while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
-                        Remove-Item $waitFile -ErrorAction SilentlyContinue
-                    } else {
-                        # Standard Read-Host for normal operation
-                        Read-Host -Prompt "${C_ORANGE}Manual step is pending. Press Enter to halt the pipeline...${C_RESET}" | Out-Null
-                    }
+            # Always print the step header for pending manual steps, regardless of Resumed flag
+            if ($Interactive) {
+                $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
+                Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+                Write-Host "$C_BLUE$stepHeader$C_RESET"
+                Write-Host "$C_BLUE$($step.Description)$C_RESET"
+                Write-Host "`n${C_YELLOW}MANUAL STEP PENDING: The required file has been detected but needs to be processed.${C_RESET}"
+                
+                # Show inputs and output information
+                $infoBlock = New-Object System.Text.StringBuilder
+                [void]$infoBlock.AppendLine("`n${C_RESET}  INPUTS:")
+                $Step.Inputs | ForEach-Object { [void]$infoBlock.AppendLine("    - $_") }
+                [void]$infoBlock.AppendLine("`n  OUTPUT:")
+                [void]$infoBlock.Append("    - $($Step.Output)")
+                [void]$infoBlock.AppendLine("")
+                [void]$infoBlock.AppendLine("")
+                [void]$infoBlock.AppendLine("${C_YELLOW}NOTE: The pipeline will halt at this manual step.
+Please complete the required action and then re-run the script to continue.${C_RESET}")
+                
+                # Piping to Out-Host forces the multi-line info block to flush immediately
+                $infoBlock.ToString() | Out-Host
+                
+                # Handle interactive prompt
+                if ($env:UNDER_TEST_HARNESS -eq "true") {
+                    # Signal to test harness and wait for response
+                    $waitFile = Join-Path $env:TEMP "harness_wait_$PID.txt"
+                    Write-Host "HARNESS_PROMPT:Manual step is pending. Press Enter to halt the pipeline...:$waitFile"
+                    # Wait for test harness to create the response file
+                    while (-not (Test-Path $waitFile)) { Start-Sleep -Milliseconds 100 }
+                    Remove-Item $waitFile -ErrorAction SilentlyContinue
                 } else {
-                    Write-Host "Step ${stepCounter}: '$($step.Name)' is pending. Halting pipeline." -ForegroundColor Yellow
+                    # Standard Read-Host for normal operation
+                    Read-Host -Prompt "${C_ORANGE}Manual step is pending. Press Enter to halt the pipeline...${C_RESET}" | Out-Null
                 }
+            } else {
+                # In non-interactive mode (including TestMode), print full step header
+                $stepHeader = ">>> Step $stepCounter/${totalSteps}: $($step.Name) <<<"
+                Write-Host "`n$C_GRAY$('-'*80)$C_RESET"
+                Write-Host "$C_BLUE$stepHeader$C_RESET"
+                
+                # Use the TestMode-modified description if available, otherwise use original
+                $displayDescription = $step.Description
+                if ($TestMode.IsPresent -and $step.Name -eq "Delineations Library Export (Manual)") {
+                    $displayDescription = "Simulating the one-time Solar Fire delineation library export."
+                } elseif ($TestMode.IsPresent -and $step.Name -eq "Astrology Data Export (Manual)") {
+                    $displayDescription = "Simulating the manual Solar Fire import, calculation, and chart export process."
+                }
+                Write-Host "$C_BLUE$displayDescription$C_RESET"
+                
+                Write-Host "`n${C_RESET}  INPUTS:"
+                $Step.Inputs | ForEach-Object { Write-Host "    - $_" }
+                Write-Host "`n  OUTPUT:"
+                Write-Host "    - $($Step.Output)"
+                
+                # Add test mode explanation
+                if ($TestMode.IsPresent) {
+                    Write-Host "`n${C_CYAN}[TEST MODE] This manual step is simulated for testing purposes.${C_RESET}"
+                }
+                Write-Host ""
+                
+                Write-Host "Step ${stepCounter}: '$($step.Name)' is pending. Halting pipeline." -ForegroundColor Yellow
             }
             # Halt the pipeline for pending manual steps
             throw "The pipeline is paused because a manual step is incomplete. Please refer to the Framework Manual for detailed instructions on completing Step ${stepCounter}: '$($step.Name)'."
@@ -1140,8 +1173,14 @@ try {
         # For manual steps, halt the pipeline. The behavior differs for tests vs. users.
         if ($step.Type -eq 'Manual') {
             if ($TestMode.IsPresent) {
-                # In test mode, set the exit code and break the loop.
-                # The 'finally' block will handle the actual exit.
+                # In test mode, print step header before halting
+                Write-Host "`n${C_RESET}  INPUTS:"
+                $Step.Inputs | ForEach-Object { Write-Host "    - $_" }
+                Write-Host "`n  OUTPUT:"
+                Write-Host "    - $($Step.Output)"
+                Write-Host ""
+                
+                # Set the exit code and break the loop
                 $exitCode = 1
                 break
             } else {
@@ -1354,7 +1393,7 @@ finally {
             Write-Host "`n${C_YELLOW}--- Final Pipeline Status ---${C_RESET}"; Show-PipelineStatus -Steps $PipelineSteps -BaseDirectory $WorkingDirectory | Out-Null
             
             # Add data completeness report
-            Show-DataCompletenessReport -BaseDirectory $WorkingDirectory
+            Show-DataCompletenessReport -BaseDirectory $WorkingDirectory -TestMode:$TestMode
         }
     }
     exit $exitCode

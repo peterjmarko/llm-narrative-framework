@@ -64,14 +64,19 @@ def mock_input_files(tmp_path: Path) -> dict:
 
     # Create dummy Solar Fire chart export
     # NOTE: The script decodes the ID from the 4th field (ZoneAbbr), not the name.
+    # We must encode the idADB values (101, 103) as Base58 strings
+    from src.id_encoder import to_base58
+    encoded_101 = to_base58(101)  # For Newton
+    encoded_103 = to_base58(103)  # For Monroe
+    
     chart_export_path.write_text(
-        '"Isaac Newton","4 January 1643","1:00","2k","-0:01","London","UK","51n30","0w5"\n'
+        f'"Isaac Newton","4 January 1643","1:00","{encoded_101}","-0:01","London","UK","51n30","0w5"\n'
         '"Body Name","Body Abbr","Longitude"\n'
         '"Sun","Sun","285.65"\n"Moon","Mon","85.21"\n"Mercury","Mer","295.11"\n'
         '"Venus","Ven","325.00"\n"Mars","Mar","15.98"\n"Jupiter","Jup","35.22"\n'
         '"Saturn","Sat","335.88"\n"Uranus","Ura","225.12"\n"Neptune","Nep","235.65"\n'
         '"Pluto","Plu","105.43"\n"Ascendant","Asc","185.33"\n"Midheaven","MC","105.99"\n'
-        '"Marilyn Monroe","1 June 1926","9:30","2n","+8:00","LA","USA","34n03","118w15"\n'
+        f'"Marilyn Monroe","1 June 1926","9:30","{encoded_103}","+8:00","LA","USA","34n03","118w15"\n'
         '"Body Name","Body Abbr","Longitude"\n'
         '"Sun","Sun","70.45"\n"Moon","Mon","216.89"\n"Mercury","Mer","85.22"\n'
         '"Venus","Ven","45.12"\n"Mars","Mar","325.76"\n"Jupiter","Jup","320.11"\n'
@@ -93,6 +98,7 @@ def test_create_subject_db_logic(mock_input_files):
         "--sandbox-path",
         str(sandbox_path),
         "--force",
+        "--no-fetch",
     ]
 
     with patch("sys.argv", test_args):
@@ -176,7 +182,7 @@ class TestMainWorkflow:
         output_path.touch()
 
         with patch("builtins.input", return_value="y"):
-            test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"])]
+            test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"]), "--no-fetch"]
             with patch("sys.argv", test_args):
                 main()
         
@@ -188,7 +194,7 @@ class TestMainWorkflow:
         output_path.touch()
 
         with patch("builtins.input", return_value="n"):
-            test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"])]
+            test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"]), "--no-fetch"]
             with patch("sys.argv", test_args):
                 with pytest.raises(SystemExit) as e:
                     main()
@@ -206,7 +212,7 @@ class TestMainWorkflow:
         
         mock_backup = mocker.patch('src.create_subject_db.backup_and_remove')
 
-        test_args = ["script.py", "--sandbox-path", str(sandbox_path)]
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--no-fetch"]
         with patch("sys.argv", test_args):
             main()
         
@@ -219,7 +225,7 @@ class TestMainWorkflow:
 
         mocker.patch('sys.exit', side_effect=SystemExit)
 
-        test_args = ["script.py", "--sandbox-path", str(sandbox_path)]
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--no-fetch"]
         with patch("sys.argv", test_args):
             with pytest.raises(SystemExit):
                 main()
@@ -236,7 +242,7 @@ class TestMainWorkflow:
 
         mocker.patch('src.create_subject_db.sys.exit', side_effect=SystemExit(1))
 
-        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force", "--no-fetch"]
         with patch("sys.argv", test_args):
             with pytest.raises(SystemExit):
                 main()
@@ -258,7 +264,7 @@ class TestMainWorkflow:
 
         mocker.patch('sys.exit', side_effect=SystemExit)
 
-        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force", "--no-fetch"]
         with patch("sys.argv", test_args):
             with pytest.raises(SystemExit):
                 main()
@@ -279,7 +285,7 @@ class TestMainWorkflow:
         # This also ensures the raised exception carries the exit code.
         mocker.patch('src.create_subject_db.sys.exit', side_effect=SystemExit(1))
 
-        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force", "--no-fetch"]
         with patch("sys.argv", test_args):
             with pytest.raises(SystemExit) as e:
                 main()
@@ -293,7 +299,7 @@ class TestMainWorkflow:
             "Index\tidADB\tLastName\tFirstName\n"
         )
         
-        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force"]
+        test_args = ["script.py", "--sandbox-path", str(sandbox_path), "--force", "--no-fetch"]
         with patch("sys.argv", test_args):
             main()
         
@@ -312,7 +318,7 @@ class TestMainWorkflow:
 
         mocker.patch('builtins.open', side_effect=open_side_effect)
 
-        test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"]), "--force"]
+        test_args = ["script.py", "--sandbox-path", str(mock_input_files["sandbox_path"]), "--force", "--no-fetch"]
         with patch("sys.argv", test_args):
             with pytest.raises(SystemExit) as e:
                 main()

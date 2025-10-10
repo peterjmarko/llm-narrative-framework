@@ -242,7 +242,8 @@ def convert_scripts_to_txt(project_root_path, output_subdir_name, exclude_dirs, 
     cprint(f"Errors during copy/directory creation: {error_count}", TxtColors.WARNING if error_count > 0 else TxtColors.GREEN)
     if error_count > 0:
         cprint("Please review error messages above.", TxtColors.FAIL)
-    cprint(f"Output directory: {output_dir.resolve()}", TxtColors.BLUE)
+    relative_output = output_dir.relative_to(project_root_path)
+    cprint(f"Output directory: {relative_output}", TxtColors.BLUE)
 
 
 def main():

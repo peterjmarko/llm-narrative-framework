@@ -72,6 +72,12 @@ try {
 
     Write-Host "  -> Copying orchestrator to test sandbox..."
     Copy-Item -Path $OrchestratorSource -Destination $TestDir
+    
+    Write-Host "  -> Copying config.ini to test sandbox..."
+    $configSource = Join-Path $ProjectRoot "config.ini"
+    if (Test-Path $configSource) {
+        Copy-Item -Path $configSource -Destination $TestDir
+    }
 
     Write-Host "  -> Parsing orchestrator to build mock scripts..."
     $pipelineContent = Get-Content $OrchestratorSource -Raw
@@ -86,53 +92,80 @@ try {
         $mockContent = ""
         if ($scriptName -eq "generate_eminence_scores.py") {
             $mockContent = @"
+import os
 import sys
-from pathlib import Path
 # This mock simulates creating the output file AND its summary file.
-output = Path('$outputFile')
-output.parent.mkdir(parents=True, exist_ok=True)
-output.touch()
-summary_file = Path('data/reports/eminence_scores_summary.txt')
-summary_file.parent.mkdir(parents=True, exist_ok=True)
-summary_file.write_text('Total in Source: 100\nTotal Scored: 100')
+output_path = '$outputFile'
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+open(output_path, 'a').close()
+summary_path = 'data/reports/eminence_scores_summary.txt'
+os.makedirs(os.path.dirname(summary_path), exist_ok=True)
+with open(summary_path, 'w') as f:
+    f.write('Total in Source: 100\nTotal Scored: 100')
 sys.exit(0)
 "@
         } elseif ($scriptName -eq "generate_ocean_scores.py") {
             $mockContent = @"
+import os
 import sys
-from pathlib import Path
 # This mock simulates creating the output file AND its summary file.
-output = Path('$outputFile')
-output.parent.mkdir(parents=True, exist_ok=True)
-output.touch()
-summary_file = Path('data/reports/ocean_scores_summary.txt')
-summary_file.parent.mkdir(parents=True, exist_ok=True)
-summary_file.write_text('Total in Source: 100\nTotal Scored: 100')
+output_path = '$outputFile'
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+open(output_path, 'a').close()
+summary_path = 'data/reports/ocean_scores_summary.txt'
+os.makedirs(os.path.dirname(summary_path), exist_ok=True)
+with open(summary_path, 'w') as f:
+    f.write('Total in Source: 100\nTotal Scored: 100')
 sys.exit(0)
 "@
         } elseif ($scriptName -eq "neutralize_delineations.py") {
             $mockContent = @"
+import os
 import sys
-from pathlib import Path
+import json
 # This mock simulates creating the full directory of neutralized files.
-output_dir = Path('$outputFile').parent
-output_dir.mkdir(parents=True, exist_ok=True)
-expected_files = [
-    "balances_elements.csv", "balances_modes.csv", "balances_hemispheres.csv",
-    "balances_quadrants.csv", "balances_signs.csv", "points_in_signs.csv"
-]
-for f in expected_files:
-    (output_dir / f).touch()
+output_path = '$outputFile'
+output_dir = os.path.dirname(output_path)
+os.makedirs(output_dir, exist_ok=True)
+expected_files = {
+    'balances_elements.csv': 8,
+    'balances_modes.csv': 6,
+    'balances_hemispheres.csv': 4,
+    'balances_quadrants.csv': 4,
+    'balances_signs.csv': 12,
+    'points_in_signs.csv': 144
+}
+for filename, line_count in expected_files.items():
+    filepath = os.path.join(output_dir, filename)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        lines = [f'mock_line_{i+1}' for i in range(line_count)]
+        f.write('\n'.join(lines) + '\n')
+
+# Also create pipeline_completion_info.json with matching LLM from config
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
+current_llm = config.get('DataGeneration', 'neutralization_model', fallback='mock_model')
+
+completion_info_path = 'data/reports/pipeline_completion_info.json'
+os.makedirs(os.path.dirname(completion_info_path), exist_ok=True)
+completion_info = {
+    'neutralize_delineations': {
+        'llm_used': current_llm
+    }
+}
+with open(completion_info_path, 'w') as f:
+    json.dump(completion_info, f)
 sys.exit(0)
 "@
         } else {
             $mockContent = @"
+import os
 import sys
-from pathlib import Path
 # This mock simulates the creation of the expected output file.
-output = Path('$outputFile')
-output.parent.mkdir(parents=True, exist_ok=True)
-output.touch()
+output_path = '$outputFile'
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+open(output_path, 'a').close()
 sys.exit(0)
 "@
         }
@@ -147,23 +180,62 @@ sys.exit(0)
     
     # Test 1: Default run, should halt at first manual step
     Write-Host "`n--> Testing initial run (halts on manual step)..."
+    # Ensure manual step files don't exist in production (they would cause test to fail)
+    # Move files to a temp directory to preserve timestamps
+    $prodDelineations = Join-Path $ProjectRoot "data/foundational_assets/sf_delineations_library.txt"
+    $prodChartExport = Join-Path $ProjectRoot "data/foundational_assets/sf_chart_export.csv"
+    
+    # Also hide Solar Fire export directory files
+    $documentsFolder = [System.Environment]::GetFolderPath('Personal')
+    $sfDelineations = Join-Path $documentsFolder "Solar Fire User Files\Export\sf_delineations_library.txt"
+    $sfChartExport = Join-Path $documentsFolder "Solar Fire User Files\Export\sf_chart_export.csv"
+    
+    # Create temp backup directory
+    $tempBackupDir = Join-Path $TestDir ".test_file_backup"
+    New-Item -Path $tempBackupDir -ItemType Directory -Force | Out-Null
+    
+    if (Test-Path $prodDelineations) { 
+        Write-Host "  -> WARNING: Temporarily hiding production delineations file for test isolation" -ForegroundColor Yellow
+        Move-Item $prodDelineations (Join-Path $tempBackupDir "prod_sf_delineations_library.txt") -Force 
+    }
+    if (Test-Path $prodChartExport) { 
+        Write-Host "  -> WARNING: Temporarily hiding production chart export for test isolation" -ForegroundColor Yellow
+        Move-Item $prodChartExport (Join-Path $tempBackupDir "prod_sf_chart_export.csv") -Force 
+    }
+    if (Test-Path $sfDelineations) { 
+        Write-Host "  -> WARNING: Temporarily hiding Solar Fire delineations file for test isolation" -ForegroundColor Yellow
+        Move-Item $sfDelineations (Join-Path $tempBackupDir "sf_sf_delineations_library.txt") -Force 
+    }
+    if (Test-Path $sfChartExport) { 
+        Write-Host "  -> WARNING: Temporarily hiding Solar Fire chart export for test isolation" -ForegroundColor Yellow
+        Move-Item $sfChartExport (Join-Path $tempBackupDir "sf_sf_chart_export.csv") -Force 
+    }
+    
     $output = & .\prepare_data.ps1 -Force -TestMode -SuppressConfigDisplay 2>&1
     if ($LASTEXITCODE -ne 1) { throw "Expected pipeline to halt with exit code 1, but got $($LASTEXITCODE)." }
     Test-OrchestratorState "Halt 1" -ShouldExist -Files "data/intermediate/sf_data_import.txt"
     Test-OrchestratorState "Halt 1" -Files "data/foundational_assets/sf_chart_export.csv" # Should NOT exist
 
-    # Test 2: Simulate first manual step, should halt at second
+    # Test 2: Simulate first manual step (Step 9), should halt at second manual step (Step 10)
     Write-Host "`n--> Testing resumed run (halts on second manual step)..."
-    New-Item -Path "data/foundational_assets/sf_chart_export.csv" -ItemType File | Out-Null
+    # Restore Solar Fire delineations file to simulate user completing Step 9
+    $backedUpSfDelin = Join-Path $tempBackupDir "sf_sf_delineations_library.txt"
+    if (Test-Path $backedUpSfDelin) {
+        Move-Item $backedUpSfDelin $sfDelineations -Force
+    }
     $output = & .\prepare_data.ps1 -Force -TestMode -Resumed -SuppressConfigDisplay 2>&1
     if ($LASTEXITCODE -ne 1) { throw "Expected pipeline to halt with exit code 1, but got $($LASTEXITCODE)." }
-    # Verify that the pipeline has halted at the 'Delineations Library Export (Manual)' step, BEFORE running 'Neutralize Delineations'.
-    Test-OrchestratorState "Halt 2" -ShouldExist -Files "data/foundational_assets/sf_chart_export.csv"
-    Test-OrchestratorState "Halt 2" -Files "data/foundational_assets/neutralized_delineations/balances_quadrants.csv" # Should NOT exist
+    # Verify that the pipeline has completed Step 9 and halted at Step 10 (Astrology Data Export)
+    Test-OrchestratorState "Halt 2" -ShouldExist -Files "data/foundational_assets/sf_delineations_library.txt"
+    Test-OrchestratorState "Halt 2" -Files "data/foundational_assets/sf_chart_export.csv" # Should NOT exist yet
 
-    # Test 3: Simulate final manual step, should complete successfully
+    # Test 3: Simulate final manual step (Step 10), should complete successfully
     Write-Host "`n--> Testing final resumed run (completes successfully)..."
-    New-Item -Path "data/foundational_assets/sf_delineations_library.txt" -ItemType File | Out-Null
+    # Restore Solar Fire chart export file to simulate user completing Step 10
+    $backedUpSfChart = Join-Path $tempBackupDir "sf_sf_chart_export.csv"
+    if (Test-Path $backedUpSfChart) {
+        Move-Item $backedUpSfChart $sfChartExport -Force
+    }
     $output = & .\prepare_data.ps1 -Force -TestMode -Resumed -SuppressConfigDisplay 2>&1
     if ($LASTEXITCODE -ne 0 -or $output -notmatch "Pipeline Completed Successfully") { throw "Expected pipeline to complete but it did not." }
     Test-OrchestratorState "Completion" -ShouldExist -Files "data/personalities_db.txt"
@@ -173,6 +245,38 @@ sys.exit(0)
 finally {
     # --- Phase 3: Automated Cleanup ---
     Set-Location $ProjectRoot
+    
+    # Restore production files if they were backed up
+    $prodDelineations = Join-Path $ProjectRoot "data/foundational_assets/sf_delineations_library.txt"
+    $prodChartExport = Join-Path $ProjectRoot "data/foundational_assets/sf_chart_export.csv"
+    $documentsFolder = [System.Environment]::GetFolderPath('Personal')
+    $sfDelineations = Join-Path $documentsFolder "Solar Fire User Files\Export\sf_delineations_library.txt"
+    $sfChartExport = Join-Path $documentsFolder "Solar Fire User Files\Export\sf_chart_export.csv"
+    $tempBackupDir = Join-Path $TestDir ".test_file_backup"
+    
+    # Restore from temp backup directory
+    $backedUpProdDelin = Join-Path $tempBackupDir "prod_sf_delineations_library.txt"
+    $backedUpProdChart = Join-Path $tempBackupDir "prod_sf_chart_export.csv"
+    $backedUpSfDelin = Join-Path $tempBackupDir "sf_sf_delineations_library.txt"
+    $backedUpSfChart = Join-Path $tempBackupDir "sf_sf_chart_export.csv"
+    
+    if (Test-Path $backedUpProdDelin) {
+        Move-Item $backedUpProdDelin $prodDelineations -Force
+        Write-Host "  -> Restored production delineations file" -ForegroundColor Cyan
+    }
+    if (Test-Path $backedUpProdChart) {
+        Move-Item $backedUpProdChart $prodChartExport -Force
+        Write-Host "  -> Restored production chart export file" -ForegroundColor Cyan
+    }
+    if (Test-Path $backedUpSfDelin) {
+        Move-Item $backedUpSfDelin $sfDelineations -Force
+        Write-Host "  -> Restored Solar Fire delineations file" -ForegroundColor Cyan
+    }
+    if (Test-Path $backedUpSfChart) {
+        Move-Item $backedUpSfChart $sfChartExport -Force
+        Write-Host "  -> Restored Solar Fire chart export file" -ForegroundColor Cyan
+    }
+    
     if ($cleanupPath -and (Test-Path $cleanupPath)) {
         Write-Host "`n--- Phase 3: Automated Cleanup ---" -ForegroundColor Cyan
         Remove-Item -Path $cleanupPath -Recurse -Force

@@ -76,9 +76,84 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 > **Warning on Using `-Force`**: The `-Force` flag triggers a full, destructive re-run of the entire pipeline. It backs up and deletes all existing data, re-downloads the full raw dataset, and re-runs all expensive LLM scoring steps. This process is very time-consuming and will incur API costs.
 > **Interactive Mode (`-Interactive`)**: This mode provides a step-by-step "guided tour" of the entire pipeline. Before execution begins, it displays the relevant DataGeneration parameters from `config.ini` and pauses for user confirmation. During execution, it pauses before each step to show detailed information about inputs, outputs, and script summaries, allowing users to understand exactly what the pipeline is doing. This mode is highly recommended for new users or when troubleshooting issues.
 > **Data Completeness Reporting**: At the end of the pipeline, a comprehensive data completeness report is displayed that shows any missing subjects from the LLM scoring steps. This report provides clear visibility into data quality issues and includes actionable guidance on how to retry specific steps if needed.
+> **Data Preparation Pipeline Summary Report**: Upon successful completion of the pipeline, a comprehensive summary report is automatically generated at `data/reports/data_preparation_pipeline_summary.txt`. This report provides a unified overview of the entire data preparation pipeline, including validation results, scoring statistics, file status, and identified issues with specific recommendations for resolution.
 > **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING_GUIDE.md)](../TESTING_GUIDE.md)** for details on running the Layer 3 Interactive Mode.
 
 The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.
+
+#### Data Preparation Pipeline Summary Report
+
+The framework automatically generates a comprehensive summary report upon successful completion of the data preparation pipeline. This report, located at `data/reports/data_preparation_pipeline_summary.txt`, provides a unified overview of the entire pipeline status and results.
+
+**Report Contents:**
+
+1. **Overall Pipeline Status**
+   - Overall completion rate: Percentage of eligible candidates successfully processed by LLM scoring
+   - Data quality score: Percentage of raw records that passed Wikipedia validation
+   - Clear definitions of what these metrics represent
+   - Actual counts shown in parentheses (e.g., "97.9% (7,198/7,349)")
+
+2. **Data Validation Summary**
+   - Total records from Astro-Databank
+   - Valid records (passed Wikipedia validation)
+   - Failed records (did not pass validation)
+
+3. **Candidate Qualification Section**
+   - Count of eligible candidates after deterministic filtering
+   - Explanation of records filtered out during qualification
+   - Count of final candidates after cutoff algorithm (if available)
+
+4. **LLM Scoring Summaries**
+   - Eminence scoring statistics (subjects scored, subjects in source, mean score)
+   - OCEAN scoring statistics (subjects scored, subjects in source)
+   - Missing subjects counts with detailed reports
+   - Clear indication that OCEAN scoring processes the eminence-filtered candidates
+
+5. **Final Database Section**
+   - Status of the final subject database
+   - Total number of subjects included
+   - Explanation of reduction from OCEAN database (cutoff algorithm)
+   - File size and location information
+
+6. **Delineation Library Section**
+   - Status of the source delineation library
+   - Count of neutralized files generated (out of 6 expected)
+   - Detailed status of each neutralized file with line counts
+
+7. **Cutoff Analysis Section**
+   - Status of the cutoff parameter analysis
+   - Location of the analysis file
+   - Clear note that the analysis was performed on a different dataset
+   - Explanation that cutoff parameters are used as a reference for selecting the final research cohort
+
+8. **Pipeline Output Files Status**
+   - Visual indicators (✓/✗) for each expected output file
+   - Files grouped by pipeline stage for easy assessment
+
+9. **Issues and Recommendations**
+   - Identified bottlenecks and data quality issues
+   - Specific commands to address issues (e.g., re-running from specific steps)
+
+10. **Detailed Report References**
+    - Direct paths to all detailed reports for further investigation
+
+**Usage:**
+
+- **Automatic Generation**: The report is automatically generated at the end of successful pipeline runs
+- **Manual Regeneration**: Can be regenerated at any time using:
+  ```bash
+  python src/generate_data_preparation_summary.py
+  ```
+- **Integration with Report-Only Mode**: The report is also displayed when using `.\prepare_data.ps1 -ReportOnly`
+
+**Benefits:**
+
+- **Quick Assessment**: Provides immediate visibility into pipeline status without checking multiple files
+- **Actionable Insights**: Includes specific recommendations for addressing identified issues
+- **Comprehensive Overview**: Aggregates information from all pipeline reports into a single document
+- **Problem Resolution**: Helps identify and resolve data quality issues efficiently
+
+This summary report serves as the primary interface for understanding the overall health and completeness of your data preparation pipeline.
 
 #### Resuming from Failed Steps
 

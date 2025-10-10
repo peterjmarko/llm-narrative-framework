@@ -163,3 +163,12 @@ This document outlines planned development tasks and tracks known issues for the
   - [ ] Refactor the test harness to manage pipeline steps as a stateful list.
   - [ ] Implement a command parser in the interactive prompt to handle 'back' and 'repeat' commands.
   - [ ] Develop logic to automatically delete the output artifacts of any steps being re-run to ensure a clean state.
+
+### Data Pipeline Reporting Enhancements
+
+- [ ] **Enhance Data Preparation Pipeline Summary Report**
+  - [ ] **Performance Metrics**: Add timing information for each pipeline stage, estimated API costs, and processing speed metrics
+  - [ ] **Historical Comparisons**: Track changes over time and compare pipeline runs with different parameters
+  - [ ] **Visual Elements**: Implement ASCII charts for better visualization and color-coding for status indicators
+  - [ ] **Automated Recommendations**: Develop more sophisticated analysis of issues and suggested parameter adjustments
+  - [ ] **Integration with Pipeline Management**: Add direct links to retry failed steps and automatic issue detection and resolution

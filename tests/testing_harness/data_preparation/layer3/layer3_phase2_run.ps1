@@ -474,6 +474,25 @@ try {
     Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
     Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
 
+    # Hide production Solar Fire export files to ensure clean test isolation
+    $documentsFolder = [System.Environment]::GetFolderPath('Personal')
+    $sfDelineationsBackup = $null
+    $sfChartExportBackup = $null
+    
+    $sfDelineationsPath = Join-Path $documentsFolder "Solar Fire User Files\Export\sf_delineations_library.txt"
+    $sfChartExportPath = Join-Path $documentsFolder "Solar Fire User Files\Export\sf_chart_export.csv"
+    
+    if (Test-Path $sfDelineationsPath) {
+        $sfDelineationsBackup = "$sfDelineationsPath.l3_backup"
+        Move-Item $sfDelineationsPath $sfDelineationsBackup -Force
+        Write-Host "  -> Temporarily hidden Solar Fire delineations file for test isolation" -ForegroundColor DarkGray
+    }
+    if (Test-Path $sfChartExportPath) {
+        $sfChartExportBackup = "$sfChartExportPath.l3_backup"
+        Move-Item $sfChartExportPath $sfChartExportBackup -Force
+        Write-Host "  -> Temporarily hidden Solar Fire chart export file for test isolation" -ForegroundColor DarkGray
+    }
+
     if ($Interactive) {
         Read-Host -Prompt "`n${C_ORANGE}Press Enter to simulate this manual step (Ctrl+C to exit)...${C_RESET}" | Out-Null
     }
@@ -681,6 +700,15 @@ catch {
 finally {
     # Clean up test environment variable
     Remove-Item -Path "Env:UNDER_TEST_HARNESS" -ErrorAction SilentlyContinue
+    # Restore Solar Fire export files if they were hidden
+    if ($sfDelineationsBackup -and (Test-Path $sfDelineationsBackup)) {
+        Move-Item $sfDelineationsBackup $sfDelineationsPath -Force
+        Write-Host "  -> Restored Solar Fire delineations file" -ForegroundColor DarkGray
+    }
+    if ($sfChartExportBackup -and (Test-Path $sfChartExportBackup)) {
+        Move-Item $sfChartExportBackup $sfChartExportPath -Force
+        Write-Host "  -> Restored Solar Fire chart export file" -ForegroundColor DarkGray
+    }
     
     # --- 8. Print Execution Summary ---
     if ($executedStepsLog.Count -gt 0) {
