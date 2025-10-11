@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 12.15.2 (2025-10-11)
+
+### Bump
+
+- **version 12.15.1 → 12.15.2**
+
+### Fixes
+
+- **fix Layer 3 test hang and improve small dataset handling**
+  Fixed Layer 3 integration test hang caused by Step 7 failing silently on small datasets, and improved pipeline robustness for edge cases.
+  
+  - Modified Step 7 (Analyze Cutoff Parameters) to create minimal placeholder CSV when dataset is too small for meaningful analysis instead of failing silently
+  - Fixed Layer 3 test to properly skip manual steps after simulation using StartWithStep parameter
+  - Pre-populate neutralized delineations before Run 4 to prevent LLM bypass mode from interfering with test assets
+  - Added Force parameter to Run 4 to prevent interactive confirmation prompt
+  - Updated test assertions to match new graceful degradation behavior for small datasets
+  - All data preparation unit tests and Layer 2/3 integration tests now passing
+
 ## 12.15.1 (2025-10-11)
 
 ### Bump
