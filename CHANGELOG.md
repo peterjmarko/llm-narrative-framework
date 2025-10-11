@@ -2,6 +2,23 @@
 
 # Changelog
 
+## 12.15.1 (2025-10-11)
+
+### Bump
+
+- **version 12.15.0 → 12.15.1**
+
+### Fixes
+
+- **fix StopAfterStep parameter not halting pipeline correctly**
+  Fixed critical bug where -StopAfterStep parameter failed to halt pipeline execution.
+  
+  - Added stop check for skipped steps before the continue statement to ensure pipeline halts at specified step regardless of execution status
+  - Improved user messaging to clarify when pipeline will stop before the natural resume point
+  - Added informative message before parameter analysis grid search progress bar
+  - All prepare_data.ps1 functionality, data-prep unit tests, and Layer 2 integration tests now pass
+  - Layer 3 integration test shows unrelated issue with Step 7 re-execution after Step 10
+
 ## 12.15.0 (2025-10-11)
 
 ### Bump
