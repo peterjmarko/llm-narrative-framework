@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/analysis/analyze_cutoff_parameters.py
+# Filename: src/analyze_cutoff_parameters.py
 
 """
 Performs a sensitivity analysis to find the optimal parameters for the
@@ -52,9 +52,8 @@ from tqdm import tqdm
 init(autoreset=True, strip=False)
 
 # Ensure the src directory is in the Python path
-sys.path.append(str(Path(__file__).resolve().parents[2]))
-from config_loader import APP_CONFIG, get_config_value, get_path
-from src.select_final_candidates import calculate_average_variance
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+# Note: config_loader imports are deferred to main() to allow sandbox path to be set first
 
 
 def find_ideal_cutoff(x_values, y_values):
@@ -111,6 +110,10 @@ def print_centered_table(df):
 
 def main():
     """Main function to run the sensitivity analysis."""
+    # Import here to allow sandbox path to be set first
+    from config_loader import APP_CONFIG, get_config_value, get_path
+    from select_final_candidates import calculate_average_variance
+    
     print(f"\n{Fore.YELLOW}--- Starting Cutoff Parameter Sensitivity Analysis ---")
 
     # --- Parameters to Test ---
@@ -121,7 +124,6 @@ def main():
     # --- Load Data ---
     ocean_path = Path(get_path("data/foundational_assets/ocean_scores.csv"))
     print(f"Loading data from '{ocean_path}'...")
-    print() # Add blank line
     try:
         ocean_df = pd.read_csv(ocean_path)
     except FileNotFoundError:
@@ -129,8 +131,10 @@ def main():
         sys.exit(1)
         
     # Calculate the raw variance curve once to avoid redundant calculations.
+    print(f"Calculating variance curve for {len(ocean_df)} subjects...")
     x_values = np.array(range(2, len(ocean_df) + 1))
-    variances = np.array([calculate_average_variance(ocean_df.head(i)) for i in x_values])
+    variances = np.array([calculate_average_variance(ocean_df.head(i)) for i in tqdm(x_values, desc="Computing Variances", ncols=80)])
+    print() # Add blank line after progress bar
     
     results = []
     total_iterations = len(start_points) * len(smoothing_windows)
@@ -182,10 +186,12 @@ def main():
     results_df = pd.DataFrame(results)
     results_df.sort_values(by="Error", ascending=True, inplace=True)
     
-    print(f"\n\n{Fore.YELLOW}--- Parameter Analysis Results (Full Grid Search) ---")
-    print("The best parameters are those with the lowest 'Error' value.")
-    print("This means the algorithm's result was closest to the geometrically ideal cutoff point.\n")
-    print_centered_table(results_df)
+    # Full results table is suppressed for pipeline runs (saved to CSV instead)
+    # Uncomment the lines below to see the full table during standalone analysis:
+    # print(f"\n\n{Fore.YELLOW}--- Parameter Analysis Results (Full Grid Search) ---")
+    # print("The best parameters are those with the lowest 'Error' value.")
+    # print("This means the algorithm's result was closest to the geometrically ideal cutoff point.\n")
+    # print_centered_table(results_df)
 
     # Save the results to a CSV file
     report_path = Path(get_path("data/reports/cutoff_parameter_analysis_results.csv"))
@@ -270,6 +276,25 @@ def main():
 
 
 if __name__ == "__main__":
+    import argparse
+    import os
+    
+    # Parse arguments BEFORE importing config_loader to respect sandbox path
+    parser = argparse.ArgumentParser(
+        description="Analyze cutoff parameters for optimal candidate selection.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "--sandbox-path",
+        type=str,
+        help="Path to the sandbox directory for testing.",
+    )
+    args = parser.parse_args()
+    
+    # Set sandbox environment variable if provided (before any imports that use config_loader)
+    if args.sandbox_path:
+        os.environ["PROJECT_SANDBOX_PATH"] = os.path.abspath(args.sandbox_path)
+    
     main()
 
-# === End of scripts/analysis/analyze_cutoff_parameters.py ===
+# === End of src/analyze_cutoff_parameters.py ===

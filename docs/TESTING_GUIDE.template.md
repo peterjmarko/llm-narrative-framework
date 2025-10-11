@@ -484,9 +484,27 @@ These tests validate the LLM-based scoring and data-driven cutoff algorithm that
 - Pre-flight checks for resumable runs
 - Data format validation
 
+##### Cutoff Parameter Analysis
+
+**Module:** `src/analyze_cutoff_parameters.py` | **Coverage:** 84%
+
+**Test file:** `tests/data_preparation/test_analyze_cutoff_parameters.py`
+
+**What's tested:**
+
+- Grid search over parameter space (start points and smoothing windows)
+- Variance curve calculation and ideal cutoff detection
+- Stability-based recommendation algorithm
+- Error calculation and parameter ranking
+- Table formatting and output generation
+- Handling of datasets too small for analysis
+- Sandbox-aware execution for testing
+
+**Key validation:** Ensures the parameter optimization script correctly identifies the most robust parameter values for the cutoff algorithm through comprehensive grid search analysis.
+
 ##### Final Selection with Cutoff Algorithm
 
-**Module:** `src/select_final_candidates.py` | **Coverage:** 91% (Critical) | **Status:** COMPLETE
+**Module:** `src/select_final_candidates.py` | **Coverage:** 91% (Critical)
 
 **Test file:** `tests/data_preparation/test_select_final_candidates.py`
 
@@ -946,10 +964,10 @@ pdm test-l3
 
 **What's tested:**
 
-- Complete 4-stage pipeline execution:
+- Complete 4-stage pipeline execution (14 steps):
   1. Data Sourcing (fetch_adb_data.py)
   2. Candidate Qualification (find_wikipedia_links.py, validate_wikipedia_pages.py, select_eligible_candidates.py)
-  3. Candidate Selection (generate_eminence_scores.py, generate_ocean_scores.py, select_final_candidates.py)
+  3. Candidate Selection (generate_eminence_scores.py, generate_ocean_scores.py, analyze_cutoff_parameters.py, select_final_candidates.py)
   4. Profile Generation (prepare_sf_import.py, create_subject_db.py, neutralize_delineations.py, generate_personalities_db.py)
 - Orchestrator state machine with real scripts
 - LLM interaction patterns
@@ -1399,6 +1417,7 @@ This comprehensive table provides the current status of all tests in the framewo
 | **Candidate Selection** | | | | |
 | `src/generate_eminence_scores.py` | **Critical** | **COMPLETE** | 90% | Batch processing, API interaction, resume capability |
 | `src/generate_ocean_scores.py` | **Critical** | **COMPLETE** | 82% | Text processing, API interaction, pre-flight checks |
+| `src/analyze_cutoff_parameters.py` | Standard | **COMPLETE** | 84% | Grid search, stability analysis, parameter optimization |
 | `src/select_final_candidates.py` | **Critical** | **COMPLETE** | 91% | Variance curve calculation, slope analysis, cutoff detection |
 | **Profile Generation** | | | | |
 | `src/prepare_sf_import.py` | Standard | **COMPLETE** | 86% | File formatting, ID encoding, data transformation |

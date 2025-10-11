@@ -57,9 +57,14 @@
 
 .PARAMETER StopAfterStep
     If specified, the script will stop after completing the specified step number.
+    WARNING: This parameter is intended for testing purposes only. Using it in
+    production may result in inconsistent data, as downstream steps that depend
+    on the executed steps will not be run.
 
 .PARAMETER StartWithStep
     If specified, the script will start execution from the specified step number.
+    When a step executes, all downstream steps will automatically be forced to
+    re-run to maintain data consistency.
 
 .EXAMPLE
     # Run the full pipeline, resuming from the first incomplete step.
@@ -146,6 +151,7 @@ $PipelineSteps = @(
     @{ Stage="2. Candidate Qualification"; Name="Select Eligible Candidates"; Script="src/select_eligible_candidates.py"; Inputs=@("data/sources/adb_raw_export.txt", "data/reports/adb_validation_report.csv"); Output="data/intermediate/adb_eligible_candidates.txt";      Type="Automated"; Description="Applies deterministic data quality filters to create a pool of eligible candidates." },
     @{ Stage="3. Candidate Selection";   Name="Generate Eminence Scores";   Script="src/generate_eminence_scores.py";   Inputs=@("data/intermediate/adb_eligible_candidates.txt"); Output="data/foundational_assets/eminence_scores.csv";   Type="Automated"; Description="Generates a calibrated eminence score for each eligible candidate using an LLM." },
     @{ Stage="3. Candidate Selection";   Name="Generate OCEAN Scores";      Script="src/generate_ocean_scores.py";      Inputs=@("data/foundational_assets/eminence_scores.csv"); Output="data/foundational_assets/ocean_scores.csv";        Type="Automated"; Description="Generates OCEAN personality scores for each eligible candidate using an LLM." },
+    @{ Stage="3. Candidate Selection";   Name="Analyze Cutoff Parameters";  Script="src/analyze_cutoff_parameters.py"; Inputs=@("data/foundational_assets/ocean_scores.csv"); Output="data/reports/cutoff_parameter_analysis_results.csv"; Type="Automated"; Description="Performs grid search analysis to find optimal cutoff parameters for final candidate selection." },
     @{ Stage="3. Candidate Selection";   Name="Select Final Candidates";    Script="src/select_final_candidates.py";    Inputs=@("data/intermediate/adb_eligible_candidates.txt", "data/foundational_assets/eminence_scores.csv", "data/foundational_assets/ocean_scores.csv"); Output="data/intermediate/adb_final_candidates.txt";        Type="Automated"; Description="Determines the final subject set based on the LLM scoring." },
     @{ Stage="4. Profile Generation";    Name="Prepare Solar Fire Import File";     Script="src/prepare_sf_import.py";          Inputs=@("data/intermediate/adb_final_candidates.txt"); Output="data/intermediate/sf_data_import.txt";            Type="Automated"; Description="Formats the final subject list for import into the Solar Fire software." },
     @{ Stage="4. Profile Generation";    Name="Delineations Library Export (Manual)";    Inputs=@("Solar Fire Software"); Output="data/foundational_assets/sf_delineations_library.txt"; Type="Manual"; Description="The pipeline is paused. Please perform the one-time Solar Fire delineation library export." },
@@ -409,6 +415,37 @@ function Get-StepStatus {
                 return "Partial"
             }
         }
+
+        "Analyze Cutoff Parameters" {
+            # Check if output file exists
+            if (-not (Test-Path $outputFile)) {
+                return "Missing"
+            }
+            
+            # Read current parameters from config
+            $currentStartPoint = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "cutoff_search_start_point" -DefaultValue "0"
+            $currentSmoothingWindow = Get-ConfigValue -FilePath $ConfigFilePath -Section "DataGeneration" -Key "smoothing_window_size" -DefaultValue "0"
+            
+            # Read the optimal parameters from the analysis CSV
+            try {
+                $csvContent = Import-Csv $outputFile
+                if ($csvContent.Count -gt 0) {
+                    $optimalStartPoint = $csvContent[0].'Start Point'
+                    $optimalSmoothingWindow = $csvContent[0].'Smoothing Window'
+                    
+                    # If current config doesn't match the optimal parameters from the analysis, mark as stale
+                    if ($currentStartPoint -ne $optimalStartPoint -or $currentSmoothingWindow -ne $optimalSmoothingWindow) {
+                        return "Stale"
+                    }
+                }
+            } catch {
+                # If we can't read the CSV, treat it as incomplete
+                return "Incomplete"
+            }
+            
+            return "Complete"
+        }
+        
         default {
             if (Test-Path $outputFile) { return "Complete" } else { return "Missing" }
         }
@@ -455,7 +492,7 @@ function Backup-And-Remove {
 function Show-PipelineStatus {
     param([array]$Steps, [string]$BaseDirectory = ".")
     Format-Banner "Data Preparation Pipeline Status" $C_CYAN
-    $nameWidth = 45; $statusWidth = 13; $fileWidth = 40
+    $nameWidth = 45; $statusWidth = 13; $fileWidth = 60
     Write-Host ("{0,-$nameWidth} {1,-$statusWidth} {2}" -f "Step", "Status", "Output File");
     Write-Host ("-" * $nameWidth + " " + "-" * $statusWidth + " " + "-" * $fileWidth)
     $filesExist = $false
@@ -476,16 +513,12 @@ function Show-PipelineStatus {
         }
         $stepNameFormatted = "$($stepNumber). $($step.Name)"
         
-        # Special handling for step 11 (Neutralize Delineations) to show directory name
+        # Special handling for step 11 (Neutralize Delineations) to show directory name with file count
         if ($step.Name -eq "Neutralize Delineations") {
-            $outputFile = "data/foundational_assets/neutralized_delineations/"
-        } elseif ($step.Name -eq "Delineations Library Export (Manual)") {
-            # Show the actual file name from config
-            $configFile = Join-Path $BaseDirectory "config.ini"
-            $outputFile = Get-ConfigValue -FilePath $configFile -Section "SolarFire" -Key "delin_lib_filename"
+            $outputFile = "data/foundational_assets/neutralized_delineations/ (6 files)"
         } else {
-            # Extract just the filename from the output path
-            $outputFile = Split-Path $step.Output -Leaf
+            # Show the full relative path from the output
+            $outputFile = $step.Output
         }
         
         if ($outputFile.Length -gt $fileWidth) {
@@ -548,7 +581,7 @@ function Show-DataCompletenessReport {
                 
                 Write-Host ""
                 Write-Host "${C_YELLOW}To retry missing subjects for a specific step, run:${C_RESET}"
-                Write-Host "  .\\prepare_data.ps1 -StopAfterStep <step_number>"
+                Write-Host "  .\\prepare_data.ps1 -StartWithStep <step_number>"
                 Write-Host ""
                 Write-Host "${C_CYAN}Step numbers:${C_RESET}"
                 Write-Host "  5: Generate Eminence Scores"
@@ -648,7 +681,7 @@ function Show-Parameters-And-Confirm {
         # Display an overview first
         Write-Host "`n${C_CYAN}Data Preparation Pipeline Overview${C_RESET}"
         Write-Host ("-" * 45)
-        Write-Host "This pipeline consists of 13 steps, including 2 manual steps that"
+        Write-Host "This pipeline consists of 14 steps, including 2 manual steps that"
         Write-Host "require your intervention. The entire process typically takes"
         Write-Host "3 hours or more to complete, depending on the size of your dataset"
         Write-Host "and the performance of the selected LLM models."
@@ -737,6 +770,32 @@ try {
         # Show data completeness report
         Show-DataCompletenessReport -BaseDirectory $WorkingDirectory
         
+        # Generate pipeline summary report (skip in test mode)
+        if (-not $TestMode.IsPresent) {
+            Write-Host "`n${C_YELLOW}Generating pipeline summary report...${C_RESET}"
+            $summaryScriptPath = Join-Path $ProjectRoot "src/generate_data_preparation_summary.py"
+        $summaryArgs = "run", "python", "-u", $summaryScriptPath
+        if ($SandboxMode) {
+            $summaryArgs += "--sandbox-path", $WorkingDirectory
+        }
+        $originalLocation = Get-Location
+        try {
+            Set-Location $WorkingDirectory
+            $commandString = "pdm " + ($summaryArgs -join " ")
+            Invoke-Expression $commandString | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "${C_GREEN}Pipeline summary report generated successfully.${C_RESET}"
+            } else {
+                Write-Host "${C_YELLOW}Warning: Pipeline summary report generation returned exit code $LASTEXITCODE${C_RESET}"
+            }
+        }
+        catch {
+            Write-Host "${C_YELLOW}Warning: Could not generate pipeline summary report. Error: $($_.Exception.Message)${C_RESET}"
+        }
+        finally {
+            Set-Location $originalLocation
+        }
+        }    
         Write-Host "${C_CYAN}Report-only mode enabled. Exiting.${C_RESET}"; return
     }
     
@@ -898,6 +957,22 @@ try {
         } else {
             # All steps are complete, so inform the user
             Write-Host "All steps are already complete. Use -Force to re-run the entire pipeline."
+            
+            # Determine which adaptive steps are in the current run scope
+            $runStart = if ($StartWithStep -gt 0) { $StartWithStep } else { 1 }
+            $runEnd = if ($StopAfterStep -gt 0) { $StopAfterStep } else { $PipelineSteps.Count }
+            
+            $adaptiveStepsInScope = @()
+            if ($runStart -le 7 -and $runEnd -ge 7) {
+                $adaptiveStepsInScope += "Step 7 (Analyze Cutoff Parameters)"
+            }
+            if ($runStart -le 12 -and $runEnd -ge 12) {
+                $adaptiveStepsInScope += "Step 12 (Neutralize Delineations)"
+            }
+            
+            if ($adaptiveStepsInScope.Count -gt 0) {
+                Write-Host "${C_YELLOW}Note: $($adaptiveStepsInScope -join ' and ') may trigger downstream updates if needed.${C_RESET}"
+            }
         }
         
         Read-Host -Prompt "${C_ORANGE}Press Enter to continue (Ctrl+C to exit)...${C_RESET}" | Out-Null
@@ -909,6 +984,18 @@ try {
     # Track whether we've shown the overwrite instruction
     $overwriteInstructionShown = $false
 
+    # Initialize session tracking flags
+    $script:AnyStepExecutedThisRun = $false
+    $script:Step7ExecutedThisRun = $false
+    $script:Step7ParametersChanged = $false
+    
+    # Warn if StopAfterStep is used (testing only)
+    if ($StopAfterStep -gt 0 -and -not $TestMode.IsPresent) {
+        Write-Host "`n${C_YELLOW}WARNING: -StopAfterStep is intended for testing purposes only.${C_RESET}"
+        Write-Host "${C_YELLOW}Stopping before pipeline completion may result in inconsistent data.${C_RESET}"
+        Write-Host "${C_YELLOW}Downstream steps that depend on executed steps will not be run.${C_RESET}`n"
+    }
+    
     $totalSteps = $PipelineSteps.Count; $stepCounter = 0
     foreach ($step in $PipelineSteps) {
         $stepCounter++
@@ -967,15 +1054,30 @@ try {
             $isSkipped = $true
         }
 
-        # Skip if the step is complete AND we are not in force-overwrite mode AND we didn't start from a previous step
-        # If we resumed from a previous step, we need to force re-execution of all downstream steps
-        $shouldForceDownstream = ($StartWithStep -gt 0) -and ($stepCounter -ge $StartWithStep)
+        # Global rule: Any step that executes forces all downstream steps to re-run
+        # This ensures data consistency throughout the pipeline
+        # Track if any previous step executed in this session
+        $shouldForceDownstream = $script:AnyStepExecutedThisRun
+        
         $stepStatus = Get-StepStatus -Step $step -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
         
-        # Special handling: If Step 11 (Neutralize Delineations) is not COMPLETE, force reprocessing of steps 12 and 13
-        if ($stepCounter -gt 11 -and $step.Name -in @("Create Subject Database", "Generate Personalities Database")) {
-            $step11Status = Get-StepStatus -Step $PipelineSteps[10] -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
-            if ($step11Status -ne "Complete") {
+        # Exception 1: Step 7 (Analyze Cutoff Parameters) only forces downstream if parameters changed
+        # If Step 7 executed but parameters didn't change, don't force Steps 8-11
+        if ($stepCounter -ge 8 -and $stepCounter -le 11 -and $script:Step7ExecutedThisRun -and -not $script:Step7ParametersChanged) {
+            $shouldForceDownstream = $false
+        }
+        
+        # Exception 2: Step 12 (Neutralize Delineations) has its own state machine
+        # It's independent and only re-runs based on staleness/partialness (handled by Get-StepStatus)
+        # So we don't force it based on upstream execution
+        if ($stepCounter -eq 12) {
+            $shouldForceDownstream = $false
+        }
+        
+        # Special handling: If Step 12 (Neutralize Delineations) is not COMPLETE, force reprocessing of steps 13 and 14
+        if ($stepCounter -gt 12 -and $step.Name -in @("Create Subject Database", "Generate Personalities Database")) {
+            $step12Status = Get-StepStatus -Step $PipelineSteps[11] -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
+            if ($step12Status -ne "Complete") {
                 $shouldForceDownstream = $true
             }
         }
@@ -1141,7 +1243,19 @@ Please complete the required action and then re-run the script to continue.${C_R
                     if ($stepStatus -eq "Partial") {
                         Write-Host "Step ${stepCounter}: '$($step.Name)' is partially complete. Skipping. Use --force to process all files." -ForegroundColor Yellow
                     } else {
-                        Write-Host "Output exists for Step ${stepCounter}: '$($step.Name)'. Skipping." -ForegroundColor Yellow
+                        # Special messaging for adaptive steps
+                        if ($step.Name -eq "Analyze Cutoff Parameters") {
+                            # Read current parameters to show they're unchanged
+                            $currentStartPoint = Get-ConfigValue -FilePath $configFile -Section "DataGeneration" -Key "cutoff_search_start_point" -DefaultValue "unknown"
+                            $currentSmoothingWindow = Get-ConfigValue -FilePath $configFile -Section "DataGeneration" -Key "smoothing_window_size" -DefaultValue "unknown"
+                            Write-Host "Step ${stepCounter}: '$($step.Name)' - Parameters unchanged (start=$currentStartPoint, window=$currentSmoothingWindow). Skipping." -ForegroundColor Cyan
+                        }
+                        elseif ($step.Name -eq "Neutralize Delineations") {
+                            Write-Host "Step ${stepCounter}: '$($step.Name)' - Neutralized files are up to date and complete. Skipping." -ForegroundColor Cyan
+                        }
+                        else {
+                            Write-Host "Output exists for Step ${stepCounter}: '$($step.Name)'. Skipping." -ForegroundColor Cyan
+                        }
                     }
                 }
             }
@@ -1299,6 +1413,61 @@ Please complete the required action and then re-run the script to continue.${C_R
             Write-Host "Script failed with exit code $exitCode" -ForegroundColor Red
             throw "Script '$($step.Script)' failed with exit code $exitCode. Halting pipeline." 
         }
+        
+        # Mark that a step executed successfully (for downstream forcing logic)
+        $script:AnyStepExecutedThisRun = $true
+        
+        # Special post-processing for Analyze Cutoff Parameters step
+        if ($step.Name -eq "Analyze Cutoff Parameters") {
+            Write-Host "`n${C_YELLOW}Updating config.ini with optimal cutoff parameters...${C_RESET}"
+            $csvPath = Join-Path $WorkingDirectory $step.Output
+            if (Test-Path $csvPath) {
+                try {
+                    # Read current parameters from config
+                    $configPath = Join-Path $WorkingDirectory "config.ini"
+                    $currentStartPoint = Get-ConfigValue -FilePath $configPath -Section "DataGeneration" -Key "cutoff_search_start_point" -DefaultValue "0"
+                    $currentSmoothingWindow = Get-ConfigValue -FilePath $configPath -Section "DataGeneration" -Key "smoothing_window_size" -DefaultValue "0"
+                    
+                    # Read the CSV and get the top row (best parameters)
+                    $csvContent = Import-Csv $csvPath
+                    if ($csvContent.Count -gt 0) {
+                        $bestParams = $csvContent[0]
+                        $newStartPoint = $bestParams.'Start Point'
+                        $newSmoothingWindow = $bestParams.'Smoothing Window'
+                        
+                        # Check if parameters actually changed
+                        if ($newStartPoint -ne $currentStartPoint -or $newSmoothingWindow -ne $currentSmoothingWindow) {
+                            # Update config.ini
+                            $configContent = Get-Content $configPath -Raw
+                            $configContent = $configContent -replace '(?m)^cutoff_search_start_point\s*=\s*\d+', "cutoff_search_start_point = $newStartPoint"
+                            $configContent = $configContent -replace '(?m)^smoothing_window_size\s*=\s*\d+', "smoothing_window_size = $newSmoothingWindow"
+                            $configContent | Set-Content $configPath -NoNewline
+                            
+                            Write-Host "${C_GREEN}Config updated: cutoff_search_start_point = $newStartPoint, smoothing_window_size = $newSmoothingWindow${C_RESET}"
+                            Write-Host "${C_YELLOW}Parameters changed - downstream steps 8-11 will be re-executed${C_RESET}"
+                            
+                            # Set flags to force downstream steps 8-11 to re-run
+                            $script:Step7ExecutedThisRun = $true
+                            $script:Step7ParametersChanged = $true
+                        } else {
+                            Write-Host "${C_GREEN}Parameters unchanged: cutoff_search_start_point = $newStartPoint, smoothing_window_size = $newSmoothingWindow${C_RESET}"
+                            Write-Host "${C_CYAN}No changes detected - downstream steps will not be forced to re-run${C_RESET}"
+                            
+                            # Mark that Step 7 ran but didn't change parameters
+                            $script:Step7ExecutedThisRun = $true
+                            $script:Step7ParametersChanged = $false
+                        }
+                    } else {
+                        Write-Host "${C_YELLOW}Warning: CSV file is empty, config not updated${C_RESET}"
+                    }
+                } catch {
+                    Write-Host "${C_YELLOW}Warning: Could not update config.ini. Error: $($_.Exception.Message)${C_RESET}"
+                }
+            } else {
+                Write-Host "${C_YELLOW}Warning: Analysis results file not found at $csvPath${C_RESET}"
+            }
+        }
+        
         if ($Interactive) { 
             Write-Host ""   # This line cannot be removed without breaking the flow!
             if ($env:UNDER_TEST_HARNESS -eq "true") {
@@ -1394,6 +1563,33 @@ finally {
             
             # Add data completeness report
             Show-DataCompletenessReport -BaseDirectory $WorkingDirectory -TestMode:$TestMode
+            
+            # Generate pipeline summary report (skip in test mode)
+            if (-not $TestMode.IsPresent) {
+                Write-Host "`n${C_YELLOW}Generating pipeline summary report...${C_RESET}"
+                $summaryScriptPath = Join-Path $ProjectRoot "src/generate_data_preparation_summary.py"
+                $summaryArgs = "run", "python", "-u", $summaryScriptPath
+                if ($SandboxMode) {
+                    $summaryArgs += "--sandbox-path", $WorkingDirectory
+                }
+                $originalLocation = Get-Location
+                try {
+                    Set-Location $WorkingDirectory
+                    $commandString = "pdm " + ($summaryArgs -join " ")
+                    Invoke-Expression $commandString | Out-Null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "${C_GREEN}Pipeline summary report generated successfully.${C_RESET}"
+                    } else {
+                        Write-Host "${C_YELLOW}Warning: Pipeline summary report generation returned exit code $LASTEXITCODE${C_RESET}"
+                    }
+                }
+                catch {
+                    Write-Host "${C_YELLOW}Warning: Could not generate pipeline summary report. Error: $($_.Exception.Message)${C_RESET}"
+                }
+                finally {
+                    Set-Location $originalLocation
+                }
+            }
         }
     }
     exit $exitCode

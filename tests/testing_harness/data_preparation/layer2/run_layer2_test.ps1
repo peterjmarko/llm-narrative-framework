@@ -116,6 +116,13 @@ summary_path = 'data/reports/ocean_scores_summary.txt'
 os.makedirs(os.path.dirname(summary_path), exist_ok=True)
 with open(summary_path, 'w') as f:
     f.write('Total in Source: 100\nTotal Scored: 100')
+    
+# Also create the validation summary file that the pipeline summary script needs
+validation_summary_path = 'data/reports/adb_validation_summary.txt'
+os.makedirs(os.path.dirname(validation_summary_path), exist_ok=True)
+with open(validation_summary_path, 'w') as f:
+    f.write('Total Records in Report: 100\nValid Records: 100 (100.0%)\nFailed Records: 0 (0.0%)')
+
 sys.exit(0)
 "@
         } elseif ($scriptName -eq "neutralize_delineations.py") {
@@ -174,6 +181,9 @@ sys.exit(0)
     Write-Host "  -> Successfully created $($automatedSteps.Count) mock scripts."
 
     Set-Location $TestDir
+
+    # Set environment variable for additional sandbox detection
+    $env:PROJECT_SANDBOX_PATH = $TestDir
 
     # --- Phase 2: Execute Test Workflow ---
     Write-Host "`n--- Phase 2: Execute Test Workflow ---" -ForegroundColor Cyan
@@ -237,7 +247,15 @@ sys.exit(0)
         Move-Item $backedUpSfChart $sfChartExport -Force
     }
     $output = & .\prepare_data.ps1 -Force -TestMode -Resumed -SuppressConfigDisplay 2>&1
-    if ($LASTEXITCODE -ne 0 -or $output -notmatch "Pipeline Completed Successfully") { throw "Expected pipeline to complete but it did not." }
+    Write-Host "Pipeline output:"
+    Write-Host $output
+    Write-Host "LASTEXITCODE: $LASTEXITCODE"
+    if ($LASTEXITCODE -ne 0 -or $output -notmatch "Pipeline Completed Successfully") { 
+        Write-Host "Pipeline failed. Exit code: $LASTEXITCODE"
+        Write-Host "Output content:"
+        $output | ForEach-Object { Write-Host "  $_" }
+        throw "Expected pipeline to complete but it did not." 
+    }
     Test-OrchestratorState "Completion" -ShouldExist -Files "data/personalities_db.txt"
 
     Write-Host "`nSUCCESS: Layer 2 orchestrator test completed successfully." -ForegroundColor Green

@@ -175,16 +175,24 @@ Alternatively, you can run the pipeline using pdm:
 - Step 4: Select Eligible Candidates
 - Step 5: Generate Eminence Scores
 - Step 6: Generate OCEAN Scores
-- Step 7: Select Final Candidates
-- Step 8: Prepare Solar Fire Import File
-- Step 9: Delineations Library Export (Manual)
-- Step 10: Astrology Data Export (Manual)
-- Step 11: Neutralize Delineations
-- Step 12: Create Subject Database
-- Step 13: Generate Personalities Database
+- Step 7: Analyze Cutoff Parameters
+- Step 8: Select Final Candidates
+- Step 9: Prepare Solar Fire Import File
+- Step 10: Delineations Library Export (Manual)
+- Step 11: Astrology Data Export (Manual)
+- Step 12: Neutralize Delineations
+- Step 13: Create Subject Database
+- Step 14: Generate Personalities Database
+
+**Important Notes:**
+- **Automatic Downstream Execution**: When any step executes, all downstream steps are automatically forced to re-run to maintain data consistency. There are two exceptions:
+  - Step 7 (Analyze Cutoff Parameters): Only forces downstream re-execution if the optimal parameters actually change
+  - Step 12 (Neutralize Delineations): Has an independent state machine and only re-runs based on its own staleness/completeness checks
+- **`-StopAfterStep` Parameter**: This parameter is intended for testing and debugging purposes only. Using it in production may result in data inconsistency, as dependent downstream steps will not be automatically updated.
 
 **Common Scenarios for Resuming:**
 - **Network/API Failures**: If LLM scoring steps (5 or 6) fail due to network issues, resume from the failed step to continue processing only the remaining batches.
+- **Parameter Changes**: If Step 7 runs and updates cutoff parameters, Steps 8-11 will automatically re-run with the new values.
 - **Manual Step Interruption**: If you need to pause during manual steps (9 or 10), the pipeline can be resumed from the next automated step.
 - **Partial Completion**: When a step completes partially but doesn't finish, resuming from that step will continue from where it left off.
 - **Re-running Scoring Steps**: When you re-run eminence or OCEAN scoring steps (5 or 6) with different parameters or models, the pipeline will automatically force re-execution of all downstream steps (7 and 8) to ensure data consistency, even if their output files already exist.

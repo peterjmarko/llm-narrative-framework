@@ -38,21 +38,43 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
+# Add the project root to the Python path
+script_dir = Path(__file__).resolve().parent
+project_root = script_dir.parent
+sys.path.insert(0, str(project_root))
+
+# Import configuration loader
+try:
+    from config_loader import get_path
+except ImportError:
+    # Fallback for test environments
+    def get_path(path):
+        return path
+
 # Report configuration
 PIPELINE_SUMMARY_PATH = "data/reports/data_preparation_pipeline_summary.txt"
 PIPELINE_COMPLETION_INFO = "data/reports/pipeline_completion_info.json"
 
+def safe_file_operation(operation, default_return=None, error_message=None):
+    """Safely perform a file operation with error handling."""
+    try:
+        return operation()
+    except Exception as e:
+        if error_message:
+            print(f"Warning: {error_message}. Error: {str(e)}")
+        return default_return
+
 def load_pipeline_completion_info() -> Dict:
     """Loads the pipeline completion information from JSON."""
-    try:
-        with open(PIPELINE_COMPLETION_INFO, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
+    return safe_file_operation(
+        lambda: json.load(open(PIPELINE_COMPLETION_INFO, 'r')),
+        {},
+        f"Could not load pipeline completion info from {PIPELINE_COMPLETION_INFO}"
+    )
 
 def load_validation_summary() -> Dict:
     """Loads validation statistics from the validation summary report."""
-    try:
+    def _load():
         with open("data/reports/adb_validation_summary.txt", 'r') as f:
             content = f.read()
         
@@ -68,12 +90,16 @@ def load_validation_summary() -> Dict:
                 failed_part = line.split(':')[1].strip()
                 stats['failed_records'] = int(failed_part.split('(')[0].strip().replace(',', ''))
         return stats
-    except FileNotFoundError:
-        return {}
+    
+    return safe_file_operation(
+        _load,
+        {},
+        "Could not load validation summary"
+    )
 
 def load_eminence_summary() -> Dict:
     """Loads eminence scoring statistics from the eminence summary report."""
-    try:
+    def _load():
         with open("data/reports/eminence_scores_summary.txt", 'r') as f:
             content = f.read()
         
@@ -86,12 +112,16 @@ def load_eminence_summary() -> Dict:
             elif "Mean:" in line:
                 stats['mean_score'] = float(line.split(':')[1].strip())
         return stats
-    except FileNotFoundError:
-        return {}
+    
+    return safe_file_operation(
+        _load,
+        {},
+        "Could not load eminence summary"
+    )
 
 def load_ocean_summary() -> Dict:
     """Loads OCEAN scoring statistics from the OCEAN summary report."""
-    try:
+    def _load():
         with open("data/reports/ocean_scores_summary.txt", 'r') as f:
             content = f.read()
         
@@ -102,15 +132,19 @@ def load_ocean_summary() -> Dict:
             elif "Total in Source:" in line:
                 stats['total_in_source'] = int(line.split(':')[1].strip().replace(',', ''))
         return stats
-    except FileNotFoundError:
-        return {}
+    
+    return safe_file_operation(
+        _load,
+        {},
+        "Could not load OCEAN summary"
+    )
 
 def load_cutoff_analysis() -> Dict:
     """Loads cutoff parameter analysis results."""
     result = {}
     
     # Load CSV data if available
-    try:
+    def _load_csv():
         df = pd.read_csv("data/reports/cutoff_parameter_analysis_results.csv")
         # Find the optimal parameters (minimum error)
         optimal_row = df.loc[df['Error'].idxmin()]
@@ -121,14 +155,16 @@ def load_cutoff_analysis() -> Dict:
             'optimal_error': int(optimal_row['Error']),
             'csv_available': True
         })
-    except FileNotFoundError:
-        result['csv_available'] = False
+        return result
+    
+    safe_file_operation(
+        _load_csv,
+        None,
+        "Could not load cutoff analysis CSV"
+    )
     
     # Try to extract cutoff from the variance curve analysis image
-    try:
-        # This is a simple text extraction approach
-        # In a real implementation, you might use OCR to read the image
-        # For now, we'll check if the file exists and note that manual extraction is needed
+    def _check_image():
         variance_file = Path("data/reports/variance_curve_analysis.png")
         if variance_file.exists():
             result['variance_analysis_available'] = True
@@ -137,14 +173,18 @@ def load_cutoff_analysis() -> Dict:
             result['final_cutoff_from_image'] = "Manual extraction required"
         else:
             result['variance_analysis_available'] = False
-    except Exception:
-        result['variance_analysis_available'] = False
+    
+    safe_file_operation(
+        _check_image,
+        None,
+        "Could not check variance analysis image"
+    )
     
     return result
 
 def count_missing_subjects(missing_file_path: str) -> int:
     """Counts the number of missing subjects from a missing subjects report."""
-    try:
+    def _count():
         with open(missing_file_path, 'r') as f:
             content = f.read()
         
@@ -158,8 +198,12 @@ def count_missing_subjects(missing_file_path: str) -> int:
                 if not any(keyword in line.lower() for keyword in ['subjects missed', 'none', 'subjects not attempted']):
                     count += 1
         return count
-    except FileNotFoundError:
-        return 0
+    
+    return safe_file_operation(
+        _count,
+        0,
+        f"Could not count missing subjects from {missing_file_path}"
+    )
 
 def check_file_existence() -> Dict:
     """Checks for the existence of key pipeline output files."""
@@ -186,7 +230,7 @@ def check_file_existence() -> Dict:
 
 def load_candidate_qualification_info() -> Dict:
     """Loads information about the candidate qualification process."""
-    try:
+    def _load():
         eligible_path = "data/intermediate/adb_eligible_candidates.txt"
         if Path(eligible_path).exists():
             with open(eligible_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -195,21 +239,28 @@ def load_candidate_qualification_info() -> Dict:
                 eligible_count = sum(1 for line in f if line.strip())
             return {'eligible_count': eligible_count}
         return {'eligible_count': 0}
-    except Exception:
-        return {'eligible_count': 0}
-
+    
+    return safe_file_operation(
+        _load,
+        {'eligible_count': 0},
+        "Could not load candidate qualification info"
+    )
 
 def load_final_candidates_info() -> Dict:
     """Loads information about the final candidates after cutoff."""
-    try:
+    def _load():
         final_path = "data/intermediate/adb_final_candidates.txt"
         if Path(final_path).exists():
             with open(final_path, 'r', encoding='utf-8', errors='ignore') as f:
                 final_count = sum(1 for line in f if line.strip())
             return {'final_count': final_count}
         return {'final_count': 0}
-    except Exception:
-        return {'final_count': 0}
+    
+    return safe_file_operation(
+        _load,
+        {'final_count': 0},
+        "Could not load final candidates info"
+    )
 
 def calculate_pipeline_metrics(completion_info: Dict, validation_stats: Dict,
                               eminence_stats: Dict, ocean_stats: Dict) -> Dict:
@@ -287,7 +338,7 @@ def calculate_pipeline_metrics(completion_info: Dict, validation_stats: Dict,
 
 def load_final_database_info() -> Dict:
     """Loads information about the final subject database."""
-    try:
+    def _load():
         db_path = "data/processed/subject_db.csv"
         if Path(db_path).exists():
             df = pd.read_csv(db_path)
@@ -297,8 +348,12 @@ def load_final_database_info() -> Dict:
                 'file_size_mb': Path(db_path).stat().st_size / (1024 * 1024)
             }
         return {'file_exists': False}
-    except Exception:
-        return {'file_exists': False}
+    
+    return safe_file_operation(
+        _load,
+        {'file_exists': False},
+        "Could not load final database info"
+    )
 
 def load_delineation_info() -> Dict:
     """Loads information about the delineation library and neutralized files."""
@@ -308,41 +363,60 @@ def load_delineation_info() -> Dict:
         'total_neutralized_files': 0
     }
     
-    # Check for source delineation library
-    if Path("data/foundational_assets/sf_delineations_library.txt").exists():
-        info['source_library_exists'] = True
-    
-    # Check for neutralized delineations directory
-    neutralized_dir = Path("data/foundational_assets/neutralized_delineations")
-    if neutralized_dir.exists():
-        expected_files = [
-            "balances_elements.csv",
-            "balances_hemispheres.csv",
-            "balances_modes.csv",
-            "balances_quadrants.csv",
-            "balances_signs.csv",
-            "points_in_signs.csv"
-        ]
+    def _load():
+        # Check for source delineation library
+        if Path("data/foundational_assets/sf_delineations_library.txt").exists():
+            info['source_library_exists'] = True
         
-        for file_name in expected_files:
-            file_path = neutralized_dir / file_name
-            if file_path.exists():
-                try:
-                    line_count = sum(1 for _ in open(file_path, 'r', encoding='utf-8') if _.strip())
-                    info['neutralized_files'][file_name] = {
-                        'exists': True,
-                        'line_count': line_count
-                    }
-                    info['total_neutralized_files'] += 1
-                except Exception:
+        # Check for neutralized delineations directory
+        neutralized_dir = Path("data/foundational_assets/neutralized_delineations")
+        if neutralized_dir.exists():
+            expected_files = [
+                "balances_elements.csv",
+                "balances_hemispheres.csv",
+                "balances_modes.csv",
+                "balances_quadrants.csv",
+                "balances_signs.csv",
+                "points_in_signs.csv"
+            ]
+            
+            for file_name in expected_files:
+                file_path = neutralized_dir / file_name
+                if file_path.exists():
+                    try:
+                        line_count = sum(1 for _ in open(file_path, 'r', encoding='utf-8') if _.strip())
+                        info['neutralized_files'][file_name] = {
+                            'exists': True,
+                            'line_count': line_count
+                        }
+                        info['total_neutralized_files'] += 1
+                    except Exception:
+                        info['neutralized_files'][file_name] = {'exists': False}
+                else:
                     info['neutralized_files'][file_name] = {'exists': False}
-            else:
-                info['neutralized_files'][file_name] = {'exists': False}
+        
+        return info
     
-    return info
+    return safe_file_operation(
+        _load,
+        info,
+        "Could not load delineation info"
+    )
 
 def generate_pipeline_summary_report() -> str:
     """Generates the complete data preparation pipeline summary report."""
+    
+    # Check if key files exist
+    key_files = [
+        "data/reports/adb_validation_summary.txt",
+        "data/reports/eminence_scores_summary.txt",
+        "data/reports/ocean_scores_summary.txt",
+        "data/reports/cutoff_parameter_analysis_results.csv"
+    ]
+    
+    for file_path in key_files:
+        exists = Path(file_path).exists()
+    
     # Load all report data
     completion_info = load_pipeline_completion_info()
     validation_stats = load_validation_summary()
@@ -546,7 +620,7 @@ def generate_pipeline_summary_report() -> str:
     cutoff_file = "data/reports/cutoff_parameter_analysis_results.csv"
     if Path(cutoff_file).exists():
         # Load cutoff analysis details
-        try:
+        def _load_cutoff():
             df = pd.read_csv(cutoff_file)
             optimal_row = df.loc[df['Error'].idxmin()]
             optimal_cutoff = int(optimal_row['Predicted Cutoff'])
@@ -562,14 +636,13 @@ def generate_pipeline_summary_report() -> str:
                 f"and may not reflect the current dataset of {final_db_info.get('total_subjects', 0):,} subjects.",
                 "The analysis file serves as documentation of the methodology used for cohort selection."
             ])
-        except Exception:
-            # Fallback if CSV can't be read
-            report_lines.extend([
-                "",
-                "--- CUTOFF ANALYSIS DETAILS ---",
-                f"Location: {cutoff_file}",
-                f"Note: Analysis was performed on a different dataset and serves as methodological reference"
-            ])
+            return True
+        
+        safe_file_operation(
+            _load_cutoff,
+            None,
+            "Could not load cutoff analysis details"
+        )
     
     # Add issues and recommendations section
     report_lines.extend([
@@ -698,7 +771,19 @@ def main():
     )
     parser.add_argument("--output", default=PIPELINE_SUMMARY_PATH,
                        help="Output path for the pipeline summary report.")
+    parser.add_argument("--sandbox-path", 
+                       help="Path to the sandbox directory (for testing).")
     args = parser.parse_args()
+    
+    # Handle sandbox path for testing
+    if args.sandbox_path:
+        # Store the original directory for later use
+        original_dir = os.getcwd()
+        os.chdir(args.sandbox_path)
+        
+        # Update the output path to be in the sandbox directory
+        if not os.path.isabs(args.output):
+            args.output = os.path.join(args.sandbox_path, args.output)
     
     # Ensure the reports directory exists
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
@@ -707,8 +792,12 @@ def main():
     report_content = generate_pipeline_summary_report()
     
     # Write to file and console
-    with open(args.output, 'w', encoding='utf-8') as f:
-        f.write(report_content)
+    try:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            f.write(report_content)
+    except Exception as e:
+        print(f"Error writing report to file: {e}")
+        return 2  # Return error code 2 for file write errors
     
     # Create a console-safe version with ASCII characters
     console_safe_content = report_content.replace('✓', '[OK]').replace('✗', '[MISSING]').replace('⚠', '[WARNING]')
@@ -716,12 +805,14 @@ def main():
     try:
         print(console_safe_content)
         print(f"\nData preparation pipeline summary report saved to: {args.output}")
+        return 0  # Success
     except UnicodeEncodeError:
         # Final fallback - just print the success message
         print(f"Data preparation pipeline summary report saved to: {args.output}")
         print("View the file to see the full report with special characters.")
+        return 0  # Success
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
 
 # === End of src/generate_data_preparation_summary.py ===
