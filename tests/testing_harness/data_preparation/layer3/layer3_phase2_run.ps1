@@ -541,9 +541,9 @@ Assertive and pioneering.
         [Console]::ReadLine() | Out-Null
     }
 
-    # --- RUN 3: Resume pipeline to halt at Step 10 ---
-    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming to Step 10... ---$($C_RESET)" -ForegroundColor Cyan
-    $run3Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; SuppressConfigDisplay = $true }
+    # --- RUN 3: Resume pipeline to halt at Step 11 (Astrology Data Export) ---
+    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming to Step 11... ---$($C_RESET)" -ForegroundColor Cyan
+    $run3Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; SuppressConfigDisplay = $true; StartWithStep = 11 }
     if ($Interactive) { $run3Args.Interactive = $true }
 
     & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run3Args 2>&1 | ForEach-Object {
@@ -618,29 +618,8 @@ Assertive and pioneering.
         [Console]::ReadLine() | Out-Null
     }
 
-    # --- SIMULATE Step 11: Neutralize Delineations ---
-    # Always print the step header for consistency
-    $stepHeader11 = ">>> Step 11/13: Neutralize Delineations <<<"
-    Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
-    Write-Host $stepHeader11 -ForegroundColor Blue
-    Write-Host "Rewrites esoteric texts into neutral psychological descriptions using an LLM." -ForegroundColor Blue
-    
-    if ($Interactive) {
-        $summary11 = "This automated step uses an LLM to neutralize esoteric astrological text into psychological descriptions. The test harness simulates this by copying pre-generated neutralized files from the test assets directory."
-        Write-Host "`n${C_BLUE}Script Summary: $summary11${C_RESET}"
-        Write-Host "${C_MAGENTA}Test Harness Note: LLM neutralization is being bypassed by using pre-computed test assets.${C_RESET}"
-        Write-Host "`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}"
-        Write-Host ""
-        Write-Host "${C_RESET}  INPUTS:"
-        Write-Host "    - data/foundational_assets/sf_delineations_library.txt"
-        Write-Host ""
-        Write-Host "  OUTPUT:"
-        Write-Host "    - data/foundational_assets/neutralized_delineations/"
-        
-        Read-Host -Prompt "`n${C_ORANGE}Press Enter to simulate this automated step (Ctrl+C to exit)...${C_RESET}" | Out-Null
-    }
-    
-    Write-Host "`n--- SIMULATING: Neutralize Delineations (copying pre-generated test assets)... ---$($C_RESET)" -ForegroundColor Magenta
+    # --- Pre-populate neutralized delineations for Step 12 ---
+    Write-Host "`n--- PRE-POPULATING: Neutralized delineations for pipeline processing... ---$($C_RESET)" -ForegroundColor Magenta
     
     $sourceDir = Join-Path $ProjectRoot "tests/assets/data/foundational_assets/neutralized_delineations"
     $destDir = Join-Path $SandboxDir "data/foundational_assets/neutralized_delineations"
@@ -650,19 +629,12 @@ Assertive and pioneering.
     }
     
     Copy-Item -Path "$sourceDir/*" -Destination $destDir -Recurse -Force
-    Write-Host "  -> Copied pre-neutralized delineation files from test assets."
-    
-    # Log Step 11 completion
-    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 11; 'Step Description' = "Neutralize Delineations"; 'Status' = "SUCCESS"; 'Output File' = "data/foundational_assets/neutralized_delineations/ (6 files)" })
+    Write-Host "  -> Copied pre-neutralized delineation files from test assets." -ForegroundColor DarkGray
+    Write-Host "  -> Step 12 will detect these files and skip LLM processing." -ForegroundColor DarkGray
 
-    if ($Interactive) {
-        [Console]::Write("`n${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET} ")
-        [Console]::ReadLine() | Out-Null
-    }
-
-    # --- RUN 4: Resume to completion (Steps 12-13 only) ---
+    # --- RUN 4: Resume to completion (Steps 12-14) ---
     Write-Host "`n--- EXECUTING PIPELINE (Part 4): Resuming to completion... ---$($C_RESET)" -ForegroundColor Cyan
-    $run4Args = @{ NoFinalReport = $true; Resumed = $true; TestMode = $true; SuppressConfigDisplay = $true; StartWithStep = 12 }
+    $run4Args = @{ Force = $true; NoFinalReport = $true; Resumed = $true; TestMode = $true; SuppressConfigDisplay = $true; StartWithStep = 12 }
     if ($Interactive) { $run4Args.Interactive = $true }
 
     $run4Steps = [System.Collections.Generic.List[object]]::new()

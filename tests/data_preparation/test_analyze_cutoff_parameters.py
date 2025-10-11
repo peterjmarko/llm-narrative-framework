@@ -193,13 +193,19 @@ slope_threshold = -0.00001
         from src.analyze_cutoff_parameters import main
         main()
         
-        # With minimal data, the script should complete but produce no results
-        # Verify it prints the appropriate message
+        # With minimal data, the script should complete and create minimal output
+        # Verify it prints the appropriate warning message
         captured = capsys.readouterr()
-        assert "Analysis could not be completed" in captured.out
+        assert "Dataset too small for meaningful parameter analysis" in captured.out
+        assert "Creating minimal output file" in captured.out
         
-        # The output file should NOT be created when there are no results
-        output_path = Path(temp_sandbox) / "data" / "reports" / "cutoff_parameter_analysis_results.csv"
-        assert not output_path.exists(), "CSV should not be created when analysis produces no results"
+        # Verify that a minimal CSV was created
+        report_path = Path(temp_sandbox) / "data" / "reports" / "cutoff_parameter_analysis_results.csv"
+        assert report_path.exists(), "Minimal results CSV should be created"
+        
+        # Verify the minimal CSV contains placeholder data
+        minimal_df = pd.read_csv(report_path)
+        assert len(minimal_df) == 1, "Minimal CSV should have exactly 1 row"
+        assert minimal_df['Error'].iloc[0] == 0, "Error should be 0 for placeholder data"
 
 # === End of tests/data_preparation/test_analyze_cutoff_parameters.py ===
