@@ -944,7 +944,10 @@ try {
             # We found a pending manual step, which takes precedence
             $stepName = $PipelineSteps[$pendingManualStep - 1].Name
             $stepStatus = Get-StepStatus -Step $PipelineSteps[$pendingManualStep - 1] -BaseDirectory $WorkingDirectory -ConfigFilePath $configFile
-            if ($stepName -eq "Astrology Data Export (Manual)") {
+            if ($StopAfterStep -gt 0 -and $pendingManualStep -gt $StopAfterStep) {
+                Write-Host "The pipeline would resume at Step ${pendingManualStep}: $stepName"
+                Write-Host "However, execution will stop after Step ${StopAfterStep} as requested."
+            } elseif ($stepName -eq "Astrology Data Export (Manual)") {
                 Write-Host "The pipeline will resume at Step ${pendingManualStep}: $stepName"
                 Write-Host "The Solar Fire export file has been detected and will be automatically fetched."
             } else {
@@ -953,7 +956,12 @@ try {
         } elseif ($firstIncompleteStep) {
             # We found an incomplete step that's not a pending manual step
             $stepName = $PipelineSteps[$firstIncompleteStep - 1].Name
-            Write-Host "The pipeline will resume at Step ${firstIncompleteStep}: $stepName"
+            if ($StopAfterStep -gt 0 -and $firstIncompleteStep -gt $StopAfterStep) {
+                Write-Host "The pipeline would resume at Step ${firstIncompleteStep}: $stepName"
+                Write-Host "However, execution will stop after Step ${StopAfterStep} as requested."
+            } else {
+                Write-Host "The pipeline will resume at Step ${firstIncompleteStep}: $stepName"
+            }
         } else {
             # All steps are complete, so inform the user
             Write-Host "All steps are already complete. Use -Force to re-run the entire pipeline."
@@ -1261,7 +1269,15 @@ Please complete the required action and then re-run the script to continue.${C_R
             }
             $isSkipped = $true
         }
-        if ($isSkipped) { continue }
+        if ($isSkipped) {
+            # Check if we should stop after this skipped step
+            if ($StopAfterStep -gt 0 -and $stepCounter -eq $StopAfterStep) {
+                Write-Host "`n${C_MAGENTA}Stopping at Step $stepCounter as requested (step was skipped).${C_RESET}"
+                $exitCode = 1
+                break
+            }
+            continue
+        }
         
         # --- If we reach here, the step will be executed. ---
         # Print the stage banner only if this is the very first step of the stage.

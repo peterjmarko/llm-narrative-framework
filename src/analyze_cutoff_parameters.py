@@ -131,13 +131,15 @@ def main():
         sys.exit(1)
         
     # Calculate the raw variance curve once to avoid redundant calculations.
-    print(f"Calculating variance curve for {len(ocean_df)} subjects...")
+    print(f"\nCalculating variance curve for {len(ocean_df)} subjects...")
     x_values = np.array(range(2, len(ocean_df) + 1))
     variances = np.array([calculate_average_variance(ocean_df.head(i)) for i in tqdm(x_values, desc="Computing Variances", ncols=80)])
     print() # Add blank line after progress bar
     
     results = []
     total_iterations = len(start_points) * len(smoothing_windows)
+    
+    print(f"Determining optimal cutoff parameters for {total_iterations} combinations...")
 
     with tqdm(total=total_iterations, desc="Analyzing Parameters", ncols=80) as pbar:
         for start_point in start_points:
