@@ -254,9 +254,9 @@ try {
         Write-Host "  -> ✓ ${StepName}: All subjects present" -ForegroundColor Green
     }
 
-    # --- Execute Pipeline (Part 1) ---
+    # --- Execute Pipeline ---
     $prepareDataScript = Join-Path $ProjectRoot "prepare_data.ps1"
-    Write-Host "`n--- EXECUTING PIPELINE (Part 1): Running pipeline to generate files needed for simulation... ---$($C_RESET)" -ForegroundColor Cyan
+    Write-Host "`n--- EXECUTING PIPELINE: Starting data preparation workflow... ---$($C_RESET)" -ForegroundColor Cyan
     
     # Create targeted ADB data for test subjects
     Format-Banner "BEGIN STAGE: 1. DATA SOURCING"
@@ -408,8 +408,8 @@ try {
     }
     $run1ExitCode = $LASTEXITCODE
     if ($run1ExitCode -ne 1) { throw "Pipeline Run 1 was expected to halt after Step 3 but did not." }
-    # Remove the halted step (Step 3 in this case) from the list of completed steps before logging
-    if ($run1Steps.Count > 0) { $run1Steps.RemoveAt($run1Steps.Count - 1) }
+    # Note: Step 3 completes successfully before halting, so we DO want to log it
+    # Do NOT remove the last step for Run 1
 
     $run1Status = "SUCCESS"
     foreach ($step in $run1Steps) {
@@ -422,7 +422,33 @@ try {
         & $TestProfile.InterventionScript -SandboxDir $SandboxDir
     }
 
-    # --- RUN 2: Resume pipeline from Step 4 to the next manual step (9) ---
+    # Hide production Solar Fire export files to ensure clean test isolation
+    $documentsFolder = [System.Environment]::GetFolderPath('Personal')
+    $sfExportDir = Join-Path $documentsFolder "Solar Fire User Files\Export"
+    $sfBackupDir = Join-Path $sfExportDir ".l3_test_backup"
+    
+    $sfDelineationsPath = Join-Path $sfExportDir "sf_delineations_library.txt"
+    $sfChartExportPath = Join-Path $sfExportDir "sf_chart_export.csv"
+    $sfDelineationsBackup = Join-Path $sfBackupDir "sf_delineations_library.txt"
+    $sfChartExportBackup = Join-Path $sfBackupDir "sf_chart_export.csv"
+    
+    # Create backup directory if files exist
+    if ((Test-Path $sfDelineationsPath) -or (Test-Path $sfChartExportPath)) {
+        if (-not (Test-Path $sfBackupDir)) {
+            New-Item -ItemType Directory -Path $sfBackupDir -Force | Out-Null
+        }
+    }
+    
+    if (Test-Path $sfDelineationsPath) {
+        Move-Item $sfDelineationsPath $sfDelineationsBackup -Force
+        Write-Host "  -> Temporarily hidden Solar Fire delineations file for test isolation" -ForegroundColor DarkGray
+    }
+    if (Test-Path $sfChartExportPath) {
+        Move-Item $sfChartExportPath $sfChartExportBackup -Force
+        Write-Host "  -> Temporarily hidden Solar Fire chart export file for test isolation" -ForegroundColor DarkGray
+    }
+
+    # --- RUN 2: Resume pipeline from Step 4 to halt at Step 9 ---
     Write-Host "`n--- EXECUTING PIPELINE (Part 2): Resuming from Step 4... ---$($C_RESET)" -ForegroundColor Cyan
     $run2Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; SuppressConfigDisplay = $true }
     if ($Interactive) { $run2Args.Interactive = $true }
@@ -439,27 +465,30 @@ try {
         }
     }
     $run2ExitCode = $LASTEXITCODE
-    if ($run2ExitCode -ne 1) { throw "Pipeline Run 2 was expected to halt for Step 9 but did not." }
+    if ($run2ExitCode -ne 1) { throw "Pipeline Run 2 was expected to halt at Step 9 but did not." }
+    
+    # Remove the halted step from completed steps
+    if ($run2Steps.Count -gt 0) { 
+        $run2Steps.RemoveAt($run2Steps.Count - 1)
+    }
 
-    # Log all steps that completed in this unified run (4, 7, 8, and the manual step 9).
+    # Log all steps that completed in Run 2 (Steps 4-8)
     foreach ($step in $run2Steps) {
         $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = "SUCCESS"; 'Output File' = $step.'Output File' })
     }
 
-    # --- SIMULATE Manual Step 9: Astrology Data Export (Manual) ---
+    # --- SIMULATE Manual Step 9: Delineations Library Export (Manual) ---
     if ($Interactive) {
         # Manually print the info block for this step as the orchestrator has halted.
-        $summary9 = "This is a manual step. It simulates the process of importing the `sf_data_import.txt` file into the Solar Fire software, running the necessary chart calculations, and exporting the results to `sf_chart_export.csv`."
-        $note9 = "Test Harness Note: This test automates the manual step by creating a pre-computed `sf_chart_export.csv` file."
+        $summary9 = "This is a manual step. It simulates the one-time export of the complete delineation library from the Solar Fire software into a plain text file, `sf_delineations_library.txt`. This test automates this by creating a small, representative library file."
         Write-Host "`n${C_BLUE}Script Summary: $summary9${C_RESET}"
-        Write-Host "${C_MAGENTA}$note9${C_RESET}"
         Write-Host "`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}"
         Write-Host ""
         Write-Host "${C_RESET}  INPUTS:"
-        Write-Host "    - data/intermediate/sf_data_import.txt"
+        Write-Host "    - Solar Fire Software"
         Write-Host ""
         Write-Host "  OUTPUT:"
-        Write-Host "    - data/foundational_assets/sf_chart_export.csv"
+        Write-Host "    - data/foundational_assets/sf_delineations_library.txt"
     }
 
     # --- VALIDATE INTERMEDIATE RESULTS ---
@@ -474,55 +503,49 @@ try {
     Test-StepContinuity "Final Candidates" (Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt") 1 "`t" $FinalSubjects
     Test-StepContinuity "SF Import" $sfImportFile 3 "," $FinalSubjects
 
-    # Hide production Solar Fire export files to ensure clean test isolation
-    $documentsFolder = [System.Environment]::GetFolderPath('Personal')
-    $sfDelineationsBackup = $null
-    $sfChartExportBackup = $null
-    
-    $sfDelineationsPath = Join-Path $documentsFolder "Solar Fire User Files\Export\sf_delineations_library.txt"
-    $sfChartExportPath = Join-Path $documentsFolder "Solar Fire User Files\Export\sf_chart_export.csv"
-    
-    if (Test-Path $sfDelineationsPath) {
-        $sfDelineationsBackup = "$sfDelineationsPath.l3_backup"
-        Move-Item $sfDelineationsPath $sfDelineationsBackup -Force
-        Write-Host "  -> Temporarily hidden Solar Fire delineations file for test isolation" -ForegroundColor DarkGray
-    }
-    if (Test-Path $sfChartExportPath) {
-        $sfChartExportBackup = "$sfChartExportPath.l3_backup"
-        Move-Item $sfChartExportPath $sfChartExportBackup -Force
-        Write-Host "  -> Temporarily hidden Solar Fire chart export file for test isolation" -ForegroundColor DarkGray
-    }
-
     if ($Interactive) {
         Read-Host -Prompt "`n${C_ORANGE}Press Enter to simulate this manual step (Ctrl+C to exit)...${C_RESET}" | Out-Null
     }
 
-    Write-Host "`n--- SIMULATING: Astrology Data Export (Manual)... ---$($C_RESET)" -ForegroundColor Magenta
+    Write-Host "`n--- SIMULATING: Delineations Library Export (Manual)... ---$($C_RESET)" -ForegroundColor Magenta
+    
+    # Temporarily restore SF delineations file to simulate user completing Step 9
+    if (Test-Path $sfDelineationsBackup) {
+        Move-Item $sfDelineationsBackup $sfDelineationsPath -Force
+        Write-Host "  -> Restored Solar Fire delineations file for simulation" -ForegroundColor DarkGray
+    }
 
-    $idMap = @{}; Get-Content $sfImportFile | ForEach-Object { $f = $_.Split(',') | ForEach-Object { $_.Trim('"') }; if ($f.Length -ge 4) { $idMap[$f[0]] = $f[3] } }
     $destAssetDir = Join-Path $SandboxDir "data/foundational_assets"
-    $chartExportContent = (@"
-"Ernst (1900) Busch","22 Jan 1900","0:15","ID_BUSCH","-1:00","Kiel","Germany","54N20","010E08"; "Body Name","Body Abbr","Longitude";"Moon","Mon",189.002;"Sun","Sun",301.513;"Mercury","Mer",289.248;"Venus","Ven",332.342;"Mars","Mar",300.143;"Jupiter","Jup",244.946;"Saturn","Sat",270.067;"Uranus","Ura",251.194;"Neptune","Nep",84.700;"Pluto","Plu",74.934;"Ascendant","Asc",200.157;"Midheaven","MC",117.655
-"Paul McCartney","18 Jun 1942","14:00","ID_MCCARTNEY","-2:00","Liverpool","United Kingdom","53N25","002W55"; "Body Name","Body Abbr","Longitude";"Moon","Mon",137.438;"Sun","Sun",86.608;"Mercury","Mer",78.361;"Venus","Ven",48.992;"Mars","Mar",122.680;"Jupiter","Jup",91.832;"Saturn","Sat",65.208;"Uranus","Ura",61.968;"Neptune","Nep",177.119;"Pluto","Plu",124.270;"Ascendant","Asc",175.307;"Midheaven","MC",83.737
-"Jonathan Cainer","18 Dec 1957","8:00","ID_CAINER","+0:00","London","United Kingdom","51N30","000W10"; "Body Name","Body Abbr","Longitude";"Moon","Mon",229.370;"Sun","Sun",266.145;"Mercury","Mer",281.204;"Venus","Ven",308.785;"Mars","Mar",236.738;"Jupiter","Jup",206.650;"Saturn","Sat",257.858;"Uranus","Ura",131.237;"Neptune","Nep",214.121;"Pluto","Plu",152.279;"Ascendant","Asc",264.205;"Midheaven","MC",208.521
-"@ -replace ";", "`r`n").Trim()
-    foreach ($key in $idMap.Keys) { $chartExportContent = $chartExportContent -replace "ID_$($key.Split(' ')[-1].ToUpper())", $idMap[$key] }
-    $chartExportPath = Join-Path $destAssetDir "sf_chart_export.csv"
-    $chartExportContent | Set-Content -Path $chartExportPath -Encoding UTF8
+    $delineationLibPath = Join-Path $destAssetDir "sf_delineations_library.txt"
+    @"
+*Quadrant Strong 1st
+A focus on self-awareness and personal identity.
+*Hemisphere Strong East
+A self-motivated and independent nature.
+*Aries Strong
+Assertive and pioneering.
+"@ | Set-Content -Path $delineationLibPath -Encoding UTF8
 
-    Write-Host "  -> Exported Solar Fire chart data."
+    Write-Host "  -> Exported Solar Fire delineation library."
+    # Log Step 9 completion
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 9; 'Step Description' = "Delineations Library Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[9] })
+
+    # Re-hide the SF delineations file so it can be properly restored in finally block
+    if (Test-Path $sfDelineationsPath) {
+        Move-Item $sfDelineationsPath $sfDelineationsBackup -Force
+        Write-Host "  -> Re-hidden Solar Fire delineations file after simulation" -ForegroundColor DarkGray
+    }
 
     if ($Interactive) {
         [Console]::Write("`n${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET} ")
         [Console]::ReadLine() | Out-Null
     }
 
-    # --- RUN 3: Resume pipeline from Step 10 to the next manual step (10) ---
-    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming from Step 10... ---$($C_RESET)" -ForegroundColor Cyan
+    # --- RUN 3: Resume pipeline to halt at Step 10 ---
+    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming to Step 10... ---$($C_RESET)" -ForegroundColor Cyan
     $run3Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; SuppressConfigDisplay = $true }
     if ($Interactive) { $run3Args.Interactive = $true }
 
-    $run3Steps = [System.Collections.Generic.List[object]]::new()
     & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run3Args 2>&1 | ForEach-Object {
         if ($_ -match '^HARNESS_PROMPT:(.*):(.*)') {
             # Handle interactive prompt at test harness level with file signaling
@@ -535,97 +558,111 @@ try {
         } else {
             Write-Host $_
         }
-        if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
-        if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
-            $stepNum = [int]$matches[1]
-            $run3Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
-        }
     }
     $run3ExitCode = $LASTEXITCODE
-    if ($run3ExitCode -ne 1) { throw "Pipeline Run 3 was expected to halt for Step 10 but did not." }
-    if ($run3Steps.Count > 0) { $run3Steps.RemoveAt($run3Steps.Count - 1) } # Remove the halted step
+    if ($run3ExitCode -ne 1) { throw "Pipeline Run 3 was expected to halt at Step 10 but did not." }
+    
+    # Run 3 should not execute any automated steps - it immediately halts at Step 10
+    # No step logging needed here
 
-    # --- SIMULATE Manual Step 10: Delineation Library Export (Manual) ---
+    # --- SIMULATE Manual Step 10: Astrology Data Export (Manual) ---
     if ($Interactive) {
         # Manually print the info block for this step as the orchestrator has halted.
-        $summary10 = "This is a manual step. It simulates the one-time export of the complete delineation library from the Solar Fire software into a plain text file, `sf_delineations_library.txt`. This test automates this by creating a small, representative library file."
-        [Console]::WriteLine("`n${C_BLUE}Script Summary: $summary10${C_RESET}")
-        [Console]::WriteLine("`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}")
-        [Console]::WriteLine()
-        [Console]::WriteLine("${C_RESET}  INPUTS:")
-        [Console]::WriteLine("    - Solar Fire Software")
-        [Console]::WriteLine()
-        [Console]::WriteLine("  OUTPUT:")
-        [Console]::WriteLine("    - data/foundational_assets/sf_delineations_library.txt")
+        $summary10 = "This is a manual step. It simulates the process of importing the `sf_data_import.txt` file into the Solar Fire software, running the necessary chart calculations, and exporting the results to `sf_chart_export.csv`."
+        $note10 = "Test Harness Note: This test automates the manual step by creating a pre-computed `sf_chart_export.csv` file."
+        Write-Host "`n${C_BLUE}Script Summary: $summary10${C_RESET}"
+        Write-Host "${C_MAGENTA}$note10${C_RESET}"
+        Write-Host "`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}"
+        Write-Host ""
+        Write-Host "${C_RESET}  INPUTS:"
+        Write-Host "    - data/intermediate/sf_data_import.txt"
+        Write-Host ""
+        Write-Host "  OUTPUT:"
+        Write-Host "    - data/foundational_assets/sf_chart_export.csv"
     }
-    $delineationLibPath = Join-Path $destAssetDir "sf_delineations_library.txt"
 
     if ($Interactive) {
-        [Console]::Write("`n${C_ORANGE}Press Enter to simulate this manual step (Ctrl+C to exit)...${C_RESET} ")
-        [Console]::ReadLine() | Out-Null
+        Read-Host -Prompt "`n${C_ORANGE}Press Enter to simulate this manual step (Ctrl+C to exit)...${C_RESET}" | Out-Null
     }
 
-    Write-Host "`n--- SIMULATING: Delineation Library Export (Manual)... ---$($C_RESET)" -ForegroundColor Magenta
+    Write-Host "`n--- SIMULATING: Astrology Data Export (Manual)... ---$($C_RESET)" -ForegroundColor Magenta
+    
+    # Temporarily restore SF chart export file to simulate user completing Step 10
+    if (Test-Path $sfChartExportBackup) {
+        Move-Item $sfChartExportBackup $sfChartExportPath -Force
+        Write-Host "  -> Restored Solar Fire chart export file for simulation" -ForegroundColor DarkGray
+    }
 
-    @"
-*Quadrant Strong 1st
-A focus on self-awareness and personal identity.
-*Hemisphere Strong East
-A self-motivated and independent nature.
-*Aries Strong
-Assertive and pioneering.
-"@ | Set-Content -Path $delineationLibPath -Encoding UTF8
-    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Delineations Library Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
+    $idMap = @{}; Get-Content $sfImportFile | ForEach-Object { $f = $_.Split(',') | ForEach-Object { $_.Trim('"') }; if ($f.Length -ge 4) { $idMap[$f[0]] = $f[3] } }
+    $chartExportContent = (@"
+"Ernst (1900) Busch","22 Jan 1900","0:15","ID_BUSCH","-1:00","Kiel","Germany","54N20","010E08"; "Body Name","Body Abbr","Longitude";"Moon","Mon",189.002;"Sun","Sun",301.513;"Mercury","Mer",289.248;"Venus","Ven",332.342;"Mars","Mar",300.143;"Jupiter","Jup",244.946;"Saturn","Sat",270.067;"Uranus","Ura",251.194;"Neptune","Nep",84.700;"Pluto","Plu",74.934;"Ascendant","Asc",200.157;"Midheaven","MC",117.655
+"Paul McCartney","18 Jun 1942","14:00","ID_MCCARTNEY","-2:00","Liverpool","United Kingdom","53N25","002W55"; "Body Name","Body Abbr","Longitude";"Moon","Mon",137.438;"Sun","Sun",86.608;"Mercury","Mer",78.361;"Venus","Ven",48.992;"Mars","Mar",122.680;"Jupiter","Jup",91.832;"Saturn","Sat",65.208;"Uranus","Ura",61.968;"Neptune","Nep",177.119;"Pluto","Plu",124.270;"Ascendant","Asc",175.307;"Midheaven","MC",83.737
+"Jonathan Cainer","18 Dec 1957","8:00","ID_CAINER","+0:00","London","United Kingdom","51N30","000W10"; "Body Name","Body Abbr","Longitude";"Moon","Mon",229.370;"Sun","Sun",266.145;"Mercury","Mer",281.204;"Venus","Ven",308.785;"Mars","Mar",236.738;"Jupiter","Jup",206.650;"Saturn","Sat",257.858;"Uranus","Ura",131.237;"Neptune","Nep",214.121;"Pluto","Plu",152.279;"Ascendant","Asc",264.205;"Midheaven","MC",208.521
+"@ -replace ";", "`r`n").Trim()
+    foreach ($key in $idMap.Keys) { $chartExportContent = $chartExportContent -replace "ID_$($key.Split(' ')[-1].ToUpper())", $idMap[$key] }
+    $chartExportPath = Join-Path $destAssetDir "sf_chart_export.csv"
+    $chartExportContent | Set-Content -Path $chartExportPath -Encoding UTF8
 
-    Write-Host "  -> Exported Solar Fire delineation library."
+    Write-Host "  -> Exported Solar Fire chart data."
+    # Log Step 10 completion
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Astrology Data Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
+
+    # Re-hide the SF chart export file so it can be properly restored in finally block
+    if (Test-Path $sfChartExportPath) {
+        Move-Item $sfChartExportPath $sfChartExportBackup -Force
+        Write-Host "  -> Re-hidden Solar Fire chart export file after simulation" -ForegroundColor DarkGray
+    }
 
     if ($Interactive) {
         [Console]::Write("`n${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET} ")
         [Console]::ReadLine() | Out-Null
+    }
+
+    # --- SIMULATE Step 11: Neutralize Delineations ---
+    # Always print the step header for consistency
+    $stepHeader11 = ">>> Step 11/13: Neutralize Delineations <<<"
+    Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray
+    Write-Host $stepHeader11 -ForegroundColor Blue
+    Write-Host "Rewrites esoteric texts into neutral psychological descriptions using an LLM." -ForegroundColor Blue
+    
+    if ($Interactive) {
+        $summary11 = "This automated step uses an LLM to neutralize esoteric astrological text into psychological descriptions. The test harness simulates this by copying pre-generated neutralized files from the test assets directory."
+        Write-Host "`n${C_BLUE}Script Summary: $summary11${C_RESET}"
+        Write-Host "${C_MAGENTA}Test Harness Note: LLM neutralization is being bypassed by using pre-computed test assets.${C_RESET}"
+        Write-Host "`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}"
+        Write-Host ""
+        Write-Host "${C_RESET}  INPUTS:"
+        Write-Host "    - data/foundational_assets/sf_delineations_library.txt"
+        Write-Host ""
+        Write-Host "  OUTPUT:"
+        Write-Host "    - data/foundational_assets/neutralized_delineations/"
+        
+        Read-Host -Prompt "`n${C_ORANGE}Press Enter to simulate this automated step (Ctrl+C to exit)...${C_RESET}" | Out-Null
     }
     
-    # --- SIMULATE Step 11 by copying pre-neutralized assets ---
-    $stepHeader11 = ">>> Step 11/13: Neutralize Delineations <<<"
-    Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader11 -ForegroundColor Blue; Write-Host "Simulating the LLM text neutralization by copying pre-generated assets." -ForegroundColor Blue
-
-    if ($Interactive) {
-        $summaryHelper = Join-Path $ProjectRoot "scripts/analysis/get_docstring_summary.py"
-        $targetScriptPath = Join-Path $ProjectRoot "src/neutralize_delineations.py"
-        $summary = & python $summaryHelper $targetScriptPath 2>$null
-        if ($summary) {
-            [Console]::WriteLine("`n${C_BLUE}Script Summary: $summary${C_RESET}")
-        }
-        [Console]::WriteLine("`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}")
-        [Console]::WriteLine()
-        [Console]::WriteLine("${C_RESET}  INPUTS:")
-        [Console]::WriteLine("    - data/foundational_assets/sf_delineations_library.txt")
-        [Console]::WriteLine()
-        [Console]::WriteLine("  OUTPUT:")
-        [Console]::WriteLine("    - data/foundational_assets/neutralized_delineations/")
-    }
-
-    if ($Interactive) {
-        [Console]::Write("`n${C_ORANGE}Press Enter to simulate this automated step (Ctrl+C to exit)...${C_RESET} ")
-        [Console]::ReadLine() | Out-Null
-    }
-
-    Write-Host "`n--- SIMULATING: Neutralize Delineations... ---$($C_RESET)" -ForegroundColor Magenta
-
+    Write-Host "`n--- SIMULATING: Neutralize Delineations (copying pre-generated test assets)... ---$($C_RESET)" -ForegroundColor Magenta
+    
     $sourceDir = Join-Path $ProjectRoot "tests/assets/data/foundational_assets/neutralized_delineations"
     $destDir = Join-Path $SandboxDir "data/foundational_assets/neutralized_delineations"
-    New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+    
+    if (-not (Test-Path $destDir)) {
+        New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+    }
+    
     Copy-Item -Path "$sourceDir/*" -Destination $destDir -Recurse -Force
     Write-Host "  -> Copied pre-neutralized delineation files from test assets."
-    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 11; 'Step Description' = "Neutralize Delineations"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[11] })
+    
+    # Log Step 11 completion
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 11; 'Step Description' = "Neutralize Delineations"; 'Status' = "SUCCESS"; 'Output File' = "data/foundational_assets/neutralized_delineations/ (6 files)" })
 
     if ($Interactive) {
         [Console]::Write("`n${C_ORANGE}Step complete. Inspect the output, then press Enter to continue...${C_RESET} ")
         [Console]::ReadLine() | Out-Null
     }
 
-    # --- RUN 4: Resume to completion ---
+    # --- RUN 4: Resume to completion (Steps 12-13 only) ---
     Write-Host "`n--- EXECUTING PIPELINE (Part 4): Resuming to completion... ---$($C_RESET)" -ForegroundColor Cyan
-    $run4Args = @{ NoFinalReport = $true; Resumed = $true; TestMode = $true; SuppressConfigDisplay = $true }
+    $run4Args = @{ NoFinalReport = $true; Resumed = $true; TestMode = $true; SuppressConfigDisplay = $true; StartWithStep = 12 }
     if ($Interactive) { $run4Args.Interactive = $true }
 
     $run4Steps = [System.Collections.Generic.List[object]]::new()
@@ -650,6 +687,7 @@ Assertive and pioneering.
     $run4ExitCode = $LASTEXITCODE
     if ($run4ExitCode -ne 0) { throw "Pipeline Run 4 failed with exit code $run4ExitCode." }
     
+    # Log all steps that completed in Run 4 (Steps 11-13)
     $run4Status = "SUCCESS"
     foreach ($step in $run4Steps) {
         $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = $run4Status; 'Output File' = $step.'Output File' })
@@ -701,15 +739,20 @@ finally {
     # Clean up test environment variable
     Remove-Item -Path "Env:UNDER_TEST_HARNESS" -ErrorAction SilentlyContinue
     # Restore Solar Fire export files if they were hidden
-    if ($sfDelineationsBackup -and (Test-Path $sfDelineationsBackup)) {
+    if (Test-Path $sfDelineationsBackup) {
         Move-Item $sfDelineationsBackup $sfDelineationsPath -Force
         Write-Host "  -> Restored Solar Fire delineations file" -ForegroundColor DarkGray
     }
-    if ($sfChartExportBackup -and (Test-Path $sfChartExportBackup)) {
+    if (Test-Path $sfChartExportBackup) {
         Move-Item $sfChartExportBackup $sfChartExportPath -Force
         Write-Host "  -> Restored Solar Fire chart export file" -ForegroundColor DarkGray
     }
     
+    # Clean up backup directory if empty
+    if ((Test-Path $sfBackupDir) -and -not (Get-ChildItem $sfBackupDir)) {
+        Remove-Item $sfBackupDir -Force
+    }
+
     # --- 8. Print Execution Summary ---
     if ($executedStepsLog.Count -gt 0) {
         Write-Host "`n--- HARNESS: Actual Pipeline Execution Flow ---`n" -ForegroundColor Yellow

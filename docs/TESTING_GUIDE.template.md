@@ -47,7 +47,7 @@ The integration tests are organized into a layered architecture that mirrors the
 
 - Tests the full data preparation workflow from raw data to final profiles
 - Runs in three modes: default, bypass, and interactive
-- Commands: `pdm run test-l3-default`, `pdm run test-l3-bypass`, `pdm run test-l3-interactive`
+- Commands: `pdm run test-l3`, `pdm run test-l3-bypass`, `pdm run test-l3-interactive`
 
 **Layer 4: Experiment Lifecycle**
 
@@ -939,9 +939,9 @@ Runs the full pipeline with LLM-based candidate selection active.
 
 **Command:**
 ```powershell
-pdm run test-l3-default
+pdm run test-l3
 # or simply:
-pdm test-l3-default
+pdm test-l3
 ```
 
 **What's tested:**
@@ -1255,7 +1255,7 @@ pdm test-query-gen -Beta 0.001
 ```
 
 **Prerequisites:**
-This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3-default` (or `pdm test-l3-default`) once to bootstrap these assets. If the assets are not present, the test will be skipped.
+This test depends on asset files that are **automatically generated** by the Layer 3 integration test. On a fresh clone, you must run `pdm run test-l3` (or `pdm test-l3`) once to bootstrap these assets. If the assets are not present, the test will be skipped.
 
 ## Statistical Analysis & Reporting Validation
 
