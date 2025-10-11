@@ -2,6 +2,34 @@
 
 # Changelog
 
+## 12.15.0 (2025-10-11)
+
+### Bump
+
+- **version 12.14.1 → 12.15.0**
+
+### Features
+
+- **integrate cutoff parameter analysis as automated Step 7 in data pipeline**
+  Integrates cutoff parameter analysis as a formal automated step in the 14-step data preparation pipeline with intelligent downstream re-execution logic.
+  
+  This major enhancement transforms the cutoff parameter analysis from a standalone utility into Step 7 of the production pipeline, positioned between OCEAN scoring (Step 6) and final candidate selection (Step 8). The integration includes sophisticated state management that automatically detects parameter changes and triggers downstream re-execution only when necessary, ensuring data consistency while maintaining efficiency.
+  
+  Key features:
+  - Moved analyze_cutoff_parameters.py from scripts/analysis/ to src/ as production script
+  - Renumbered all downstream steps (former Steps 7-13 became Steps 8-14)
+  - Implemented intelligent downstream forcing with two critical exceptions:
+    * Step 7: Only forces re-execution if optimal parameters actually changed
+    * Step 12: Independent state machine based on file staleness and LLM model
+  - Added staleness detection comparing current config.ini vs optimal parameters in CSV
+  - Enhanced Get-StepStatus to mark Step 7 as "Stale" when parameters don't match
+  - Added sandbox support (--sandbox-path argument) for test compatibility
+  - Improved user messaging with parameter values and adaptive step notifications
+  - Created comprehensive unit test (84% coverage) with edge case handling
+  - Updated Framework Manual and Testing Guide with new step numbering and behavior
+  - Added warnings about -StopAfterStep parameter (testing use only)
+  - Suppressed pipeline summary generation in TestMode to fix Layer 2 tests
+
 ## 12.14.1 (2025-10-10)
 
 ### Bump
