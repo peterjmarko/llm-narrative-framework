@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 12.14.1 (2025-10-10)
+
+### Bump
+
+- **version 12.14.0 → 12.14.1**
+
+### Fixes
+
+- **fix integration test execution flow and file isolation**
+  Fixed Layer 3 integration test to properly halt at manual steps and preserve production file timestamps.
+  
+  - Restructured pipeline execution from 3 runs to 4 runs with correct halt points
+  - Fixed execution flow: Run 1 (Steps 1-3)  Run 2 (Steps 4-8, halt at 9)  Simulate Step 9  Run 3 (halt at 10)  Simulate Step 10  Simulate Step 11  Run 4 (Steps 12-13)
+  - Moved Solar Fire file isolation to occur before Run 2 instead of before Step 9 simulation
+  - Corrected step order: Step 9 (Delineations Library Export) and Step 10 (Astrology Data Export) were swapped
+  - Fixed manual step detection by temporarily restoring production Solar Fire files during simulation
+  - Added Step 11 simulation to copy pre-neutralized test assets, ensuring all delineation files exist
+  - Fixed PowerShell comparison operator bug: changed `>` to `-gt` in Run 1 and Run 2 step removal logic
+  - Eliminated duplicate step logging in execution flow table
+  - Improved Solar Fire file hiding strategy to use subdirectory moves instead of renaming, preserving original timestamps
+  - Added comprehensive step headers for Step 11 in both interactive and non-interactive modes
+  - Updated execution table to show Step 11 output as directory with file count
+  - Fixed Testing Guide documentation to use correct `test-l3` command instead of `test-l3-default`
+
 ## 12.14.0 (2025-10-10)
 
 ### Bump
