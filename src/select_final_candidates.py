@@ -129,7 +129,6 @@ def main():
         help="Path to the sandbox directory for testing.",
     )
     parser.add_argument("--force", action="store_true", help="Force overwrite of the output file if it exists.")
-    parser.add_argument("--plot", action="store_true", help="Generate a diagnostic plot of the variance curve analysis.")
     args = parser.parse_args()
 
     if args.sandbox_path:
@@ -263,12 +262,9 @@ def main():
                     "Could not find a plateau in the variance curve. Using all available subjects."
                 )
             
-            # Generate the diagnostic plot if requested.
-            if args.plot:
-                plot_path = Path(get_path("data/reports/variance_curve_analysis.png"))
-                # In a sandbox/test run, save the plot but do not show it interactively.
-                is_interactive_mode = not args.sandbox_path
-                generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, smoothing_window, plot_path, interactive=is_interactive_mode)
+            # Always generate the diagnostic plot (non-interactive)
+            plot_path = Path(get_path("data/reports/variance_curve_analysis.png"))
+            generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, smoothing_window, plot_path, interactive=False)
 
         ocean_df = ocean_df.head(final_count)
 

@@ -617,7 +617,7 @@ def generate_pipeline_summary_report() -> str:
         ])
     
     # Add cutoff analysis details within Stage 2
-    cutoff_file = "data/reports/cutoff_parameter_analysis_results.csv"
+    cutoff_file = "data/foundational_assets/cutoff_parameter_analysis_results.csv"
     if Path(cutoff_file).exists():
         # Load cutoff analysis details
         def _load_cutoff():

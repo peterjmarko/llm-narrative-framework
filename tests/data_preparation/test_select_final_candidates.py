@@ -231,20 +231,19 @@ def test_select_final_candidates_with_variance_cutoff(mock_sandbox_for_cutoff_te
     assert 700 < final_count < 950
 
 
-def test_plot_flag_triggers_plot_generation(mock_sandbox_for_cutoff_test):
-    """Tests that the --plot flag correctly calls the plot generation function."""
+def test_plot_is_generated_during_variance_analysis(mock_sandbox_for_cutoff_test):
+    """Tests that the plot generation function is called when variance analysis runs."""
     sandbox_path = mock_sandbox_for_cutoff_test["sandbox_path"]
     test_args = [
         "select_final_candidates.py",
         "--sandbox-path", str(sandbox_path),
         "--force",
-        "--plot",
     ]
 
     with patch("sys.argv", test_args), \
          patch("src.select_final_candidates.generate_variance_plot") as mock_generate_plot:
         select_final_candidates.main()
-    
+
     mock_generate_plot.assert_called_once()
 
 

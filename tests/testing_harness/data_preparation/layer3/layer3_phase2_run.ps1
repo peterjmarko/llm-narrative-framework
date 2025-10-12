@@ -465,7 +465,7 @@ try {
         }
     }
     $run2ExitCode = $LASTEXITCODE
-    if ($run2ExitCode -ne 1) { throw "Pipeline Run 2 was expected to halt at Step 9 but did not." }
+    if ($run2ExitCode -ne 1) { throw "Pipeline Run 2 was expected to halt at Step 10 but did not." }
     
     # Remove the halted step from completed steps
     if ($run2Steps.Count -gt 0) { 
@@ -477,11 +477,11 @@ try {
         $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = "SUCCESS"; 'Output File' = $step.'Output File' })
     }
 
-    # --- SIMULATE Manual Step 9: Delineations Library Export (Manual) ---
+    # --- SIMULATE Manual Step 10: Delineations Library Export (Manual) ---
     if ($Interactive) {
         # Manually print the info block for this step as the orchestrator has halted.
-        $summary9 = "This is a manual step. It simulates the one-time export of the complete delineation library from the Solar Fire software into a plain text file, `sf_delineations_library.txt`. This test automates this by creating a small, representative library file."
-        Write-Host "`n${C_BLUE}Script Summary: $summary9${C_RESET}"
+        $summary10 = "This is a manual step. It simulates the one-time export of the complete delineation library from the Solar Fire software into a plain text file, `sf_delineations_library.txt`. This test automates this by creating a small, representative library file."
+        Write-Host "`n${C_BLUE}Script Summary: $summary10${C_RESET}"
         Write-Host "`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}"
         Write-Host ""
         Write-Host "${C_RESET}  INPUTS:"
@@ -509,7 +509,7 @@ try {
 
     Write-Host "`n--- SIMULATING: Delineations Library Export (Manual)... ---$($C_RESET)" -ForegroundColor Magenta
     
-    # Temporarily restore SF delineations file to simulate user completing Step 9
+    # Temporarily restore SF delineations file to simulate user completing Step 10
     if (Test-Path $sfDelineationsBackup) {
         Move-Item $sfDelineationsBackup $sfDelineationsPath -Force
         Write-Host "  -> Restored Solar Fire delineations file for simulation" -ForegroundColor DarkGray
@@ -527,8 +527,8 @@ Assertive and pioneering.
 "@ | Set-Content -Path $delineationLibPath -Encoding UTF8
 
     Write-Host "  -> Exported Solar Fire delineation library."
-    # Log Step 9 completion
-    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 9; 'Step Description' = "Delineations Library Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[9] })
+    # Log Step 10 completion
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Delineations Library Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
 
     # Re-hide the SF delineations file so it can be properly restored in finally block
     if (Test-Path $sfDelineationsPath) {
@@ -542,7 +542,7 @@ Assertive and pioneering.
     }
 
     # --- RUN 3: Resume pipeline to halt at Step 11 (Astrology Data Export) ---
-    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming to Step 11... ---$($C_RESET)" -ForegroundColor Cyan
+    Write-Host "`n--- EXECUTING PIPELINE (Part 3): Resuming to halt at next manual step... ---$($C_RESET)" -ForegroundColor Cyan
     $run3Args = @{ NoFinalReport = $true; SilentHalt = $true; TestMode = $true; Resumed = $true; SuppressConfigDisplay = $true; StartWithStep = 11 }
     if ($Interactive) { $run3Args.Interactive = $true }
 
@@ -560,18 +560,18 @@ Assertive and pioneering.
         }
     }
     $run3ExitCode = $LASTEXITCODE
-    if ($run3ExitCode -ne 1) { throw "Pipeline Run 3 was expected to halt at Step 10 but did not." }
+    if ($run3ExitCode -ne 1) { throw "Pipeline Run 3 was expected to halt at Step 11 but did not." }
     
-    # Run 3 should not execute any automated steps - it immediately halts at Step 10
+    # Run 3 should not execute any automated steps - it immediately halts at Step 11
     # No step logging needed here
 
-    # --- SIMULATE Manual Step 10: Astrology Data Export (Manual) ---
+    # --- SIMULATE Manual Step 11: Astrology Data Export (Manual) ---
     if ($Interactive) {
         # Manually print the info block for this step as the orchestrator has halted.
-        $summary10 = "This is a manual step. It simulates the process of importing the `sf_data_import.txt` file into the Solar Fire software, running the necessary chart calculations, and exporting the results to `sf_chart_export.csv`."
-        $note10 = "Test Harness Note: This test automates the manual step by creating a pre-computed `sf_chart_export.csv` file."
-        Write-Host "`n${C_BLUE}Script Summary: $summary10${C_RESET}"
-        Write-Host "${C_MAGENTA}$note10${C_RESET}"
+        $summary11 = "This is a manual step. It simulates the process of importing the `sf_data_import.txt` file into the Solar Fire software, running the necessary chart calculations, and exporting the results to `sf_chart_export.csv`."
+        $note11 = "Test Harness Note: This test automates the manual step by creating a pre-computed `sf_chart_export.csv` file."
+        Write-Host "`n${C_BLUE}Script Summary: $summary11${C_RESET}"
+        Write-Host "${C_MAGENTA}$note11${C_RESET}"
         Write-Host "`n${C_GRAY}  BASE DIRECTORY: $($SandboxDir.Replace('\', '/'))${C_RESET}"
         Write-Host ""
         Write-Host "${C_RESET}  INPUTS:"
@@ -587,7 +587,7 @@ Assertive and pioneering.
 
     Write-Host "`n--- SIMULATING: Astrology Data Export (Manual)... ---$($C_RESET)" -ForegroundColor Magenta
     
-    # Temporarily restore SF chart export file to simulate user completing Step 10
+    # Temporarily restore SF chart export file to simulate user completing Step 11
     if (Test-Path $sfChartExportBackup) {
         Move-Item $sfChartExportBackup $sfChartExportPath -Force
         Write-Host "  -> Restored Solar Fire chart export file for simulation" -ForegroundColor DarkGray
@@ -604,8 +604,8 @@ Assertive and pioneering.
     $chartExportContent | Set-Content -Path $chartExportPath -Encoding UTF8
 
     Write-Host "  -> Exported Solar Fire chart data."
-    # Log Step 10 completion
-    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 10; 'Step Description' = "Astrology Data Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[10] })
+    # Log Step 11 completion
+    $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = 4; 'Step #' = 11; 'Step Description' = "Astrology Data Export (Manual)"; 'Status' = "SUCCESS"; 'Output File' = $stepToOutputMap[11] })
 
     # Re-hide the SF chart export file so it can be properly restored in finally block
     if (Test-Path $sfChartExportPath) {
@@ -745,11 +745,11 @@ finally {
         
         # Build and print header line
         $headerLine = ($props | ForEach-Object { $_.PadRight($widths[$_]) }) -join $separator
-        Write-Host $headerLine
+        Write-Host $headerLine -ForegroundColor White
         
         # Build and print separator line
         $separatorLine = ($props | ForEach-Object { '-' * $widths[$_] }) -join $separator
-        Write-Host $separatorLine
+        Write-Host $separatorLine -ForegroundColor White
         
         # Build and print data rows
         foreach ($log in $executedStepsLog) {

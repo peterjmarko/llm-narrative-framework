@@ -43,12 +43,12 @@ def mock_sandbox(tmp_path: Path) -> Path:
     """Creates a temporary sandbox directory with mock input files."""
     # Create the necessary directory structure inside the temp path
     (tmp_path / "data" / "sources").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "data" / "reports").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "data" / "processed").mkdir(parents=True, exist_ok=True)
     (tmp_path / "data" / "intermediate").mkdir(parents=True, exist_ok=True)
     (tmp_path / "data" / "backup").mkdir(parents=True, exist_ok=True)
 
     raw_export_path = tmp_path / "data" / "sources" / "adb_raw_export.txt"
-    validation_report_path = tmp_path / "data" / "reports" / "adb_validation_report.csv"
+    validation_report_path = tmp_path / "data" / "processed" / "adb_validation_report.csv"
 
     # Create dummy raw export file (TSV format)
     raw_content = (
@@ -131,7 +131,7 @@ class TestMainWorkflow:
 
     def test_main_exits_if_input_missing(self, mock_sandbox, mocker, caplog):
         """Tests graceful exit if an input file is missing."""
-        validation_path = mock_sandbox / "data/reports/adb_validation_report.csv"
+        validation_path = mock_sandbox / "data/processed/adb_validation_report.csv"
         validation_path.unlink() # Delete one of the required inputs
 
         mocker.patch('sys.exit', side_effect=SystemExit)

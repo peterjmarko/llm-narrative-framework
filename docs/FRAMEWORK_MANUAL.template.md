@@ -15,6 +15,20 @@ This study introduces a novel methodological twist to probe the limits of LLM pa
 
 {{grouped_figure:docs/diagrams/logic_matching_task.mmd | scale=2.5 | width=60% | caption=The Core Research Question: An LLM-driven matching task to detect a non-random signal.}}
 
+**Replication Paths:** Researchers can approach this project in several ways to validate and extend the findings, as illustrated below.
+
+{{grouped_figure:docs/diagrams/flow_replication_paths.mmd | scale=2.5 | width=100% | caption=The Three Research Replication Paths.}}
+
+1.  **Direct Replication (Computational Reproducibility):** To verify that the framework produces the exact findings reported in the article, clone this repository and use the static data and randomization seeds as provided. This is a bit-for-bit validation of the original results.
+
+2.  **Methodological Replication (Testing Robustness):** To validate that the findings are robust and not an artifact of a specific dataset or randomization seed, use the framework as-is but vary the inputs. This can be done in two ways:
+    *   **With a New Dataset:** Run the full `prepare_data.ps1` pipeline to generate a fresh dataset from the live Astro-Databank. This tests the statistical robustness of the method on a new sample.
+    *   **With New Randomization:** Use the provided static dataset but specify a different set of randomization seeds in `config.ini`. This validates the stability of the results across different random permutations.
+
+3.  **Conceptual Replication (Extending the Research):** To test the underlying scientific concepts with an improved or modified method, researchers can alter the framework itself. This could involve using a different LLM, modifying the analysis scripts, or changing other core parameters to conduct new research built upon this study's foundation.
+
+The pipeline can be understood through the following architecture, workflow, data flow, and logic diagrams.
+
 ## A Note on Stimulus Generation and Experimental Design
 The experiment is built upon a custom database of 4,954 famous historical individuals, for whom accurate and verified birth data (date, time, place) was meticulously collected. This population was chosen for two reasons:
 
@@ -40,17 +54,53 @@ The result is a clean dataset of personality profiles where the connection to an
 
 The data preparation pipeline is a fully automated, multi-stage workflow. It begins with data extraction from the live Astro-Databank website and concludes with the generation of the final `personalities_db.txt` file used in the experiments.
 
-**Replication Paths:** Researchers can approach this project in several ways to validate and extend the findings, as illustrated below.
+### Data Preparation: Architecture
 
-{{grouped_figure:docs/diagrams/flow_replication_paths.mmd | scale=2.5 | width=100% | caption=The Three Research Replication Paths.}}
+This diagram provides a map of the scripts in the data preparation pipeline, showing how they are orchestrated and which utilities they share.
 
-1.  **Direct Replication (Computational Reproducibility):** To verify that the framework produces the exact findings reported in the article, clone this repository and use the static data and randomization seeds as provided. This is a bit-for-bit validation of the original results.
+{{grouped_figure:docs/diagrams/arch_prep_codebase.mmd | scale=2.5 | width=100% | caption=Data Preparation Code Architecture: The execution flow of the data processing scripts.}}
 
-2.  **Methodological Replication (Testing Robustness):** To validate that the findings are robust and not an artifact of a specific dataset or randomization seed, use the framework as-is but vary the inputs. This can be done in two ways:
-    *   **With a New Dataset:** Run the full `prepare_data.ps1` pipeline to generate a fresh dataset from the live Astro-Databank. This tests the statistical robustness of the method on a new sample.
-    *   **With New Randomization:** Use the provided static dataset but specify a different set of randomization seeds in `config.ini`. This validates the stability of the results across different random permutations.
+### Data Preparation: Workflow
 
-3.  **Conceptual Replication (Extending the Research):** To test the underlying scientific concepts with an improved or modified method, researchers can alter the framework itself. This could involve using a different LLM, modifying the analysis scripts, or changing other core parameters to conduct new research built upon this study's foundation.
+This diagram shows the high-level, multi-stage workflow for the entire data preparation pipeline, including both automated and manual processes.
+
+{{grouped_figure:docs/diagrams/flow_prep_pipeline.mmd | scale=2.5 | width=35% | caption=Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated databases, showing both manual and automated steps.}}
+
+### Data Preparation: Data Flow
+
+These diagrams show the sequence of data artifacts (files) created and transformed by the pipeline scripts at each major stage.
+
+{{grouped_figure:docs/diagrams/flow_prep_1_qualification.mmd | scale=2.5 | width=75% | caption=Data Prep Flow 1: Data Sourcing and Candidate Qualification.}}
+
+{{grouped_figure:docs/diagrams/flow_prep_2_selection.mmd | scale=2.5 | width=80% | caption=Data Prep Flow 2: LLM-based Candidate Selection.}}
+
+{{grouped_figure:docs/diagrams/flow_prep_3_generation.mmd | scale=2.5 | width=100% | caption=Data Prep Flow 3: Profile Generation.}}
+
+Concurrent with these outputs, the individual scripts also generate summary reports as shown in the dogram below.
+
+{{grouped_figure:docs/diagrams/flow_data_prep_reports.mmd | scale=2.5 | width=75% | caption=Data Prep Flow: Generated Reports.}}
+
+### Data Preparation: Logic
+
+These diagrams illustrate the internal decision-making logic and control flow of each script in the data preparation pipeline.
+
+{{grouped_figure:docs/diagrams/logic_prep_pipeline.mmd | scale=2.5 | width=50% | caption=Overall Logic for the Data Preparation Pipeline: A high-level view of the four main stages.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_find_links.mmd | scale=2.5 | width=70% | caption=Logic for Link Finding (`find_wikipedia_links.py`): The algorithm for finding Wikipedia URLs by scraping ADB and using a Wikipedia search fallback.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_validate_pages.mmd | scale=2.5 | width=80% | caption=Logic for Page Validation (`validate_wikipedia_pages.py`): The algorithm for validating Wikipedia page content, including redirect and disambiguation handling.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_eligible_candidates.mmd | scale=2.5 | width=65% | caption=Logic for Final Filtering (`select_eligible_candidates.py`): The algorithm for applying all deterministic data quality rules to create the final "eligible candidates" list.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_eminence_scoring.mmd | scale=2.5 | width=60% | caption=Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=55% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN personality scores for all eligible subjects. A robust pre-flight check ensures that interrupted runs can be safely resumed.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_final_candidates.mmd | scale=2.5 | width=35% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for finding the optimal cohort size by performing a slope analysis on a smoothed cumulative personality variance curve.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_neutralization.mmd | scale=2.5 | width=60% | caption=Logic for Delineation Neutralization (`neutralize_delineations.py`): The hybrid algorithm for rewriting texts. Fast mode bundles tasks for speed, while the robust default mode processes each item individually to guarantee completion.}}
+
+{{grouped_figure:docs/diagrams/logic_prep_generation.mmd | scale=2.5 | width=70% | caption=Logic for Database Generation (`generate_personalities_db.py`): The algorithm for assembling the final description text for each subject.}}
 
 #### The Automated Workflow
 
@@ -727,52 +777,6 @@ The personality descriptions are assembled from a library of pre-written text co
     1.  Select `Standard.int` and click **'Edit'**.
     2.  In the 'Interpretations Editor', go to `File > Decompile...` and save the file. This creates `Standard.def` in the `Documents\Solar Fire User Files\Interpretations` directory.
     3.  Copy this file to the `data/foundational_assets/` folder and rename it to `sf_delineations_library.txt`. Note: Filename extensions must be displayed for this rename.
-
-The pipeline can be understood through the following architecture, workflow, data flow, and logic diagrams.
-
-### Data Preparation: Architecture
-
-This diagram provides a map of the scripts in the data preparation pipeline, showing how they are orchestrated and which utilities they share.
-
-{{grouped_figure:docs/diagrams/arch_prep_codebase.mmd | scale=2.5 | width=100% | caption=Data Preparation Code Architecture: The execution flow of the data processing scripts.}}
-
-### Data Preparation: Workflow
-
-This diagram shows the high-level, multi-stage workflow for the entire data preparation pipeline, including both automated and manual processes.
-
-{{grouped_figure:docs/diagrams/flow_prep_pipeline.mmd | scale=2.5 | width=35% | caption=Data Preparation Workflow: The end-to-end pipeline from raw data extraction to the final generated databases, showing both manual and automated steps.}}
-
-### Data Preparation: Data Flow
-
-These diagrams show the sequence of data artifacts (files) created and transformed by the pipeline scripts at each major stage.
-
-{{grouped_figure:docs/diagrams/flow_prep_1_qualification.mmd | scale=2.5 | width=75% | caption=Data Prep Flow 1: Data Sourcing and Candidate Qualification.}}
-
-{{grouped_figure:docs/diagrams/flow_prep_2_selection.mmd | scale=2.5 | width=80% | caption=Data Prep Flow 2: LLM-based Candidate Selection.}}
-
-{{grouped_figure:docs/diagrams/flow_prep_3_generation.mmd | scale=2.5 | width=100% | caption=Data Prep Flow 3: Profile Generation.}}
-
-### Data Preparation: Logic
-
-These diagrams illustrate the internal decision-making logic and control flow of each script in the data preparation pipeline.
-
-{{grouped_figure:docs/diagrams/logic_prep_pipeline.mmd | scale=2.5 | width=50% | caption=Overall Logic for the Data Preparation Pipeline: A high-level view of the four main stages.}}
-
-{{grouped_figure:docs/diagrams/logic_prep_find_links.mmd | scale=2.5 | width=70% | caption=Logic for Link Finding (`find_wikipedia_links.py`): The algorithm for finding Wikipedia URLs by scraping ADB and using a Wikipedia search fallback.}}
-
-{{grouped_figure:docs/diagrams/logic_prep_validate_pages.mmd | scale=2.5 | width=80% | caption=Logic for Page Validation (`validate_wikipedia_pages.py`): The algorithm for validating Wikipedia page content, including redirect and disambiguation handling.}}
-
-{{grouped_figure:docs/diagrams/logic_prep_eligible_candidates.mmd | scale=2.5 | width=65% | caption=Logic for Final Filtering (`select_eligible_candidates.py`): The algorithm for applying all deterministic data quality rules to create the final "eligible candidates" list.}}
-
-{{grouped_figure:docs/diagrams/logic_prep_eminence_scoring.mmd | scale=2.5 | width=60% | caption=Logic for Eminence Scoring (`generate_eminence_scores.py`): The algorithm for batch processing, LLM interaction, and finalization of eminence scores.}}
-
-{{grouped_figure:docs/diagrams/logic_prep_ocean_scoring.mmd | scale=2.5 | width=55% | caption=Logic for OCEAN Scoring (`generate_ocean_scores.py`): The algorithm for generating OCEAN personality scores for all eligible subjects. A robust pre-flight check ensures that interrupted runs can be safely resumed.}}
-
-{{grouped_figure:docs/diagrams/logic_prep_final_candidates.mmd | scale=2.5 | width=35% | caption=Logic for Final Selection (`select_final_candidates.py`): The algorithm for finding the optimal cohort size by performing a slope analysis on a smoothed cumulative personality variance curve.}}
-
-{{grouped_figure:docs/diagrams/logic_prep_neutralization.mmd | scale=2.5 | width=60% | caption=Logic for Delineation Neutralization (`neutralize_delineations.py`): The hybrid algorithm for rewriting texts. Fast mode bundles tasks for speed, while the robust default mode processes each item individually to guarantee completion.}}
-
-{{grouped_figure:docs/diagrams/logic_prep_generation.mmd | scale=2.5 | width=70% | caption=Logic for Database Generation (`generate_personalities_db.py`): The algorithm for assembling the final description text for each subject.}}
 
 ## Experiment Lifecycle & Analysis
 

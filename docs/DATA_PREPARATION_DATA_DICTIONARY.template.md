@@ -11,15 +11,14 @@ The `data/` directory provides the foundational inputs for the project's core lo
 ```
 data/
 │
-├── README_DATA.md                # This file.
-├── base_query.txt                # LLM prompt template.
-├── personalities_db.txt          # Final database for experiments.
+├── README_DATA.md                      # This file.
+├── base_query.txt                      # LLM prompt template.
+├── personalities_db.txt                # Final database for experiments.
 │
 ├── sources/
-│   └── adb_raw_export.txt        # Raw data from automated fetch.
+│   └── adb_raw_export.txt              # Raw data from automated fetch.
 │
 ├── reports/
-│   ├── adb_validation_report.csv
 │   ├── adb_validation_summary.txt
 │   ├── delineation_coverage_map.csv
 │   ├── eminence_scores_summary.txt
@@ -28,26 +27,28 @@ data/
 │   └── ... (other audit logs)
 │
 ├── foundational_assets/
-│   ├── neutralized_delineations/ # Sanitized text snippets.
-│   ├── sf_chart_export.csv       # Chart data from Solar Fire.
-│   ├── sf_delineations_library.txt # Raw text library from Solar Fire.
-│   ├── country_codes.csv         # Maps country/state codes.
-│   ├── eminence_scores.csv       # List ranked by eminence.
-│   ├── ocean_scores.csv          # Definitive subject set.
-│   ├── point_weights.csv         # Weights for profile algorithm.
-│   └── balance_thresholds.csv    # Thresholds for profile algorithm.
-│
+│   ├── neutralized_delineations/       # Sanitized text snippets.
+│   ├── sf_chart_export.csv             # Chart data from Solar Fire.
+│   ├── sf_delineations_library.txt     # Raw text library from Solar Fire.
+│   ├── country_codes.csv               # Maps country/state codes.
+│   ├── eminence_scores.csv             # List ranked by eminence.
+│   ├── ocean_scores.csv                # Definitive subject set.
+│   ├── point_weights.csv               # Weights for profile algorithm.
+│   ├── balance_thresholds.csv          # Thresholds for profile algorithm.
+│   └── cutoff_parameter_analysis_results.csv # Optimal cutoff parameters.
+│                                       
 ├── intermediate/
-│   ├── adb_eligible_candidates.txt # Subjects passing quality checks.
-│   ├── adb_final_candidates.txt  # Final subject set for SF.
-│   └── sf_data_import.txt        # Formatted for SF import.
+│   ├── adb_eligible_candidates.txt     # Subjects passing quality checks.
+│   ├── adb_final_candidates.txt        # Final subject set for SF.
+│   └── sf_data_import.txt              # Formatted for SF import.
 │
 ├── processed/
-│   ├── adb_wiki_links.csv        # Best-guess Wikipedia URLs.
-│   └── subject_db.csv            # Cleaned & integrated master DB.
+│   ├── adb_wiki_links.csv              # Best-guess Wikipedia URLs.
+│   ├── adb_validation_report.csv       # Detailed output of Wikipedia page validation.
+│   └── subject_db.csv                  # Cleaned & integrated master DB.
 │
 └── backup/
-    └── ... (timestamped backups) # Automatic backups.
+    └── ... (timestamped backups)       # Automatic backups.
 ```
 
 ## File Descriptions by Directory
@@ -62,7 +63,6 @@ This directory contains the original, unprocessed starting point for the pipelin
 
 These files are generated during the data validation and filtering stages.
 
--   **`adb_validation_report.csv`**: The detailed, row-by-row output of the Wikipedia page validation script. It is a critical input for the final filtering step.
 -   **`adb_validation_summary.txt`**: A human-readable summary of the validation report.
 -   **`delineation_coverage_map.csv`**: A report used by the assembly logic validation workflow to ensure test subjects provide maximum coverage of all text components.
 -   **`eminence_scores_summary.txt`**: A human-readable summary of the eminence scoring run.
@@ -72,10 +72,17 @@ These files are generated during the data validation and filtering stages.
 
 ### 3. `foundational_assets/` - Static Assets for Generation
 
+### 4. `processed/` - Cleaned & Validated Data
+
+-   **`adb_wiki_links.csv`**: Best-guess Wikipedia URLs for each subject.
+-   **`adb_validation_report.csv`**: The detailed, row-by-row output of the Wikipedia page validation script. This validated data is consumed by the candidate selection pipeline.
+-   **`subject_db.csv`**: The cleaned and integrated master database.
+
 These files are static, pre-prepared assets that provide the rules and content for generating the final personality descriptions.
 
 -   **`eminence_scores.csv`**: Contains the LLM-generated eminence score for every subject in the raw export. It is created by `generate_eminence_scores.py` and provides the rank-ordered input for `generate_ocean_scores.py`.
 -   **`ocean_scores.csv`**: This file is the **definitive source for the experiment's final subject pool**. It is created by `generate_ocean_scores.py`, which stops generating scores once personality diversity (variance) shows a sustained drop. The number of subjects in this file dictates the final dataset size.
+-   **`cutoff_parameter_analysis_results.csv`**: Contains the grid search results for optimal cutoff parameters. These parameters are used by `config.ini` to configure the final candidate selection algorithm.
 -   **`country_codes.csv`**: A mapping file to resolve country/state abbreviations.
 -   **`sf_delineations_library.txt`**: The raw, complete library of interpretive text as exported from Solar Fire.
 -   **`neutralized_delineations/`**: A directory of `.csv` files containing the sanitized, de-jargonized description components. This library is generated automatically by `neutralize_delineations.py`, which uses a hybrid strategy: a fast, bundled initial run (`--fast`) followed by a granular, robust resume run to guarantee completion.

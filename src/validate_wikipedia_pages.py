@@ -590,7 +590,7 @@ def main():
     logging.basicConfig(level=log_level, handlers=[handler], force=True)
 
     input_path = Path(get_path("data/processed/adb_wiki_links.csv"))
-    output_path = Path(get_path("data/reports/adb_validation_report.csv"))
+    output_path = Path(get_path("data/processed/adb_validation_report.csv"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if args.report_only:
@@ -638,9 +638,12 @@ def main():
     output_file = None
 
     try:
-        output_file = open(output_path, 'a', encoding='utf-8', newline='')
+        # Determine file mode: 'w' if no file exists, 'a' if resuming
+        is_new_file = not output_path.exists()
+        file_mode = 'w' if is_new_file else 'a'
+        output_file = open(output_path, file_mode, encoding='utf-8', newline='')
         writer = csv.DictWriter(output_file, fieldnames=fieldnames)
-        if output_file.tell() == 0:
+        if is_new_file:
             writer.writeheader()
 
         with tqdm(total=len(records_to_process), desc="Validating pages", ncols=100, smoothing=0.01, disable=args.quiet) as pbar:

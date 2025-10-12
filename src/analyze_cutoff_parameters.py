@@ -197,7 +197,7 @@ def main():
         }])
         
         # Define the output path
-        minimal_report_path = Path(get_path("data/reports/cutoff_parameter_analysis_results.csv"))
+        minimal_report_path = Path(get_path("data/foundational_assets/cutoff_parameter_analysis_results.csv"))
         
         try:
             minimal_report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -221,7 +221,7 @@ def main():
     # print_centered_table(results_df)
 
     # Save the results to a CSV file
-    report_path = Path(get_path("data/reports/cutoff_parameter_analysis_results.csv"))
+    report_path = Path(get_path("data/foundational_assets/cutoff_parameter_analysis_results.csv"))
     try:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         results_df.to_csv(report_path, index=False)

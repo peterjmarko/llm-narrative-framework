@@ -242,8 +242,9 @@ def save_scores_to_csv(filepath: Path, scores: List[Tuple[str, str, str, str]], 
     """Appends a list of scores to the CSV file, adding a header only if the file is new."""
     try:
         file_is_new = not filepath.exists() or filepath.stat().st_size == 0
+        file_mode = 'w' if file_is_new else 'a'
 
-        with open(filepath, 'a', encoding='utf-8', newline='') as f:
+        with open(filepath, file_mode, encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
             
             if file_is_new:
@@ -634,17 +635,47 @@ def main():
         all_eligible_ids = {s['idADB'] for s in all_subjects} | processed_ids
         missing_ids = all_eligible_ids - final_processed_ids
         
-        if missing_ids:
-            missing_report_path = output_path.parent.parent / "reports" / "missing_eminence_scores.txt"
-            missing_report_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(missing_report_path, 'w', encoding='utf-8') as f:
+        missing_report_path = output_path.parent.parent / "reports" / "missing_eminence_scores.txt"
+        missing_report_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Always overwrite the report, even if empty
+        with open(missing_report_path, 'w', encoding='utf-8') as f:
+            if missing_ids:
                 f.write("Subjects missed by LLM during eminence scoring:\n")
                 for subject_id in sorted(list(missing_ids)):
                     f.write(f"{subject_id}\n")
-            tqdm.write(f"{Fore.YELLOW}Wrote report of {len(missing_ids)} missing subjects to '{missing_report_path}'.")
-            
-            # Calculate completion rate
-            completion_rate = (len(final_processed_ids) / len(all_eligible_ids)) * 100 if all_eligible_ids else 0
+                tqdm.write(f"{Fore.YELLOW}Wrote report of {len(missing_ids)} missing subjects to '{missing_report_path}'.")
+            else:
+                f.write("No missing subjects. All eligible candidates were successfully scored.\n")
+        
+        # Calculate completion rate
+        completion_rate = (len(final_processed_ids) / len(all_eligible_ids)) * 100 if all_eligible_ids else 0
+        
+        # Always write completion info to pipeline JSON
+        completion_info = {
+            'step_name': 'Generate Eminence Scores',
+            'completion_rate': completion_rate,
+            'missing_count': len(missing_ids),
+            'missing_report_path': str(missing_report_path) if missing_ids else None
+        }
+        
+        import json
+        completion_info_path = output_path.parent.parent / "reports" / "pipeline_completion_info.json"
+        completion_info_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        if completion_info_path.exists():
+            with open(completion_info_path, 'r') as f:
+                all_completion_info = json.load(f)
+        else:
+            all_completion_info = {}
+        
+        all_completion_info['eminence_scores'] = completion_info
+        
+        with open(completion_info_path, 'w') as f:
+            json.dump(all_completion_info, f, indent=2)
+        
+        # Handle tiered warnings/errors based on completion rate
+        if missing_ids:
             
             # Tiered approach based on completion rate
             if completion_rate < 95.0:
@@ -675,33 +706,6 @@ def main():
                 from config_loader import PROJECT_ROOT
                 display_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
                 tqdm.write(f"See '{display_path}' for details. This is within acceptable limits.")
-
-            # Store completion info for final pipeline report
-            # The missing_ids variable already contains the correct count of missing subjects
-            # This ensures consistency with the report file
-            completion_info = {
-                'step_name': 'Generate Eminence Scores',
-                'completion_rate': completion_rate,
-                'missing_count': len(missing_ids),
-                'missing_report_path': str(missing_report_path) if missing_ids else None
-            }
-
-            # Write completion info to a shared file for final pipeline report
-            import json
-            completion_info_path = output_path.parent.parent / "reports" / "pipeline_completion_info.json"
-            completion_info_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Read existing info or create new
-            if completion_info_path.exists():
-                with open(completion_info_path, 'r') as f:
-                    all_completion_info = json.load(f)
-            else:
-                all_completion_info = {}
-
-            all_completion_info['eminence_scores'] = completion_info
-
-            with open(completion_info_path, 'w') as f:
-                json.dump(all_completion_info, f, indent=2)
 
         if was_interrupted:
             logging.warning("Eminence score generation terminated by user. Re-run to continue. ✨\n")

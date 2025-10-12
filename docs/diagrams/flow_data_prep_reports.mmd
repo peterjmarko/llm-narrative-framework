@@ -1,0 +1,53 @@
+flowchart TD
+    subgraph Stage2["Stage 2: Candidate Qualification"]
+        S2_Script1[validate_wikipedia_pages.py]
+        S2_Script1 --> R1[adb_validation_summary.txt]
+    end
+
+    subgraph Stage3["Stage 3: Candidate Selection"]
+        S3_Script1[generate_eminence_scores.py]
+        S3_Script2[generate_ocean_scores.py]
+        S3_Script3[analyze_cutoff_parameters.py]
+        
+        S3_Script1 --> R2[eminence_scores_summary.txt]
+        S3_Script1 --> R3[missing_eminence_scores.txt]
+        S3_Script1 --> R7[pipeline_completion_info.json]
+        
+        S3_Script2 --> R4[ocean_scores_summary.txt]
+        S3_Script2 --> R5[missing_ocean_scores.txt]
+        S3_Script2 --> R7
+        
+        S3_Script3 --> R6[variance_curve_analysis.png]
+    end
+
+    subgraph Stage4["Stage 4: Profile Generation"]
+        S4_Script1[create_subject_db.py]
+        S4_Script2[neutralize_delineations.py]
+        
+        S4_Script1 --> R8[missing_sf_subjects.csv]
+        S4_Script2 --> R7
+    end
+
+    subgraph Summary["Pipeline Summary"]
+        S5_Script1[generate_data_preparation_summary.py]
+        S5_Script1 --> R9[data_preparation_pipeline_summary.txt]
+        
+        R1 -.-> S5_Script1
+        R2 -.-> S5_Script1
+        R3 -.-> S5_Script1
+        R4 -.-> S5_Script1
+        R5 -.-> S5_Script1
+        R6 -.-> S5_Script1
+        R7 -.-> S5_Script1
+        R8 -.-> S5_Script1
+    end
+
+    style R1 fill:#e1f5ff
+    style R2 fill:#e1f5ff
+    style R3 fill:#e1f5ff
+    style R4 fill:#e1f5ff
+    style R5 fill:#e1f5ff
+    style R6 fill:#e1f5ff
+    style R7 fill:#fff3cd
+    style R8 fill:#e1f5ff
+    style R9 fill:#d4edda

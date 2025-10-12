@@ -404,7 +404,7 @@ class TestMainWorkflow:
         mock_generate_summary = mocker.patch('src.validate_wikipedia_pages.generate_summary_report')
 
         # Create a dummy report file for the function to read
-        (mock_sandbox / "data/reports/adb_validation_report.csv").touch()
+        (mock_sandbox / "data/processed/adb_validation_report.csv").touch()
 
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--report-only"]
         with patch("sys.argv", test_args):
@@ -434,7 +434,7 @@ class TestMainWorkflow:
     def test_main_handles_stale_report(self, mock_sandbox, mocker):
         """Tests that a stale report file triggers an automatic re-run."""
         input_path = mock_sandbox / "data/processed/adb_wiki_links.csv"
-        report_path = mock_sandbox / "data/reports/adb_validation_report.csv"
+        report_path = mock_sandbox / "data/processed/adb_validation_report.csv"
         report_path.touch()
 
         # Make the input file newer than the report

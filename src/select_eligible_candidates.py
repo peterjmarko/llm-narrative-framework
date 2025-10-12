@@ -140,7 +140,7 @@ def main():
     from config_loader import get_path, PROJECT_ROOT
 
     input_path = Path(get_path("data/sources/adb_raw_export.txt"))
-    validation_path = Path(get_path("data/reports/adb_validation_report.csv"))
+    validation_path = Path(get_path("data/processed/adb_validation_report.csv"))
     output_path = Path(get_path("data/intermediate/adb_eligible_candidates.txt"))
 
     if not args.force and output_path.exists():

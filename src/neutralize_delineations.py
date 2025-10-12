@@ -540,36 +540,40 @@ def main():
         print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
         print(f"{Fore.CYAN} - Neutralized delineations saved to: {display_path}{Fore.RESET}")
 
+        # Calculate completion rate based on actual results
+        total_possible_tasks = processed_count + failed_count
+        completion_rate = (processed_count / total_possible_tasks * 100.0) if total_possible_tasks > 0 else 100.0
+        
+        # Always write completion info to pipeline JSON
+        import json
+        completion_info = {
+            'llm_used': args.model,
+            'completion_rate': completion_rate,
+            'processed_count': processed_count,
+            'failed_count': failed_count
+        }
+        
+        completion_info_path = output_dir.parent.parent / "reports" / "pipeline_completion_info.json"
+        completion_info_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        if completion_info_path.exists():
+            with open(completion_info_path, 'r') as f:
+                all_completion_info = json.load(f)
+        else:
+            all_completion_info = {}
+        
+        all_completion_info['neutralize_delineations'] = completion_info
+        
+        with open(completion_info_path, 'w') as f:
+            json.dump(all_completion_info, f, indent=2)
+        
+        # Print status message
         if failed_count > 0:
             key_metric = f"Finished with {failed_count} failure(s)"
             print(f"\n{Fore.RED}FAILURE: {key_metric}. Re-run the script to automatically retry.{Fore.RESET}\n")
         else:
             key_metric = f"Processed {processed_count} task(s)"
             print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Neutralization completed successfully.{Fore.RESET}\n")
-            
-            # Write completion info to a shared file for final pipeline report
-            completion_info = {
-                'llm_used': args.model,
-                'completion_rate': 100.0,  # If we get here, all tasks were processed successfully
-                'processed_count': processed_count,
-                'failed_count': failed_count
-            }
-            
-            import json
-            completion_info_path = output_dir.parent.parent / "reports" / "pipeline_completion_info.json"
-            completion_info_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Read existing info or create new
-            if completion_info_path.exists():
-                with open(completion_info_path, 'r') as f:
-                    all_completion_info = json.load(f)
-            else:
-                all_completion_info = {}
-            
-            all_completion_info['neutralize_delineations'] = completion_info
-            
-            with open(completion_info_path, 'w') as f:
-                json.dump(all_completion_info, f, indent=2)
 
 def debug_and_exit(prompt, worker_result, pbar, temp_dir):
     """Prints debug info and halts the script."""

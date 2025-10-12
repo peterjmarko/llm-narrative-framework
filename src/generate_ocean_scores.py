@@ -212,7 +212,8 @@ def save_scores_to_csv(filepath: Path, scores: List[Dict]):
 
     try:
         file_is_new = not filepath.exists() or filepath.stat().st_size == 0
-        with open(filepath, 'a', encoding='utf-8', newline='') as f:
+        file_mode = 'w' if file_is_new else 'a'
+        with open(filepath, file_mode, encoding='utf-8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=OCEAN_FIELDNAMES)
             if file_is_new:
                 writer.writeheader()
@@ -649,11 +650,34 @@ def main():
             missing_report_path, llm_missed_subjects, subjects_to_process, final_df_from_disk
         )
 
-        # If any subjects were not processed (either missed by LLM or unattempted due to error), apply tiered approach.
+        # Calculate completion metrics
+        completion_rate = (len(final_processed_ids) / len(initial_ids)) * 100 if initial_ids else 0
+        missing_count = len(missing_ids)
+        
+        # Always write completion info to pipeline JSON
+        completion_info = {
+            'step_name': 'Generate OCEAN Scores',
+            'completion_rate': completion_rate,
+            'missing_count': missing_count,
+            'missing_report_path': str(missing_report_path) if missing_count > 0 else None
+        }
+        
+        completion_info_path = output_path.parent.parent / "reports" / "pipeline_completion_info.json"
+        completion_info_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        if completion_info_path.exists():
+            with open(completion_info_path, 'r') as f:
+                all_completion_info = json.load(f)
+        else:
+            all_completion_info = {}
+        
+        all_completion_info['ocean_scores'] = completion_info
+        
+        with open(completion_info_path, 'w') as f:
+            json.dump(all_completion_info, f, indent=2)
+        
+        # Handle tiered warnings/errors based on completion rate
         if missing_ids:
-            # Calculate completion rate
-            completion_rate = (len(final_processed_ids) / len(initial_ids)) * 100 if initial_ids else 0
-            
             # Tiered approach based on completion rate
             if completion_rate < 95.0:
                 # Critical: Stop the pipeline
@@ -683,33 +707,6 @@ def main():
                 from config_loader import PROJECT_ROOT
                 display_path = os.path.relpath(missing_report_path, PROJECT_ROOT).replace('\\', '/')
                 tqdm.write(f"See '{display_path}' for details. This is within acceptable limits.")
-
-            # Store completion info for final pipeline report
-            # Calculate missing_count as the sum of llm_missed_subjects and unattempted_subjects
-            # This ensures consistency with the report file
-            missing_count = len(llm_missed_subjects) + len(unattempted_subjects)
-            completion_info = {
-                'step_name': 'Generate OCEAN Scores',
-                'completion_rate': completion_rate,
-                'missing_count': missing_count,
-                'missing_report_path': str(missing_report_path) if missing_count > 0 else None
-            }
-
-            # Write completion info to a shared file for final pipeline report
-            completion_info_path = output_path.parent.parent / "reports" / "pipeline_completion_info.json"
-            completion_info_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Read existing info or create new
-            if completion_info_path.exists():
-                with open(completion_info_path, 'r') as f:
-                    all_completion_info = json.load(f)
-            else:
-                all_completion_info = {}
-
-            all_completion_info['ocean_scores'] = completion_info
-
-            with open(completion_info_path, 'w') as f:
-                json.dump(all_completion_info, f, indent=2)
 
         # Print final status message based on the exit condition
         if was_interrupted:
