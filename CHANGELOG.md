@@ -2,6 +2,35 @@
 
 # Changelog
 
+## 13.0.0 (2025-10-12)
+
+### Bump
+
+- **version 12.16.0 → 13.0.0**
+
+### Refactor
+
+- **reorganize data directory structure and improve report management**
+  Reorganize data pipeline file structure for better semantic organization and ensure all reports are properly managed.
+  
+  BREAKING CHANGE: File locations changed - adb_validation_report.csv moved from data/reports/ to data/processed/, and cutoff_parameter_analysis_results.csv moved from data/reports/ to data/foundational_assets/. Update any external scripts that reference these files.
+  
+  Changes:
+  - Moved adb_validation_report.csv to data/processed/ (validated data consumed by pipeline)
+  - Moved cutoff_parameter_analysis_results.csv to data/foundational_assets/ (configuration data)
+  - Changed all report-generating scripts from append to write mode to ensure clean overwrites
+  - Fixed completion tracking JSON to always write regardless of success/failure state
+  - Updated all source code, tests, and documentation to reference new file locations
+  - Enhanced L3 integration test table formatting (white headers, colored status only)
+  - Updated Step 12 pipeline display to show "(6 files)" instead of single file
+  - Created new Mermaid diagram visualizing report generation flow by pipeline stage
+  - All unit tests and integration tests (L2, L3) passing
+  
+  Files modified: 16 (11 source, 1 orchestration, 4 tests, 2 docs)
+  Files created: 1 (flow diagram)
+  
+  BREAKING CHANGE:
+
 ## 12.16.0 (2025-10-11)
 
 ### Bump
