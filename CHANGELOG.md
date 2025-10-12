@@ -2,6 +2,28 @@
 
 # Changelog
 
+## 12.16.0 (2025-10-11)
+
+### Bump
+
+- **version 12.15.2 → 12.16.0**
+
+### Features
+
+- **add global lock mechanism to prevent race conditions in PDM operations**
+  Implement cross-platform file-based locking to prevent concurrent execution of data processing and experiment operations.
+  
+  - Add `run_with_lock.py` wrapper for all PDM commands that touch data/experiments
+  - Add `unlock.py` utility for manual lock removal in emergency situations
+  - Integrate session-level lock in pytest via `conftest.py` fixture
+  - Update all data preparation, experiment, study, and test commands in `pyproject.toml`
+  - Lock stored in `.pdm-locks/operations.lock` with operation name for debugging
+  - Fail immediately with informative error message when lock is held
+  - Silent on success, colored error output with blank lines for visibility
+  - Automatically cleaned up on process exit or Ctrl+C interrupt
+  - Cross-platform compatible (Windows, Linux, macOS)
+  - Documentation updates in DEVELOPERS_GUIDE, README, and TESTING_GUIDE
+
 ## 12.15.2 (2025-10-11)
 
 ### Bump
