@@ -122,6 +122,7 @@ docs/word_docs/
 /tests/temp_test_environment/
 /temp_test_environment/
 /temp_assembly_logic_validation/
+/tests/results/
 
 
 # ==============================================================================

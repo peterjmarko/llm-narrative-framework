@@ -1,7 +1,0 @@
-{"timestamp": "2025-10-12T17:45:14.436849", "operation": "test-op-runner", "status": "PASS", "exit_code": 0, "duration_seconds": 0.45, "command": "pytest tests/maintenance/test_operation_runner.py"}
-{"timestamp": "2025-10-12T17:56:25.774135", "operation": "test-data-prep", "status": "PASS", "exit_code": 0, "duration_seconds": 14.83, "command": "pytest tests/data_preparation/"}
-{"timestamp": "2025-10-12T17:57:13.989015", "operation": "test-l2", "status": "PASS", "exit_code": 0, "duration_seconds": 21.31, "command": "pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"}
-{"timestamp": "2025-10-12T17:59:29.152531", "operation": "test-l3", "status": "PASS", "exit_code": 0, "duration_seconds": 69.3, "command": "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"}
-{"timestamp": "2025-10-12T19:06:18.039768", "operation": "test-assembly-setup", "status": "PASS", "exit_code": 0, "duration_seconds": 4.35, "command": "python scripts/workflows/assembly_logic/test_assembly_setup.py"}
-{"timestamp": "2025-10-12T19:13:29.026592", "operation": "test-query-gen", "status": "PASS", "exit_code": 0, "duration_seconds": 31.2, "command": "pwsh -File ./tests/testing_harness/validate_query_generation.ps1"}
-{"timestamp": "2025-10-12T19:15:29.375907", "operation": "test-l3-selection", "status": "FAIL", "exit_code": 1, "duration_seconds": 2.83, "command": "pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"}

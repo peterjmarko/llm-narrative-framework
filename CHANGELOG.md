@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 13.1.0 (2025-10-12)
+
+### Bump
+
+- **version 13.0.0 → 13.1.0**
+
+### Features
+
+- **implement comprehensive audit logging system for all operations**
+  Add automatic audit logging for all test, workflow, and data preparation operations with timestamped JSONL records.
+  
+  - Create operation_runner.py to replace run_with_lock.py with audit logging capabilities
+  - Log operations to categorized files: test_summary.jsonl, workflow_summary.jsonl, data_prep_summary.jsonl
+  - Parse pyproject.toml section headers to automatically categorize operations
+  - Include timestamp, operation name, status, exit code, duration, and full command in logs
+  - Add shell=True to subprocess calls to ensure PDM virtual environment is properly used
+  - Wrap all test commands (including PowerShell tests) through operation_runner for consistent logging
+  - Create test suite for operation_runner with 4 passing tests
+  - Update all documentation (TESTING_GUIDE, DEVELOPERS_GUIDE) with audit logging information
+  - Add colorama dependency for colored console output in assembly logic scripts
+  - Fix assembly logic validation to sort by idADB instead of Index column for correct comparison
+  - Add retry mechanism for Windows file lock issues in assembly logic subject selection
+  - Make operation runner Stage 0 in recommended testing workflow as foundational infrastructure
+
 ## 13.0.0 (2025-10-12)
 
 ### Bump
