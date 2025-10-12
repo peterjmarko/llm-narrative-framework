@@ -77,8 +77,22 @@ All integration tests run in isolated `temp_test_environment` directories at the
 
 - **Non-destructive**: Never modify production files or directories
 - **Reproducible**: Start from a clean state every time
-- **Parallel-safe**: Multiple tests can run without interfering
+- **Parallel-safe**: Multiple tests can run without interfering (prevented by global lock)
 - **Self-contained**: All test assets are created and cleaned up automatically
+
+### Race Condition Prevention
+
+All test operations and data processing workflows use a global lock mechanism to prevent concurrent execution. This ensures:
+
+- **Data Integrity**: No simultaneous operations can corrupt shared data files
+- **Experiment Safety**: Only one experiment operation runs at a time
+- **Automatic Management**: Locks are acquired/released automatically through PDM commands and pytest fixtures
+
+If you encounter a "Cannot acquire lock" error:
+1. Wait for the current operation to complete
+2. If certain no operations are running (e.g., after a crash), use `pdm run unlock`
+
+The lock is implemented at the project level in `.pdm-locks/operations.lock` and is automatically cleaned up by the OS if a process crashes.
 
 ## Typical Testing Sequence
 

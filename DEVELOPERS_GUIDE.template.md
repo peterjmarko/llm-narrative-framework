@@ -159,6 +159,8 @@ To maintain the quality and consistency of the codebase, all contributions shoul
 
 *   **Predictable and Safe User Interaction**: All scripts that modify or delete data must follow a standard interaction model. By default, they should prompt for confirmation before overwriting existing files. A `--force` flag should be available to bypass this prompt for automated workflows. In either case, a backup of the overwritten data should be created automatically.
 
+*   **Race Condition Prevention**: All data processing and experiment operations are protected by a global lock mechanism to prevent concurrent execution that could corrupt data. The lock is automatically managed through PDM command wrappers and pytest fixtures. Users should always use `pdm run` commands rather than executing scripts directly. If a lock becomes stale due to a process crash, use `pdm run unlock` to manually remove it.
+
 *   **Guaranteed Reproducibility**: Experimental results must be verifiably linked to the parameters that created them. The pipeline ensures this by automatically archiving the `config.ini` file within each run's output directory, creating an immutable record.
 
 *   **Standardized Wrapper and Backend Interfaces**: All user-facing PowerShell wrappers and their Python backends must adhere to a consistent architectural pattern to ensure robustness and predictability.
@@ -523,7 +525,7 @@ This section covers common technical issues that may arise during development, t
 | Issue | Solution |
 | :--- | :--- |
 | **`pdm use` fails with `[NoPythonVersion]`** | This means PDM cannot find the Python interpreter. Provide the full, absolute path to your `python.exe`, wrapped in quotes (e.g., `pdm use "C:/.../python.exe"`). Use `py -0p` (Windows) or `which python3.11` (macOS/Linux) to find the path. |
-| **Mermaid diagram fails to render (`mmdc` error)** | This is almost always a syntax error in the `.mmd` file. Check for special characters (`&`, `=`, `(`, `)`) in node text that are not enclosed in double quotes. |
+| **"Cannot acquire lock" error when running tests/operations** | Another operation is currently running. Wait for it to complete, or if you're certain no operations are running (e.g., after a crash), use `pdm run unlock` to remove the stale lock file. || **Mermaid diagram fails to render (`mmdc` error)** | This is almost always a syntax error in the `.mmd` file. Check for special characters (`&`, `=`, `(`, `)`) in node text that are not enclosed in double quotes. |
 | **Tests fail due to `ModuleNotFoundError`** | You have likely added a new dependency in the code but not to the project. Use `pdm add <package-name>` (for main dependencies) or `pdm add -G dev <package-name>` (for development tools) to add it correctly. |
 | **Pre-commit hook fails on `build-docs --check`** | This means you have modified a documentation source file (`*.template.md` or a diagram) but have not run `pdm run build-docs` to apply the changes to the final generated files. Run the build command and `git add` the updated files. |
 | **Cannot rename project folder ("Folder In Use")** | A background process (often a lingering `pwsh.exe` or `python.exe`) is holding a lock on the folder. Use the **Resource Monitor** on Windows to find the process with a handle on the folder and end it. If all else fails, a system reboot will release the lock. |

@@ -59,4 +59,43 @@ def test_record_number(request):
     """A fixture to retrieve the value of the --test-record-number option."""
     return request.config.getoption("--test-record-number")
 
+
+# === Lock Management for Race Condition Prevention ===
+from pathlib import Path
+
+# Add maintenance scripts to path
+maintenance_path = Path(project_root) / "scripts" / "maintenance"
+if str(maintenance_path) not in sys.path:
+    sys.path.insert(0, str(maintenance_path))
+
+from run_with_lock import acquire_lock, release_lock
+
+
+@pytest.fixture(scope="session", autouse=True)
+def session_lock():
+    """
+    Automatically acquire lock for entire pytest session.
+    
+    If pytest is called through PDM wrapper, the lock is already held,
+    so we skip acquisition to avoid blocking ourselves.
+    """
+    lock_dir = Path(project_root) / ".pdm-locks"
+    lock_file_path = lock_dir / "operations.lock"
+    
+    lock_acquired = False
+    lock_file = None
+    
+    # Only try to acquire if lock doesn't exist
+    if not lock_file_path.exists():
+        lock_file = acquire_lock("pytest")
+        if not lock_file:
+            pytest.exit("Cannot run tests: lock held by another operation", returncode=1)
+        lock_acquired = True
+    
+    yield
+    
+    # Only release if we acquired it
+    if lock_acquired and lock_file:
+        release_lock(lock_file)
+
 # === End of tests/conftest.py ===

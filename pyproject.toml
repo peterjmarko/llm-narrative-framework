@@ -52,6 +52,11 @@ addopts = [
 
 [tool.pdm.scripts]
 # ==============================================================================
+# === LOCK MANAGEMENT ===
+# ==============================================================================
+unlock = {cmd = "python scripts/maintenance/unlock.py", help = "Remove stale operation lock (emergency use only)."}
+
+# ==============================================================================
 # === MAINTENANCE, LINTING & REPORTING ===
 # ==============================================================================
 clean = {cmd = "python scripts/maintenance/clean_project.py", help = "Clean up temporary and generated files."}
@@ -76,13 +81,13 @@ release = {cmd = "python scripts/build/finalize_release.py", help = "Finalize a 
 # === CORE PROJECT WORKFLOWS ===
 # ==============================================================================
 # Data preparation workflow shortcuts
-prep-data = "pwsh -ExecutionPolicy Bypass -File ./prepare_data.ps1"
+prep-data = {shell = "python scripts/maintenance/run_with_lock.py prep-data pwsh -ExecutionPolicy Bypass -File ./prepare_data.ps1"}
 # Main workflow shortcuts
-new-exp = "pwsh -ExecutionPolicy Bypass -File ./new_experiment.ps1"
-aud-exp = "pwsh -ExecutionPolicy Bypass -File ./audit_experiment.ps1"
-fix-exp = "pwsh -ExecutionPolicy Bypass -File ./fix_experiment.ps1"
-com-stu = "pwsh -ExecutionPolicy Bypass -File ./compile_study.ps1"
-aud-stu = "pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"
+new-exp = {shell = "python scripts/maintenance/run_with_lock.py new-exp pwsh -ExecutionPolicy Bypass -File ./new_experiment.ps1"}
+aud-exp = {shell = "python scripts/maintenance/run_with_lock.py aud-exp pwsh -ExecutionPolicy Bypass -File ./audit_experiment.ps1"}
+fix-exp = {shell = "python scripts/maintenance/run_with_lock.py fix-exp pwsh -ExecutionPolicy Bypass -File ./fix_experiment.ps1"}
+com-stu = {shell = "python scripts/maintenance/run_with_lock.py com-stu pwsh -ExecutionPolicy Bypass -File ./compile_study.ps1"}
+aud-stu = {shell = "python scripts/maintenance/run_with_lock.py aud-stu pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"}
 
 # ==============================================================================
 # === TESTING WORKFLOW (Organized by Typical Testing Sequence) ===
@@ -91,13 +96,13 @@ aud-stu = "pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"
 # docs/TESTING_GUIDE.md - "Typical Testing Sequence" section
 
 # --- Stage 1: Unit Tests - Data Preparation Pipeline ---
-test-data-prep = {cmd = "pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+test-data-prep = {shell = "python scripts/maintenance/run_with_lock.py test-data-prep pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
 
 # --- Stage 2: Data Pipeline Integration (Layer 2-3) ---
-test-l2 = "pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"
-test-l3 = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"
-test-l3-bypass = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"
-test-l3-interactive = "pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"
+test-l2 = {shell = "python scripts/maintenance/run_with_lock.py test-l2 pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"}
+test-l3 = {shell = "python scripts/maintenance/run_with_lock.py test-l3 pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"}
+test-l3-bypass = {shell = "python scripts/maintenance/run_with_lock.py test-l3-bypass pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"}
+test-l3-interactive = {shell = "python scripts/maintenance/run_with_lock.py test-l3-interactive pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"}
 
 # --- Stage 3: Algorithm Validation ---
 # Prerequisite steps for test-assembly (Personality Assembly Algorithm Validation)
@@ -112,25 +117,25 @@ test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.p
 test-l3-selection = "pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"
 
 # --- Stage 4: Unit Tests - Experiment Workflow ---
-test-exp-wf = {cmd = "pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}
-test-exp-lc = {cmd = "pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}  # Backward compatibility
+test-exp-wf = {shell = "python scripts/maintenance/run_with_lock.py test-exp-wf pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}
+test-exp-lc = {shell = "python scripts/maintenance/run_with_lock.py test-exp-lc pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}  # Backward compatibility
 
 # --- Stage 5: Experiment & Study Integration (Layer 4-5) ---
-test-l4 = "pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1"
-test-l4-interactive = "pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1 -Interactive"
-test-l5 = "pwsh -File ./tests/testing_harness/experiment_workflow/layer5/run_layer5_test.ps1"
+test-l4 = {shell = "python scripts/maintenance/run_with_lock.py test-l4 pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1"}
+test-l4-interactive = {shell = "python scripts/maintenance/run_with_lock.py test-l4-interactive pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1 -Interactive"}
+test-l5 = {shell = "python scripts/maintenance/run_with_lock.py test-l5 pwsh -File ./tests/testing_harness/experiment_workflow/layer5/run_layer5_test.ps1"}
 
 # --- Stage 6: All Unit Tests Together ---
-test = {cmd = "python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
-cov = {shell = "pytest --cov=src --cov-report=term-missing", help = "Run all tests with coverage analysis."}
-cov-html = {shell = "pytest --cov=src --cov-report=html", help = "Run all tests and generate an HTML coverage report."}
-test-cov = {shell = "pytest --cov=src --cov-report= {args}", help = "Run tests for a specific file to update .coverage data."}
+test = {shell = "python scripts/maintenance/run_with_lock.py test python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
+cov = {shell = "python scripts/maintenance/run_with_lock.py cov pytest --cov=src --cov-report=term-missing", help = "Run all tests with coverage analysis."}
+cov-html = {shell = "python scripts/maintenance/run_with_lock.py cov-html pytest --cov=src --cov-report=html", help = "Run all tests and generate an HTML coverage report."}
+test-cov = {shell = "python scripts/maintenance/run_with_lock.py test-cov pytest --cov=src --cov-report= {args}", help = "Run tests for a specific file to update .coverage data."}
 report-cov = {shell = "coverage report -m --no-skip-covered {args}", help = "Generate a focused coverage report for specific source file(s)."}
 
 # --- Stage 7: Statistical Validation ---
-test-stats-study = "pwsh -File ./tests/algorithm_validation/create_statistical_study.ps1"
-test-stats-imports = "pwsh -File ./tests/algorithm_validation/generate_graphpad_imports.ps1" 
-test-stats-results = "pwsh -File ./tests/algorithm_validation/validate_graphpad_results.ps1"
+test-stats-study = {shell = "python scripts/maintenance/run_with_lock.py test-stats-study pwsh -File ./tests/algorithm_validation/create_statistical_study.ps1"}
+test-stats-imports = {shell = "python scripts/maintenance/run_with_lock.py test-stats-imports pwsh -File ./tests/algorithm_validation/generate_graphpad_imports.ps1"}
+test-stats-results = {shell = "python scripts/maintenance/run_with_lock.py test-stats-results pwsh -File ./tests/algorithm_validation/validate_graphpad_results.ps1"}
 
 # --- PowerShell Wrapper Tests (Used by Integration Tests) ---
 test-ps-new-exp = "pwsh ./tests/experiment_workflow/new_experiment.Tests.ps1"

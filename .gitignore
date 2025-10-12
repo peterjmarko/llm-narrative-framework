@@ -148,3 +148,6 @@ commit.txt
 /debug/CONTRIBUTING.md
 CONTRIBUTING.md
 debug/
+
+# PDM operation locks
+.pdm-locks/

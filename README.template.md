@@ -95,6 +95,24 @@ Once you have a separate experiment directory for each of your conditions, you c
 
 3.  **Compile the Study (`compile_study.ps1`)**: This is the final step. It aggregates all data, runs the statistical analysis, and generates the publication-ready reports and plots.
 
+## Race Condition Prevention
+
+All data processing and experiment operations use a global lock to prevent concurrent execution that could corrupt data or experiments. The lock is automatically managed when using PDM commands.
+
+**Best Practices:**
+- Always use `pdm run` commands (e.g., `pdm run test-data-prep`, `pdm run new-exp`)
+- If you see a lock error, wait for the current operation to complete
+- If a lock is stale after a crash, use `pdm run unlock` to remove it
+
+**Example:**
+```powershell
+# This automatically acquires and releases the lock
+pdm run test-data-prep
+
+# If lock is stale (process crashed)
+pdm run unlock
+```
+
 ## Workflow Validation & Reliability
 
 The experiment workflow has been comprehensively validated through integration testing that demonstrates the framework's self-healing capabilities:
