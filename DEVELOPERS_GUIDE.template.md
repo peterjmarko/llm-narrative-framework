@@ -247,6 +247,26 @@ The test suite is organized into four complementary pillars that work together t
     pdm run test
     ````
 
+#### Operation Runner & Audit Logging
+
+The project uses `scripts/maintenance/operation_runner.py` to wrap all PDM operations with:
+
+- **Global Lock**: Prevents concurrent operations that could corrupt data
+- **Audit Logging**: Automatically logs all operations to `tests/results/` organized by category:
+  - `test_summary.jsonl` - All test executions
+  - `data_prep_summary.jsonl` - Data preparation pipeline runs
+  - `workflow_summary.jsonl` - Experiment and study workflow operations
+
+The audit logs use JSONL format (one JSON object per line):
+
+```json
+The audit logs use JSONL format (one JSON object per line):
+```
+
+**Category Detection**: The runner parses `pyproject.toml` section headers (marked with `===`) to automatically classify operations. When adding new PDM commands, ensure they're under the appropriate section header.
+
+**Testing the Runner**: Run `pdm test-op-runner` to validate the operation runner itself.
+
 *   **PowerShell Tests**: The PowerShell orchestration scripts are tested using a custom, lightweight integration testing harness, not a traditional framework like Pester. This decision was made to ensure maximum reliability and compatibility across different environments, as Pester's advanced mocking and assertion features can introduce complexities that are not necessary for testing these simple wrapper scripts.
 
 | Command | Workflow Tested |

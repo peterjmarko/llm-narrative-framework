@@ -82,7 +82,16 @@ def main():
     sandbox_dir = Path("temp_assembly_logic_validation")
     print(f"\nCreating clean sandbox at: {sandbox_dir.resolve()}")
     if sandbox_dir.exists():
-        shutil.rmtree(sandbox_dir)
+        import time
+        while True:
+            try:
+                shutil.rmtree(sandbox_dir)
+                break
+            except PermissionError:
+                print(f"\n{Fore.YELLOW}WARNING: Cannot delete sandbox directory - files are in use.{Fore.RESET}")
+                print(f"Please close any programs that have files open in '{sandbox_dir}'")
+                print(f"(such as Excel, text editors, file explorers, etc.)")
+                input(f"\nPress Enter when ready to retry...")
     
     # Define output paths within the sandbox, mirroring the project structure
     output_path = sandbox_dir / "data/processed/subject_db.assembly_logic.csv"

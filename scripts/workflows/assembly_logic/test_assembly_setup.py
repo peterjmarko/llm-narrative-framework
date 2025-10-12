@@ -189,9 +189,10 @@ Please execute the following manual procedure:
 4. Export all chart data as 'sf_chart_export.assembly_logic.csv' to your Solar Fire export directory:
    'Documents/Solar Fire User Files/Export/'.
 5. Generate and save interpretation reports for all charts (17 total) using the special procedure
-   detailed in the Replication Guide under 'Special Step: Generate Interpretation Reports'.
+   detailed in the Framework Manual under 'Special Step: Generate Interpretation Reports' of the 
+   'Import/Export Workflow' section of the 'Solar Fire Integration and Configuration' chapter.
 
-See the 'Importing to and Exporting from Solar Fire' section of the Replication Guide for detailed instructions.
+See the 'Import/Export Workflow' of the 'Solar Fire Integration and Configuration' chapter of the Framework Manual for detailed instructions.
 
 {Fore.YELLOW}This step is critical for generating the ground truth data needed for validation.{Style.RESET_ALL}
 """)

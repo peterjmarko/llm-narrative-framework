@@ -68,7 +68,7 @@ maintenance_path = Path(project_root) / "scripts" / "maintenance"
 if str(maintenance_path) not in sys.path:
     sys.path.insert(0, str(maintenance_path))
 
-from run_with_lock import acquire_lock, release_lock
+from operation_runner import acquire_lock, release_lock
 
 
 @pytest.fixture(scope="session", autouse=True)

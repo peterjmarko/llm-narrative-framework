@@ -139,8 +139,14 @@ def main():
         converted_df = pd.read_csv(from_sf_output_path, dtype=str)
         original_df.fillna("", inplace=True)
         converted_df.fillna("", inplace=True)
-        original_df = original_df.sort_values(by="Index").reset_index(drop=True)
-        converted_df = converted_df.sort_values(by="Index").reset_index(drop=True)
+        
+        # Sort by idADB for consistent comparison (Index reflects original ADB export order)
+        original_df = original_df.sort_values(by="idADB").reset_index(drop=True)
+        converted_df = converted_df.sort_values(by="idADB").reset_index(drop=True)
+        
+        # Drop Index column as it's just the original row number, not part of the data
+        original_df = original_df.drop(columns=["Index"])
+        converted_df = converted_df.drop(columns=["Index"])
 
         assert_frame_equal(original_df, converted_df)
 

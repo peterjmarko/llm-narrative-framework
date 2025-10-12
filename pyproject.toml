@@ -28,6 +28,7 @@ dependencies = [
     "thefuzz[speedup]>=0.22.1",
     "beautifulsoup4>=4.13.4",
     "certifi>=2025.8.3",
+    "colorama>=0.4.6",
 ]
 
 [tool.pdm]
@@ -81,69 +82,76 @@ release = {cmd = "python scripts/build/finalize_release.py", help = "Finalize a 
 # === CORE PROJECT WORKFLOWS ===
 # ==============================================================================
 # Data preparation workflow shortcuts
-prep-data = {shell = "python scripts/maintenance/run_with_lock.py prep-data pwsh -ExecutionPolicy Bypass -File ./prepare_data.ps1"}
+prep-data = {shell = "python scripts/maintenance/operation_runner.py prep-data pwsh -ExecutionPolicy Bypass -File ./prepare_data.ps1"}
 # Main workflow shortcuts
-new-exp = {shell = "python scripts/maintenance/run_with_lock.py new-exp pwsh -ExecutionPolicy Bypass -File ./new_experiment.ps1"}
-aud-exp = {shell = "python scripts/maintenance/run_with_lock.py aud-exp pwsh -ExecutionPolicy Bypass -File ./audit_experiment.ps1"}
-fix-exp = {shell = "python scripts/maintenance/run_with_lock.py fix-exp pwsh -ExecutionPolicy Bypass -File ./fix_experiment.ps1"}
-com-stu = {shell = "python scripts/maintenance/run_with_lock.py com-stu pwsh -ExecutionPolicy Bypass -File ./compile_study.ps1"}
-aud-stu = {shell = "python scripts/maintenance/run_with_lock.py aud-stu pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"}
+new-exp = {shell = "python scripts/maintenance/operation_runner.py new-exp pwsh -ExecutionPolicy Bypass -File ./new_experiment.ps1"}
+aud-exp = {shell = "python scripts/maintenance/operation_runner.py aud-exp pwsh -ExecutionPolicy Bypass -File ./audit_experiment.ps1"}
+fix-exp = {shell = "python scripts/maintenance/operation_runner.py fix-exp pwsh -ExecutionPolicy Bypass -File ./fix_experiment.ps1"}
+com-stu = {shell = "python scripts/maintenance/operation_runner.py com-stu pwsh -ExecutionPolicy Bypass -File ./compile_study.ps1"}
+aud-stu = {shell = "python scripts/maintenance/operation_runner.py aud-stu pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"}
 
 # ==============================================================================
 # === TESTING WORKFLOW (Organized by Typical Testing Sequence) ===
 # ==============================================================================
 # For the complete testing workflow and sequence details, see:
 # docs/TESTING_GUIDE.md - "Typical Testing Sequence" section
+#
+# IMPORTANT: Section headers (marked with ===) are used by operation_runner.py
+# to categorize operations for audit logging. Maintain clear section boundaries:
+# - "TESTING" → test_summary.jsonl
+# - "DATA PREPARATION" → data_prep_summary.jsonl  
+# - "CORE PROJECT WORKFLOWS" → workflow_summary.jsonl
 
 # --- Stage 1: Unit Tests - Data Preparation Pipeline ---
-test-data-prep = {shell = "python scripts/maintenance/run_with_lock.py test-data-prep pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+test-data-prep = {shell = "python scripts/maintenance/operation_runner.py test-data-prep pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
+test-op-runner = {shell = "python scripts/maintenance/operation_runner.py test-op-runner pytest tests/maintenance/test_operation_runner.py", help = "Test the operation runner itself."}
 
 # --- Stage 2: Data Pipeline Integration (Layer 2-3) ---
-test-l2 = {shell = "python scripts/maintenance/run_with_lock.py test-l2 pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"}
-test-l3 = {shell = "python scripts/maintenance/run_with_lock.py test-l3 pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"}
-test-l3-bypass = {shell = "python scripts/maintenance/run_with_lock.py test-l3-bypass pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"}
-test-l3-interactive = {shell = "python scripts/maintenance/run_with_lock.py test-l3-interactive pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"}
+test-l2 = {shell = "python scripts/maintenance/operation_runner.py test-l2 pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"}
+test-l3 = {shell = "python scripts/maintenance/operation_runner.py test-l3 pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default"}
+test-l3-bypass = {shell = "python scripts/maintenance/operation_runner.py test-l3-bypass pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile bypass"}
+test-l3-interactive = {shell = "python scripts/maintenance/operation_runner.py test-l3-interactive pwsh ./tests/testing_harness/data_preparation/layer3/run_layer3_test.ps1 -Profile default -Interactive"}
 
 # --- Stage 3: Algorithm Validation ---
 # Prerequisite steps for test-assembly (Personality Assembly Algorithm Validation)
-test-assembly-step1 = {cmd = "python scripts/workflows/assembly_logic/1_generate_coverage_map.py", help = "Step 1: Generate coverage map for assembly logic validation."}
-test-assembly-step2 = {cmd = "python scripts/workflows/assembly_logic/2_select_assembly_logic_subjects.py", help = "Step 2: Select optimal subject set for assembly logic validation."}
-test-assembly-step3 = {cmd = "python scripts/workflows/assembly_logic/3_prepare_assembly_logic_import.py", help = "Step 3: Prepare import file for Solar Fire."}
-test-assembly-step4 = {cmd = "python scripts/workflows/assembly_logic/4_extract_assembly_logic_text.py", help = "Step 5: Extract and assemble the ground truth database."}
-test-assembly-step5 = {cmd = "python scripts/workflows/assembly_logic/5_validate_assembly_logic_subjects.py", help = "Step 6: Validate the assembled ground truth database."}
-test-assembly-setup = {cmd = "python scripts/workflows/assembly_logic/test_assembly_setup.py", help = "Run all steps with interactive pause for manual Solar Fire processing."}
-test-assembly = {cmd = "python scripts/workflows/assembly_logic/run_assembly_validation.py", help = "Validate the personality assembly algorithm against Solar Fire ground truth data."}
-test-query-gen = "pwsh -File ./tests/testing_harness/validate_query_generation.ps1"
-test-l3-selection = "pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"
+test-assembly-step1 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step1 python scripts/workflows/assembly_logic/1_generate_coverage_map.py", help = "Step 1: Generate coverage map for assembly logic validation."}
+test-assembly-step2 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step2 python scripts/workflows/assembly_logic/2_select_assembly_logic_subjects.py", help = "Step 2: Select optimal subject set for assembly logic validation."}
+test-assembly-step3 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step3 python scripts/workflows/assembly_logic/3_prepare_assembly_logic_import.py", help = "Step 3: Prepare import file for Solar Fire."}
+test-assembly-step4 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step4 python scripts/workflows/assembly_logic/4_extract_assembly_logic_text.py", help = "Step 5: Extract and assemble the ground truth database."}
+test-assembly-step5 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step5 python scripts/workflows/assembly_logic/5_validate_assembly_logic_subjects.py", help = "Step 6: Validate the assembled ground truth database."}
+test-assembly-setup = {shell = "python scripts/maintenance/operation_runner.py test-assembly-setup python scripts/workflows/assembly_logic/test_assembly_setup.py", help = "Run all steps with interactive pause for manual Solar Fire processing."}
+test-assembly = {shell = "python scripts/maintenance/operation_runner.py test-assembly python scripts/workflows/assembly_logic/run_assembly_validation.py", help = "Validate the personality assembly algorithm against Solar Fire ground truth data."}
+test-query-gen = {shell = "python scripts/maintenance/operation_runner.py test-query-gen pwsh -File ./tests/testing_harness/validate_query_generation.ps1"}
+test-l3-selection = {shell = "python scripts/maintenance/operation_runner.py test-l3-selection pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"}
 
 # --- Stage 4: Unit Tests - Experiment Workflow ---
-test-exp-wf = {shell = "python scripts/maintenance/run_with_lock.py test-exp-wf pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}
-test-exp-lc = {shell = "python scripts/maintenance/run_with_lock.py test-exp-lc pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}  # Backward compatibility
+test-exp-wf = {shell = "python scripts/maintenance/operation_runner.py test-exp-wf pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}
+test-exp-lc = {shell = "python scripts/maintenance/operation_runner.py test-exp-lc pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}  # Backward compatibility
 
 # --- Stage 5: Experiment & Study Integration (Layer 4-5) ---
-test-l4 = {shell = "python scripts/maintenance/run_with_lock.py test-l4 pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1"}
-test-l4-interactive = {shell = "python scripts/maintenance/run_with_lock.py test-l4-interactive pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1 -Interactive"}
-test-l5 = {shell = "python scripts/maintenance/run_with_lock.py test-l5 pwsh -File ./tests/testing_harness/experiment_workflow/layer5/run_layer5_test.ps1"}
+test-l4 = {shell = "python scripts/maintenance/operation_runner.py test-l4 pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1"}
+test-l4-interactive = {shell = "python scripts/maintenance/operation_runner.py test-l4-interactive pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1 -Interactive"}
+test-l5 = {shell = "python scripts/maintenance/operation_runner.py test-l5 pwsh -File ./tests/testing_harness/experiment_workflow/layer5/run_layer5_test.ps1"}
 
 # --- Stage 6: All Unit Tests Together ---
-test = {shell = "python scripts/maintenance/run_with_lock.py test python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
-cov = {shell = "python scripts/maintenance/run_with_lock.py cov pytest --cov=src --cov-report=term-missing", help = "Run all tests with coverage analysis."}
-cov-html = {shell = "python scripts/maintenance/run_with_lock.py cov-html pytest --cov=src --cov-report=html", help = "Run all tests and generate an HTML coverage report."}
-test-cov = {shell = "python scripts/maintenance/run_with_lock.py test-cov pytest --cov=src --cov-report= {args}", help = "Run tests for a specific file to update .coverage data."}
+test = {shell = "python scripts/maintenance/operation_runner.py test python tests/run_all_tests.py {args}", help = "Run all tests (Python and PowerShell) with cleanup."}
+cov = {shell = "python scripts/maintenance/operation_runner.py cov pytest --cov=src --cov-report=term-missing", help = "Run all tests with coverage analysis."}
+cov-html = {shell = "python scripts/maintenance/operation_runner.py cov-html pytest --cov=src --cov-report=html", help = "Run all tests and generate an HTML coverage report."}
+test-cov = {shell = "python scripts/maintenance/operation_runner.py test-cov pytest --cov=src --cov-report= {args}", help = "Run tests for a specific file to update .coverage data."}
 report-cov = {shell = "coverage report -m --no-skip-covered {args}", help = "Generate a focused coverage report for specific source file(s)."}
 
 # --- Stage 7: Statistical Validation ---
-test-stats-study = {shell = "python scripts/maintenance/run_with_lock.py test-stats-study pwsh -File ./tests/algorithm_validation/create_statistical_study.ps1"}
-test-stats-imports = {shell = "python scripts/maintenance/run_with_lock.py test-stats-imports pwsh -File ./tests/algorithm_validation/generate_graphpad_imports.ps1"}
-test-stats-results = {shell = "python scripts/maintenance/run_with_lock.py test-stats-results pwsh -File ./tests/algorithm_validation/validate_graphpad_results.ps1"}
+test-stats-study = {shell = "python scripts/maintenance/operation_runner.py test-stats-study pwsh -File ./tests/algorithm_validation/create_statistical_study.ps1"}
+test-stats-imports = {shell = "python scripts/maintenance/operation_runner.py test-stats-imports pwsh -File ./tests/algorithm_validation/generate_graphpad_imports.ps1"}
+test-stats-results = {shell = "python scripts/maintenance/operation_runner.py test-stats-results pwsh -File ./tests/algorithm_validation/validate_graphpad_results.ps1"}
 
 # --- PowerShell Wrapper Tests (Used by Integration Tests) ---
-test-ps-new-exp = "pwsh ./tests/experiment_workflow/new_experiment.Tests.ps1"
-test-ps-audit-exp = "pwsh ./tests/experiment_workflow/audit_experiment.Tests.ps1"
-test-ps-fix-exp = "pwsh ./tests/experiment_workflow/fix_experiment.Tests.ps1"
-test-ps-comp-study = "pwsh ./tests/experiment_workflow/compile_study.Tests.ps1"
-test-ps-audit-study = "pwsh ./tests/experiment_workflow/audit_study.Tests.ps1"
-test-ps-all = "pwsh ./tests/run_all_ps_tests.ps1"
+test-ps-new-exp = {shell = "python scripts/maintenance/operation_runner.py test-ps-new-exp pwsh ./tests/experiment_workflow/new_experiment.Tests.ps1"}
+test-ps-audit-exp = {shell = "python scripts/maintenance/operation_runner.py test-ps-audit-exp pwsh ./tests/experiment_workflow/audit_experiment.Tests.ps1"}
+test-ps-fix-exp = {shell = "python scripts/maintenance/operation_runner.py test-ps-fix-exp pwsh ./tests/experiment_workflow/fix_experiment.Tests.ps1"}
+test-ps-compile-study = {shell = "python scripts/maintenance/operation_runner.py test-ps-comp-study pwsh ./tests/experiment_workflow/compile_study.Tests.ps1"}
+test-ps-audit-study = {shell = "python scripts/maintenance/operation_runner.py test-ps-audit-study pwsh ./tests/experiment_workflow/audit_study.Tests.ps1"}
+test-ps-all = {shell = "python scripts/maintenance/operation_runner.py test-ps-all pwsh ./tests/run_all_ps_tests.ps1"}
 
 # --- Composite Test Runners ---
 test-ps-exp = {composite = ["test-ps-new-exp", "test-ps-audit-exp", "test-ps-fix-exp"], help = "Run all PowerShell tests for the experiment workflow."}

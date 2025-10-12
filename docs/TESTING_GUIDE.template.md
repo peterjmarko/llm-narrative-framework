@@ -94,6 +94,27 @@ If you encounter a "Cannot acquire lock" error:
 
 The lock is implemented at the project level in `.pdm-locks/operations.lock` and is automatically cleaned up by the OS if a process crashes.
 
+## Audit Logging
+
+All test executions are automatically logged to `tests/results/test_summary.jsonl`. Each entry includes:
+- Timestamp
+- Operation name
+- Status (PASS/FAIL)
+- Exit code
+- Duration in seconds
+- Full command executed
+
+This provides a permanent record of test execution history. The audit log is managed automatically by `scripts/maintenance/operation_runner.py` and requires no manual intervention.
+
+Example entries:
+
+```json
+{"timestamp": "2025-10-12T14:30:22.123456", "operation": "test-data-prep", "status": "PASS", "exit_code": 0, "duration_seconds": 12.45, "command": "pytest tests/data_preparation/"}
+{"timestamp": "2025-10-12T14:35:10.789012", "operation": "test-l4", "status": "PASS", "exit_code": 0, "duration_seconds": 347.82, "command": "pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1"}
+```
+
+Similarly, data preparation runs are logged to `data_prep_summary.jsonl` and workflow operations to `workflow_summary.jsonl`.
+
 ## Typical Testing Sequence
 
 This section provides a practical walkthrough of running the complete test suite, explaining dependencies and expected outcomes at each stage.
@@ -102,8 +123,24 @@ This section provides a practical walkthrough of running the complete test suite
 
 For thorough validation during development, follow this staged approach:
 
+#### Stage 0: Infrastructure - Operation Runner
+Start by validating the operation runner that provides locking and audit logging for all other tests:
+
+```bash
+# Test the operation runner infrastructure
+pdm run test-op-runner
+# or simply:
+pdm test-op-runner
+```
+
+**Expected outcome:** All operation runner tests pass, confirming that the locking mechanism and audit logging are working correctly.
+
+**Why first?** The operation runner is foundational infrastructure. If locking or audit logging fails, all subsequent test results may be unreliable or lost. This quick test (< 1 second) validates the foundation before running the full test suite.
+
+**If failures occur:** Fix the operation runner before proceeding, as other tests depend on it.
+
 #### Stage 1: Unit Tests - Data Preparation Pipeline
-Start by testing data preparation components:
+Test data preparation components:
 
 ```bash
 # Test all data preparation unit tests
@@ -114,7 +151,7 @@ pdm test-data-prep
 
 **Expected outcome:** All data preparation unit tests pass, demonstrating that individual components handle their inputs correctly and manage errors appropriately.
 
-**Why first?** These are the foundation tests—fast, isolated validation of core data processing logic before testing workflows.
+**Why second?** These are fast, isolated validation of core data processing logic before testing workflows.
 
 **If failures occur:** Run individual test files with pytest directly to isolate issues, or use the focused coverage tool to debug specific modules.
 
