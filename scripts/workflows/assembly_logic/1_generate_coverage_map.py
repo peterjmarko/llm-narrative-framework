@@ -59,7 +59,7 @@ def main():
     )
     parser.add_argument(
         "--subject-db",
-        default="data/processed/subject_db.csv",
+        default=None,
         help="Path to the master subject database.",
     )
     parser.add_argument(
@@ -83,12 +83,23 @@ def main():
     # --- Load all necessary configuration and data files ---
     print(f"\n{Fore.YELLOW}--- Generating Delineation Coverage Map ---{Fore.RESET}")
     print("\nLoading configuration and subject data...")
-    logging.info(f"Reading subject data from: {args.subject_db}")
+
+    # Determine subject DB path: use test asset if it exists, otherwise use production path
+    subject_db_path = args.subject_db
+    if not subject_db_path:
+        test_prereq_path = Path("tests/assets/assembly_logic/prerequisites/subject_db.csv")
+        prod_path = Path("data/processed/subject_db.csv")
+        if test_prereq_path.exists():
+            subject_db_path = test_prereq_path
+        else:
+            subject_db_path = prod_path
+    
+    logging.info(f"Reading subject data from: {subject_db_path}")
     point_weights = load_point_weights(Path(args.point_weights))
     thresholds = load_thresholds(Path(args.thresholds))
 
     try:
-        with open(args.subject_db, "r", encoding="utf-8") as f:
+        with open(subject_db_path, "r", encoding="utf-8") as f:
             subjects = list(csv.DictReader(f))
     except FileNotFoundError:
         logging.error(

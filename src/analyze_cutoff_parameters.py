@@ -108,8 +108,19 @@ def print_centered_table(df):
         print(" ".join(str(row[col]).center(col_widths[col]) for col in df.columns))
 
 
-def main():
-    """Main function to run the sensitivity analysis."""
+def run_analysis(sandbox_path=None):
+    """
+    Core logic for the sensitivity analysis. Separated from main() for testability.
+    
+    Args:
+        sandbox_path (str, optional): Path to a sandbox directory. Defaults to None.
+    """
+    import os
+    
+    # If a sandbox path is provided, set the environment variable
+    if sandbox_path:
+        os.environ['PROJECT_SANDBOX_PATH'] = os.path.abspath(sandbox_path)
+    
     # Import here to allow sandbox path to be set first
     from config_loader import APP_CONFIG, get_config_value, get_path
     from select_final_candidates import calculate_average_variance
@@ -153,7 +164,13 @@ def main():
                 
                 # --- 1. Get the algorithm's predicted cutoff ---
                 predicted_cutoff = len(ocean_df) # Default
-                start_idx = np.where(x_values >= start_point)[0][0]
+                try:
+                    start_idx = np.where(x_values >= start_point)[0][0]
+                except IndexError:
+                    # This happens if start_point > max(x_values)
+                    pbar.update(1)
+                    continue
+
                 gradient = np.gradient(smoothed, x_values)
                 
                 cutoff_idx = -1
@@ -181,7 +198,7 @@ def main():
                 pbar.update(1)
 
     if not results:
-        print(f"{Fore.YELLOW}WARNING: Dataset too small for meaningful parameter analysis (requires 20+ subjects).{Fore.RESET}")
+        print(f"{Fore.YELLOW}WARNING: Dataset too small for meaningful parameter analysis.{Fore.RESET}")
         print(f"{Fore.CYAN}Creating minimal output file to allow pipeline to continue.{Fore.RESET}")
         
         # Create a minimal CSV with current config values as placeholder
@@ -237,8 +254,8 @@ def main():
 
     if not best_cluster_df.empty:
         # Get the unique values for start points and windows that were tested
-        unique_starts = sorted(results_df['Start Point'].unique())
-        unique_windows = sorted(results_df['Smoothing Window'].unique())
+        unique_starts = sorted(list(results_df['Start Point'].unique()))
+        unique_windows = sorted(list(results_df['Smoothing Window'].unique()))
 
         stability_scores = []
         for index, row in best_cluster_df.iterrows():
@@ -296,32 +313,29 @@ def main():
         # Fallback to the single best result if no cluster is found
         best_params = results_df.iloc[0]
         print("No high-performing cluster found. Recommending the single best result:")
-        print(f"{Fore.CYAN}  cutoff_search_start_point = {best_params['Start Point']}{Fore.RESET}")
-        print(f"{Fore.CYAN}  smoothing_window_size = {best_params['Smoothing Window']}{Fore.RESET}")
+        print(f"{Fore.CYAN}  cutoff_search_start_point = {int(best_params['Start Point'])}{Fore.RESET}")
+        print(f"{Fore.CYAN}  smoothing_window_size = {int(best_params['Smoothing Window'])}{Fore.RESET}")
 
     print() # Add blank line
 
 
-if __name__ == "__main__":
+def main():
+    """Main function to parse arguments and run the sensitivity analysis."""
     import argparse
     import os
-    
-    # Parse arguments BEFORE importing config_loader to respect sandbox path
+
     parser = argparse.ArgumentParser(
-        description="Analyze cutoff parameters for optimal candidate selection.",
+        description="Performs a sensitivity analysis to find optimal cutoff parameters.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument(
-        "--sandbox-path",
-        type=str,
-        help="Path to the sandbox directory for testing.",
-    )
+    parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
+    parser.add_argument("--force", action="store_true", help="Force re-run of analysis (included for pipeline compatibility).")
     args = parser.parse_args()
-    
-    # Set sandbox environment variable if provided (before any imports that use config_loader)
-    if args.sandbox_path:
-        os.environ["PROJECT_SANDBOX_PATH"] = os.path.abspath(args.sandbox_path)
-    
+
+    run_analysis(sandbox_path=args.sandbox_path)
+
+
+if __name__ == "__main__":
     main()
 
 # === End of src/analyze_cutoff_parameters.py ===

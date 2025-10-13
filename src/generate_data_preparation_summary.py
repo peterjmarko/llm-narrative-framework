@@ -55,6 +55,17 @@ except ImportError:
 PIPELINE_SUMMARY_PATH = "data/reports/data_preparation_pipeline_summary.txt"
 PIPELINE_COMPLETION_INFO = "data/reports/pipeline_completion_info.json"
 
+def format_number(value):
+    """Format a number with thousands separator, or return 'Unknown' if not a number."""
+    if value is None or (isinstance(value, str) and value == 'Unknown'):
+        return 'Unknown'
+    if value == 'Unknown':
+        return 'Unknown'
+    try:
+        return f"{int(value):,}"
+    except (ValueError, TypeError):
+        return 'Unknown'
+    
 def safe_file_operation(operation, default_return=None, error_message=None):
     """Safely perform a file operation with error handling."""
     try:
@@ -466,11 +477,11 @@ def generate_pipeline_summary_report() -> str:
         "",
         "--- DATA FLOW ---",
         f"Live Astro-Databank Website",
-        f"  ↓ ({validation_stats.get('total_records', 'Unknown'):,} total records)",
+        f"  ↓ ({format_number(validation_stats.get('total_records'))} total records)",
         f"Raw ADB Export",
         "",
         "--- SOURCING METRICS ---",
-        f"Total Records Retrieved: {validation_stats.get('total_records', 'Unknown'):,}",
+        f"Total Records Retrieved: {format_number(validation_stats.get('total_records', 'Unknown'))}",
         f"Source File: data/sources/adb_raw_export.txt",
         "",
     ])
@@ -487,9 +498,9 @@ def generate_pipeline_summary_report() -> str:
         "",
         "--- DATA FLOW ---",
         f"Raw ADB Export",
-        f"  ↓ ({validation_stats.get('total_records', 'Unknown'):,} total)",
+        f"  ↓ ({format_number(validation_stats.get('total_records', 'Unknown'))} total)",
         f"Wikipedia Validation",
-        f"  ↓ ({validation_stats.get('valid_records', 'Unknown'):,} passed, {validation_stats.get('failed_records', 'Unknown'):,} failed)",
+        f"  ↓ ({format_number(validation_stats.get('valid_records', 'Unknown'))} passed, {format_number(validation_stats.get('failed_records', 'Unknown'))} failed)",
         f"Deterministic Filters",
         f"  ↓ ({eligible_candidates:,} eligible)",
         f"Eligible Candidates Pool",

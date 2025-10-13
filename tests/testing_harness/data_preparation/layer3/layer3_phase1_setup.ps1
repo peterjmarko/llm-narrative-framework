@@ -76,7 +76,7 @@ if (Test-Path $SandboxDir) {
 New-Item -ItemType Directory -Path $TestEnvRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $SandboxDir -Force | Out-Null
 # Create the complete data scaffolding required by the pipeline scripts
-@("data/sources", "data/processed", "data/intermediate", "data/reports", "data/foundational_assets", "data/config") | ForEach-Object {
+@("data/sources", "data/processed", "data/intermediate", "data/foundational_assets", "data/config") | ForEach-Object {
     New-Item -Path (Join-Path $SandboxDir $_) -ItemType Directory -Force | Out-Null
 }
 
@@ -163,7 +163,7 @@ foreach ($asset in $dynamicAssets) {
 $largeSeedBaseDir = Join-Path $testsAssetsDir "large_seed/data"
 $requiredLargeSeedFiles = @(
     "sources/adb_raw_export.txt",
-    "reports/adb_validation_report.csv",
+    "processed/adb_validation_report.csv",
     "foundational_assets/eminence_scores.csv",
     "foundational_assets/ocean_scores.csv"
 )

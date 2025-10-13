@@ -69,7 +69,7 @@ try {
     # --- 1. Setup ---
     Write-Host "`n--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
     if (Test-Path $SandboxDir) { Remove-Item -Path $SandboxDir -Recurse -Force }
-    @("data/sources", "data/reports", "data/intermediate", "data/foundational_assets") | ForEach-Object {
+    @("data/sources", "data/intermediate", "data/processed", "data/foundational_assets") | ForEach-Object {
         New-Item -Path (Join-Path $SandboxDir $_) -ItemType Directory -Force | Out-Null
     }
     $displayPath = (Resolve-Path $SandboxDir -Relative).TrimStart(".\").Replace('\', '/')
@@ -79,7 +79,7 @@ try {
     $stepHeader4a = ">>> Validate Eligible Candidate Logic <<<"
     Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader4a -ForegroundColor Cyan; Write-Host "Validates the deterministic filtering logic using a large seed dataset." -ForegroundColor Cyan
     Copy-Item -Path (Join-Path $largeSeedDir "data/sources/adb_raw_export.txt") -Destination (Join-Path $SandboxDir "data/sources/")
-    Copy-Item -Path (Join-Path $largeSeedDir "data/reports/adb_validation_report.csv") -Destination (Join-Path $SandboxDir "data/reports/")
+    Copy-Item -Path (Join-Path $largeSeedDir "data/processed/adb_validation_report.csv") -Destination (Join-Path $SandboxDir "data/processed/")
     
     $eligibleCandidatesScript = Join-Path $ProjectRoot "src/select_eligible_candidates.py"
     & pdm run python -u $eligibleCandidatesScript --sandbox-path $SandboxDir
@@ -99,7 +99,7 @@ try {
     Copy-Item -Path (Join-Path $ProjectRoot "tests/assets/data/foundational_assets/country_codes.csv") -Destination (Join-Path $SandboxDir "data/foundational_assets/")
 
     $selectCandidatesScript = Join-Path $ProjectRoot "src/select_final_candidates.py"
-    & pdm run python $selectCandidatesScript --sandbox-path $SandboxDir --plot
+    & pdm run python $selectCandidatesScript --sandbox-path $SandboxDir
 
     $largeInput7a = (Get-Content (Join-Path $SandboxDir "data/foundational_assets/ocean_scores.csv") | Select-Object -Skip 1).Length
     $largeOutput7a = Join-Path $SandboxDir "data/intermediate/adb_final_candidates.txt"

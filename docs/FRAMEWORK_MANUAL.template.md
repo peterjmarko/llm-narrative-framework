@@ -120,6 +120,9 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 # Get a read-only status report of the pipeline's progress
 .\prepare_data.ps1 -ReportOnly
 
+# Restore the most recent backup to recover from data loss
+.\prepare_data.ps1 -RestoreBackup
+
 # Resume from a specific step if a failure occurs
 .\prepare_data.ps1 -StartWithStep 6
 ```
@@ -127,6 +130,7 @@ The automated data preparation pipeline is orchestrated by a single, intelligent
 > **Interactive Mode (`-Interactive`)**: This mode provides a step-by-step "guided tour" of the entire pipeline. Before execution begins, it displays the relevant DataGeneration parameters from `config.ini` and pauses for user confirmation. During execution, it pauses before each step to show detailed information about inputs, outputs, and script summaries, allowing users to understand exactly what the pipeline is doing. This mode is highly recommended for new users or when troubleshooting issues.
 > **Data Completeness Reporting**: At the end of the pipeline, a comprehensive data completeness report is displayed that shows any missing subjects from the LLM scoring steps. This report provides clear visibility into data quality issues and includes actionable guidance on how to retry specific steps if needed.
 > **Data Preparation Pipeline Summary Report**: Upon successful completion of the pipeline, a comprehensive summary report is automatically generated at `data/reports/data_preparation_pipeline_summary.txt`. This report provides a unified overview of the entire data preparation pipeline, including validation results, scoring statistics, file status, and identified issues with specific recommendations for resolution.
+> **Restore Functionality (`-RestoreBackup`)**: This mode is a recovery tool. It automatically finds the most recent timestamped backup in the `data/backup/` directory and restores all files from that backup to their original locations. It is non-destructive: it copies files from the backup and will not overwrite existing files at the destination, preventing accidental data loss. This is useful for recovering from accidental file deletion or reverting to a previous stable state.
 > **Note on Learning the Pipeline:** A step-by-step "guided tour" of this workflow is available as part of the project's testing harness. This is an excellent way for new users to learn how the pipeline works. See the **[🧪 Testing Guide (TESTING_GUIDE.md)](../TESTING_GUIDE.md)** for details on running the Layer 3 Interactive Mode.
 
 The script is fully resumable. It automatically detects which steps have already been completed and picks up from the first missing data artifact, ensuring a smooth and efficient workflow.
@@ -378,7 +382,7 @@ Based on this comprehensive, data-driven analysis, the following optimal paramet
 
 The plot of this analysis (see Figure S8) provides a clear visual justification for these choices. It shows how the algorithm, using these parameters, correctly identifies the start of the curve's final plateau, resulting in a final cutoff of 4,954 subjects.
 
-{{grouped_figure:data/reports/variance_curve_analysis.png | caption=Figure S8: Variance Curve Analysis for Optimal Cohort Selection. The plot shows the raw cumulative variance, the smoothed curve (800-pt moving average), the search start point (3500), and the final data-driven cutoff (4954).}}
+{{grouped_figure:data/foundational_assets/variance_curve_analysis.png | caption=Figure S8: Variance Curve Analysis for Optimal Cohort Selection. The plot shows the raw cumulative variance, the smoothed curve (800-pt moving average), the search start point (3500), and the final data-driven cutoff (4954).}}
 
 ##### Stage 4: Profile Generation
 

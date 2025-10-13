@@ -140,14 +140,11 @@ slope_threshold = -0.00001
         # Cleanup
         shutil.rmtree(sandbox_dir)
     
-    def test_main_creates_output_file(self, temp_sandbox, monkeypatch):
-        """Test that main() creates the expected output CSV file."""
-        # Set sandbox environment before importing
-        monkeypatch.setenv('PROJECT_SANDBOX_PATH', temp_sandbox)
-        
-        # Import and run main directly (sandbox is already set)
-        from analyze_cutoff_parameters import main
-        main()
+    def test_run_analysis_creates_output_file(self, temp_sandbox):
+        """Test that run_analysis() creates the expected output CSV file."""
+        # Import and run the core logic function directly
+        from analyze_cutoff_parameters import run_analysis
+        run_analysis(sandbox_path=temp_sandbox)
         
         # Verify output file was created
         output_path = Path(temp_sandbox) / "data" / "foundational_assets" / "cutoff_parameter_analysis_results.csv"
@@ -168,7 +165,7 @@ slope_threshold = -0.00001
         # Verify results are sorted by error (ascending)
         assert results_df['Error'].is_monotonic_increasing or results_df['Error'].iloc[0] <= results_df['Error'].iloc[-1]
     
-    def test_main_with_minimal_data(self, temp_sandbox, monkeypatch, capsys):
+    def test_run_analysis_with_minimal_data(self, temp_sandbox, capsys):
         """Test that the script handles datasets too small for analysis gracefully."""
         # Overwrite OCEAN scores with minimal data (only 10 subjects)
         data_dir = Path(temp_sandbox) / "data" / "foundational_assets"
@@ -188,22 +185,21 @@ slope_threshold = -0.00001
         ocean_path = data_dir / "ocean_scores.csv"
         ocean_df.to_csv(ocean_path, index=False)
         
-        # Set sandbox environment before importing
-        monkeypatch.setenv('PROJECT_SANDBOX_PATH', temp_sandbox)
-        
         # Run should complete without error even with minimal data  
-        from analyze_cutoff_parameters import main
-        main()
+        from analyze_cutoff_parameters import run_analysis
+        run_analysis(sandbox_path=temp_sandbox)
         
-        # The script DOES run with minimal data and produces some results
-        # With only 10 subjects, only the smallest parameter combinations work (250, 100/200)
-        # Verify output file was created
+        # Verify a warning is printed to the console
+        captured = capsys.readouterr()
+        assert "WARNING: Dataset too small" in captured.out
+        
+        # Verify output file was created with placeholder data
         report_path = Path(temp_sandbox) / "data" / "foundational_assets" / "cutoff_parameter_analysis_results.csv"
         assert report_path.exists(), "Results CSV should be created even with minimal data"
         
-        # Verify the CSV has valid structure
+        # Verify the CSV has valid structure and one row of data
         results_df = pd.read_csv(report_path)
-        assert len(results_df) >= 1, "Should have at least one result with minimal data"
+        assert len(results_df) == 1, "Should have exactly one placeholder result with minimal data"
         assert 'Start Point' in results_df.columns
         assert 'Smoothing Window' in results_df.columns
 

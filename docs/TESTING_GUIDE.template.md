@@ -117,261 +117,132 @@ Similarly, data preparation runs are logged to `data_prep_summary.jsonl` and wor
 
 ## Typical Testing Sequence
 
-This section provides a practical walkthrough of running the complete test suite, explaining dependencies and expected outcomes at each stage.
+This section provides a practical walkthrough of running the complete test suite. The workflow is divided into two major parts, reflecting a clear separation of concerns:
 
-### Recommended Testing Workflow
+- **Part 1: Core Software Validation:** Fast, self-contained tests that validate the software's components and workflows. These are ideal for rapid feedback during development and for continuous integration (CI) pipelines. They use small, controlled test assets and do not require a full production dataset.
 
-For thorough validation during development, follow this staged approach:
-
-#### Stage 0: Infrastructure - Operation Runner
-Start by validating the operation runner that provides locking and audit logging for all other tests:
-
-```bash
-# Test the operation runner infrastructure
-pdm run test-op-runner
-# or simply:
-pdm test-op-runner
-```
-
-**Expected outcome:** All operation runner tests pass, confirming that the locking mechanism and audit logging are working correctly.
-
-**Why first?** The operation runner is foundational infrastructure. If locking or audit logging fails, all subsequent test results may be unreliable or lost. This quick test (< 1 second) validates the foundation before running the full test suite.
-
-**If failures occur:** Fix the operation runner before proceeding, as other tests depend on it.
-
-#### Stage 1: Unit Tests - Data Preparation Pipeline
-Test data preparation components:
-
-```bash
-# Test all data preparation unit tests
-pdm run test-data-prep
-# or simply:
-pdm test-data-prep
-```
-
-**Expected outcome:** All data preparation unit tests pass, demonstrating that individual components handle their inputs correctly and manage errors appropriately.
-
-**Why second?** These are fast, isolated validation of core data processing logic before testing workflows.
-
-**If failures occur:** Run individual test files with pytest directly to isolate issues, or use the focused coverage tool to debug specific modules.
-
-#### Stage 2: Data Pipeline Integration (Layer 2-3)
-Validate the complete data preparation workflow:
-
-**State Machine Logic (Layer 2):**
-```bash
-pdm run test-l2
-# or simply:
-pdm test-l2
-```
-**Expected outcome:** Orchestrator halt/resume logic validated with mock scripts (< 30 seconds).
-
-**Complete Pipeline (Layer 3):**
-```bash
-# Standard test with LLM selection
-pdm run test-l3
-# or simply:
-pdm test-l3
-
-# Control test without LLM selection
-pdm run test-l3-bypass
-# or simply:
-pdm test-l3-bypass
-
-# Educational walkthrough
-pdm run test-l3-interactive
-# or simply:
-pdm test-l3-interactive
-```
-**Expected outcome:** Full pipeline execution from raw data to final personality database. Default and bypass modes produce valid output files with different selection logic.
-
-**Prerequisites:** Configured `.env` file with API keys for default and interactive modes.
-
-**Why second?** Validates that data preparation components work together correctly and generates assets required by later tests.
-
-#### Stage 3: Algorithm Validation (Scientific Proof)
-Validate the framework's core methodological contributions:
-
-**Personality Assembly Algorithm:**
-
-This is the project's most rigorous validation. It requires running a 5-step workflow first to generate the ground truth dataset needed by the automated test. The scripts are located in `scripts/workflows/assembly_logic/` and must be run in the numbered order.
+- **Part 2: Scientific & Large-Scale Validation:** Slower, more intensive tests that validate the scientific integrity and performance of the framework's core algorithms at scale. These tests **require a full production dataset** as a prerequisite.
 
 **Note on PDM commands:** PDM allows two syntaxes for running custom scripts: `pdm run <script-name>` and `pdm <script-name>`. Both achieve the same result. This documentation uses `pdm run` for clarity, but you can use either form.
 
-**Option 1: Interactive mode with automatic pause (Recommended):**
-```bash
-pdm run test-assembly-setup
-# or simply:
-pdm test-assembly-setup
-```
-*Note: This command runs steps 1-3 automatically, then pauses and waits for you to complete step 4 manually in Solar Fire. After confirming completion, it automatically continues with steps 4-5.*
+### Part 1: Core Software Validation (CI/CD Friendly)
 
-**Option 2: Run steps individually:**
-```bash
-# Step 1: Generate coverage map
-pdm run test-assembly-step1
-# or simply:
-pdm test-assembly-step1
+Follow this sequence for rapid, everyday validation.
 
-# Step 2: Select optimal subject set
-pdm run test-assembly-step2
-# or simply:
-pdm test-assembly-step2
-
-# Step 3: Prepare import file for Solar Fire
-pdm run test-assembly-step3
-# or simply:
-pdm test-assembly-step3
-
-# Step 4: Manual step - Import and export in Solar Fire
-# Follow the instructions in the script output to manually process the data
-# in Solar Fire software and place the exported file in the specified location
-
-# Step 5: Extract and assemble the ground truth database
-pdm run test-assembly-step4
-# or simply:
-pdm test-assembly-step4
-
-# Optional validation step:
-pdm run test-assembly-step5
-# or simply:
-pdm test-assembly-step5
-```
-
-After completing the 5-step workflow, run the automated validation test:
+#### Stage 0: Infrastructure Tests
+Start by validating the foundational infrastructure for locking, logging, and recovery.
 
 ```bash
-pdm run test-assembly
-# or simply:
-pdm test-assembly
+# Test the operation runner (locking and logging)
+pdm run test-op-runner
+
+# Test the backup and restore functionality
+pdm run test-restore-backup
 ```
+**Why first?** These quick tests (< 5 seconds total) confirm that the core framework services are working correctly before running longer test suites.
 
-**Expected outcome:** Bit-for-bit validation against ground truth dataset.
+#### Stage 1: All Unit Tests
+Run the complete suite of fast, isolated unit tests for all Python components.
 
-**Query Generation & Randomization:**
+```bash
+# Test all data preparation components
+pdm run test-data-prep
+
+# Test all experiment workflow components
+pdm run test-exp-wf
+```
+**Why second?** This validates the internal logic of every individual script before testing how they work together.
+
+#### Stage 2: Data & Experiment Integration Tests (Small Scale)
+Validate the complete end-to-end workflows using a small, fast, controlled dataset in an isolated sandbox.
+
+```bash
+# State Machine Logic (Layer 2)
+pdm run test-l2
+
+# Complete Data Pipeline (Layer 3)
+pdm run test-l3
+pdm run test-l3-bypass
+pdm run test-l3-interactive
+
+# Experiment Lifecycle (Layer 4)
+pdm run test-l4
+pdm run test-l4-interactive
+
+# Study Compilation (Layer 5)
+pdm run test-l5
+```
+**Why third?** These tests confirm that all software components integrate and execute correctly from start to finish, validating the complete workflow logic without the time and expense of a full production run.
+
+#### Stage 3: Randomization Integrity Test
+Validate the query generator's mapping and randomization logic.
+
 ```bash
 pdm run test-query-gen
-# or simply:
-pdm test-query-gen
 ```
-**Expected outcome:** Statistical proof of determinism for `correct` mapping and non-determinism for `random` mapping.
+**Why here?** This test's prerequisites (a small `personalities_db.txt`) are generated by the Layer 3 integration test, so it naturally follows.
+
+---
+
+### Part 2: Scientific & Large-Scale Validation
+
+These tests validate the scientific method and require a full production dataset.
+
+#### Prerequisite Step: Generate the Full Production Dataset
+Run the full data preparation pipeline **once** to generate the large-scale assets required by the following tests.
+
+```bash
+# This is a one-time setup step for scientific validation
+pdm run prep-data
+```
+**Why first?** This step creates the large-scale `subject_db.csv`, `eminence_scores.csv`, and other files that the algorithm validation tests need to perform their analyses correctly. **This is not a test itself, but a required prerequisite.**
+
+#### Stage 4: Algorithm Validation Tests
+Validate the scientific correctness of the framework's core algorithms using the full dataset.
+
+**Personality Assembly Algorithm:**
+```bash
+# Run the 5-step setup workflow (with a manual pause)
+pdm run test-assembly-setup
+
+# After setup, run the final bit-for-bit validation
+pdm run test-assembly
+```
 
 **Qualification & Selection Algorithms:**
 ```bash
+# Validate filtering and cutoff logic at scale
 pdm run test-l3-selection
-# or simply:
-pdm test-l3-selection
 ```
-**Expected outcome:** Validation of filtering rules and cutoff algorithm at scale.
+**Why here?** These tests validate the scientific methodology. They must run after the full production dataset is generated to ensure they are operating on realistic, large-scale data.
 
-**Prerequisites:** Some algorithm validation tests require assets generated by Layer 3 tests. Run `pdm run test-l3` first if encountering "prerequisites not found" errors.
-
-**Why third?** These tests validate scientific correctness and depend on assets from Layer 3 tests.
-
-#### Stage 4: Unit Tests - Experiment Lifecycle
-Test experiment workflow components:
+#### Stage 5: Statistical Validation (Publication Readiness)
+Validate the framework's statistical calculations against GraphPad Prism.
 
 ```bash
-# Test all experiment workflow unit tests
-pdm run test-exp-lc
-# or simply:
-pdm test-exp-lc
-```
-
-**Expected outcome:** All experiment workflow unit tests pass, verifying that query generation, LLM interaction, and analysis components function correctly.
-
-**Why fourth?** Validates experiment components before running expensive end-to-end integration tests.
-
-#### Stage 5: Experiment & Study Integration (Layer 4-5)
-Validate complete experiment and study workflows:
-
-**Experiment Lifecycle (Layer 4):**
-```bash
-# Automated validation
-pdm run test-l4
-# or simply:
-pdm test-l4
-
-# Educational guided tour
-pdm run test-l4-interactive
-# or simply:
-pdm test-l4-interactive
-```
-**Expected outcome:** Complete `new -> audit -> break -> fix` workflow with 4 corruption scenarios and automated repair. All experiments restore to valid state.
-
-**Study Compilation (Layer 5):**
-```bash
-pdm run test-l5
-# or simply:
-pdm test-l5
-```
-**Expected outcome:** Complete study compilation from Layer 4 experiments, including aggregation, statistical analysis, and artifact generation.
-
-**Why fifth?** These are the highest-level integration tests, depending on all previous stages.
-
-#### Stage 6: All Unit Tests Together
-Once confident in individual components, run the complete unit test suite:
-
-```bash
-# Run all Python tests with coverage
-pdm run cov
-# or simply:
-pdm cov
-
-# Or just run all tests quickly
-pdm run test
-# or simply:
-pdm test
-```
-
-**Expected outcome:** All unit tests pass with coverage reports showing 80-90% coverage for standard modules and 85%+ for critical modules.
-
-**Why sixth?** This comprehensive check ensures no regressions were introduced and validates the complete test suite.
-
-#### Stage 7: Statistical Validation (Publication Readiness - Optional)
-Validate statistical calculations against GraphPad Prism:
-
-```bash
-# Stage 1: Create validation study (24 experiments, ~2 hours)
+# Run the 4-stage validation workflow
 pdm run test-stats-study
-# or simply:
-pdm test-stats-study
-
-# Stage 2: Generate GraphPad import files
 pdm run test-stats-imports
-# or simply:
-pdm test-stats-imports
-
-# Stage 3: Manual GraphPad Prism processing
-# (Follow instructions from Stage 2 output)
-
-# Stage 4: Validate results
+# (Perform manual GraphPad step)
 pdm run test-stats-results
-# or simply:
-pdm test-stats-results
 ```
+**Why last in this part?** This is the most time-consuming validation, establishing academic credibility. It depends on a complete and validated framework and production dataset.
 
-**Expected outcome:** Statistical calculations match GraphPad within established tolerances (±0.0001 for p-values, ±0.01 for effect sizes).
+---
 
-**Why last?** This validation establishes academic credibility and supports the citation: "Statistical analyses were validated against GraphPad Prism 10.6.1". Only needed when preparing for publication or verifying statistical correctness.
+### Part 3: Final Comprehensive Checks
 
-### Testing Dependencies
+#### Stage 6: Run All Tests Together
+As a final sanity check, run the composite commands that execute all unit tests or the entire test suite.
 
+```bash
+# Run all Python tests with a coverage report
+pdm run cov
+
+# Run all Python and PowerShell tests
+pdm run test
 ```
-Stage 1: Data Prep Unit Tests
-         ↓
-Stage 2: Data Pipeline Integration (Layer 2-3)
-         ↓
-Stage 3: Algorithm Validation
-         ↓
-Stage 4: Experiment Unit Tests
-         ↓
-Stage 5: Experiment & Study Integration (Layer 4-5)
-         ↓
-Stage 6: All Unit Tests Together
-         ↓
-Stage 7: Statistical Validation (optional)
-```
+**Why last?** This is a final catch-all to ensure no regressions were introduced during development or testing.
 
 ### Troubleshooting Common Issues
 
@@ -991,6 +862,30 @@ pdm test-l2
 **Test duration:** < 30 seconds
 
 **Implementation:** Uses fast mock scripts that simulate pipeline stages to test orchestration logic independently.
+
+#### Orchestrator Feature Tests
+
+##### Backup and Restore Functionality
+
+**Purpose:** Validates the `-RestoreBackup` functionality of the `prepare_data.ps1` orchestrator.
+
+**Command:**
+```powershell
+pdm run test-restore-backup
+# or simply:
+pdm test-restore-backup
+```
+
+**What's tested:**
+- **Sandbox Creation:** An isolated test environment is created.
+- **File & Backup Creation:** A test file is created, and a timestamped backup is manually generated to simulate a previous pipeline run.
+- **Simulated Data Loss:** The original test file is deleted.
+- **Restore Execution:** The `prepare_data.ps1 -RestoreBackup` command is called on the sandbox.
+- **Verification:** The test confirms that the original file was successfully restored with the correct content and that the backup file was preserved.
+
+**Test duration:** < 5 seconds
+
+**Implementation:** A standalone PowerShell script (`tests/test_restore_data_backup.ps1`) executes the complete test cycle in an isolated, temporary directory that is automatically cleaned up.
 
 #### Layer 3: Complete Live Testing
 

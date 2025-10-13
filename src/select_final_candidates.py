@@ -263,7 +263,8 @@ def main():
                 )
             
             # Always generate the diagnostic plot (non-interactive)
-            plot_path = Path(get_path("data/reports/variance_curve_analysis.png"))
+            variance_plot_output = get_config_value(config, "DataGeneration", "variance_plot_output", "data/foundational_assets/variance_curve_analysis.png", str)
+            plot_path = Path(get_path(variance_plot_output))
             generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, smoothing_window, plot_path, interactive=False)
 
         ocean_df = ocean_df.head(final_count)

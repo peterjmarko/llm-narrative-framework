@@ -102,6 +102,7 @@ docs/word_docs/
 /data/foundational_assets/sf_chart_export.csv
 /data/foundational_assets/eminence_scores.csv
 /data/foundational_assets/ocean_scores.csv
+/data/foundational_assets/variance_curve_analysis.png
 /data/personalities_db.txt
 
 # Temporary worker directories used by the pipeline

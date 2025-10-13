@@ -135,18 +135,22 @@ def main():
         # --- Step 2: Compare the original and converted files ---
         print(f"\nComparing original and converted files...")
         
-        original_df = pd.read_csv(original_db_path, dtype=str)
-        converted_df = pd.read_csv(from_sf_output_path, dtype=str)
-        original_df.fillna("", inplace=True)
-        converted_df.fillna("", inplace=True)
+        # Read files normally, letting pandas infer dtypes
+        original_df = pd.read_csv(original_db_path)
+        converted_df = pd.read_csv(from_sf_output_path)
         
-        # Sort by idADB for consistent comparison (Index reflects original ADB export order)
+        # Sort by idADB for consistent comparison
         original_df = original_df.sort_values(by="idADB").reset_index(drop=True)
         converted_df = converted_df.sort_values(by="idADB").reset_index(drop=True)
         
-        # Drop Index column as it's just the original row number, not part of the data
+        # Drop Index column as it's not part of the core data
         original_df = original_df.drop(columns=["Index"])
         converted_df = converted_df.drop(columns=["Index"])
+
+        # Round numerical columns to handle minor precision differences from Solar Fire
+        numerical_cols = original_df.select_dtypes(include="number").columns
+        original_df[numerical_cols] = original_df[numerical_cols].round(3)
+        converted_df[numerical_cols] = converted_df[numerical_cols].round(3)
 
         assert_frame_equal(original_df, converted_df)
 

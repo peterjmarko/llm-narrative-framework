@@ -85,10 +85,10 @@ release = {cmd = "python scripts/build/finalize_release.py", help = "Finalize a 
 prep-data = {shell = "python scripts/maintenance/operation_runner.py prep-data pwsh -ExecutionPolicy Bypass -File ./prepare_data.ps1"}
 # Main workflow shortcuts
 new-exp = {shell = "python scripts/maintenance/operation_runner.py new-exp pwsh -ExecutionPolicy Bypass -File ./new_experiment.ps1"}
-aud-exp = {shell = "python scripts/maintenance/operation_runner.py aud-exp pwsh -ExecutionPolicy Bypass -File ./audit_experiment.ps1"}
+audit-exp = {shell = "python scripts/maintenance/operation_runner.py aud-exp pwsh -ExecutionPolicy Bypass -File ./audit_experiment.ps1"}
 fix-exp = {shell = "python scripts/maintenance/operation_runner.py fix-exp pwsh -ExecutionPolicy Bypass -File ./fix_experiment.ps1"}
-com-stu = {shell = "python scripts/maintenance/operation_runner.py com-stu pwsh -ExecutionPolicy Bypass -File ./compile_study.ps1"}
-aud-stu = {shell = "python scripts/maintenance/operation_runner.py aud-stu pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"}
+compile-study = {shell = "python scripts/maintenance/operation_runner.py com-stu pwsh -ExecutionPolicy Bypass -File ./compile_study.ps1"}
+audit-study = {shell = "python scripts/maintenance/operation_runner.py aud-stu pwsh -ExecutionPolicy Bypass -File ./audit_study.ps1"}
 
 # ==============================================================================
 # === TESTING WORKFLOW (Organized by Typical Testing Sequence) ===
@@ -102,9 +102,12 @@ aud-stu = {shell = "python scripts/maintenance/operation_runner.py aud-stu pwsh 
 # - "DATA PREPARATION" → data_prep_summary.jsonl  
 # - "CORE PROJECT WORKFLOWS" → workflow_summary.jsonl
 
+# --- Stage 0: Infrastructure Tests ---
+test-op-runner = {shell = "python scripts/maintenance/operation_runner.py test-op-runner pytest tests/maintenance/test_operation_runner.py", help = "Test the operation runner itself."}
+test-restore-backup = {shell = "python scripts/maintenance/operation_runner.py test-restore-backup pwsh -File ./tests/test_restore_data_backup.ps1", help = "Test the data pipeline's backup and restore functionality."}
+
 # --- Stage 1: Unit Tests - Data Preparation Pipeline ---
 test-data-prep = {shell = "python scripts/maintenance/operation_runner.py test-data-prep pytest tests/data_preparation/", help = "Run all data preparation unit tests."}
-test-op-runner = {shell = "python scripts/maintenance/operation_runner.py test-op-runner pytest tests/maintenance/test_operation_runner.py", help = "Test the operation runner itself."}
 
 # --- Stage 2: Data Pipeline Integration (Layer 2-3) ---
 test-l2 = {shell = "python scripts/maintenance/operation_runner.py test-l2 pwsh -File ./tests/testing_harness/data_preparation/layer2/run_layer2_test.ps1"}
@@ -126,7 +129,6 @@ test-l3-selection = {shell = "python scripts/maintenance/operation_runner.py tes
 
 # --- Stage 4: Unit Tests - Experiment Workflow ---
 test-exp-wf = {shell = "python scripts/maintenance/operation_runner.py test-exp-wf pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}
-test-exp-lc = {shell = "python scripts/maintenance/operation_runner.py test-exp-lc pytest tests/experiment_workflow/", help = "Run all experiment workflow unit tests."}  # Backward compatibility
 
 # --- Stage 5: Experiment & Study Integration (Layer 4-5) ---
 test-l4 = {shell = "python scripts/maintenance/operation_runner.py test-l4 pwsh -File ./tests/testing_harness/experiment_workflow/layer4/run_layer4_test.ps1"}

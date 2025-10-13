@@ -195,7 +195,11 @@ def main():
         # shell=True is required to ensure PDM's virtual environment is properly used,
         # making all installed packages available to subprocesses on Windows
         start_time = time.time()
-        result = subprocess.run(command, shell=True)
+        try:
+            result = subprocess.run(command, shell=True)
+        except KeyboardInterrupt:
+            print("\n\nOperation cancelled by user.")
+            return 130  # Standard exit code for Ctrl+C
         duration = time.time() - start_time
         
         # Log summary based on operation type (pattern matching)

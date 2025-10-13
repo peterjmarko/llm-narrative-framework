@@ -120,7 +120,13 @@ param(
     [int]$StopAfterStep = 0,
 
     [Parameter(Mandatory=$false)]
-    [int]$StartWithStep = 0
+    [int]$StartWithStep = 0,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$RestoreBackup,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$RestoreFromPath
 )
 
 # --- Pre-flight Cleanup ---
@@ -489,6 +495,113 @@ function Backup-And-Remove {
     }
 }
 
+# Find and replace this function in prepare_data.ps1
+
+function Restore-Recent-Backup {
+    <#
+    .SYNOPSIS
+    Restores the most recent backup files to their original locations.
+    #>
+    param(
+        [string]$BackupTimestamp = $null,
+        [string]$BaseDir = $ProjectRoot
+    )
+    
+    $baseDir = $BaseDir
+    $backupDir = Join-Path $baseDir "data/backup"
+    
+    if (-not (Test-Path $backupDir)) {
+        Write-Host "No backup directory found at '$backupDir'" -ForegroundColor Yellow
+        return
+    }
+    
+    # If no timestamp provided, find the most recent one
+    if (-not $BackupTimestamp) {
+        $allBackups = Get-ChildItem -Path $backupDir -File
+        if ($allBackups.Count -eq 0) {
+            Write-Host "No backup files found in '$backupDir'" -ForegroundColor Yellow
+            return
+        }
+        
+        # Extract timestamps from filenames (format: YYYYMMDD_HHMMSS)
+        # Wrap in @() to ensure the result is always an array
+        $timestamps = @($allBackups | ForEach-Object {
+            if ($_.Name -match '\.(\d{8}_\d{6})\.') {
+                $matches[1]
+            }
+        } | Select-Object -Unique | Sort-Object -Descending)
+        
+        if ($timestamps.Count -eq 0) {
+            Write-Host "Could not find any timestamped backup files" -ForegroundColor Yellow
+            return
+        }
+        
+        $BackupTimestamp = $timestamps[0]
+    }
+    
+    Write-Host "`nRestoring backups from timestamp: $BackupTimestamp" -ForegroundColor Cyan
+    
+    # Find all files with this timestamp
+    $backupFiles = Get-ChildItem -Path $backupDir -File | Where-Object { $_.Name -match [regex]::Escape($BackupTimestamp) }
+    
+    if ($backupFiles.Count -eq 0) {
+        Write-Host "No backup files found with timestamp '$BackupTimestamp'" -ForegroundColor Yellow
+        return
+    }
+    
+    $restoredCount = 0
+    foreach ($backupFile in $backupFiles) {
+        # Parse the original path from the backup filename
+        # Format: basename.YYYYMMDD_HHMMSS.extension.bak
+        $originalName = $backupFile.Name -replace "\.$BackupTimestamp", "" -replace "\.bak$", ""
+        
+        # Determine original location based on file type
+        $originalPath = $null
+        # Use a wildcard to match both 'adb_raw_export.txt' and 'test_adb_raw_export.txt'
+        if ($originalName -like "*adb_raw_export.*") {
+            $originalPath = Join-Path $baseDir "data/sources/$originalName"
+        }
+        elseif ($originalName -like "adb_wiki_links.*" -or $originalName -like "adb_validation_report.*" -or $originalName -like "subject_db.*") {
+            $originalPath = Join-Path $baseDir "data/processed/$originalName"
+        }
+        elseif ($originalName -like "adb_eligible_candidates.*" -or $originalName -like "adb_final_candidates.*" -or $originalName -like "sf_data_import.*") {
+            $originalPath = Join-Path $baseDir "data/intermediate/$originalName"
+        }
+        elseif ($originalName -like "eminence_scores.*" -or $originalName -like "ocean_scores.*" -or $originalName -like "sf_*") {
+            $originalPath = Join-Path $baseDir "data/foundational_assets/$originalName"
+        }
+        elseif ($originalName -like "*_summary.*" -or $originalName -like "missing_*") {
+            $originalPath = Join-Path $baseDir "data/reports/$originalName"
+        }
+        elseif ($originalName -like "personalities_db.*") {
+            $originalPath = Join-Path $baseDir "data/$originalName"
+        }
+        
+        if ($originalPath) {
+            # Ensure parent directory exists
+            $parentDir = Split-Path -Parent $originalPath
+            if (-not (Test-Path $parentDir)) {
+                New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+            }
+            
+            # Check if a file already exists at the destination
+            if (Test-Path $originalPath) {
+                Write-Host "  Skipping: $originalName (file already exists at destination)" -ForegroundColor Yellow
+            }
+            else {
+                Copy-Item -Path $backupFile.FullName -Destination $originalPath
+                Write-Host "  Restored: $originalName" -ForegroundColor Green
+                $restoredCount++
+            }
+        }
+        else {
+            Write-Host "  Warning: Could not determine original location for '$originalName'" -ForegroundColor Yellow
+        }
+    }
+    
+    Write-Host "`nRestored $restoredCount file(s) from backup timestamp $BackupTimestamp" -ForegroundColor Green
+}
+
 function Show-PipelineStatus {
     param([array]$Steps, [string]$BaseDirectory = ".")
     Format-Banner "Data Preparation Pipeline Status" $C_CYAN
@@ -747,6 +860,24 @@ if ($SandboxMode) {
 }
 
 try {
+    # Handle restore backup mode before anything else
+    if ($RestoreBackup.IsPresent) {
+        # Determine working directory for restore
+        $restoreBaseDir = $ProjectRoot
+        
+        # Use explicit parameter if provided (for testing)
+        if ($RestoreFromPath) {
+            $restoreBaseDir = $RestoreFromPath
+        }
+        # Otherwise check environment variable
+        elseif ($env:PROJECT_SANDBOX_PATH -and (Test-Path $env:PROJECT_SANDBOX_PATH)) {
+            $restoreBaseDir = $env:PROJECT_SANDBOX_PATH
+        }
+        
+        Restore-Recent-Backup -BaseDir $restoreBaseDir
+        exit 0
+    }
+    
     $runCompletedSuccessfully = $false
     if (-not (Get-Command pdm -ErrorAction SilentlyContinue)) { throw "PDM not found. Please ensure PDM is installed and in your PATH." }
 
@@ -824,25 +955,38 @@ try {
     # --- Pre-run Cleanup for an INTERACTIVE force flag ---
     # This is now moved after displaying the parameters
     if ($isInteractiveForceOverwrite) {
-        Write-Host "`n${C_YELLOW}WARNING: The -Force flag is active."
-        Write-Host "This will back up and delete all existing data artifacts to re-run the entire pipeline from scratch.${C_RESET}"
+        if ($StartWithStep -eq 0) {
+            Write-Host "`n${C_YELLOW}WARNING: The -Force flag is active."
+            Write-Host "This will back up and delete all existing data artifacts to re-run the entire pipeline from scratch.${C_RESET}"
+        } else {
+            Write-Host "`n${C_YELLOW}WARNING: The -Force flag is active with -StartWithStep $StartWithStep."
+            Write-Host "This will back up and delete data artifacts from Step $StartWithStep onwards.${C_RESET}"
+        }
         $confirm = Read-Host "Are you sure you want to proceed? (Y/N)"
         if ($confirm.Trim().ToLower() -ne 'y') { throw "USER_CANCELLED: Operation cancelled by user." }
 
         Write-Host "`n${C_YELLOW}Backing up and removing existing data files...${C_RESET}`n"
         
         try {
+            # Determine which steps to backup based on StartWithStep
+            $startBackupFrom = if ($StartWithStep -gt 0) { $StartWithStep } else { 1 }
+            
             # Special handling for neutralization directory, which contains multiple files
-            $neutralizationStep = $PipelineSteps | Where-Object { $_.Name -eq "Neutralize Delineations" }
-            if ($neutralizationStep) {
-                $repFile = Join-Path $WorkingDirectory $neutralizationStep.Output
-                $outputDir = Split-Path $repFile -Parent
-                Backup-And-Remove -ItemPath $outputDir
+            $neutralizationStepIndex = ($PipelineSteps | ForEach-Object { $i = 0 } { $i++; if ($_.Name -eq "Neutralize Delineations") { $i } }).Where({$_})[0]
+            if ($neutralizationStepIndex -ge $startBackupFrom) {
+                $neutralizationStep = $PipelineSteps | Where-Object { $_.Name -eq "Neutralize Delineations" }
+                if ($neutralizationStep) {
+                    $repFile = Join-Path $WorkingDirectory $neutralizationStep.Output
+                    $outputDir = Split-Path $repFile -Parent
+                    Backup-And-Remove -ItemPath $outputDir
+                }
             }
             
             # Handle all other individual files from pipeline steps
+            $stepIndex = 0
             foreach ($step in $PipelineSteps) {
-                if ($step.Name -ne "Neutralize Delineations") {
+                $stepIndex++
+                if ($stepIndex -ge $startBackupFrom -and $step.Name -ne "Neutralize Delineations") {
                     Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $step.Output)
                 }
             }
@@ -886,9 +1030,7 @@ try {
                 "data/foundational_assets/point_weights.csv",
                 "data/base_query.txt",
                 "data/foundational_assets/assembly_logic/personalities_db.assembly_logic.txt",
-                "data/foundational_assets/assembly_logic/subject_db.assembly_logic.csv",
-                "data/foundational_assets/cutoff_parameter_analysis_results.csv",
-                "data/reports/variance_curve_analysis.png"
+                "data/foundational_assets/assembly_logic/subject_db.assembly_logic.csv"
             )
             
             Write-Host "${C_CYAN}Preserving the following essential files:${C_RESET}" -ForegroundColor Cyan
