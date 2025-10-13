@@ -2,6 +2,34 @@
 
 # Changelog
 
+## 13.1.1 (2025-10-13)
+
+### Bump
+
+- **version 13.1.0 → 13.1.1**
+
+### Fixes
+
+- **Resolve cascading test failures and overhaul testing workflow**
+  This commit addresses a series of critical bugs discovered during testing and corrects the overall testing strategy to improve clarity and correctness.
+  
+    **Testing Strategy Overhaul:**
+    - Fundamentally restructures the "Typical Testing Sequence" in TESTING_GUIDE.md to separate fast, CI-friendly software validation from slower, data-dependent scientific validation.
+  
+    **New Feature:**
+    - Implements a new `-RestoreBackup` feature in `prepare_data.ps1` to allow users to easily recover data from the most recent timestamped backup.
+    - Adds a new integration test (`test-restore-data_backup.ps1`) and a `pdm` shortcut to validate this functionality.
+  
+    **Key Bug Fixes:**
+    - **Assembly Logic:** Fixes a floating-point comparison failure in the validation script (`5_validate_...`) by adding rounding.
+    - **Restore Backup:** Resolves a critical PowerShell bug where a single-item array was being misinterpreted as a string, causing incorrect timestamp parsing.
+    - **Parameter Analysis:** Refactors `analyze_cutoff_parameters.py` to separate core logic from `ArgumentParser`, fixing conflicts with `pytest`.
+    - **Data Pipeline:** Corrects the backup logic for `-StartWithStep -Force` to prevent unintended file deletion.
+  
+    **Refactoring & Chores:**
+    - Standardizes the path for `variance_curve_analysis.png` to `data/foundational_assets/` and updates `.gitignore`.
+    - Updates `pyproject.toml` with the new test shortcut.
+
 ## 13.1.0 (2025-10-12)
 
 ### Bump
