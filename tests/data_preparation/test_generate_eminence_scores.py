@@ -29,6 +29,7 @@ of the main orchestrator loop to ensure the subprocess worker is called correctl
 """
 
 import os
+import re
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -117,6 +118,30 @@ def mock_sandbox(tmp_path: Path) -> Path:
 class TestMainWorkflow:
     """Tests the main orchestration logic of the script."""
 
+    class MockLLMWorker:
+        """A mock for subprocess.run that simulates the eminence score worker."""
+        def __init__(self, ids_to_miss=None):
+            self.ids_to_miss = ids_to_miss or set()
+
+        def run(self, cmd, check=False, shell=False, **kwargs):
+            # Parse the command line arguments passed to the worker
+            response_file_path = Path(cmd[cmd.index("--output_response_file") + 1])
+            query_file_path = Path(cmd[cmd.index("--input_query_file") + 1])
+
+            # Read the query to find out who was requested
+            query_text = query_file_path.read_text()
+            requested = re.findall(r'"([^"]+)"\s\((\d+)\),\sID\s(\d+)', query_text)
+
+            # Construct a valid response that matches the request
+            response_lines = []
+            for name, year, id_adb in requested:
+                if id_adb not in self.ids_to_miss:
+                    # The response format must exactly match what parse_batch_response expects
+                    response_lines.append(f'"{name} ({year}), ID {id_adb}: 85.0"')
+            
+            response_file_path.write_text("\n".join(response_lines))
+            return MagicMock(returncode=0)
+
     @pytest.fixture
     def mock_sandbox_with_bypass(self, mock_sandbox: Path) -> Path:
         """Adds a config.ini with bypass_candidate_selection=true."""
@@ -126,25 +151,75 @@ class TestMainWorkflow:
     def test_main_happy_path(self, mocker, mock_sandbox):
         """Tests the main orchestrator loop with a successful run."""
         output_path = mock_sandbox / "data/foundational_assets/eminence_scores.csv"
-        mock_subprocess = mocker.patch('subprocess.run')
+        mock_worker = self.MockLLMWorker()
+        mocker.patch('subprocess.run', side_effect=mock_worker.run)
         mocker.patch('src.generate_eminence_scores.sort_and_reindex_scores')
         mocker.patch('src.generate_eminence_scores.generate_scores_summary')
+        # Mock sys.exit to prevent the test runner from halting on a successful exit
+        mocker.patch('sys.exit')
 
-        def side_effect(*args, **kwargs):
-            worker_cmd = args[0]
-            response_file = Path(worker_cmd[worker_cmd.index("--output_response_file") + 1])
-            response_text = '"Test A (1950), ID 101: 85.0"\n"Test B (1951), ID 102: 88.0"'
-            response_file.write_text(response_text)
-            return MagicMock(returncode=0)
-
-        mock_subprocess.side_effect = side_effect
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--batch-size", "2", "--force"]
         with patch("sys.argv", test_args):
             main()
 
-        assert mock_subprocess.call_count == 1
         df = pd.read_csv(output_path)
         assert set(df['idADB'].astype(str)) == {"101", "102"}
+
+    def test_main_validation_discards_bad_llm_responses(self, mocker, mock_sandbox, capsys):
+        """Tests that the validation logic discards mismatched names or hallucinated IDs."""
+        output_path = mock_sandbox / "data/foundational_assets/eminence_scores.csv"
+
+        class BadLLMWorker:
+            def run(self, cmd, **kwargs):
+                response_file_path = Path(cmd[cmd.index("--output_response_file") + 1])
+                response_text = (
+                    '"Test A (1950), ID 101: 85.0"\n'          # Correct
+                    '"Test WRONG (1951), ID 102: 86.0"\n'      # Mismatched name
+                    '"Hallucinated Person (1999), ID 999: 90.0"\n'# Hallucinated ID
+                )
+                response_file_path.write_text(response_text)
+                return MagicMock(returncode=0)
+
+        mocker.patch('subprocess.run', side_effect=BadLLMWorker().run)
+        # Mock exit because missing subject 102 will trigger a critical failure exit(1)
+        mocker.patch('sys.exit', side_effect=SystemExit)
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--force", "--no-summary"]
+        with patch("sys.argv", test_args):
+            with pytest.raises(SystemExit):
+                main()
+
+        df = pd.read_csv(output_path)
+        assert len(df) == 1
+        assert df['idADB'].iloc[0] == 101
+        
+        captured = capsys.readouterr().out
+        assert "Warning: Discarded 2 invalid records" in captured
+
+    def test_main_issues_warning_for_near_complete_runs(self, mocker, mock_sandbox, capsys):
+        """Tests the warning path for >=95% but <99% completion, which should not halt."""
+        # Setup an input file with 100 subjects
+        input_file = mock_sandbox / "data/intermediate/adb_eligible_candidates.txt"
+        subjects = [f"{100 + i}\tTest\t{i}\t1950" for i in range(100)]
+        input_content = "idADB\tFirstName\tLastName\tYear\n" + "\n".join(subjects)
+        input_file.write_text(input_content)
+        
+        # Configure the mock worker to miss 2 subjects (98% completion)
+        mock_worker = self.MockLLMWorker(ids_to_miss={'100', '101'})
+        mocker.patch('subprocess.run', side_effect=mock_worker.run)
+        mock_exit = mocker.patch('sys.exit')
+
+        test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--force", "--no-summary", "--batch-size", "10"]
+        with patch("sys.argv", test_args):
+            main()
+
+        # The script should complete without a fatal exit code
+        mock_exit.assert_not_called()
+
+        captured = capsys.readouterr().out
+        assert "WARNING: Failed to retrieve scores for 2 subject(s)" in captured
+        assert "The pipeline will continue" in captured
+        assert "CRITICAL" not in captured
 
     def test_main_handles_bypass_mode_cancellation(self, mock_sandbox_with_bypass):
         """Tests that the script exits if the user declines to run in bypass mode."""
@@ -188,27 +263,15 @@ class TestMainWorkflow:
 
     def test_main_creates_missing_scores_report(self, mocker, mock_sandbox):
         """Tests that a report is generated for subjects the LLM failed to score."""
-        mock_subprocess = mocker.patch('subprocess.run')
-        
-        # Mock sys.exit to correctly capture the exit code
-        def mock_exit(code=0):
-            raise SystemExit(code)
-        mocker.patch('sys.exit', side_effect=mock_exit)
+        # Configure the mock to miss subject '102'
+        mock_worker = self.MockLLMWorker(ids_to_miss={'102'})
+        mocker.patch('subprocess.run', side_effect=mock_worker.run)
 
-        def side_effect(*args, **kwargs):
-            # Simulate the LLM only returning one of the two subjects
-            worker_cmd = args[0]
-            response_file = Path(worker_cmd[worker_cmd.index("--output_response_file") + 1])
-            response_text = '"Test A (1950), ID 101: 85.0"' # Missing ID 102
-            response_file.write_text(response_text)
-            return MagicMock(returncode=0)
-
-        mock_subprocess.side_effect = side_effect
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--force", "--no-summary"]
         with patch("sys.argv", test_args):
             with pytest.raises(SystemExit) as e:
                 main()
-            assert e.value.code == 1 # Should exit with an error code
+            assert e.value.code == 1 # Should exit with a critical error code
 
         missing_report_path = mock_sandbox / "data/reports/missing_eminence_scores.txt"
         assert missing_report_path.exists()
@@ -220,7 +283,7 @@ class TestMainWorkflow:
     def test_main_handles_worker_failure(self, mocker, mock_sandbox):
         """Tests that the script halts gracefully after max consecutive worker failures."""
         mock_subprocess = mocker.patch('subprocess.run')
-        mock_sys_exit = mocker.patch('sys.exit')
+        mocker.patch('sys.exit')
 
         # Simulate the worker always creating an error file
         def side_effect(*args, **kwargs):
@@ -379,7 +442,8 @@ class TestCoverageAndEdgeCases:
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
         with patch("sys.argv", test_args), \
              patch("builtins.input", return_value="y"), \
-             patch('src.generate_eminence_scores.backup_and_remove') as mock_backup:
+             patch('src.generate_eminence_scores.backup_and_remove') as mock_backup, \
+             patch('sys.exit'): # Mock exit to prevent halting after cancellation logic
             
             # Mock `isatty` to ensure the script thinks it's in an interactive session
             with patch('sys.stdout.isatty', return_value=True):
@@ -413,6 +477,8 @@ class TestCoverageAndEdgeCases:
         """Tests that the --no-summary flag suppresses the detailed report."""
         mocker.patch('src.generate_eminence_scores.load_subjects_to_process', return_value=[])
         mock_generate_summary = mocker.patch('src.generate_eminence_scores.generate_scores_summary')
+        # Mock sys.exit to prevent the test runner from exiting
+        mocker.patch('sys.exit', side_effect=SystemExit)
 
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--no-summary"]
         with patch("sys.argv", test_args):

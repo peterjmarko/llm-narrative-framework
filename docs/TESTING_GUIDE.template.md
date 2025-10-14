@@ -301,7 +301,7 @@ These tests validate the components that transform raw Astro-Databank data into 
 
 #### Data Sourcing
 
-**Module:** `src/fetch_adb_data.py` | **Coverage:** 84% | **Status:** COMPLETE
+**Module:** `src/fetch_adb_data.py`
 
 Validates the automated extraction of birth data from the live Astro-Databank website.
 
@@ -324,7 +324,7 @@ These tests validate the deterministic filtering rules that create the pool of e
 
 ##### Wikipedia Link Discovery
 
-**Module:** `src/find_wikipedia_links.py` | **Coverage:** 89% | **Status:** COMPLETE
+**Module:** `src/find_wikipedia_links.py`
 
 **Test file:** `tests/data_preparation/test_find_wikipedia_links.py`
 
@@ -338,7 +338,7 @@ These tests validate the deterministic filtering rules that create the pool of e
 
 ##### Wikipedia Page Validation
 
-**Module:** `src/validate_wikipedia_pages.py` | **Coverage:** 91% | **Status:** COMPLETE
+**Module:** `src/validate_wikipedia_pages.py`
 
 **Test file:** `tests/data_preparation/test_validate_wikipedia_pages.py`
 
@@ -353,7 +353,7 @@ These tests validate the deterministic filtering rules that create the pool of e
 
 ##### Final Eligibility Filtering
 
-**Module:** `src/select_eligible_candidates.py` | **Coverage:** 90% (Critical) | **Status:** COMPLETE
+**Module:** `src/select_eligible_candidates.py`
 
 **Test file:** `tests/data_preparation/test_select_eligible_candidates.py`
 
@@ -378,7 +378,7 @@ These tests validate the LLM-based scoring and data-driven cutoff algorithm that
 
 ##### Eminence Scoring
 
-**Module:** `src/generate_eminence_scores.py` | **Coverage:** 90% (Critical) | **Status:** COMPLETE
+**Module:** `src/generate_eminence_scores.py`
 
 **Test file:** `tests/data_preparation/test_generate_eminence_scores.py`
 
@@ -393,7 +393,7 @@ These tests validate the LLM-based scoring and data-driven cutoff algorithm that
 
 ##### OCEAN Personality Scoring
 
-**Module:** `src/generate_ocean_scores.py` | **Coverage:** 82% (Critical) | **Status:** COMPLETE
+**Module:** `src/generate_ocean_scores.py`
 
 **Test file:** `tests/data_preparation/test_generate_ocean_scores.py`
 
@@ -408,7 +408,7 @@ These tests validate the LLM-based scoring and data-driven cutoff algorithm that
 
 ##### Cutoff Parameter Analysis
 
-**Module:** `src/analyze_cutoff_parameters.py` | **Coverage:** 84%
+**Module:** `src/analyze_cutoff_parameters.py`
 
 **Test file:** `tests/data_preparation/test_analyze_cutoff_parameters.py`
 
@@ -426,7 +426,7 @@ These tests validate the LLM-based scoring and data-driven cutoff algorithm that
 
 ##### Final Selection with Cutoff Algorithm
 
-**Module:** `src/select_final_candidates.py` | **Coverage:** 91% (Critical)
+**Module:** `src/select_final_candidates.py`
 
 **Test file:** `tests/data_preparation/test_select_final_candidates.py`
 
@@ -449,7 +449,7 @@ These tests validate the components that assemble the final neutralized personal
 
 ##### Solar Fire Import Preparation
 
-**Module:** `src/prepare_sf_import.py` | **Coverage:** 86% | **Status:** COMPLETE
+**Module:** `src/prepare_sf_import.py`
 
 **Test file:** `tests/data_preparation/test_prepare_sf_import.py`
 
@@ -463,7 +463,7 @@ These tests validate the components that assemble the final neutralized personal
 
 ##### Chart Data Integration
 
-**Module:** `src/create_subject_db.py` | **Coverage:** 92% (Critical) | **Status:** COMPLETE
+**Module:** `src/create_subject_db.py`
 
 **Test file:** `tests/data_preparation/test_create_subject_db.py`
 
@@ -480,7 +480,7 @@ These tests validate the components that assemble the final neutralized personal
 
 ##### Delineation Neutralization
 
-**Module:** `src/neutralize_delineations.py` | **Coverage:** 91% (Critical) | **Status:** COMPLETE
+**Module:** `src/neutralize_delineations.py`
 
 **Test file:** `tests/data_preparation/test_neutralize_delineations.py`
 
@@ -499,7 +499,7 @@ These tests validate the components that assemble the final neutralized personal
 
 ##### Personality Database Assembly
 
-**Module:** `src/generate_personalities_db.py` | **Coverage:** 91% (Critical) | **Status:** COMPLETE
+**Module:** `src/generate_personalities_db.py`
 
 **Test file:** `tests/data_preparation/test_generate_personalities_db.py`
 
@@ -523,7 +523,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Experiment Manager (Orchestrator)
 
-**Module:** `src/experiment_manager.py` | **Coverage:** 94% (Critical) | **Status:** COMPLETE
+**Module:** `src/experiment_manager.py`
 
 **Test file:** `tests/experiment_workflow/test_experiment_manager.py`
 
@@ -543,7 +543,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Experiment Auditor (Diagnostic Tool)
 
-**Module:** `src/experiment_auditor.py` | **Coverage:** 95% (Critical) | **Status:** COMPLETE
+**Module:** `src/experiment_auditor.py`
 
 **Test file:** `tests/experiment_workflow/test_experiment_auditor.py`
 
@@ -561,7 +561,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Configuration Management
 
-**Module:** `src/config_loader.py` | **Coverage:** 85% (Utility) | **Status:** COMPLETE
+**Module:** `src/config_loader.py`
 
 **Test file:** `tests/experiment_workflow/test_config_loader.py`
 
@@ -574,7 +574,7 @@ These tests validate the components that manage experiment execution, LLM intera
 - Path resolution
 - Multiple config file scenarios
 
-**Module:** `src/restore_experiment_config.py` | **Coverage:** Target met | **Status:** COMPLETE
+**Module:** `src/restore_experiment_config.py`
 
 **Test file:** `tests/experiment_workflow/test_restore_experiment_config.py`
 
@@ -586,7 +586,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 #### Replication Management
 
-**Module:** `src/replication_manager.py` | **Coverage:** 91% (Critical) | **Status:** COMPLETE
+**Module:** `src/replication_manager.py`
 
 **Test file:** `tests/experiment_workflow/test_replication_manager.py`
 
@@ -606,7 +606,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Query Construction
 
-**Module:** `src/build_llm_queries.py` | **Coverage:** 84% | **Status:** COMPLETE
+**Module:** `src/build_llm_queries.py`
 
 **Test file:** `tests/experiment_workflow/test_build_llm_queries.py`
 
@@ -619,7 +619,7 @@ These tests validate the components that manage experiment execution, LLM intera
 - File I/O operations
 - Edge cases and error handling
 
-**Module:** `src/query_generator.py` | **Coverage:** Target met | **Status:** COMPLETE
+**Module:** `src/query_generator.py`
 
 **Test file:** `tests/experiment_workflow/test_query_generator.py`
 
@@ -633,7 +633,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### LLM API Interaction
 
-**Module:** `src/llm_prompter.py` | **Coverage:** 85% | **Status:** COMPLETE
+**Module:** `src/llm_prompter.py`
 
 **Test file:** `tests/experiment_workflow/test_llm_prompter.py`
 
@@ -649,7 +649,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Response Processing
 
-**Module:** `src/process_llm_responses.py` | **Coverage:** 94% | **Status:** COMPLETE
+**Module:** `src/process_llm_responses.py`
 
 **Test file:** `tests/experiment_workflow/test_process_llm_responses.py`
 
@@ -669,7 +669,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Performance Analysis
 
-**Module:** `src/analyze_llm_performance.py` | **Coverage:** 83% (Critical) | **Status:** COMPLETE
+**Module:** `src/analyze_llm_performance.py`
 
 **Test file:** `tests/experiment_workflow/test_analyze_llm_performance.py`
 
@@ -685,7 +685,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 **Key validation:** Comprehensive validation of statistical engine, meeting 80%+ target for critical modules. Enhanced with Priority 1-3 statistical validation improvements for GraphPad validation testing.
 
-**Module:** `src/run_bias_analysis.py` | **Coverage:** 86% | **Status:** COMPLETE
+**Module:** `src/run_bias_analysis.py`
 
 **Test file:** `tests/experiment_workflow/test_run_bias_analysis.py`
 
@@ -699,7 +699,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Report Generation
 
-**Module:** `src/generate_replication_report.py` | **Coverage:** 90% | **Status:** COMPLETE
+**Module:** `src/generate_replication_report.py`
 
 **Test file:** `tests/experiment_workflow/test_generate_replication_report.py`
 
@@ -712,7 +712,7 @@ These tests validate the components that manage experiment execution, LLM intera
 - Template processing
 - Error handling
 
-**Module:** `src/manage_experiment_log.py` | **Coverage:** Target met | **Status:** COMPLETE
+**Module:** `src/manage_experiment_log.py`
 
 **Test file:** `tests/experiment_workflow/test_manage_experiment_log.py`
 
@@ -727,7 +727,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Result Compilation
 
-**Module:** `src/compile_replication_results.py` | **Coverage:** Target met | **Status:** COMPLETE
+**Module:** `src/compile_replication_results.py`
 
 **Test file:** `tests/experiment_workflow/test_compile_replication_results.py`
 
@@ -737,7 +737,7 @@ These tests validate the components that manage experiment execution, LLM intera
 - Data extraction from reports
 - Error handling for missing files
 
-**Module:** `src/compile_experiment_results.py` | **Coverage:** Target met | **Status:** COMPLETE
+**Module:** `src/compile_experiment_results.py`
 
 **Test file:** `tests/experiment_workflow/test_compile_experiment_results.py`
 
@@ -747,7 +747,7 @@ These tests validate the components that manage experiment execution, LLM intera
 - Experiment-level CSV generation
 - Data validation and formatting
 
-**Module:** `src/compile_study_results.py` | **Coverage:** Target met | **Status:** COMPLETE
+**Module:** `src/compile_study_results.py`
 
 **Test file:** `tests/experiment_workflow/test_compile_study_results.py`
 
@@ -759,7 +759,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 ##### Statistical Analysis
 
-**Module:** `src/analyze_study_results.py` | **Coverage:** 82% (Critical) | **Status:** COMPLETE
+**Module:** `src/analyze_study_results.py`
 
 **Test file:** `tests/experiment_workflow/test_analyze_study_results.py`
 
@@ -779,7 +779,7 @@ These tests validate the components that manage experiment execution, LLM intera
 
 These shared utility modules provide common functionality across the framework.
 
-**Module:** `src/id_encoder.py` | **Coverage:** Target met | **Status:** COMPLETE
+**Module:** `src/id_encoder.py`
 
 **Test file:** `tests/test_id_encoder.py`
 
@@ -790,7 +790,7 @@ These shared utility modules provide common functionality across the framework.
 - Round-trip validation
 - Edge cases
 
-**Module:** `src/utils/file_utils.py` | **Coverage:** 85% (Utility) | **Status:** COMPLETE
+**Module:** `src/utils/file_utils.py`
 
 **Test file:** `tests/utils/test_file_utils.py`
 
@@ -1361,8 +1361,8 @@ This comprehensive table provides the current status of all tests in the framewo
 | `src/validate_wikipedia_pages.py` | Standard | **COMPLETE** | 91% | URL validation, content checks, disambiguation detection |
 | `src/select_eligible_candidates.py` | **Critical** | **COMPLETE** | 90% | Deterministic filtering rules, deduplication, edge cases |
 | **Candidate Selection** | | | | |
-| `src/generate_eminence_scores.py` | **Critical** | **COMPLETE** | 90% | Batch processing, API interaction, resume capability |
-| `src/generate_ocean_scores.py` | **Critical** | **COMPLETE** | 82% | Text processing, API interaction, pre-flight checks |
+| `src/generate_eminence_scores.py` | **Critical** | **COMPLETE** | 87% | Batch processing, API interaction, resume capability |
+| `src/generate_ocean_scores.py` | **Critical** | **COMPLETE** | 88% | Text processing, API interaction, pre-flight checks |
 | `src/analyze_cutoff_parameters.py` | Standard | **COMPLETE** | 84% | Grid search, stability analysis, parameter optimization |
 | `src/select_final_candidates.py` | **Critical** | **COMPLETE** | 91% | Variance curve calculation, slope analysis, cutoff detection |
 | **Profile Generation** | | | | |

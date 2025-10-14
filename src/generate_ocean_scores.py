@@ -575,29 +575,43 @@ def main():
                     tqdm.write(f"{Fore.RED}Failed to parse any scores from response for batch {batch_num}.")
                     continue
                 
-                # --- Validate and Enrich Response ---
-                # 1. Ensure we only process scores for subjects that were actually requested in this batch.
-                sent_ids = {str(s['idADB']) for s in batch}
-                parsed_scores = [p for p in parsed_scores if str(p.get('idADB')) in sent_ids]
-
-                # 2. Filter out any duplicates that may have been returned by the LLM in the same batch.
-                original_count = len(parsed_scores)
-                seen_ids = set()
-                unique_scores = []
-                for score in parsed_scores:
-                    id_adb = str(score.get('idADB'))
-                    if id_adb not in seen_ids:
-                        unique_scores.append(score)
-                        seen_ids.add(id_adb)
-                parsed_scores = unique_scores
+                # --- START: New Hardened Validation Logic ---
+                # Create a lookup dictionary from the original batch for fast, accurate validation.
+                batch_lookup = {str(s['idADB']): s['Name'] for s in batch}
+                validated_scores = []
                 
-                if len(parsed_scores) < original_count:
-                    num_dupes = original_count - len(parsed_scores)
-                    tqdm.write(f"{Fore.YELLOW}Warning: Skipped {num_dupes} duplicate subject(s) already processed in this run.")
+                for score_dict in parsed_scores:
+                    llm_id = str(score_dict.get('idADB', ''))
+                    llm_name = score_dict.get('Name', '')
+                    
+                    # 1. Validate ID: Check if the ID returned by the LLM was in our original request.
+                    if llm_id not in batch_lookup:
+                        # DISCARD: LLM hallucinated an ID or returned an ID from a different batch.
+                        continue
+                    
+                    # 2. Validate Name: Normalize both names for a robust comparison.
+                    original_name_norm = batch_lookup[llm_id].lower().strip()
+                    llm_name_norm = llm_name.lower().strip()
+                    
+                    if original_name_norm != llm_name_norm:
+                        # DISCARD: The ID is correct, but the LLM mismatched or corrupted the name.
+                        continue
+                    
+                    # If both checks pass, the record is valid.
+                    validated_scores.append(score_dict)
 
+                # Report any discrepancies found during validation.
+                if len(validated_scores) < len(parsed_scores):
+                    num_discarded = len(parsed_scores) - len(validated_scores)
+                    tqdm.write(f"{Fore.YELLOW}Warning: Discarded {num_discarded} invalid records from batch {batch_num} due to ID/name mismatches.")
+                
+                # The final, clean list of scores to be saved.
+                parsed_scores = validated_scores
+                
                 if not parsed_scores:
                     tqdm.write(f"{Fore.RED}Error: No valid scores remained after validation for batch {batch_num}.")
                     continue
+                # --- END: New Hardened Validation Logic ---
 
                 id_to_birth_year = {str(s["idADB"]): s["BirthYear"] for s in batch}
                 start_index = len(all_scores_df) + 1

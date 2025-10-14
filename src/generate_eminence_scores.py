@@ -489,7 +489,7 @@ def main():
 
     # Display a non-interactive warning if the script is proceeding automatically
     if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
-         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (15 minutes or more for a set of 7,000 records).{Fore.RESET}")
+         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (20 minutes or more for a set of 7,000 records).{Fore.RESET}")
 
     print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
     print(f"Found {len(processed_ids):,} existing scores.")

@@ -19,101 +19,114 @@
 #
 # Filename: tests/maintenance/test_operation_runner.py
 
-"""Tests for operation_runner.py module."""
-
-import unittest
 import json
-import tempfile
-import shutil
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+import pytest
+from pyfakefs.fake_filesystem import FakeFilesystem
+
+# Add src to path to allow importing the script under test
 import sys
+script_dir = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(script_dir / "scripts" / "maintenance"))
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts" / "maintenance"))
-import operation_runner
+from operation_runner import main as operation_runner_main
 
+@pytest.fixture
+def mock_project(fs: FakeFilesystem, mocker) -> Path:
+    """Sets up a fake project structure with a pyproject.toml file."""
+    project_root = Path("/app")
+    # Define the path where the script *thinks* it is located
+    fake_script_path = project_root / "scripts" / "maintenance" / "operation_runner.py"
 
-class TestOperationRunner(unittest.TestCase):
-    """Test suite for operation_runner functionality."""
-    
-    def setUp(self):
-        """Create temporary directory for test files."""
-        self.test_dir = tempfile.mkdtemp()
-        self.test_results_dir = Path(self.test_dir) / "tests" / "results"
-        self.test_results_dir.mkdir(parents=True, exist_ok=True)
-    
-    def tearDown(self):
-        """Clean up temporary directory."""
-        shutil.rmtree(self.test_dir)
-    
-    @patch('operation_runner.Path')
-    def test_log_operation_summary_creates_file(self, mock_path):
-        """Test that log_operation_summary creates the correct file structure."""
-        mock_path.return_value.resolve.return_value.parent.parent.parent = Path(self.test_dir)
-        
-        log_file = self.test_results_dir / "test_summary.jsonl"
-        
-        operation_runner.log_operation_summary(
-            "test-data-prep",
-            0,
-            12.34,
-            "test_summary.jsonl",
-            ["pytest", "tests/data_preparation/"]
-        )
-        
-        self.assertTrue(log_file.exists())
-        
-        with open(log_file, 'r') as f:
-            entry = json.loads(f.read())
-        
-        self.assertEqual(entry['operation'], 'test-data-prep')
-        self.assertEqual(entry['status'], 'PASS')
-        self.assertEqual(entry['exit_code'], 0)
-        self.assertEqual(entry['duration_seconds'], 12.34)
-        self.assertIn('timestamp', entry)
-        self.assertEqual(entry['command'], 'pytest tests/data_preparation/')
-    
-    @patch('operation_runner.Path')
-    def test_log_operation_summary_appends(self, mock_path):
-        """Test that multiple calls append to the same file."""
-        mock_path.return_value.resolve.return_value.parent.parent.parent = Path(self.test_dir)
-        
-        log_file = self.test_results_dir / "workflow_summary.jsonl"
-        
-        # Log two operations
-        operation_runner.log_operation_summary("new-exp", 0, 10.0, "workflow_summary.jsonl", ["pwsh", "-File", "new_experiment.ps1"])
-        operation_runner.log_operation_summary("aud-exp", 1, 5.5, "workflow_summary.jsonl", ["pwsh", "-File", "audit_experiment.ps1"])
-        
-        with open(log_file, 'r') as f:
-            lines = f.readlines()
-        
-        self.assertEqual(len(lines), 2)
-        
-        entry1 = json.loads(lines[0])
-        entry2 = json.loads(lines[1])
-        
-        self.assertEqual(entry1['operation'], 'new-exp')
-        self.assertEqual(entry1['status'], 'PASS')
-        self.assertIn('command', entry1)
-        
-        self.assertEqual(entry2['operation'], 'aud-exp')
-        self.assertEqual(entry2['status'], 'FAIL')
-        self.assertIn('command', entry2)
-    
-    def test_get_operation_category_detects_test_section(self):
-        """Test that get_operation_category correctly identifies test operations."""
-        # This would need a mock pyproject.toml, but demonstrates the test structure
-        # In practice, you'd use a fixture file or mock the file reading
-        pass
-    
-    def test_lock_prevents_concurrent_operations(self):
-        """Test that the lock mechanism prevents concurrent operations."""
-        # This would test the acquire_lock/release_lock functionality
-        pass
+    # Create the fake directory structure for the script
+    fs.create_dir(fake_script_path.parent)
 
+    # This is the critical fix: Patch the __file__ attribute of the module under test.
+    # This tricks the script into believing it lives inside our fake filesystem.
+    mocker.patch('operation_runner.__file__', str(fake_script_path))
 
-if __name__ == '__main__':
-    unittest.main()
+    fs.cwd = project_root
+    pyproject_content = """
+[tool.pdm.scripts]
+# === TESTING ===
+test-op = "echo 'testing'"
+
+# === DATA PREPARATION ===
+prep-data = "echo 'prepping data'"
+
+# === CORE PROJECT WORKFLOWS ===
+new-exp = "echo 'new experiment'"
+    """
+    fs.create_file("pyproject.toml", contents=pyproject_content)
+    return project_root
+
+@pytest.mark.usefixtures('fs')
+def test_lock_acquire_and_release(mock_project: Path, mocker):
+    """Tests that a lock is acquired during execution and released afterward."""
+    # Correctly mock subprocess.run to return an object with an integer returncode
+    mocker.patch('subprocess.run', return_value=mocker.Mock(returncode=0))
+    lock_file = mock_project / ".pdm-locks" / "operations.lock"
+
+    assert not lock_file.exists()
+
+    with patch('sys.argv', ["script.py", "test-op", "echo", "hello"]):
+        result_code = operation_runner_main()
+
+    assert not lock_file.exists()
+    assert result_code == 0
+
+@pytest.mark.usefixtures('fs')
+def test_lock_prevents_concurrent_run(mock_project: Path, capsys):
+    """Tests that an existing lock file prevents a new operation from running."""
+    lock_dir = mock_project / ".pdm-locks"
+    lock_dir.mkdir()
+    (lock_dir / "operations.lock").write_text("previous-op")
+
+    with patch('sys.argv', ["script.py", "test-op", "echo", "hello"]):
+        result_code = operation_runner_main()
+    
+    assert result_code == 1
+    captured = capsys.readouterr()
+    assert "ERROR: Cannot acquire lock" in captured.err
+
+@pytest.mark.parametrize("op_name, command, expected_log_file", [
+    ("test-op", ["echo", "test"], "test_summary.jsonl"),
+    ("prep-data", ["echo", "data"], "data_prep_summary.jsonl"),
+    ("new-exp", ["echo", "workflow"], "workflow_summary.jsonl"),
+])
+@pytest.mark.usefixtures('fs')
+def test_operation_categorization_and_logging(mock_project: Path, mocker, op_name, command, expected_log_file):
+    """Tests that operations are correctly categorized and logged to the right file."""
+    mocker.patch('subprocess.run', return_value=mocker.Mock(returncode=0))
+    
+    with patch('sys.argv', ["script.py", op_name, *command]):
+        operation_runner_main()
+    
+    log_path = mock_project / "output" / "operation_logs" / expected_log_file
+    assert log_path.exists()
+    
+    log_content = log_path.read_text()
+    log_entry = json.loads(log_content)
+    
+    assert log_entry["operation"] == op_name
+    assert log_entry["status"] == "PASS"
+
+@pytest.mark.usefixtures('fs')
+def test_command_failure_is_logged_correctly(mock_project: Path, mocker):
+    """Tests that a failed command is logged with a 'FAIL' status."""
+    mocker.patch('subprocess.run', return_value=mocker.Mock(returncode=127))
+
+    with patch('sys.argv', ["script.py", "test-op", "bad-command"]):
+        result_code = operation_runner_main()
+    
+    assert result_code == 127
+    log_path = mock_project / "output" / "operation_logs" / "test_summary.jsonl"
+    assert log_path.exists()
+
+    log_entry = json.loads(log_path.read_text())
+    assert log_entry["status"] == "FAIL"
+    assert log_entry["exit_code"] == 127
 
 # === End of tests/maintenance/test_operation_runner.py ===

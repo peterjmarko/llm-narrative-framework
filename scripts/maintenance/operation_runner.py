@@ -109,57 +109,49 @@ def get_operation_category(operation_name):
     Determine the category of an operation by parsing pyproject.toml sections.
     
     Returns:
-        Filename for the audit log (e.g., "test_summary.jsonl")
+        A tuple of (log_filename, log_directory) e.g., ("test_summary.jsonl", "output/operation_logs")
     """
     project_root = Path(__file__).resolve().parent.parent.parent
     pyproject_path = project_root / "pyproject.toml"
+    log_dir = project_root / "output" / "operation_logs"
     
     try:
-        with open(pyproject_path, 'rb') as f:
-            pyproject = tomllib.load(f)
-        
-        scripts = pyproject.get('tool', {}).get('pdm', {}).get('scripts', {})
-        
-        if operation_name not in scripts:
-            return None
-        
-        # Read the file to find which comment section this operation is under
         with open(pyproject_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         
         current_section = None
         for line in lines:
-            # Detect section headers (comments with "===" markers)
-            if '===' in line and '===' in line:
-                if 'TESTING' in line.upper():
+            # Detect section headers based on the convention in pyproject.toml
+            if '===' in line:
+                line_upper = line.upper()
+                if 'TESTING' in line_upper:
                     current_section = 'test'
-                elif 'DATA' in line and 'PREPARATION' in line.upper():
+                elif 'DATA PREPARATION' in line_upper:
                     current_section = 'data_prep'
-                elif 'WORKFLOW' in line.upper() and 'CORE' in line.upper():
+                elif 'CORE PROJECT WORKFLOWS' in line_upper:
                     current_section = 'workflow'
             
-            # Check if this line defines our operation
+            # Check if this line defines our specific operation
             if f'{operation_name} =' in line or f'"{operation_name}"' in line:
                 if current_section == 'test':
-                    return 'test_summary.jsonl'
+                    return 'test_summary.jsonl', log_dir
                 elif current_section == 'data_prep':
-                    return 'data_prep_summary.jsonl'
+                    return 'data_prep_summary.jsonl', log_dir
                 elif current_section == 'workflow':
-                    return 'workflow_summary.jsonl'
-                break
+                    return 'workflow_summary.jsonl', log_dir
+                
+                # If a match is found, stop searching
+                return None, None
         
-        return None
+        return None, None
         
     except Exception:
-        return None
+        return None, None
 
-def log_operation_summary(operation_name, exit_code, duration, filename, command_args=None):
+def log_operation_summary(operation_name, exit_code, duration, filename, directory, command_args=None):
     """Log operation execution summary to structured file."""
-    project_root = Path(__file__).resolve().parent.parent.parent
-    results_dir = project_root / "tests" / "results"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    
-    summary_file = results_dir / filename
+    directory.mkdir(parents=True, exist_ok=True)
+    summary_file = directory / filename
     
     entry = {
         "timestamp": datetime.now().isoformat(),
@@ -203,9 +195,9 @@ def main():
         duration = time.time() - start_time
         
         # Log summary based on operation type (pattern matching)
-        log_file = get_operation_category(operation_name)
-        if log_file:
-            log_operation_summary(operation_name, result.returncode, duration, log_file, command)
+        log_file, log_dir = get_operation_category(operation_name)
+        if log_file and log_dir:
+            log_operation_summary(operation_name, result.returncode, duration, log_file, log_dir, command)
         
         return result.returncode
     finally:

@@ -628,7 +628,7 @@ def main():
     print(f"\n{Fore.YELLOW}--- Validating Wikipedia Pages ---")
     print(f"Found {processed_before:,} already processed records ({valid_before:,} valid).")
     print(f"Now processing {len(records_to_process):,} new records using {args.workers} workers.")
-    print(f"{Fore.YELLOW}NOTE: Each set of 10,000 records can take 20 minutes or more to process.")
+    print(f"{Fore.YELLOW}NOTE: Each set of 10,000 records can take 15 minutes or more to process.")
     print(f"You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     was_interrupted = False
