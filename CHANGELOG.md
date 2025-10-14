@@ -2,6 +2,23 @@
 
 # Changelog
 
+## 13.2.0 (2025-10-14)
+
+### Bump
+
+- **version 13.1.1 → 13.2.0**
+
+### Features
+
+- **overhaul data prep summary and add validation tests**
+  This commit introduces a major overhaul of the data preparation summary report, transforming it into an intelligent diagnostic tool. It also adds a full unit test suite for the new reporting logic and hardens several core pipeline scripts.
+  
+  - **Reporting:** Replaced the static summary report with a dynamic script (`generate_data_preparation_summary.py`) that intelligently detects and flags issues like missing files, data loss, and inconsistencies.
+  - **Testing:** Added a new `pytest` unit test suite for the summary script, using `pyfakefs` to validate file-based logic without touching the production data path.
+  - **Dependencies:** Added `pyfakefs` and `pytest-mock` as new development dependencies, updating `pyproject.toml` and `pdm.lock`.
+  - **Pipeline Robustness:** Hardened the `generate_eminence_scores.py` script with strict validation to prevent data excess from LLM hallucinations. Refactored assembly logic scripts for improved clarity and robustness.
+  - **Documentation:** Includes related updates to the framework manual.
+
 ## 13.1.1 (2025-10-13)
 
 ### Bump
