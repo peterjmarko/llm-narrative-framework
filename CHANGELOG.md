@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 13.2.1 (2025-10-14)
+
+### Bump
+
+- **version 13.2.0 → 13.2.1**
+
+### Fixes
+
+- **overhaul test suites and harden data pipeline**
+  This commit resolves critical testing failures, improves data integrity across the pipeline, and removes a tracked, generated data asset.
+  
+  - Fixes and expands the test suites for `generate_ocean_scores.py` and `generate_eminence_scores.py`, correcting mock logic and increasing coverage for both to over 85%.
+  - Implements hardened LLM response validation in `generate_ocean_scores.py` and refactors `generate_eminence_scores.py` to ensure data integrity.
+  - Overhauls `operation_runner.py` to unify audit logging into a single directory and improves command categorization, supported by a new comprehensive test suite.
+  - Removes `sf_delineations_library.txt` from source control as it is a generated artifact created by the `neutralize_delineations.py` script.
+  - Includes a minor bugfix in `validate_wikipedia_pages.py` to improve error handling for malformed URLs.
+  - Updates the `TESTING_GUIDE.md` to reflect new test coverage metrics and streamlines its content for clarity.
+
 ## 13.2.0 (2025-10-14)
 
 ### Bump
