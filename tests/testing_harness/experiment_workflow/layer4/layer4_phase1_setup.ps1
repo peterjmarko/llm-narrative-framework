@@ -122,7 +122,7 @@ $configContent.Trim() | Set-Content -Path $TestConfigPath -Encoding UTF8
 
 if ($Interactive) {
         Write-Host ""
-        Write-Host "--- Layer 4: Experiment Lifecycle Integration Testing ---" -ForegroundColor Magenta
+        Write-Host "--- Layer 4: Experiment & Study Workflow Integration Testing ---" -ForegroundColor Magenta
         Write-Host "--- Phase 1: Automated Setup ---" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "Integration test sandbox created successfully in '$((Resolve-Path $SandboxDir -Relative).TrimStart(".\"))'." -ForegroundColor Green

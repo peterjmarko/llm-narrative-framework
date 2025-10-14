@@ -712,7 +712,7 @@ The procedure below is for the production workflow. When validating the Personal
 
 *   **Menu:** `Chart > Open...`
 *   **Action:**
-    1.  Select the charts file you just created (e.g., `adb_candidates.sfcht`).
+    1.  Select the charts file you just created (e.g., `adb_candidates.sfcht`). If the list of charts is empty, navigate away to a different file and then back using the **'File'** button.
     2.  Click the **'All'** button to select all charts in the file.
     3.  Click the **'Open...'** button. This will calculate all charts and add them to the "Calculated Charts" list. The processing time will vary depending on the number of subjects (typically a few minutes for each set of 1,000 charts).
 

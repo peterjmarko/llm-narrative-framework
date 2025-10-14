@@ -31,10 +31,6 @@ dependencies = [
     "colorama>=0.4.6",
 ]
 
-[tool.pdm]
-# This tells PDM to use a virtual environment located in the project's .venv folder.
-venv.in-project = true
-
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
@@ -50,6 +46,32 @@ addopts = [
     "--ignore=tests/test_robustness.py",
     "--ignore=tests/test_smoke.py"
 ]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "13.1.1"
+version_files = [
+    "pyproject.toml:version"
+]
+tag_format = "v$version"
+changelog_file = "CHANGELOG.md"
+changelog_format = "keep_a_changelog"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
+
+
+[tool.pdm.venv]
+in-project = true
 
 [tool.pdm.scripts]
 # ==============================================================================
@@ -159,28 +181,6 @@ test-ps-all = {shell = "python scripts/maintenance/operation_runner.py test-ps-a
 test-ps-exp = {composite = ["test-ps-new-exp", "test-ps-audit-exp", "test-ps-fix-exp"], help = "Run all PowerShell tests for the experiment workflow."}
 test-exp-all = {composite = ["test-exp-lc", "test-ps-exp"], help = "Run all Python and PowerShell tests for the experiment workflow."}
 
-[tool.commitizen]
-name = "cz_conventional_commits"
-version = "13.1.1"
-version_files = [
-    "pyproject.toml:version"
-]
-tag_format = "v$version"
-changelog_file = "CHANGELOG.md"
-changelog_format = "keep_a_changelog"
-
-[tool.coverage.run]
-source = ["src"]
-omit = ["*/__init__.py"]
-
-[tool.coverage.report]
-show_missing = true
-skip_covered = false
-exclude_lines = [
-    "pragma: no cover",
-    "if __name__ == .__main__.:",
-]
-
 [dependency-groups]
 dev = [
     "pytest",
@@ -188,9 +188,10 @@ dev = [
     "pypandoc>=1.15",
     "pillow>=10.4.0",
     "pytest-cov>=5.0.0",
-    "pytest-mock>=3.14.1",
+    "pytest-mock>=3.15.1",
     "commitizen>=3.31.0",
     "python-docx>=1.2.0",
+    "pyfakefs>=5.10.0",
 ]
 
 [tool.pylance.exclude]

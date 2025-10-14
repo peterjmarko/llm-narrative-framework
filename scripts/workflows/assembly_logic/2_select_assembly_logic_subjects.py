@@ -116,12 +116,14 @@ def main():
         signs = "(Aries|Taurus|Gemini|Cancer|Leo|Virgo|Libra|Scorpio|Sagittarius|Capricorn|Aquarius|Pisces)"
         points = "(Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|Ascendant|Midheaven)"
 
+        # Valid patterns include both Strong and Weak classification for all 5 divisions
+        # In practice, `data\foundational_assets\balance_thresholds.csv` might not allow ceratin combinations
         valid_patterns = [
             r"^Quadrant (?:Strong|Weak) [1-4]$",
             r"^Hemisphere (?:Strong|Weak) (?:East|West|North|South)$",
             r"^Element (?:Strong|Weak) (?:Fire|Earth|Air|Water)$",
             r"^Mode (?:Strong|Weak) (?:Cardinal|Fixed|Mutable)$",
-            r"^\w+ Strong$",  # Correctly matches "Aries Strong", etc.
+            rf"^{signs} (?:Strong|Weak)$",
             rf"^{points} in {signs}$",
         ]
         

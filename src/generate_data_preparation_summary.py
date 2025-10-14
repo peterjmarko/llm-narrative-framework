@@ -86,7 +86,8 @@ def load_pipeline_completion_info() -> Dict:
 def load_validation_summary() -> Dict:
     """Loads validation statistics from the validation summary report."""
     def _load():
-        with open("data/reports/adb_validation_summary.txt", 'r') as f:
+        # The validation summary is generated alongside its report in data/processed
+        with open("data/processed/adb_validation_summary.txt", 'r') as f:
             content = f.read()
         
         # Parse the key statistics from the text report
@@ -221,7 +222,7 @@ def check_file_existence() -> Dict:
     files_to_check = [
         "data/sources/adb_raw_export.txt",
         "data/processed/adb_wiki_links.csv",
-        "data/reports/adb_validation_report.csv",
+        "data/processed/adb_validation_report.csv",
         "data/intermediate/adb_eligible_candidates.txt",
         "data/foundational_assets/eminence_scores.csv",
         "data/foundational_assets/ocean_scores.csv",
@@ -263,6 +264,7 @@ def load_final_candidates_info() -> Dict:
         final_path = "data/intermediate/adb_final_candidates.txt"
         if Path(final_path).exists():
             with open(final_path, 'r', encoding='utf-8', errors='ignore') as f:
+                next(f)  # Skip the header row
                 final_count = sum(1 for line in f if line.strip())
             return {'final_count': final_count}
         return {'final_count': 0}
@@ -274,7 +276,8 @@ def load_final_candidates_info() -> Dict:
     )
 
 def calculate_pipeline_metrics(completion_info: Dict, validation_stats: Dict,
-                              eminence_stats: Dict, ocean_stats: Dict) -> Dict:
+                              eminence_stats: Dict, ocean_stats: Dict,
+                              candidate_info: Dict) -> Dict:
     """Calculates overall pipeline metrics."""
     metrics = {
         'overall_completion_rate': 0.0,
@@ -285,66 +288,42 @@ def calculate_pipeline_metrics(completion_info: Dict, validation_stats: Dict,
         'data_quality_total': 0,
         'bottlenecks': [],
         'missing_subjects': {
-            'eminence': 0,
-            'ocean': 0,
+            'llm_scoring': 0,
             'sf_export': 0
         }
     }
+
+    # --- Corrected Completion Rate and Data Loss Logic ---
+    # The true total is the number of eligible candidates entering the scoring stage.
+    eligible_total = candidate_info.get('eligible_count', 0)
     
-    # Calculate overall completion rate based on LLM scoring steps
-    # This represents the percentage of eligible candidates successfully processed
-    
-    # First try to get the completion rate from completion info
-    completion_rates = []
-    if 'eminence_scores' in completion_info:
-        completion_rates.append(completion_info['eminence_scores']['completion_rate'])
-        # Get the counts from completion info if available
-        metrics['overall_completion_count'] = completion_info['eminence_scores'].get('subjects_processed', 0)
-        metrics['overall_completion_total'] = completion_info['eminence_scores'].get('total_in_source', 0)
-    
-    if 'ocean_scores' in completion_info:
-        completion_rates.append(completion_info['ocean_scores']['completion_rate'])
-        # Update with OCEAN data if available (should be the same pool)
-        metrics['overall_completion_count'] = completion_info['ocean_scores'].get('subjects_processed', 0)
-        metrics['overall_completion_total'] = completion_info['ocean_scores'].get('total_in_source', 0)
-    
-    # Calculate the completion rate
-    if completion_rates:
-        metrics['overall_completion_rate'] = sum(completion_rates) / len(completion_rates)
-    elif metrics['overall_completion_total'] > 0:
-        # Calculate from raw counts if completion info is not available
-        metrics['overall_completion_rate'] = (metrics['overall_completion_count'] / metrics['overall_completion_total']) * 100
-    
-    # If we still don't have valid counts, try to get them from the summary files
-    if metrics['overall_completion_count'] == 0 and metrics['overall_completion_total'] == 0:
-        if eminence_stats:
-            metrics['overall_completion_count'] = eminence_stats.get('total_scored', 0)
-            metrics['overall_completion_total'] = eminence_stats.get('total_in_source', 0)
-            if metrics['overall_completion_total'] > 0:
-                metrics['overall_completion_rate'] = (metrics['overall_completion_count'] / metrics['overall_completion_total']) * 100
-    
-    # Calculate data quality score based on validation success rate
-    # This represents the percentage of raw records that passed Wikipedia validation
+    # The number successfully scored is the final count from the eminence/OCEAN stages.
+    # We use eminence_stats as the primary source as it's the first scoring step.
+    scored_count = eminence_stats.get('total_scored', 0)
+
+    metrics['overall_completion_total'] = eligible_total
+    metrics['overall_completion_count'] = scored_count
+
+    if eligible_total > 0:
+        metrics['overall_completion_rate'] = (scored_count / eligible_total) * 100
+
+    # Calculate the true number of subjects lost during LLM scoring.
+    llm_missing_count = eligible_total - scored_count
+    metrics['missing_subjects']['llm_scoring'] = llm_missing_count
+    if llm_missing_count > 0:
+        metrics['bottlenecks'].append(f"{llm_missing_count:,} subjects missed during LLM scoring")
+
+    # --- Data Quality Score Logic (Unchanged) ---
     if validation_stats:
         metrics['data_quality_count'] = validation_stats.get('valid_records', 0)
         metrics['data_quality_total'] = validation_stats.get('total_records', 1)
-        quality_score = (metrics['data_quality_count'] / metrics['data_quality_total']) * 100
-        metrics['data_quality_score'] = quality_score
-    
-    # Get missing subjects counts from completion info (more accurate than file parsing)
-    if 'eminence_scores' in completion_info:
-        metrics['missing_subjects']['eminence'] = completion_info['eminence_scores'].get('missing_count', 0)
-        if completion_info['eminence_scores'].get('missing_count', 0) > 0:
-            metrics['bottlenecks'].append("Eminence scoring has missing subjects")
-    
-    if 'ocean_scores' in completion_info:
-        metrics['missing_subjects']['ocean'] = completion_info['ocean_scores'].get('missing_count', 0)
-        if completion_info['ocean_scores'].get('missing_count', 0) > 0:
-            metrics['bottlenecks'].append("OCEAN scoring has missing subjects")
-    
-    # Count missing subjects from SF export file (fallback method)
+        if metrics['data_quality_total'] > 0:
+            quality_score = (metrics['data_quality_count'] / metrics['data_quality_total']) * 100
+            metrics['data_quality_score'] = quality_score
+
+    # --- Other Missing Subjects Logic (Unchanged) ---
     metrics['missing_subjects']['sf_export'] = count_missing_subjects("data/reports/missing_sf_subjects.csv")
-    
+
     return metrics
 
 def load_final_database_info() -> Dict:
@@ -441,7 +420,7 @@ def generate_pipeline_summary_report() -> str:
     final_candidates_info = load_final_candidates_info()
     
     # Calculate overall metrics
-    metrics = calculate_pipeline_metrics(completion_info, validation_stats, eminence_stats, ocean_stats)
+    metrics = calculate_pipeline_metrics(completion_info, validation_stats, eminence_stats, ocean_stats, candidate_info)
     
     # Build the report
     report_lines = []
@@ -532,10 +511,9 @@ def generate_pipeline_summary_report() -> str:
         "--- DATA FLOW ---",
         f"Eligible Candidates Pool",
         f"  ↓ ({eligible_candidates:,} candidates)",
-        f"Eminence Scoring (LLM)",
-        f"  ↓ ({eminence_stats.get('total_scored', 'Unknown'):,} scored, {metrics['missing_subjects']['eminence']:,} missing)",
-        f"OCEAN Scoring (LLM)",
-        f"  ↓ ({ocean_stats.get('total_scored', 'Unknown'):,} scored, {metrics['missing_subjects']['ocean']:,} missing)",
+        f"LLM Scoring (Eminence & OCEAN)",
+        f"  - Successfully Scored: {format_number(metrics['overall_completion_count'])}",
+        f"  - Subjects Missed:     {format_number(metrics['missing_subjects'].get('llm_scoring', 0))}",
         f"Cutoff Algorithm",
         f"  ↓ ({final_candidates:,} selected)",
         f"Final Candidates Cohort",
@@ -547,11 +525,15 @@ def generate_pipeline_summary_report() -> str:
     ])
     
     if eminence_stats:
-        report_lines.extend([
-            f"Eminence Scoring:",
-            f"  - Mean Score: {eminence_stats.get('mean_score', 'Unknown'):.2f}",
-            f"  - Success Rate: {(eminence_stats.get('total_scored', 0) / eminence_stats.get('total_in_source', 1) * 100):.1f}%",
-        ])
+        report_lines.append("Eminence Scoring:")
+        mean_score = eminence_stats.get('mean_score', 'Unknown')
+        if isinstance(mean_score, (int, float)):
+            report_lines.append(f"  - Mean Score: {mean_score:.2f}")
+        else:
+            report_lines.append(f"  - Mean Score: {mean_score}")
+        
+        success_rate_val = (eminence_stats.get('total_scored', 0) / eminence_stats.get('total_in_source', 1) * 100)
+        report_lines.append(f"  - Success Rate: {success_rate_val:.1f}%")
     
     if final_candidates < eligible_candidates:
         cutoff_filtered = eligible_candidates - final_candidates
@@ -639,13 +621,13 @@ def generate_pipeline_summary_report() -> str:
             report_lines.extend([
                 "",
                 "--- CUTOFF ANALYSIS DETAILS ---",
-                f"Optimal Cutoff Value: {optimal_cutoff:,}",
+                f"Predicted Optimal Cutoff Value: {optimal_cutoff:,}",
                 f"Analysis File: data/reports/variance_curve_analysis.png",
                 f"Analysis Method: Variance curve analysis across eminence score thresholds",
                 "",
-                "Note: This cutoff analysis was performed during a previous run of the pipeline ",
-                f"and may not reflect the current dataset of {final_db_info.get('total_subjects', 0):,} subjects.",
-                "The analysis file serves as documentation of the methodology used for cohort selection."
+                "Note: This is the predicted optimal cutoff from the variance curve analysis.",
+                "The actual number of selected candidates may differ slightly based on data distribution.",
+                "The analysis serves as documentation for the cohort selection methodology."
             ])
             return True
         
@@ -665,60 +647,63 @@ def generate_pipeline_summary_report() -> str:
         "--- IDENTIFIED ISSUES ---",
     ])
     
+    issues_found = False
+    # Check for data-driven issues first
     if metrics['bottlenecks']:
         for bottleneck in metrics['bottlenecks']:
             report_lines.append(f"⚠️  {bottleneck}")
-    else:
+        issues_found = True
+
+    # Now, check for file-based issues
+    for file_path, exists in file_existence.items():
+        if not exists:
+            filename = Path(file_path).name
+            report_lines.append(f"⚠️  Missing critical pipeline file: {filename}")
+            issues_found = True
+    
+    if not issues_found:
         report_lines.append("✓ No critical issues detected")
     
-    # Add stage-specific recommendations
+    # --- DYNAMIC RECOMMENDATIONS ---
     report_lines.extend([
         "",
-        "--- RECOMMENDATIONS BY STAGE ---",
-        "",
-        "Stage 1 - Data Sourcing:",
-        "  • Verify raw data integrity in data/sources/adb_raw_export.txt",
-        "  • Check for any data fetching anomalies or incomplete records",
-        "",
-        "Stage 2 - Candidate Qualification:",
-        "  • Review data/reports/adb_validation_report.csv for failed validation patterns",
-        "  • Check data/intermediate/adb_eligible_candidates.txt for filter effectiveness",
-        "",
-        "Stage 3 - Candidate Selection:",
+        "--- RECOMMENDATIONS ---",
     ])
     
-    if metrics['missing_subjects']['eminence'] > 0 or metrics['missing_subjects']['ocean'] > 0:
-        report_lines.extend([
-            f"  • Re-run scoring for missing subjects: {metrics['missing_subjects']['eminence'] + metrics['missing_subjects']['ocean']} total",
-            f"  • Command: pdm run prep-data -StartWithStep 5  # For eminence scoring",
-            f"  • Command: pdm run prep-data -StartWithStep 6  # For OCEAN scoring",
-        ])
-    else:
-        report_lines.extend([
-            "  • ✓ All eligible candidates successfully scored",
-        ])
+    recommendations = []
     
-    report_lines.extend([
-        "",
-        "Stage 4 - Profile Generation:",
-    ])
-    
-    if not final_db_info.get('file_exists', False):
-        report_lines.extend([
-            "  • Complete Solar Fire export process (manual step required)",
-            "  • Verify chart export file is in the correct location",
-        ])
+    # Stage 1: Data Sourcing Recommendation
+    if validation_stats.get('total_records', 0) == 0 and file_existence.get("data/sources/adb_raw_export.txt"):
+        recommendations.append("• [Stage 1] Data Sourcing may have failed; the raw export file appears empty or unreadable.")
+
+    # Stage 2: Candidate Qualification Recommendations
+    validation_report_path = "data/processed/adb_validation_report.csv"
+    if not file_existence.get(validation_report_path, False):
+        recommendations.append("• [Stage 2] Re-run Stage 2 to generate the missing validation report.")
     else:
-        final_subjects = final_db_info.get('total_subjects', 0)
-        if final_subjects < final_candidates:
-            difference = final_candidates - final_subjects
-            report_lines.extend([
-                f"  • Investigate loss of {difference:,} subjects during processing",
-            ])
-        else:
-            report_lines.extend([
-                "  • ✓ Profile generation completed successfully",
-            ])
+        failed_validation_count = validation_stats.get('failed_records', 0)
+        if failed_validation_count > 0:
+            recommendations.append(f"• [Stage 2] Review the {failed_validation_count:,} records that failed Wikipedia validation in {validation_report_path}.")
+    
+    filtered_by_criteria = validation_stats.get('valid_records', 0) - eligible_candidates
+    if filtered_by_criteria > 0:
+        recommendations.append(f"• [Stage 2] Review the {filtered_by_criteria:,} candidates removed by deterministic filters to ensure effectiveness.")
+
+    # Stage 3: Candidate Selection Recommendation
+    llm_missed_count = metrics.get('missing_subjects', {}).get('llm_scoring', 0)
+    if llm_missed_count > 0:
+        recommendations.append(f"• [Stage 3] Investigate the {llm_missed_count:,} subjects missed during LLM scoring. See missing scores reports for details.")
+
+    # Stage 4: Profile Generation Recommendation
+    subjects_lost_in_stage4 = final_candidates - final_db_info.get('total_subjects', 0)
+    if subjects_lost_in_stage4 > 0:
+        recommendations.append(f"• [Stage 4] Investigate the loss of {subjects_lost_in_stage4:,} subjects during the final profile generation stage.")
+    
+    # Print the collected recommendations, or a success message if none were found.
+    if recommendations:
+        report_lines.extend(recommendations)
+    else:
+        report_lines.append("✓ No specific issues were detected that require manual review.")
     
     # Add file existence status
     report_lines.extend([
@@ -731,7 +716,7 @@ def generate_pipeline_summary_report() -> str:
         "Data Sourcing": ["data/sources/adb_raw_export.txt"],
         "Candidate Qualification": [
             "data/processed/adb_wiki_links.csv",
-            "data/reports/adb_validation_report.csv",
+            "data/processed/adb_validation_report.csv",
             "data/intermediate/adb_eligible_candidates.txt"
         ],
         "Candidate Selection": [
@@ -755,16 +740,33 @@ def generate_pipeline_summary_report() -> str:
             filename = file_path.split('/')[-1]
             report_lines.append(f"  {status} {filename}")
     
-    # Add file references
+    # --- DYNAMIC DETAILED REPORTS LIST ---
     report_lines.extend([
         "",
         "--- DETAILED REPORTS ---",
-        "  • Validation Summary: data/reports/adb_validation_summary.txt",
-        "  • Validation Details: data/reports/adb_validation_report.csv",
-        "  • Eminence Summary: data/reports/eminence_scores_summary.txt",
-        "  • OCEAN Summary: data/reports/ocean_scores_summary.txt",
-        "  • Cutoff Analysis: data/reports/cutoff_parameter_analysis_results.csv (separate analysis)",
-        "  • Missing Data: data/reports/missing_*_scores.txt",
+    ])
+    
+    detailed_reports = {
+        "Validation Summary": "data/reports/adb_validation_summary.txt",
+        "Validation Details": "data/processed/adb_validation_report.csv",
+        "Eminence Summary": "data/reports/eminence_scores_summary.txt",
+        "OCEAN Summary": "data/reports/ocean_scores_summary.txt",
+        "Cutoff Analysis": "data/reports/cutoff_parameter_analysis_results.csv",
+        "Missing Eminence Scores": "data/reports/missing_eminence_scores.txt",
+        "Missing OCEAN Scores": "data/reports/missing_ocean_scores.txt"
+    }
+    
+    found_reports = False
+    for name, path in detailed_reports.items():
+        if file_existence.get(path, False): # Check if the file exists
+            report_lines.append(f"  • {name}: {path}")
+            found_reports = True
+    
+    if not found_reports:
+        report_lines.append("  None available.")
+
+    # --- USAGE NOTES ---
+    report_lines.extend([
         "",
         "--- USAGE NOTES ---",
         "This report can be regenerated at any time using:",

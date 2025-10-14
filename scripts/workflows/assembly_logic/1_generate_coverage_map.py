@@ -85,14 +85,10 @@ def main():
     print("\nLoading configuration and subject data...")
 
     # Determine subject DB path: use test asset if it exists, otherwise use production path
-    subject_db_path = args.subject_db
-    if not subject_db_path:
-        test_prereq_path = Path("tests/assets/assembly_logic/prerequisites/subject_db.csv")
-        prod_path = Path("data/processed/subject_db.csv")
-        if test_prereq_path.exists():
-            subject_db_path = test_prereq_path
-        else:
-            subject_db_path = prod_path
+    if args.subject_db:
+        subject_db_path = Path(args.subject_db)
+    else:
+        subject_db_path = Path("data/processed/subject_db.csv")
     
     logging.info(f"Reading subject data from: {subject_db_path}")
     point_weights = load_point_weights(Path(args.point_weights))
