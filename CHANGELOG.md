@@ -2,6 +2,32 @@
 
 # Changelog
 
+## 14.0.0 (2025-10-15)
+
+### Bump
+
+- **version 13.2.4 → 14.0.0**
+
+### Features
+
+- **refactor qualification, add Wikidata, and fix scoring logic**
+  This commit introduces a major refactoring of the data preparation pipeline, enhances validation logic, and fixes several bugs in the scoring and analysis scripts.
+  
+  Refactoring:
+  - Renamed `validate_wikipedia_pages.py` to `qualify_subjects.py` and updated all related documentation, diagrams, tests, and orchestrator scripts.
+  
+  Features:
+  - Implemented a two-layer life status check in `qualify_subjects.py` that prioritizes structured data from Wikidata.
+  - Added the foundational `sf_delineations_library.txt` to the repository to ensure direct reproducibility.
+  
+  Fixes:
+  - Corrected a critical bug in `analyze_cutoff_parameters.py` to ensure the stability-sorted recommendation is saved correctly.
+  - Removed the aggressive stale-check in `generate_ocean_scores.py` to prevent wasteful re-runs.
+  - Implemented lenient name validation in both scoring scripts to improve resilience against minor LLM formatting differences.
+  - Updated all associated test suites to reflect the new logic and fixes.
+  
+  BREAKING CHANGE: The script `src/validate_wikipedia_pages.py` has been renamed to `src/qualify_subjects.py`. All direct references and associated test files have been updated accordingly. External scripts or workflows referencing the old filename will break.
+
 ## 13.2.4 (2025-10-15)
 
 ### Bump
