@@ -132,6 +132,10 @@ try {
         $i++
     }
 
+    # Manually correct the output file map for Step 3 after it's been built.
+    # This is the single source of truth for the output log.
+    $stepToOutputMap[3] = "data/processed/adb_validated_subjects.csv"
+
     $AllSubjects = $TestProfile.Subjects
     # Define the subset of subjects expected to pass initial filtering and selection
     $FinalSubjects = $TestProfile.Subjects | Where-Object { $_.Name -in @("Ernst (1900) Busch", "Paul McCartney", "Jonathan Cainer") }
@@ -378,46 +382,33 @@ try {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $env:PYTHONIOENCODING = "utf-8"
 
-    # --- RUN 1: Execute pipeline through Step 3 ---
+    # --- RUN 1: Execute pipeline through Step 2 (before intervention) ---
     $env:UNDER_TEST_HARNESS = "true"
     $run1Args = @{
-        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 3; SuppressConfigDisplay = $true
+        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 2; SuppressConfigDisplay = $true
     }
     if ($Interactive) { $run1Args.Interactive = $true }
 
     $run1Steps = [System.Collections.Generic.List[object]]::new()
     & pwsh -WorkingDirectory $SandboxDir -File $prepareDataScript @run1Args 2>&1 | ForEach-Object {
         if ($_ -match '^HARNESS_PROMPT:(.*):(.*)') {
-            # Handle interactive prompt at test harness level with file signaling
-            $promptText = $matches[1]
-            $waitFile = $matches[2]
-            Read-Host -Prompt "`n${C_ORANGE}$promptText${C_RESET}" | Out-Null
-            # Signal back to subprocess that user has responded
-            "" | Set-Content -Path $waitFile
-            Write-Host "" # Add spacing after user input
-        } else {
-            Write-Host $_
-        }
+            $promptText = $matches[1]; $waitFile = $matches[2]; Read-Host -Prompt "`n${C_ORANGE}$promptText${C_RESET}" | Out-Null; "" | Set-Content -Path $waitFile; Write-Host ""
+        } else { Write-Host $_ }
         if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
         if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
-            $stepNum = [int]$matches[1]
-            $run1Steps.Add(@{
-                'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum]
-            })
+            $stepNum = [int]$matches[1]; $stepDesc = $matches[2].Trim()
+            $run1Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $stepDesc; 'Output File' = $stepToOutputMap[$stepNum] })
         }
     }
     $run1ExitCode = $LASTEXITCODE
-    if ($run1ExitCode -ne 1) { throw "Pipeline Run 1 was expected to halt after Step 3 but did not." }
-    # Note: Step 3 completes successfully before halting, so we DO want to log it
-    # Do NOT remove the last step for Run 1
-
+    if ($run1ExitCode -ne 1) { throw "Pipeline Run 1 was expected to halt after Step 2 but did not." }
+    
     $run1Status = "SUCCESS"
     foreach ($step in $run1Steps) {
-        $executedStepsLog.Add([pscustomobject]@{
-            'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = $run1Status; 'Output File' = $step.'Output File'
-        })
+        $executedStepsLog.Add([pscustomobject]@{ 'Task #' = $taskCounter++; 'Stage #' = $step.'Stage #'; 'Step #' = $step.'Step #'; 'Step Description' = $step.'Step Description'; 'Status' = $run1Status; 'Output File' = $step.'Output File' })
     }
     
+    # Run the intervention script AFTER step 2 is complete, but BEFORE resuming at step 3.
     if ($TestProfile.InterventionScript) {
         & $TestProfile.InterventionScript -SandboxDir $SandboxDir
     }

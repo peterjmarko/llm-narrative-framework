@@ -49,6 +49,7 @@ from src.find_wikipedia_links import (
     is_research_entry,
     load_processed_ids,
     load_research_categories,
+    sanitize_adb_name,
     worker_task_with_timeout,
 )
 
@@ -161,11 +162,22 @@ def test_find_best_wikipedia_match_resolves_disambiguation(mocker):
     mock_fetch.assert_called_once_with(disambiguation_url)
 
 
+@pytest.mark.parametrize("name, expected", [
+    ('"Kennedy, John F (1917)"', "Kennedy, John F"),
+    ('Doe, Jane (see notes)', 'Doe, Jane'),
+    ('  Some "Artist" ', 'Some Artist'), # Quotes in middle should be removed
+    (None, ""),
+])
+def test_sanitize_adb_name(name, expected):
+    """Tests the ADB name sanitization logic."""
+    assert sanitize_adb_name(name) == expected
+
+
 def test_load_processed_ids(tmp_path):
     """Tests reading an existing output file to correctly resume processing."""
     output_file = tmp_path / "adb_wiki_links.csv"
     csv_content = (
-        'Index,idADB,ADB_Name,Wikipedia_URL,Notes\n'
+        'Index,idADB,Subject_Name,Wikipedia_URL,Notes\n'
         '1,101,A,http://a.com,\n'
         '2,102,B,,"Processing timeout"\n'
         '3,103,C,,\n'
@@ -249,7 +261,7 @@ def test_worker_task_with_timeout_handles_hung_worker(mock_worker_task, mock_thr
     # Assert that a timeout record was correctly generated
     assert result is not None
     assert result['idADB'] == '101'
-    assert result['ADB_Name'] == 'Doe, John'
+    assert result['Subject_Name'] == 'Doe, John'
     assert result['Notes'] == 'Processing timeout'
 
     # Verify that the thread was started and joined with the correct timeout
@@ -310,7 +322,7 @@ class TestMainWorkflow:
         output_path = mock_sandbox / "data/processed/adb_wiki_links.csv"
         # Pre-populate with one success and one timeout
         output_path.write_text(
-            'Index,idADB,ADB_Name,Wikipedia_URL,Notes\n'
+            'Index,idADB,Subject_Name,Wikipedia_URL,Notes\n'
             '1,101,"Doe, John",http://a.com,\n'
             '2,102,"Smith, Jane",,"Processing timeout"\n'
         )
@@ -511,7 +523,7 @@ class TestCoverageAndEdgeCases:
         output_path = mock_sandbox / "data/processed/adb_wiki_links.csv"
         # Make the output file seem complete by having an entry for every input line
         output_path.write_text(
-            'Index,idADB,ADB_Name,Wikipedia_URL,Notes\n'
+            'Index,idADB,Subject_Name,Wikipedia_URL,Notes\n'
             '1,101,"Doe, John",http://a.com,\n'
             '2,102,"Smith, Jane",http://b.com,\n'
         )
@@ -520,7 +532,7 @@ class TestCoverageAndEdgeCases:
         # Simulate user pressing 'y' to force a re-run
         # Mock the worker to return a valid dictionary structure
         mock_worker = patch('src.find_wikipedia_links.worker_task_with_timeout', return_value={
-            'Index': 1, 'idADB': '101', 'ADB_Name': 'Doe, John', 'BirthYear': '1990',
+            'Index': 1, 'idADB': '101', 'Subject_Name': 'Doe, John', 'BirthYear': '1990',
             'Entry_Type': 'Person', 'Wikipedia_URL': 'http://a.com', 'Notes': ''
         })
 

@@ -140,7 +140,7 @@ def main():
     from config_loader import get_path, PROJECT_ROOT
 
     input_path = Path(get_path("data/sources/adb_raw_export.txt"))
-    validation_path = Path(get_path("data/processed/adb_validation_report.csv"))
+    validation_path = Path(get_path("data/processed/adb_validated_subjects.csv"))
     output_path = Path(get_path("data/intermediate/adb_eligible_candidates.txt"))
 
     if not args.force and output_path.exists():
@@ -155,8 +155,8 @@ def main():
 
     try:
         raw_df = pd.read_csv(input_path, sep='\t', dtype={'idADB': str})
-        # The validation report is now the source of truth for Entry_Type
-        validation_df = pd.read_csv(validation_path, usecols=['idADB', 'Status', 'Entry_Type'], dtype={'idADB': str})
+        # Read the clean Subject_Name, which will become the source of truth for names
+        validation_df = pd.read_csv(validation_path, usecols=['idADB', 'Status', 'Entry_Type', 'Subject_Name'], dtype={'idADB': str})
     except FileNotFoundError as e:
         from config_loader import PROJECT_ROOT
         relative_path = os.path.relpath(e.filename, PROJECT_ROOT)
@@ -181,10 +181,22 @@ def main():
     df = df[df['Time'].astype(str).str.match(r"^\d{1,2}:\d{2}$", na=False)]
     # Filter for Northern Hemisphere births only
     df = df[df['Latitude'].str.contains('N', na=False)]
-    df['FullName'] = df['LastName'].fillna('') + ", " + df['FirstName'].fillna('')
-    df['NormalizedName'] = normalize_name_for_deduplication(df['FullName'])
+
+    # --- Name Sanitization and Splitting ---
+    # The Subject_Name from the validation file is now the source of truth.
+    # We split it to overwrite the dirty FirstName/LastName from the raw file.
+    # Use a more robust regex split that handles zero or more spaces after the comma.
+    split_names = df['Subject_Name'].str.split(r',\s*', n=1, expand=True)
+    
+    # Defensively strip whitespace from each part to guarantee clean fields.
+    df['LastName'] = split_names[0].str.strip()
+    df['FirstName'] = split_names[1].fillna('').str.strip()
+
+    # Use the clean Subject_Name for deduplication as well
+    df['DedupeKey'] = normalize_name_for_deduplication(df['Subject_Name'])
     df['BirthDate'] = df['Year'].astype(str) + '-' + df['Month'].astype(str) + '-' + df['Day'].astype(str)
-    df.drop_duplicates(subset=['NormalizedName', 'BirthDate'], keep='first', inplace=True)
+    df.drop_duplicates(subset=['DedupeKey', 'BirthDate'], keep='first', inplace=True)
+    
     all_eligible_df = df[raw_df.columns].copy()
     logging.info(f"Found {len(all_eligible_df):,} total potential candidates in source files.")
 

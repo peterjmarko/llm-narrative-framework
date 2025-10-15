@@ -119,6 +119,7 @@ data/foundational_assets/cutoff_parameter_analysis_results.csv
 # Ignore pytest cache, coverage reports, and temporary test environments
 .pytest_cache/
 .coverage
+scripts/testing/adb_names.txt
 /tests/archive/
 /tests/assets/
 /tests/temp_test_environment/

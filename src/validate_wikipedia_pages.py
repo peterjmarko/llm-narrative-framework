@@ -163,17 +163,19 @@ def find_matching_disambiguation_link(soup: BeautifulSoup, birth_year: str) -> s
                 return urljoin("https://en.wikipedia.org", link['href'])
     return None
 
-def validate_name(adb_name: str, soup: BeautifulSoup) -> tuple[str, int]:
-    """Extracts Wikipedia name and compares it to the ADB name."""
+def validate_name(subject_name: str, soup: BeautifulSoup) -> tuple[str, int]:
+    """Extracts Wikipedia name and compares it to the Subject name."""
     wp_name_tag = soup.find('h1', id='firstHeading')
     wp_name = wp_name_tag.get_text(strip=True) if wp_name_tag else "Name Not Found"
     
-    adb_base_name = re.sub(r'\s*\(\d{4}\)$', '', adb_name).strip()
-    if ',' in adb_base_name:
-        adb_base_name = ' '.join(reversed(adb_base_name.split(',', 1))).strip()
+    # The incoming name is already sanitized, so we just need to handle the format.
+    if ',' in subject_name:
+        subject_base_name = ' '.join(reversed(subject_name.split(',', 1))).strip()
+    else:
+        subject_base_name = subject_name.strip()
 
     wp_base_name = re.sub(r'\s*\(.*\)$', '', wp_name).strip()
-    return wp_name, fuzz.ratio(adb_base_name.lower(), wp_base_name.lower())
+    return wp_name, fuzz.ratio(subject_base_name.lower(), wp_base_name.lower())
 
 def validate_death_date(soup: BeautifulSoup) -> bool:
     """Exhaustive death date detection using multiple strategies and locations."""
@@ -256,7 +258,7 @@ def validate_death_date(soup: BeautifulSoup) -> bool:
     
     return False
 
-def process_wikipedia_page(url: str, adb_name: str, birth_year: str, pbar: tqdm, depth=0) -> dict:
+def process_wikipedia_page(url: str, subject_name: str, birth_year: str, pbar: tqdm, depth=0) -> dict:
     """Scrapes and validates a Wikipedia page with robust disambiguation handling."""
     if depth >= MAX_DISAMBIGUATION_DEPTH:
         return {'status': 'FAIL', 'notes': 'Max disambiguation depth reached'}
@@ -266,13 +268,13 @@ def process_wikipedia_page(url: str, adb_name: str, birth_year: str, pbar: tqdm,
         return {'status': 'ERROR', 'notes': 'Failed to fetch Wikipedia page'}
 
     if is_disambiguation_page(soup):
-        logging.info(f"Disambiguation page for {adb_name}. Searching for birth year '{birth_year}'...")
+        logging.info(f"Disambiguation page for {subject_name}. Searching for birth year '{birth_year}'...")
         matching_url = find_matching_disambiguation_link(soup, birth_year)
         if matching_url:
-            return process_wikipedia_page(matching_url, adb_name, birth_year, pbar, depth + 1)
+            return process_wikipedia_page(matching_url, subject_name, birth_year, pbar, depth + 1)
         return {'status': 'FAIL', 'notes': f"Disambiguation page, no link with year {birth_year} found"}
 
-    wp_name, name_score = validate_name(adb_name, soup)
+    wp_name, name_score = validate_name(subject_name, soup)
     death_date_found = validate_death_date(soup)
     
     return {
@@ -300,7 +302,7 @@ def worker_task(row: dict, pbar: tqdm, index: int) -> dict:
         return {**result, 'Status': status, 'Notes': notes}
 
     # Only proceed with validation if a URL is present and there were no prior errors.
-    validation = process_wikipedia_page(row['Wikipedia_URL'], row['ADB_Name'], row['BirthYear'], pbar)
+    validation = process_wikipedia_page(row['Wikipedia_URL'], row['Subject_Name'], row['BirthYear'], pbar)
     
     if validation['status'] != 'OK':
         return {**result, 'Status': validation['status'], 'Notes': validation['notes']}
@@ -372,11 +374,12 @@ def sort_output_file(filepath: Path, fieldnames: list):
 
 def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int, was_interrupted: bool = False):
     """Sorts the final CSV, generates the summary, and prints the final status message."""
-    from config_loader import PROJECT_ROOT
+    from config_loader import PROJECT_ROOT, get_path
     sort_output_file(output_path, fieldnames)
     generate_summary_report(output_path) # This already prints the full summary to console
     
-    summary_path = output_path.with_name("adb_validation_summary.txt")
+    # Correctly get the summary path from the config for display purposes
+    summary_path = Path(get_path("data/reports")) / "adb_validation_summary.txt"
     
     display_output_path = os.path.relpath(output_path, PROJECT_ROOT).replace('\\', '/')
     display_summary_path = os.path.relpath(summary_path, PROJECT_ROOT).replace('\\', '/')
@@ -414,14 +417,17 @@ def finalize_and_report(output_path: Path, fieldnames: list, total_subjects: int
             key_metric = f"{total_count:,} records processed"
             print(f"\n{Fore.GREEN}SUCCESS: {key_metric}. Validation completed successfully.{Fore.RESET}")
 
-def generate_summary_report(report_path: Path):
+def generate_summary_report(validated_subjects_path: Path):
     """Reads the detailed CSV report and generates a summary text file."""
     from config_loader import get_path, PROJECT_ROOT
-    if not report_path.exists():
-        print(f"{Fore.RED}ERROR: Input report file not found at '{report_path}'")
+    if not validated_subjects_path.exists():
+        print(f"{Fore.RED}ERROR: Input file not found at '{validated_subjects_path}'")
         return
 
-    summary_path = report_path.parent / "adb_validation_summary.txt"
+    # Correctly define the output path for the summary in the reports directory
+    reports_dir = Path(get_path("data/reports"))
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = reports_dir / "adb_validation_summary.txt"
     
     if summary_path.exists():
         try:
@@ -442,12 +448,12 @@ def generate_summary_report(report_path: Path):
     research_entries, person_entries = 0, 0
 
     try:
-        with open(report_path, 'r', encoding='utf-8') as f:
+        with open(validated_subjects_path, 'r', encoding='utf-8') as f:
             rows = list(csv.DictReader(f))
             total_records = len(rows)
 
         if total_records == 0:
-            print(f"{Fore.YELLOW}Warning: Report is empty. Cannot generate summary.")
+            print(f"{Fore.YELLOW}Warning: Validated subjects file is empty. Cannot generate summary.")
             return
 
         # Aggregate data
@@ -553,7 +559,7 @@ def worker_task_with_timeout(row: dict, pbar: tqdm, index: int) -> dict:
     thread.join(timeout=60)
 
     if thread.is_alive():
-        tqdm.write(f"{Fore.YELLOW}Worker timeout for idADB {row.get('idADB')} ({row.get('ADB_Name')}). Skipping.")
+        tqdm.write(f"{Fore.YELLOW}Worker timeout for idADB {row.get('idADB')} ({row.get('Subject_Name')}). Skipping.")
         # Return a result that preserves input data but marks it as a timeout failure
         return {**row, 'Index': index, 'Status': 'FAIL', 'Notes': 'Processing timeout'}
 
@@ -590,7 +596,7 @@ def main():
     logging.basicConfig(level=log_level, handlers=[handler], force=True)
 
     input_path = Path(get_path("data/processed/adb_wiki_links.csv"))
-    output_path = Path(get_path("data/processed/adb_validation_report.csv"))
+    output_path = Path(get_path("data/processed/adb_validated_subjects.csv"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if args.report_only:
@@ -623,7 +629,8 @@ def main():
         generate_summary_report(output_path)
         sys.exit(0)
 
-    fieldnames = ['Index', 'idADB', 'ADB_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Status', 'Notes']
+    # Propagate the new column name and drop the old one from the fieldnames list
+    fieldnames = ['Index', 'idADB', 'Subject_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Status', 'Notes']
         
     print(f"\n{Fore.YELLOW}--- Validating Wikipedia Pages ---")
     print(f"Found {processed_before:,} already processed records ({valid_before:,} valid).")

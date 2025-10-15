@@ -52,26 +52,24 @@ from src.validate_wikipedia_pages import (
 )
 
 
-@pytest.mark.parametrize("adb_name, wp_title_html, expected_wp_name, expected_score_range", [
+@pytest.mark.parametrize("subject_name, wp_title_html, expected_wp_name, expected_score_range", [
     # Case 1: Perfect match
     ("Da Vinci, Leonardo", "<h1>Leonardo da Vinci</h1>", "Leonardo da Vinci", (99, 100)),
     # Case 2: Good match with middle initial
     ("Bush, George W.", "<h1>George W. Bush</h1>", "George W. Bush", (99, 100)),
-    # Case 3: ADB name has year, WP name does not
-    ("Nixon, Richard (1913)", "<h1>Richard Nixon</h1>", "Richard Nixon", (99, 100)),
-    # Case 4: WP name has disambiguation, ADB does not
+    # Case 3: WP name has disambiguation, Subject name does not
     ("Smith, John", "<h1>John Smith (explorer)</h1>", "John Smith (explorer)", (99, 100)),
-    # Case 5: Poor match
+    # Case 4: Poor match
     ("Smith, John", "<h1>Jane Doe</h1>", "Jane Doe", (0, 50)),
 ])
-def test_validate_name(adb_name, wp_title_html, expected_wp_name, expected_score_range):
+def test_validate_name(subject_name, wp_title_html, expected_wp_name, expected_score_range):
     """
-    Tests the name validation logic, including name cleaning and fuzzy matching.
+    Tests the name validation logic against an already sanitized subject name.
     """
     # Add the standard h1 id that the script looks for
     soup = BeautifulSoup(wp_title_html.replace("<h1>", "<h1 id='firstHeading'>"), 'html.parser')
     
-    wp_name, name_score = validate_name(adb_name, soup)
+    wp_name, name_score = validate_name(subject_name, soup)
     
     assert wp_name == expected_wp_name
     assert expected_score_range[0] <= name_score <= expected_score_range[1]
@@ -195,35 +193,35 @@ def test_process_wikipedia_page_disambiguation_failure(mocker):
 @pytest.mark.parametrize("input_row, mock_validation, expected_status, expected_notes", [
     # Case 1: Successful validation
     (
-        {'Wikipedia_URL': 'http://a.com', 'ADB_Name': 'Test A', 'BirthYear': '1900', 'Entry_Type': 'Person'},
+        {'Wikipedia_URL': 'http://a.com', 'Subject_Name': 'Test A', 'BirthYear': '1900', 'Entry_Type': 'Person'},
         {'status': 'OK', 'final_url': 'http://a.com', 'wp_name': 'Test A', 'name_score': 95, 'death_date_found': True},
         'OK', ''
     ),
     # Case 2: Name mismatch failure
     (
-        {'Wikipedia_URL': 'http://b.com', 'ADB_Name': 'Test B', 'BirthYear': '1901', 'Entry_Type': 'Person'},
+        {'Wikipedia_URL': 'http://b.com', 'Subject_Name': 'Test B', 'BirthYear': '1901', 'Entry_Type': 'Person'},
         {'status': 'OK', 'final_url': 'http://b.com', 'wp_name': 'Test Z', 'name_score': 50, 'death_date_found': True},
         'FAIL', 'Name mismatch (Score: 50)'
     ),
     # Case 3: Death date not found failure
     (
-        {'Wikipedia_URL': 'http://c.com', 'ADB_Name': 'Test C', 'BirthYear': '1902', 'Entry_Type': 'Person'},
+        {'Wikipedia_URL': 'http://c.com', 'Subject_Name': 'Test C', 'BirthYear': '1902', 'Entry_Type': 'Person'},
         {'status': 'OK', 'final_url': 'http://c.com', 'wp_name': 'Test C', 'name_score': 100, 'death_date_found': False},
         'FAIL', 'Death date not found'
     ),
     # Case 4: No URL to begin with
     (
-        {'Wikipedia_URL': '', 'ADB_Name': 'Test D', 'BirthYear': '1903', 'Entry_Type': 'Person', 'Notes': ''},
+        {'Wikipedia_URL': '', 'Subject_Name': 'Test D', 'BirthYear': '1903', 'Entry_Type': 'Person', 'Notes': ''},
         None, 'FAIL', 'No Wikipedia URL found'
     ),
     # Case 5: Research entry (should be marked as VALID)
     (
-        {'Wikipedia_URL': '', 'ADB_Name': 'Research X', 'BirthYear': '1904', 'Entry_Type': 'Research', 'Notes': ''},
+        {'Wikipedia_URL': '', 'Subject_Name': 'Research X', 'BirthYear': '1904', 'Entry_Type': 'Research', 'Notes': ''},
         None, 'VALID', 'Research entry - Wikipedia not expected'
     ),
     # Case 6: Pre-existing notes from link-finder (should be passed through)
     (
-        {'Wikipedia_URL': '', 'ADB_Name': 'Test E', 'BirthYear': '1905', 'Entry_Type': 'Person', 'Notes': 'Previous error'},
+        {'Wikipedia_URL': '', 'Subject_Name': 'Test E', 'BirthYear': '1905', 'Entry_Type': 'Person', 'Notes': 'Previous error'},
         None, 'FAIL', 'Previous error'
     ),
 ])
@@ -323,7 +321,7 @@ def test_worker_task_with_timeout_handles_hung_worker(mock_worker_task, mock_thr
     mock_thread_instance.is_alive.return_value = True  # Simulate a hung thread
     mock_thread_class.return_value = mock_thread_instance
 
-    row = {'idADB': '101', 'ADB_Name': 'Hung Worker'}
+    row = {'idADB': '101', 'Subject_Name': 'Hung Worker'}
 
     result = worker_task_with_timeout(row, MagicMock(), 1)
 
@@ -373,7 +371,7 @@ class TestMainWorkflow:
         # Create input file
         input_path = tmp_path / "data/processed/adb_wiki_links.csv"
         input_content = (
-            "idADB,ADB_Name,BirthYear,Entry_Type,Wikipedia_URL,Notes\n"
+            "idADB,Subject_Name,BirthYear,Entry_Type,Wikipedia_URL,Notes\n"
             "101,Doe, John,1990,Person,http://a.com,\n"
             "102,Smith, Jane,1991,Person,http://b.com,\n"
         )
@@ -404,7 +402,7 @@ class TestMainWorkflow:
         mock_generate_summary = mocker.patch('src.validate_wikipedia_pages.generate_summary_report')
 
         # Create a dummy report file for the function to read
-        (mock_sandbox / "data/processed/adb_validation_report.csv").touch()
+        (mock_sandbox / "data/processed/adb_validated_subjects.csv").touch()
 
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--report-only"]
         with patch("sys.argv", test_args):
@@ -434,7 +432,7 @@ class TestMainWorkflow:
     def test_main_handles_stale_report(self, mock_sandbox, mocker):
         """Tests that a stale report file triggers an automatic re-run."""
         input_path = mock_sandbox / "data/processed/adb_wiki_links.csv"
-        report_path = mock_sandbox / "data/processed/adb_validation_report.csv"
+        report_path = mock_sandbox / "data/processed/adb_validated_subjects.csv"
         report_path.touch()
 
         # Make the input file newer than the report
@@ -473,9 +471,9 @@ class TestSummaryReport:
     @pytest.fixture
     def mock_report_csv(self, tmp_path: Path):
         """Creates a mock validation report CSV with diverse data."""
-        report_dir = tmp_path / "data" / "reports"
+        report_dir = tmp_path / "data" / "processed"
         report_dir.mkdir(parents=True)
-        report_path = report_dir / "adb_validation_report.csv"
+        report_path = report_dir / "adb_validated_subjects.csv"
 
         report_content = (
             "Index,idADB,Entry_Type,Status,Notes\n"

@@ -52,6 +52,7 @@ import json
 import logging
 import os
 import re
+from urllib.parse import unquote
 import shutil
 import sys
 import threading
@@ -134,6 +135,33 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 # --- Helper Functions ---
+
+def sanitize_adb_name(name: str) -> str:
+    """
+    Removes non-essential text and standardizes an ADB name string.
+    - URL-decodes escaped characters (e.g., %22 -> ").
+    - Removes parenthetical content (e.g., birth years, notes).
+    - Removes quotation marks.
+    - Standardizes curly apostrophes to straight apostrophes.
+    - Strips leading/trailing whitespace.
+    """
+    if not isinstance(name, str):
+        return ""
+    
+    # 1. Decode any URL-encoded characters like %22
+    name = unquote(name)
+    
+    # 2. Remove content in parentheses, like (1917) or (see notes)
+    name = re.sub(r'\s*\([^)]*\)', '', name)
+    
+    # 3. Remove quotes
+    name = name.replace('"', '')
+
+    # 4. Standardize apostrophes
+    name = name.replace('’', "'")
+    
+    # 5. Strip whitespace and return
+    return name.strip()
 
 def load_research_categories() -> Dict:
     """Loads research categories from the configuration file."""
@@ -305,16 +333,25 @@ def worker_task(line: str, pbar: tqdm, index: int) -> dict | None:
     parts = line.strip().split('\t')
     if len(parts) < 19: return None
 
-    id_adb, last_name, first_name, birth_year, adb_url = parts[1], parts[2], parts[3], parts[7], unquote(parts[18])
-    adb_name = f"{last_name}, {first_name}".strip(', ')
-    full_name = adb_name if adb_name else f"{last_name} {first_name}".strip()
-    entry_type = "Research" if is_research_entry(full_name, first_name) else "Person"
+    id_adb, raw_last_name, raw_first_name, birth_year, adb_url = parts[1], parts[2], parts[3], parts[7], unquote(parts[18])
+    
+    # Sanitize the individual name components BEFORE combining them.
+    # This correctly handles cases like "Ernst (1900)" in the first name field.
+    sanitized_last = sanitize_adb_name(raw_last_name)
+    sanitized_first = sanitize_adb_name(raw_first_name)
+
+    # Construct the final, clean Subject_Name
+    subject_name = f"{sanitized_last}, {sanitized_first}".strip(', ')
+
+    # The is_research_entry function can now be called with just the sanitized full name.
+    full_name = subject_name
+    entry_type = "Research" if is_research_entry(full_name) else "Person"
 
     if entry_type == 'Research' and '/astro-databank/' in adb_url and 'research:' not in adb_url.lower():
         base, path = adb_url.split('/astro-databank/', 1)
         adb_url = f"{base}/astro-databank/Research:{path}"
 
-    result = {'Index': index, 'idADB': id_adb, 'ADB_Name': adb_name, 'BirthYear': birth_year, 'Entry_Type': entry_type, 'Wikipedia_URL': '', 'Notes': ''}
+    result = {'Index': index, 'idADB': id_adb, 'Subject_Name': subject_name, 'BirthYear': birth_year, 'Entry_Type': entry_type, 'Wikipedia_URL': '', 'Notes': ''}
     
     wiki_url = get_initial_wiki_url_from_adb(adb_url)
 
@@ -326,21 +363,21 @@ def worker_task(line: str, pbar: tqdm, index: int) -> dict | None:
             wp_title = h1.get_text(strip=True) if h1 else ""
             
             # Clean names for a fair comparison
-            adb_base_name = ' '.join(reversed(adb_name.split(',', 1))).strip()
+            adb_base_name = ' '.join(reversed(subject_name.split(',', 1))).strip()
             wp_base_title = re.sub(r'\s*\(.*?\)$', '', wp_title).strip()
             
             score = fuzz.ratio(adb_base_name.lower(), wp_base_title.lower())
             if score < 60:
-                logging.info(f"  -> Rejecting ADB link for {adb_name}. Mismatch score: {score} ('{wp_title}')")
+                logging.info(f"  -> Rejecting ADB link for {subject_name}. Mismatch score: {score} ('{wp_title}')")
                 wiki_url = None # Nullify the bad URL to trigger a search or fail correctly.
         else:
             wiki_url = None # If we can't fetch the page, the link is bad.
     
     if not wiki_url and entry_type == 'Person':
-        logging.info(f"No link on ADB for {adb_name}. Searching Wikipedia...")
-        search_results = search_wikipedia(adb_name)
+        logging.info(f"No link on ADB for {subject_name}. Searching Wikipedia...")
+        search_results = search_wikipedia(subject_name)
         if search_results:
-            wiki_url = find_best_wikipedia_match(adb_name, birth_year, search_results, pbar)
+            wiki_url = find_best_wikipedia_match(subject_name, birth_year, search_results, pbar)
 
     if wiki_url:
         english_url = get_english_wiki_url(wiki_url)
@@ -439,8 +476,9 @@ def worker_task_with_timeout(line: str, pbar: tqdm, index: int) -> dict:
         except IndexError:
             id_adb, name, birth_year, entry_type = "unknown", "unknown", "", "Person"
         
-        tqdm.write(f"{Fore.YELLOW}Worker timeout for idADB {id_adb} ({name}). Skipping.")
-        return {'Index': index, 'idADB': id_adb, 'ADB_Name': name, 'BirthYear': birth_year, 'Entry_Type': entry_type, 'Wikipedia_URL': '', 'Notes': 'Processing timeout'}
+        sanitized_name = sanitize_adb_name(name)
+        tqdm.write(f"{Fore.YELLOW}Worker timeout for idADB {id_adb} ({sanitized_name}). Skipping.")
+        return {'Index': index, 'idADB': id_adb, 'Subject_Name': sanitized_name, 'BirthYear': birth_year, 'Entry_Type': entry_type, 'Wikipedia_URL': '', 'Notes': 'Processing timeout'}
 
     # Retrieve result or exception from the queue
     result = result_queue.get()
@@ -635,7 +673,7 @@ def main():
         if line.strip() and line.split('\t')[1] not in processed_ids
     ]
 
-    fieldnames = ['Index', 'idADB', 'ADB_Name', 'BirthYear', 'Entry_Type', 'Wikipedia_URL', 'Notes']
+    fieldnames = ['Index', 'idADB', 'Subject_Name', 'BirthYear', 'Entry_Type', 'Wikipedia_URL', 'Notes']
     
     if not lines_to_process:
         print(f"\n{Fore.YELLOW}WARNING: The links data file at `{output_path}` is already up to date. ✨")
