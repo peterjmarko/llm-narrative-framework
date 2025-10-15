@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 13.2.2 (2025-10-14)
+
+### Bump
+
+- **version 13.2.1 → 13.2.2**
+
+### Refactor
+
+- **overhaul name sanitization and fix L3 test harness**
+  This major refactor overhauls name handling in the data pipeline to ensure consistency and resolves a series of cascading test failures.
+  
+  - Implements a robust name sanitization process in `find_wikipedia_links.py` to clean name fields at the earliest possible stage.
+  - Replaces the ambiguous `ADB_Name` column with `Subject_Name` and renames `adb_validation_report.csv` to `adb_validated_subjects.csv` for clarity.
+  - Updates all affected pipeline scripts (`validate_wikipedia_pages.py`, `select_eligible_candidates.py`) and their corresponding unit tests to use the new schemas.
+  - Hardens the name-splitting logic in `select_eligible_candidates.py` to prevent validation failures in downstream LLM scoring scripts.
+  - Fixes a bug in the L3 test harness (`layer3_phase2_run.ps1`) that caused duplicate step execution by correctly timing the test intervention.
+  - Adds a new utility script (`scripts/testing/inspect_special_chars.py`) for analyzing special characters in raw data.
+
 ## 13.2.1 (2025-10-14)
 
 ### Bump
