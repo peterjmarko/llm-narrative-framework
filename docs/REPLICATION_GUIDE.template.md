@@ -50,7 +50,7 @@ The production codebase implements two principal workflows that form the backbon
 
 The **Data Preparation Pipeline** is a fully automated, multi-stage workflow that transforms raw data from external sources (Astro-Databank, Wikipedia) into the curated `personalities_db.txt` file used in experiments. This pipeline implements sophisticated filtering, scoring, and selection algorithms to create a high-quality, diverse dataset of personality profiles.
 
-{{grouped_figure:docs/diagrams/flow_data_preparation_pipeline.mmd | scale=2.0 | width=35% | caption=Figure S2: Data Preparation Pipeline. The pipeline processes raw astrological data from ADB through multiple stages to create personalities_db.txt.}}
+{{grouped_figure:docs/diagrams/flow_prep_pipeline.mmd | scale=2.0 | width=35% | caption=Figure S2: Data Preparation Pipeline. The pipeline processes raw astrological data from ADB through multiple stages to create personalities_db.txt.}}
 
 ### Experiment & Study Workflow
 
@@ -96,7 +96,7 @@ This procedure tests the robustness of the findings by using the framework's aut
     # or simply:
     pdm prep-data
    ```
-This executes `prepare_data.ps1`, which is a PowerShell wrapper calling the 13 individual Python modules of the data preparation pipeline. This script automatically checks the state of the pipeline and resumes from the first incomplete step. It will also pause with clear instructions when a manual user action is required.
+This executes `prepare_data.ps1`, which is a PowerShell wrapper that orchestrates the **14 distinct steps** of the data preparation pipeline (including automated Python scripts and manual processes). This script automatically checks the state of the pipeline and resumes from the first incomplete step, and it will pause with clear instructions when a manual user action is required.
 
 It is highly recommended that you first run this module in read-only mode to produce a report on current data files (use the '-ReportOnly' parameter). Subsequently, it is advisable to step through execution in interactive mode to understand what can be expected on a normal run (use the '-Interactive' paramater). Once the script's operation is clear, use the '-Force' parameter to overwrite existing data.
 

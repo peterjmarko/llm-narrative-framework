@@ -261,6 +261,15 @@ try {
     # --- Execute Pipeline ---
     $prepareDataScript = Join-Path $ProjectRoot "prepare_data.ps1"
     Write-Host "`n--- EXECUTING PIPELINE: Starting data preparation workflow... ---$($C_RESET)" -ForegroundColor Cyan
+    # Manually log the pre-population of Step 1 data, as the harness performs this work.
+    $executedStepsLog.Add([pscustomobject]@{
+        'Task #' = $taskCounter++
+        'Stage #' = 1
+        'Step #' = 1
+        'Step Description' = "Fetch Raw ADB Data"
+        'Status' = "SUCCESS"
+        'Output File' = $stepToOutputMap[1]
+    })
     
     # Create targeted ADB data for test subjects
     Format-Banner "BEGIN STAGE: 1. DATA SOURCING"
@@ -290,14 +299,6 @@ try {
         Read-Host -Prompt "`n${C_ORANGE}Press Enter to execute this step (Ctrl+C to exit)...${C_RESET}`n"
     }
 
-    $executedStepsLog.Add([pscustomobject]@{
-        'Task #' = $taskCounter++
-        'Stage #' = 1
-        'Step #' = 1
-        'Step Description' = "Fetch Raw ADB Data"
-        'Status' = "SUCCESS"
-        'Output File' = $stepToOutputMap[1]
-    })
     Write-Host "  -> Performing targeted fetch for $($TestProfile.Subjects.Count) subjects..."
     $fetchScript = Join-Path $ProjectRoot "src/fetch_adb_data.py"
     $outputFile = "data/sources/adb_raw_export.txt"
@@ -382,10 +383,10 @@ try {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $env:PYTHONIOENCODING = "utf-8"
 
-    # --- RUN 1: Execute pipeline through Step 2 (before intervention) ---
+    # --- RUN 1: Execute pipeline from Step 2 through Step 2 (before intervention) ---
     $env:UNDER_TEST_HARNESS = "true"
     $run1Args = @{
-        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 2; SuppressConfigDisplay = $true
+        Force = $true; NoFinalReport = $true; SilentHalt = $true; TestMode = $true; StopAfterStep = 2; SuppressConfigDisplay = $true; StartWithStep = 2
     }
     if ($Interactive) { $run1Args.Interactive = $true }
 
@@ -452,7 +453,10 @@ try {
         if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
         if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
             $stepNum = [int]$matches[1]
-            $run2Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+            # Do not log Step 1, as it is logged manually by the harness.
+            if ($stepNum -ne 1) {
+                $run2Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+            }
         }
     }
     $run2ExitCode = $LASTEXITCODE
@@ -644,7 +648,10 @@ Assertive and pioneering.
         if ($_ -match 'BEGIN STAGE: (\d+)\.') { $currentStageNumber = [int]$matches[1] }
         if ($_ -match '>>> Step (\d+)/\d+: (.*?) <<<') {
             $stepNum = [int]$matches[1]
-            $run4Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+            # Do not log Step 1, as it is logged manually by the harness.
+            if ($stepNum -ne 1) {
+                $run4Steps.Add(@{ 'Stage #' = $currentStageNumber; 'Step #' = $stepNum; 'Step Description' = $matches[2].Trim(); 'Output File' = $stepToOutputMap[$stepNum] })
+            }
         }
     }
     $run4ExitCode = $LASTEXITCODE

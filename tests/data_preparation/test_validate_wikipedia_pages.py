@@ -493,12 +493,16 @@ class TestSummaryReport:
 
     def test_generate_summary_report_full(self, mock_report_csv, capsys, mocker):
         """Tests that the summary report is generated correctly with varied data."""
-        # Mock PROJECT_ROOT from the config_loader module where it's imported
+        # Mock PROJECT_ROOT for path calculations
         mocker.patch('src.config_loader.PROJECT_ROOT', mock_report_csv.parents[2])
+        # Mock get_path at its source in config_loader to redirect the reports directory
+        # into our temporary test sandbox.
+        mocker.patch('config_loader.get_path', return_value=mock_report_csv.parents[1] / "reports")
 
         generate_summary_report(mock_report_csv)
 
-        summary_path = mock_report_csv.with_name("adb_validation_summary.txt")
+        # Construct the correct path to the summary file in the `reports` directory
+        summary_path = mock_report_csv.parents[1] / "reports" / "adb_validation_summary.txt"
         assert summary_path.exists()
 
         summary_content = summary_path.read_text()

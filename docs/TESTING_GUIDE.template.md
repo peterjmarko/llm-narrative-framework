@@ -344,7 +344,7 @@ These tests validate the deterministic filtering rules that create the pool of e
 
 **What's tested:**
 
-- Content validation (name and death date confirmation)
+- Content validation (using the sanitized `Subject_Name`)
 - Redirect handling and resolution
 - Disambiguation page detection and handling
 - Language verification (English pages only)
@@ -1357,7 +1357,7 @@ This comprehensive table provides the current status of all tests in the framewo
 | **Data Sourcing** | | | | |
 | `src/fetch_adb_data.py` | Standard | **COMPLETE** | 84% | Session management, data parsing, error handling, timeout scenarios |
 | **Candidate Qualification** | | | | |
-| `src/find_wikipedia_links.py` | Standard | **COMPLETE** | 89% | Web scraping, fallback logic, malformed page handling |
+| `src/find_wikipedia_links.py` | Standard | **COMPLETE** | 89% | Name sanitization, web scraping, fallback logic |
 | `src/validate_wikipedia_pages.py` | Standard | **COMPLETE** | 91% | URL validation, content checks, disambiguation detection |
 | `src/select_eligible_candidates.py` | **Critical** | **COMPLETE** | 90% | Deterministic filtering rules, deduplication, edge cases |
 | **Candidate Selection** | | | | |

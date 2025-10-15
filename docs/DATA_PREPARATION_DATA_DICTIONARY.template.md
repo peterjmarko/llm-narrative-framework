@@ -44,7 +44,7 @@ data/
 │
 ├── processed/
 │   ├── adb_wiki_links.csv              # Best-guess Wikipedia URLs.
-│   ├── adb_validation_report.csv       # Detailed output of Wikipedia page validation.
+│   ├── adb_validated_subjects.csv      # Detailed output of Wikipedia page validation.
 │   └── subject_db.csv                  # Cleaned & integrated master DB.
 │
 └── backup/
@@ -63,7 +63,7 @@ This directory contains the original, unprocessed starting point for the pipelin
 
 These files are generated during the data validation and filtering stages.
 
--   **`adb_validation_summary.txt`**: A human-readable summary of the validation report.
+-   **`adb_validation_summary.txt`**: A human-readable summary of the Wikipedia page validation process, generated from `adb_validated_subjects.csv`.
 -   **`delineation_coverage_map.csv`**: A report used by the assembly logic validation workflow to ensure test subjects provide maximum coverage of all text components.
 -   **`eminence_scores_summary.txt`**: A human-readable summary of the eminence scoring run.
 -   **`ocean_scores_summary.txt`**: The detailed summary report from `generate_ocean_scores.py`, including the cutoff analysis and descriptive statistics.
@@ -74,8 +74,8 @@ These files are generated during the data validation and filtering stages.
 
 ### 4. `processed/` - Cleaned & Validated Data
 
--   **`adb_wiki_links.csv`**: Best-guess Wikipedia URLs for each subject.
--   **`adb_validation_report.csv`**: The detailed, row-by-row output of the Wikipedia page validation script. This validated data is consumed by the candidate selection pipeline.
+-   **`adb_wiki_links.csv`**: Best-guess Wikipedia URLs for each subject, with a sanitized `Subject_Name` column.
+-   **`adb_validated_subjects.csv`**: The detailed, row-by-row output of the Wikipedia page validation script. This file contains the final validation status for each subject and is the source of truth for the sanitized `Subject_Name` used by the rest of the pipeline.
 -   **`subject_db.csv`**: The cleaned and integrated master database.
 
 These files are static, pre-prepared assets that provide the rules and content for generating the final personality descriptions.
@@ -101,7 +101,8 @@ These files are the outputs of one pipeline script and the inputs to the next.
 
 This directory holds cleaned and integrated data files that are ready for downstream processing.
 
--   **`adb_wiki_links.csv`**: The output of `find_wikipedia_links.py`, containing the best-guess Wikipedia URL for each subject from the raw data export.
+-   **`adb_wiki_links.csv`**: The output of `find_wikipedia_links.py`. It contains the best-guess Wikipedia URL and a sanitized `Subject_Name` for each entry from the raw data export.
+-   **`adb_validated_subjects.csv`**: The output of `validate_wikipedia_pages.py`. This file contains the final validation status for each subject and is the source of truth for the sanitized `Subject_Name`.
 -   **`subject_db.csv`**: The output of `create_subject_db.py`. This script integrates the Solar Fire chart data with the final subject list to produce a clean, master database ready for the final generation step.
 
 ### 6. Top-Level Files - Main Experiment Files

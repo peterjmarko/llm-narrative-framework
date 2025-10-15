@@ -18,7 +18,7 @@ graph TD
     subgraph "Data Artifacts"
         raw_export[adb_raw_export.txt]:::artifact
         wiki_links[adb_wiki_links.csv]:::artifact
-        validation_report[adb_validation_report.csv]:::artifact
+        validated_subjects[adb_validated_subjects.csv]:::artifact
     end
     
     subgraph "Output"
@@ -32,9 +32,9 @@ graph TD
     find_links --> wiki_links
     
     wiki_links --> validate
-    validate --> validation_report
+    validate --> validated_subjects
     
     raw_export --> select_eligible
-    validation_report --> select_eligible
+    validated_subjects --> select_eligible
     
     select_eligible --> eligible_candidates

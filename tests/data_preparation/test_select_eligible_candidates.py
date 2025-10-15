@@ -64,16 +64,16 @@ def mock_sandbox(tmp_path: Path) -> Path:
     )
     raw_export_path.write_text(raw_content)
 
-    # Create dummy validation report (CSV format)
+    # Create dummy validation report (CSV format), quoting names that contain commas
     validation_content = (
-        "idADB,Status,Entry_Type\n"
-        "101,OK,Person\n"
-        "102,OK,Person\n"
-        "103,OK,Person\n"
-        "104,FAIL,Person\n"
-        "105,OK,Person\n"
-        "106,OK,Person\n"
-        "201,VALID,Research\n"
+        "idADB,Subject_Name,Status,Entry_Type\n"
+        '101,"Smith, John",OK,Person\n'
+        '102,"Doe, Jane",OK,Person\n'
+        '103,"Lee, Bruce",OK,Person\n'
+        '104,"King, Martin",FAIL,Person\n'
+        '105,"Curie, Marie",OK,Person\n'
+        '106,Pele,OK,Person\n' # No comma, no quotes needed
+        '201,"Research: Event",VALID,Research\n'
     )
     validation_report_path.write_text(validation_content)
 

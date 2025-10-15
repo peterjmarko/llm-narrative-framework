@@ -287,16 +287,16 @@ This produces `data/sources/adb_raw_export.txt`.
 
 This stage performs a rigorous, deterministic filtering pass on the raw data to create a high-quality cohort of "eligible candidates."
 
-1.  **Link Finding (`find_wikipedia_links.py`):** This script takes the raw ADB export and finds the best-guess English Wikipedia URL for each subject. It scrapes the ADB page and uses a Wikipedia search as a fallback. The output is an intermediate file, `adb_wiki_links.csv`.
+1.  **Link Finding (`find_wikipedia_links.py`):** This script takes the raw ADB export, sanitizes the `FirstName` and `LastName` fields to remove non-essential text (like parenthetical years), and finds the best-guess English Wikipedia URL for each subject. The output is an intermediate file, `adb_wiki_links.csv`, which now contains a clean `Subject_Name` column.
     
     ```bash
     # Find Wikipedia links for all raw records
     pdm run find-links
     ```
 
-2.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name, and confirms their death date. The final output is the detailed `adb_validation_report.csv`.
+2.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name using the sanitized `Subject_Name`, and confirms their death date. The final output is the detailed `adb_validated_subjects.csv`.
     
-    **A Note on Reproducibility:** Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. For direct replication, the study's pipeline relies on the static report (`adb_validation_report.csv`) included in the repository.
+    **A Note on Reproducibility:** Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. For direct replication, the study's pipeline relies on the static `adb_validated_subjects.csv` file included in the repository.
     
     ```bash
     # Validate the content of each found Wikipedia page
@@ -526,7 +526,7 @@ The following files and directories are backed up to `data/backup/` with timesta
 **Primary Pipeline Outputs:**
 - `data/sources/adb_raw_export.txt` - Raw data from Astro-Databank
 - `data/processed/adb_wiki_links.csv` - Wikipedia links for candidates
-- `data/reports/adb_validation_report.csv` - Wikipedia validation results
+- `data/processed/adb_validated_subjects.csv` - Wikipedia validation results
 - `data/intermediate/adb_eligible_candidates.txt` - Filtered candidate list
 - `data/foundational_assets/eminence_scores.csv` - LLM-generated eminence scores
 - `data/foundational_assets/ocean_scores.csv` - LLM-generated OCEAN scores
@@ -1727,7 +1727,7 @@ This section provides a reference for the structure of the most important data f
 
 {{diagram:docs/diagrams/format_data_adb_wiki_links.txt | caption=Format for `adb_wiki_links.csv`}}
 
-{{diagram:docs/diagrams/format_data_adb_validation_report.txt | caption=Format for `adb_validation_report.csv`}}
+{{diagram:docs/diagrams/format_data_adb_validated_subjects.txt | caption=Format for `adb_validated_subjects.csv`}}
 
 {{diagram:docs/diagrams/format_data_adb_eligible_candidates.txt | caption=Format for `adb_eligible_candidates.txt`}}
 
