@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 13.2.4 (2025-10-15)
+
+### Bump
+
+- **version 13.2.3 → 13.2.4**
+
+### Refactor
+
+- **standardize reports and improve orchestration logic**
+  This commit introduces a series of enhancements to the data preparation pipeline to improve robustness, logging, and documentation.
+  
+  - Refactors `pyproject.toml` to create a dedicated `DATA PREPARATION WORKFLOW` section, simplifying the logic in `operation_runner.py` for categorizing PDM scripts.
+  - Enhances `validate_wikipedia_pages.py` to write its completion status to the central `pipeline_completion_info.json` report.
+  - Standardizes `missing_eminence_scores.txt` and `missing_ocean_scores.txt` into a consistent, structured format with summary statistics and tabular data.
+  - Adds generation timestamps to the `eminence_scores_summary.txt` and `ocean_scores_summary.txt` reports for better traceability.
+  - Improves the `prepare_data.ps1` orchestrator and `layer3_phase1_setup.ps1` test harness to perform a comprehensive cleanup of all generated artifacts when a re-run is forced.
+  - Modifies `select_final_candidates.py` to copy the `variance_curve_analysis.png` artifact to a permanent `docs/images/` directory for documentation builds.
+  - Updates the Data Dictionary, Framework Manual, and all relevant test suites to reflect the script and report changes.
+
 ## 13.2.3 (2025-10-15)
 
 ### Bump
