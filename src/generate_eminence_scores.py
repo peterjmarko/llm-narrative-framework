@@ -573,32 +573,37 @@ def main():
                 for score_tuple in raw_parsed_scores:
                     llm_id, llm_name, llm_year, llm_score = score_tuple
                     
-                    # 1. Validate ID: Check if the ID returned by the LLM was in our original request.
+                    # 1. Validate ID (Strict): Check if the ID returned by the LLM was in our original request.
                     if llm_id not in batch_lookup:
                         # DISCARD: LLM hallucinated an ID or returned an ID from a different batch.
                         continue
                     
-                    # 2. Validate Name: Normalize both names for a robust comparison.
+                    # 2. Validate Name (Lenient): Clean the LLM's name output by removing any trailing (YYYY)
+                    # before comparing. This handles a common LLM formatting artifact without generating noise.
+                    cleaned_llm_name = re.sub(r'\s*\(\d{4}\)$', '', llm_name).strip()
+                    
                     original_name_norm = batch_lookup[llm_id].lower().strip()
-                    llm_name_norm = llm_name.lower().strip()
+                    llm_name_norm = cleaned_llm_name.lower().strip()
                     
                     if original_name_norm != llm_name_norm:
-                        # DISCARD: The ID is correct, but the LLM mismatched or corrupted the name.
-                        continue
+                        # Only warn if the names still don't match after cleaning.
+                        tqdm.write(f"{Fore.YELLOW}Warning: Name mismatch for idADB {llm_id}. "
+                                   f"Expected: '{batch_lookup[llm_id]}', Got: '{llm_name}'. "
+                                   f"Accepting record based on matching ID.")
                     
-                    # If both checks pass, the record is valid.
+                    # If the ID check passes, the record is considered valid.
                     validated_scores.append(score_tuple)
-                
-                # Report any discrepancies found during validation.
+
+                # Report any discrepancies found during ID validation.
                 if len(validated_scores) < len(raw_parsed_scores):
                     num_discarded = len(raw_parsed_scores) - len(validated_scores)
-                    tqdm.write(f"{Fore.YELLOW}Warning: Discarded {num_discarded} invalid records from batch {batch_num} due to ID/name mismatches.")
-
+                    tqdm.write(f"{Fore.YELLOW}Warning: Discarded {num_discarded} invalid records from batch {batch_num} due to incorrect or missing IDs.")
+                
                 # The final, clean list of scores to be saved.
                 parsed_scores = validated_scores
                 
                 if not parsed_scores:
-                    tqdm.write(f"{Fore.RED}Error: No valid scores remained after validation for batch {batch_num}.")
+                    tqdm.write(f"{Fore.RED}Error: No valid scores with matching IDs were found in the response for batch {batch_num}.")
                     continue
                 # --- END: New Hardened Validation Logic ---
 

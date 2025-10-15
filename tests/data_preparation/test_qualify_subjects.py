@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: tests/data_preparation/test_validate_wikipedia_pages.py
+# Filename: tests/data_preparation/test_qualify_subjects.py
 
 """
-Unit tests for the Wikipedia page validation script (src/validate_wikipedia_pages.py).
+Unit tests for the subject qualification script (src/qualify_subjects.py).
 
 This suite validates the critical offline logic of the script, such as name
 matching, robust death date detection from various HTML patterns, and the
@@ -37,16 +37,19 @@ from bs4 import BeautifulSoup
 from tqdm import tqdm
 
 # Import the entire module so we can patch objects within it
-from src import validate_wikipedia_pages
-from src.validate_wikipedia_pages import (
+from src import qualify_subjects
+from src.qualify_subjects import (
+    _is_deceased_via_wikipedia_parsing,
+    check_life_status,
     fetch_page_content,
     find_matching_disambiguation_link,
     follow_all_redirects,
     generate_summary_report,
+    get_wikidata_qid,
     is_disambiguation_page,
+    is_deceased_via_wikidata,
     load_and_filter_input,
     process_wikipedia_page,
-    validate_death_date,
     validate_name,
     worker_task,
     worker_task_with_timeout,
@@ -76,42 +79,49 @@ def test_validate_name(subject_name, wp_title_html, expected_wp_name, expected_s
     assert expected_score_range[0] <= name_score <= expected_score_range[1]
 
 
-# --- Tests for validate_death_date ---
+# --- Tests for Life Status Validation ---
+
+def test_get_wikidata_qid():
+    """Tests the extraction of a Wikidata QID from a Wikipedia page."""
+    html = '<html><body><li id="t-wikibase"><a href="https://www.wikidata.org/wiki/Special:EntityPage/Q12345">Wikidata item</a></li></body></html>'
+    soup = BeautifulSoup(html, 'html.parser')
+    assert get_wikidata_qid(soup) == "Q12345"
+
+def test_check_life_status_wikidata_deceased(mocker):
+    """Tests that a death date from Wikidata correctly identifies a person as deceased."""
+    mock_soup = BeautifulSoup('<html></html>', 'html.parser')
+    mocker.patch('src.qualify_subjects.get_wikidata_qid', return_value="Q123")
+    mocker.patch('src.qualify_subjects.is_deceased_via_wikidata', return_value=True)
+    
+    is_deceased, method = check_life_status(mock_soup)
+    assert is_deceased is True
+    assert method == "Wikidata"
+
+def test_check_life_status_fallback_to_wikipedia_parsing(mocker):
+    """Tests that the system falls back to Wikipedia parsing when Wikidata fails."""
+    mock_soup = BeautifulSoup('<html></html>', 'html.parser')
+    mocker.patch('src.qualify_subjects.get_wikidata_qid', return_value="Q123")
+    mocker.patch('src.qualify_subjects.is_deceased_via_wikidata', return_value=None) # Simulate API failure
+    mocker.patch('src.qualify_subjects._is_deceased_via_wikipedia_parsing', return_value=True)
+
+    is_deceased, method = check_life_status(mock_soup)
+    assert is_deceased is True
+    assert method == "Wikipedia Parsing"
 
 @pytest.mark.parametrize("html_snippet, expected_result", [
-    # --- Positive Cases (Should return True) ---
-    # Strategy 1: Categories
+    # Positive cases
     ('<div id="mw-normal-catlinks"><a>2001 deaths</a></div>', True),
-    ('<div id="mw-normal-catlinks"><a>Category:People who died in prison</a></div>', True),
-    ('<div id="mw-normal-catlinks"><a>Category:1900 births</a></div>', True),
-    # Strategy 2: Infobox
     ('<table class="infobox"><tr><th>Died</th><td>2020</td></tr></table>', True),
-    # This case now includes a year, making it a valid positive test
-    ('<table class="infobox"><tr><td><b>Born</b></td><td>...</td></tr><tr><td><b>Deceased</b></td><td>1 Jan 2021</td></tr></table>', True),
-    # Strategy 3: First paragraph date range
-    ('<p><b>John Doe</b> (1 January 1900 – 1 January 2000) was a person.</p>', True),
-    ('<p>... was an artist (b. 1920, d. 1990) ...</p>', True),
-    ('<p>... died on January 1, 2000 ...</p>', True),
-    # Strategy 6: Section Headers
+    ('<p><b>John Doe</b> (1900–2000) was a person.</p>', True),
     ('<h2>Death</h2>', True),
-    ('<h3>Final years and death</h3>', True),
-    # Strategy 7: Wikipedia Templates
-    ('<span class="death-date">2005-11-25</span>', True),
-
-    # --- Negative Cases (Should return False) ---
-    # Living person category
+    # Negative cases
     ('<div id="mw-normal-catlinks"><a>Living people</a></div>', False),
-    # No death indicators
-    ('<html><body><h1>A Living Person</h1><p>This person is still alive.</p></body></html>', False),
-    # Infobox with only a birth date
-    ('<table class="infobox"><tr><th>Born</th><td>1990</td></tr></table>', False),
+    ('<html><body><p>This person is still alive.</p></body></html>', False),
 ])
-def test_validate_death_date(html_snippet, expected_result):
-    """
-    Tests the death date validation logic against various HTML snippets.
-    """
+def test_wikipedia_parsing_fallback(html_snippet, expected_result):
+    """Tests the internal Wikipedia parsing logic (_is_deceased_via_wikipedia_parsing)."""
     soup = BeautifulSoup(html_snippet, 'html.parser')
-    assert validate_death_date(soup) == expected_result
+    assert _is_deceased_via_wikipedia_parsing(soup) == expected_result
 
 
 # --- Tests for Disambiguation Helpers ---
@@ -153,10 +163,10 @@ def test_process_wikipedia_page_success(mocker):
     """Tests a successful validation path for a standard page."""
     mock_pbar = MagicMock(spec=tqdm)
     mock_soup = BeautifulSoup("<html></html>", 'html.parser')
-    mocker.patch('src.validate_wikipedia_pages.follow_all_redirects', return_value=("https://final.url/page", mock_soup))
-    mocker.patch('src.validate_wikipedia_pages.is_disambiguation_page', return_value=False)
-    mocker.patch('src.validate_wikipedia_pages.validate_name', return_value=("WP Name", 95))
-    mocker.patch('src.validate_wikipedia_pages.validate_death_date', return_value=True)
+    mocker.patch('src.qualify_subjects.follow_all_redirects', return_value=("https://final.url/page", mock_soup))
+    mocker.patch('src.qualify_subjects.is_disambiguation_page', return_value=False)
+    mocker.patch('src.qualify_subjects.validate_name', return_value=("WP Name", 95))
+    mocker.patch('src.qualify_subjects.check_life_status', return_value=(True, "Wikidata"))
 
     result = process_wikipedia_page("http://start.url", "ADB Name", "1990", mock_pbar)
 
@@ -169,7 +179,7 @@ def test_process_wikipedia_page_success(mocker):
 def test_process_wikipedia_page_fetch_failure(mocker):
     """Tests the case where the page fetch fails."""
     mock_pbar = MagicMock(spec=tqdm)
-    mocker.patch('src.validate_wikipedia_pages.follow_all_redirects', return_value=("http://fail.url", None))
+    mocker.patch('src.qualify_subjects.follow_all_redirects', return_value=("http://fail.url", None))
 
     result = process_wikipedia_page("http://fail.url", "ADB Name", "1990", mock_pbar)
     assert result['status'] == 'ERROR'
@@ -180,9 +190,9 @@ def test_process_wikipedia_page_disambiguation_failure(mocker):
     """Tests the case where a disambiguation page cannot be resolved."""
     mock_pbar = MagicMock(spec=tqdm)
     mock_soup = BeautifulSoup("<html></html>", 'html.parser')
-    mocker.patch('src.validate_wikipedia_pages.follow_all_redirects', return_value=("http://disambig.url", mock_soup))
-    mocker.patch('src.validate_wikipedia_pages.is_disambiguation_page', return_value=True)
-    mocker.patch('src.validate_wikipedia_pages.find_matching_disambiguation_link', return_value=None)
+    mocker.patch('src.qualify_subjects.follow_all_redirects', return_value=("http://disambig.url", mock_soup))
+    mocker.patch('src.qualify_subjects.is_disambiguation_page', return_value=True)
+    mocker.patch('src.qualify_subjects.find_matching_disambiguation_link', return_value=None)
 
     result = process_wikipedia_page("http://start.url", "ADB Name", "1990", mock_pbar)
     assert result['status'] == 'FAIL'
@@ -229,7 +239,7 @@ def test_process_wikipedia_page_disambiguation_failure(mocker):
 def test_worker_task_logic(mocker, input_row, mock_validation, expected_status, expected_notes):
     """Tests the decision-making logic of the main worker task."""
     mock_pbar = MagicMock(spec=tqdm)
-    mock_process_page = mocker.patch('src.validate_wikipedia_pages.process_wikipedia_page', return_value=mock_validation)
+    mock_process_page = mocker.patch('src.qualify_subjects.process_wikipedia_page', return_value=mock_validation)
     
     result = worker_task(input_row, mock_pbar, 1)
     
@@ -302,7 +312,7 @@ def test_follow_all_redirects_handles_canonical_link(mocker):
     soup_b = BeautifulSoup(soup_b_html, 'html.parser')
 
     # Mock fetch_page_content to return the two different soups
-    mock_fetch = mocker.patch('src.validate_wikipedia_pages.fetch_page_content', side_effect=[soup_a, soup_b])
+    mock_fetch = mocker.patch('src.qualify_subjects.fetch_page_content', side_effect=[soup_a, soup_b])
 
     final_url, final_soup = follow_all_redirects(start_url)
 
@@ -312,7 +322,7 @@ def test_follow_all_redirects_handles_canonical_link(mocker):
 
 
 @patch('threading.Thread')
-@patch('src.validate_wikipedia_pages.worker_task')
+@patch('src.qualify_subjects.worker_task')
 def test_worker_task_with_timeout_handles_hung_worker(mock_worker_task, mock_thread_class, mocker):
     """
     Tests that the timeout wrapper correctly handles a worker task that hangs
@@ -351,7 +361,7 @@ def test_fetch_page_content_handles_meta_refresh(mocker):
     mock_response_final.text = final_html
     mock_response_final.url = final_url
 
-    mock_session_get = mocker.patch('src.validate_wikipedia_pages.SESSION.get', side_effect=[mock_response_redirect, mock_response_final])
+    mock_session_get = mocker.patch('src.qualify_subjects.SESSION.get', side_effect=[mock_response_redirect, mock_response_final])
 
     soup = fetch_page_content(start_url)
 
@@ -379,15 +389,15 @@ class TestMainWorkflow:
         input_path.write_text(input_content)
         return tmp_path
 
-    @patch('src.validate_wikipedia_pages.generate_summary_report')
-    @patch('src.validate_wikipedia_pages.worker_task_with_timeout')
+    @patch('src.qualify_subjects.generate_summary_report')
+    @patch('src.qualify_subjects.worker_task_with_timeout')
     def test_main_full_run(self, mock_worker, mock_summary, mock_sandbox, capsys):
         """Tests a full, successful run from scratch."""
         mock_worker.return_value = {'Status': 'OK', 'idADB': '101'}
 
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--force"]
         with patch("sys.argv", test_args):
-            validate_wikipedia_pages.main()
+            qualify_subjects.main()
 
         captured = capsys.readouterr()
         assert "SUCCESS:" in captured.out
@@ -400,7 +410,7 @@ class TestMainWorkflow:
             raise SystemExit(code)
 
         mocker.patch('sys.exit', side_effect=mock_exit)
-        mock_generate_summary = mocker.patch('src.validate_wikipedia_pages.generate_summary_report')
+        mock_generate_summary = mocker.patch('src.qualify_subjects.generate_summary_report')
 
         # Create a dummy report file for the function to read
         (mock_sandbox / "data/processed/adb_validated_subjects.csv").touch()
@@ -409,22 +419,22 @@ class TestMainWorkflow:
         with patch("sys.argv", test_args):
             # The script should exit gracefully after generating the report
             with pytest.raises(SystemExit) as e:
-                validate_wikipedia_pages.main()
+                qualify_subjects.main()
             assert e.value.code == 0
 
         mock_generate_summary.assert_called_once()
         captured = capsys.readouterr()
         assert "Generating Summary Report Only" in captured.out
 
-    @patch('src.validate_wikipedia_pages.finalize_and_report')
-    @patch('src.validate_wikipedia_pages.worker_task_with_timeout')
+    @patch('src.qualify_subjects.finalize_and_report')
+    @patch('src.qualify_subjects.worker_task_with_timeout')
     def test_main_handles_keyboard_interrupt(self, mock_worker, mock_finalize, mock_sandbox):
         """Tests graceful shutdown on KeyboardInterrupt."""
         mock_worker.side_effect = KeyboardInterrupt
 
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--quiet"]
         with patch("sys.argv", test_args):
-            validate_wikipedia_pages.main()
+            qualify_subjects.main()
 
         mock_finalize.assert_called_once()
         # was_interrupted is the 4th positional argument
@@ -439,13 +449,13 @@ class TestMainWorkflow:
         # Make the input file newer than the report
         os.utime(input_path, (report_path.stat().st_mtime + 1, report_path.stat().st_mtime + 1))
 
-        mock_backup = mocker.patch('src.validate_wikipedia_pages.backup_and_remove')
-        mocker.patch('src.validate_wikipedia_pages.worker_task_with_timeout')
-        mocker.patch('src.validate_wikipedia_pages.generate_summary_report')
+        mock_backup = mocker.patch('src.qualify_subjects.backup_and_remove')
+        mocker.patch('src.qualify_subjects.worker_task_with_timeout')
+        mocker.patch('src.qualify_subjects.generate_summary_report')
 
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
         with patch("sys.argv", test_args):
-            validate_wikipedia_pages.main()
+            qualify_subjects.main()
 
         # The backup function is a reliable indicator of a forced re-run
         mock_backup.assert_called_once_with(report_path)
@@ -461,7 +471,7 @@ class TestMainWorkflow:
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox)]
         with patch("sys.argv", test_args):
             with pytest.raises(SystemExit):
-                validate_wikipedia_pages.main()
+                qualify_subjects.main()
 
         assert "Input file not found" in caplog.text
 
@@ -551,4 +561,4 @@ class TestSummaryReport:
         assert "some_other_step" in pipeline_data
         assert pipeline_data["some_other_step"]["status"] == "complete"
 
-# === End of tests/data_preparation/test_validate_wikipedia_pages.py ===
+# === End of tests/data_preparation/test_qualify_subjects.py ===

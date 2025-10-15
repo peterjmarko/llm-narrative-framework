@@ -233,121 +233,67 @@ def generate_summary_report(filepath: Path, total_subjects_overall: int):
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         df = pd.read_csv(filepath)
-        # Define columns for the main stats table and for the 'Overall' calculation
         report_cols = [field for field in OCEAN_FIELDNAMES if field not in ["Index", "idADB", "Name"]]
         personality_cols = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
         stats_raw = df[report_cols].describe()
-
-        # Calculate the 'Overall' aggregate column for the main table, using only personality scores
         stats_raw['Overall'] = stats_raw[personality_cols].mean(axis=1)
-        stats_raw.loc['count', 'Overall'] = stats_raw.loc['count', 'Openness']
-        stats_raw.loc['min', 'Overall'] = stats_raw.loc['min', personality_cols].min()
-        stats_raw.loc['max', 'Overall'] = stats_raw.loc['max', personality_cols].max()
-
-        # Reorder columns
+        stats_raw.loc[['count', 'min', 'max'], 'Overall'] = [stats_raw.loc['count', 'Openness'], stats_raw.loc['min', personality_cols].min(), stats_raw.loc['max', personality_cols].max()]
         all_cols_with_overall = ['Overall'] + report_cols
         stats_raw = stats_raw[all_cols_with_overall]
 
         def format_with_custom_precision(raw_stats_df):
-            """Applies custom formatting rules to each row of a stats dataframe."""
             formatted_df = pd.DataFrame(index=raw_stats_df.index, columns=raw_stats_df.columns)
             for idx in raw_stats_df.index:
-                if idx == 'count':
-                    formatted_df.loc[idx] = raw_stats_df.loc[idx].map('{:,.0f}'.format)
-                elif idx == 'std':
-                    formatted_df.loc[idx] = raw_stats_df.loc[idx].map('{:,.4f}'.format)
-                else:
-                    formatted_df.loc[idx] = raw_stats_df.loc[idx].map('{:,.2f}'.format)
+                if idx == 'count': formatted_df.loc[idx] = raw_stats_df.loc[idx].map('{:,.0f}'.format)
+                elif idx == 'std': formatted_df.loc[idx] = raw_stats_df.loc[idx].map('{:,.4f}'.format)
+                else: formatted_df.loc[idx] = raw_stats_df.loc[idx].map('{:,.2f}'.format)
             return formatted_df
         
         stats_formatted = format_with_custom_precision(stats_raw)
 
-        # --- Custom Table Formatter ---
         def format_stats_table(stats_df):
-            """Helper function to format a stats dataframe into a string table."""
-            # Calculate a single, uniform width for all data columns for even spacing
             max_header_len = max(len(col) for col in stats_df.columns)
             max_value_len = max(stats_df[col].str.len().max() for col in stats_df.columns)
-            uniform_col_width = max(max_header_len, max_value_len) + 2
-            
+            col_width = max(max_header_len, max_value_len) + 2
             index_width = max(len(s) for s in stats_df.index) + 2
-            
-            # Use the uniform width for all columns
-            header = f"{'':<{index_width}}" + "".join([col.center(uniform_col_width) for col in stats_df.columns])
+            header = f"{'':<{index_width}}" + "".join([col.center(col_width) for col in stats_df.columns])
             table_width = len(header)
-            
-            table_lines = [header]
-            for index, row in stats_df.iterrows():
-                line = f"{index:<{index_width}}" + "".join([row[col].center(uniform_col_width) for col in stats_df.columns])
-                table_lines.append(line)
-            return "\n".join(table_lines), table_width
+            lines = [header] + [f"{index:<{index_width}}" + "".join([row[col].center(col_width) for col in stats_df.columns]) for index, row in stats_df.iterrows()]
+            return "\n".join(lines), table_width
 
         stats_string, table_width = format_stats_table(stats_formatted)
         divider = "=" * table_width
         title = "OCEAN Scores Generation Summary".center(table_width)
-        
         total_scored = len(df)
 
-        report = [divider, title, divider]
-        report.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        report.append(f"Total Scored:     {total_scored:,}")
-        report.append(f"Total in Source:  {total_subjects_overall:,}")
+        report_header = [divider, title, divider, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n", f"Total Scored:     {total_scored:,}", f"Total in Source:  {total_subjects_overall:,}", "\n--- Descriptive Statistics ---", stats_string]
         
-        report.append("\n--- Descriptive Statistics ---")
-        report.append(stats_string)
-
-        # --- Quintile Analysis ---
-        report.append("\n\n" + "--- Quintile Analysis (Degradation of Variance) ---".center(table_width))
-        
-        n_total = len(df)
-        quintile_size = n_total // 5
-        quintile_labels = [
-            "Quintile 1 (Top 20%)", "Quintile 2 (80-60%)", "Quintile 3 (60-40%)",
-            "Quintile 4 (40-20%)", "Quintile 5 (Bottom 20%)"
-        ]
-
+        report_quintiles = ["\n\n" + "--- Quintile Analysis (Degradation of Variance) ---".center(table_width)]
+        quintile_size = len(df) // 5
         if quintile_size > 0:
             for i in range(5):
-                start_row = i * quintile_size
-                # Ensure the last quintile includes all remaining rows
-                end_row = (i + 1) * quintile_size if i < 4 else n_total
-                
-                quintile_df = df.iloc[start_row:end_row]
-                if quintile_df.empty:
-                    continue
-
-                # Get stats for the quintile
+                start, end = i * quintile_size, ((i + 1) * quintile_size if i < 4 else len(df))
+                quintile_df = df.iloc[start:end]
+                if quintile_df.empty: continue
                 q_stats_raw = quintile_df[report_cols].describe().loc[['count', 'mean', 'std']]
-                
-                # Calculate the 'Overall' aggregate column for the quintile, using only personality scores
                 q_stats_raw['Overall'] = q_stats_raw[personality_cols].mean(axis=1)
                 q_stats_raw.loc['count', 'Overall'] = q_stats_raw.loc['count', 'Openness']
-                
-                # Reorder and format using the custom precision formatter
                 q_stats_formatted = format_with_custom_precision(q_stats_raw[all_cols_with_overall])
-                
-                # Format the quintile table using the helper
                 q_table_string, _ = format_stats_table(q_stats_formatted)
-                
-                report.append(f"\n\n--- {quintile_labels[i]} (Entries {start_row+1}-{end_row}) ---".center(table_width))
-                report.append(q_table_string)
+                report_quintiles.extend([f"\n\n--- Quintile {i+1} ({['Top 20%', '80-60%', '60-40%', '40-20%', 'Bottom 20%'][i]}) (Entries {start+1}-{end}) ---".center(table_width), q_table_string])
 
-        report.append("\n" + divider)
-        
         completion_pct = (total_scored / total_subjects_overall) * 100 if total_subjects_overall > 0 else 0
         status_line = f"Completion: {total_scored}/{total_subjects_overall} ({completion_pct:.2f}%)"
-        
-        # The SUCCESS keyword is the trigger for the orchestrator to mark the step as complete.
-        if total_scored == total_subjects_overall:
-            report.append(f"\n{Fore.GREEN}SUCCESS - {status_line}")
-        elif completion_pct >= 95.0:
-            report.append(f"\n{Fore.YELLOW}WARNING - {status_line}")
-        else:
-            report.append(f"\n{Fore.RED}ERROR - {status_line} - Significantly incomplete.")
+        if total_scored == total_subjects_overall: status_msg = f"\n{Fore.GREEN}SUCCESS - {status_line}"
+        elif completion_pct >= 95.0: status_msg = f"\n{Fore.YELLOW}WARNING - {status_line}"
+        else: status_msg = f"\n{Fore.RED}ERROR - {status_line} - Significantly incomplete."
+        report_footer = ["\n" + divider, status_msg]
 
-        summary_content = "\n".join(report)
-        summary_path.write_text(summary_content, encoding='utf-8')
-        print(f"\n{summary_content}\n")
+        summary_content_for_file = "\n".join(report_header + report_quintiles + report_footer)
+        summary_content_for_console = "\n".join(report_header + report_footer)
+        
+        summary_path.write_text(summary_content_for_file, encoding='utf-8')
+        print(f"\n{summary_content_for_console}\n")
         
     except Exception as e:
         logging.error(f"Could not generate summary report: {e}")
@@ -445,12 +391,18 @@ def main():
         sys.exit(0)
 
     # --- Intelligent Startup Logic (Stale Check) ---
-    if not args.force and output_path.exists() and input_path.exists():
-        if os.path.getmtime(input_path) > os.path.getmtime(output_path):
-            print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
-            print("Automatically re-running full scoring process..." + Fore.RESET)
-            backup_and_overwrite_related_files(output_path)
-            args.force = True
+    # The following block was removed because it was too aggressive. It incorrectly
+    # triggered a full re-run when the input file was merely appended to, which is
+    # a valid state during pipeline resumption. The script's standard resumption logic
+    # (comparing subject IDs) correctly handles this scenario without needing a
+    # timestamp-based check.
+    #
+    # if not args.force and output_path.exists() and input_path.exists():
+    #     if os.path.getmtime(input_path) > os.path.getmtime(output_path):
+    #         print(f"{Fore.YELLOW}\nInput file '{input_path.name}' is newer than the existing output. Stale data detected.")
+    #         print("Automatically re-running full scoring process..." + Fore.RESET)
+    #         backup_and_overwrite_related_files(output_path)
+    #         args.force = True
 
     if args.force and any(p.exists() for p in [output_path, summary_path, missing_report_path]):
         print(f"\n{Fore.YELLOW}--force flag detected. Backing up and removing existing output files...{Fore.RESET}")
@@ -585,32 +537,37 @@ def main():
                     llm_id = str(score_dict.get('idADB', ''))
                     llm_name = score_dict.get('Name', '')
                     
-                    # 1. Validate ID: Check if the ID returned by the LLM was in our original request.
+                    # 1. Validate ID (Strict): Check if the ID returned by the LLM was in our original request.
                     if llm_id not in batch_lookup:
                         # DISCARD: LLM hallucinated an ID or returned an ID from a different batch.
                         continue
                     
-                    # 2. Validate Name: Normalize both names for a robust comparison.
+                    # 2. Validate Name (Lenient): Clean the LLM's name output by removing any trailing (YYYY)
+                    # before comparing. This handles a common LLM formatting artifact without generating noise.
+                    cleaned_llm_name = re.sub(r'\s*\(\d{4}\)$', '', llm_name).strip()
+
                     original_name_norm = batch_lookup[llm_id].lower().strip()
-                    llm_name_norm = llm_name.lower().strip()
+                    llm_name_norm = cleaned_llm_name.lower().strip()
                     
                     if original_name_norm != llm_name_norm:
-                        # DISCARD: The ID is correct, but the LLM mismatched or corrupted the name.
-                        continue
+                        # Only warn if the names still don't match after cleaning.
+                        tqdm.write(f"{Fore.YELLOW}Warning: Name mismatch for idADB {llm_id}. "
+                                   f"Expected: '{batch_lookup[llm_id]}', Got: '{llm_name}'. "
+                                   f"Accepting record based on matching ID.")
                     
-                    # If both checks pass, the record is valid.
+                    # If the ID check passes, the record is considered valid.
                     validated_scores.append(score_dict)
 
-                # Report any discrepancies found during validation.
+                # Report any discrepancies found during ID validation.
                 if len(validated_scores) < len(parsed_scores):
                     num_discarded = len(parsed_scores) - len(validated_scores)
-                    tqdm.write(f"{Fore.YELLOW}Warning: Discarded {num_discarded} invalid records from batch {batch_num} due to ID/name mismatches.")
+                    tqdm.write(f"{Fore.YELLOW}Warning: Discarded {num_discarded} invalid records from batch {batch_num} due to incorrect or missing IDs.")
                 
                 # The final, clean list of scores to be saved.
                 parsed_scores = validated_scores
                 
                 if not parsed_scores:
-                    tqdm.write(f"{Fore.RED}Error: No valid scores remained after validation for batch {batch_num}.")
+                    tqdm.write(f"{Fore.RED}Error: No valid scores with matching IDs were found in the response for batch {batch_num}.")
                     continue
                 # --- END: New Hardened Validation Logic ---
 
@@ -640,7 +597,7 @@ def main():
         tqdm.write(f"\n\n{Fore.YELLOW}{stop_reason} Exiting gracefully.{Fore.RESET}")
     finally:
         # --- Finalization ---
-        tqdm.write(f"\n--- Finalizing ---")
+        tqdm.write(f"\n{Fore.YELLOW}--- Finalizing ---{Fore.RESET}")
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
 
@@ -710,11 +667,12 @@ def main():
                 tqdm.write(f"See '{display_path}' for details.")
                 tqdm.write("The pipeline will continue, but consider re-running to retrieve missing subjects for better results.")
                 tqdm.write("")
-                tqdm.write(f"{Fore.YELLOW}{'='*60}")
+                tqdm.write(f"{Fore.CYAN}{'='*60}")
                 tqdm.write(f"{'RECOMMENDED ACTION':^60}")
                 tqdm.write(f"{'='*60}")
-                tqdm.write(f"To retrieve missing subjects, re-run the pipeline starting with this step:")
-                tqdm.write(f"  pdm run prep-data -StartWithStep 6")
+                tqdm.write(f"To retry missing subjects, simply re-run the pipeline.")
+                tqdm.write(f"It will automatically resume and process the missing data:")
+                tqdm.write(f"  pdm run prep-data")
                 tqdm.write(f"{'='*60}{Fore.RESET}")
             else:
                 # Minor: Continue with simple notification

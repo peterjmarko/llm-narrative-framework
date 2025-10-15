@@ -153,7 +153,7 @@ $env:PYTHONIOENCODING = "utf-8"
 $PipelineSteps = @(
     @{ Stage="1. Data Sourcing";        Name="Fetch Raw ADB Data";         Script="src/fetch_adb_data.py";             Inputs=@("Live Astro-Databank Website");            Output="data/sources/adb_raw_export.txt";                   Type="Automated"; Description="Fetches the initial raw dataset from the live Astro-Databank database." },
     @{ Stage="2. Candidate Qualification"; Name="Find Wikipedia Links";       Script="src/find_wikipedia_links.py";        Inputs=@("data/sources/adb_raw_export.txt");        Output="data/processed/adb_wiki_links.csv";                Type="Automated"; Description="Finds a best-guess Wikipedia URL for each subject." },
-    @{ Stage="2. Candidate Qualification"; Name="Validate Wikipedia Pages";   Script="src/validate_wikipedia_pages.py";   Inputs=@("data/processed/adb_wiki_links.csv");      Output="data/processed/adb_validated_subjects.csv";           Type="Automated"; Description="Validates each Wikipedia page for content, language, and redirects." },
+    @{ Stage="2. Candidate Qualification"; Name="Qualify Subjects";           Script="src/qualify_subjects.py";            Inputs=@("data/processed/adb_wiki_links.csv");      Output="data/processed/adb_validated_subjects.csv";           Type="Automated"; Description="Qualifies subjects by validating their Wikipedia/Wikidata entries for redirects, content, and life status." },
     @{ Stage="2. Candidate Qualification"; Name="Select Eligible Candidates"; Script="src/select_eligible_candidates.py"; Inputs=@("data/sources/adb_raw_export.txt", "data/processed/adb_validated_subjects.csv"); Output="data/intermediate/adb_eligible_candidates.txt";      Type="Automated"; Description="Applies deterministic data quality filters to create a pool of eligible candidates." },
     @{ Stage="3. Candidate Selection";   Name="Generate Eminence Scores";   Script="src/generate_eminence_scores.py";   Inputs=@("data/intermediate/adb_eligible_candidates.txt"); Output="data/foundational_assets/eminence_scores.csv";   Type="Automated"; Description="Generates a calibrated eminence score for each eligible candidate using an LLM." },
     @{ Stage="3. Candidate Selection";   Name="Generate OCEAN Scores";      Script="src/generate_ocean_scores.py";      Inputs=@("data/foundational_assets/eminence_scores.csv"); Output="data/foundational_assets/ocean_scores.csv";        Type="Automated"; Description="Generates OCEAN personality scores for each eligible candidate using an LLM." },
@@ -693,12 +693,9 @@ function Show-DataCompletenessReport {
                 }
                 
                 Write-Host ""
-                Write-Host "${C_YELLOW}To retry missing subjects for a specific step, run:${C_RESET}"
-                Write-Host "  .\\prepare_data.ps1 -StartWithStep <step_number>"
-                Write-Host ""
-                Write-Host "${C_CYAN}Step numbers:${C_RESET}"
-                Write-Host "  5: Generate Eminence Scores"
-                Write-Host "  6: Generate OCEAN Scores"
+                Write-Host "${C_YELLOW}To retry missing subjects, simply re-run the pipeline.${C_RESET}"
+                Write-Host "The script will automatically find and process any incomplete data."
+                Write-Host "  pdm run prep-data" -ForegroundColor Cyan
                 Write-Host ""
             } else {
                 # All steps are complete, no missing subjects
@@ -1700,14 +1697,11 @@ catch {
             Write-Host "   The pipeline will automatically resume from where it stopped."
             Write-Host ""
         } elseif ($errorMessage -match "Script .* failed with exit code") {
-            # This is a script failure, provide instructions to resume from the failed step
-            $failedStep = $stepCounter
-            Write-Host "`n${C_YELLOW}TO RESUME FROM THIS STEP:${C_RESET}"
-            Write-Host "Run the following command to restart from the failed step:"
-            Write-Host "  .\prepare_data.ps1 -StartWithStep $failedStep" -ForegroundColor Cyan
-            Write-Host ""
-            Write-Host "Alternatively, you can run the pipeline using pdm:"
-            Write-Host "  pdm run prep-data -StartWithStep $failedStep" -ForegroundColor Cyan
+            # This is a script failure, provide instructions to resume.
+            Write-Host "`n${C_YELLOW}TO RESUME THE PIPELINE:${C_RESET}"
+            Write-Host "The script will automatically continue from the failed step."
+            Write-Host "Run the following command to resume:"
+            Write-Host "  pdm run prep-data" -ForegroundColor Cyan
             Write-Host ""
         }
     }

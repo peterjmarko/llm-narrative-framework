@@ -88,7 +88,7 @@ These diagrams illustrate the internal decision-making logic and control flow of
 
 {{grouped_figure:docs/diagrams/logic_prep_find_links.mmd | scale=2.5 | width=70% | caption=Logic for Link Finding (`find_wikipedia_links.py`): The algorithm for finding Wikipedia URLs by scraping ADB and using a Wikipedia search fallback.}}
 
-{{grouped_figure:docs/diagrams/logic_prep_validate_pages.mmd | scale=2.5 | width=80% | caption=Logic for Page Validation (`validate_wikipedia_pages.py`): The algorithm for validating Wikipedia page content, including redirect and disambiguation handling.}}
+{{grouped_figure:docs/diagrams/logic_prep_qualify_subjects.mmd | scale=2.5 | width=80% | caption=Logic for Subject Qualification (`qualify_subjects.py`): The algorithm for validating Wikipedia/Wikidata entries, including redirect handling, disambiguation, and life status verification.}}
 
 {{grouped_figure:docs/diagrams/logic_prep_eligible_candidates.mmd | scale=2.5 | width=65% | caption=Logic for Final Filtering (`select_eligible_candidates.py`): The algorithm for applying all deterministic data quality rules to create the final "eligible candidates" list.}}
 
@@ -225,7 +225,7 @@ Alternatively, you can run the pipeline using pdm:
 **Step Numbers Reference:**
 - Step 1: Fetch Raw ADB Data
 - Step 2: Find Wikipedia Links
-- Step 3: Validate Wikipedia Pages
+- Step 3: Qualify Subjects
 - Step 4: Select Eligible Candidates
 - Step 5: Generate Eminence Scores
 - Step 6: Generate OCEAN Scores
@@ -294,14 +294,20 @@ This stage performs a rigorous, deterministic filtering pass on the raw data to 
     pdm run find-links
     ```
 
-2.  **Page Validation (`validate_wikipedia_pages.py`):** This script takes the list of found links and performs an intensive content validation on each page. It handles redirects, resolves disambiguation pages, validates the subject's name using the sanitized `Subject_Name`, and confirms their death date. The final output is the detailed `adb_validated_subjects.csv`.
+2.  **Subject Qualification (`qualify_subjects.py`):** This script takes the list of found links and performs an intensive content-level validation. It resolves redirects, handles disambiguation pages, and validates the subject's name. Critically, it uses a robust two-layer approach to confirm the subject is deceased, prioritizing structured data from Wikidata before falling back to parsing the Wikipedia page. The final output is the detailed `adb_validated_subjects.csv`.
     
-    **A Note on Reproducibility:** Because Wikipedia is a dynamic source, this validation is not perfectly reproducible. For direct replication, the study's pipeline relies on the static `adb_validated_subjects.csv` file included in the repository.
+    **A Note on Reproducibility:** Because Wikipedia and Wikidata are dynamic sources, this validation is not perfectly reproducible. For direct replication, the study's pipeline relies on the static `adb_validated_subjects.csv` file included in the repository.
     
     ```bash
-    # Validate the content of each found Wikipedia page
-    pdm run validate-pages
+    # Qualify subjects by validating their Wikipedia/Wikidata entries
+    pdm run qualify-subjects
     ```
+
+#### 3. Data Dictionary (`DATA_PREPARATION_DATA_DICTIONARY.template.md`)
+
+The data dictionary references the script in a few key places that must be updated.
+
+**Change 4: Update the Pipeline Completion Info Description**
 
 3.  **Final Filtering (`select_eligible_candidates.py`):** This script integrates the raw data with the Wikipedia validation report and applies the following additional criteria in order:
 

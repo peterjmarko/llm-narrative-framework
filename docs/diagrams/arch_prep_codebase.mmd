@@ -16,7 +16,7 @@ graph TD
         end
         subgraph "Stage 2: Candidate Qualification"
             B[src/find_wikipedia_links.py]
-            B2[src/validate_wikipedia_pages.py]
+            B2[src/qualify_subjects.py]
             C[src/select_eligible_candidates.py]
         end
         subgraph "Stage 3: LLM-based Candidate Selection"

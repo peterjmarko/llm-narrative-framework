@@ -67,7 +67,7 @@ These files are generated during the data validation and filtering stages.
 -   **`delineation_coverage_map.csv`**: A report used by the assembly logic validation workflow to ensure test subjects provide maximum coverage of all text components.
 -   **`eminence_scores_summary.txt`**: A human-readable summary of the eminence scoring run, including descriptive statistics, a score distribution histogram, and a list of the top 10 most eminent subjects. Includes a generation timestamp.
 -   **`ocean_scores_summary.txt`**: The detailed summary report from `generate_ocean_scores.py`, including descriptive statistics for the entire cohort and a quintile-based analysis of variance degradation. Includes a generation timestamp.
--   **`pipeline_completion_info.json`**: A machine-readable JSON file that tracks the completion status and metrics for fallible, I/O-bound pipeline steps. It contains objects for Wikipedia validation (`validate_wikipedia_pages`), eminence scoring (`eminence_scores`), OCEAN scoring (`ocean_scores`), and text neutralization (`neutralize_delineations`). Each object includes metrics like completion rates, success/failure counts, and paths to detailed reports. This file is used by the pipeline orchestrator to determine if a step completed successfully.
+-   **`pipeline_completion_info.json`**: A machine-readable JSON file that tracks the completion status and metrics for fallible, I/O-bound pipeline steps. It contains objects for subject qualification (`qualify_subjects`), eminence scoring (`eminence_scores`), OCEAN scoring (`ocean_scores`), and text neutralization (`neutralize_delineations`). Each object includes metrics like completion rates, success/failure counts, and paths to detailed reports. This file is used by the pipeline orchestrator to determine if a step completed successfully.
 -   **`missing_eminence_scores.txt`** & **`missing_ocean_scores.txt`**: Standardized, human-readable reports detailing subjects that were not scored by an LLM process. Both files share a common structure:
     1.  **Header:** Contains the report title and a generation timestamp.
     2.  **Summary Block:** Provides high-level statistics (`Total Eligible`, `Total Scored`, `Total Missing`).
@@ -105,7 +105,7 @@ These files are the outputs of one pipeline script and the inputs to the next.
 This directory holds cleaned and integrated data files that are ready for downstream processing.
 
 -   **`adb_wiki_links.csv`**: The output of `find_wikipedia_links.py`. It contains the best-guess Wikipedia URL and a sanitized `Subject_Name` for each entry from the raw data export.
--   **`adb_validated_subjects.csv`**: The output of `validate_wikipedia_pages.py`. This file contains the final validation status for each subject and is the source of truth for the sanitized `Subject_Name`.
+-   **`adb_validated_subjects.csv`**: The output of `qualify_subjects.py`. This file contains the final validation status for each subject and is the source of truth for the sanitized `Subject_Name`.
 -   **`subject_db.csv`**: The output of `create_subject_db.py`. This script integrates the Solar Fire chart data with the final subject list to produce a clean, master database ready for the final generation step.
 
 ### 6. Top-Level Files - Main Experiment Files

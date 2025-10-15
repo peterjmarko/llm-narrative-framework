@@ -62,6 +62,8 @@ main_archive/
 output/
 tests/llm_qualification/
 data/foundational_assets/neutralized_delineations/
+data/foundational_assets/cutoff_parameter_analysis_results.txt
+data/foundational_assets/cutoff_parameter_analysis_results_full_grid_search.csv
 
 
 # ==============================================================================

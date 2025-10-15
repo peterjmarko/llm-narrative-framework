@@ -165,8 +165,10 @@ class TestMainWorkflow:
         df = pd.read_csv(output_path)
         assert set(df['idADB'].astype(str)) == {"101", "102"}
 
-    def test_main_validation_discards_bad_llm_responses(self, mocker, mock_sandbox, capsys):
-        """Tests that the validation logic discards mismatched names or hallucinated IDs."""
+    def test_main_validation_handles_bad_llm_responses(self, mocker, mock_sandbox, capsys):
+        """
+        Tests that validation discards hallucinated IDs but accepts name mismatches with a warning.
+        """
         output_path = mock_sandbox / "data/foundational_assets/eminence_scores.csv"
 
         class BadLLMWorker:
@@ -181,20 +183,23 @@ class TestMainWorkflow:
                 return MagicMock(returncode=0)
 
         mocker.patch('subprocess.run', side_effect=BadLLMWorker().run)
-        # Mock exit because missing subject 102 will trigger a critical failure exit(1)
-        mocker.patch('sys.exit', side_effect=SystemExit)
+        # Mock exit, but we don't expect it to be called with an error.
+        mock_exit = mocker.patch('sys.exit')
 
         test_args = ["script.py", "--sandbox-path", str(mock_sandbox), "--force", "--no-summary"]
         with patch("sys.argv", test_args):
-            with pytest.raises(SystemExit):
-                main()
+            main()
 
+        # The run should complete successfully, so no fatal SystemExit should be raised.
+        mock_exit.assert_not_called()
+
+        # Both subjects 101 and 102 should be in the final output.
         df = pd.read_csv(output_path)
-        assert len(df) == 1
-        assert df['idADB'].iloc[0] == 101
+        assert len(df) == 2
+        assert set(df['idADB'].astype(str)) == {"101", "102"}
         
         captured = capsys.readouterr().out
-        assert "Warning: Discarded 2 invalid records" in captured
+        # Only 1 record (ID 999) should be discarded due to a bad
 
     def test_main_issues_warning_for_near_complete_runs(self, mocker, mock_sandbox, capsys):
         """Tests the warning path for >=95% but <99% completion, which should not halt."""

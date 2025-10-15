@@ -38,9 +38,7 @@ import pytest
 # Add src to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-# Import from scripts/analysis since analyze_cutoff_parameters is a utility script, not a src module
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "analysis"))
-from analyze_cutoff_parameters import find_ideal_cutoff, print_centered_table, main
+from analyze_cutoff_parameters import find_ideal_cutoff, run_analysis
 import numpy as np
 
 
@@ -68,28 +66,6 @@ class TestFindIdealCutoff:
         # For a perfect line, any point could be "ideal" (all have distance ~0)
         # Just verify it returns a valid x value
         assert ideal in x_values
-
-
-class TestPrintCenteredTable:
-    """Tests for the print_centered_table function."""
-    
-    def test_print_centered_table_basic(self, capsys):
-        """Test that the table prints without errors."""
-        df = pd.DataFrame({
-            'Start Point': [100, 200],
-            'Smoothing Window': [50, 100],
-            'Error': [10, 20]
-        })
-        
-        print_centered_table(df)
-        captured = capsys.readouterr()
-        
-        # Verify output contains the column names
-        assert 'Start' in captured.out
-        assert 'Point' in captured.out
-        assert 'Smoothing' in captured.out
-        assert 'Window' in captured.out
-        assert 'Error' in captured.out
 
 
 class TestAnalyzeCutoffParametersIntegration:

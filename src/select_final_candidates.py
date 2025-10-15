@@ -162,10 +162,11 @@ def main():
     is_stale = False
     if not args.force and output_path.exists():
         output_mtime = os.path.getmtime(output_path)
-        is_stale = any(p.exists() and os.path.getmtime(p) > output_mtime for p in input_files)
+        stale_file = next((p for p in input_files if p.exists() and os.path.getmtime(p) > output_mtime), None)
 
-        if is_stale:
-            print(f"{Fore.YELLOW}\nInput file(s) are newer than the existing output. Stale data detected.")
+        if stale_file:
+            is_stale = True
+            print(f"{Fore.YELLOW}\nInput file '{stale_file.name}' is newer than the existing output. Stale data detected.")
             print("Automatically re-running full selection process...")
             args.force = True
     

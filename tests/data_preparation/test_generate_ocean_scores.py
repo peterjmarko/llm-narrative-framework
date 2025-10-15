@@ -222,30 +222,9 @@ def test_llm_misses_subjects_halts_execution(mock_sandbox_for_main_tests):
     assert len(df) == 4
 
 
-def test_stale_input_triggers_rerun(mock_sandbox_for_main_tests, capsys):
-    """Tests that a stale output file triggers an automatic re-run."""
-    paths = mock_sandbox_for_main_tests
-    
-    # Run once to create an output file
-    with patch("sys.argv", ["s.py", "--sandbox-path", str(paths["sandbox_path"])]), \
-         patch("src.generate_ocean_scores.subprocess.run", side_effect=MockLLMWorker().run):
-        # A successful run does not exit, just completes.
-        from src import generate_ocean_scores
-        generate_ocean_scores.main()
-
-    # Make the input file newer
-    (paths["sandbox_path"] / "data/foundational_assets/eminence_scores.csv").touch()
-    
-    with patch("sys.argv", ["s.py", "--sandbox-path", str(paths["sandbox_path"])]), \
-         patch("src.generate_ocean_scores.subprocess.run", side_effect=MockLLMWorker().run) as mock_run:
-        # The second run will also complete successfully after detecting stale data.
-        generate_ocean_scores.main()
-        # Ensure it ran all 5 subjects again (1 batch with default size 50)
-        assert mock_run.call_count == 1
-    
-    captured = capsys.readouterr()
-    # The stale message is printed during the second run.
-    assert "Stale data detected" in captured.out
+# This test was removed because the aggressive stale-check logic was intentionally
+# removed from the production script. The new behavior is to resume, not to
+# force a re-run, which is already tested in `test_resume_from_partial_file`.
 
 
 class TestCoverageAndEdgeCases:
@@ -293,8 +272,8 @@ class TestCoverageAndEdgeCases:
                 generate_ocean_scores.main()
             assert e.value.code == 1
 
-    def test_validation_discards_mismatched_names(self, mock_sandbox_for_main_tests, capsys):
-        """Tests that validation discards records with a correct ID but mismatched name."""
+    def test_validation_accepts_mismatched_names_with_warning(self, mock_sandbox_for_main_tests, capsys):
+        """Tests that validation accepts records with a name mismatch but logs a warning."""
         paths = mock_sandbox_for_main_tests
         
         class MockNameMismatchWorker(MockLLMWorker):
@@ -308,16 +287,20 @@ class TestCoverageAndEdgeCases:
         
         test_args = ["s.py", "--sandbox-path", str(paths["sandbox_path"])]
         with patch("sys.argv", test_args), \
-             patch("src.generate_ocean_scores.subprocess.run", side_effect=MockNameMismatchWorker().run), \
-             pytest.raises(SystemExit) as e:
+             patch("src.generate_ocean_scores.subprocess.run", side_effect=MockNameMismatchWorker().run):
             from src import generate_ocean_scores
+            # The script should complete successfully without raising SystemExit
             generate_ocean_scores.main()
-        assert e.value.code == 1
 
         captured = capsys.readouterr()
-        assert "Warning: Discarded 1 invalid records" in captured.out
+        assert "Warning: Name mismatch for idADB 101" in captured.out
+        # No records should be discarded
+        assert "Warning: Discarded" not in captured.out
+        
         df = pd.read_csv(paths["output_path"])
-        assert "101" not in df['idADB'].astype(str).values
+        # All 5 subjects should be present, including the one with the mismatched name
+        assert len(df) == 5
+        assert "101" in df['idADB'].astype(str).values
 
     def test_validation_discards_extraneous_subjects(self, mock_sandbox_for_main_tests, capsys):
         """Tests that validation discards subjects not in the original request batch."""
@@ -423,8 +406,8 @@ def test_summary_report_with_few_subjects(tmp_path, capsys):
     generate_summary_report(scores_file, 4)
     
     captured = capsys.readouterr()
-    assert "Quintile Analysis" in captured.out
-    assert "Quintile 1" not in captured.out
+    assert "Descriptive Statistics" in captured.out
+    assert "Quintile Analysis" not in captured.out
 
 def test_main_handles_network_error_and_halts(mock_sandbox_for_main_tests, capsys):
     """Tests that 3 consecutive network errors will halt execution."""
@@ -485,7 +468,8 @@ def test_main_warns_on_near_complete_run(mock_sandbox_for_main_tests, capsys):
     # Check for the tiered warning and recommended action printout
     assert "WARNING: Failed to retrieve scores for 3 subject(s)" in captured.out
     assert "RECOMMENDED ACTION" in captured.out
-    assert "pdm run prep-data -StartWithStep 6" in captured.out
+    assert "pdm run prep-data" in captured.out
+    assert "-StartWithStep" not in captured.out
 
 def test_main_debug_mode_from_env(mock_sandbox_for_main_tests, mocker):
     """Tests that the DEBUG_OCEAN environment variable sets the log level."""

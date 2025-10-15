@@ -11,7 +11,7 @@ graph TD
     subgraph "Pipeline Scripts"
         fetch[src/fetch_adb_data.py]:::process
         find_links[src/find_wikipedia_links.py]:::process
-        validate[src/validate_wikipedia_pages.py]:::process
+        validate[src/qualify_subjects.py]:::process
         select_eligible[src/select_eligible_candidates.py]:::process
     end
 

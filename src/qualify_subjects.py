@@ -17,19 +17,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: src/validate_wikipedia_pages.py
+# Filename: src/qualify_subjects.py
 
 """
-Validates Wikipedia page content and generates the final validation reports.
+Qualifies subjects by validating their Wikipedia and Wikidata entries.
 
-This script takes the intermediate file of Wikipedia links and performs an
-intensive, content-level validation for each page to ensure data quality before
-any expensive LLM-based processing occurs.
+This script takes the intermediate file of potential Wikipedia links and performs
+an intensive, content-level validation for each subject to ensure data quality
+before any expensive LLM-based processing occurs.
 
 Key Features:
 -   **Sandbox-Aware**: Fully supports sandboxed execution via a `--sandbox-path`
     argument for isolated testing.
--   **Intelligent Validation**: The script's validation process includes:
+-   **Hybrid Validation Strategy**: The script's validation process includes:
     1.  **Resolving Redirects:** Follows all HTTP redirects, meta-refresh tags,
         and canonical URL declarations to find the true source page.
     2.  **Handling Disambiguation:** Detects disambiguation pages and
@@ -37,15 +37,14 @@ Key Features:
         year.
     3.  **Validating Names:** Performs a fuzzy string comparison between the ADB
         name and the Wikipedia article title to check for mismatches.
-    4.  **Verifying Death Date:** Uses a multi-strategy approach to confirm
-        that the subject is deceased by checking infoboxes, categories, and text
-        patterns.
--   **Comprehensive Reporting**: Upon completion, it produces two key outputs:
-    - A detailed, machine-readable CSV report (`adb_validation_report.csv`).
-    - A human-readable text summary (`adb_validation_summary.txt`).
+    4.  **Verifying Life Status (Deceased):** Uses a robust, two-layer approach,
+        prioritizing structured data from Wikidata and falling back to
+        comprehensive text parsing of the Wikipedia page.
+-   **Comprehensive Reporting**: Upon completion, it produces a detailed validation
+    report and a human-readable summary.
 -   **Resumable & Flexible**: The script is fully resumable, interrupt-safe, and
-    includes a `--report-only` flag to regenerate the text summary from an
-    existing CSV report without re-running the validation.
+    includes a `--report-only` flag to regenerate the summary from existing
+    data without re-running the validation.
 """
 
 import argparse
@@ -178,7 +177,47 @@ def validate_name(subject_name: str, soup: BeautifulSoup) -> tuple[str, int]:
     wp_base_name = re.sub(r'\s*\(.*\)$', '', wp_name).strip()
     return wp_name, fuzz.ratio(subject_base_name.lower(), wp_base_name.lower())
 
-def validate_death_date(soup: BeautifulSoup) -> bool:
+def get_wikidata_qid(soup: BeautifulSoup) -> str | None:
+    """Extracts the Wikidata QID from a Wikipedia page's soup."""
+    wikidata_link = soup.select_one('li#t-wikibase a')
+    if wikidata_link and wikidata_link.get('href'):
+        match = re.search(r'/(Q\d+)$', wikidata_link['href'])
+        if match:
+            return match.group(1)
+    return None
+
+def is_deceased_via_wikidata(qid: str) -> bool | None:
+    """Checks for a death date (P570) for a given Wikidata QID."""
+    url = f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
+    try:
+        response = SESSION.get(url, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        claims = data.get('entities', {}).get(qid, {}).get('claims', {})
+        # If P570 key exists and has at least one entry, they are deceased.
+        if 'P570' in claims and claims['P570']:
+            return True
+        return False  # No P570 property means they are presumed alive.
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        logging.warning(f"Wikidata query failed for {qid}: {e}")
+        return None
+
+def check_life_status(soup: BeautifulSoup) -> tuple[bool, str]:
+    """
+    Hybrid life status check. Prefers Wikidata, falls back to Wikipedia parsing.
+    Returns a tuple: (is_deceased, method_used).
+    """
+    qid = get_wikidata_qid(soup)
+    if qid:
+        is_deceased = is_deceased_via_wikidata(qid)
+        if is_deceased is not None:
+            return is_deceased, "Wikidata"
+    
+    # Fallback to Wikipedia parsing if Wikidata fails or is inconclusive
+    logging.info("Falling back to Wikipedia text parsing for death date.")
+    return _is_deceased_via_wikipedia_parsing(soup), "Wikipedia Parsing"
+
+def _is_deceased_via_wikipedia_parsing(soup: BeautifulSoup) -> bool:
     """Exhaustive death date detection using multiple strategies and locations."""
     # Strategy 1: Check categories first (most reliable for Wikipedia)
     categories_div = soup.find('div', id='mw-normal-catlinks')
@@ -276,11 +315,12 @@ def process_wikipedia_page(url: str, subject_name: str, birth_year: str, pbar: t
         return {'status': 'FAIL', 'notes': f"Disambiguation page, no link with year {birth_year} found"}
 
     wp_name, name_score = validate_name(subject_name, soup)
-    death_date_found = validate_death_date(soup)
+    death_date_found, death_check_method = check_life_status(soup)
     
     return {
         'status': 'OK', 'final_url': final_url, 'wp_name': wp_name,
-        'name_score': name_score, 'death_date_found': death_date_found
+        'name_score': name_score, 'death_date_found': death_date_found,
+        'death_check_method': death_check_method
     }
 
 def worker_task(row: dict, pbar: tqdm, index: int) -> dict:
@@ -311,7 +351,8 @@ def worker_task(row: dict, pbar: tqdm, index: int) -> dict:
     # Update result with validation data
     result.update({
         'WP_URL': validation['final_url'], 'WP_Name': validation['wp_name'],
-        'Name_Match_Score': validation['name_score'], 'Death_Date_Found': validation['death_date_found']
+        'Name_Match_Score': validation['name_score'], 'Death_Date_Found': validation['death_date_found'],
+        'Death_Check_Method': validation.get('death_check_method', 'N/A')
     })
     
     final_status, notes = 'OK', []
@@ -447,6 +488,7 @@ def generate_summary_report(validated_subjects_path: Path):
     no_wiki_link, fetch_fail, no_death, name_mismatch, disambiguation_fail = 0, 0, 0, 0, 0
     timeout_error, non_english_error, other_errors = 0, 0, 0
     research_entries, person_entries = 0, 0
+    wikidata_confirms, parsing_confirms = 0, 0
 
     try:
         with open(validated_subjects_path, 'r', encoding='utf-8') as f:
@@ -464,6 +506,10 @@ def generate_summary_report(validated_subjects_path: Path):
             
             if row.get('Status') in ['OK', 'VALID']:
                 valid_records += 1
+                if row.get('Death_Check_Method') == 'Wikidata':
+                    wikidata_confirms += 1
+                elif row.get('Death_Check_Method') == 'Wikipedia Parsing':
+                    parsing_confirms += 1
             else:
                 failed_records += 1
                 notes = row.get('Notes', '')
@@ -530,6 +576,14 @@ def generate_summary_report(validated_subjects_path: Path):
             f"{'Person Entries:':<{label_col}}{person_entries:>{count_col},}",
             f"{'Research Entries:':<{label_col}}{research_entries:>{count_col},}"
         ]
+        
+        death_check_stats = []
+        if wikidata_confirms > 0 or parsing_confirms > 0:
+            death_check_stats = [
+                f"\n--- Death Date Verification Method ---",
+                f"{'Confirmed via Wikidata:':<{label_col}}{wikidata_confirms:>{count_col},}",
+                f"{'Confirmed via Wikipedia Parsing:':<{label_col}}{parsing_confirms:>{count_col},}"
+            ]
 
         failure_analysis = []
         if failed_records > 0:
@@ -553,7 +607,7 @@ def generate_summary_report(validated_subjects_path: Path):
         report_lines_color = [
             banner, title.center(banner_width), banner,
             f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
-            *overall_stats, *entry_type_stats, *failure_analysis,
+            *overall_stats, *entry_type_stats, *death_check_stats, *failure_analysis,
             banner
         ]
         
@@ -665,7 +719,7 @@ def main():
         sys.exit(0)
 
     # Propagate the new column name and drop the old one from the fieldnames list
-    fieldnames = ['Index', 'idADB', 'Subject_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Status', 'Notes']
+    fieldnames = ['Index', 'idADB', 'Subject_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Death_Check_Method', 'Status', 'Notes']
         
     print(f"\n{Fore.YELLOW}--- Validating Wikipedia Pages ---")
     print(f"Found {processed_before:,} already processed records ({valid_before:,} valid).")
@@ -732,4 +786,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of src/validate_wikipedia_pages.py ===
+# === End of src/qualify_subjects.py ===
