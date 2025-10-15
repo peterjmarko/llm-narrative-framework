@@ -2,6 +2,23 @@
 
 # Changelog
 
+## 13.2.3 (2025-10-15)
+
+### Bump
+
+- **version 13.2.2 → 13.2.3**
+
+### Fixes
+
+- **align all documentation and tests with name sanitization refactor**
+  This commit finalizes the name sanitization refactor by updating all documentation and fixing the final test failures and harness bugs discovered during validation.
+  
+  - Updates the Framework Manual, Replication Guide, Data Dictionary, and Testing Guide to reflect the `adb_validated_subjects.csv` filename and updated logic.
+  - Modifies all relevant Mermaid (`.mmd`) and text-based (`.txt`) diagram source files to accurately represent the refactored data flow and schemas.
+  - Corrects the pipeline definition in the `prepare_data.ps1` orchestrator, fixing a critical crash that occurred in interactive mode.
+  - Fixes the L3 test harness (`layer3_phase2_run.ps1`) to correctly log all pipeline steps, resolving the duplicate/missing log entry bug.
+  - Corrects mock data and patch targets in the unit tests for `select_eligible_candidates.py` and `validate_wikipedia_pages.py` to resolve the last remaining test failures.
+
 ## 13.2.2 (2025-10-14)
 
 ### Bump
