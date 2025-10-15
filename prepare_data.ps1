@@ -991,27 +991,27 @@ try {
                 }
             }
             
-            # Also backup summary files that will be overwritten
-            $summaryFiles = @(
+            # Also backup and remove all other generated reports and intermediate files
+            # to ensure a completely clean state.
+            $otherGeneratedFiles = @(
+                # Reports
                 "data/reports/eminence_scores_summary.txt",
-                "data/reports/ocean_scores_summary.txt"
-            )
-            
-            foreach ($summaryFile in $summaryFiles) {
-                Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $summaryFile)
-            }
-            
-            # Backup additional files that are not part of pipeline steps but should be removed
-            $additionalFiles = @(
+                "data/reports/ocean_scores_summary.txt",
                 "data/reports/adb_validation_summary.txt",
                 "data/reports/delineation_coverage_map.csv",
                 "data/reports/missing_eminence_scores.txt",
                 "data/reports/missing_ocean_scores.txt",
-                "data/reports/missing_sf_subjects.csv"
+                "data/reports/missing_sf_subjects.csv",
+                "data/reports/data_preparation_pipeline_summary.txt",
+                "data/reports/pipeline_completion_info.json",
+                # Foundational Assets (generated)
+                "data/foundational_assets/variance_curve_analysis.png",
+                # Processed Files (generated)
+                "data/processed/adb_wiki_links.csv"
             )
-            
-            foreach ($additionalFile in $additionalFiles) {
-                Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $additionalFile)
+
+            foreach ($file in $otherGeneratedFiles) {
+                Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $file)
             }
             
             # Handle sf_chart_export files with any extension (safest approach)

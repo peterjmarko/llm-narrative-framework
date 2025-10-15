@@ -2,6 +2,7 @@ flowchart TD
     subgraph Stage2["Stage 2: Candidate Qualification"]
         S2_Script1[validate_wikipedia_pages.py]
         S2_Script1 --> R1[adb_validation_summary.txt]
+        S2_Script1 --> R7[pipeline_completion_info.json]
     end
 
     subgraph Stage3["Stage 3: Candidate Selection"]

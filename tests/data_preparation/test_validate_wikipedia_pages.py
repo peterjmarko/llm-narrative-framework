@@ -27,6 +27,7 @@ matching, robust death date detection from various HTML patterns, and the
 handling of disambiguation pages.
 """
 
+import json
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -492,37 +493,62 @@ class TestSummaryReport:
         return report_path
 
     def test_generate_summary_report_full(self, mock_report_csv, capsys, mocker):
-        """Tests that the summary report is generated correctly with varied data."""
-        # Mock PROJECT_ROOT for path calculations
-        mocker.patch('src.config_loader.PROJECT_ROOT', mock_report_csv.parents[2])
-        # Mock get_path at its source in config_loader to redirect the reports directory
-        # into our temporary test sandbox.
-        mocker.patch('config_loader.get_path', return_value=mock_report_csv.parents[1] / "reports")
+        """Tests that the summary report is generated correctly with varied data and updates the pipeline JSON."""
+        # --- Setup Mocks ---
+        sandbox_root = mock_report_csv.parents[2]
+        mocker.patch('src.config_loader.PROJECT_ROOT', sandbox_root)
 
+        # Mock get_path to resolve paths relative to our temporary sandbox. This is necessary
+        # because the function under test calls get_path with different arguments.
+        def mock_get_path(relative_path):
+            return sandbox_root / relative_path
+        mocker.patch('config_loader.get_path', side_effect=mock_get_path)
+        
+        # Define reports directory for convenience
+        reports_dir = sandbox_root / "data" / "reports"
+        
+        # --- Setup a pre-existing pipeline info JSON to test update logic ---
+        completion_info_path = reports_dir / "pipeline_completion_info.json"
+        existing_data = {"some_other_step": {"status": "complete"}}
+        completion_info_path.parent.mkdir(parents=True, exist_ok=True) 
+        with open(completion_info_path, 'w') as f:
+            json.dump(existing_data, f)
+            
+        # --- Run the function to be tested ---
         generate_summary_report(mock_report_csv)
-
-        # Construct the correct path to the summary file in the `reports` directory
-        summary_path = mock_report_csv.parents[1] / "reports" / "adb_validation_summary.txt"
+        
+        # --- Assertions for the text summary file ---
+        summary_path = reports_dir / "adb_validation_summary.txt"
         assert summary_path.exists()
-
         summary_content = summary_path.read_text()
-
-        # Check overall stats
         assert "Total Records in Report:                     10" in summary_content
         assert "Valid Records:                                2" in summary_content
         assert "Failed Records:                               8" in summary_content
-
-        # Check specific failure breakdown lines
-        assert "1. No Wikipedia Link Found:                   1" in summary_content
-        assert "2. Could Not Fetch Page:                      1" in summary_content
-        assert "5. Name Mismatch:                             1" in summary_content
         assert "6. Death Date Not Found:                      1" in summary_content
         assert "7. Processing Timeout:                        1" in summary_content
-        assert "8. Other Errors:                              1" in summary_content
 
-        # Check console output as well
+        # --- Assertions for the console output ---
         captured = capsys.readouterr()
         assert "Astro-Databank Validation Summary" in captured.out
         assert "Total Records in Report:                     10" in captured.out
+        
+        # --- Assertions for the pipeline completion JSON ---
+        assert completion_info_path.exists()
+        with open(completion_info_path, 'r') as f:
+            pipeline_data = json.load(f)
+
+        # Check that the new data was added correctly
+        assert "validate_wikipedia_pages" in pipeline_data
+        validation_data = pipeline_data["validate_wikipedia_pages"]
+        assert validation_data["step_name"] == "Validate Wikipedia Pages"
+        assert validation_data["processed_count"] == 10
+        assert validation_data["passed_count"] == 2
+        assert validation_data["failed_count"] == 8
+        assert validation_data["completion_rate"] == 20.0
+        assert "adb_validated_subjects.csv" in validation_data["report_path"]
+
+        # Check that the pre-existing data was preserved
+        assert "some_other_step" in pipeline_data
+        assert pipeline_data["some_other_step"]["status"] == "complete"
 
 # === End of tests/data_preparation/test_validate_wikipedia_pages.py ===

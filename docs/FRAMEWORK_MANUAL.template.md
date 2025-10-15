@@ -382,7 +382,7 @@ Based on this comprehensive, data-driven analysis, the following optimal paramet
 
 The plot of this analysis (see Figure S8) provides a clear visual justification for these choices. It shows how the algorithm, using these parameters, correctly identifies the start of the curve's final plateau, resulting in a final cutoff of 4,954 subjects.
 
-{{grouped_figure:data/foundational_assets/variance_curve_analysis.png | caption=Figure S8: Variance Curve Analysis for Optimal Cohort Selection. The plot shows the raw cumulative variance, the smoothed curve (800-pt moving average), the search start point (3500), and the final data-driven cutoff (4954).}}
+{{grouped_figure:docs/images/variance_curve_analysis.png | caption=Figure S8: Variance Curve Analysis for Optimal Cohort Selection. The plot shows the raw cumulative variance, the smoothed curve (800-pt moving average), the search start point (3500), and the final data-driven cutoff (4954).}}
 
 ##### Stage 4: Profile Generation
 

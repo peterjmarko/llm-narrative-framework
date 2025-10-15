@@ -306,6 +306,7 @@ def generate_scores_summary(filepath: Path, total_subjects_overall: int):
 
         banner = "="*50
         report = [banner, f"{'Eminence Scores Summary'.center(50)}", banner]
+        report.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         report.append(f"Total Scored:     {total_scored:,}")
         report.append(f"Total in Source:  {total_subjects_overall:,}")
         
@@ -658,13 +659,46 @@ def main():
         
         # Always overwrite the report, even if empty
         with open(missing_report_path, 'w', encoding='utf-8') as f:
+            total_scored = len(final_processed_ids)
+            total_missing = len(missing_ids)
+            total_eligible = total_scored + total_missing
+            completion_pct = (total_scored / total_eligible * 100) if total_eligible > 0 else 100
+
+            banner = "="*80
+            f.write(f"{banner}\n")
+            f.write(f"{'Missing Eminence Scores Report'.center(80)}\n")
+            f.write(f"{banner}\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+            f.write("--- Summary ---\n")
+            f.write(f"Total Eligible:      {total_eligible:,}\n")
+            f.write(f"Total Scored:        {total_scored:,}\n")
+            f.write(f"Total Missing:       {total_missing:,} ({100-completion_pct:.1f}%)\n\n")
+
+            f.write(f"{banner}\n")
+            f.write(f"Subjects Missed by LLM ({total_missing})\n")
+            f.write(f"{banner}\n")
+            f.write("- The LLM was queried for these subjects but failed to return a valid score.\n\n")
+
             if missing_ids:
-                f.write("Subjects missed by LLM during eminence scoring:\n")
-                for subject_id in sorted(list(missing_ids)):
-                    f.write(f"{subject_id}\n")
-                tqdm.write(f"{Fore.YELLOW}Wrote report of {len(missing_ids)} missing subjects to '{missing_report_path}'.")
+                # Load original subjects to get names for the report
+                id_to_subject = {s['idADB']: s for s in (all_subjects or [])}
+                # Also consider subjects that were processed before this run
+                if not all_subjects:
+                    full_subject_list = load_subjects_to_process(input_path, set())
+                    id_to_subject.update({s['idADB']: s for s in full_subject_list})
+
+                missing_subjects = [id_to_subject[mid] for mid in missing_ids if mid in id_to_subject]
+                
+                f.write(f"{'idADB':<10} {'Name'}\n")
+                f.write(f"{'-'*10} {'-'*50}\n")
+                for subject in sorted(missing_subjects, key=lambda s: s.get('LastName', '')):
+                    name = f"{subject.get('FirstName', '')} {subject.get('LastName', '')}".strip()
+                    f.write(f"{subject['idADB']:<10} {name}\n")
+                
+                tqdm.write(f"{Fore.YELLOW}Wrote report of {len(missing_ids)} missing subjects to '{os.path.basename(missing_report_path)}'.")
             else:
-                f.write("No missing subjects. All eligible candidates were successfully scored.\n")
+                f.write("No missing subjects found. All eligible candidates were scored.\n")
         
         # Calculate completion rate
         completion_rate = (len(final_processed_ids) / len(all_eligible_ids)) * 100 if all_eligible_ids else 0

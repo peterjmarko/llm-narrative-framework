@@ -289,6 +289,7 @@ def generate_summary_report(filepath: Path, total_subjects_overall: int):
         total_scored = len(df)
 
         report = [divider, title, divider]
+        report.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         report.append(f"Total Scored:     {total_scored:,}")
         report.append(f"Total in Source:  {total_subjects_overall:,}")
         
@@ -500,7 +501,7 @@ def main():
 
     # Display a non-interactive warning if the script is proceeding automatically
     if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
-        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (1 hour 45 minutes or more for a set of 7,000 records).{Fore.RESET}")
+        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (2 hours or more for a set of 7,000 records).{Fore.RESET}")
         
         if bypass_candidate_selection:
             print(f"{Fore.RED}BYPASS ACTIVE: The 'bypass_candidate_selection' flag is set to true in config.ini.{Fore.RESET}")
@@ -763,9 +764,9 @@ def generate_missing_scores_report(
     initial_subjects_to_process: List[Dict],
     final_scores_df: pd.DataFrame
 ):
-    """Generates a report of all subjects who did not receive a score."""
+    """Generates a structured report of all subjects who did not receive a score."""
     try:
-        # Determine which subjects were not attempted at all
+        # Determine which subjects were not attempted at all (not just those missed by the LLM)
         initial_ids = {str(s['idADB']) for s in initial_subjects_to_process}
         processed_ids = set(final_scores_df['idADB'].astype(str)) if not final_scores_df.empty else set()
         missed_in_batch_ids = {str(s['idADB']) for s in llm_missed_subjects}
@@ -773,26 +774,53 @@ def generate_missing_scores_report(
         unattempted_ids = initial_ids - processed_ids - missed_in_batch_ids
         unattempted_subjects = [s for s in initial_subjects_to_process if str(s['idADB']) in unattempted_ids]
         
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write("="*80 + "\n")
-            f.write("Missing OCEAN Scores Report".center(80) + "\n")
-            f.write("="*80 + "\n\n")
-            
-            f.write(f"--- Subjects Missed in LLM Batches ({len(llm_missed_subjects)}) ---\n")
-            if llm_missed_subjects:
-                for s in sorted(llm_missed_subjects, key=lambda x: x['Name']):
-                    f.write(f"  - {s['Name']} (idADB: {s['idADB']})\n")
-            else:
-                f.write("  None\n")
-            
-            f.write(f"\n--- Subjects Not Attempted ({len(unattempted_subjects)}) ---\n")
-            if unattempted_subjects:
-                 for s in sorted(unattempted_subjects, key=lambda x: x.get('EminenceScore', 0), reverse=True):
-                    f.write(f"  - {s['Name']} (idADB: {s['idADB']})\n")
-            else:
-                f.write("  None\n")
+        total_scored = len(processed_ids)
+        total_missing = len(llm_missed_subjects) + len(unattempted_subjects)
+        total_eligible = total_scored + total_missing
+        completion_pct = (total_scored / total_eligible * 100) if total_eligible > 0 else 100
 
-        # Final log messages are handled by the main finally block.
+        banner = "=" * 80
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(f"{banner}\n")
+            f.write(f"{'Missing OCEAN Scores Report'.center(80)}\n")
+            f.write(f"{banner}\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+            f.write("--- Summary ---\n")
+            f.write(f"Total Eligible:      {total_eligible:,}\n")
+            f.write(f"Total Scored:        {total_scored:,}\n")
+            f.write(f"Total Missing:       {total_missing:,} ({100-completion_pct:.1f}%)\n\n")
+            
+            # --- Section 1: Missed by LLM ---
+            f.write(f"{banner}\n")
+            f.write(f"CATEGORY 1: Subjects Missed During LLM Processing ({len(llm_missed_subjects)})\n")
+            f.write(f"{banner}\n")
+            f.write("- The LLM was queried for these subjects but failed to return a valid score.\n\n")
+            
+            if llm_missed_subjects:
+                f.write(f"{'idADB':<10} {'Eminence':<10} {'Name'}\n")
+                f.write(f"{'-'*10} {'-'*10} {'-'*50}\n")
+                for s in sorted(llm_missed_subjects, key=lambda x: x['Name']):
+                    eminence_score = f"{s.get('EminenceScore', 0):.2f}"
+                    f.write(f"{s['idADB']:<10} {eminence_score:<10} {s['Name']}\n")
+            else:
+                f.write("None\n")
+
+            # --- Section 2: Not Attempted ---
+            f.write(f"\n{banner}\n")
+            f.write(f"CATEGORY 2: Subjects Not Processed ({len(unattempted_subjects)})\n")
+            f.write(f"{banner}\n")
+            f.write("- The script was halted or did not reach these subjects.\n\n")
+
+            if unattempted_subjects:
+                f.write(f"{'idADB':<10} {'Eminence':<10} {'Name'}\n")
+                f.write(f"{'-'*10} {'-'*10} {'-'*50}\n")
+                # Sort by EminenceScore to show the most important missed subjects first
+                for s in sorted(unattempted_subjects, key=lambda x: x.get('EminenceScore', 0), reverse=True):
+                    eminence_score = f"{s.get('EminenceScore', 0):.2f}"
+                    f.write(f"{s['idADB']:<10} {eminence_score:<10} {s['Name']}\n")
+            else:
+                f.write("None\n")
 
     except Exception as e:
         logging.error(f"Failed to generate missing scores report: {e}")

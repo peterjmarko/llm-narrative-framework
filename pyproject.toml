@@ -101,10 +101,13 @@ commit = {cmd = "cz commit", help = "Create a new commit using the interactive C
 release = {cmd = "python scripts/build/finalize_release.py", help = "Finalize a new release (bump, changelog, tag)."}
 
 # ==============================================================================
-# === CORE PROJECT WORKFLOWS ===
+# === DATA PREPARATION WORKFLOW ===
 # ==============================================================================
-# Data preparation workflow shortcuts
-prep-data = {shell = "python scripts/maintenance/operation_runner.py prep-data pwsh -ExecutionPolicy Bypass -File ./prepare_data.ps1"}
+prep-data = {shell = "python scripts/maintenance/operation_runner.py prep-data pwsh -ExecutionPolicy Bypass -File ./prepare_data.ps1", help = "Run the full data preparation pipeline."}
+
+# ==============================================================================
+# === CORE EXPERIMENT WORKFLOWS ===
+# ==============================================================================
 # Main workflow shortcuts
 new-exp = {shell = "python scripts/maintenance/operation_runner.py new-exp pwsh -ExecutionPolicy Bypass -File ./new_experiment.ps1"}
 audit-exp = {shell = "python scripts/maintenance/operation_runner.py aud-exp pwsh -ExecutionPolicy Bypass -File ./audit_experiment.ps1"}
@@ -121,8 +124,8 @@ audit-study = {shell = "python scripts/maintenance/operation_runner.py aud-stu p
 # IMPORTANT: Section headers (marked with ===) are used by operation_runner.py
 # to categorize operations for audit logging. Maintain clear section boundaries:
 # - "TESTING" → test_summary.jsonl
-# - "DATA PREPARATION" → data_prep_summary.jsonl  
-# - "CORE PROJECT WORKFLOWS" → workflow_summary.jsonl
+# - "DATA PREPARATION" → data_prep_summary.jsonl
+# - "CORE EXPERIMENT" → workflow_summary.jsonl
 
 # --- Stage 0: Infrastructure Tests ---
 test-op-runner = {shell = "python scripts/maintenance/operation_runner.py test-op-runner pytest tests/maintenance/test_operation_runner.py", help = "Test the operation runner itself."}

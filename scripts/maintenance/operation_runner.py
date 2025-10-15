@@ -128,7 +128,7 @@ def get_operation_category(operation_name):
                     current_section = 'test'
                 elif 'DATA PREPARATION' in line_upper:
                     current_section = 'data_prep'
-                elif 'CORE PROJECT WORKFLOWS' in line_upper:
+                elif 'CORE EXPERIMENT' in line_upper: # Updated section name
                     current_section = 'workflow'
             
             # Check if this line defines our specific operation

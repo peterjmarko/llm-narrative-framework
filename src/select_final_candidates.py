@@ -267,6 +267,16 @@ def main():
             plot_path = Path(get_path(variance_plot_output))
             generate_variance_plot(x_values, variances, smoothed_variances, final_count, search_start_point, smoothing_window, plot_path, interactive=False)
 
+            # Copy the plot to the permanent documentation directory
+            try:
+                docs_image_dir = Path(get_path("docs/images"))
+                docs_image_dir.mkdir(parents=True, exist_ok=True)
+                permanent_plot_path = docs_image_dir / plot_path.name
+                shutil.copy2(plot_path, permanent_plot_path)
+                logging.info(f"Copied plot to documentation folder: '{permanent_plot_path}'.")
+            except Exception as e:
+                logging.warning(f"Could not copy plot to documentation folder: {e}")
+
         ocean_df = ocean_df.head(final_count)
 
         # Step 2: Filter the main eligible list by the now-finalized OCEAN set

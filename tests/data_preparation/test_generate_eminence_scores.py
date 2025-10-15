@@ -276,7 +276,15 @@ class TestMainWorkflow:
         missing_report_path = mock_sandbox / "data/reports/missing_eminence_scores.txt"
         assert missing_report_path.exists()
         content = missing_report_path.read_text()
-        assert "102" in content
+        
+        # Check for the new structured format
+        assert re.search(r"--- Summary ---", content)
+        assert re.search(r"Total Missing:\s+1\s", content)
+        assert re.search(r"Subjects Missed by LLM \(1\)", content)
+        assert re.search(r"idADB\s+Name", content)
+        # Check that the correct subject is listed (FirstName + LastName from mock)
+        assert re.search(r"102\s+Test B", content)
+        # Check that the scored subject is not listed
         assert "101" not in content
 
 

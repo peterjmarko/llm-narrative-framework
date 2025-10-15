@@ -210,7 +210,14 @@ def test_llm_misses_subjects_halts_execution(mock_sandbox_for_main_tests):
             generate_ocean_scores.main()
         assert e.value.code == 1
 
-    assert "Person 3 (idADB: 103)" in paths["missing_path"].read_text()
+    content = paths["missing_path"].read_text()
+    assert "Missing OCEAN Scores Report" in content
+    assert re.search(r"Total Missing:\s+1\s", content)
+    assert re.search(r"CATEGORY 1: Subjects Missed During LLM Processing \(1\)", content)
+    assert re.search(r"idADB\s+Eminence\s+Name", content)
+    # Check that the correct subject and eminence score (90.0) are listed
+    assert re.search(r"103\s+90.00\s+Person 3", content)
+
     df = pd.read_csv(paths["output_path"])
     assert len(df) == 4
 
@@ -350,7 +357,10 @@ class TestCoverageAndEdgeCases:
         assert "Process interrupted by user." in captured.out
         # The finally block should create a report of unattempted subjects
         content = paths["missing_path"].read_text()
-        assert "Subjects Not Attempted (5)" in content
+        assert re.search(r"Total Missing:\s+5\s", content)
+        assert re.search(r"CATEGORY 2: Subjects Not Processed \(5\)", content)
+        # Check that all 5 people are listed somewhere in the report
+        assert content.count("Person") == 5
 
     def test_main_handles_non_interactive_bypass(self, mock_sandbox_with_bypass_config, capsys):
         """Tests that the script runs non-interactively when bypass is active if not a TTY."""

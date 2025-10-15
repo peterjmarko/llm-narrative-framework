@@ -50,6 +50,7 @@ Key Features:
 
 import argparse
 import csv
+import json
 import logging
 import os
 import re
@@ -475,6 +476,40 @@ def generate_summary_report(validated_subjects_path: Path):
                 elif 'Death date not found' in notes: no_death += 1
                 else: other_errors += 1
         
+        # --- Update Pipeline Completion Info JSON ---
+        try:
+            completion_info_path = Path(get_path("data/reports/pipeline_completion_info.json"))
+            report_path_relative = os.path.relpath(validated_subjects_path, PROJECT_ROOT).replace('\\', '/')
+            completion_rate = (valid_records / total_records * 100) if total_records > 0 else 0
+            
+            step_data = {
+                "step_name": "Validate Wikipedia Pages",
+                "completion_rate": completion_rate,
+                "processed_count": total_records,
+                "passed_count": valid_records,
+                "failed_count": failed_records,
+                "report_path": report_path_relative
+            }
+            
+            pipeline_data = {}
+            if completion_info_path.exists():
+                with open(completion_info_path, 'r', encoding='utf-8') as f:
+                    try:
+                        # Handle case where file is empty
+                        content = f.read()
+                        if content:
+                            pipeline_data = json.loads(content)
+                    except json.JSONDecodeError:
+                        print(f"{Fore.YELLOW}Warning: Could not parse existing completion info JSON. Overwriting.")
+
+            pipeline_data["validate_wikipedia_pages"] = step_data
+
+            with open(completion_info_path, 'w', encoding='utf-8') as f:
+                json.dump(pipeline_data, f, indent=2)
+
+        except Exception as e:
+            print(f"{Fore.YELLOW}Warning: Could not update pipeline completion info JSON: {e}")
+
         # --- Build Formatted Report ---
         title = "Astro-Databank Validation Summary"
         banner_width = 60; banner = "=" * banner_width

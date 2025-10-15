@@ -163,7 +163,7 @@ foreach ($asset in $dynamicAssets) {
 $largeSeedBaseDir = Join-Path $testsAssetsDir "large_seed/data"
 $requiredLargeSeedFiles = @(
     "sources/adb_raw_export.txt",
-    "processed/adb_validation_report.csv",
+    "processed/adb_validated_subjects.csv",
     "foundational_assets/eminence_scores.csv",
     "foundational_assets/ocean_scores.csv"
 )
