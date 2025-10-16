@@ -2,6 +2,33 @@
 
 # Changelog
 
+## 15.0.0 (2025-10-15)
+
+### Bump
+
+- **version 14.0.0 → 15.0.0**
+
+### Fixes
+
+- **harden subject validator and align all tests**
+  This commit resolves a series of interconnected bugs and improves the data integrity of the subject qualification pipeline. The changes address test failures, API access issues, and flawed validation logic across the data preparation workflow and its corresponding tests.
+  
+  -   **Hardened Subject Validator:** The `qualify_subjects.py` script was overhauled. The unreliable Wikipedia text parser for death dates, which produced false positives, has been removed. The script now exclusively uses Wikidata as the single source of truth for a subject's life status, significantly increasing the accuracy of the final dataset.
+  
+  -   **Aligned L3 Integration Tests:** The L3 test suite (`run_layer3_test.ps1`, `layer3_phase2_run.ps1`) was updated to reflect the new, stricter validation logic. The tests now correctly expect fewer candidates to pass the filter, demonstrating the improved accuracy of the validator.
+  
+  -   **Fixed Pipeline Orchestrator:** A critical bug in `prepare_data.ps1` was fixed. When using `-Force` with `-StartWithStep`, the script would incorrectly delete necessary input files for the starting step. The cleanup logic is now context-aware.
+  
+  -   **Updated Unit Tests:** All related unit tests (`test_qualify_subjects.py`, `test_operation_runner.py`) were updated to align with the new application logic, removing obsolete tests and fixing assertion errors.
+  
+  -   **Updated Documentation:** The `FRAMEWORK_MANUAL.md` and `TESTING_GUIDE.md` were updated to accurately describe the new Wikidata-only validation method.
+  
+  -   **Asset Regeneration:** Foundational assets (`sf_delineations_library.txt`) were removed as part of the process to regenerate them based on the new, smaller, and more accurate final subject list.
+  
+  -   **Minor Fixes:** Includes a minor fix to `generate_eminence_scores.py`.
+  
+  BREAKING CHANGE: The `qualify_subjects.py` script no longer uses Wikipedia text parsing as a fallback for death date verification. It relies exclusively on Wikidata. This will result in a smaller but more accurate set of validated subjects for the same input data compared to previous versions. Downstream processes or tests that rely on the old, larger set of candidates will be affected and need to be updated.
+
 ## 14.0.0 (2025-10-15)
 
 ### Bump
