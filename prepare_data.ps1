@@ -988,34 +988,38 @@ try {
                 }
             }
             
-            # Also backup and remove all other generated reports and intermediate files
-            # to ensure a completely clean state.
-            $otherGeneratedFiles = @(
-                # Reports
-                "data/reports/eminence_scores_summary.txt",
-                "data/reports/ocean_scores_summary.txt",
-                "data/reports/adb_validation_summary.txt",
-                "data/reports/delineation_coverage_map.csv",
-                "data/reports/missing_eminence_scores.txt",
-                "data/reports/missing_ocean_scores.txt",
-                "data/reports/missing_sf_subjects.csv",
-                "data/reports/data_preparation_pipeline_summary.txt",
-                "data/reports/pipeline_completion_info.json",
-                # Foundational Assets (generated)
-                "data/foundational_assets/variance_curve_analysis.png",
-                # Processed Files (generated)
-                "data/processed/adb_wiki_links.csv"
-            )
+            # Also back up and remove associated reports and intermediate files
+            # based on the start step, to ensure a clean state.
+            $associatedFilesMap = @{
+                # File Path = Step Number that generates it
+                "data/processed/adb_wiki_links.csv" = 2 # Input for Step 3
+                "data/reports/adb_validation_summary.txt" = 3
+                "data/reports/eminence_scores_summary.txt" = 5
+                "data/reports/missing_eminence_scores.txt" = 5
+                "data/reports/ocean_scores_summary.txt" = 6
+                "data/reports/missing_ocean_scores.txt" = 6
+                "data/foundational_assets/variance_curve_analysis.png" = 8
+                "data/reports/delineation_coverage_map.csv" = 13
+                "data/reports/missing_sf_subjects.csv" = 13
+                # Meta-reports are always regenerated if any step runs
+                "data/reports/data_preparation_pipeline_summary.txt" = 1
+                "data/reports/pipeline_completion_info.json" = 1
+            }
 
-            foreach ($file in $otherGeneratedFiles) {
-                Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $file)
+            foreach ($file in $associatedFilesMap.Keys) {
+                $generatingStep = $associatedFilesMap[$file]
+                if ($generatingStep -ge $startBackupFrom) {
+                    Backup-And-Remove -ItemPath (Join-Path $WorkingDirectory $file)
+                }
             }
             
-            # Handle sf_chart_export files with any extension (safest approach)
-            $sfChartExportPattern = Join-Path $WorkingDirectory "data/foundational_assets/sf_chart_export.*"
-            $sfChartExportFiles = Get-ChildItem -Path $sfChartExportPattern -ErrorAction SilentlyContinue
-            foreach ($file in $sfChartExportFiles) {
-                Backup-And-Remove -ItemPath $file.FullName
+            # Handle sf_chart_export files (output of Step 11) with any extension
+            if (11 -ge $startBackupFrom) {
+                $sfChartExportPattern = Join-Path $WorkingDirectory "data/foundational_assets/sf_chart_export.*"
+                $sfChartExportFiles = Get-ChildItem -Path $sfChartExportPattern -ErrorAction SilentlyContinue
+                foreach ($file in $sfChartExportFiles) {
+                    Backup-And-Remove -ItemPath $file.FullName
+                }
             }
             
             # List of files to preserve (do not remove)

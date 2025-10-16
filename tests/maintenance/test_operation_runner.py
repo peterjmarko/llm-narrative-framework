@@ -56,7 +56,7 @@ test-op = "echo 'testing'"
 # === DATA PREPARATION ===
 prep-data = "echo 'prepping data'"
 
-# === CORE PROJECT WORKFLOWS ===
+# === CORE EXPERIMENT WORKFLOWS ===
 new-exp = "echo 'new experiment'"
     """
     fs.create_file("pyproject.toml", contents=pyproject_content)

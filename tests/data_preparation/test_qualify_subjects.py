@@ -39,7 +39,6 @@ from tqdm import tqdm
 # Import the entire module so we can patch objects within it
 from src import qualify_subjects
 from src.qualify_subjects import (
-    _is_deceased_via_wikipedia_parsing,
     check_life_status,
     fetch_page_content,
     find_matching_disambiguation_link,
@@ -88,7 +87,7 @@ def test_get_wikidata_qid():
     assert get_wikidata_qid(soup) == "Q12345"
 
 def test_check_life_status_wikidata_deceased(mocker):
-    """Tests that a death date from Wikidata correctly identifies a person as deceased."""
+    """Tests that a person is correctly identified as deceased via Wikidata."""
     mock_soup = BeautifulSoup('<html></html>', 'html.parser')
     mocker.patch('src.qualify_subjects.get_wikidata_qid', return_value="Q123")
     mocker.patch('src.qualify_subjects.is_deceased_via_wikidata', return_value=True)
@@ -97,31 +96,25 @@ def test_check_life_status_wikidata_deceased(mocker):
     assert is_deceased is True
     assert method == "Wikidata"
 
-def test_check_life_status_fallback_to_wikipedia_parsing(mocker):
-    """Tests that the system falls back to Wikipedia parsing when Wikidata fails."""
+def test_check_life_status_wikidata_alive(mocker):
+    """Tests that a person is correctly identified as alive via Wikidata."""
+    mock_soup = BeautifulSoup('<html></html>', 'html.parser')
+    mocker.patch('src.qualify_subjects.get_wikidata_qid', return_value="Q123")
+    mocker.patch('src.qualify_subjects.is_deceased_via_wikidata', return_value=False)
+    
+    is_deceased, method = check_life_status(mock_soup)
+    assert is_deceased is False
+    assert method == "Wikidata"
+
+def test_check_life_status_wikidata_inconclusive(mocker):
+    """Tests that the system returns False when Wikidata lookup is inconclusive."""
     mock_soup = BeautifulSoup('<html></html>', 'html.parser')
     mocker.patch('src.qualify_subjects.get_wikidata_qid', return_value="Q123")
     mocker.patch('src.qualify_subjects.is_deceased_via_wikidata', return_value=None) # Simulate API failure
-    mocker.patch('src.qualify_subjects._is_deceased_via_wikipedia_parsing', return_value=True)
 
     is_deceased, method = check_life_status(mock_soup)
-    assert is_deceased is True
-    assert method == "Wikipedia Parsing"
-
-@pytest.mark.parametrize("html_snippet, expected_result", [
-    # Positive cases
-    ('<div id="mw-normal-catlinks"><a>2001 deaths</a></div>', True),
-    ('<table class="infobox"><tr><th>Died</th><td>2020</td></tr></table>', True),
-    ('<p><b>John Doe</b> (1900–2000) was a person.</p>', True),
-    ('<h2>Death</h2>', True),
-    # Negative cases
-    ('<div id="mw-normal-catlinks"><a>Living people</a></div>', False),
-    ('<html><body><p>This person is still alive.</p></body></html>', False),
-])
-def test_wikipedia_parsing_fallback(html_snippet, expected_result):
-    """Tests the internal Wikipedia parsing logic (_is_deceased_via_wikipedia_parsing)."""
-    soup = BeautifulSoup(html_snippet, 'html.parser')
-    assert _is_deceased_via_wikipedia_parsing(soup) == expected_result
+    assert is_deceased is False
+    assert method == "Wikidata Inconclusive"
 
 
 # --- Tests for Disambiguation Helpers ---
@@ -550,7 +543,7 @@ class TestSummaryReport:
         # Check that the new data was added correctly
         assert "validate_wikipedia_pages" in pipeline_data
         validation_data = pipeline_data["validate_wikipedia_pages"]
-        assert validation_data["step_name"] == "Validate Wikipedia Pages"
+        assert validation_data["step_name"] == "Validate Subject Pages"
         assert validation_data["processed_count"] == 10
         assert validation_data["passed_count"] == 2
         assert validation_data["failed_count"] == 8

@@ -336,18 +336,18 @@ These tests validate the deterministic filtering rules that create the pool of e
 - Error handling for malformed pages and missing data
 - Robust handling of network failures
 
-##### Wikipedia Page Validation
+##### Subject Qualification
 
-**Module:** `src/validate_wikipedia_pages.py`
+**Module:** `src/qualify_subjects.py`
 
-**Test file:** `tests/data_preparation/test_validate_wikipedia_pages.py`
+**Test file:** `tests/data_preparation/test_qualify_subjects.py`
 
 **What's tested:**
 
-- Content validation (using the sanitized `Subject_Name`)
-- Redirect handling and resolution
+- Content validation (name matching, life status)
+- Redirect handling and resolution (canonical, meta-refresh)
 - Disambiguation page detection and handling
-- Language verification (English pages only)
+- Wikidata integration for life status verification
 - Error categorization and reporting
 - Extensive mocking of HTTP requests
 

@@ -79,15 +79,16 @@ $TestProfiles = @{
             } | Set-Content -Path $wikiLinksFile
             Write-Host "  -> Injected Non-English URL and No Link Found failures."
         }
-        ExpectedFinalLineCount = 4 # This will be determined by the LLM scoring process + header
+        # Expects 2 subjects (Busch, Cainer) + header
+        ExpectedFinalLineCount = 3
     }
     bypass = @{
         Name = "Bypass"; Description = "Tests the pipeline with LLM-based selection bypassed."
         Subjects = $commonSubjects
         ConfigOverrides = @{ "bypass_candidate_selection" = "true" }
         InterventionScript = $null
-        # Expects the 3 subjects that pass deterministic filtering + header
-        ExpectedFinalLineCount = 4
+        # Expects 2 subjects (Busch, Cainer) + header
+        ExpectedFinalLineCount = 3
     }
 }
 

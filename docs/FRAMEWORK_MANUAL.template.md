@@ -37,7 +37,7 @@ The experiment is built upon a custom database of 4,954 famous historical indivi
 
 To create a uniquely challenging test, we employed a multi-step, deterministic process to generate the textual stimuli, organized into four main stages:
 
-1.  **Data Sourcing & Candidate Qualification:** A `Raw Subject Database` of 10,619 famous individuals was derived from the Astro-Databank (ADB) and subjected to a rigorous, deterministic filtering pass to create a high-quality cohort of 7,234 "eligible candidates."
+1.  **Data Sourcing & Candidate Qualification:** A `Raw Subject Database` of over 10,000 famous individuals was derived from the Astro-Databank (ADB) and subjected to a rigorous, deterministic filtering pass to create a high-quality cohort of "eligible candidates."
 2.  **LLM-based Candidate Selection:** This eligible cohort was then processed by two LLM-driven scripts (`generate_eminence_scores.py`, `generate_ocean_scores.py`) that scored every subject for historical eminence and personality diversity. The final selection is then performed by a third script (`select_final_candidates.py`), which applies a data-driven cutoff based on score variance to determine the final subject pool.
 3.  **Manual Data Processing:** The final subject list was processed by a commercial astrology program (Solar Fire) to calculate the precise celestial positions for each person.
 4.  **Profile Generation:** A custom Python script (`generate_personalities_db.py`) then processed this celestial data. Using a `Neutralized Component Library` of pre-written sentences, the script deterministically assembled a unique personality narrative for each individual based on a validated **personality assembly algorithm**.
@@ -294,7 +294,7 @@ This stage performs a rigorous, deterministic filtering pass on the raw data to 
     pdm run find-links
     ```
 
-2.  **Subject Qualification (`qualify_subjects.py`):** This script takes the list of found links and performs an intensive content-level validation. It resolves redirects, handles disambiguation pages, and validates the subject's name. Critically, it uses a robust two-layer approach to confirm the subject is deceased, prioritizing structured data from Wikidata before falling back to parsing the Wikipedia page. The final output is the detailed `adb_validated_subjects.csv`.
+2.  **Subject Qualification (`qualify_subjects.py`):** This script takes the list of found links and performs an intensive content-level validation. It resolves redirects, handles disambiguation pages, and validates the subject's name. Critically, it uses **Wikidata as the single source of truth** to confirm a subject's life status, ensuring the highest possible data integrity by relying exclusively on structured data. The final output is the detailed `adb_validated_subjects.csv`.
     
     **A Note on Reproducibility:** Because Wikipedia and Wikidata are dynamic sources, this validation is not perfectly reproducible. For direct replication, the study's pipeline relies on the static `adb_validated_subjects.csv` file included in the repository.
     

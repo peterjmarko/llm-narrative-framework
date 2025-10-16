@@ -37,9 +37,9 @@ Key Features:
         year.
     3.  **Validating Names:** Performs a fuzzy string comparison between the ADB
         name and the Wikipedia article title to check for mismatches.
-    4.  **Verifying Life Status (Deceased):** Uses a robust, two-layer approach,
-        prioritizing structured data from Wikidata and falling back to
-        comprehensive text parsing of the Wikipedia page.
+    4.  **Verifying Life Status (Deceased):** Uses Wikidata as the single source
+        of truth to confirm a subject's life status, ensuring the highest data
+        integrity.
 -   **Comprehensive Reporting**: Upon completion, it produces a detailed validation
     report and a human-readable summary.
 -   **Resumable & Flexible**: The script is fully resumable, interrupt-safe, and
@@ -87,6 +87,7 @@ MAX_DISAMBIGUATION_DEPTH = 3
 
 # --- Resilient Session Management ---
 SESSION = requests.Session()
+SESSION.headers.update({'User-Agent': USER_AGENT})
 retry_strategy = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
 adapter = HTTPAdapter(pool_connections=10, pool_maxsize=10, max_retries=retry_strategy)
 SESSION.mount("https://", adapter)
@@ -114,8 +115,7 @@ class CustomFormatter(logging.Formatter):
 def fetch_page_content(url: str) -> BeautifulSoup | None:
     """Fetches and parses a web page, handling meta-refresh redirects."""
     try:
-        headers = {'User-Agent': USER_AGENT}
-        response = SESSION.get(url, headers=headers, timeout=REQUEST_TIMEOUT, allow_redirects=True)
+        response = SESSION.get(url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -204,99 +204,25 @@ def is_deceased_via_wikidata(qid: str) -> bool | None:
 
 def check_life_status(soup: BeautifulSoup) -> tuple[bool, str]:
     """
-    Hybrid life status check. Prefers Wikidata, falls back to Wikipedia parsing.
+    Performs a life status check using Wikidata as the single source of truth.
     Returns a tuple: (is_deceased, method_used).
     """
     qid = get_wikidata_qid(soup)
     if qid:
         is_deceased = is_deceased_via_wikidata(qid)
-        if is_deceased is not None:
-            return is_deceased, "Wikidata"
-    
-    # Fallback to Wikipedia parsing if Wikidata fails or is inconclusive
-    logging.info("Falling back to Wikipedia text parsing for death date.")
-    return _is_deceased_via_wikipedia_parsing(soup), "Wikipedia Parsing"
+        # Tier 1: Wikidata has a death date. Accept as ground truth.
+        if is_deceased is True:
+            return True, "Wikidata"
+        # Tier 2: Wikidata has an entry but no death date. Assume alive.
+        if is_deceased is False:
+            return False, "Wikidata"
 
-def _is_deceased_via_wikipedia_parsing(soup: BeautifulSoup) -> bool:
-    """Exhaustive death date detection using multiple strategies and locations."""
-    # Strategy 1: Check categories first (most reliable for Wikipedia)
-    categories_div = soup.find('div', id='mw-normal-catlinks')
-    if categories_div:
-        cat_text = categories_div.get_text()
-        if re.search(r'\bLiving people\b', cat_text):
-            return False
-        death_category_patterns = [
-            r'\d{4} deaths', r'Deaths in \d{4}', r'\d{4} births', r'People who died',
-            r'Murdered', r'Executed', r'Suicides', r'Assassination', r'victims'
-        ]
-        for pattern in death_category_patterns:
-            if re.search(pattern, cat_text, re.I):
-                return True
-    
-    # Strategy 2: Infobox check (multiple field names)
-    infobox = soup.find('table', class_='infobox')
-    if infobox:
-        death_headers = [
-            r'\bDied\b', r'\bDeath\b', r'\bDeceased\b', r'\bResting place\b',
-            r'\bBuried\b', r'\bDeath date\b', r'\bDate of death\b', r'\bDisappeared\b'
-        ]
-        for header_pattern in death_headers:
-            header = infobox.find(lambda tag: tag.name in ['th', 'td', 'caption'] and re.search(header_pattern, tag.get_text(strip=True), re.I))
-            if header:
-                if re.search(r'\d{4}', header.get_text(strip=True)): return True
-                next_cell = header.find_next_sibling()
-                if next_cell and re.search(r'\d{4}', next_cell.get_text()): return True
-                if header.name == 'th':
-                    parent_row = header.find_parent('tr')
-                    if parent_row and parent_row.find('td') and re.search(r'\d{4}', parent_row.find('td').get_text()):
-                        return True
-    
-    # Strategy 3: First paragraph analysis
-    paragraphs = [p for p in soup.find_all('p') if len(p.get_text(strip=True)) > 20 and not p.get_text(strip=True).startswith('Coordinates:')]
-    for p in paragraphs[:10]:
-        text = p.get_text()
-        if re.search(r'\([^)]*\b\d{3,4}\b[^)]*[–—\-][^)]*\b\d{3,4}\b[^)]*\)', text):
-            return True
-        if re.search(r'\bwas\s+(?:a|an)\s+\w+', text, re.I) and not re.search(r'was\s+(?:a|an)\s+\w+\s+(?:from|between|during|in\s+\d{4})', text, re.I):
-            if re.search(r'\b(?:1[0-9]{3}|20[0-2][0-9])\b', text):
-                return True
-        death_patterns = [
-            r'\b(?:died|d\.)\s+(?:on\s+)?[\w\s,]*\b\d{4}\b', r'†\s*[\w\s,]*\b\d{4}\b',
-            r'\b(?:deceased|death)\b.*\b\d{4}\b', r'\b(?:passed away|passing)\b.*\b\d{4}\b',
-            r'\b(?:killed|murdered|executed)\b.*\b\d{4}\b', r'\b(?:perished|drowned|crashed)\b.*\b\d{4}\b',
-            r'\b(?:suicide|hanged)\b.*\b\d{4}\b', r'\blast seen\b.*\b\d{4}\b',
-            r'\b(?:found dead|body found)\b',
-            r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\s*[)–—\-]'
-        ]
-        for pattern in death_patterns:
-            if re.search(pattern, text, re.I):
-                return True
-    
-    # Strategy 4: Check other infobox table formats
-    for table in soup.find_all('table', class_=re.compile(r'infobox|biography|vcard', re.I)):
-        text = table.get_text()
-        if re.search(r'\bDied\b.*\d{4}', text, re.I): return True
-        if re.search(r'[–—\-]\s*\d{1,2}\s+\w+\s+\d{4}', text): return True
-    
-    # Strategy 5: Check hatnotes
-    for hatnote in soup.find_all('div', class_=re.compile(r'hatnote')):
-        if re.search(r'\b(?:died|deceased)\b.*\d{4}', hatnote.get_text(), re.I):
-            return True
-    
-    # Strategy 6: Check "Death" section headers
-    if soup.find_all(['h2', 'h3'], string=re.compile(r'\bDeath\b|\bFinal\b|\bLast\s+years\b|\bPassing\b', re.I)):
-        return True
-    
-    # Strategy 7: Special Wikipedia templates
-    if soup.find_all(attrs={'class': re.compile(r'death-date|deathdate|dday', re.I)}):
-        return True
-    
-    # Strategy 8: Check image captions
-    for caption in soup.find_all(['div', 'p'], class_=re.compile(r'caption|thumb', re.I)):
-        if re.search(r'\b\d{4}\s*[–—\-]\s*\d{4}\b', caption.get_text()):
-            return True
-    
-    return False
+    # Tier 3: Wikidata lookup failed (no QID, API error, etc.).
+    # Per the simplified logic, we do not fall back to parsing.
+    # The absence of a confirmed death date means the check fails.
+    return False, "Wikidata Inconclusive"
+
+# The _is_deceased_via_wikipedia_parsing function has been removed as it is no longer used.
 
 def process_wikipedia_page(url: str, subject_name: str, birth_year: str, pbar: tqdm, depth=0) -> dict:
     """Scrapes and validates a Wikipedia page with robust disambiguation handling."""
@@ -488,7 +414,7 @@ def generate_summary_report(validated_subjects_path: Path):
     no_wiki_link, fetch_fail, no_death, name_mismatch, disambiguation_fail = 0, 0, 0, 0, 0
     timeout_error, non_english_error, other_errors = 0, 0, 0
     research_entries, person_entries = 0, 0
-    wikidata_confirms, parsing_confirms = 0, 0
+    wikidata_confirms = 0
 
     try:
         with open(validated_subjects_path, 'r', encoding='utf-8') as f:
@@ -506,10 +432,10 @@ def generate_summary_report(validated_subjects_path: Path):
             
             if row.get('Status') in ['OK', 'VALID']:
                 valid_records += 1
+                # A 'VALID'/'OK' status for a person implies their death date was confirmed,
+                # and our logic now ensures this only happens via Wikidata.
                 if row.get('Death_Check_Method') == 'Wikidata':
                     wikidata_confirms += 1
-                elif row.get('Death_Check_Method') == 'Wikipedia Parsing':
-                    parsing_confirms += 1
             else:
                 failed_records += 1
                 notes = row.get('Notes', '')
@@ -529,7 +455,7 @@ def generate_summary_report(validated_subjects_path: Path):
             completion_rate = (valid_records / total_records * 100) if total_records > 0 else 0
             
             step_data = {
-                "step_name": "Validate Wikipedia Pages",
+                "step_name": "Validate Subject Pages",
                 "completion_rate": completion_rate,
                 "processed_count": total_records,
                 "passed_count": valid_records,
@@ -578,11 +504,10 @@ def generate_summary_report(validated_subjects_path: Path):
         ]
         
         death_check_stats = []
-        if wikidata_confirms > 0 or parsing_confirms > 0:
+        if wikidata_confirms > 0:
             death_check_stats = [
                 f"\n--- Death Date Verification Method ---",
-                f"{'Confirmed via Wikidata:':<{label_col}}{wikidata_confirms:>{count_col},}",
-                f"{'Confirmed via Wikipedia Parsing:':<{label_col}}{parsing_confirms:>{count_col},}"
+                f"{'Confirmed via Wikidata:':<{label_col}}{wikidata_confirms:>{count_col},}"
             ]
 
         failure_analysis = []
@@ -721,10 +646,10 @@ def main():
     # Propagate the new column name and drop the old one from the fieldnames list
     fieldnames = ['Index', 'idADB', 'Subject_Name', 'Entry_Type', 'WP_URL', 'WP_Name', 'Name_Match_Score', 'Death_Date_Found', 'Death_Check_Method', 'Status', 'Notes']
         
-    print(f"\n{Fore.YELLOW}--- Validating Wikipedia Pages ---")
+    print(f"\n{Fore.YELLOW}--- Validating Subject Pages ---")
     print(f"Found {processed_before:,} already processed records ({valid_before:,} valid).")
     print(f"Now processing {len(records_to_process):,} new records using {args.workers} workers.")
-    print(f"{Fore.YELLOW}NOTE: Each set of 10,000 records can take 15 minutes or more to process.")
+    print(f"{Fore.YELLOW}NOTE: Each set of 10,000 records can take 20 minutes or more to process.")
     print(f"You can safely interrupt with Ctrl+C at any time to resume later.\n")
 
     was_interrupted = False
