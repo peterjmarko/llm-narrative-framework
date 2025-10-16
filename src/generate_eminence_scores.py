@@ -490,7 +490,7 @@ def main():
 
     # Display a non-interactive warning if the script is proceeding automatically
     if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
-         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (15 minutes or more for a set of 6,000 records).{Fore.RESET}")
+         print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (20 minutes or more for a set of 6,000 records).{Fore.RESET}")
 
     print(f"\n{Fore.YELLOW}--- Processing Scope ---{Fore.RESET}")
     print(f"Found {len(processed_ids):,} existing scores.")
@@ -607,9 +607,29 @@ def main():
                     continue
                 # --- END: New Hardened Validation Logic ---
 
-                save_scores_to_csv(output_path, parsed_scores, current_index)
-                processed_count += len(parsed_scores)
-                current_index += len(parsed_scores)
+                # --- START: Prevent Duplicate Writes on Resumption ---
+                # Filter out scores that are already processed or are duplicates within this batch.
+                scores_to_save = []
+                seen_in_this_batch = set()
+                for score_tuple in parsed_scores:
+                    id_adb = score_tuple[0]
+                    if id_adb not in processed_ids and id_adb not in seen_in_this_batch:
+                        scores_to_save.append(score_tuple)
+                        seen_in_this_batch.add(id_adb)
+                
+                if len(scores_to_save) < len(parsed_scores):
+                    num_skipped = len(parsed_scores) - len(scores_to_save)
+                    tqdm.write(f"{Fore.YELLOW}Note: Skipped writing {num_skipped} duplicate or already-processed score(s).{Fore.RESET}")
+
+                if scores_to_save:
+                    save_scores_to_csv(output_path, scores_to_save, current_index)
+                    processed_count += len(scores_to_save)
+                    current_index += len(scores_to_save)
+                    
+                    # Update the master set of processed IDs for the next batch
+                    processed_ids.update(s[0] for s in scores_to_save)
+                # --- END: Prevent Duplicate Writes on Resumption ---
+                
                 pbar.update(len(batch))
         
         run_completed_successfully = True
@@ -754,8 +774,7 @@ def main():
                 tqdm.write(f"{Fore.YELLOW}{'='*60}")
                 tqdm.write(f"{'RECOMMENDED ACTION':^60}")
                 tqdm.write(f"{'='*60}")
-                tqdm.write(f"To retrieve missing subjects, re-run the pipeline starting with this step:")
-                tqdm.write(f"  pdm run prep-data -StartWithStep 5")
+                tqdm.write(f"To retrieve missing subjects, re-run the pipeline:  pdm run prep-data")
                 tqdm.write(f"{'='*60}{Fore.RESET}")
             else:
                 # Minor: Continue with simple notification

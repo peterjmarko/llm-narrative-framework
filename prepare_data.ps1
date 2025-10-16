@@ -231,24 +231,34 @@ function Get-StepStatus {
                 $content = Get-Content $summaryFile -Raw
                 $scored = ($content | Select-String -Pattern "Total Scored:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
                 $total = ($content | Select-String -Pattern "Total in Source:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
-                if ($scored -eq $total -and (Test-Path $outputFile)) { return "Complete" }
+                if ($scored -ge $total -and (Test-Path $outputFile)) { return "Complete" } # Use -ge for robustness
             } catch {
                 # Fallback in case of parsing error
             }
             return "Incomplete"
         }
         "Generate OCEAN Scores" {
-            $summaryFile = Join-Path $BaseDirectory "data/reports/ocean_scores_summary.txt"
-            if (-not (Test-Path $summaryFile)) {
-                if (Test-Path $outputFile) { return "Incomplete" } else { return "Missing" }
+            $inputFile = Join-Path $BaseDirectory $Step.Inputs[0] # eminence_scores.csv
+            
+            if (-not (Test-Path $inputFile)) {
+                # If the input doesn't exist, this step is effectively missing its prerequisite.
+                return "Missing"
             }
+            if (-not (Test-Path $outputFile)) {
+                # If output doesn't exist but input does, it's ready to run.
+                return "Incomplete"
+            }
+            
             try {
-                $content = Get-Content $summaryFile -Raw
-                $scored = ($content | Select-String -Pattern "Total Scored:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
-                $total = ($content | Select-String -Pattern "Total in Source:\s+([\d,]+)").Matches[0].Groups[1].Value -replace ",", ""
-                if ($scored -eq $total -and (Test-Path $outputFile)) { return "Complete" }
+                # Compare the number of data rows in the input and output files.
+                $inputCount = (Import-Csv $inputFile).Count
+                $outputCount = (Import-Csv $outputFile).Count
+                
+                if ($outputCount -ge $inputCount) {
+                    return "Complete"
+                }
             } catch {
-                # Fallback in case of parsing error
+                # If we can't read either file, it's safer to mark as incomplete to trigger a re-run.
             }
             return "Incomplete"
         }
@@ -1695,11 +1705,29 @@ catch {
         Write-Host ""
 
         if ($isManualPause) {
-            Write-Host "`n${C_YELLOW}NEXT STEPS:${C_RESET}"
-            Write-Host "1. Complete the manual step described in the message above."
-            Write-Host "2. Once the required output file is in place, re-run this script."
-            Write-Host "   The pipeline will automatically resume from where it stopped."
-            Write-Host ""
+            # Check if the halt is for Step 10 specifically
+            if ($errorMessage -match "one-time Solar Fire delineation library export") {
+                Write-Host "`n${C_YELLOW}NEXT STEPS:${C_RESET}"
+                Write-Host "1. ${C_CYAN}Review the automated selection results.${C_RESET}"
+                Write-Host "   Check the summary reports for Steps 5-8 to ensure all subjects were scored."
+                Write-Host "   If subjects were missed, re-run the pipeline to complete the scoring:"
+                Write-Host "     ${C_GREEN}pdm run prep-data${C_RESET}"
+                Write-Host ""
+                Write-Host "2. ${C_CYAN}Perform the manual Solar Fire export.${C_RESET}"
+                Write-Host "   Once you are satisfied with the candidate selection, complete Step 10 as described"
+                Write-Host "   in the Framework Manual."
+                Write-Host ""
+                Write-Host "3. ${C_CYAN}Resume the pipeline.${C_RESET}"
+                Write-Host "   After the export file is in place, re-run this script to continue."
+                Write-Host ""
+            } else {
+                # Standard message for other manual steps
+                Write-Host "`n${C_YELLOW}NEXT STEPS:${C_RESET}"
+                Write-Host "1. Complete the manual step described in the message above."
+                Write-Host "2. Once the required output file is in place, re-run this script."
+                Write-Host "   The pipeline will automatically resume from where it stopped."
+                Write-Host ""
+            }
         } elseif ($errorMessage -match "Script .* failed with exit code") {
             # This is a script failure, provide instructions to resume.
             Write-Host "`n${C_YELLOW}TO RESUME THE PIPELINE:${C_RESET}"

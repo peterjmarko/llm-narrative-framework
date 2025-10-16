@@ -84,42 +84,56 @@ def find_ideal_cutoff(x_values, y_values):
     return x_values[max_dist_index]
 
 
-def generate_report(stability_df, best_params, text_report_path):
+def generate_report(results_df, best_params_row, consensus_cutoff, text_report_path):
     """
-    Generates a formatted text report for the console (top 10) and a full
-    report for a file.
+    Generates a formatted text report for the console and a file based on the new consensus logic.
     """
+    from datetime import datetime
+    
     # --- Shared Report Components ---
+    title = "Cutoff Parameter Analysis Report"
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     report_header = [
-        f"\n{Fore.YELLOW}--- Recommendation ---{Fore.RESET}",
-        f"\n\n{Fore.YELLOW}--- Stability Analysis (Top Performers with Error < 50) ---{Fore.RESET}",
-        "Showing the most stable results, sorted by neighbor error ('Stability') then self error.\n"
+        f"\n{Fore.YELLOW}{'=' * (len(title) + 4)}{Fore.RESET}",
+        f"{Fore.YELLOW}  {title}  {Fore.RESET}",
+        f"{Fore.YELLOW}{'=' * (len(title) + 4)}{Fore.RESET}",
+        f"Generated: {timestamp}\n",
+        f"{Fore.YELLOW}--- Analysis Summary ---{Fore.RESET}",
+        "Showing the top-performing parameter sets, sorted by Error.\n"
     ]
     
+    best_params = {
+        'start_point': int(best_params_row['Start Point'].iloc[0]),
+        'smoothing_window': int(best_params_row['Smoothing Window'].iloc[0])
+    }
+
     report_footer = [
-        "\nThe most robust parameters (center of the most stable, high-performing cluster) are:",
+        f"\nConsensus Ideal Cutoff (avg of top performers): {int(consensus_cutoff)}",
+        "\nThe recommended parameter set is the one that most accurately predicts this consensus value:",
         f"{Fore.CYAN}  cutoff_search_start_point = {best_params['start_point']}{Fore.RESET}",
         f"{Fore.CYAN}  smoothing_window_size = {best_params['smoothing_window']}{Fore.RESET}",
-        "\nThese values are recommended as they are high-performing and surrounded by other",
-        "high-performing parameters, indicating a stable and reliable choice."
+        "\nThis set is recommended for its high accuracy and reliability in predicting the stable cutoff point."
     ]
 
     # Define headers for tabulate
     headers = {
         'Start Point': 'Start\nPoint', 'Smoothing Window': 'Smoothing\nWindow',
         'Predicted Cutoff': 'Predicted\nCutoff', 'Ideal Cutoff': 'Ideal\nCutoff',
-        'Error': 'Error', 'Stability': 'Stability'
+        'Error': 'Error', 'Deviation': 'Deviation from\nConsensus'
     }
-    df_renamed = stability_df.rename(columns=lambda x: headers.get(x, x))
+    
+    # Select and rename columns for the report
+    report_cols = ['Start Point', 'Smoothing Window', 'Predicted Cutoff', 'Ideal Cutoff', 'Error', 'Deviation']
+    df_renamed = results_df[report_cols].rename(columns=lambda x: headers.get(x, x))
 
     # Define column-specific number formats for tabulate
-    # Integers for all columns except Stability, which gets 2 decimal places.
-    col_formats = (".0f", ".0f", ".0f", ".0f", ".0f", ".2f")
+    col_formats = (".0f", ".0f", ".0f", ".0f", ".0f", ".0f")
 
     # --- Generate Console Output (Top 10) ---
     console_df = df_renamed.head(10)
     console_table = tabulate(
-        console_df, headers="keys", tablefmt="simple", floatfmt=col_formats, numalign="center"
+        console_df, headers="keys", tablefmt="simple", floatfmt=col_formats, numalign="center", showindex=False
     )
     console_report_parts = report_header + [console_table] + report_footer
     print("\n".join(console_report_parts))
@@ -127,13 +141,17 @@ def generate_report(stability_df, best_params, text_report_path):
     # --- Generate File Output (Full Report) ---
     file_df = df_renamed
     file_table = tabulate(
-        file_df, headers="keys", tablefmt="simple", floatfmt=col_formats, numalign="center"
+        file_df, headers="keys", tablefmt="simple", floatfmt=col_formats, numalign="center", showindex=False
     )
     
     # Remove ANSI color codes for the file version
-    file_footer_clean = [s.split('m', 1)[-1] for s in report_footer]
-    file_report_parts = report_header + [file_table] + file_footer_clean
-    text_report_path.write_text("\n".join(file_report_parts).replace(Fore.YELLOW, '').replace(Fore.RESET, ''), encoding="utf-8")
+    file_report_plain = []
+    import re
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    for part in report_header + [file_table] + report_footer:
+        file_report_plain.append(ansi_escape.sub('', part))
+
+    text_report_path.write_text("\n".join(file_report_plain), encoding="utf-8")
 
 
 def run_analysis(sandbox_path=None):
@@ -213,8 +231,10 @@ def run_analysis(sandbox_path=None):
                 search_y = smoothed[start_idx:]
                 ideal_cutoff = find_ideal_cutoff(search_x, search_y)
                 
-                # --- 3. Calculate error and store ---
+                # --- 3. Calculate base error ---
+                # The error is the absolute difference between the predicted and ideal cutoffs.
                 error = abs(predicted_cutoff - ideal_cutoff)
+                
                 results.append({
                     "Start Point": start_point,
                     "Smoothing Window": window,
@@ -249,76 +269,73 @@ def run_analysis(sandbox_path=None):
     results_df = pd.DataFrame(results)
     results_df.sort_values(by="Error", ascending=True, inplace=True)
     
-    # Define file paths
-    csv_report_path = Path(get_path("data/foundational_assets/cutoff_parameter_analysis_results.csv"))
-    text_report_path = csv_report_path.with_suffix('.txt')
-    full_grid_search_path = csv_report_path.with_name(f"{csv_report_path.stem}_full_grid_search.csv")
+    from config_loader import PROJECT_ROOT
 
+    # --- Define and manage file output paths ---
+    # Main output (recommendation)
+    recommendation_path = Path(get_path("data/foundational_assets/cutoff_parameter_analysis_results.csv"))
+    
+    # Diagnostic reports
+    reports_dir = Path(get_path("data/reports"))
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    text_report_path = reports_dir / "cutoff_parameter_stability_report.txt"
+    full_grid_search_path = reports_dir / "cutoff_parameter_full_grid_search.csv"
+    
     # --- Save the full grid search data for diagnostic purposes ---
     try:
-        full_grid_search_path.parent.mkdir(parents=True, exist_ok=True)
         results_df.to_csv(full_grid_search_path, index=False)
-        print(f"\nAnalysis results (full grid search) saved to '{full_grid_search_path}'.")
+        display_grid_path = os.path.relpath(full_grid_search_path, PROJECT_ROOT).replace('\\', '/')
+        print(f"\nAnalysis results (full grid search) saved to '{display_grid_path}'.")
     except Exception as e:
         print(f"\n{Fore.RED}Error saving full grid search results to file: {e}")
 
-    # --- Stability-Based Algorithm: Find the most robust high-performer ---
-    error_threshold = 50
-    best_cluster_df = results_df[results_df['Error'] < error_threshold].copy()
+    # --- New Consensus-Based Recommendation Logic ---
+    top_n_for_consensus = get_config_value(APP_CONFIG, "DataGeneration", "top_n_for_consensus", 50, int)
+    top_n_df = results_df.head(top_n_for_consensus)
     
-    final_recommendation_df = None
+    if top_n_df.empty:
+        print(f"{Fore.RED}Error: No results to analyze. Cannot generate a recommendation.{Fore.RESET}")
+        return
 
-    if not best_cluster_df.empty:
-        unique_starts = sorted(list(results_df['Start Point'].unique()))
-        unique_windows = sorted(list(results_df['Smoothing Window'].unique()))
+    consensus_cutoff = top_n_df['Ideal Cutoff'].mean()
 
-        stability_scores = []
-        for index, row in best_cluster_df.iterrows():
-            current_start, current_window = row['Start Point'], row['Smoothing Window']
-            start_idx, window_idx = unique_starts.index(current_start), unique_windows.index(current_window)
-            
-            neighbor_errors = []
-            # Check neighbors in cardinal directions
-            for ds, dw in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                ni, nj = start_idx + ds, window_idx + dw
-                if 0 <= ni < len(unique_starts) and 0 <= nj < len(unique_windows):
-                    neighbor_row = results_df[(results_df['Start Point'] == unique_starts[ni]) & (results_df['Smoothing Window'] == unique_windows[nj])]
-                    if not neighbor_row.empty: neighbor_errors.append(neighbor_row['Error'].iloc[0])
-            
-            stability_scores.append(np.mean(neighbor_errors) if neighbor_errors else np.inf)
+    # Calculate deviation from this consensus for all parameter sets
+    results_df['Deviation'] = abs(results_df['Predicted Cutoff'] - consensus_cutoff)
+    
+    # Add a normalized tie-breaker column to handle different parameter scales
+    min_start, max_start = results_df['Start Point'].min(), results_df['Start Point'].max()
+    min_window, max_window = results_df['Smoothing Window'].min(), results_df['Smoothing Window'].max()
 
-        best_cluster_df['Stability'] = stability_scores
-        best_cluster_df.sort_values(by=['Stability', 'Error'], ascending=[True, True], inplace=True)
-        
-        # The final recommendation is the single most stable, high-performing parameter set.
-        recommended_params_row = best_cluster_df.iloc[[0]]
-        final_recommendation_df = recommended_params_row[['Start Point', 'Smoothing Window', 'Predicted Cutoff', 'Ideal Cutoff', 'Error']]
-        
-        best_params = {
-            'start_point': int(recommended_params_row['Start Point'].iloc[0]),
-            'smoothing_window': int(recommended_params_row['Smoothing Window'].iloc[0])
-        }
-        
-        # Generate the console and text reports from the full stability analysis
-        generate_report(best_cluster_df, best_params, text_report_path)
+    # Avoid division by zero if a parameter range has only one value
+    range_start = max_start - min_start if max_start > min_start else 1
+    range_window = max_window - min_window if max_window > min_window else 1
+    
+    norm_start = (results_df['Start Point'] - min_start) / range_start
+    norm_window = (results_df['Smoothing Window'] - min_window) / range_window
+    
+    results_df['TieBreaker'] = norm_start + norm_window
+    
+    # Find the best row: sort by deviation, then by the normalized tie-breaker
+    best_params_row = results_df.sort_values(by=['Deviation', 'TieBreaker'], ascending=[True, True]).iloc[[0]]
+    
+    # The final recommendation for the CSV is just the best parameter set
+    final_recommendation_df = best_params_row[['Start Point', 'Smoothing Window', 'Predicted Cutoff', 'Ideal Cutoff', 'Error']]
 
-    else:
-        # Fallback to the single best result if no cluster is found
-        best_params_row = results_df.iloc[[0]]
-        final_recommendation_df = best_params_row[['Start Point', 'Smoothing Window', 'Predicted Cutoff', 'Ideal Cutoff', 'Error']]
-        
-        print("No high-performing cluster found. Recommending the single best result:")
-        print(f"{Fore.CYAN}  cutoff_search_start_point = {int(best_params_row['Start Point'].iloc[0])}{Fore.RESET}")
-        print(f"{Fore.CYAN}  smoothing_window_size = {int(best_params_row['Smoothing Window'].iloc[0])}{Fore.RESET}")
+    # Generate the console and text reports
+    generate_report(results_df, best_params_row, consensus_cutoff, text_report_path)
 
     # --- Save the final, single-line recommendation to the main CSV output file ---
     # This ensures the orchestrator reads the correct, stability-analyzed result.
     try:
-        csv_report_path.parent.mkdir(parents=True, exist_ok=True)
-        final_recommendation_df.to_csv(csv_report_path, index=False)
-        print(f"\nAnalysis recommendation saved to '{csv_report_path}'.")
+        recommendation_path.parent.mkdir(parents=True, exist_ok=True)
+        final_recommendation_df.to_csv(recommendation_path, index=False)
+        
+        display_rec_path = os.path.relpath(recommendation_path, PROJECT_ROOT).replace('\\', '/')
+        display_txt_path = os.path.relpath(text_report_path, PROJECT_ROOT).replace('\\', '/')
+        
+        print(f"\nAnalysis recommendation saved to '{display_rec_path}'.")
         if text_report_path.exists():
-            print(f"Formatted stability analysis saved to '{text_report_path}'.")
+            print(f"Formatted stability analysis saved to '{display_txt_path}'.")
     except Exception as e:
         print(f"\n{Fore.RED}Error saving recommendation to file: {e}")
     
@@ -336,7 +353,15 @@ def main():
     )
     parser.add_argument("--sandbox-path", help="Specify a sandbox directory for all file operations.")
     parser.add_argument("--force", action="store_true", help="Force re-run of analysis (included for pipeline compatibility).")
+    parser.add_argument("--top-n-for-consensus", type=int, help="Number of top results to use for calculating the consensus cutoff point. Overrides config.ini.")
     args = parser.parse_args()
+
+    # Allow CLI to override the config value for top_n_for_consensus
+    if args.top_n_for_consensus:
+        from config_loader import APP_CONFIG
+        if not APP_CONFIG.has_section("DataGeneration"):
+            APP_CONFIG.add_section("DataGeneration")
+        APP_CONFIG.set("DataGeneration", "top_n_for_consensus", str(args.top_n_for_consensus))
 
     run_analysis(sandbox_path=args.sandbox_path)
 

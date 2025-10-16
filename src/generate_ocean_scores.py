@@ -453,7 +453,7 @@ def main():
 
     # Display a non-interactive warning if the script is proceeding automatically
     if not args.no_api_warning and total_to_process > 0 and not (output_path.exists() and not args.force and not 'is_stale' in locals()):
-        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (2 hours or more for a set of 7,000 records).{Fore.RESET}")
+        print(f"\n{Fore.YELLOW}WARNING: This process will make LLM calls incurring API transaction costs which could take some time to complete (1.5 hours or more for a set of 6,000 records).{Fore.RESET}")
         
         if bypass_candidate_selection:
             print(f"{Fore.RED}BYPASS ACTIVE: The 'bypass_candidate_selection' flag is set to true in config.ini.{Fore.RESET}")
@@ -683,9 +683,10 @@ def main():
 
         # Print final status message based on the exit condition
         if was_interrupted:
-            tqdm.write(f"{Fore.YELLOW}OCEAN score generation terminated by user. ✨\n{Fore.RESET}")
+            tqdm.write(f"\n{Fore.YELLOW}OCEAN score generation terminated by user. ✨\n{Fore.RESET}")
         elif stop_reason.startswith("Halted"):
-            tqdm.write(f"{Fore.RED}OCEAN score generation halted due to critical errors. ✨\n{Fore.RESET}")
+            tqdm.write(f"\n{Fore.YELLOW}OCEAN score generation halted due to recoverable API errors. ✨\n{Fore.RESET}")
+            tqdm.write(f"{Fore.CYAN}Re-run the pipeline to automatically resume and process the missing subjects.{Fore.RESET}\n")
         else:
             final_df = pd.read_csv(output_path) if output_path.exists() and output_path.stat().st_size > 0 else pd.DataFrame()
             
