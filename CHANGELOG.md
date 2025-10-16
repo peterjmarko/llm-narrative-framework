@@ -2,6 +2,35 @@
 
 # Changelog
 
+## 15.0.1 (2025-10-16)
+
+### Bump
+
+- **version 15.0.0 → 15.0.1**
+
+### Fixes
+
+- **Refine cutoff analysis, fix scoring bugs, and improve docs**
+  This commit introduces a more robust, consensus-based algorithm for the cutoff parameter analysis, resolves several bugs in the LLM-based scoring and pipeline resumption logic, and updates the Framework Manual to reflect these changes.
+  
+  -   **`analyze_cutoff_parameters.py`:**
+      -   Replaced the stability-based algorithm with a new consensus-based method that identifies the most reliable cutoff point from top-performing parameters.
+      -   Removed the complex runway penalty/reward system in favor of a simple base error (`ideal - predicted`).
+      -   Implemented a normalized tie-breaker (`Start Point + Smoothing Window`) to eliminate bias from different parameter ranges.
+  
+  -   **`generate_eminence_scores.py`:**
+      -   Fixed a critical bug that caused duplicate subjects to be appended to the output file on re-runs by de-duplicating LLM batch responses before saving.
+  
+  -   **`generate_ocean_scores.py`:**
+      -   Corrected the final status message to accurately reflect a "halt due to recoverable API errors" instead of "critical errors," avoiding confusion.
+  
+  -   **`prepare_data.ps1`:**
+      -   Fixed a logic flaw in the pipeline resumption; the OCEAN scoring step now correctly calculates its work based on its input file (`eminence_scores.csv`), ensuring it processes both newly available subjects and any it missed on a previous run.
+      -   Enhanced the "NEXT STEPS" message when halting at the manual Step 10 to be more contextual and actionable.
+  
+  -   **`docs/FRAMEWORK_MANUAL.template.md`:**
+      -   Updated documentation to describe the new consensus-based cutoff analysis algorithm and the improved pipeline messaging.
+
 ## 15.0.0 (2025-10-15)
 
 ### Bump
