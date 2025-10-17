@@ -6,11 +6,6 @@ This document outlines planned development tasks and tracks known issues for the
 
 ### 1. Final Data Generation and Study Execution
 
-- [ ] **Execute Final Data Preparation**
-  - [ ] Run the complete `prepare_data.ps1` pipeline to generate a fresh, final dataset from live sources.
-- [ ] **Execute Final Study Runs**
-  - [ ] Design final study.
-  - [ ] Run `new_experiment.ps1` for each experimental condition defined in the paper, using fixed randomization seeds in `config.ini`.
 - [ ] **Organize and Compile Final Study**
   - [ ] Manually create a final study directory (e.g., `output/studies/publication_run/`).
   - [ ] Move all generated experiment folders into the study directory.
@@ -24,9 +19,8 @@ This document outlines planned development tasks and tracks known issues for the
 
 - [ ] **Update All Documents with Final Results**
   - [ ] Consolidate documentation: justify each document and sharply define scope and relationships.
-    - [ ] Merge Lifecycle Guide into main README.
   - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
-  - [ ] Update all dates (October 6 to ...), tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
+  - [ ] Update all dates (October 16 to ...), tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
   - [ ] Replace the text placeholder in `article_main_text.md` with the final, generated interaction plot (`interaction_plot_mean_rank.png`).
   - [ ] Address Research Article inconsistencies identified in documentation alignment:
     - [ ] Clarify statistical analysis - either report Three-Way ANOVA results consistent with 2×3×3 design or explain why Two-Way was used
@@ -114,11 +108,21 @@ This document outlines planned development tasks and tracks known issues for the
 - [ ] **Implement Shared Progress Bar Utility**
   - [ ] Create a new utility in `src/utils/` to provide a standardized, shared `tqdm` progress bar.
   - [ ] Refactor `generate_eminence_scores.py` and `generate_ocean_scores.py` to use this shared utility for a consistent user experience during long-running LLM calls.
+- [x] **Implement Interactive Study Parameter Selection**
+  - [x] Restructure `config.ini` to accommodate [Study] parameters
+  - [x] Enhance `new_experiment.ps1` to present interactive selection from study design matrix
+  - [x] Implement study creation logging for tracking experimental conditions
+  - [x] Update Layer 4 test suite for compatibility
+
 - [ ] **Implement Automated Study Lifecycle Management**
-  - [ ] Restructure `config.ini` to accommodate [Study] parameters (like for Layer 4). Sync with Layer 4 approach.
-  - [ ] Implement a `new_study.ps1` orchestrator to automate the creation of multi-experiment studies based on a factor matrix in `config.ini`.
-  - [ ] Develop a corresponding Layer 7 test harness to validate the full `new -> audit -> break -> fix` study workflow.
-  - [ ] Implement `fix_study.ps1` to provide an automated repair workflow for entire studies.
+  - [ ] Implement a `new_study.ps1` orchestrator to automate batch creation of all experimental conditions from study design matrix
+  - [ ] Develop a corresponding Layer 7 test harness to validate the full `new -> audit -> break -> fix` study workflow
+  - [ ] Implement `fix_study.ps1` to provide an automated repair workflow for entire studies
+
+- [ ] **Implement CLI-Driven Experiment Creation**
+  - [ ] Add command-line parameter support to `new_experiment.ps1` for non-interactive use
+  - [ ] Support syntax: `.\new_experiment.ps1 -MappingStrategy "correct" -GroupSize 7 -Model "meta-llama/llama-3.3-70b-instruct"`
+  - [ ] Maintain backward compatibility with interactive and config-only modes
 - [ ] **Implement Provenance Capture**
   - [ ] Modify `new_experiment.ps1` to generate a `provenance.json` file in each new experiment directory.
   - [ ] The provenance file will capture Git state (commit SHA, tag) and key environment details (Python version, OS).

@@ -1613,6 +1613,57 @@ This is the entry point for creating a new experiment from scratch. It reads `co
 .\new_experiment.ps1 -Verbose
 ```
 
+#### Interactive Study Parameter Selection
+
+If your `config.ini` includes a `[Study]` section with multiple values for experimental design parameters, `new_experiment.ps1` will present an interactive menu for selecting specific conditions:
+```ini
+[Study]
+# Study-level experimental design parameters
+mapping_strategy = correct, random
+group_size = 7, 10, 14
+model_name = meta-llama/llama-3.3-70b-instruct, google/gemini-2.5-flash-lite, openai/gpt-4.1-nano
+
+[Experiment]
+num_replications = 30
+num_trials = 80
+```
+
+When you run the script, it displays available options:
+```powershell
+.\new_experiment.ps1
+```
+```
+Study Experimental Design
+================================================================================
+
+Mapping Strategies:
+  [1] correct
+  [2] random
+
+Group Sizes:
+  [1] 7
+  [2] 10
+  [3] 14
+
+Models:
+  [1] meta-llama/llama-3.3-70b-instruct
+  [2] google/gemini-2.5-flash-lite
+  [3] openai/gpt-4.1-nano
+
+Select Mapping Strategy [1-2]: 1
+Select Group Size [1-3]: 1
+Select Model [1-3]: 1
+
+Selected Configuration:
+  Mapping Strategy: correct
+  Group Size: 7
+  Model: meta-llama/llama-3.3-70b-instruct
+```
+
+After selection, your choices are automatically written to the `[Experiment]` and `[LLM]` sections before experiment creation. Each experiment's parameters are logged to `output/studies/study_creation_log.txt` for tracking your complete study design.
+
+**Fallback Behavior:** If the `[Study]` section is empty or absent, the script uses values directly from `[Experiment]` and `[LLM]` sections (standard behavior).
+
 ### Auditing an Experiment (`audit_experiment.ps1`)
 
 This is the primary diagnostic tool for an experiment. It performs a read-only check and provides a detailed status report.

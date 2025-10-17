@@ -90,28 +90,40 @@ This procedure tests the robustness of the findings by using the framework's aut
 1. **Set Up Environment**: Follow the setup instructions in Appendix A.2.
 
 2. **Generate Fresh Dataset**: Create a new dataset from the live Astro-Databank database:
-   ```powershell
+```powershell
    # Run the entire data preparation workflow
     pdm run prep-data
     # or simply:
     pdm prep-data
-   ```
+```
 This executes `prepare_data.ps1`, which is a PowerShell wrapper that orchestrates the **14 distinct steps** of the data preparation pipeline (including automated Python scripts and manual processes). This script automatically checks the state of the pipeline and resumes from the first incomplete step, and it will pause with clear instructions when a manual user action is required.
 
 It is highly recommended that you first run this module in read-only mode to produce a report on current data files (use the '-ReportOnly' parameter). Subsequently, it is advisable to step through execution in interactive mode to understand what can be expected on a normal run (use the '-Interactive' paramater). Once the script's operation is clear, use the '-Force' parameter to overwrite existing data.
 
-3. **Configure Experiments**: Update `config.ini` for your experimental design.
+3. **Configure Study Design**: Define your factorial design in `config.ini` (example):
+```ini
+   [Study]
+   mapping_strategy = correct, random
+   group_size = 5, 8, 13, 21
+   model_name = anthropic/claude-3.5-sonnet, mistralai/mistral-small-3.2-24b-instruct, qwen/qwen3-coder, deepseek/deepseek-chat-v3-0324, x-ai/grok-code-fast-1
+   
+   [Experiment]
+   num_replications = 50
+   num_trials = 120
+```
 
-4. **Run Experiments**: Execute the experiments with your new dataset:
-   ```powershell
-   # For each experimental condition
+4. **Run Experiments**: Execute the experiments with interactive parameter selection:
+```powershell
+   # For each experimental condition (repeat 12 times for 2×6 design)
    ./new_experiment.ps1
-   ```
+```
+   
+   The script will display an interactive menu for selecting experimental conditions. Alternatively, manually configure `config.ini` before each run (see Appendix A.2 for details).
 
 5. **Compile Results**: Once all experiments are complete:
-   ```powershell
+```powershell
    ./compile_study.ps1 -StudyDirectory "output/studies/Methodological_Replication"
-   ```
+```
 
 6. **Compare Results**: Compare your results with the original study to assess robustness.
 
@@ -124,22 +136,34 @@ This procedure extends the research by modifying the framework itself, enabling 
 2. **Modify Framework**: Implement your conceptual extensions (see Section 6).
 
 3. **Generate Dataset**: Create a dataset appropriate for your modified framework:
-   ```powershell
+```powershell
    # May use prepare_data.ps1 or custom scripts
-   ```
+```
 
-4. **Configure Experiments**: Update `config.ini` for your experimental design.
+4. **Configure Study Design**: Update `config.ini` for your experimental design (example):
+```ini
+   [Study]
+   mapping_strategy = your, custom, values
+   group_size = your, custom, values
+   model_name = your, custom, models
+   temperature = your, custom, values
+   ...
+   
+   [Experiment]
+   num_replications = your, custom, value
+   num_trials = your, custom, value
+```
 
 5. **Run Experiments**: Execute the experiments with your modified framework:
-   ```powershell
+```powershell
    # For each experimental condition
    ./new_experiment.ps1
-   ```
+```
 
 6. **Compile Results**: Once all experiments are complete:
-   ```powershell
+```powershell
    ./compile_study.ps1 -StudyDirectory "output/studies/Conceptual_Replication"
-   ```
+```
 
 7. **Analyze Results**: Interpret your findings in the context of your conceptual extensions.
 
