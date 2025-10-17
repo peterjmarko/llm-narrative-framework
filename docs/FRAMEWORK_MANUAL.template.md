@@ -967,7 +967,7 @@ Factor 2: group_size (3 levels)
 
 Factor 3: model (3 levels)
   - Selected from low-cost, high-reliability tier
-  - Examples: Llama 3.3 70B, Gemini 2.5 Flash Lite, DeepSeek V3
+  - Examples: Llama 3.3 70B, Gemini 2.5 Flash Lite, GPT-4.1 Nano
 
 Sample Size:
   - 30 replications per condition

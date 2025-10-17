@@ -48,7 +48,7 @@ def main():
     print()
     
     # Get the project root directory
-    project_root = Path(__file__).resolve().parents[3]
+    project_root = Path(__file__).resolve().parents[2]
     
     # Run the pytest command with output suppressed
     result = subprocess.run([

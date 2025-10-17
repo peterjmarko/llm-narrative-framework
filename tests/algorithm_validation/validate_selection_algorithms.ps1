@@ -79,7 +79,7 @@ try {
     $stepHeader4a = ">>> Validate Eligible Candidate Logic <<<"
     Write-Host "`n" + ("-"*80) -ForegroundColor DarkGray; Write-Host $stepHeader4a -ForegroundColor Cyan; Write-Host "Validates the deterministic filtering logic using a large seed dataset." -ForegroundColor Cyan
     Copy-Item -Path (Join-Path $largeSeedDir "data/sources/adb_raw_export.txt") -Destination (Join-Path $SandboxDir "data/sources/")
-    Copy-Item -Path (Join-Path $largeSeedDir "data/processed/adb_validation_report.csv") -Destination (Join-Path $SandboxDir "data/processed/")
+    Copy-Item -Path (Join-Path $largeSeedDir "data/processed/adb_validated_subjects.csv") -Destination (Join-Path $SandboxDir "data/processed/")
     
     $eligibleCandidatesScript = Join-Path $ProjectRoot "src/select_eligible_candidates.py"
     & pdm run python -u $eligibleCandidatesScript --sandbox-path $SandboxDir
