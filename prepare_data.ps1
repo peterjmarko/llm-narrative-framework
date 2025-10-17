@@ -1086,8 +1086,8 @@ try {
                 break
             }
             
-            # Then check for other incomplete steps
-            if ($stepStatus -ne "Complete" -and $stepStatus -ne "Partial") {
+            # Check for any step that is not fully complete
+            if ($stepStatus -ne "Complete") {
                 $firstIncompleteStep = $i + 1  # +1 to convert to 1-based indexing
                 break
             }
@@ -1149,6 +1149,7 @@ try {
     $script:AnyStepExecutedThisRun = $false
     $script:Step7ExecutedThisRun = $false
     $script:Step7ParametersChanged = $false
+    $script:Step12ExecutedThisRun = $false
     
     # Warn if StopAfterStep is used (testing only)
     if ($StopAfterStep -gt 0 -and -not $TestMode.IsPresent) {
@@ -1529,7 +1530,15 @@ Please complete the required action and then re-run the script to continue.${C_R
         $scriptPath = Join-Path $ProjectRoot $step.Script
         # Use python -u for unbuffered output to see progress bars in real-time
         $arguments = "run", "python", "-u", $scriptPath
-        if ($Force.IsPresent) {
+        
+        # Determine if this step should be forced
+        $shouldForceThisStep = $Force.IsPresent
+        if (($step.Name -eq "Create Subject Database" -or $step.Name -eq "Generate Personalities Database") -and $script:Step12ExecutedThisRun) {
+            $shouldForceThisStep = $true
+            Write-Host "`n${C_YELLOW}Forcing re-run of this step because upstream dependency (Neutralize Delineations) was updated.${C_RESET}"
+        }
+
+        if ($shouldForceThisStep) {
             $arguments += "--force"
         }
         # Pass the --plot flag ONLY to the script that uses it.
@@ -1585,6 +1594,9 @@ Please complete the required action and then re-run the script to continue.${C_R
         
         # Mark that a step executed successfully (for downstream forcing logic)
         $script:AnyStepExecutedThisRun = $true
+        if ($step.Name -eq "Neutralize Delineations") {
+            $script:Step12ExecutedThisRun = $true
+        }
         
         # Special post-processing for Analyze Cutoff Parameters step
         if ($step.Name -eq "Analyze Cutoff Parameters") {

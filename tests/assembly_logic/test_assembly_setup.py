@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/workflows/assembly_logic/test_assembly_setup.py
+# Filename: tests/assembly_logic/test_assembly_setup.py
 
 """
 Interactive assembly logic setup script that pauses for manual Solar Fire processing.
@@ -212,8 +212,8 @@ def main():
     from assembly_logic.step_3_prepare_assembly_logic_import import prepare_and_format
 
     scripts_to_run_as_subprocess = [
-        "1_generate_coverage_map.py",
-        "2_select_assembly_logic_subjects.py",
+        "step_1_generate_coverage_map.py",
+        "step_2_select_assembly_logic_subjects.py",
     ]
     
     print("\nStarting assembly logic setup (automated steps)...")
@@ -224,7 +224,7 @@ def main():
             sys.exit(1)
 
     # --- Step 3: Call the refactored function directly ---
-    rel_path = (script_dir / "3_prepare_assembly_logic_import.py").relative_to(project_root)
+    rel_path = (script_dir / "step_3_prepare_assembly_logic_import.py").relative_to(project_root)
     print(f"\n{Fore.MAGENTA}{'='*80}{Style.RESET_ALL}")
     print(f"{Fore.MAGENTA}Running: {rel_path.as_posix()}{Style.RESET_ALL}")
     print(f"{Fore.MAGENTA}{'='*80}{Style.RESET_ALL}")
@@ -241,7 +241,7 @@ def main():
         print(f"✅ {rel_path.as_posix()} completed successfully")
         subject_count = num_processed
     except Exception as e:
-        print(f"\n{Fore.RED}❌ Setup failed at 3_prepare_assembly_logic_import.py: {e}{Style.RESET_ALL}")
+        print(f"\n{Fore.RED}❌ Setup failed at step_3_prepare_assembly_logic_import.py: {e}{Style.RESET_ALL}")
         sys.exit(1)
 
     # Copy the import file to SF import directory
@@ -267,8 +267,8 @@ def main():
     
     # Run the remaining steps
     remaining_scripts = [
-        "4_extract_assembly_logic_text.py",
-        "5_validate_assembly_logic_subjects.py"
+        "step_4_extract_assembly_logic_text.py",
+        "step_5_validate_assembly_logic_subjects.py"
     ]
     
     print("\nContinuing with remaining steps...")
@@ -289,4 +289,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/workflows/assembly_logic/test_assembly_setup.py ===
+# === End of tests/assembly_logic/test_assembly_setup.py ===

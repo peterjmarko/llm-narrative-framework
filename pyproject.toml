@@ -142,13 +142,13 @@ test-l3-interactive = {shell = "python scripts/maintenance/operation_runner.py t
 
 # --- Stage 3: Algorithm Validation ---
 # Prerequisite steps for test-assembly (Personality Assembly Algorithm Validation)
-test-assembly-step1 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step1 python scripts/workflows/assembly_logic/1_generate_coverage_map.py", help = "Step 1: Generate coverage map for assembly logic validation."}
-test-assembly-step2 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step2 python scripts/workflows/assembly_logic/2_select_assembly_logic_subjects.py", help = "Step 2: Select optimal subject set for assembly logic validation."}
-test-assembly-step3 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step3 python scripts/workflows/assembly_logic/3_prepare_assembly_logic_import.py", help = "Step 3: Prepare import file for Solar Fire."}
-test-assembly-step4 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step4 python scripts/workflows/assembly_logic/4_extract_assembly_logic_text.py", help = "Step 5: Extract and assemble the ground truth database."}
-test-assembly-step5 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step5 python scripts/workflows/assembly_logic/5_validate_assembly_logic_subjects.py", help = "Step 6: Validate the assembled ground truth database."}
-test-assembly-setup = {shell = "python scripts/maintenance/operation_runner.py test-assembly-setup python scripts/workflows/assembly_logic/test_assembly_setup.py", help = "Run all steps with interactive pause for manual Solar Fire processing."}
-test-assembly = {shell = "python scripts/maintenance/operation_runner.py test-assembly python scripts/workflows/assembly_logic/run_assembly_validation.py", help = "Validate the personality assembly algorithm against Solar Fire ground truth data."}
+test-assembly-step1 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step1 python tests/assembly_logic/step_1_generate_coverage_map.py", help = "Step 1: Generate coverage map for assembly logic validation."}
+test-assembly-step2 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step2 python tests/assembly_logic/step_2_select_assembly_logic_subjects.py", help = "Step 2: Select optimal subject set for assembly logic validation."}
+test-assembly-step3 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step3 python tests/assembly_logic/step_3_prepare_assembly_logic_import.py", help = "Step 3: Prepare import file for Solar Fire."}
+test-assembly-step4 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step4 python tests/assembly_logic/step_4_extract_assembly_logic_text.py", help = "Step 5: Extract and assemble the ground truth database."}
+test-assembly-step5 = {shell = "python scripts/maintenance/operation_runner.py test-assembly-step5 python tests/assembly_logic/step_5_validate_assembly_logic_subjects.py", help = "Step 6: Validate the assembled ground truth database."}
+test-assembly-setup = {shell = "python scripts/maintenance/operation_runner.py test-assembly-setup python tests/assembly_logic/test_assembly_setup.py", help = "Run all steps with interactive pause for manual Solar Fire processing."}
+test-assembly = {shell = "python scripts/maintenance/operation_runner.py test-assembly python tests/assembly_logic/run_assembly_validation.py", help = "Validate the personality assembly algorithm against Solar Fire ground truth data."}
 test-query-gen = {shell = "python scripts/maintenance/operation_runner.py test-query-gen pwsh -File ./tests/testing_harness/validate_query_generation.ps1"}
 test-l3-selection = {shell = "python scripts/maintenance/operation_runner.py test-l3-selection pwsh ./tests/algorithm_validation/validate_selection_algorithms.ps1"}
 

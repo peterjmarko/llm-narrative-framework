@@ -69,6 +69,9 @@ llm-narrative-framework/
     └── ...                         # (and other utility subdirectories)
 │
 └── tests/                          # Unit and integration tests.
+    └── assembly_logic/
+        └── step_1_generate_coverage_map.py
+        └── ...                     # (and other validation workflow scripts)
     └── assets/
     └── data_preparation/
         └── test_create_subject_db.py

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/workflows/assembly_logic/4_extract_assembly_logic_text.py
+# Filename: tests/assembly_logic/step_4_extract_assembly_logic_text.py
 
 """
 Extracts and assembles assembly logic text from raw Solar Fire reports.
@@ -42,13 +42,13 @@ from pathlib import Path
 from colorama import Fore
 from tqdm import tqdm
 
-# Add project root to Python path to find src module
-import sys
-project_root = Path(__file__).resolve().parents[3]
+# Add project root and src to Python path
+project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "src"))
 
 # Import the base58 decoder
-from src.id_encoder import from_base58
+from id_encoder import from_base58
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -207,4 +207,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/workflows/assembly_logic/4_extract_assembly_logic_text.py ===
+# === End of tests/assembly_logic/step_4_extract_assembly_logic_text.py ===

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/workflows/assembly_logic/3_prepare_assembly_logic_import.py
+# Filename: tests/assembly_logic/step_3_prepare_assembly_logic_import.py
 
 """
 Prepares the Solar Fire import file for the assembly logic subject set.
@@ -44,11 +44,53 @@ from pathlib import Path
 from colorama import Fore
 
 # Add the 'src' directory to the Python path to allow for module imports
-sys.path.append(str(Path(__file__).resolve().parents[3] / "src"))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 
 from prepare_sf_import import format_for_solar_fire  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+
+def prepare_and_format(final_candidates_source_path, sandbox_dir):
+    """
+    Filters candidates and formats them for Solar Fire import.
+    
+    Args:
+        final_candidates_source_path (Path): Path to the source adb_final_candidates.txt.
+        sandbox_dir (Path): Path to the sandbox directory.
+        
+    Returns:
+        tuple: (number_of_processed_subjects, output_file_path)
+    """
+    if not sandbox_dir.exists():
+        logging.error(f"Sandbox directory not found at '{sandbox_dir}'. Please run select_assembly_logic_subjects.py first.")
+        sys.exit(1)
+        
+    assembly_logic_db_path = sandbox_dir / "data/processed/subject_db.assembly_logic.csv"
+    output_path = sandbox_dir / "data/intermediate/sf_data_import.assembly_logic.txt"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    print("\nLoading and filtering subject data...")
+    try:
+        with open(assembly_logic_db_path, "r", encoding="utf-8") as f:
+            assembly_logic_ids = {row["idADB"] for row in csv.DictReader(f)}
+
+        with open(final_candidates_source_path, "r", encoding="utf-8") as f:
+            final_candidates = list(csv.DictReader(f, delimiter="\t"))
+
+        assembly_logic_subjects = [
+            s for s in final_candidates if s["idADB"] in assembly_logic_ids
+        ]
+        logging.info(f"Filtered to {len(assembly_logic_subjects)} assembly logic subjects.")
+
+    except FileNotFoundError as e:
+        logging.error(f"Input file not found: {e.filename}")
+        sys.exit(1)
+
+    logging.info(f"Writing Solar Fire import file to: {output_path}")
+    num_processed = format_for_solar_fire(assembly_logic_subjects, output_path)
+    
+    return num_processed, output_path
 
 
 def main():
@@ -68,38 +110,11 @@ def main():
         f"{Fore.RESET}"
     )
 
-    # --- Define sandbox and file paths ---
     sandbox_dir = Path("temp_assembly_logic_validation")
-    if not sandbox_dir.exists():
-        logging.error(f"Sandbox directory not found at '{sandbox_dir}'. Please run select_assembly_logic_subjects.py first.")
-        sys.exit(1)
-        
-    assembly_logic_db_path = sandbox_dir / "data/processed/subject_db.assembly_logic.csv"
-    output_path = sandbox_dir / "data/intermediate/sf_data_import.assembly_logic.txt"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # --- Load data and filter for assembly logic subjects ---
-    print("\nLoading and filtering subject data...")
-    try:
-        with open(assembly_logic_db_path, "r", encoding="utf-8") as f:
-            assembly_logic_ids = {row["idADB"] for row in csv.DictReader(f)}
-
-        with open(args.final_candidates_source, "r", encoding="utf-8") as f:
-            final_candidates = list(csv.DictReader(f, delimiter="\t"))
-
-        assembly_logic_subjects = [
-            s for s in final_candidates if s["idADB"] in assembly_logic_ids
-        ]
-        logging.info(f"Filtered to {len(assembly_logic_subjects)} assembly logic subjects.")
-
-    except FileNotFoundError as e:
-        logging.error(f"Input file not found: {e.filename}")
-        sys.exit(1)
-
-    # --- Format and write the output file ---
-    logging.info(f"Writing Solar Fire import file to: {output_path}")
-
-    num_processed = format_for_solar_fire(assembly_logic_subjects, output_path)
+    project_root = Path(__file__).resolve().parents[2]
+    final_candidates_path = project_root / args.final_candidates_source
+    
+    num_processed, output_path = prepare_and_format(final_candidates_path, sandbox_dir)
 
     if num_processed:
         print(f"\n{Fore.YELLOW}--- Final Output ---{Fore.RESET}")
@@ -123,4 +138,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/workflows/assembly_logic/3_prepare_assembly_logic_import.py ===
+# === End of tests/assembly_logic/step_3_prepare_assembly_logic_import.py ===

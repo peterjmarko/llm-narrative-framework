@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/workflows/assembly_logic/run_assembly_validation.py
+# Filename: tests/assembly_logic/run_assembly_validation.py
 
 """
 Wrapper script for running the assembly validation test with clear output.
@@ -83,4 +83,4 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 
-# === End of scripts/workflows/assembly_logic/run_assembly_validation.py ===
+# === End of tests/assembly_logic/run_assembly_validation.py ===

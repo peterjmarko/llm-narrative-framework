@@ -766,7 +766,7 @@ The entire file consists of `N * 14` lines, where `N` is the final number of sub
 
 #### Special Step: Generate Interpretation Reports
 
-This procedure is not part of the production workflow and only applies to the last manual item ('Generate and save interpretation reports...') of validating the Personality Assembly Algorithm ('test-assembly-setup'). The first 3 stages of the 5-stage validation process should be completed at this point.
+This procedure is not part of the production workflow and only applies to the manual portion of the Personality Assembly Algorithm validation (`pdm run test-assembly-setup`). The first automated stages of the validation process should be completed at this point. The orchestrator script will display the exact number of charts to process.
 
 *   **Menu:** `Interps > Full Report...`
 *   **Action:**

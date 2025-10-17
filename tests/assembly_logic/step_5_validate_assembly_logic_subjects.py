@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/workflows/assembly_logic/5_validate_assembly_logic_subjects.py
+# Filename: tests/assembly_logic/step_5_validate_assembly_logic_subjects.py
 
 """
 Validates the integrity of the assembly logic subject data round-trip.
@@ -45,7 +45,7 @@ import pandas as pd
 from colorama import Fore
 
 # Add the 'src' directory to the Python path to allow for module imports
-sys.path.append(str(Path(__file__).resolve().parents[3] / "src"))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 
 from create_subject_db import main as create_subject_db_main  # noqa: E402
 from pandas.testing import assert_frame_equal  # noqa: E402
@@ -184,4 +184,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/workflows/assembly_logic/5_validate_assembly_logic_subjects.py ===
+# === End of tests/assembly_logic/step_5_validate_assembly_logic_subjects.py ===

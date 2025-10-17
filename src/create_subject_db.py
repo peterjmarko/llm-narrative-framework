@@ -219,6 +219,8 @@ def main():
             print("Automatically re-running...")
             args.force = True
 
+    # If the file is up-to-date and --force is not active, prompt the user.
+    # The orchestrator script passes --force to bypass this prompt when an upstream dependency has changed.
     if not args.force and output_path.exists() and not is_stale:
         print(f"\n{Fore.YELLOW}WARNING: The subject database at '{output_path}' is already up to date.")
         print(f"{Fore.YELLOW}If you decide to go ahead with the update, a backup of the existing database will be created first.{Fore.RESET}")

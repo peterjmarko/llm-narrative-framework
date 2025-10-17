@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/workflows/assembly_logic/1_generate_coverage_map.py
+# Filename: tests/assembly_logic/step_1_generate_coverage_map.py
 
 """
 Generates a map of which delineation keys each subject triggers.
@@ -41,7 +41,7 @@ from colorama import Fore
 from tqdm import tqdm
 
 # Add the 'src' directory to the Python path to allow for module imports
-sys.path.append(str(Path(__file__).resolve().parents[3]))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 
 from generate_personalities_db import (  # noqa: E402
     calculate_classifications,
@@ -161,4 +161,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/workflows/assembly_logic/1_generate_coverage_map.py ===
+# === End of tests/assembly_logic/step_1_generate_coverage_map.py ===

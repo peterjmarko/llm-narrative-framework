@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: scripts/workflows/assembly_logic/2_select_assembly_logic_subjects.py
+# Filename: tests/assembly_logic/step_2_select_assembly_logic_subjects.py
 
 """
 Selects an optimal, minimal set of subjects for the assembly logic test.
@@ -47,7 +47,7 @@ from colorama import Fore
 from tqdm import tqdm
 
 # Add the 'src' directory to the Python path to allow for module imports
-sys.path.append(str(Path(__file__).resolve().parents[3] / "src"))
+sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 
 from neutralize_delineations import parse_llm_response  # noqa: E402
 
@@ -287,4 +287,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# === End of scripts/workflows/assembly_logic/2_select_assembly_logic_subjects.py ===
+# === End of tests/assembly_logic/step_2_select_assembly_logic_subjects.py ===
