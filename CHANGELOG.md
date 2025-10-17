@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 15.0.3 (2025-10-17)
+
+### Bump
+
+- **version 15.0.2 → 15.0.3**
+
+### Fixes
+
+- **Correct paths and configs after assembly logic refactor**
+  This commit corrects paths, configurations, and documentation following the major assembly logic workflow refactoring.
+  
+  -   **`run_assembly_validation.py`:** Corrected the `project_root` path calculation to be accurate for its new location in `tests/assembly_logic/`.
+  -   **`pyproject.toml`:** Updated the `test-assembly` PDM command to point to the correct path for `run_assembly_validation.py`.
+  -   **`validate_selection_algorithms.ps1`:** Fixed the script by updating a seed filename from the outdated `adb_validation_report.csv` to `adb_validated_subjects.csv`.
+
 ## 15.0.2 (2025-10-16)
 
 ### Bump
