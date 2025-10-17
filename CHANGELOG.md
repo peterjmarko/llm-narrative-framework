@@ -2,6 +2,31 @@
 
 # Changelog
 
+## 15.0.2 (2025-10-16)
+
+### Bump
+
+- **version 15.0.1 → 15.0.2**
+
+### Refactor
+
+- **Relocate and refactor assembly logic workflow, fix pipeline bugs**
+  This commit improves the project's structure by moving the assembly logic validation suite into the `tests/` directory, refactors it for robustness, and fixes several bugs in the main data preparation pipeline.
+  
+  -   **Assembly Logic Workflow (Major Refactor):**
+      -   **Moved** the entire workflow from `scripts/workflows/assembly_logic/` to `tests/assembly_logic/`, correctly classifying it as a testing suite.
+      -   **Renamed** all workflow scripts (e.g., `1_...` to `step_1_...`) to be valid, importable Python modules.
+      -   **Refactored** the orchestrator (`test_assembly_setup.py`) to use direct function imports instead of `subprocess`, making the workflow more robust and easier to debug.
+      -   Updated `sys.path` logic in all workflow scripts (`step_*.py`, `run_assembly_validation.py`) to be correct for their new location.
+  
+  -   **Pipeline Bug Fixes:**
+      -   **`prepare_data.ps1`:** Fixed a critical bug where the pipeline would not resume from a `[PARTIAL]` status. It now also correctly forces downstream updates when Step 12 (Neutralization) is run.
+      -   **`create_subject_db.py`:** Updated to respect the `--force` flag, allowing the pipeline to bypass the interactive prompt and run fully automatically.
+  
+  -   **Documentation & Config Updates:**
+      -   **`pyproject.toml`:** Updated all `test-assembly-*` PDM commands to point to the new script locations in `tests/assembly_logic/`.
+      -   **`FRAMEWORK_MANUAL.md` & `view_directory_structure.txt`:** Updated the directory structure diagram and related text to reflect the refactored location of the assembly logic workflow.
+
 ## 15.0.1 (2025-10-16)
 
 ### Bump
