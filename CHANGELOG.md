@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 15.1.0 (2025-10-17)
+
+### Bump
+
+- **version 15.0.3 → 15.1.0**
+
+### Features
+
+- **add interactive study parameter selection to new_experiment.ps1**
+  Add interactive parameter selection workflow for multi-condition studies.
+  
+  - Create [Study] section in config.ini for defining factorial design matrices
+  - Add five helper functions to new_experiment.ps1 for interactive selection
+  - Implement automatic config backup/restore with error handling in backup/ directory
+  - Add study creation logging to output/studies/study_creation_log.txt
+  - Update REPLICATION_GUIDE and FRAMEWORK_MANUAL with new workflow documentation
+  - Update PROJECT_ROADMAP to reflect completed tasks
+  - Maintain full backward compatibility when [Study] section is empty/absent
+
 ## 15.0.3 (2025-10-17)
 
 ### Bump
