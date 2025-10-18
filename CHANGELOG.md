@@ -2,6 +2,57 @@
 
 # Changelog
 
+## 15.1.2 (2025-10-18)
+
+### Bump
+
+- **version 15.1.1 → 15.1.2**
+
+### Documentation
+
+- **finalize 7-model experimental design with tri-continental representation**
+  Complete comprehensive revision of Replication Guide to document final 7-model experimental design based on rigorous pilot testing.
+  
+  Model Selection & Pilot Testing:
+  - Document 7 evaluation models (4 US, 2 Chinese, 1 European) achieving 57% open-source
+  - Add geographic diversity: US (57%), China (29%), Europe (14%)
+  - Include parsing performance data from pilot testing (n=50 trials per model)
+  - Document excluded models with failure reasons (Qwen3 235B: 24%, Qwen3-Next 80B: infinite loop)
+  - Correct model identifiers (DeepSeek Chat V3.1, Gemini 2.0 Flash Lite -001, Qwen 2.5)
+  - Emphasize complete independence of evaluation models from data generation models
+  
+  Experimental Design Updates:
+  - Update factorial design: 234  237 (24  42 conditions)
+  - Update trial count: 57,600  100,800 total trials
+  - Update cost estimates: $90  $150 (full study), maintain $50-90 (data generation)
+  - Correct iteration count in procedures: 12  42 experimental conditions
+  
+  Documentation Improvements:
+  - Add terminology clarification callout box (research vs experimental replication)
+  - Add "Choosing Your Research Path" comparison table with time/cost estimates
+  - Add "Expected Results for Validation" section with performance benchmarks
+  - Shorten "Suggestions for Future Research" (reference Framework Manual for details)
+  - Standardize documentation links (emoji format:  Framework Manual)
+  - Fix PowerShell command syntax throughout (bash  powershell)
+  - Add Python 3.11+ requirement to software prerequisites
+  - Clarify PowerShell 7.0+ is cross-platform
+  - Specify static data location (data/ subdirectory)
+  - Add Solar Fire prerequisite for methodological replication
+  - Fix section reference (Section 6  "Suggestions for Future Research")
+  
+  Appendix C Restructuring:
+  - Separate data generation models from evaluation models
+  - Organize evaluation models by geography (US/China/Europe sections)
+  - Add provider names and parsing performance columns
+  - Include model selection rationale explaining diversity goals
+  - Document pilot testing exclusions with technical reasons
+  - Add sample size justification and statistical power analysis
+  - Update to Three-Way Mixed ANOVA (1 between, 2 within factors)
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 15.1.1 (2025-10-17)
 
 ### Bump
