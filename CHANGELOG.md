@@ -2,6 +2,36 @@
 
 # Changelog
 
+## 15.1.1 (2025-10-17)
+
+### Bump
+
+- **version 15.1.0 → 15.1.1**
+
+### Fixes
+
+- **resolve DOCX rebuild issue and streamline README for first-time users**
+  Fix critical DOCX conversion bug and comprehensively improve README as primary entry point.
+  
+  DOCX Conversion Fix (build_docs.py):
+  - Track rebuilt MD files to force corresponding DOCX regeneration
+  - Replace glob-based file discovery with explicit document lists
+  - Eliminate race conditions from competing README.md files in subdirectories
+  - Ensure DOCX files update when templates change
+  - Centralize document definitions for maintainability
+  
+  README Improvements (README.template.md):
+  - Add complete installation instructions to Quick Start (PDM, dependencies, API key)
+  - Remove technical sections (Race Condition Prevention, Workflow Validation)
+  - Simplify Research Workflow section (35 lines  12 lines)
+  - Add cost estimate for typical study replication (~$140 USD)
+  - Create documentation map diagram (documentation_map.mmd)
+  - Improve Windows PowerShell compatibility for .env creation
+  - Add "What's Next?" section for role-based guidance
+  - Clarify experimental folder organization steps
+  - Move architecture diagram earlier for better context
+  - Reduce document length (~280 lines  ~180 lines) while adding essential setup
+
 ## 15.1.0 (2025-10-17)
 
 ### Bump
