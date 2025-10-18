@@ -710,145 +710,66 @@ def main():
     if not render_all_diagrams(project_root, force_render=do_force_diagrams, template_files=files_with_diagrams):
         sys.exit(1)
 
+    # Centralized document definitions
+    # For templates: (template_path, final_path, display_name)
+    documents_to_build = [
+        ('README.template.md', 'README.md', 'README.md'),
+        ('DEVELOPERS_GUIDE.template.md', 'DEVELOPERS_GUIDE.md', 'DEVELOPERS_GUIDE.md'),
+        ('docs/FRAMEWORK_MANUAL.template.md', 'docs/FRAMEWORK_MANUAL.md', 'FRAMEWORK_MANUAL.md'),
+        ('docs/article_main_text.template.md', 'docs/article_main_text.md', 'article_main_text.md'),
+        ('docs/REPLICATION_GUIDE.template.md', 'docs/REPLICATION_GUIDE.md', 'REPLICATION_GUIDE.md'),
+        ('docs/DATA_PREPARATION_DATA_DICTIONARY.template.md', 'docs/DATA_PREPARATION_DATA_DICTIONARY.md', 'DATA_PREPARATION_DATA_DICTIONARY.md'),
+        ('docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.template.md', 'docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md', 'EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md'),
+        ('docs/TESTING_GUIDE.template.md', 'docs/TESTING_GUIDE.md', 'TESTING_GUIDE.md'),
+    ]
+    
+    # Non-template MD files that should also have DOCX versions
+    standalone_md_files = [
+        'LICENSE.md',
+        'CHANGELOG.md',
+        'docs/changelog_template.md',
+        'docs/article_cover_letter.md',
+        'docs/PROJECT_ROADMAP.md',
+        'output/project_reports/project_scope_report.md',
+        'output/project_reports/SYNC_MANIFEST.md',
+    ]
+
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Building Final Markdown Files from Templates ---{Colors.RESET}")
 
-    # --- 1. Build README.md ---
-    readme_template_path = os.path.join(project_root, 'README.template.md')
-    readme_final_path = os.path.join(project_root, 'README.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, readme_final_path, readme_template_path):
-        print(f"    - Skipping {Colors.CYAN}README.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, readme_template_path, flavor='viewer')
-        header = generate_warning_header('README.md', '/README.template.md')
-        final_content = header + '\n' + viewer_content
+    # Track which MD files were rebuilt so we can force their DOCX conversions
+    rebuilt_md_files = set()
+
+    def build_single_document(template_rel_path, final_rel_path, display_name):
+        """Helper function to build a single document from its template."""
+        template_path = os.path.join(project_root, template_rel_path)
+        final_path = os.path.join(project_root, final_rel_path)
         
-        make_writable(readme_final_path)
-        with open(readme_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(readme_final_path)
-        print(f"    - {Colors.GREEN}Successfully built README.md!{Colors.RESET}")
-    
-    # --- 2. Build DEVELOPERS_GUIDE.md ---
-    contrib_template_path = os.path.join(project_root, 'DEVELOPERS_GUIDE.template.md')
-    contrib_final_path = os.path.join(project_root, 'DEVELOPERS_GUIDE.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, contrib_final_path, contrib_template_path):
-        print(f"    - Skipping {Colors.CYAN}DEVELOPERS_GUIDE.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, contrib_template_path, flavor='viewer')
-        header = generate_warning_header('DEVELOPERS_GUIDE.md', '/DEVELOPERS_GUIDE.template.md')
-        final_content = header + '\n' + viewer_content
-        
-        make_writable(contrib_final_path)
-        with open(contrib_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(contrib_final_path)
-        print(f"    - {Colors.GREEN}Successfully built DEVELOPERS_GUIDE.md!{Colors.RESET}")
+        if not do_force_documents and is_doc_up_to_date(project_root, final_path, template_path):
+            print(f"    - Skipping {Colors.CYAN}{display_name}{Colors.RESET} build (up-to-date).")
+            return False
+        else:
+            viewer_content = build_doc_content(project_root, template_path, flavor='viewer')
+            header = generate_warning_header(final_rel_path, f'/{template_rel_path}')
+            final_content = header + '\n' + viewer_content
+            
+            make_writable(final_path)
+            with open(final_path, 'w', encoding='utf-8') as f:
+                f.write(final_content)
+            make_readonly(final_path)
+            print(f"    - {Colors.GREEN}Successfully built {display_name}!{Colors.RESET}")
+            return True
 
-    # --- 3. Build FRAMEWORK_MANUAL.md ---
-    doc_template_path = os.path.join(project_root, 'docs/FRAMEWORK_MANUAL.template.md')
-    doc_final_path = os.path.join(project_root, 'docs/FRAMEWORK_MANUAL.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, doc_final_path, doc_template_path):
-        print(f"    - Skipping {Colors.CYAN}FRAMEWORK_MANUAL.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, doc_template_path, flavor='viewer')
-        header = generate_warning_header('docs/FRAMEWORK_MANUAL.md', '/docs/FRAMEWORK_MANUAL.template.md')
-        final_content = header + '\n' + viewer_content
+    # Build all documents
+    for template_rel, final_rel, display in documents_to_build:
+        if build_single_document(template_rel, final_rel, display):
+            rebuilt_md_files.add(str(pathlib.Path(os.path.join(project_root, final_rel)).resolve()))
 
-        make_writable(doc_final_path)
-        with open(doc_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(doc_final_path)
-        print(f"    - {Colors.GREEN}Successfully built FRAMEWORK_MANUAL.md!{Colors.RESET}")
-
-    # --- 4. Build article_main_text.md ---
-    article_template_path = os.path.join(project_root, 'docs/article_main_text.template.md')
-    article_final_path = os.path.join(project_root, 'docs/article_main_text.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, article_final_path, article_template_path):
-         print(f"    - Skipping {Colors.CYAN}article_main_text.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, article_template_path, flavor='viewer')
-        header = generate_warning_header('docs/article_main_text.md', '/docs/article_main_text.template.md')
-        final_content = header + '\n' + viewer_content
-
-        make_writable(article_final_path)
-        with open(article_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(article_final_path)
-        print(f"    - {Colors.GREEN}Successfully built article_main_text.md!{Colors.RESET}")
-
-    # --- 5. Build REPLICATION_GUIDE.md ---
-    supp_template_path = os.path.join(project_root, 'docs/REPLICATION_GUIDE.template.md')
-    supp_final_path = os.path.join(project_root, 'docs/REPLICATION_GUIDE.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, supp_final_path, supp_template_path):
-         print(f"    - Skipping {Colors.CYAN}REPLICATION_GUIDE.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, supp_template_path, flavor='viewer')
-        header = generate_warning_header('docs/REPLICATION_GUIDE.md', '/docs/REPLICATION_GUIDE.template.md')
-        final_content = header + '\n' + viewer_content
-
-        make_writable(supp_final_path)
-        with open(supp_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(supp_final_path)
-        print(f"    - {Colors.GREEN}Successfully built REPLICATION_GUIDE.md!{Colors.RESET}")
-
-    # --- 6. Build DATA_PREPARATION_DATA_DICTIONARY.md ---
-    data_template_path = os.path.join(project_root, 'docs/DATA_PREPARATION_DATA_DICTIONARY.template.md')
-    data_final_path = os.path.join(project_root, 'docs/DATA_PREPARATION_DATA_DICTIONARY.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, data_final_path, data_template_path):
-         print(f"    - Skipping {Colors.CYAN}DATA_PREPARATION_DATA_DICTIONARY.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, data_template_path, flavor='viewer')
-        header = generate_warning_header('docs/DATA_PREPARATION_DATA_DICTIONARY.md', '/docs/DATA_PREPARATION_DATA_DICTIONARY.template.md')
-        final_content = header + '\n' + viewer_content
-
-        make_writable(data_final_path)
-        with open(data_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(data_final_path)
-        print(f"    - {Colors.GREEN}Successfully built DATA_PREPARATION_DATA_DICTIONARY.md!{Colors.RESET}")
-
-    # --- 7. Build EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md ---
-    experiment_template_path = os.path.join(project_root, 'docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.template.md')
-    experiment_final_path = os.path.join(project_root, 'docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, experiment_final_path, experiment_template_path):
-         print(f"    - Skipping {Colors.CYAN}EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, experiment_template_path, flavor='viewer')
-        header = generate_warning_header('docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md', '/docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.template.md')
-        final_content = header + '\n' + viewer_content
-
-        make_writable(experiment_final_path)
-        with open(experiment_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(experiment_final_path)
-        print(f"    - {Colors.GREEN}Successfully built EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md!{Colors.RESET}")
-
-    # --- 8. Build PROJECT_ROADMAP.md ---
-    roadmap_template_path = os.path.join(project_root, 'docs/PROJECT_ROADMAP.md') # Note: Not a template, but needs to be in the build flow
+    # Handle PROJECT_ROADMAP.md separately (not a template)
     roadmap_final_path = os.path.join(project_root, 'docs/PROJECT_ROADMAP.md')
-    # For non-template files, just check if they exist
     if os.path.exists(roadmap_final_path):
-         print(f"    - Skipping {Colors.CYAN}PROJECT_ROADMAP.md{Colors.RESET} build (up-to-date).")
+        print(f"    - Skipping {Colors.CYAN}PROJECT_ROADMAP.md{Colors.RESET} build (up-to-date).")
     else:
-        # Since PROJECT_ROADMAP.md is not a template, we just ensure it exists for the DOCX conversion
         print(f"    - {Colors.GREEN}Verified PROJECT_ROADMAP.md exists for DOCX conversion.{Colors.RESET}")
-    
-    # --- 9. Build TESTING_GUIDE.md ---
-    test_template_path = os.path.join(project_root, 'docs', 'TESTING_GUIDE.template.md')
-    test_final_path = os.path.join(project_root, 'docs', 'TESTING_GUIDE.md')
-    if not do_force_documents and is_doc_up_to_date(project_root, test_final_path, test_template_path):
-         print(f"    - Skipping {Colors.CYAN}TESTING_GUIDE.md{Colors.RESET} build (up-to-date).")
-    else:
-        viewer_content = build_doc_content(project_root, test_template_path, flavor='viewer')
-        header = generate_warning_header('docs/TESTING_GUIDE.md', '/docs/TESTING_GUIDE.template.md')
-        final_content = header + '\n' + viewer_content
-
-        make_writable(test_final_path)
-        with open(test_final_path, 'w', encoding='utf-8') as f:
-            f.write(final_content)
-        make_readonly(test_final_path)
-        print(f"    - {Colors.GREEN}Successfully built TESTING_GUIDE.md!{Colors.RESET}")
 
     print(f"\n{Colors.BOLD}{Colors.CYAN}--- Converting all Markdown files to DOCX ---{Colors.RESET}")
     try:
@@ -859,55 +780,42 @@ def main():
         # List of final markdown files that were built from templates.
         # These need special handling for DOCX conversion to use pandoc-flavored placeholders.
         files_needing_placeholders = {
-            str(pathlib.Path(readme_final_path).resolve()),
-            str(pathlib.Path(doc_final_path).resolve()),
-            str(pathlib.Path(supp_final_path).resolve()),
-            str(pathlib.Path(test_final_path).resolve()),
+            str(pathlib.Path(os.path.join(project_root, 'README.md')).resolve()),
+            str(pathlib.Path(os.path.join(project_root, 'docs/FRAMEWORK_MANUAL.md')).resolve()),
+            str(pathlib.Path(os.path.join(project_root, 'docs/REPLICATION_GUIDE.md')).resolve()),
+            str(pathlib.Path(os.path.join(project_root, 'docs/TESTING_GUIDE.md')).resolve()),
         }
         
-        exclude_dirs = {'.git', '.venv', 'node_modules', 'docs/word_docs'}
-        # Files to exclude from DOCX generation
-        exclude_files = {
-            'COMMIT_RECOMMENDATIONS.md',  # Temporary file
-            'docs_PROJECT_ROADMAP.md',    # Duplicate
-            'docs_ROADMAP.md',            # Legacy file
-            'output_project_reports_project_scope_report.md',  # Duplicate
-            'WORK_SUMMARY_v12.2.3.md',    # Temporary file
-        }
-        all_md_files = {p for p in project_root.glob('**/*.md')}
-        
-        # Track processed filenames to avoid duplicates
-        processed_filenames = set()
+        # Combine all MD files for DOCX conversion: built templates + standalone files
+        md_files_to_convert = [final_path for _, final_path, _ in documents_to_build] + standalone_md_files
         
         # Use a context manager for robust cleanup of temporary files
         with tempfile.TemporaryDirectory() as temp_dir:
-            for source_path in sorted(list(all_md_files)):
-                if any(part in exclude_dirs for part in source_path.parts) or source_path.name.endswith('.template.md'):
+            for md_rel_path in md_files_to_convert:
+                source_path = pathlib.Path(project_root) / md_rel_path
+                
+                # Skip if source doesn't exist
+                if not source_path.exists():
                     continue
                 
-                # Skip specific files that shouldn't have DOCX versions
-                if source_path.name in exclude_files:
+                # Skip template files
+                if source_path.name.endswith('.template.md'):
                     continue
 
-                # Use just the filename for user-friendly output
                 output_filename = source_path.with_suffix(".docx").name
-                
-                # Skip if we've already processed a file with this name
-                # This avoids duplicates while keeping user-friendly names
-                if output_filename in processed_filenames:
-                    continue
-                processed_filenames.add(output_filename)
                 
                 output_path = os.path.join(word_docs_dir, output_filename)
                 
                 should_build = False
-                if do_force_documents or not os.path.exists(output_path):
+                resolved_source = str(source_path.resolve())
+                if do_force_documents or not os.path.exists(output_path) or resolved_source in rebuilt_md_files:
                     should_build = True
-                else:
+                elif os.path.exists(output_path):
                     # Check if the source MD file is newer than the DOCX file
                     source_mtime = os.path.getmtime(source_path)
                     docx_mtime = os.path.getmtime(output_path)
-                    if source_mtime > docx_mtime:
+                    # Use >= instead of > to catch files updated in the same second
+                    if source_mtime >= docx_mtime:
                         should_build = True
                     
                     # Also check if any diagram images referenced in the MD are newer
