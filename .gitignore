@@ -157,3 +157,6 @@ debug/
 
 # PDM operation locks
 .pdm-locks/
+
+# Other temp files
+src/temp_*

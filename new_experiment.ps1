@@ -74,7 +74,11 @@ function Read-StudyParameters {
     $studyParams = @{
         mapping_strategy = @()
         group_size = @()
+        num_replications = @()
+        num_trials = @()
         model_name = @()
+        temperature = @()
+        max_tokens = @()
     }
     
     if (-not (Test-Path $ConfigPath)) {
@@ -90,7 +94,7 @@ function Read-StudyParameters {
         elseif ($line -match '^\[') {
             $inStudySection = $false
         }
-        elseif ($inStudySection -and $line -match '^(mapping_strategy|group_size|model_name)\s*=\s*(.+)$') {
+        elseif ($inStudySection -and $line -match '^(mapping_strategy|group_size|num_replications|num_trials|model_name|temperature|max_tokens)\s*=\s*(.+)$') {
             $key = $matches[1]
             $values = $matches[2] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
             if ($values.Count -gt 0) {
@@ -100,9 +104,15 @@ function Read-StudyParameters {
     }
     
     # Return null if all arrays are empty (no study parameters defined)
-    if ($studyParams.mapping_strategy.Count -eq 0 -and 
-        $studyParams.group_size.Count -eq 0 -and 
-        $studyParams.model_name.Count -eq 0) {
+    $hasAnyParams = $false
+    foreach ($key in $studyParams.Keys) {
+        if ($studyParams[$key].Count -gt 0) {
+            $hasAnyParams = $true
+            break
+        }
+    }
+    
+    if (-not $hasAnyParams) {
         return $null
     }
     
@@ -112,26 +122,27 @@ function Read-StudyParameters {
 function Show-StudyParameterSelection {
     param($StudyParams)
     
-    Write-Host "`nStudy Experimental Design" -ForegroundColor Cyan
-    Write-Host ("=" * 80) -ForegroundColor Cyan
-    Write-Host ""
+    Write-Host "`nStudy Experimental Design" -ForegroundColor Magenta
+    Write-Host ("=" * 80) -ForegroundColor Magenta
     
-    # Display mapping strategies
-    Write-Host "Mapping Strategies:" -ForegroundColor Yellow
-    for ($i = 0; $i -lt $StudyParams.mapping_strategy.Count; $i++) {
-        Write-Host "  [$($i+1)] $($StudyParams.mapping_strategy[$i])"
+    $paramOrder = @('mapping_strategy', 'group_size', 'num_replications', 'num_trials', 'model_name', 'temperature', 'max_tokens')
+    $paramLabels = @{
+        mapping_strategy = "Mapping Strategies"
+        group_size = "Group Sizes"
+        num_replications = "Number of Replications"
+        num_trials = "Number of Trials"
+        model_name = "Models"
+        temperature = "Temperature Values"
+        max_tokens = "Max Tokens"
     }
     
-    # Display group sizes
-    Write-Host "`nGroup Sizes:" -ForegroundColor Yellow
-    for ($i = 0; $i -lt $StudyParams.group_size.Count; $i++) {
-        Write-Host "  [$($i+1)] $($StudyParams.group_size[$i])"
-    }
-    
-    # Display models
-    Write-Host "`nModels:" -ForegroundColor Yellow
-    for ($i = 0; $i -lt $StudyParams.model_name.Count; $i++) {
-        Write-Host "  [$($i+1)] $($StudyParams.model_name[$i])"
+    foreach ($param in $paramOrder) {
+        if ($StudyParams[$param].Count -gt 1) {
+            Write-Host "`n$($paramLabels[$param]):" -ForegroundColor Yellow
+            for ($i = 0; $i -lt $StudyParams[$param].Count; $i++) {
+                Write-Host "  [$($i+1)] $($StudyParams[$param][$i])"
+            }
+        }
     }
     
     Write-Host ""
@@ -140,12 +151,32 @@ function Show-StudyParameterSelection {
 function Get-UserSelection {
     param(
         [string]$ParameterName,
-        [array]$Options
+        [array]$Options,
+        [bool]$IsFirstPrompt = $false
     )
     
+    # Single value: use it without prompting
+    if ($Options.Count -eq 1) {
+        return $Options[0]
+    }
+    
     while ($true) {
-        $prompt = "Select $ParameterName [1-$($Options.Count)]"
-        $selection = Read-Host $prompt
+        $promptText = "Select $ParameterName [1-$($Options.Count)]"
+        if ($IsFirstPrompt) {
+            $promptText += " or 'e' to use [Experiment] defaults"
+        }
+        
+        try {
+            $selection = Read-Host $promptText
+        } catch {
+            # Ctrl+C pressed - throw to outer catch block
+            throw
+        }
+        
+        # Check for 'e' option (only on first prompt)
+        if ($IsFirstPrompt -and $selection -eq 'e') {
+            return 'USE_EXPERIMENT_DEFAULTS'
+        }
         
         if ($selection -match '^\d+$') {
             $index = [int]$selection - 1
@@ -233,74 +264,129 @@ $configPath = if ($ConfigPath) { $ConfigPath } else { Join-Path $ProjectRoot "co
 
 # Check for Study section and handle interactive selection
 $studyParams = Read-StudyParameters -ConfigPath $configPath
-$configBackup = $null
-$userSelections = $null
+$script:configBackup = $null
+$script:userSelections = $null
+$script:configRestored = $false
 
-if ($studyParams) {
-    Write-Header -Lines "CREATING NEW EXPERIMENT FROM CONFIG.INI" -Color Cyan
-    
-    # Create backup directory if it doesn't exist
-    $backupDir = Join-Path $ProjectRoot "backup"
-    if (-not (Test-Path $backupDir)) {
-        New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-    }
-    
-    # Create backup before any modifications
-    $configBackup = Join-Path $backupDir "config.ini.backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-    Copy-Item $configPath $configBackup -Force
-    
-    try {
+try {
+    if ($studyParams) {
+        Write-Header -Lines "NEW EXPERIMENT SETUP" -Color Cyan
+        
+        # Create backup directory if it doesn't exist
+        $backupDir = Join-Path $ProjectRoot "backup"
+        if (-not (Test-Path $backupDir)) {
+            New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+        }
+        
+        # Create backup before any modifications
+        $script:configBackup = Join-Path $backupDir "config.ini.backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        Copy-Item $configPath $script:configBackup -Force
         # Display study parameters and get user selections
         Show-StudyParameterSelection -StudyParams $studyParams
         
-        $userSelections = @{
-            mapping_strategy = Get-UserSelection -ParameterName "Mapping Strategy" -Options $studyParams.mapping_strategy
-            group_size = Get-UserSelection -ParameterName "Group Size" -Options $studyParams.group_size
-            model_name = Get-UserSelection -ParameterName "Model" -Options $studyParams.model_name
+        # Helper function to read Experiment defaults
+        function Get-ExperimentDefault {
+            param([string]$Section, [string]$Key)
+            $configContent = Get-Content $configPath -Encoding UTF8
+            $inSection = $false
+            foreach ($line in $configContent) {
+                if ($line -match "^\[$Section\]") { $inSection = $true }
+                elseif ($line -match "^\[") { $inSection = $false }
+                elseif ($inSection -and $line -match "^\s*$Key\s*=\s*(.+)$") {
+                    return $matches[1].Trim()
+                }
+            }
+            return $null
+        }
+        
+        # Define parameter order and metadata
+        $paramOrder = @(
+            @{Key='mapping_strategy'; Label='Mapping Strategy'; Section='Experiment'},
+            @{Key='group_size'; Label='Group Size'; Section='Experiment'},
+            @{Key='num_replications'; Label='Number of Replications'; Section='Experiment'},
+            @{Key='num_trials'; Label='Number of Trials'; Section='Experiment'},
+            @{Key='model_name'; Label='Model'; Section='LLM'},
+            @{Key='temperature'; Label='Temperature'; Section='LLM'},
+            @{Key='max_tokens'; Label='Max Tokens'; Section='LLM'}
+        )
+        
+        $userSelections = @{}
+        $isFirstPrompt = $true
+        $useExperimentDefaults = $false
+        
+        foreach ($param in $paramOrder) {
+            $key = $param.Key
+            $options = $studyParams[$key]
+            
+            # Skip if empty in Study section (use Experiment default)
+            if ($options.Count -eq 0) {
+                $userSelections[$key] = Get-ExperimentDefault -Section $param.Section -Key $key
+                continue
+            }
+            
+            # Get selection (handles single values automatically)
+            $selection = Get-UserSelection -ParameterName $param.Label -Options $options -IsFirstPrompt $isFirstPrompt
+            
+            # Check if user chose to use Experiment defaults
+            if ($selection -eq 'USE_EXPERIMENT_DEFAULTS') {
+                $useExperimentDefaults = $true
+                break
+            }
+            
+            $userSelections[$key] = $selection
+            $isFirstPrompt = $false
+        }
+        
+        # If user chose 'e', fill remaining with Experiment defaults
+        if ($useExperimentDefaults) {
+            Write-Host "`nUsing [Experiment] section defaults..." -ForegroundColor Yellow
+            foreach ($param in $paramOrder) {
+                if (-not $userSelections.ContainsKey($param.Key)) {
+                    $userSelections[$param.Key] = Get-ExperimentDefault -Section $param.Section -Key $param.Key
+                }
+            }
         }
         
         Write-Host "`nSelected Configuration:" -ForegroundColor Green
-        Write-Host "  Mapping Strategy: $($userSelections.mapping_strategy)" -ForegroundColor White
-        Write-Host "  Group Size: $($userSelections.group_size)" -ForegroundColor White
-        Write-Host "  Model: $($userSelections.model_name)" -ForegroundColor White
+        foreach ($param in $paramOrder) {
+            if ($userSelections.ContainsKey($param.Key)) {
+                Write-Host "  $($param.Label): $($userSelections[$param.Key])" -ForegroundColor White
+            }
+        }
         Write-Host ""
         
         # Update config.ini with selections
         $configLines = Get-Content $configPath -Encoding UTF8
-        $configLines = Update-ConfigParameter $configLines "Experiment" "mapping_strategy" $userSelections.mapping_strategy
-        $configLines = Update-ConfigParameter $configLines "Experiment" "group_size" $userSelections.group_size
-        $configLines = Update-ConfigParameter $configLines "LLM" "model_name" $userSelections.model_name
+        foreach ($param in $paramOrder) {
+            if ($userSelections.ContainsKey($param.Key)) {
+                $configLines = Update-ConfigParameter $configLines $param.Section $param.Key $userSelections[$param.Key]
+            }
+        }
         Set-Content -Path $configPath -Value $configLines -Encoding UTF8
         
-    } catch {
-        # Restore original config on Ctrl+C or error
-        if (Test-Path $configBackup) {
-            Move-Item $configBackup $configPath -Force
-            Write-Host "`nOperation cancelled. Configuration restored." -ForegroundColor Yellow
-        }
-        exit 1
+        # Mark config as successfully updated
+        $script:configRestored = $true
     }
-} else {
+    
+    # Display banner after selections are complete
     Write-Header -Lines "CREATING NEW EXPERIMENT FROM CONFIG.INI" -Color Cyan
-}
 
-$pythonScriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
-$pythonArgs = @($pythonScriptPath)
-if (-not [string]::IsNullOrEmpty($Notes)) { $pythonArgs += "--notes", $Notes }
-if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) { $pythonArgs += "--verbose" }
-if ($Host.UI.SupportsVirtualTerminal) { $pythonArgs += "--force-color" }
-if (-not [string]::IsNullOrEmpty($ConfigPath)) { $pythonArgs += "--config-path", $ConfigPath }
+    $pythonScriptPath = Join-Path $ProjectRoot "src/experiment_manager.py"
+    $pythonArgs = @($pythonScriptPath)
+    if (-not [string]::IsNullOrEmpty($Notes)) { $pythonArgs += "--notes", $Notes }
+    if ($PSBoundParameters.ContainsKey('Verbose') -and $PSBoundParameters['Verbose']) { $pythonArgs += "--verbose" }
+    if ($Host.UI.SupportsVirtualTerminal) { $pythonArgs += "--force-color" }
+    if (-not [string]::IsNullOrEmpty($ConfigPath)) { $pythonArgs += "--config-path", $ConfigPath }
 
-& pdm run python $pythonArgs
-$pythonExitCode = $LASTEXITCODE
+    & pdm run python $pythonArgs
+    $pythonExitCode = $LASTEXITCODE
 
-if ($pythonExitCode -ne 0) {
-    Write-Host "`nExperiment creation failed. Check configuration and try again.`n" -ForegroundColor Yellow
-    exit $pythonExitCode
-}
+    if ($pythonExitCode -ne 0) {
+        Write-Host "`nExperiment creation failed. Check configuration and try again.`n" -ForegroundColor Yellow
+        exit $pythonExitCode
+    }
 
-try {
-    # Read the output directory from config instead of hardcoding
+# Read the output directory from config instead of hardcoding
     $basePath = Join-Path $ProjectRoot "output/new_experiments"  # Default fallback
     
     if (-not [string]::IsNullOrEmpty($ConfigPath) -and (Test-Path $ConfigPath)) {
@@ -336,11 +422,17 @@ try {
         & $auditScriptPath @auditSplat
     }
 } catch {
-    Write-Warning "Could not automatically verify the new experiment."
+    # Catch any errors during the entire execution
+    Write-Warning "An error occurred: $($_.Exception.Message)"
 } finally {
-    # Clean up config backup
-    if ($configBackup -and (Test-Path $configBackup)) {
-        Remove-Item $configBackup -Force
+    # CRITICAL: Restore config on ANY termination (including Ctrl+C)
+    if ($script:configBackup -and (Test-Path $script:configBackup) -and -not $script:configRestored) {
+        Move-Item $script:configBackup $configPath -Force
+        Write-Host "`nOperation interrupted. Configuration restored." -ForegroundColor Yellow
+        $script:configRestored = $true
+    } elseif ($script:configBackup -and (Test-Path $script:configBackup)) {
+        # Normal cleanup - experiment completed successfully
+        Remove-Item $script:configBackup -Force
     }
 }
 
