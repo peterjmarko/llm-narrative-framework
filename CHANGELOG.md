@@ -2,6 +2,26 @@
 
 # Changelog
 
+## 15.2.0 (2025-10-18)
+
+### Bump
+
+- **version 15.1.2 → 15.2.0**
+
+### Features
+
+- **enahnce interactive study parameter selection with multi-parameter support**
+  Enhance experiment workflow with comprehensive study parameter configuration.
+  
+  - Add all experiment/LLM parameters to [Study] section (num_replications, num_trials, temperature, max_tokens)
+  - Implement smart prompting logic: skip single-value parameters, use [Experiment] defaults for empty parameters
+  - Add 'e' option on first prompt to use [Experiment] defaults for standalone operation
+  - Fix critical config restoration on Ctrl+C interruption using finally block
+  - Improve UI flow: defer "CREATING NEW EXPERIMENT" banner until after user selections
+  - Add "NEW EXPERIMENT SETUP" top-level banner for clearer workflow phases
+  - Reduce max_tokens from 8192 to 2048 in [Experiment], add study options (1024, 2048)
+  - Maintain backup/restore mechanism for safe config modifications
+
 ## 15.1.2 (2025-10-18)
 
 ### Bump
