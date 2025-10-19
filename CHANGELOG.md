@@ -2,6 +2,32 @@
 
 # Changelog
 
+## 15.2.1 (2025-10-19)
+
+### Bump
+
+- **version 15.2.0 → 15.2.1**
+
+### Documentation
+
+- **enhance Framework Manual with navigation aids and cross-reference standardization**
+  Comprehensive enhancement of Framework Manual usability and consistency.
+  
+  - Add Quick Reference Card with essential commands, parameters, file paths, and troubleshooting
+  - Add Reader Navigation Guide matrix showing section relevance by role (Researcher/Developer/Data Analyst)
+  - Add Study-Level vs Experiment-Level Configuration subsection explaining [Study] and [Experiment] section relationship
+  - Condense Key Data Formats section from 15+ individual diagrams to summary table with 3 critical formats
+  - Standardize all cross-document references to use consistent paths and correct terminology
+  - Update all references from "Experiment Workflow Data Dictionary" to "Experiment and Study Workflow Data Dictionary"
+  - Add explicit section anchor links throughout document for precise cross-referencing
+  - Add emoji icons (, , , , , ) to all guide references for visual navigation
+  - Move Code Coverage subsection from Framework Manual to Developer's Guide for proper audience separation
+  - Update configuration table to reflect current study design (30 replications, 80 trials, temperature=0.0)
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 15.2.0 (2025-10-18)
 
 ### Bump
