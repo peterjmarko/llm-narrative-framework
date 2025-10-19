@@ -6,6 +6,92 @@ This manual is intended for developers, contributors, and researchers who wish t
 
 {{toc}}
 
+---
+
+## Quick Reference Card
+
+### Essential Commands
+
+| Task | Command | Purpose |
+|:-----|:--------|:--------|
+| **Create experiment** | `./new_experiment.ps1` | Generate new experiment for a single condition |
+| **Check status** | `./audit_experiment.ps1 -ExperimentDirectory <path>` | Diagnostic report on experiment completeness |
+| **Resume/fix** | `./fix_experiment.ps1 -ExperimentDirectory <path>` | Repair interrupted or incomplete experiment |
+| **Compile study** | `./compile_study.ps1 -StudyDirectory <path>` | Aggregate experiments and run statistical analysis |
+| **Run all tests** | `pdm run test` or `pdm test` | Execute complete test suite |
+
+### Key Configuration Parameters
+
+| Parameter | Location | Purpose | Example |
+|:----------|:---------|:--------|:--------|
+| `mapping_strategy` | `[Study]` or `[Experiment]` | Correct vs random pairing | `correct, random` |
+| `group_size` | `[Study]` or `[Experiment]` | Number of subjects per trial (k) | `7, 10, 14` |
+| `model_name` | `[Study]` or `[LLM]` | LLM to evaluate | `google/gemini-2.0-flash-lite-001` |
+| `num_replications` | `[Experiment]` | Repetitions per condition | `30` |
+| `num_trials` | `[Experiment]` | Trials per replication | `80` |
+| `temperature` | `[LLM]` | Output randomness (0.0-2.0) | `0.0` |
+
+### Critical File Paths
+
+| File | Purpose |
+|:-----|:--------|
+| `config.ini` | Main configuration file |
+| `.env` | API key storage (OPENROUTER_API_KEY) |
+| `data/personalities_db.txt` | Final personality database (input to experiments) |
+| `output/new_experiments/` | Individual experiment results |
+| `output/studies/` | Compiled study analyses |
+
+### Quick Troubleshooting
+
+| Issue | Solution |
+|:------|:---------|
+| Experiment incomplete | Run `audit_experiment.ps1` to diagnose, then `fix_experiment.ps1` to repair |
+| API errors | Check `.env` file for valid OPENROUTER_API_KEY |
+| Cannot acquire lock | Wait for current operation or use `pdm run unlock` if certain no operations running |
+| Missing dependencies | Run `pdm install -G dev` from project root |
+
+### Getting Help
+
+- **Framework details:** See sections below
+- **Step-by-step procedures:** [📋 Replication Guide](docs/REPLICATION_GUIDE.md)
+- **Development:** [👨‍💻 Developer's Guide](DEVELOPERS_GUIDE.md)
+- **Testing:** [🧪 Testing Guide](docs/TESTING_GUIDE.md)
+
+---
+
+## Reader Navigation Guide
+
+This manual serves multiple audiences. Use this matrix to identify which sections are most relevant to your needs:
+
+| Section | Researcher | Developer | Data Analyst | Page |
+|:--------|:----------:|:---------:|:------------:|:----:|
+| **Research Question** | ✓✓✓ | ✓ | ✓ | [Link](#research-question) |
+| **A Note on Stimulus Generation** | ✓✓✓ | ✓ | ✓✓ | [Link](#a-note-on-stimulus-generation-and-experimental-design) |
+| **Replication Paths** | ✓✓✓ | ✓ | ✓ | [Link](#replication-paths) |
+| **Architecture Overview** | ✓ | ✓✓✓ | ✓✓ | [Link](#architecture-overview) |
+| **Visual Architecture** | ✓✓ | ✓✓✓ | ✓✓ | [Link](#visual-architecture) |
+| **Experimental Hierarchy** | ✓✓✓ | ✓✓ | ✓✓✓ | [Link](#experimental-hierarchy) |
+| **Study Design** | ✓✓✓ | ✓✓ | ✓✓ | [Link](#study-design) |
+| **Directory Structure** | ✓ | ✓✓✓ | ✓✓ | [Link](#directory-structure) |
+| **Setup and Installation** | ✓✓✓ | ✓✓✓ | ✓✓ | [Link](#setup-and-installation) |
+| **Configuration** | ✓✓✓ | ✓✓ | ✓✓ | [Link](#configuration-configini) |
+| **Choosing the Right Workflow** | ✓✓✓ | ✓✓ | ✓ | [Link](#choosing-the-right-workflow-separation-of-concerns) |
+| **Core Workflows** | ✓✓✓ | ✓✓ | ✓✓ | [Link](#core-workflows) |
+| **Data Preparation Pipeline** | ✓✓ | ✓✓ | ✓✓✓ | [Link](#data-preparation-pipeline) |
+| **Report Formats** | ✓✓ | ✓✓ | ✓✓✓ | [Link](#report-formats) |
+| **Key Data Formats** | ✓ | ✓✓ | ✓✓✓ | [Link](#key-data-formats) |
+| **Testing** | ✓ | ✓✓✓ | ✓ | [Link](#testing) |
+| **Extending the Framework** | ✓✓ | ✓✓✓ | ✓ | [Link](#extending-the-framework) |
+
+**Legend:** ✓✓✓ = Essential | ✓✓ = Highly Relevant | ✓ = Useful Context
+
+**Quick Start Paths:**
+- **Researchers:** Start with Quick Reference → Research Question → Core Workflows → Configuration
+- **Developers:** Start with Quick Reference → Architecture → Directory Structure → Testing
+- **Data Analysts:** Start with Quick Reference → Experimental Hierarchy → Data Formats → Data Preparation Pipeline
+
+---
+
 {{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=100% | caption=Project Architecture: A high-level overview of the project's main functional components and their relationships.}}
 
 ## Research Question
@@ -1454,7 +1540,7 @@ After defining your study design:
 4. **Compile Results**: Use `compile_study.ps1` for final analysis
 5. **Validate**: Review diagnostic plots and statistical assumptions
 
-For detailed execution instructions, see the **Lifecycle Guide** and **Replication Guide**.
+For detailed execution instructions, see the **Replication Guide**.
 
 
 ## Error Recovery and Resilience
@@ -1515,7 +1601,7 @@ This logical hierarchy is reflected in the physical layout of the repository:
 
 {{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
 
-Data dictionaries provide detailed explanations for all files: [📁 Data Preparation Data Dictionary](../docs/DATA_PREPARATION_DATA_DICTIONARY.md) covers the `data/` directory, and [📊 Experiment Workflow Data Dictionary](../output/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md) covers the `output/` directory structure and experimental results.
+Data dictionaries provide detailed explanations for all files: [📁 Data Preparation Data Dictionary](../docs/DATA_PREPARATION_DATA_DICTIONARY.md) covers the `data/` directory, and [📊 Experiment and Study Workflow Data Dictionary](../output/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md) covers the `output/` directory structure and experimental results.
 
 ## Setup and Installation
 
@@ -1545,27 +1631,79 @@ To run any project command, such as the test suite, prefix it with `pdm run`:
 pdm run test
 ```
 
-> **For Developers:** If you intend to contribute to the project or encounter issues with the simple setup, please see the **[Developer Setup Guide in DEVELOPERS_GUIDE.md](DEVELOPERS_GUIDE.md#getting-started-development-environment-setup)** for more detailed instructions and troubleshooting.
+> **For Developers:** If you intend to contribute to the project or encounter issues with the simple setup, please see the **[Developer Setup Guide](../DEVELOPERS_GUIDE.md#getting-started-development-environment-setup)** for more detailed instructions and troubleshooting.
 
 ## Configuration (`config.ini`)
 
 The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results for guaranteed reproducibility.
 
+### Configuration Reference
+
 | Section | Parameter | Description | Example Value |
 | :--- | :--- | :--- | :--- |
-| **`[Experiment]`** | `num_replications` | The number of times the experiment will be repeated (`r`). | `2` |
-| | `num_trials` | The number of trials for each replication (`m`). | `3` |
-| | `group_size` | The number of subjects in each group (`k`). | `4` |
-| | `mapping_strategy` | A key experimental variable; can be `correct` or `random`. | `correct` |
-| **`[LLM]`** | `model_name` | The API identifier for the LLM to be tested for the main experiment. | `google/gemini-flash-1.5` |
-| | `temperature` | Controls the randomness of the model's output (0-2). | `1` |
+| **`[Study]`** | `mapping_strategy` | Comma-separated list of mapping strategies for factorial design. Enables interactive selection. | `correct, random` |
+| | `group_size` | Comma-separated list of group sizes (`k`) for factorial design. | `7, 10, 14` |
+| | `model_name` | Comma-separated list of LLM models for factorial design. | `google/gemini-2.0-flash-lite-001, meta-llama/llama-3.3-70b-instruct` |
+| **`[Experiment]`** | `num_replications` | The number of times the experiment will be repeated (`r`). | `30` |
+| | `num_trials` | The number of trials for each replication (`m`). | `80` |
+| | `group_size` | The number of subjects in each group (`k`). Used when `[Study]` section is empty. | `10` |
+| | `mapping_strategy` | Mapping strategy: `correct` or `random`. Used when `[Study]` section is empty. | `correct` |
+| **`[LLM]`** | `model_name` | The API identifier for the LLM. Used when `[Study]` section is empty. | `google/gemini-2.0-flash-lite-001` |
+| | `temperature` | Controls the randomness of the model's output (0.0-2.0). | `0.0` |
+| | `max_tokens` | Maximum tokens in the model's response. | `8192` |
 | | `max_parallel_sessions` | The number of concurrent API calls to make. | `10` |
-| **`[Analysis]`** | `min_valid_response_threshold` | Minimum average valid responses for an experiment to be included in the final analysis. | `25` |
+| **`[Analysis]`** | `min_valid_response_threshold` | Minimum average valid responses for an experiment to be included in the final analysis. Set to `0` to disable. | `25` |
 | **`[DataGeneration]`** | `bypass_candidate_selection` | If `true`, skips LLM-based scoring and uses all eligible candidates. | `false` |
 | | `cutoff_search_start_point` | The cohort size at which to start searching for the variance curve plateau. | `3500` |
 | | `smoothing_window_size` | The window size for the moving average used to smooth the variance curve. | `800` |
 
-#### Model Selection Philosophy and Future Work
+**Note:** Parameters defined in `[Study]` take precedence. When you run `new_experiment.ps1` with a populated `[Study]` section, you'll select specific values interactively, which are then written to `[Experiment]` and `[LLM]` sections before the experiment executes. If `[Study]` is empty or absent, values are read directly from `[Experiment]` and `[LLM]` sections.
+
+### Study-Level vs. Experiment-Level Configuration
+
+The framework supports two configuration modes:
+
+#### Interactive Study Design (`[Study]` Section)
+
+For factorial experiments comparing multiple conditions, define experimental 
+factors in the `[Study]` section with comma-separated values:
+```ini
+[Study]
+mapping_strategy = correct, random
+group_size = 7, 10, 14
+model_name = model-a, model-b, model-c
+```
+
+When you run `new_experiment.ps1`, the script presents an interactive menu 
+for selecting specific values. Your selections are automatically written to 
+the `[Experiment]` section before the experiment executes.
+
+**Use this mode when:** You're creating multiple experiments for a factorial study.
+
+#### Direct Configuration (`[Experiment]` Section Only)
+
+For single-condition experiments, specify parameters directly:
+```ini
+[Experiment]
+mapping_strategy = correct
+group_size = 10
+num_replications = 30
+num_trials = 80
+```
+
+**Use this mode when:** You're running a single experiment with fixed parameters.
+
+#### How They Work Together
+
+1. **If `[Study]` section exists with parameters** → Interactive mode activated
+2. **User selections** → Written to `[Experiment]` section
+3. **Experiment executes** → Uses values from `[Experiment]` section
+4. **Configuration archived** → `config.ini.archived` captures exact parameters used
+
+This two-tier system enables efficient factorial study creation while maintaining 
+complete reproducibility for each individual experiment.
+
+### Model Selection Philosophy and Future Work
 The selection of models for this study was guided by a balance of performance, cost, speed, and technical compatibility with the automated framework. Several top-tier models were not included for one of the following reasons:
 
 -   **Prohibitive Cost**: Models like `o1 pro`, `GPT 4.5 Preview`, and `Claude 4 Opus` were excluded as a single experiment (requiring ~3,000 queries) was financially infeasible.
@@ -1582,7 +1720,7 @@ A follow-up study is planned to evaluate other powerful, medium-cost models as A
 
 ## Known Issues and Future Work
 
-This framework is under active development. For a detailed and up-to-date list of planned improvements, known issues, and future development tasks, please see the [Project Roadmap](ROADMAP.md).
+This framework is under active development. For a detailed and up-to-date list of planned improvements, known issues, and future development tasks, please see the [📋 Project Roadmap](docs/PROJECT_ROADMAP.md).
 
 ## Choosing the Right Workflow: Separation of Concerns
 
@@ -1754,47 +1892,41 @@ The final analysis script (`analyze_study_results.py`) produces a comprehensive 
 
 ## Key Data Formats
 
-This section provides a reference for the structure of the most important data files used and generated by the framework.
+This section provides a summary reference for the most important data files. For complete format specifications and detailed field descriptions, see the **[📁 Data Preparation Data Dictionary](DATA_PREPARATION_DATA_DICTIONARY.md)** and **[📊 Experiment and Study Workflow Data Dictionary](../output/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md)**.
 
-### Primary Data Source
+### Format Summary Table
 
-{{diagram:docs/diagrams/format_data_adb_raw_export.txt | caption=Format for `adb_raw_export.txt`}}
+| Category | File | Purpose | Key Fields |
+|:---------|:-----|:--------|:-----------|
+| **Input Sources** | `adb_raw_export.txt` | Raw Astro-Databank export | idADB, Name, DateTime, Place, Rodden Rating |
+| | `sf_chart_export.csv` | Solar Fire chart calculations | Subject_ID, Sun, Moon, Ascendant, etc. |
+| **Core Databases** | `subject_db.csv` | Cleaned & validated master database | idADB, Subject_Name, Wikipedia_URL, Birth data |
+| | `personalities_db.txt` | Final experiment input database | Subject_ID, Description (5000+ chars), Metadata |
+| **Configuration** | `point_weights.csv` | Astrological element weights | Point, Weight (Sun=3, Moon=3, etc.) |
+| | `balance_thresholds.csv` | Classification thresholds | Category, WeakRatio, StrongRatio |
+| **Intermediate** | `adb_wiki_links.csv` | Wikipedia URL mappings | idADB, Subject_Name, Wikipedia_URL |
+| | `eminence_scores.csv` | LLM-generated eminence rankings | Subject_ID, Eminence_Score, Rank |
+| | `ocean_scores.csv` | LLM-generated personality scores | Subject_ID, O, C, E, A, N scores |
+| | `adb_eligible_candidates.txt` | Filtered subject pool | idADB, Name, Birth data (validated) |
+| | `adb_final_candidates.txt` | Study-selected subjects | idADB, Name (diversity-optimized) |
+| **Text Libraries** | `sf_delineations_library.txt` | Raw interpretive text from Solar Fire | Structured astrological descriptions |
+| | `neutralized_delineations/*.csv` | Sanitized description components | De-jargonized text fragments |
 
-### Manual Process I/O
+### Critical Formats (Detailed)
 
-{{diagram:docs/diagrams/format_data_sf_chart_export.txt | caption=Format for `sf_chart_export.csv`}}
+For most use cases, the summary table above is sufficient. However, three formats warrant detailed explanation due to their centrality to the framework:
 
-### Core Integrated & Final Databases
+#### Final Personality Database Format
 
-{{diagram:docs/diagrams/format_data_subject_db.txt | caption=Format for `subject_db.csv`}}
+{{diagram:docs/diagrams/format_data_personalities_db.txt | caption=Format for `personalities_db.txt` - The definitive input to all experiments}}
 
-{{diagram:docs/diagrams/format_data_personalities_db.txt | caption=Format for `personalities_db.txt`}}
+#### Configuration Files
 
-### Algorithm Configuration & Text Libraries
+{{diagram:docs/diagrams/format_data_point_weights.txt | caption=Format for `point_weights.csv` - Defines algorithmic weights}}
 
-{{diagram:docs/diagrams/format_data_point_weights.txt | caption=Format for `point_weights.csv`}}
+{{diagram:docs/diagrams/format_data_balance_thresholds.txt | caption=Format for `balance_thresholds.csv` - Sets classification rules}}
 
-{{diagram:docs/diagrams/format_data_balance_thresholds.txt | caption=Format for `balance_thresholds.csv`}}
-
-{{diagram:docs/diagrams/format_data_neutralized_text_example.txt | caption=Format for Neutralized Text Library Files (e.g., `points_in_signs.csv`, `balance_elements.csv`)}}
-
-{{diagram:docs/diagrams/format_data_sf_delineations_library.txt | caption=Format for the Source Delineation Library (`sf_delineations_library.txt`)}}
-
-### Intermediate Data Artifacts
-
-{{diagram:docs/diagrams/format_data_adb_wiki_links.txt | caption=Format for `adb_wiki_links.csv`}}
-
-{{diagram:docs/diagrams/format_data_adb_validated_subjects.txt | caption=Format for `adb_validated_subjects.csv`}}
-
-{{diagram:docs/diagrams/format_data_adb_eligible_candidates.txt | caption=Format for `adb_eligible_candidates.txt`}}
-
-{{diagram:docs/diagrams/format_data_eminence_scores.txt | caption=Format for `eminence_scores.csv`}}
-
-{{diagram:docs/diagrams/format_data_ocean_scores.txt | caption=Format for `ocean_scores.csv`}}
-
-{{diagram:docs/diagrams/format_data_adb_final_candidates.txt | caption=Format for `adb_final_candidates.txt`}}
-
-{{diagram:docs/diagrams/format_data_sf_import.txt | caption=Format for `sf_data_import.txt`}}
+**For complete format specifications:** See the data dictionaries linked above.
 
 ---
 
@@ -1814,28 +1946,16 @@ This ensures that the main branch is always stable and that all contributions ad
 ### Running the Test Suite
 
 -   **To run all tests (Python and PowerShell) at once:**
-    ```bash
+```bash
     pdm run test
-    ```
+```
 -   **To run only the PowerShell script tests:**
-    ```bash
+```bash
     pdm run test-ps-all
-    ```
+```
     You can also test individual PowerShell scripts (e.g., `pdm run test-ps-exp`, `pdm run test-ps-stu`).
 
-### Code Coverage
-
-The test suite is configured for detailed code coverage analysis using the `coverage` package.
-
--   **To run all tests and view a coverage report in the console:**
-    ```bash
-    pdm run cov
-    ```
--   **To generate a detailed HTML coverage report (saved to `htmlcov/`):**
-    ```bash
-    pdm run cov-html
-    ```
-    Open `htmlcov/index.html` in your browser to explore the report.
+For detailed code coverage analysis, see the [👨‍💻 Developer's Guide - Code Coverage](../DEVELOPERS_GUIDE.md#code-coverage).
 
 ### Statistical Validation
 
