@@ -4,22 +4,9 @@ This document outlines the testing philosophy, procedures, and coverage strategy
 
 {{toc}}
 
-## Testing Philosophy
+## Testing Philosophy and Architecture
 
-The project's testing strategy is organized into a clear, four-part hierarchy designed to ensure both scientific validity and software robustness. This approach allows for rigorous, independent verification at every level of the framework.
-
-{{diagram:docs/diagrams/test_strategy_overview.mmd | scale=2.5 | width=100% | caption=The Four Pillars of the Testing Strategy: A hierarchical approach to validating the framework.}}
-
-1.  **Unit Testing:** Focuses on the internal logic of individual Python scripts, validating each component in isolation.
-2.  **Integration Testing:** A suite of end-to-end tests that validate the complete, live execution flows for the project's two main functional domains: the data preparation pipeline and the experiment/study workflow.
-3.  **Algorithm Validation:** A set of standalone, high-precision tests that provide scientific proof for the framework's core methodological claims (e.g., bit-for-bit accuracy of data generation, statistical integrity of analysis).
-4.  **Statistical Analysis & Reporting Validation:** External validation of the complete statistical analysis pipeline against GraphPad Prism 10.6.1, establishing academic credibility and publication readiness.
-
-This structure ensures that we can verify that our individual components are correct (Unit Testing), our workflows execute properly end-to-end (Integration Testing), our scientific method is sound (Algorithm Validation), and our statistical analyses meet academic standards (Statistical Validation).
-
-## Test Suite Architecture
-
-The framework's testing strategy is built on four complementary pillars that work together to ensure both scientific validity and software reliability. Each pillar serves a distinct purpose and validates different aspects of the framework.
+The project's testing strategy is organized into a clear, four-part hierarchy—the "Four Pillars"—designed to ensure both scientific validity and software robustness. This approach allows for rigorous, independent verification at every level of the framework.
 
 {{diagram:docs/diagrams/test_philosophy_overview.mmd | scale=2.5 | width=100% | caption=The Four Testing Pillars: A comprehensive overview of the testing philosophy and how each pillar breaks down into specific validation areas.}}
 
@@ -116,6 +103,8 @@ Example entries:
 Similarly, data preparation runs are logged to `data_prep_summary.jsonl` and workflow operations to `workflow_summary.jsonl`.
 
 ## Typical Testing Sequence
+
+**Note on PDM commands:** PDM allows two syntaxes for running custom scripts: `pdm run <script-name>` and the shorter `pdm <script-name>`. Both achieve the same result. This guide uses the more explicit `pdm run` form for clarity, but you can use either.
 
 This section provides a practical walkthrough of running the complete test suite. The workflow is divided into two major parts, reflecting a clear separation of concerns:
 
@@ -266,13 +255,9 @@ This foundational layer focuses on validating the internal logic of individual P
 ```bash
 # Test data preparation components
 pdm run test-data-prep
-# or simply:
-pdm test-data-prep
 
 # Test experiment workflow components
-pdm run test-exp-lc
-# or simply:
-pdm test-exp-lc
+pdm run test-exp-wf
 ```
 
 **Test specific modules:**
@@ -286,13 +271,9 @@ pdm report-cov src/analyze_llm_performance.py
 ```bash
 # Quick test run
 pdm run test
-# or simply:
-pdm test
 
 # With coverage report
 pdm run cov
-# or simply:
-pdm cov
 ```
 
 ### Data Preparation Pipeline
@@ -848,8 +829,6 @@ These tests validate the complete data preparation workflow from raw Astro-Datab
 **Command:**
 ```powershell
 pdm run test-l2
-# or simply:
-pdm test-l2
 ```
 
 **What's tested:**
@@ -904,8 +883,6 @@ Runs the full pipeline with LLM-based candidate selection active.
 **Command:**
 ```powershell
 pdm run test-l3
-# or simply:
-pdm test-l3
 ```
 
 **What's tested:**
@@ -931,8 +908,6 @@ Tests the pipeline with `bypass_candidate_selection` flag enabled, skipping LLM-
 **Command:**
 ```powershell
 pdm run test-l3-bypass
-# or simply:
-pdm test-l3-bypass
 ```
 
 **What's tested:**
@@ -955,8 +930,6 @@ Provides a step-by-step educational walkthrough of the data pipeline.
 **Command:**
 ```powershell
 pdm run test-l3-interactive
-# or simply:
-pdm test-l3-interactive
 ```
 
 **What's tested:**
@@ -993,8 +966,6 @@ Rapid validation suitable for CI/CD pipelines.
 **Command:**
 ```powershell
 pdm run test-l4
-# or simply:
-pdm test-l4
 ```
 
 **What's tested:**
@@ -1030,8 +1001,6 @@ Comprehensive educational experience with detailed explanations at each step.
 **Command:**
 ```powershell
 pdm run test-l4-interactive
-# or simply:
-pdm test-l4-interactive
 ```
 
 **What's tested:**
@@ -1079,8 +1048,6 @@ For granular control or debugging:
 **Command:**
 ```powershell
 pdm run test-l5
-# or simply:
-pdm test-l5
 ```
 
 **What's tested:**
@@ -1142,8 +1109,6 @@ Once the ground truth dataset is generated, the automated test (`tests/algorithm
 **To run the test:**
 ```powershell
 pdm run test-assembly
-# or simply:
-pdm test-assembly
 ```
 
 **Prerequisites:**
@@ -1182,8 +1147,6 @@ Validates the sophisticated variance-based cutoff algorithm that determines the 
 **To run the test:**
 ```powershell
 pdm run test-l3-selection
-# or simply:
-pdm test-l3-selection
 ```
 
 **Prerequisites:**
@@ -1209,13 +1172,9 @@ This standalone test provides mathematical proof of the mapping and randomizatio
 ```powershell
 # Run with default 99.9999% power (Beta = 0.000001), which requires 9 iterations for k=3.
 pdm run test-query-gen
-# or simply:
-pdm test-query-gen
 
 # Run with a custom 99.9% power (Beta = 0.001), which requires 5 iterations.
 pdm run test-query-gen -Beta 0.001
-# or simply:
-pdm test-query-gen -Beta 0.001
 ```
 
 **Prerequisites:**
@@ -1234,21 +1193,15 @@ This 4-stage validation workflow provides external validation of the entire stat
 ```powershell
 # Stage 1: Create statistical validation study using real framework
 pdm run test-stats-study
-# or simply:
-pdm test-stats-study
 
 # Stage 2: Generate GraphPad import files
 pdm run test-stats-imports
-# or simply:
-pdm test-stats-imports
 
 # Stage 3: Manual GraphPad Prism processing
 # (Manual import, analyze, export for 8 selected replications)
 
 # Stage 4: Validate GraphPad results against framework calculations
 pdm run test-stats-results
-# or simply:
-pdm test-stats-results
 ```
 
 **Current Status: Complete**
@@ -1358,7 +1311,7 @@ This comprehensive table provides the current status of all tests in the framewo
 | `src/fetch_adb_data.py` | Standard | **COMPLETE** | 84% | Session management, data parsing, error handling, timeout scenarios |
 | **Candidate Qualification** | | | | |
 | `src/find_wikipedia_links.py` | Standard | **COMPLETE** | 89% | Name sanitization, web scraping, fallback logic |
-| `src/validate_wikipedia_pages.py` | Standard | **COMPLETE** | 91% | URL validation, content checks, disambiguation detection |
+| `src/qualify_subjects.py` | Standard | **COMPLETE** | 91% | URL validation, content checks, disambiguation detection |
 | `src/select_eligible_candidates.py` | **Critical** | **COMPLETE** | 90% | Deterministic filtering rules, deduplication, edge cases |
 | **Candidate Selection** | | | | |
 | `src/generate_eminence_scores.py` | **Critical** | **COMPLETE** | 87% | Batch processing, API interaction, resume capability |

@@ -66,6 +66,8 @@ import json
 import glob
 import time
 import configparser
+import threading
+from itertools import cycle
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from colorama import Fore, init
@@ -77,6 +79,41 @@ except ImportError:
 
 # Initialize colorama
 init(autoreset=True)
+
+
+class Spinner:
+    """A simple terminal spinner class that runs in a separate thread."""
+    def __init__(self, message="Processing... ", delay=0.1):
+        self.spinner = cycle(['|', '/', '-', '\\'])
+        self.delay = delay
+        self.message = message
+        self.running = False
+        self.spinner_thread = None
+        self._stop_event = threading.Event()
+
+    def _spin(self):
+        while not self._stop_event.is_set():
+            sys.stderr.write(f"\r{self.message}{next(self.spinner)}")
+            sys.stderr.flush()
+            # Use event.wait for a more responsive stop
+            self._stop_event.wait(self.delay)
+
+    def start(self):
+        if not self.running:
+            self.running = True
+            self._stop_event.clear()
+            self.spinner_thread = threading.Thread(target=self._spin)
+            self.spinner_thread.start()
+
+    def stop(self):
+        if self.running:
+            self._stop_event.set()
+            if self.spinner_thread:
+                self.spinner_thread.join()
+            # Clear the line
+            sys.stderr.write(f"\r{' ' * (len(self.message) + 5)}\r")
+            sys.stderr.flush()
+            self.running = False
 
 # Define ANSI color codes for consistency with experiment_manager.py
 C_YELLOW = '\033[93m'
@@ -202,7 +239,7 @@ def main():
         # Determine if this is a repair or a full reprocess for logging clarity
         mode_string = "REPAIR MODE" if args.indices else "REPROCESS MODE"
         print(f"\n{C_YELLOW}--- {mode_string} for: ---{C_RESET}")
-        print(f"{C_YELLOW}{os.path.basename(run_specific_dir_path)}{C_RESET}")
+        print(f"{Fore.CYAN}{os.path.basename(run_specific_dir_path)}{Fore.RESET}")
         
         config_path = os.path.join(run_specific_dir_path, 'config.ini.archived')
         if not os.path.exists(config_path):
@@ -233,7 +270,20 @@ def main():
 
         run_specific_dir_path = os.path.join(base_output_dir, run_dir_name)
         os.makedirs(run_specific_dir_path, exist_ok=True)
-        logging.info(f"Created unique output directory: {run_specific_dir_path}")
+
+        # Use a relative path and color for cleaner, multi-line logging.
+        try:
+            # The prefix is the parent directory of the new run, which is always base_output_dir.
+            display_prefix = os.path.relpath(base_output_dir, config_loader.PROJECT_ROOT).replace(os.sep, '/')
+            
+            # The suffix is simply the name of the unique run directory.
+            path_suffix = run_dir_name
+            
+            print(f"{Fore.CYAN}INFO (orchestrator): Created unique replication directory in '{display_prefix}/':\n{path_suffix}{Fore.RESET}", file=sys.stderr)
+        except (ValueError, TypeError):
+            # Fallback for any other edge cases (e.g., paths outside project root)
+            relative_run_path = os.path.relpath(run_specific_dir_path, config_loader.PROJECT_ROOT).replace(os.sep, '/')
+            print(f"{Fore.CYAN}INFO (orchestrator): Created unique output directory: {relative_run_path}{Fore.RESET}", file=sys.stderr)
         
         # Determine which config file to archive. Use the override if it exists.
         config_override_path = os.getenv('PROJECT_CONFIG_OVERRIDE')
@@ -326,23 +376,34 @@ def main():
             else:
                 repair_mode_desc = "Processing LLM Sessions"
             
+            is_repair_mode = args.reprocess or args.indices
+            spinner = Spinner("Repairing queries... ") if is_repair_mode else None
+            
             try:
+                if spinner:
+                    spinner.start()
+
+                # In repair mode, we print individual statuses, so the tqdm bar is redundant.
                 with ThreadPoolExecutor(max_workers=max_workers) as executor, \
-                    tqdm(total=len(indices_to_run), desc=repair_mode_desc, ncols=80, file=sys.stderr) as pbar:
+                    tqdm(total=len(indices_to_run), desc=repair_mode_desc, ncols=80, file=sys.stderr, disable=is_repair_mode) as pbar:
                     
-                    # In repair mode, enable verbose output to show LLM prompter progress
-                    repair_verbose = args.verbose or (args.reprocess or args.indices)
+                    repair_verbose = args.verbose or is_repair_mode
                     tasks = {executor.submit(session_worker, i, run_specific_dir_path, responses_dir, llm_prompter_script, src_dir, repair_verbose): i for i in indices_to_run}
                     
                     for future in as_completed(tasks):
+                        if spinner:
+                            spinner.stop() # Pause spinner to print status
+
                         completed_count += 1
                         index, success, log, duration = future.result()
                         total_elapsed_time += duration
                         
-                        # Enhanced repair mode status updates
-                        if args.reprocess or args.indices:
-                            status = "SUCCESS" if success else "FAILED"
-                            print(f"  - Query {index:03d}: {status} ({duration:.1f}s)")
+                        if is_repair_mode:
+                            if success:
+                                status_str = f"{Fore.GREEN}SUCCESS{Fore.RESET}"
+                            else:
+                                status_str = f"{Fore.RED}FAILED{Fore.RESET}"
+                            print(f"  - Query {index:03d}: {status_str} ({duration:.1f}s)")
                         
                         if not success:
                             failed_sessions += 1
@@ -353,15 +414,21 @@ def main():
                         pbar.update(1)
                         with open(api_times_log_path, "a", encoding='utf-8') as f:
                             f.write(f"Query_{index:03d}\t{duration:.2f}\t{total_elapsed_time:.2f}\t{eta:.2f}\n")
+                        
+                        if spinner:
+                            spinner.start() # Resume spinner for the next wait
             
             except KeyboardInterrupt:
+                # The 'finally' block will handle stopping the spinner.
                 print(f"\n\n--- LLM SESSIONS INTERRUPTED BY USER ---")
                 print(f"Processed {completed_count}/{len(indices_to_run)} queries before interruption.")
                 print(f"Experiment directory preserved at: {run_specific_dir_path}")
                 print(f"You can resume by running repair mode on this directory.")
                 pipeline_status = "INTERRUPTED BY USER"
-                # The 'with' statement will handle executor.shutdown() automatically
                 return
+            finally:
+                if spinner:
+                    spinner.stop()
             
             if failed_sessions > 0:
                 # Skip individual query failure logging - we'll show summary instead
@@ -384,7 +451,7 @@ def main():
                         logging.warning(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed to repair. The script will continue, but the run remains incomplete.")
                 else:
                     # Low failure rate - continue with warning
-                    logging.warning(f"{failed_sessions}/{len(indices_to_run)} LLM session(s) failed ({failure_rate:.1%} failure rate), but continuing with {len(indices_to_run) - failed_sessions} successful responses.")
+                    print(f"{C_YELLOW}WARNING (orchestrator): {failed_sessions}/{len(indices_to_run)} LLM session(s) failed ({failure_rate:.1%} failure rate), but continuing with {len(indices_to_run) - failed_sessions} successful responses.{C_RESET}", file=sys.stderr)
                     if args.reprocess:
                         repair_had_failures = True
 

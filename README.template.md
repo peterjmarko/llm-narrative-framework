@@ -23,7 +23,7 @@ pdm install -G dev
 #    OPENROUTER_API_KEY=sk-or-your-key-here
 
 # 4. Configure your experiment in config.ini [Study] section
-#    Define experimental conditions and parameters
+#    See the "Configuring Your First Experiment" section below for details.
 
 # 5. Run the interactive experiment wizard
 ./new_experiment.ps1
@@ -123,9 +123,13 @@ The framework uses an **interactive wizard** that guides you through selecting e
 
 For complete configuration options, see the [Framework Manual](docs/FRAMEWORK_MANUAL.md).
 
-## 📊 Experimental Hierarchy
+## 🔄 Understanding the Workflow
 
-Understanding the framework's organizational structure is essential for navigating your results and using the workflow scripts effectively:
+The framework's structure and workflow are designed to be logical and hierarchical.
+
+### Experimental Hierarchy
+
+Understanding the organizational structure is essential for navigating your results:
 ```
 Study
 └── Experiment (Condition A)
@@ -142,12 +146,12 @@ Study
         └── ...
 ```
 
--   **Study:** The highest-level grouping, representing a complete research question (e.g., comparing "correct" vs. "random" mappings).
--   **Experiment:** A complete set of runs for a single experimental condition (e.g., all runs for the "correct" mapping condition).
--   **Replication:** A single, complete run of an experiment, repeated multiple times for statistical power.
--   **Trial:** An individual matching task performed within a replication.
+-   **Study:** The highest-level grouping, representing a complete research question.
+-   **Experiment:** Runs for a single experimental condition.
+-   **Replication:** A single, complete run of an experiment.
+-   **Trial:** An individual matching task within a replication.
 
-## 🔄 The Research Workflow
+### The Research Workflow
 
 {{grouped_figure:docs/diagrams/flow_research_workflow.mmd | scale=2.5 | width=70% | caption=The End-to-End Research Workflow.}}
 

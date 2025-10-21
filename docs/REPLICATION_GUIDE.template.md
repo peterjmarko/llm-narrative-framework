@@ -58,7 +58,7 @@ The following table summarizes key differences to help you select the appropriat
 | **Framework Code** | Unchanged | Unchanged | Modified |
 | **Primary Purpose** | Verify computational reproducibility | Test statistical robustness | Extend research questions |
 | **Time Required** | Hours | Days | Weeks to months |
-| **Estimated Cost** | ~$150 | ~$200-240 | Variable |
+| **Estimated Cost** | ~$1,500 | ~$2,000-2,400 | Variable |
 | **Prerequisites** | Basic setup (A.1) | Basic + ADB + Solar Fire (A.2) | Full dev environment (A.3) |
 | **Output** | Bit-for-bit match validation | Robustness assessment | New findings |
 
@@ -258,7 +258,7 @@ For detailed examples and guidance on each innovation type, see the **[📖 Fram
 - PDM (Python Dependency Manager)
 
 **Accounts and Services:**
-- OpenRouter account with sufficient funds (approximately $150 for full study)
+- OpenRouter account with sufficient funds (approximately $1,500 for full study)
 - No Astro-Databank account required (using static data)
 
 **Installation Steps:**
@@ -290,7 +290,7 @@ For detailed examples and guidance on each innovation type, see the **[📖 Fram
    [Study]
    mapping_strategy = correct, random
    group_size = 7, 10, 14
-   model_name = anthropic/claude-sonnet-4, google/gemini-2.0-flash-lite-001, meta-llama/llama-3.3-70b-instruct, openai/gpt-4o, deepseek/deepseek-chat-v3.1, qwen/qwen-2.5-72b-instruct, mistralai/mistral-large-2411
+   model_name = anthropic/claude-sonnet-4, google/gemini-2.0-flash-001, meta-llama/llama-3.3-70b-instruct, openai/gpt-4o, deepseek/deepseek-chat-v3.1, qwen/qwen-2.5-72b-instruct, mistralai/mistral-large-2411
    
    [Experiment]
    num_replications = 30
@@ -308,7 +308,7 @@ For detailed examples and guidance on each innovation type, see the **[📖 Fram
 
 **Additional Accounts and Services:**
 - Astro-Databank account at astro.com
-- Sufficient OpenRouter funds for data generation (additional $50-90)
+- Sufficient OpenRouter funds for data generation (additional $500-900)
 
 **Additional Software:**
 - Solar Fire software (required for manual data preparation steps)
@@ -357,7 +357,13 @@ For detailed troubleshooting, see the **[📖 Framework Manual](docs/FRAMEWORK_M
 
 ### Appendix C: Models and Experimental Design
 
-#### Models Used in the Original Study
+This appendix provides a comprehensive reference for both understanding the original study and designing new ones. It is organized into two parts: a specific reference for the original study's design and a general guide for researchers planning new experiments.
+
+#### Original Study Reference
+
+This section details the specific models, parameters, and design choices used in the original study.
+
+##### Models Used in the Original Study
 
 **Data Generation Models:**
 
@@ -374,7 +380,7 @@ For detailed troubleshooting, see the **[📖 Framework Manual](docs/FRAMEWORK_M
 | Purpose | Model Name | API Identifier | Provider | Parsing |
 | :--- | :--- | :--- | :--- | :--- |
 | Evaluation 1 (LLM D1) | Claude Sonnet 4 | `anthropic/claude-sonnet-4` | Anthropic | High |
-| Evaluation 2 (LLM D2) | Gemini 2.0 Flash Lite | `google/gemini-2.0-flash-lite-001` | Google | 98% |
+| Evaluation 2 (D2) | Gemini 2.5 Flash Lite | `google/gemini-2.5-flash-lite` | Google | ⚠️ Partial* |
 | Evaluation 3 (LLM D3) | Llama 3.3 70B Instruct | `meta-llama/llama-3.3-70b-instruct` | Meta | High |
 | Evaluation 4 (LLM D4) | GPT-4o | `openai/gpt-4o` | OpenAI | High |
 
@@ -404,12 +410,24 @@ All evaluation models were selected to ensure complete independence from data ge
 
 **Pilot Testing Exclusions:**
 
-Several models were tested but excluded due to reliability failures:
-- Qwen3 235B: 24% parsing success (below 92% threshold)
-- Qwen3-Next 80B: Entered infinite reprocessing loops (0% effective)
-- Qwen3 30B: 96% parsing but only 3.3B active parameters (10× smaller than comparable models, would confound interpretation)
+Several relatively recent models (i.e., those published within the past 12 months) were evaluated during pilot testing but were excluded from the final study for failing to meet the required reliability and performance criteria. Exclusions fell into three main categories:
 
-#### Experimental Design Reference
+-   **Low Parsing Success Rate (<90%):** These models failed to consistently produce structured, parsable output.
+    -   `Qwen: Qwen3 235B A22B Instruct` (24% success)
+    -   `Google: Gemma 3` (12B and 27B variants, 23% and 80% success)
+    -   `Z.AI: GLM 4.5` (83% success)
+    -   `OpenAI: gpt-oss-20b` (63% success)
+
+-   **Technical Instability:** This model caused critical failures in the automated workflow.
+    -   `Qwen: Qwen3 Next 80B A3B Instruct` (Caused infinite reprocessing loops, resulting in 0% effective completion).
+
+-   **Atypical Architecture or Output Format:** These models, while functional, were excluded to avoid confounding the analysis or because their output was fundamentally incompatible with the parsing engine.
+    -   `Qwen: Qwen3 30B A3B Instruct` (Although parsing was high, it used only 3.3B active parameters, making it a significant architectural outlier that would complicate interpretation).
+    -   `Google: Gemini 2.5 Pro` and `Gemini 2.5 Flash` (Generated conversational, explanatory text rather than the required structured data table, making them incompatible with the automated parser).
+
+Note: Free or rate-limited models available via OpenRouter were not included in pilot testing due to a lack of the reliable, high-throughput access required for large-scale automated experiments.
+
+###### Experimental Design Reference
 
 **Original Study Design:**
 - 2×3×7 factorial design (42 conditions)
@@ -417,20 +435,93 @@ Several models were tested but excluded due to reliability failures:
 - 80 trials per replication
 - Total: 100,800 trials
 
-**Factors:**
-- Mapping Strategy (between-subjects): correct, random
-- Group Size (within-subjects): k ∈ {7, 10, 14}
-- Model (within-subjects): 7 diverse evaluation models
+###### Factor Justification
 
-**Sample Size Justification:**
+-   **Mapping Strategy (Between-Subjects):** This is the core experimental manipulation.
+    -   `correct`: The experimental condition, testing the LLM's ability to detect the faint, systematic signal when it is present.
+    -   `random`: The null/control condition, where profiles are shuffled. This establishes a chance-level baseline and tests whether the model is merely guessing or hallucinating patterns.
+    -   This was treated as a between-subjects factor to ensure a clean design where a model is not "tipped off" to the existence of random trials within a single experiment.
 
-With 30 replications per condition and 80 trials per replication, the design provides >80% statistical power to detect small effect sizes (Cohen's d < 0.20) for main effects. The 80-trial count provides robust redundancy against parsing failures:
-- Expected valid responses: 74-77 per replication (93-96% success rate)
-- Minimum threshold: 25 valid responses per replication
-- Buffer: 194-208% above minimum threshold
+-   **Group Size (`k`) (Within-Subjects):** This factor systematically varies the difficulty of the matching task.
+    -   `k ∈ {7, 10, 14}`: This range was chosen to create a clear difficulty gradient. The step from 7 to 10, and 10 to 14, each represents an approximate 20% increase in difficulty (as measured by the decrease in chance-level MRR).
+    -   `k=7` serves as an easier baseline, while `k=14` pushes the model's context-processing capabilities to test for performance degradation under high cognitive load.
 
-**Statistical Analysis:**
-- Three-Way Mixed ANOVA (1 between-subjects, 2 within-subjects factors)
-- Effect size measures (η², Cohen's d)
-- Post-hoc tests (Tukey HSD with Benjamini-Hochberg FDR correction)
-- Bayesian analysis (Bayes Factor)
+-   **Model (Within-Subjects):** This factor tests for the generalizability of the findings across different LLMs.
+    -   The seven evaluation models were chosen for maximum diversity in architecture, provider, and training data. A detailed justification for their selection is provided in the "Model Selection Rationale" section above.
+
+###### Sample Size Justification
+
+The choice of **30 replications** per condition and **80 trials** per replication was made to strike an optimal balance between statistical power, metric precision, and the practical constraints of cost and time.
+
+**Why 30 Replications? (Statistical Power)**
+
+-   **Purpose:** The number of replications is the sample size (`n`) for the statistical tests that compare conditions (e.g., Model A vs. Model B). A larger `n` increases the power to detect real differences.
+-   **Justification:** A sample size of 30 is a well-established standard in experimental research for conducting robust ANOVA and t-tests. It provides sufficient statistical power (>80%) to reliably detect small-to-medium main effects and interactions (Cohen's d > 0.20).
+-   **Trade-offs:**
+    -   *Fewer Replications (<20)* would significantly reduce statistical power, increasing the risk of failing to detect a true effect (Type II error).
+    -   *More Replications (>50)* would offer diminishing returns in power gain while linearly increasing the total cost and runtime of the study.
+
+**Why 80 Trials? (Metric Precision and Resilience)**
+
+-   **Purpose:** The number of trials determines the precision of the performance metrics (like MRR) *within a single replication*. Each replication's performance score is an average across all its trials; more trials lead to a more stable and less noisy estimate.
+-   **Justification:** An 80-trial count provides a strong balance:
+    1.  **Reduces Noise:** It smooths out the randomness of LLM performance on any single query, yielding a more reliable data point for each replication.
+    2.  **Provides Resilience:** It creates a crucial buffer against real-world API and parsing failures. With a minimum threshold of 25 valid responses required for a replication to be included in the final analysis, 80 trials offer a substantial safety margin. Even with a parsing success rate as low as 90%, we can expect 72 valid responses—nearly 3 times the required minimum.
+-   **Trade-offs:**
+    -   *Fewer Trials (<50)* would make each replication's metrics more volatile and highly susceptible to a few outlier results. It would also reduce the buffer against parsing failures, risking data loss.
+    -   *More Trials (>100)* would offer slightly more precision but at a direct, linear increase in cost per replication, representing a point of diminishing returns.
+
+In summary, the 30x80 design was chosen as a robust and cost-effective standard that ensures the study is both statistically powerful and resilient to the practical challenges of large-scale LLM experimentation.
+
+###### Statistical Analysis Plan
+
+- **Primary Analysis:** Three-Way Mixed ANOVA (1 between-subjects, 2 within-subjects factors).
+- **Effect Size Measures:** Eta-squared (η²) and Cohen's d.
+- **Post-Hoc Tests:** Tukey HSD with Benjamini-Hochberg FDR correction for multiple comparisons.
+- **Complementary Analysis:** Bayesian analysis (Bayes Factor) to quantify evidence for or against the null hypothesis.
+
+---
+
+#### Guidance for Designing New Studies
+
+This section provides general principles for designing new multi-factor experiments for methodological or conceptual replication. Note: All cost estimates are in USD and based on OpenRouter.ai rates as of October 2025.
+
+##### 1. Define Your Factors
+
+The framework is built for factorial designs. Start by defining the independent variables (factors) you want to investigate. Common factors include:
+
+-   **`mapping_strategy` (Between-Subjects):** The core experimental manipulation (e.g., `correct` vs. `random`).
+-   **`group_size` (`k`) (Within-Subjects):** The difficulty of the matching task. Choose values that create a systematic difficulty gradient (e.g., an easy, medium, and hard condition like 7, 10, 14).
+-   **`model_name` (Within-Subjects):** The LLMs you want to compare.
+
+##### 2. Select Your Parameters
+
+-   **Models:** When selecting models, consider a balance of:
+    -   **Cost-Effectiveness:** Choose models that fit your budget.
+    -   **Architectural Diversity:** Include models from different providers (e.g., OpenAI, Google, Anthropic, Meta) and with different architectures to test generalizability.
+    -   **Parsing Reliability:** Models must consistently return structured, parsable data. Test this in a pilot run.
+    -   **Independence:** For conceptual replications, ensure evaluation models are different from any models used in your data generation pipeline.
+
+-   **Group Sizes (`k`):** Select a range of `k` values that meaningfully vary the task difficulty. The original study used {7, 10, 14} because they create a roughly 20% increase in difficulty (measured by chance-level MRR) between steps. Avoid very small `k` (e.g., k < 5) where chance performance is too high.
+
+##### 3. Determine Your Sample Size
+
+Your sample size is a function of replications and trials, and it represents a trade-off between statistical power and resources (time and cost).
+
+-   **Replications (`num_replications`):** This determines the statistical power for comparing conditions (e.g., model A vs. model B). The original study used **30 replications**, which provides over 80% power to detect small-to-medium sized effects. This is a robust baseline for academic research.
+-   **Trials (`num_trials`):** This determines the stability and reliability of the performance metrics *within* a single replication. More trials reduce noise. The original study used **80 trials**, which provides a strong buffer against occasional API errors or parsing failures while keeping costs manageable.
+
+A **30x80 design** is a well-justified starting point, but you may adjust these values based on your research goals and budget.
+
+##### 4. Plan Your Execution Strategy
+
+Never run a large-scale study in one go. Follow a phased approach:
+
+1.  **Estimate:** Calculate the total number of trials (conditions × replications × trials) to estimate the total API cost and runtime.
+2.  **Pilot:** Always run a small pilot study first (e.g., one condition, 5-10 replications). This is critical for validating your entire pipeline, confirming your chosen models have a high parsing success rate (>95%), and catching any configuration errors before committing to a large budget.
+3.  **Execute in Batches:** Run the full study in manageable chunks (e.g., by model or by k-value). Perform quality checks after each batch using the `audit_experiment.ps1` script to ensure data integrity.
+
+##### 5. Organize Your Study
+
+-   **Directory Structure:** Create a dedicated study directory in `output/studies/` to hold all related experiment folders.
+-   **Naming Convention:** Use a consistent, descriptive naming convention for your experiment folders (e.g., `exp_{mapping}_{k}_{model}`) to keep your work organized and easily sortable.

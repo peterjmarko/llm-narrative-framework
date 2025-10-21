@@ -281,9 +281,6 @@ try {
         # Create backup before any modifications
         $script:configBackup = Join-Path $backupDir "config.ini.backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
         Copy-Item $configPath $script:configBackup -Force
-        # Display study parameters and get user selections
-        Show-StudyParameterSelection -StudyParams $studyParams
-        
         # Helper function to read Experiment defaults
         function Get-ExperimentDefault {
             param([string]$Section, [string]$Key)
@@ -310,52 +307,81 @@ try {
             @{Key='max_tokens'; Label='Max Tokens'; Section='LLM'}
         )
         
-        $userSelections = @{}
-        $isFirstPrompt = $true
-        $useExperimentDefaults = $false
-        
-        foreach ($param in $paramOrder) {
-            $key = $param.Key
-            $options = $studyParams[$key]
+        while ($true) { # Main loop to allow restarting selection
+            Show-StudyParameterSelection -StudyParams $studyParams
             
-            # Skip if empty in Study section (use Experiment default)
-            if ($options.Count -eq 0) {
-                $userSelections[$key] = Get-ExperimentDefault -Section $param.Section -Key $key
-                continue
-            }
+            $userSelections = @{}
+            $isFirstPrompt = $true
+            $useExperimentDefaults = $false
             
-            # Get selection (handles single values automatically)
-            $selection = Get-UserSelection -ParameterName $param.Label -Options $options -IsFirstPrompt $isFirstPrompt
-            
-            # Check if user chose to use Experiment defaults
-            if ($selection -eq 'USE_EXPERIMENT_DEFAULTS') {
-                $useExperimentDefaults = $true
-                break
-            }
-            
-            $userSelections[$key] = $selection
-            $isFirstPrompt = $false
-        }
-        
-        # If user chose 'e', fill remaining with Experiment defaults
-        if ($useExperimentDefaults) {
-            Write-Host "`nUsing [Experiment] section defaults..." -ForegroundColor Yellow
             foreach ($param in $paramOrder) {
-                if (-not $userSelections.ContainsKey($param.Key)) {
-                    $userSelections[$param.Key] = Get-ExperimentDefault -Section $param.Section -Key $param.Key
+                $key = $param.Key
+                $options = $studyParams[$key]
+                
+                # Skip if empty in Study section (use Experiment default)
+                if ($options.Count -eq 0) {
+                    $userSelections[$key] = Get-ExperimentDefault -Section $param.Section -Key $key
+                    continue
+                }
+                
+                # Get selection (handles single values automatically)
+                $selection = Get-UserSelection -ParameterName $param.Label -Options $options -IsFirstPrompt $isFirstPrompt
+                
+                # Check if user chose to use Experiment defaults
+                if ($selection -eq 'USE_EXPERIMENT_DEFAULTS') {
+                    $useExperimentDefaults = $true
+                    break
+                }
+                
+                $userSelections[$key] = $selection
+                $isFirstPrompt = $false
+            }
+            
+            # If user chose 'e', fill remaining with Experiment defaults
+            if ($useExperimentDefaults) {
+                Write-Host "`nUsing [Experiment] section defaults..." -ForegroundColor Yellow
+                foreach ($param in $paramOrder) {
+                    if (-not $userSelections.ContainsKey($param.Key)) {
+                        $userSelections[$param.Key] = Get-ExperimentDefault -Section $param.Section -Key $param.Key
+                    }
                 }
             }
-        }
-        
-        Write-Host "`nSelected Configuration:" -ForegroundColor Green
-        foreach ($param in $paramOrder) {
-            if ($userSelections.ContainsKey($param.Key)) {
-                Write-Host "  $($param.Label): $($userSelections[$param.Key])" -ForegroundColor White
+            
+            Write-Host "`nSelected Configuration:" -ForegroundColor Green
+            foreach ($param in $paramOrder) {
+                if ($userSelections.ContainsKey($param.Key)) {
+                    Write-Host "  $($param.Label): $($userSelections[$param.Key])" -ForegroundColor White
+                }
             }
-        }
-        Write-Host ""
-        
-        # Update config.ini with selections
+            Write-Host ""
+
+            # --- Confirmation Prompt ---
+            $userConfirmed = $false
+            while ($true) {
+                try {
+                    $confirmation = Read-Host -Prompt "Proceed with this configuration? (Y/N, Ctrl+C to exit)"
+                    if ($confirmation.ToLower() -eq 'y') {
+                        $userConfirmed = $true
+                        break 
+                    }
+                    elseif ($confirmation.ToLower() -eq 'n') {
+                        break
+                    }
+                    else {
+                        Write-Host "Invalid input. Please enter 'y' for yes or 'n' for no." -ForegroundColor Red
+                    }
+                } catch { throw } # Re-throw Ctrl+C to be caught by the main handler
+            }
+
+            if ($userConfirmed) {
+                break # Exit the main selection loop and proceed
+            } else {
+                Write-Host "`nConfiguration rejected. Restarting selection...`n" -ForegroundColor Yellow
+                # The loop will automatically restart
+            }
+        } # End of main selection loop
+
+        # Update config.ini with selections only AFTER confirmation
         $configLines = Get-Content $configPath -Encoding UTF8
         foreach ($param in $paramOrder) {
             if ($userSelections.ContainsKey($param.Key)) {

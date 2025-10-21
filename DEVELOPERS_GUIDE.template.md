@@ -149,7 +149,7 @@ To maintain the quality and consistency of the codebase, all contributions shoul
 
 *   **Separation of Concerns**: Each script must have a single, well-defined responsibility. This principle applies in two key ways:
     1.  **By Workflow Pattern (Create -> Check -> Fix)**: For managing experiments, the framework uses distinct scripts for creating, auditing, and repairing data. For example, `audit_experiment.ps1` only *checks* the state, while `fix_experiment.ps1` *fixes* it.
-    2.  **By Data Pipeline Stage**: For complex data processing, workflows are broken into a clear, sequential pipeline of single-purpose scripts. For example, the original monolithic `validate_adb_data.py` was refactored into two more focused scripts: `find_wikipedia_links.py` is responsible only for finding subject URLs, while `validate_wikipedia_pages.py` handles the intensive work of validating the page content and generating the final reports.
+    2.  **By Data Pipeline Stage**: For complex data processing, workflows are broken into a clear, sequential pipeline of single-purpose scripts. For example, the original monolithic data validation script was refactored into two more focused scripts: `find_wikipedia_links.py` is responsible only for finding subject URLs, while `qualify_subjects.py` handles the intensive work of validating the page content and generating the final reports.
 
     This separation makes the system predictable, easier to debug, and more maintainable.
 

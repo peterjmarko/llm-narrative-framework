@@ -233,7 +233,7 @@ def _run_repair_mode(runs_to_repair, orchestrator_script_path, verbose, colors):
         if not failed_indices:
             continue
 
-        header_text = f" REPAIRING REPLICATION {os.path.basename(run_dir)} ({i+1}/{len(runs_to_repair)}) "
+        header_text = f" REPAIRING REPLICATION {i+1}/{len(runs_to_repair)} "
         print(f"\n{C_CYAN}{'='*80}{C_RESET}")
         print(f"{C_CYAN}{header_text.center(78)}{C_RESET}")
         print(f"{C_CYAN}{'='*80}{C_RESET}")
@@ -623,40 +623,66 @@ def main():
         else:
             # --- For all other modes, use the iterative state-machine loop ---
             force_reprocess_once = args.reprocess
-            loop_count = 0
             pipeline_successful = True
             previous_state = None
             loop_count = 0
-            repair_cycle_count = 0
-            max_repair_cycles = 3
+            new_mode_completed = False # Flag to track if we just finished the initial run.
+            
+            # Smarter repair cycle management
+            stall_counter = 0
+            max_stalled_cycles = 3
+            previous_repair_count = float('inf')
+
             while True:
                 action_taken = False
                 success = True
 
                 state_name, payload_details, _ = get_experiment_state(Path(final_output_dir), end_rep)
                 
-                # Only count loops when we repeat the same state (indicating a problem)
-                if state_name == previous_state:
+                # If we just finished a new run and now need repairs, run the auditor for a summary.
+                if new_mode_completed and state_name == "REPAIR_NEEDED":
+                    try:
+                        # Call the auditor script directly. It prints the summary table by default.
+                        cmd_audit = [sys.executable, script_paths['auditor'], final_output_dir, "--non-interactive"]
+                        # Let the audit output stream directly to the console.
+                        subprocess.run(cmd_audit, check=False) # Use check=False as it exits with non-zero on purpose
+                    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                        print(f"{C_YELLOW}Could not run interim audit summary: {e}{C_RESET}")
+                    new_mode_completed = False # Reset flag to prevent re-printing.
+
+                # General infinite loop prevention
+                if state_name == previous_state and not action_taken:
                     loop_count += 1
                     if loop_count >= args.max_loops:
-                        print(f"{C_RED}\n--- Max loop count reached. Halting to prevent infinite loop. ---{C_RESET}")
+                        print(f"{C_RED}\n--- State unchanged for {args.max_loops} loops. Halting to prevent infinite loop. ---{C_RESET}")
                         pipeline_successful = False
                         break
                 else:
-                    loop_count = 0  # Reset counter for new state
+                    loop_count = 0
                 
                 previous_state = state_name
 
                 if state_name == "NEW_NEEDED":
                     success = _run_new_mode(final_output_dir, args.start_rep, end_rep, args.notes, args.verbose, script_paths['orchestrator'], colors, use_color=use_color)
+                    if success:
+                        new_mode_completed = True
                     action_taken = True
 
                 elif state_name == "REPAIR_NEEDED":
-                    repair_cycle_count += 1
-                    if repair_cycle_count > max_repair_cycles:
-                        print(f"\n{C_YELLOW}--- Maximum {max_repair_cycles} repair cycles reached. Ending repair attempts. ---{C_RESET}")
+                    current_repair_count = len(payload_details)
+                    
+                    # Check if progress has been made since the last repair cycle.
+                    if current_repair_count < previous_repair_count:
+                        stall_counter = 0 # Progress was made, reset the stall counter.
+                        previous_repair_count = current_repair_count
+                    else:
+                        stall_counter += 1 # No progress, increment the stall counter.
+
+                    if stall_counter >= max_stalled_cycles:
+                        print(f"\n{C_YELLOW}--- Maximum {max_stalled_cycles} repair cycles without progress reached. Ending repair attempts. ---{C_RESET}")
                         print(f"{C_YELLOW}--- Proceeding with available data from successful replications. ---{C_RESET}")
-                        break
+                        pipeline_successful = False # Mark as not fully successful.
+                        break # Exit the main while loop and proceed to finalization.
                     
                     config_repairs = [d for d in payload_details if d.get("repair_type") == "config_repair"]
                     full_rep_repairs = [d for d in payload_details if d.get("repair_type") == "full_replication_repair"]
@@ -689,21 +715,48 @@ def main():
 
                 if not success:
                     if state_name == "REPAIR_NEEDED":
-                        # For repair failures, continue to show final experiment status
+                        # For repair failures, continue to show final experiment status.
+                        # Do not set pipeline_successful to False here; allow the loop to retry and recover.
                         print(f"{C_YELLOW}\n--- Repair step failed, but continuing to final audit to show overall experiment status. ---{C_RESET}")
-                        pipeline_successful = False
-                        # Don't break - let the loop continue to check final state
                     else:
                         print(f"{C_RED}\n--- A step failed. Halting experiment manager. Please review logs. ---{C_RESET}")
                         pipeline_successful = False
                         break
           
-            if pipeline_successful:
-                _run_finalization(final_output_dir, script_paths, colors)
-                relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
-                print(f"\n{C_GREEN}Experiment run finished successfully for:\n{relative_path}{C_RESET}\n")
+            # After the main loop concludes (either by success, stall, or hard fail),
+            # we check the state one last time to decide the final action.
+            
+            final_state_name, _, _ = get_experiment_state(Path(final_output_dir), end_rep)
+
+            if final_state_name not in ["COMPLETE", "AGGREGATION_NEEDED"]:
+                # This branch handles cases where the loop stalled or a hard error occurred.
+                # The experiment is NOT fully successful.
+                print(f"\n{C_YELLOW}Experiment could not be fully completed due to persistent issues.{C_RESET}")
+                print(f"{C_YELLOW}Attempting to finalize results for any completed replications...{C_RESET}")
+                
+                try:
+                    _run_finalization(final_output_dir, script_paths, colors)
+                except Exception as e:
+                    print(f"{C_RED}Finalization step failed during exit: {e}{C_RESET}")
+
+                # Provide clear, actionable advice for the user.
+                print(f"\n{C_RED}Experiment finished with incomplete replications.{C_RESET}")
+                print(f"{C_YELLOW}To see a detailed status report and continue repairs, run:{C_RESET}")
+                # Construct the command for the user to run next.
+                relative_exp_path = os.path.relpath(final_output_dir, PROJECT_ROOT).replace(os.sep, '/')
+                print(f"  {C_CYAN}pdm run fix-exp {relative_exp_path}{C_RESET}\n")
+                
+                sys.exit(1) # Exit with a failure code.
+            
             else:
-                sys.exit(1)
+                # This branch handles a successful completion where the state is ready for finalization.
+                try:
+                    _run_finalization(final_output_dir, script_paths, colors)
+                    relative_path = os.path.relpath(final_output_dir, PROJECT_ROOT)
+                    print(f"\n{C_GREEN}Experiment run finished successfully for:\n{relative_path}{C_RESET}\n")
+                except Exception as e:
+                    print(f"{C_RED}Finalization step failed: {e}{C_RESET}")
+                    sys.exit(1)
 
     except KeyboardInterrupt:
         print(f"\n{C_YELLOW}--- Operation interrupted by user (Ctrl+C). Exiting gracefully. ---{C_RESET}", file=sys.stderr)

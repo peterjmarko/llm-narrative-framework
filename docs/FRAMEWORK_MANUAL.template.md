@@ -26,7 +26,7 @@ This manual is intended for developers, contributors, and researchers who wish t
 |:----------|:---------|:--------|:--------|
 | `mapping_strategy` | `[Study]` or `[Experiment]` | Correct vs random pairing | `correct, random` |
 | `group_size` | `[Study]` or `[Experiment]` | Number of subjects per trial (k) | `7, 10, 14` |
-| `model_name` | `[Study]` or `[LLM]` | LLM to evaluate | `google/gemini-2.0-flash-lite-001` |
+| `model_name` | `[Study]` or `[LLM]` | LLM to evaluate | `google/gemini-2.0-flash-001` |
 | `num_replications` | `[Experiment]` | Repetitions per condition | `30` |
 | `num_trials` | `[Experiment]` | Trials per replication | `80` |
 | `temperature` | `[LLM]` | Output randomness (0.0-2.0) | `0.0` |
@@ -92,9 +92,283 @@ This manual serves multiple audiences. Use this matrix to identify which section
 
 ---
 
+## Getting Started
+
+### Setup and Installation
+
+This project uses **PDM** for dependency and environment management.
+
+1.  **Install PDM (One-Time Setup)**:
+    If you don't have PDM, install it once with pip. It's best to run this from a terminal *outside* of any virtual environment.
+    ```bash
+    pip install --user pdm
+    ```
+    > **Note:** If `pdm` is not found in a new terminal, use `python -m pdm` instead.
+
+2.  **Install Project Environment & Dependencies**:
+    From the project's root directory, run the main PDM installation command. The `-G dev` flag installs all packages, including the development tools needed to run the test suite.
+    ```bash
+    pdm install -G dev
+    ```
+    This command creates a local `.venv` folder and installs all necessary packages into it.
+
+3.  **Configure API Key**:
+    *   Create a file named `.env` in the project root.
+    *   Add your API key from OpenRouter. The key will start with `sk-or-`.
+        `OPENROUTER_API_KEY=your-actual-api-key`
+
+To run any project command, such as the test suite, prefix it with `pdm run`:
+```bash
+pdm run test
+```
+
+> **For Developers:** If you intend to contribute to the project or encounter issues with the simple setup, please see the **[Developer Setup Guide](../DEVELOPERS_GUIDE.md#getting-started-development-environment-setup)** for more detailed instructions and troubleshooting.
+
+### Configuration (`config.ini`)
+
+The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results for guaranteed reproducibility.
+
+### Configuration Reference
+
+| Section | Parameter | Description | Example Value |
+| :--- | :--- | :--- | :--- |
+| **`[Study]`** | `mapping_strategy` | Comma-separated list of mapping strategies for factorial design. Enables interactive selection. | `correct, random` |
+| | `group_size` | Comma-separated list of group sizes (`k`) for factorial design. | `7, 10, 14` |
+| | `model_name` | Comma-separated list of LLM models for factorial design. | `google/gemini-2.0-flash-001, meta-llama/llama-3.3-70b-instruct` |
+| **`[Experiment]`** | `num_replications` | The number of times the experiment will be repeated (`r`). | `30` |
+| | `num_trials` | The number of trials for each replication (`m`). | `80` |
+| | `group_size` | The number of subjects in each group (`k`). Used when `[Study]` section is empty. | `10` |
+| | `mapping_strategy` | Mapping strategy: `correct` or `random`. Used when `[Study]` section is empty. | `correct` |
+| **`[LLM]`** | `model_name` | The API identifier for the LLM. Used when `[Study]` section is empty. | `google/gemini-2.0-flash-001` |
+| | `temperature` | Controls the randomness of the model's output (0.0-2.0). | `0.0` |
+| | `max_tokens` | Maximum tokens in the model's response. | `8192` |
+| | `max_parallel_sessions` | The number of concurrent API calls to make. | `10` |
+| **`[Analysis]`** | `min_valid_response_threshold` | Minimum average valid responses for an experiment to be included in the final analysis. Set to `0` to disable. | `25` |
+| **`[DataGeneration]`** | `bypass_candidate_selection` | If `true`, skips LLM-based scoring and uses all eligible candidates. | `false` |
+| | `cutoff_search_start_point` | The cohort size at which to start searching for the variance curve plateau. | `3500` |
+| | `smoothing_window_size` | The window size for the moving average used to smooth the variance curve. | `800` |
+
+**Note:** Parameters defined in `[Study]` take precedence. When you run `new_experiment.ps1` with a populated `[Study]` section, you'll select specific values interactively, which are then written to `[Experiment]` and `[LLM]` sections before the experiment executes. If `[Study]` is empty or absent, values are read directly from `[Experiment]` and `[LLM]` sections.
+
+### Study-Level vs. Experiment-Level Configuration
+
+The framework supports two configuration modes:
+
+#### Interactive Study Design (`[Study]` Section)
+
+For factorial experiments comparing multiple conditions, define experimental 
+factors in the `[Study]` section with comma-separated values:
+```ini
+[Study]
+mapping_strategy = correct, random
+group_size = 7, 10, 14
+model_name = model-a, model-b, model-c
+```
+
+When you run `new_experiment.ps1`, the script presents an interactive menu 
+for selecting specific values. Your selections are automatically written to 
+the `[Experiment]` section before the experiment executes.
+
+**Use this mode when:** You're creating multiple experiments for a factorial study.
+
+#### Direct Configuration (`[Experiment]` Section Only)
+
+For single-condition experiments, specify parameters directly:
+```ini
+[Experiment]
+mapping_strategy = correct
+group_size = 10
+num_replications = 30
+num_trials = 80
+```
+
+**Use this mode when:** You're running a single experiment with fixed parameters.
+
+#### How They Work Together
+
+1. **If `[Study]` section exists with parameters** → Interactive mode activated
+2. **User selections** → Written to `[Experiment]` section
+3. **Experiment executes** → Uses values from `[Experiment]` section
+4. **Configuration archived** → `config.ini.archived` captures exact parameters used
+
+This two-tier system enables efficient factorial study creation while maintaining 
+complete reproducibility for each individual experiment.
+
+#### Model Selection Philosophy and Future Work
+The selection of models for this study was guided by a balance of performance, cost, speed, and technical compatibility with the automated framework. Several top-tier models were not included for one of the following reasons:
+
+-   **Prohibitive Cost**: Models like `o1 pro`, `GPT 4.5 Preview`, and `Claude 4 Opus` were excluded as a single experiment (requiring ~3,000 queries) was financially infeasible.
+
+-   **Technical Incompatibility**: Models like `Gemini 2.5 Pro` lacked a "non-thinking" mode, making the automated parsing of a structured response table overly challenging.
+
+-   **Excessive Runtime**: A number of large models, including `Qwen3 235B` and `Llama 3.1 Nemotron Ultra 253B`, were excluded as a full experimental run would take longer than 20 hours.
+
+A follow-up study is planned to evaluate other powerful, medium-cost models as API costs decrease and technical features evolve. Candidates include: `Grok 3`, `Grok 4`, `Claude 4 Sonnet`, `Claude 3.7 Sonnet`, `GPT-4o`, `o3`, `GPT-4.1`, `Mistral Large 2`, `Gemini 1.5 Pro`, and various `o1`/`o3`/`o4` mini-variants.
+
+#### Analysis Settings (`[Analysis]`)
+
+-   **`min_valid_response_threshold`**: Minimum average number of valid responses (`n_valid_responses`) for an experiment to be included in the final analysis. Set to `0` to disable.
+
+### Choosing the Right Workflow: Separation of Concerns
+
+The framework is designed around a clear "Create -> Check -> Fix -> Compile" model. This separation of concerns ensures that each workflow is simple, predictable, and safe.
+
+{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=50% | caption=Choosing the Right Workflow: A guide for experiment and study tasks.}}
+
+-   **`new_experiment.ps1` (Create)**: Use this to create a new experiment from scratch for a single experimental condition.
+
+-   **`audit_experiment.ps1` (Check - Experiment)**: Use this read-only tool to get a detailed status report on any existing experiment. It is your primary diagnostic tool.
+
+-   **`fix_experiment.ps1` (Fix & Update)**: Use this for any experiment with a fixable error, such as an interrupted run. This is the main "fix-it" tool for common issues.
+
+-   **`audit_study.ps1` (Check - Study)**: Use this read-only tool to get a consolidated status report on all experiments in a study directory before final analysis.
+
+-   **`compile_study.ps1` (Compile)**: After creating and validating all experiments, use this script to aggregate the results and run the final statistical analysis.
+
+### Core Workflows
+
+The project is orchestrated by several PowerShell wrapper scripts that handle distinct user workflows.
+
+### Creating a New Experiment (`new_experiment.ps1`)
+
+This is the entry point for creating a new experiment from scratch. It reads `config.ini`, generates a timestamped directory, and runs the full batch.
+
+```powershell
+# Create and run a new experiment
+.\new_experiment.ps1 -Verbose
+```
+
+#### Interactive Study Parameter Selection
+
+If your `config.ini` includes a `[Study]` section with multiple values for experimental design parameters, `new_experiment.ps1` will present an interactive menu for selecting specific conditions:
+```ini
+[Study]
+# Study-level experimental design parameters
+mapping_strategy = correct, random
+group_size = 7, 10, 14
+model_name = meta-llama/llama-3.3-70b-instruct, google/gemini-2.5-flash-lite, openai/gpt-4.1-nano
+
+[Experiment]
+num_replications = 30
+num_trials = 80
+```
+
+When you run the script, it displays available options:
+```powershell
+.\new_experiment.ps1
+```
+```
+Study Experimental Design
+================================================================================
+
+Mapping Strategies:
+  [1] correct
+  [2] random
+
+Group Sizes:
+  [1] 7
+  [2] 10
+  [3] 14
+
+Models:
+  [1] meta-llama/llama-3.3-70b-instruct
+  [2] google/gemini-2.5-flash-lite
+  [3] openai/gpt-4.1-nano
+
+Select Mapping Strategy [1-2]: 1
+Select Group Size [1-3]: 1
+Select Model [1-3]: 1
+
+Selected Configuration:
+  Mapping Strategy: correct
+  Group Size: 7
+  Model: meta-llama/llama-3.3-70b-instruct
+```
+
+After selection, your choices are automatically written to the `[Experiment]` and `[LLM]` sections before experiment creation. Each experiment's parameters are logged to `output/studies/study_creation_log.txt` for tracking your complete study design.
+
+**Fallback Behavior:** If the `[Study]` section is empty or absent, the script uses values directly from `[Experiment]` and `[LLM]` sections (standard behavior).
+
+### Auditing an Experiment (`audit_experiment.ps1`)
+
+This is the primary diagnostic tool for an experiment. It performs a read-only check and provides a detailed status report.
+
+```powershell
+# Get a status report for an existing experiment
+.\audit_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250910_062305"
+```
+
+### Fixing or Updating an Experiment (`fix_experiment.ps1`)
+
+This is the main "fix-it" tool for an existing experiment. It automatically diagnoses and fixes issues.
+
+**To automatically fix a broken or incomplete experiment:**
+The script will run an audit, identify the problem (e.g., missing responses, outdated analysis), and automatically apply the correct fix.
+```powershell
+# Automatically fix a broken experiment
+.\fix_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250910_062305"
+```
+
+**To interactively force an action on a valid experiment:**
+If you run the script on a complete and valid experiment, it will present an interactive menu allowing you to force a full repair, an analysis update, or a re-aggregation of results.
+
+```powershell
+# Run on a valid experiment to bring up the interactive force menu
+.\fix_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250910_062305"
+```
+
+### Auditing a Study (`audit_study.ps1`)
+
+This is the main diagnostic tool for a study. It performs a comprehensive, read-only audit of all experiments in a study directory and provides a consolidated summary report with a final recommendation.
+
+```powershell
+# Get a status report for an entire study
+.\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
+```
+
+### Compiling a Study (`compile_study.ps1`)
+
+This script orchestrates the entire compilation and analysis workflow for a study. It audits, compiles, and performs the final statistical analysis on all experiments.
+
+**Important:** This script begins with a robust pre-flight check by calling `audit_study.ps1`. If the audit reveals that any experiment is not `VALIDATED`, or that the study is already `COMPLETE`, the process will halt with a detailed report and a clear recommendation. This guarantees that analysis is only performed on a complete and ready set of data.
+
+For organizational purposes, one would typically move all experiment folders belonging to a single study into a common directory (e.g., `output/studies/My_First_Study/`).
+
+**To run the compilation and analysis:**
+Point the script at the top-level directory containing all relevant experiment folders. It will provide a clean, high-level summary of its progress.
+
+```powershell
+# Example: Compile and analyze all experiments in the "My_First_Study" directory
+.\compile_study.ps1 -StudyDirectory "output/studies/My_First_Study"
+```
+For detailed, real-time logs, add the `-Verbose` switch.
+
+**Final Artifacts:**
+The script generates two key outputs:
+
+1.  A master `STUDY_results.csv` file in your study directory, containing the aggregated data from all experiments.
+2.  A new `anova/` subdirectory containing the final analysis:
+    *   `STUDY_analysis_log.txt`: A comprehensive text report of the statistical findings.
+    *   `boxplots/`: Publication-quality plots visualizing the results.
+    *   `diagnostics/`: Q-Q plots for checking statistical assumptions.
+
+---
+
+## Architecture & Design
+
 {{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=100% | caption=Project Architecture: A high-level overview of the project's main functional components and their relationships.}}
 
-## Research Question
+### Directory Structure
+
+This logical hierarchy is reflected in the physical layout of the repository:
+
+{{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
+
+Data dictionaries provide detailed explanations for all files: [📁 Data Preparation Data Dictionary](../docs/DATA_PREPARATION_DATA_DICTIONARY.md) covers the `data/` directory, and [📊 Experiment and Study Workflow Data Dictionary](../output/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md) covers the `output/` directory structure and experimental results.
+
+## Research Context
+
+### Research Question
 At its core, this project investigates whether a Large Language Model (LLM) can solve a complex matching task: given a set of sanitized, narrative personality descriptions (derived from birth data) and a corresponding set of general biographical profiles, can the LLM correctly pair them at a rate significantly greater than chance?
 
 This study introduces a novel methodological twist to probe the limits of LLM pattern recognition, as illustrated below. The link between the narrative descriptions and the biographical profiles is a faint, systematic signal generated by a deterministic, esoteric system (an astrology program). This transforms the experiment into a rigorous test of an LLM's ability to detect subtle, rule-based patterns within a noisy, high-dimensional dataset. The central question is not about the validity of the generating system, but about the capability of the AI to find a signal in its output.
@@ -115,7 +389,7 @@ This study introduces a novel methodological twist to probe the limits of LLM pa
 
 The pipeline can be understood through the following architecture, workflow, data flow, and logic diagrams.
 
-## A Note on Stimulus Generation and Experimental Design
+### A Note on Stimulus Generation and Experimental Design
 The experiment is built upon a custom database of 4,954 famous historical individuals, for whom accurate and verified birth data (date, time, place) was meticulously collected. This population was chosen for two reasons:
 
 *   **Signal Integrity**: Accurate birth data ensures the deterministic generation of consistent personality narratives.
@@ -388,12 +662,6 @@ This stage performs a rigorous, deterministic filtering pass on the raw data to 
     # Qualify subjects by validating their Wikipedia/Wikidata entries
     pdm run qualify-subjects
     ```
-
-#### 3. Data Dictionary (`DATA_PREPARATION_DATA_DICTIONARY.template.md`)
-
-The data dictionary references the script in a few key places that must be updated.
-
-**Change 4: Update the Pipeline Completion Info Description**
 
 3.  **Final Filtering (`select_eligible_candidates.py`):** This script integrates the raw data with the Wikipedia validation report and applies the following additional criteria in order:
 
@@ -694,15 +962,15 @@ This selective approach ensures that expensive-to-generate analysis results and 
 
 This combination of automated scripts and well-defined manual steps ensures the final dataset is both high-quality and computationally reproducible.
 
-## Solar Fire Integration and Configuration
+### Solar Fire Integration and Configuration
 
 This section provides detailed instructions for integrating Solar Fire astrology software into the data preparation pipeline. Solar Fire is used for calculating celestial positions and exporting chart data that serves as input for the personality generation algorithm.
 
-### Software Requirements
+#### Software Requirements
 
 Solar Fire v9.0.3 is the recommended version for this framework. The software is available at https://alabe.com/solarfireV9.html.
 
-### File Locations
+#### File Locations
 
 Solar Fire stores its user files in the standard Windows Documents folder. Understanding these locations is helpful for managing the import/export process:
 
@@ -714,11 +982,11 @@ Solar Fire stores its user files in the standard Windows Documents folder. Under
     *   **Points & Colors:** Settings ('*.pts') file for Displayed Points
     *   **Interpretations:** Delineations library ('*.def') files
 
-### One-Time Software Setup
+#### One-Time Software Setup
 
 The following configuration steps only need to be performed once. After the initial setup, you can proceed directly to the **Import/Export Workflow**.
 
-#### 1. Configure Chart Points
+###### 1. Configure Chart Points
 
 You must define which astrological points are included in the calculations.
 
@@ -730,7 +998,7 @@ You must define which astrological points are included in the calculations.
 
 {{grouped_figure:docs/images/sf_images/sf_setup_1_displayed_points.png | width=60% | caption=Solar Fire "Displayed Points" dialog configured with the 12 required chart points.}}
 
-#### 2. Configure Preferences
+##### 2. Configure Preferences
 
 Ensure the core calculation settings match the study's methodology.
 
@@ -741,7 +1009,7 @@ Ensure the core calculation settings match the study's methodology.
     *   **'Zodiac' tab -> Default Zodiac:** `Tropical`
     *   **'AutoRun' tab -> Astrologer's Assistant:** Ensure this is cleared and no tasks run on startup.
 
-#### 3. Define Data Formats
+##### 3. Define Data Formats
 
 You must define the data structure for both importing and exporting. Solar Fire maintains **separate** format lists for each, so this process must be done twice.
 
@@ -768,11 +1036,11 @@ You must define the data structure for both importing and exporting. Solar Fire 
 
 {{grouped_figure:docs/images/sf_images/sf_setup_3_export_format.png | width=80% | caption=Solar Fire "Export Chart Data" format dialog configured for the CQD Export format.}}
 
-### Import/Export Workflow
+#### Import/Export Workflow
 
 After completing the one-time setup, follow this workflow to process the data.
 
-#### Pre-flight Check: Clearing Existing Chart Data (For Re-runs)
+##### Pre-flight Check: Clearing Existing Chart Data (For Re-runs)
 If you are re-running the import process, you must first clear the existing charts from your Solar Fire charts file to avoid duplicates.
 
 *   **Menu:** `Chart > Open...`
@@ -785,7 +1053,7 @@ If you are re-running the import process, you must first clear the existing char
 
 {{grouped_figure:docs/images/sf_images/sf_workflow_1_clear_charts.png | width=95% | caption=Solar Fire "Chart Database" dialog with all charts selected for deletion.}}
 
-#### Step 1: Import Birth Data
+##### Step 1: Import Birth Data
 The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, choose `sf_data_import.assembly_logic.txt` in the Solar Fire import folder for #2 and save to `adb_candidates.assembly_logic` for #3.
 
 *   **Menu:** `Utilities > Chart Import/Export...`
@@ -799,7 +1067,7 @@ The procedure below is for the production workflow. When validating the Personal
 
 {{grouped_figure:docs/images/sf_images/sf_workflow_2_import_dialog.png | width=95% | caption=Solar Fire "Chart Import/Export" dialog configured to import the prepared data.}}
 
-#### Step 2: Calculate All Charts
+##### Step 2: Calculate All Charts
 The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, select `adb_candidates.assembly_logic` for #1.
 
 *   **Menu:** `Chart > Open...`
@@ -810,7 +1078,7 @@ The procedure below is for the production workflow. When validating the Personal
 
 > **A Note on Character Encoding:** In the "Calculated Charts" list, you may notice that some names with international characters appear corrupted (e.g., `PelÃ©` instead of `Pelé`). This is an expected display issue within Solar Fire. **Do not attempt to fix these names manually.** The automated scripts are designed to detect and repair these encoding errors in the next stage, ensuring the final database is clean.
 
-#### Step 3: Export Chart Data
+##### Step 3: Export Chart Data
 The procedure below is for the production workflow. When validating the Personality Assembly Algorithm, browse to the Solar Fire export folder and set the filename to `sf_data_import.assembly_logic.txt` for #6.
 
 *   **Menu:** `Chart > Export Charts as Text...`
@@ -850,7 +1118,7 @@ The exported file consists of a repeating 14-line block for each subject. The st
 
 The entire file consists of `N * 14` lines, where `N` is the final number of subjects.
 
-#### Special Step: Generate Interpretation Reports
+##### Special Step: Generate Interpretation Reports
 
 This procedure is not part of the production workflow and only applies to the manual portion of the Personality Assembly Algorithm validation (`pdm run test-assembly-setup`). The first automated stages of the validation process should be completed at this point. The orchestrator script will display the exact number of charts to process.
 
@@ -864,7 +1132,7 @@ This procedure is not part of the production workflow and only applies to the ma
     6.  Go through steps 2 to 5 for all charts in sequence (#2 to #17) using the sequence number as the suffix in the filename. Save last report as 'sf_raw_report.assembly_logic_17'.
     7.  Once all reports have been exported, click Cancel in the "Select Text for Report" dialog and continue with executing stage 4 and 5 of the validation (i.e., resume 'test-assembly-setup').
 
-### Exporting the Delineations Library (One-Time Task)
+#### Exporting the Delineations Library (One-Time Task)
 
 The personality descriptions are assembled from a library of pre-written text components. This library must first be exported from Solar Fire.
 
@@ -874,7 +1142,16 @@ The personality descriptions are assembled from a library of pre-written text co
     2.  In the 'Interpretations Editor', go to `File > Decompile...` and save the file. This creates `Standard.def` in the `Documents\Solar Fire User Files\Interpretations` directory.
     3.  Copy this file to the `data/foundational_assets/` folder and rename it to `sf_delineations_library.txt`. Note: Filename extensions must be displayed for this rename.
 
-## Experiment Lifecycle & Analysis
+## The Experiment & Study Workflow
+
+### Experimental Hierarchy
+
+The project's experiments are organized in a logical hierarchy:
+
+-   **Study**: The highest-level grouping, representing a major research question (e.g., "Performance on Random vs. Correct Mappings").
+-   **Experiment**: A complete set of runs for a single condition within a study (e.g., "Gemini 2.0 Flash with k=10 Subjects").
+-   **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
+-   **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
 
 ### Key Features
 
@@ -1007,541 +1284,88 @@ These diagrams illustrate the scientific and procedural methodology at each leve
 
 {{grouped_figure:docs/diagrams/logic_main_study.mmd | scale=2.5 | width=100% | caption=Study Logic: The complete workflow for processing a study, from auditing and aggregation to final statistical analysis.}}
 
-## Experimental Hierarchy
+### Testing
 
-The project's experiments are organized in a logical hierarchy:
+The project includes a comprehensive test suite managed by PDM scripts, which provides shortcuts for running tests with and without code coverage. Several integration tests offer interactive modes that provide guided tours of the framework's capabilities.
 
--   **Study**: The highest-level grouping, representing a major research question (e.g., "Performance on Random vs. Correct Mappings").
--   **Experiment**: A complete set of runs for a single condition within a study (e.g., "Gemini 2.0 Flash with k=10 Subjects").
--   **Replication**: A single, complete run of an experiment, typically repeated 30 times for statistical power.
--   **Trial**: An individual matching task performed within a replication, typically repeated 100 times.
+#### Automated CI Checks
 
-## Study Design
+The project uses a GitHub Actions workflow for Continuous Integration (CI). On every push or pull request, it automatically runs a series of checks on Windows, Linux, and macOS to ensure code quality and consistency. This includes:
 
-This section provides comprehensive guidance for designing and executing multi-factor experimental studies using the framework. It covers factorial design principles, sample size determination, and practical execution strategies.
+-   Linting all source files for correct formatting and headers.
+-   Verifying that the documentation is up-to-date.
 
-### Factorial Design Overview
+This ensures that the main branch is always stable and that all contributions adhere to the project's standards.
 
-The framework supports multi-factor experimental designs where each factor can have multiple levels. A typical study design might include:
+#### Running the Test Suite
 
-**Factor 1: Mapping Strategy** (between-subjects)
-- Correct mappings (personalities matched to correct individuals)
-- Random mappings (personalities randomly shuffled)
-
-**Factor 2: Group Size (k)** (within-subjects)
-- Multiple difficulty levels (e.g., k ∈ {7, 10, 14})
-- Determines number of comparisons per trial (k²)
-
-**Factor 3: Model** (within-subjects)
-- Multiple LLMs to test generalizability
-- Different architectures and capabilities
-
-### Design Specification Example
-
-#### Three-Factor Factorial Design
-
-**Design Parameters:**
+-   **To run all tests (Python and PowerShell) at once:**
+```bash
+    pdm run test
 ```
-Factor 1: mapping_strategy (2 levels)
-  - correct
-  - random
-
-Factor 2: group_size (3 levels)
-  - k = 7  (49 comparisons per trial)
-  - k = 10 (100 comparisons per trial)
-  - k = 14 (196 comparisons per trial)
-
-Factor 3: model (3 levels)
-  - Selected from low-cost, high-reliability tier
-  - Examples: Llama 3.3 70B, Gemini 2.5 Flash Lite, GPT-4.1 Nano
-
-Sample Size:
-  - 30 replications per condition
-  - 80 trials per replication
+-   **To run only the PowerShell script tests:**
+```bash
+    pdm run test-ps-all
 ```
+    You can also test individual PowerShell scripts (e.g., `pdm run test-ps-exp`, `pdm run test-ps-stu`).
 
-**Total Experimental Scope:**
+For detailed code coverage analysis, see the [👨‍💻 Developer's Guide - Code Coverage](../DEVELOPERS_GUIDE.md#code-coverage).
 
-- Experimental conditions: 2 × 3 × 3 = **18 conditions (experiments)**
-- Replications: 18 × 30 = **540 replications**
-- Trials: 540 × 80 = **43,200 trials**
+#### Statistical Validation
 
-#### Design Table
+The framework provides external validation against GraphPad Prism 10.6.1 for academic publication.
 
-| Factor | Type | Levels | Values |
-|--------|------|--------|--------|
-| `mapping_strategy` | Between-subjects | 2 | correct, random |
-| `k` (group_size) | Within-subjects | 3 | 7, 10, 14 |
-| `model` | Within-subjects | 3 | gemini-2.5-flash-lite, gpt-4.1-nano, llama-3.3-70b-instruct |
+For complete validation procedures, see the **[Statistical Analysis & Reporting Validation section in the Testing Guide](TESTING_GUIDE.md#statistical-analysis--reporting-validation)**.
 
-### Design Rationale
+**Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.6.1"
 
-#### Group Size Selection (k-values)
+### Troubleshooting Common Issues
 
-**K=7 (Lower Boundary):**
+This section provides solutions to the most common issues researchers may encounter when setting up the framework or running experiments.
 
-- MRR chance level: 0.3704
-- 49 comparisons per trial
-- Tests whether performance plateaus at easier difficulties
-- Avoids K=4 issues (chance = 0.5208, too close to coin flip)
+| Issue | Solution |
+| :--- | :--- |
+| **`pdm` command not found** | This usually means the Python scripts directory is not in your system's PATH. You can either add it, or use `python -m pdm` as a reliable alternative (e.g., `python -m pdm install -G dev`). |
+| **API Errors during an experiment run** | Network issues or API rate limits can cause individual LLM calls to fail. The framework is designed for this. Simply run the `fix_experiment.ps1` script on the experiment directory. It will automatically find and re-run only the failed API calls. |
+| **"Permission Denied" error when building DOCX files** | This error occurs if a `.docx` file is open in Microsoft Word while the `pdm run build-docs` script is running. Close the file in Word, and the script will automatically retry and continue. |
+| **`git` command not found** | The framework requires Git for versioning and reproducibility checks. Please install it from [git-scm.com](https://git-scm.com/downloads) and ensure it is available in your system's PATH. |
+| **All LLM sessions fail (100% failure rate)** | This indicates a model configuration problem. Verify the model name in `config.ini` matches available models and check your API credentials and permissions. |
+| **Repair process loops indefinitely** | The repair system automatically limits retry attempts to 3 cycles maximum. After 3 cycles, it proceeds with available data to prevent endless loops when external factors cause persistent failures. |
+| **Enhanced status messages** | The framework now provides colored error output and detailed progress tracking (elapsed time, remaining time, ETA) for better visibility during long-running operations. |
+| **Data preparation fails at fetch stage** | Verify your Astro-Databank credentials in the `.env` file. Check that your account has active access and that you can log in through the web interface. |
+| **Wikipedia validation fails** | This can occur due to Wikipedia rate limiting or page structure changes. The script includes automatic retry logic, but persistent failures may require manual intervention. |
+| **Solar Fire import issues** | Verify the file format matches the expected CQD format. Check that all required fields are present and correctly formatted. |
+| **Neutralization script fails** | Check your OpenRouter API key and ensure you have sufficient funds. The `--fast` mode may fail on large tasks; use the default mode for reliable completion. |
+| **LLM scoring steps report missing subjects** | The eminence and OCEAN scoring steps use a tiered approach for handling missing subjects. If ≥99% of subjects are scored, the pipeline continues with a notification. If 95-98% are scored, it continues with a warning. If <95% are scored, it stops with an error. Check the data completeness report at the end of the pipeline for details on missing subjects and instructions on how to retry specific steps. |
 
-**K=10 (Middle Range):**
+### Known Issues and Future Work
 
-- MRR chance level: 0.2929
-- 100 comparisons per trial
-- Provides continuity with pilot studies
-- Balanced difficulty
+This framework is under active development. For a detailed and up-to-date list of planned improvements, known issues, and future development tasks, please see the [📋 Project Roadmap](docs/PROJECT_ROADMAP.md).
 
-**K=14 (Upper Boundary):**
+### Study Design
 
-- MRR chance level: 0.2323
-- 196 comparisons per trial
-- Tests performance degradation at higher complexity
-- Pushes LLM capabilities without exceeding context limits
+The original study for which this framework was developed employed a **2 × 3 × 7 factorial design**, resulting in 42 distinct experimental conditions.
 
-**Difficulty Progression:**
+-   **Factor 1: Mapping Strategy (Between-Subjects):**
+    -   `correct`: Personality descriptions were correctly matched to their corresponding biographical profiles.
+    -   `random`: Personality descriptions were randomly shuffled, serving as a null condition.
 
-- K=7 to K=10: 20.9% decrease in MRR chance level
-- K=10 to K=14: 20.7% decrease in MRR chance level
-- Even spacing ensures systematic difficulty gradient
+-   **Factor 2: Group Size / Difficulty (Within-Subjects):**
+    -   `k = 7`: An easier condition with 49 comparisons per trial.
+    -   `k = 10`: A moderate difficulty condition with 100 comparisons per trial.
+    -   `k = 14`: A harder condition with 196 comparisons per trial.
 
-#### Model Selection
+-   **Factor 3: LLM Model (Within-Subjects):**
+    -   Seven different large language models were evaluated to test for generalizability across architectures, providers, and training data. See the **[Replication Guide](docs/REPLICATION_GUIDE.md)** for the complete list of models used.
 
-**Low-Cost, High-Reliability Tier:**
+**Sample Size:**
+For each of the 42 conditions, the following sample sizes were used:
+-   **30 Replications per condition:** To ensure sufficient statistical power for detecting small effect sizes (Cohen's d < 0.20) with over 80% power.
+-   **80 Trials per replication:** To provide a stable estimate of performance within each run and offer a robust buffer against occasional API or parsing failures.
 
-The study prioritizes models that demonstrate both cost-effectiveness and high reliability (95%+ parsing success rate). All costs are based on OpenRouter.ai rates as of October 2025.
+This design resulted in a total of **1,260 replications** and **100,800 trials**.
 
-**Candidate Models (by cost tier):**
-
-**Ultra-Low Cost ($0.13 per experiment):**
-
-- Meta Llama 3.3 70B Instruct ($0.13)
-
-**Low Cost ($0.24-0.32 per experiment):**
-
-- Mistral Small 3.2 24B ($0.24)
-- Google Gemini 2.0 Flash Lite ($0.24)
-- Google Gemini 2.5 Flash Lite ($0.32)
-- Google Gemini 2.5 Flash Lite Preview 06-17 ($0.32)
-- OpenAI GPT-4.1 Nano ($0.32)
-
-**Mid Cost ($0.49-0.72 per experiment):**
-
-- Meta Llama 4 Maverick ($0.49)
-- Qwen Qwen3 Coder 480B A35B ($0.72)
-
-**High Cost ($0.81-1.30 per experiment):**
-
-- DeepSeek V3 0324 ($0.81)
-- OpenAI GPT-4.1 Mini ($1.30)
-
-**Recommended 3-Model Combinations:**
-
-1. **Ultra-Budget** (Llama 3.3 + Mistral Small + Gemini 2.0 Flash Lite): **$110 total** ($6.10 per condition)
-2. **Budget Balanced** (Llama 3.3 + Gemini 2.5 Flash Lite + GPT-4.1 Nano): **$139 total** ($7.70 per condition) ✓ **Recommended**
-3. **Mid-Range Performance** (Gemini 2.5 Preview + Llama 4 + Qwen3 Coder): **$275 total** ($15.30 per condition)
-4. **Architecture Diversity** (Llama 3.3 + DeepSeek V3 + GPT-4.1 Mini): **$403 total** ($22.40 per condition)
-5. **Performance Focused** (Qwen3 Coder + DeepSeek V3 + GPT-4.1 Mini): **$509 total** ($28.30 per condition)
-
-**Cost Savings:** All strategies provide 92-98% savings vs premium model baseline ($6,624).
-
-**Selection Criteria:**
-
-- Cost efficiency: 92-98% savings vs premium models ($6,624 baseline)
-- Parsing reliability: All models demonstrate 95%+ structured output compliance
-- Architectural diversity: Mix of open-source (Meta, Mistral) and proprietary (Google, OpenAI, DeepSeek, Qwen) approaches
-- Parameter range: 24B to 480B parameters
-- Training diversity: Different training datasets and objectives
-- Source: OpenRouter.ai rates (October 2025)
-
-**Note:** The "Budget Balanced" strategy ($139 total, $7.70 per condition) provides excellent cost-performance tradeoff while maintaining strong architectural diversity across Meta, Google, and OpenAI providers.
-
-### Sample Size and Statistical Power
-
-#### Power Analysis
-
-**Target:** Detect small effect sizes (Cohen's d < 0.20) with 80%+ power
-
-**Sample Size Requirements:**
-
-For **main effects** with 30 replications per condition:
-
-- Mapping strategy (correct vs random): **~82% power** for d=0.20
-- Group size (3 levels, repeated measures): **>90% power** for d=0.20
-- Model (3 levels, repeated measures): **>90% power** for d=0.20
-
-For **two-way interactions:**
-
-- Power: **75-85%** for d=0.20
-
-For **three-way interaction:**
-
-- Power: **70-75%** for d=0.20
-
-For **within-replication tests** (vs chance) with 80 trials:
-
-- Power: **~94%** for d=0.20
-
-#### Justification for 30 Replications × 80 Trials
-
-**30 Replications:**
-
-- Sufficient for detecting d=0.20 with 82% power in factorial ANOVA
-- Provides robust estimates for interaction effects
-- Sufficient for post-hoc comparisons with Tukey HSD
-- Matches published study replication count for comparable statistical rigor
-
-**80 Trials per Replication:**
-
-- Standard Error = 0.0168 (assuming SD=0.15 for MRR)
-- Provides 1.79:1 signal-to-noise ratio for d=0.20 effects
-- Reduces within-condition variance for precise between-condition comparisons
-- Handles occasional parsing failures with strong redundancy
-  - K=7: Expected 77 valid responses (8% buffer over baseline)
-  - K=10: Expected 76 valid responses (7% buffer)
-  - K=14: Expected 74 valid responses (5% buffer, 194% above minimum threshold)
-
-**Comparison to Alternative Designs:**
-
-| Design | Replications | Trials | Total per Condition | Power (d=0.20) | Cost Efficiency |
-|--------|--------------|--------|---------------------|----------------|-----------------|
-| Minimal | 15 | 40 | 600 | ~65% | High |
-| Balanced | 20 | 50 | 1,000 | ~75% | Good |
-| Recommended | 25 | 60 | 1,500 | ~78% | Moderate |
-| **Selected** | **30** | **80** | **2,400** | **~82%** | **Moderate** |
-| Conservative | 30 | 100 | 3,000 | ~82% | Lower |
-
-**Design Choice Rationale:**
-The 30×80 design provides optimal balance between statistical power (82% for d < 0.20), cost efficiency (20% savings vs 30×100), and resilience to parsing failures (strong buffer across all k-values). It maintains the same between-subjects power as the 30×100 baseline while achieving meaningful resource savings.
-
-### Resource Requirements
-
-#### Subject Pool
-
-**Database Capacity Needed:**
-
-- Unique subjects required: ~1,000-1,500 (with strategic reuse)
-- Recommended database size: 5,000+ entries
-- Reuse strategy: Random sampling from larger pool minimizes overlap
-
-**Subject Allocation:**
-
-- K=7: ~400-500 unique subjects
-- K=10: ~600-700 unique subjects
-- K=14: ~700-800 unique subjects
-
-#### Computational Resources
-
-**API Costs (estimated for 43,200 trials with low-cost models):**
-
-**Recommended Cost Scenarios (18 conditions × 30 reps = 540 total replications):**
-
-| Strategy | Models | Total Cost | Per Condition |
-|----------|--------|------------|---------------|
-| Ultra-Budget | Llama 3.3 + Mistral Small + Gemini 2.0 Lite | $110 | $6.10 |
-| **Budget Balanced** ✓ | **Llama 3.3 + Gemini 2.5 Lite + GPT-4.1 Nano** | **$139** | **$7.70** |
-| Mid-Range | Gemini 2.5 Prev + Llama 4 + Qwen3 Coder | $275 | $15.30 |
-| Architecture Mix | Llama 3.3 + DeepSeek V3 + GPT-4.1 Mini | $403 | $22.40 |
-| Performance | Qwen3 + DeepSeek V3 + GPT-4.1 Mini | $509 | $28.30 |
-
-**Per-Model Cost Breakdown (180 experiments per model):**
-
-- Ultra-low tier ($0.13): $23.40 per model
-- Low tier ($0.24-0.32): $43.20-57.60 per model
-- Mid tier ($0.49-0.72): $88.20-129.60 per model
-- High tier ($0.81-1.30): $145.80-234.00 per model
-
-**Cost Comparison:** 92-98% lower than premium model baseline ($6,624 for Gemini 2.0 Flash + GPT-4o + Claude 3.5 Sonnet)
-
-*All costs based on OpenRouter.ai rates (October 2025)*
-
-**Execution Time:**
-
-| Parallelization | Concurrent Trials | Total Time | Risk Level |
-|-----------------|-------------------|------------|------------|
-| Conservative | 10-20 | ~32-48 hours | Low (rate limits) |
-| Moderate | 30-40 | ~16-24 hours | Medium |
-| Aggressive | 50+ | ~10-14 hours | Higher (API throttling) |
-
-### Execution Strategy
-
-#### Phase-Based Implementation
-
-**Phase 1: Pilot Run (1 condition)**
-
-- Purpose: Validate pipeline, identify issues
-- Scope: 1 condition × 30 reps × 80 trials = 2,400 trials
-- Duration: ~1-2 hours (parallelized)
-- Cost: ~$1.54 (Budget Balanced: $0.26 + $0.64 + $0.64)
-- Monitors: Parsing success rate, execution stability, API limits
-
-**Phase 2: Core Study (remaining 17 conditions)**
-
-- Purpose: Execute main experimental design
-- Scope: 17 conditions × 30 reps × 80 trials = 40,800 trials
-- Duration: ~32-44 hours (parallelized at 20-30 concurrent)
-- Cost: ~$137 (Budget Balanced: $110-509 depending on model combination)
-- Strategy: Process in batches of 3-6 conditions with quality checks
-
-**Phase 3: Analysis and Validation**
-
-- Purpose: Compile results, run statistical analysis
-- Scope: All 18 conditions aggregated
-- Duration: ~2-4 hours
-- Outputs: STUDY_results.csv, ANOVA tables, diagnostic plots
-
-#### Batch Processing Guidelines
-
-**Recommended Batch Size:** 3-6 conditions per batch
-
-**Per-Batch Workflow:**
-
-1. Configure `config.ini` for each condition
-2. Run `new_experiment.ps1` with 30 replications
-3. Execute `audit_experiment.ps1` for quality check
-4. Fix any issues with `fix_experiment.ps1`
-5. Proceed to next batch
-
-**Quality Monitoring:**
-
-- Track parsing success rates (target: >92% for K=14, >95% for K≤10)
-- Monitor execution time per trial (detect API throttling)
-- Verify response quality with spot checks
-- Check for systematic errors or biases
-
-### Study Organization
-
-#### Directory Structure
-
-```
-output/
-└── studies/
-    └── main_study_2025/
-        ├── exp_01_correct_k7_gemini/
-        ├── exp_02_correct_k7_gpt4o/
-        ├── exp_03_correct_k7_claude/
-        ├── exp_04_correct_k10_gemini/
-        ...
-        ├── exp_18_random_k14_claude/
-        ├── STUDY_results.csv
-        └── anova/
-            ├── STUDY_analysis_log.txt
-            ├── boxplots/
-            └── diagnostics/
-```
-
-#### Naming Convention
-
-**Format:** `exp_{number}_{mapping}_{k}{model}/`
-
-**Examples:**
-
-- `exp_01_correct_k7_gemini/`
-- `exp_10_random_k10_gpt4o/`
-- `exp_18_random_k14_claude/`
-
-**Benefits:**
-
-- Alphabetical sorting groups by condition
-- Sequential numbering aids tracking
-- Clear condition identification
-
-### Configuration Management
-
-#### Per-Condition Configuration
-
-For each of the 18 conditions, update `config.ini`:
-
-```ini
-[Experiment]
-num_replications = 30
-num_trials = 80
-group_size = 7  # or 10, 14
-mapping_strategy = correct  # or random
-
-[LLM]
-model_name = google/gemini-2.5-flash-lite  # or others
-temperature = 0.0
-
-
-```
-
-#### Randomization Seeds
-
-**For Reproducibility:**
-Set fixed seeds in `config.ini`:
-```ini
-[Randomization]
-personality_selection_seed = 42
-list_shuffle_seed = 123
-```
-
-**Different seeds per condition** ensures independence while maintaining reproducibility.
-
-### Performance Metrics and Bias Analysis
-
-#### Primary Performance Metrics
-
-The framework calculates three main performance metrics for each replication:
-
-- **Mean Reciprocal Rank (MRR)**: Average of 1/rank across all trials, emphasizing top-ranked performance
-- **Top-K Accuracy**: Proportion of trials where correct answer appears in top K positions
-- **Mean Rank of Correct ID**: Average position of correct answer across all trials
-
-All metrics are compared against theoretical chance levels using Wilcoxon signed-rank tests.
-
-#### Positional Bias Detection Methodology
-
-**Purpose**: Detect whether LLMs exhibit position bias in their choices - systematic preference for certain positions in the ranked list regardless of correctness, similar to how human users favor top-ranked search results even when relevance is controlled.
-
-**Metric Choice - Rank vs MRR**:
-
-The framework uses `mean_rank_of_correct_id` (not MRR) for positional bias detection via linear regression:
-
-- **Linear scale**: Rank values (1, 2, 3, ..., k) are linearly spaced, satisfying linear regression assumptions
-- **Uniform sensitivity**: A 1-rank shift is equally detectable at all performance levels (rank 1→2 has same weight as rank 10→11)
-- **Direct interpretability**: Slope values represent "ranks per trial" (e.g., slope of 0.3 means "correct answer drifts by 0.3 rank positions per trial")
-- **Matches bias mechanism**: Position bias manifests as systematic drift in where the correct answer appears in the ranked list
-
-**Why not MRR**: MRR = 1/rank creates non-linear compression (1.0→0.5→0.33→0.25), making shifts at lower performance less detectable and complicating slope interpretation in practical terms.
-
-**Analysis Approach**: Linear regression is performed on mean_rank_of_correct_id values across trials within each replication. The resulting slope, r-value, and p-value characterize whether the LLM's selection behavior shows systematic positional preferences. A non-zero slope suggests position-dependent choice behavior rather than purely content-based decisions.
-
-**Note**: This differs from the framework's primary performance metric (MRR), which remains appropriate for aggregated performance reporting. Rank is used specifically for detecting positional choice bias within replications due to its superior statistical properties for linear regression analysis.
-
-### Statistical Analysis Plan
-
-#### Primary Analysis
-
-**Three-Way Repeated Measures ANOVA:**
-```
-DV: MRR Lift (or Top-1/Top-3 Accuracy Lift)
-
-Factors:
-  - mapping_strategy (between-subjects, 2 levels)
-  - k (within-subjects, 3 levels)
-  - model (within-subjects, 3 levels)
-
-Effects tested:
-  - Main effects: mapping, k, model
-  - Two-way interactions: mapping×k, mapping×model, k×model
-  - Three-way interaction: mapping×k×model
-```
-
-#### Effect Size Measures
-
-- **Eta-squared (η²)**: Proportion of variance explained by each factor
-- **Cohen's d**: Standardized mean difference for pairwise comparisons
-- **Lift metrics**: Performance relative to chance (comparable across k-values)
-
-#### Post-Hoc Tests
-
-- **Tukey HSD**: For pairwise comparisons of k-values and models
-- **FDR correction**: Benjamini-Hochberg procedure for multiple comparisons
-- **Planned contrasts**: K=7 vs K=14 (boundary comparison)
-
-#### Complementary Analysis
-
-**Bayesian Analysis:**
-- Bayes Factor (BF₁₀): Evidence for effect vs null
-- Credible intervals for effect sizes
-- Model comparison for interaction effects
-
-### Alternative Design Options
-
-#### Reduced Scope Designs
-
-**Option A: Two K-Values**
-
-- Factors: 2 mapping × 2 k-values × 3 models
-- Conditions: 12
-- Experiments: 360 (with 30 reps)
-- Trials: 28,800 (with 80 per rep)
-- Cost: ~$73-339 (depending on model combination)
-- Use when: Budget or time constrained
-
-**Option B: Two Models**
-
-- Factors: 2 mapping × 3 k-values × 2 models
-- Conditions: 12
-- Experiments: 360 (with 30 reps)
-- Trials: 28,800 (with 80 per rep)
-- Cost: ~$73-339 (depending on model combination)
-- Use when: Model comparison less critical
-
-#### Staged Execution
-
-**Stage 1: Core Study (2 models)**
-
-- Example: Llama 3.3 + Gemini 2.5 Flash Lite
-- 12 conditions
-- 28,800 trials
-- Cost: ~$54-81
-- Can publish initial results
-
-**Stage 2: Replication (3rd model)**
-
-- Add third model (e.g., GPT-4.1 Nano or DeepSeek V3)
-- 6 additional conditions
-- 14,400 trials
-- Cost: ~$58-234
-- Confirms generalizability
-
-### Methods Section Template
-
-**For Publication:**
-
-> "We employed a 2 × 3 × 3 factorial design with mapping strategy (correct vs random) as a between-subjects factor, and group size (k ∈ {7, 10, 14}) and model as within-subjects factors. Three models from the low-cost, high-reliability tier were selected based on cost efficiency ($0.13-1.30 per experiment via OpenRouter.ai), architectural diversity (open-source and proprietary), and demonstrated parsing reliability (95%+ success rate). Group sizes were selected to provide systematic difficulty progression with approximately 21% increases in task complexity (measured by decreases in MRR chance level) between consecutive k-values. We conducted 30 replications per condition with 80 trials per replication, providing >80% statistical power to detect small effect sizes (Cohen's d < 0.20) for main effects. This design yielded 18 experimental conditions with 540 total replications and 43,200 trials, executed at a total cost of $110-509 depending on model selection strategy."
-
-### Validation Checklist
-
-Before executing the main study, verify:
-
-- [ ] Database contains ≥5,000 unique subjects
-- [ ] API keys configured and funded
-- [ ] Pilot run (1 condition) completed successfully
-- [ ] Parsing success rate >92% for K=14, >95% for K≤10 in pilot
-- [ ] `config.ini` randomization seeds documented
-- [ ] Directory structure created
-- [ ] Naming convention established
-- [ ] Batch processing schedule defined
-- [ ] Quality monitoring procedures in place
-- [ ] Backup strategy for long-running processes
-
-### Risk Mitigation
-
-**API Rate Limits:**
-- Start with conservative parallelization (10-20 concurrent)
-- Monitor response times and error rates
-- Implement exponential backoff for retries
-
-**Parsing Failures:**
-- Target: <5% failure rate for K≤10, <8% for K=14
-- Monitor: K=14 may show higher rates due to 196 comparisons per trial
-- Mitigation: 80 trials provides strong buffer (expected 74 valid responses, 194% above minimum threshold of 25)
-
-**Cost Overruns:**
-- Track cumulative costs per batch
-- Adjust parallelization if API costs spike
-- Consider staged execution if budget concerns arise
-
-**Data Loss:**
-- Framework automatically saves all intermediate results
-- Each experiment is self-contained
-- Can resume interrupted experiments with `fix_experiment.ps1`
-
-### Next Steps
-
-After defining your study design:
-
-1. **Configure Database**: Ensure subject pool meets requirements
-2. **Run Pilot**: Execute Phase 1 (1 condition) to validate pipeline
-3. **Execute Main Study**: Process remaining conditions in batches
-4. **Compile Results**: Use `compile_study.ps1` for final analysis
-5. **Validate**: Review diagnostic plots and statistical assumptions
-
-For detailed execution instructions, see the **Replication Guide**.
-
+> **Note for Researchers:** This section documents the design of the *original* study. For comprehensive guidance on how to design and execute new multi-factor experiments (including methodological and conceptual replications), please refer to **Appendix C** in the **[📋 Replication Guide](docs/REPLICATION_GUIDE.md)**.
 
 ## Error Recovery and Resilience
 
@@ -1595,283 +1419,13 @@ The framework provides intelligent error detection and user-friendly guidance:
 
 - **Progress Feedback**: All operations provide consistent timing information (Time Elapsed, Time Remaining, ETA) to keep users informed during long-running processes.
 
-## Directory Structure
+## Appendices
 
-This logical hierarchy is reflected in the physical layout of the repository:
-
-{{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
-
-Data dictionaries provide detailed explanations for all files: [📁 Data Preparation Data Dictionary](../docs/DATA_PREPARATION_DATA_DICTIONARY.md) covers the `data/` directory, and [📊 Experiment and Study Workflow Data Dictionary](../output/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md) covers the `output/` directory structure and experimental results.
-
-## Setup and Installation
-
-This project uses **PDM** for dependency and environment management.
-
-1.  **Install PDM (One-Time Setup)**:
-    If you don't have PDM, install it once with pip. It's best to run this from a terminal *outside* of any virtual environment.
-    ```bash
-    pip install --user pdm
-    ```
-    > **Note:** If `pdm` is not found in a new terminal, use `python -m pdm` instead.
-
-2.  **Install Project Environment & Dependencies**:
-    From the project's root directory, run the main PDM installation command. The `-G dev` flag installs all packages, including the development tools needed to run the test suite.
-    ```bash
-    pdm install -G dev
-    ```
-    This command creates a local `.venv` folder and installs all necessary packages into it.
-
-3.  **Configure API Key**:
-    *   Create a file named `.env` in the project root.
-    *   Add your API key from OpenRouter. The key will start with `sk-or-`.
-        `OPENROUTER_API_KEY=your-actual-api-key`
-
-To run any project command, such as the test suite, prefix it with `pdm run`:
-```bash
-pdm run test
-```
-
-> **For Developers:** If you intend to contribute to the project or encounter issues with the simple setup, please see the **[Developer Setup Guide](../DEVELOPERS_GUIDE.md#getting-started-development-environment-setup)** for more detailed instructions and troubleshooting.
-
-## Configuration (`config.ini`)
-
-The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results for guaranteed reproducibility.
-
-### Configuration Reference
-
-| Section | Parameter | Description | Example Value |
-| :--- | :--- | :--- | :--- |
-| **`[Study]`** | `mapping_strategy` | Comma-separated list of mapping strategies for factorial design. Enables interactive selection. | `correct, random` |
-| | `group_size` | Comma-separated list of group sizes (`k`) for factorial design. | `7, 10, 14` |
-| | `model_name` | Comma-separated list of LLM models for factorial design. | `google/gemini-2.0-flash-lite-001, meta-llama/llama-3.3-70b-instruct` |
-| **`[Experiment]`** | `num_replications` | The number of times the experiment will be repeated (`r`). | `30` |
-| | `num_trials` | The number of trials for each replication (`m`). | `80` |
-| | `group_size` | The number of subjects in each group (`k`). Used when `[Study]` section is empty. | `10` |
-| | `mapping_strategy` | Mapping strategy: `correct` or `random`. Used when `[Study]` section is empty. | `correct` |
-| **`[LLM]`** | `model_name` | The API identifier for the LLM. Used when `[Study]` section is empty. | `google/gemini-2.0-flash-lite-001` |
-| | `temperature` | Controls the randomness of the model's output (0.0-2.0). | `0.0` |
-| | `max_tokens` | Maximum tokens in the model's response. | `8192` |
-| | `max_parallel_sessions` | The number of concurrent API calls to make. | `10` |
-| **`[Analysis]`** | `min_valid_response_threshold` | Minimum average valid responses for an experiment to be included in the final analysis. Set to `0` to disable. | `25` |
-| **`[DataGeneration]`** | `bypass_candidate_selection` | If `true`, skips LLM-based scoring and uses all eligible candidates. | `false` |
-| | `cutoff_search_start_point` | The cohort size at which to start searching for the variance curve plateau. | `3500` |
-| | `smoothing_window_size` | The window size for the moving average used to smooth the variance curve. | `800` |
-
-**Note:** Parameters defined in `[Study]` take precedence. When you run `new_experiment.ps1` with a populated `[Study]` section, you'll select specific values interactively, which are then written to `[Experiment]` and `[LLM]` sections before the experiment executes. If `[Study]` is empty or absent, values are read directly from `[Experiment]` and `[LLM]` sections.
-
-### Study-Level vs. Experiment-Level Configuration
-
-The framework supports two configuration modes:
-
-#### Interactive Study Design (`[Study]` Section)
-
-For factorial experiments comparing multiple conditions, define experimental 
-factors in the `[Study]` section with comma-separated values:
-```ini
-[Study]
-mapping_strategy = correct, random
-group_size = 7, 10, 14
-model_name = model-a, model-b, model-c
-```
-
-When you run `new_experiment.ps1`, the script presents an interactive menu 
-for selecting specific values. Your selections are automatically written to 
-the `[Experiment]` section before the experiment executes.
-
-**Use this mode when:** You're creating multiple experiments for a factorial study.
-
-#### Direct Configuration (`[Experiment]` Section Only)
-
-For single-condition experiments, specify parameters directly:
-```ini
-[Experiment]
-mapping_strategy = correct
-group_size = 10
-num_replications = 30
-num_trials = 80
-```
-
-**Use this mode when:** You're running a single experiment with fixed parameters.
-
-#### How They Work Together
-
-1. **If `[Study]` section exists with parameters** → Interactive mode activated
-2. **User selections** → Written to `[Experiment]` section
-3. **Experiment executes** → Uses values from `[Experiment]` section
-4. **Configuration archived** → `config.ini.archived` captures exact parameters used
-
-This two-tier system enables efficient factorial study creation while maintaining 
-complete reproducibility for each individual experiment.
-
-### Model Selection Philosophy and Future Work
-The selection of models for this study was guided by a balance of performance, cost, speed, and technical compatibility with the automated framework. Several top-tier models were not included for one of the following reasons:
-
--   **Prohibitive Cost**: Models like `o1 pro`, `GPT 4.5 Preview`, and `Claude 4 Opus` were excluded as a single experiment (requiring ~3,000 queries) was financially infeasible.
-
--   **Technical Incompatibility**: Models like `Gemini 2.5 Pro` lacked a "non-thinking" mode, making the automated parsing of a structured response table overly challenging.
-
--   **Excessive Runtime**: A number of large models, including `Qwen3 235B` and `Llama 3.1 Nemotron Ultra 253B`, were excluded as a full experimental run would take longer than 20 hours.
-
-A follow-up study is planned to evaluate other powerful, medium-cost models as API costs decrease and technical features evolve. Candidates include: `Grok 3`, `Grok 4`, `Claude 4 Sonnet`, `Claude 3.7 Sonnet`, `GPT-4o`, `o3`, `GPT-4.1`, `Mistral Large 2`, `Gemini 1.5 Pro`, and various `o1`/`o3`/`o4` mini-variants.
-
-### Analysis Settings (`[Analysis]`)
-
--   **`min_valid_response_threshold`**: Minimum average number of valid responses (`n_valid_responses`) for an experiment to be included in the final analysis. Set to `0` to disable.
-
-## Known Issues and Future Work
-
-This framework is under active development. For a detailed and up-to-date list of planned improvements, known issues, and future development tasks, please see the [📋 Project Roadmap](docs/PROJECT_ROADMAP.md).
-
-## Choosing the Right Workflow: Separation of Concerns
-
-The framework is designed around a clear "Create -> Check -> Fix -> Compile" model. This separation of concerns ensures that each workflow is simple, predictable, and safe.
-
-{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=50% | caption=Choosing the Right Workflow: A guide for experiment and study tasks.}}
-
--   **`new_experiment.ps1` (Create)**: Use this to create a new experiment from scratch for a single experimental condition.
-
--   **`audit_experiment.ps1` (Check - Experiment)**: Use this read-only tool to get a detailed status report on any existing experiment. It is your primary diagnostic tool.
-
--   **`fix_experiment.ps1` (Fix & Update)**: Use this for any experiment with a fixable error, such as an interrupted run. This is the main "fix-it" tool for common issues.
-
--   **`audit_study.ps1` (Check - Study)**: Use this read-only tool to get a consolidated status report on all experiments in a study directory before final analysis.
-
--   **`compile_study.ps1` (Compile)**: After creating and validating all experiments, use this script to aggregate the results and run the final statistical analysis.
-
-## Core Workflows
-
-The project is orchestrated by several PowerShell wrapper scripts that handle distinct user workflows.
-
-### Creating a New Experiment (`new_experiment.ps1`)
-
-This is the entry point for creating a new experiment from scratch. It reads `config.ini`, generates a timestamped directory, and runs the full batch.
-
-```powershell
-# Create and run a new experiment
-.\new_experiment.ps1 -Verbose
-```
-
-#### Interactive Study Parameter Selection
-
-If your `config.ini` includes a `[Study]` section with multiple values for experimental design parameters, `new_experiment.ps1` will present an interactive menu for selecting specific conditions:
-```ini
-[Study]
-# Study-level experimental design parameters
-mapping_strategy = correct, random
-group_size = 7, 10, 14
-model_name = meta-llama/llama-3.3-70b-instruct, google/gemini-2.5-flash-lite, openai/gpt-4.1-nano
-
-[Experiment]
-num_replications = 30
-num_trials = 80
-```
-
-When you run the script, it displays available options:
-```powershell
-.\new_experiment.ps1
-```
-```
-Study Experimental Design
-================================================================================
-
-Mapping Strategies:
-  [1] correct
-  [2] random
-
-Group Sizes:
-  [1] 7
-  [2] 10
-  [3] 14
-
-Models:
-  [1] meta-llama/llama-3.3-70b-instruct
-  [2] google/gemini-2.5-flash-lite
-  [3] openai/gpt-4.1-nano
-
-Select Mapping Strategy [1-2]: 1
-Select Group Size [1-3]: 1
-Select Model [1-3]: 1
-
-Selected Configuration:
-  Mapping Strategy: correct
-  Group Size: 7
-  Model: meta-llama/llama-3.3-70b-instruct
-```
-
-After selection, your choices are automatically written to the `[Experiment]` and `[LLM]` sections before experiment creation. Each experiment's parameters are logged to `output/studies/study_creation_log.txt` for tracking your complete study design.
-
-**Fallback Behavior:** If the `[Study]` section is empty or absent, the script uses values directly from `[Experiment]` and `[LLM]` sections (standard behavior).
-
-### Auditing an Experiment (`audit_experiment.ps1`)
-
-This is the primary diagnostic tool for an experiment. It performs a read-only check and provides a detailed status report.
-
-```powershell
-# Get a status report for an existing experiment
-.\audit_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250910_062305"
-```
-
-### Fixing or Updating an Experiment (`fix_experiment.ps1`)
-
-This is the main "fix-it" tool for an existing experiment. It automatically diagnoses and fixes issues.
-
-**To automatically fix a broken or incomplete experiment:**
-The script will run an audit, identify the problem (e.g., missing responses, outdated analysis), and automatically apply the correct fix.
-```powershell
-# Automatically fix a broken experiment
-.\fix_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250910_062305"
-```
-
-**To interactively force an action on a valid experiment:**
-If you run the script on a complete and valid experiment, it will present an interactive menu allowing you to force a full repair, an analysis update, or a re-aggregation of results.
-
-```powershell
-# Run on a valid experiment to bring up the interactive force menu
-.\fix_experiment.ps1 -ExperimentDirectory "output/new_experiments/experiment_20250910_062305"
-```
-
-### Auditing a Study (`audit_study.ps1`)
-
-This is the main diagnostic tool for a study. It performs a comprehensive, read-only audit of all experiments in a study directory and provides a consolidated summary report with a final recommendation.
-
-```powershell
-# Get a status report for an entire study
-.\audit_study.ps1 -StudyDirectory "output/studies/My_First_Study"
-```
-
-### Compiling a Study (`compile_study.ps1`)
-
-This script orchestrates the entire compilation and analysis workflow for a study. It audits, compiles, and performs the final statistical analysis on all experiments.
-
-**Important:** This script begins with a robust pre-flight check by calling `audit_study.ps1`. If the audit reveals that any experiment is not `VALIDATED`, or that the study is already `COMPLETE`, the process will halt with a detailed report and a clear recommendation. This guarantees that analysis is only performed on a complete and ready set of data.
-
-For organizational purposes, one would typically move all experiment folders belonging to a single study into a common directory (e.g., `output/studies/My_First_Study/`).
-
-**To run the compilation and analysis:**
-Point the script at the top-level directory containing all relevant experiment folders. It will provide a clean, high-level summary of its progress.
-
-```powershell
-# Example: Compile and analyze all experiments in the "My_First_Study" directory
-.\compile_study.ps1 -StudyDirectory "output/studies/My_First_Study"
-```
-For detailed, real-time logs, add the `-Verbose` switch.
-
-**Final Artifacts:**
-The script generates two key outputs:
-
-1.  A master `STUDY_results.csv` file in your study directory, containing the aggregated data from all experiments.
-2.  A new `anova/` subdirectory containing the final analysis:
-    *   `STUDY_analysis_log.txt`: A comprehensive text report of the statistical findings.
-    *   `boxplots/`: Publication-quality plots visualizing the results.
-    *   `diagnostics/`: Q-Q plots for checking statistical assumptions.
-
----
-
-## Standardized Output
+### Standardized Output
 
 The pipeline generates a consistent, standardized `replication_report.txt` for every run, whether it's a new, an updated (reprocessed), or migrated experiment. This ensures that all output is easily comparable and machine-parsable.
 
-### Replication Report Format
+#### Replication Report Format
 
 Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
 
@@ -1882,19 +1436,17 @@ Each report contains a clear header, the base query used, a human-readable analy
 -   **Normal Mode**: The report title is `REPLICATION RUN REPORT` and the `Date` field shows the time of the original run.
 -   **`--reprocess` Mode**: The report title is `REPLICATION RUN REPORT (YYYY-MM-DD HH:MM:SS)` with the reprocessing timestamp. The `Date` field continues to show the time of the **original** run for clear traceability.
 
-### Study Analysis Log Format
+#### Study Analysis Log Format
 
 The final analysis script (`analyze_study_results.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
 {{diagram:docs/diagrams/format_analysis_log.txt}}
 
----
+### Key Data Formats
 
-## Key Data Formats
+This section provides a summary reference for the most important data files. For complete format specifications and detailed field descriptions, see the **[📁 Data Preparation Data Dictionary](DATA_PREPARATION_DATA_DICTIONARY.md)** and **[📊 Experiment Workflow Data Dictionary](../output/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md)**.
 
-This section provides a summary reference for the most important data files. For complete format specifications and detailed field descriptions, see the **[📁 Data Preparation Data Dictionary](DATA_PREPARATION_DATA_DICTIONARY.md)** and **[📊 Experiment and Study Workflow Data Dictionary](../output/EXPERIMENT_LIFECYCLE_DATA_DICTIONARY.md)**.
-
-### Format Summary Table
+#### Format Summary Table
 
 | Category | File | Purpose | Key Fields |
 |:---------|:-----|:--------|:-----------|
@@ -1912,15 +1464,15 @@ This section provides a summary reference for the most important data files. For
 | **Text Libraries** | `sf_delineations_library.txt` | Raw interpretive text from Solar Fire | Structured astrological descriptions |
 | | `neutralized_delineations/*.csv` | Sanitized description components | De-jargonized text fragments |
 
-### Critical Formats (Detailed)
+#### Critical Formats (Detailed)
 
 For most use cases, the summary table above is sufficient. However, three formats warrant detailed explanation due to their centrality to the framework:
 
-#### Final Personality Database Format
+##### Final Personality Database Format
 
 {{diagram:docs/diagrams/format_data_personalities_db.txt | caption=Format for `personalities_db.txt` - The definitive input to all experiments}}
 
-#### Configuration Files
+##### Configuration Files
 
 {{diagram:docs/diagrams/format_data_point_weights.txt | caption=Format for `point_weights.csv` - Defines algorithmic weights}}
 
@@ -1930,73 +1482,15 @@ For most use cases, the summary table above is sufficient. However, three format
 
 ---
 
-## Testing
-
-The project includes a comprehensive test suite managed by PDM scripts, which provides shortcuts for running tests with and without code coverage. Several integration tests offer interactive modes that provide guided tours of the framework's capabilities.
-
-### Automated CI Checks
-
-The project uses a GitHub Actions workflow for Continuous Integration (CI). On every push or pull request, it automatically runs a series of checks on Windows, Linux, and macOS to ensure code quality and consistency. This includes:
-
--   Linting all source files for correct formatting and headers.
--   Verifying that the documentation is up-to-date.
-
-This ensures that the main branch is always stable and that all contributions adhere to the project's standards.
-
-### Running the Test Suite
-
--   **To run all tests (Python and PowerShell) at once:**
-```bash
-    pdm run test
-```
--   **To run only the PowerShell script tests:**
-```bash
-    pdm run test-ps-all
-```
-    You can also test individual PowerShell scripts (e.g., `pdm run test-ps-exp`, `pdm run test-ps-stu`).
-
-For detailed code coverage analysis, see the [👨‍💻 Developer's Guide - Code Coverage](../DEVELOPERS_GUIDE.md#code-coverage).
-
-### Statistical Validation
-
-The framework provides external validation against GraphPad Prism 10.6.1 for academic publication.
-
-For complete validation procedures, see the **[Statistical Analysis & Reporting Validation section in the Testing Guide](TESTING_GUIDE.md#statistical-analysis--reporting-validation)**.
-
-**Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.6.1"
-
----
-
-## Troubleshooting Common Issues
-
-This section provides solutions to the most common issues researchers may encounter when setting up the framework or running experiments.
-
-| Issue | Solution |
-| :--- | :--- |
-| **`pdm` command not found** | This usually means the Python scripts directory is not in your system's PATH. You can either add it, or use `python -m pdm` as a reliable alternative (e.g., `python -m pdm install -G dev`). |
-| **API Errors during an experiment run** | Network issues or API rate limits can cause individual LLM calls to fail. The framework is designed for this. Simply run the `fix_experiment.ps1` script on the experiment directory. It will automatically find and re-run only the failed API calls. |
-| **"Permission Denied" error when building DOCX files** | This error occurs if a `.docx` file is open in Microsoft Word while the `pdm run build-docs` script is running. Close the file in Word, and the script will automatically retry and continue. |
-| **`git` command not found** | The framework requires Git for versioning and reproducibility checks. Please install it from [git-scm.com](https://git-scm.com/downloads) and ensure it is available in your system's PATH. |
-| **All LLM sessions fail (100% failure rate)** | This indicates a model configuration problem. Verify the model name in `config.ini` matches available models and check your API credentials and permissions. |
-| **Repair process loops indefinitely** | The repair system automatically limits retry attempts to 3 cycles maximum. After 3 cycles, it proceeds with available data to prevent endless loops when external factors cause persistent failures. |
-| **Enhanced status messages** | The framework now provides colored error output and detailed progress tracking (elapsed time, remaining time, ETA) for better visibility during long-running operations. |
-| **Data preparation fails at fetch stage** | Verify your Astro-Databank credentials in the `.env` file. Check that your account has active access and that you can log in through the web interface. |
-| **Wikipedia validation fails** | This can occur due to Wikipedia rate limiting or page structure changes. The script includes automatic retry logic, but persistent failures may require manual intervention. |
-| **Solar Fire import issues** | Verify the file format matches the expected CQD format. Check that all required fields are present and correctly formatted. |
-| **Neutralization script fails** | Check your OpenRouter API key and ensure you have sufficient funds. The `--fast` mode may fail on large tasks; use the default mode for reliable completion. |
-| **LLM scoring steps report missing subjects** | The eminence and OCEAN scoring steps use a tiered approach for handling missing subjects. If ≥99% of subjects are scored, the pipeline continues with a notification. If 95-98% are scored, it continues with a warning. If <95% are scored, it stops with an error. Check the data completeness report at the end of the pipeline for details on missing subjects and instructions on how to retry specific steps. |
-
----
-
-## Related Files Reference
+### Related Files Reference
 
 This section provides reference information for key data files used by the framework.
 
-### base_query.txt
+#### base_query.txt
 
 This file contains the final prompt template used for the LLM matching task. It is the product of a systematic, multi-stage piloting process. Various prompt structures and phrasing were tested to find the version that yielded the most reliable and consistently parsable structured output from the target LLM.
 
-### country_codes.csv
+#### country_codes.csv
 
 This file provides a mapping from the country/state abbreviations used in the Astro-Databank to their full, standardized names. A sample is shown below. The complete file can be found at `data/foundational_assets/country_codes.csv`.
 
@@ -2008,12 +1502,12 @@ This file provides a mapping from the country/state abbreviations used in the As
 | `FR` | France |
 | `GER` | Germany |
 
-### Configuration Files
+#### Configuration Files
 
-#### point_weights.csv
+##### point_weights.csv
 
 Defines the weights assigned to each astrological point when calculating balances. These weights determine the relative importance of each point in the overall personality profile.
 
-#### balance_thresholds.csv
+##### balance_thresholds.csv
 
 Defines the thresholds used to classify astrological factors as 'strong' or 'weak' based on their calculated values. These thresholds are used in the personality assembly algorithm.

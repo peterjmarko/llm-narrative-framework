@@ -739,9 +739,14 @@ def main():
         logging.warning("No valid mappings found. This indicates zero valid LLM responses. Generating a null report.")
         
         summary_data = {
-            'mean_mrr': None, 'mrr_p': None, 'mean_top_1_acc': None, 'top_1_acc_p': None,
+            'mean_mrr': None, 'mrr_p': None, 
+            'median_mrr': None,
+            'mean_top_1_acc': None, 'top_1_acc_p': None,
+            'median_top_1_acc': None,
             f'mean_top_{args.top_k_acc}_acc': None, f'top_{args.top_k_acc}_acc_p': None,
-            'mean_mrr_lift': None, 'mean_top_1_acc_lift': None, f'mean_top_{args.top_k_acc}_acc_lift': None,
+            f'median_top_{args.top_k_acc}_acc': None,
+            'mean_mrr_lift': None, 'mean_top_1_acc_lift': None, 
+            f'mean_top_{args.top_k_acc}_acc_lift': None,
             'mean_rank_of_correct_id': None, 'rank_of_correct_id_p': None,
             'top1_pred_bias_std': None, 'true_false_score_diff': None,
             'bias_slope': None, 'bias_intercept': None, 'bias_r_value': None,

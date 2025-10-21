@@ -75,20 +75,14 @@ These files are generated during the data validation and filtering stages.
 
 ### 3. `foundational_assets/` - Static Assets for Generation
 
-### 4. `processed/` - Cleaned & Validated Data
-
--   **`adb_wiki_links.csv`**: Best-guess Wikipedia URLs for each subject, with a sanitized `Subject_Name` column.
--   **`adb_validated_subjects.csv`**: The detailed, row-by-row output of the Wikipedia page validation script. This file contains the final validation status for each subject and is the source of truth for the sanitized `Subject_Name` used by the rest of the pipeline.
--   **`subject_db.csv`**: The cleaned and integrated master database.
-
 These files are static, pre-prepared assets that provide the rules and content for generating the final personality descriptions.
 
 -   **`eminence_scores.csv`**: Contains the LLM-generated eminence score for every subject in the raw export. It is created by `generate_eminence_scores.py` and provides the rank-ordered input for `generate_ocean_scores.py`.
--   **`ocean_scores.csv`**: This file is the **definitive source for the experiment's final subject pool**. It is created by `generate_ocean_scores.py`, which stops generating scores once personality diversity (variance) shows a sustained drop. The number of subjects in this file dictates the final dataset size.
+-   **`ocean_scores.csv`**: Contains the LLM-generated OCEAN personality scores for every subject. This file provides the complete dataset used for the data-driven cutoff analysis that determines the final subject pool.
 -   **`cutoff_parameter_analysis_results.csv`**: Contains the grid search results for optimal cutoff parameters. These parameters are used by `config.ini` to configure the final candidate selection algorithm.
 -   **`country_codes.csv`**: A mapping file to resolve country/state abbreviations.
 -   **`sf_delineations_library.txt`**: The raw, complete library of interpretive text as exported from Solar Fire.
--   **`neutralized_delineations/`**: A directory of `.csv` files containing the sanitized, de-jargonized description components. This library is generated automatically by `neutralize_delineations.py`, which uses a hybrid strategy: a fast, bundled initial run (`--fast`) followed by a granular, robust resume run to guarantee completion.
+-   **`neutralized_delineations/`**: A directory of `.csv` files containing the sanitized, de-jargonized description components. This library is generated automatically by `neutralize_delineations.py`.
 -   **`sf_chart_export.csv`**: The raw data exported from Solar Fire after it has processed the subjects. This is the output of the single manual step in the pipeline.
 -   **`point_weights.csv` & `balance_thresholds.csv`**: Configuration files that define the core logic for the personality classification algorithm in `generate_personalities_db.py`.
 

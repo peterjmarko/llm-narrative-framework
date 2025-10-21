@@ -7,7 +7,7 @@ This document outlines planned development tasks and tracks known issues for the
 ### 1. Final Data Generation and Study Execution
 
 - [ ] **Organize and Compile Final Study**
-  - [ ] Manually create a final study directory (e.g., `output/studies/publication_run/`).
+  - [x] Manually create a final study directory (e.g., `output/studies/publication_run/`).
   - [ ] Move all generated experiment folders into the study directory.
   - [ ] Run `compile_study.ps1` to produce the definitive analysis and plots for the manuscript.
 - [ ] **Perform and Report Correction for Multiple Comparisons**
@@ -30,6 +30,8 @@ This document outlines planned development tasks and tracks known issues for the
     - [ ] Add specific references - reference Framework Manual and Replication Guide in Supplementary Materials
     - [ ] Expand replication path descriptions - briefly describe each path with references to detailed guides
     - [ ] Verify figure references - ensure all figures have proper descriptions and clear references
+  - [ ] After main study completion, compare: Performance with Flash Lite vs. other 3 models. If Flash Lite shows anomalously better performance → potential contamination flag. If similar or worse → validates independence claim.
+    - [ ] Report in Results: "Sensitivity analysis showed no significant performance advantage for Gemini 2.5 Flash Lite compared to fully independent models (p > .05), supporting the assumption that minimal contamination occurred despite shared model family."
 - [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
   - [ ] Check all tables and diagrams.
   - [ ] Check counts and dates.
