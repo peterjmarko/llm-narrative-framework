@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 15.3.0 (2025-10-21)
+
+### Bump
+
+- **version 15.2.1 → 15.3.0**
+
+### Features
+
+- **enhance workflow resiliency and overhaul documentation**
+  This commit introduces a major overhaul of both the core experimental workflow and the project's documentation suite, aimed at improving resiliency, user experience, and clarity.
+  
+  ### Workflow and UI/UX Enhancements
+  - Replaces the hard-coded repair cycle limit with an intelligent "stall detection" mechanism, allowing the manager to continue fixing transient API errors as long as progress is being made.
+  - Adds a pre-repair audit summary table, giving users immediate context on which replications have failed and why.
+  - Enhances console readability with a threaded spinner during repairs, color-coded query statuses, and cleaner output formatting.
+  - Improves user guidance with actionable exit messages and an interactive "Proceed?" confirmation prompt before starting a new experiment.
+  - Strengthens the statistical analysis logic in `analyze_llm_performance.py` for increased robustness.
+  
+  ### Comprehensive Documentation Overhaul
+  - Restructures the Framework Manual into logical, themed sections for a more intuitive user flow.
+  - Refactors the `Study Design` content, moving general guidance to the Replication Guide and leaving a concise summary in the manual.
+  - Significantly enhances the Replication Guide with corrected cost estimates, detailed justifications for the study design, and expanded pilot testing details.
+  - Streamlines and aligns content across all guides (README, Testing, Data Dictionaries, etc.) for consistency.
+
 ## 15.2.1 (2025-10-19)
 
 ### Bump
