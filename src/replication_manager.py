@@ -66,8 +66,6 @@ import json
 import glob
 import time
 import configparser
-import threading
-from itertools import cycle
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from colorama import Fore, init
@@ -79,41 +77,6 @@ except ImportError:
 
 # Initialize colorama
 init(autoreset=True)
-
-
-class Spinner:
-    """A simple terminal spinner class that runs in a separate thread."""
-    def __init__(self, message="Processing... ", delay=0.1):
-        self.spinner = cycle(['|', '/', '-', '\\'])
-        self.delay = delay
-        self.message = message
-        self.running = False
-        self.spinner_thread = None
-        self._stop_event = threading.Event()
-
-    def _spin(self):
-        while not self._stop_event.is_set():
-            sys.stderr.write(f"\r{self.message}{next(self.spinner)}")
-            sys.stderr.flush()
-            # Use event.wait for a more responsive stop
-            self._stop_event.wait(self.delay)
-
-    def start(self):
-        if not self.running:
-            self.running = True
-            self._stop_event.clear()
-            self.spinner_thread = threading.Thread(target=self._spin)
-            self.spinner_thread.start()
-
-    def stop(self):
-        if self.running:
-            self._stop_event.set()
-            if self.spinner_thread:
-                self.spinner_thread.join()
-            # Clear the line
-            sys.stderr.write(f"\r{' ' * (len(self.message) + 5)}\r")
-            sys.stderr.flush()
-            self.running = False
 
 # Define ANSI color codes for consistency with experiment_manager.py
 C_YELLOW = '\033[93m'
@@ -198,15 +161,22 @@ def session_worker(index, run_specific_dir_path, responses_dir, llm_prompter_scr
     if verbose: worker_cmd.append("-v")
     
     start_time = time.time()
+    # Read the safety-net timeout from config, with a fallback of 180s (3 minutes).
+    # This prevents the entire worker process from hanging indefinitely.
+    process_timeout = get_config_value(APP_CONFIG, 'LLM', 'worker_process_timeout_seconds', value_type=int, fallback=180)
     try:
-        result = subprocess.run(worker_cmd, check=False, cwd=src_dir, capture_output=True, text=True, encoding='utf-8', errors='replace')
+        result = subprocess.run(worker_cmd, check=False, cwd=src_dir, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=process_timeout)
         duration = time.time() - start_time
         if result.returncode == 0:
             return index, True, None, duration
         else:
-            # For user-facing errors, just return minimal info - detailed logging happens elsewhere
-            error_details = f"Query {index:03d} failed"
+            # The worker exited with an error. The reason should be in its error file.
+            error_details = f"Query {index:03d} failed. Worker process exited with code {result.returncode}."
             return index, False, error_details, duration
+    except subprocess.TimeoutExpired:
+        duration = time.time() - start_time
+        error_details = f"Query {index:03d} failed: Worker process timed out after {process_timeout} seconds (it became unresponsive)."
+        return index, False, error_details, duration
     except Exception as e:
         return index, False, f"Orchestrator worker failed for index {index}: {e}", time.time() - start_time
 
@@ -376,29 +346,21 @@ def main():
             else:
                 repair_mode_desc = "Processing LLM Sessions"
             
-            is_repair_mode = args.reprocess or args.indices
-            spinner = Spinner("Repairing queries... ") if is_repair_mode else None
-            
             try:
-                if spinner:
-                    spinner.start()
-
-                # In repair mode, we print individual statuses, so the tqdm bar is redundant.
                 with ThreadPoolExecutor(max_workers=max_workers) as executor, \
-                    tqdm(total=len(indices_to_run), desc=repair_mode_desc, ncols=80, file=sys.stderr, disable=is_repair_mode) as pbar:
+                    tqdm(total=len(indices_to_run), desc=repair_mode_desc, ncols=80, file=sys.stderr) as pbar:
                     
-                    repair_verbose = args.verbose or is_repair_mode
+                    # In repair mode, enable verbose output to show LLM prompter progress
+                    repair_verbose = args.verbose or (args.reprocess or args.indices)
                     tasks = {executor.submit(session_worker, i, run_specific_dir_path, responses_dir, llm_prompter_script, src_dir, repair_verbose): i for i in indices_to_run}
                     
                     for future in as_completed(tasks):
-                        if spinner:
-                            spinner.stop() # Pause spinner to print status
-
                         completed_count += 1
                         index, success, log, duration = future.result()
                         total_elapsed_time += duration
                         
-                        if is_repair_mode:
+                        # Enhanced repair mode status updates
+                        if args.reprocess or args.indices:
                             if success:
                                 status_str = f"{Fore.GREEN}SUCCESS{Fore.RESET}"
                             else:
@@ -414,21 +376,15 @@ def main():
                         pbar.update(1)
                         with open(api_times_log_path, "a", encoding='utf-8') as f:
                             f.write(f"Query_{index:03d}\t{duration:.2f}\t{total_elapsed_time:.2f}\t{eta:.2f}\n")
-                        
-                        if spinner:
-                            spinner.start() # Resume spinner for the next wait
             
             except KeyboardInterrupt:
-                # The 'finally' block will handle stopping the spinner.
                 print(f"\n\n--- LLM SESSIONS INTERRUPTED BY USER ---")
                 print(f"Processed {completed_count}/{len(indices_to_run)} queries before interruption.")
                 print(f"Experiment directory preserved at: {run_specific_dir_path}")
                 print(f"You can resume by running repair mode on this directory.")
                 pipeline_status = "INTERRUPTED BY USER"
+                # The 'with' statement will handle executor.shutdown() automatically
                 return
-            finally:
-                if spinner:
-                    spinner.stop()
             
             if failed_sessions > 0:
                 # Skip individual query failure logging - we'll show summary instead

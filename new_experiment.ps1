@@ -125,13 +125,13 @@ function Show-StudyParameterSelection {
     Write-Host "`nStudy Experimental Design" -ForegroundColor Magenta
     Write-Host ("=" * 80) -ForegroundColor Magenta
     
-    $paramOrder = @('mapping_strategy', 'group_size', 'num_replications', 'num_trials', 'model_name', 'temperature', 'max_tokens')
+    $paramOrder = @('mapping_strategy', 'group_size', 'model_name', 'num_replications', 'num_trials', 'temperature', 'max_tokens')
     $paramLabels = @{
         mapping_strategy = "Mapping Strategies"
         group_size = "Group Sizes"
+        model_name = "Models"
         num_replications = "Number of Replications"
         num_trials = "Number of Trials"
-        model_name = "Models"
         temperature = "Temperature Values"
         max_tokens = "Max Tokens"
     }
@@ -300,9 +300,9 @@ try {
         $paramOrder = @(
             @{Key='mapping_strategy'; Label='Mapping Strategy'; Section='Experiment'},
             @{Key='group_size'; Label='Group Size'; Section='Experiment'},
+            @{Key='model_name'; Label='Model'; Section='LLM'},
             @{Key='num_replications'; Label='Number of Replications'; Section='Experiment'},
             @{Key='num_trials'; Label='Number of Trials'; Section='Experiment'},
-            @{Key='model_name'; Label='Model'; Section='LLM'},
             @{Key='temperature'; Label='Temperature'; Section='LLM'},
             @{Key='max_tokens'; Label='Max Tokens'; Section='LLM'}
         )

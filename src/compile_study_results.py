@@ -31,7 +31,7 @@ master dataset for the entire study.
 
 This is the final data preparation step before running the main statistical
 analysis with `analyze_study_results.py`. It is typically called by the main
-`evaluate_study.ps1` user entry point.
+`compile_study.ps1` user entry point.
 
 Usage:
     python src/compile_study_results.py /path/to/study_directory

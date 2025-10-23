@@ -1252,7 +1252,7 @@ This workflow is the main "fix-it" tool for any existing experiment. The `fix_ex
 
 #### Workflow 4: Compile a Study
 
-This workflow is used after all experiments are validated to compile, analyze, and evaluate the entire study. It performs a robust pre-flight check by calling `audit_study.ps1`. If the study is not ready for processing (or is already complete), it will halt with a clear recommendation. Otherwise, it proceeds to compile all results and run the final statistical analysis.
+This workflow is used after all experiments are validated to audit, compile, and analyze the entire study. It performs a robust pre-flight check by calling `audit_study.ps1`. If the study is not ready for processing (or is already complete), it will halt with a clear recommendation. Otherwise, it proceeds to compile all results and run the final statistical analysis.
 
 {{grouped_figure:docs/diagrams/flow_main_4_compile_study.mmd | scale=2.5 | width=90% | caption=Workflow 4: Compile a Study. Audits, compiles, and analyzes all experiments in a study.}}
 

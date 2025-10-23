@@ -149,6 +149,7 @@ try {
     }
 
     $i = 0
+    $progressBarActivity = "Auditing Study Experiments"
     foreach ($dir in $experimentDirs) {
         $i++
         # Use the standard array-building method for calls to Python scripts.
@@ -162,7 +163,15 @@ try {
             Write-Host "--- End of Audit for: $($dir.Name) ---" -ForegroundColor Yellow
         }
         else {
-            & $executable $prefixArgs $scriptName $auditArgs | Out-Null # Suppress Python output in non-verbose
+            # --- Progress Bar for non-verbose mode ---
+            $percentComplete = ($i / $experimentDirs.Count) * 100
+            $statusMessage = "Processing experiment $i of $($experimentDirs.Count)..."
+            Write-Progress -Activity $progressBarActivity `
+                           -Status $statusMessage `
+                           -CurrentOperation "Auditing: $($dir.Name)" `
+                           -PercentComplete $percentComplete
+
+            & $executable $prefixArgs $scriptName $auditArgs | Out-Null # Suppress Python output
             $exitCode = $LASTEXITCODE
         }
 
@@ -181,6 +190,11 @@ try {
         if ($exitCode -gt $overallStatus -and $exitCode -ne $AUDIT_ABORTED_BY_USER) {
             $overallStatus = $exitCode
         }
+    }
+
+    # Clean up the progress bar if it was used.
+    if (-not $PSBoundParameters['Verbose']) {
+        Write-Progress -Activity $progressBarActivity -Status "Complete" -Completed
     }
 
     # --- Print Summary Report ---

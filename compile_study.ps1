@@ -21,10 +21,10 @@
 
 <#
 .SYNOPSIS
-    Audits, compiles, and evaluates a full study.
+    Audits, compiles, and analyzes a full study.
 
 .DESCRIPTION
-    This script is the main entry point for the entire study evaluation workflow. It
+    This script is the main entry point for the entire study compilation workflow. It
     orchestrates three key scripts in sequence:
     1.  `audit_study.ps1`: Performs a full audit of the study. The script will halt
         if any experiment is not in a validated state.
@@ -36,15 +36,15 @@
 
 .PARAMETER StudyDirectory
     The path to the top-level study directory containing experiment folders that need
-    to be evaluated (e.g., 'output/studies'). This is a mandatory parameter.
+    to be compiled (e.g., 'output/studies'). This is a mandatory parameter.
 
 .EXAMPLE
-    # Evaluate a study with the default high-level summary.
-    .\evaluate_study.ps1 -StudyDirectory "output/studies/My_Full_Study"
+    # Compile a study with the default high-level summary.
+    .\compile_study.ps1 -StudyDirectory "output/studies/My_Full_Study"
 
 .EXAMPLE
-    # Evaluate a study with detailed, real-time output for debugging.
-    .\evaluate_study.ps1 -StudyDirectory "output/studies/My_Full_Study" -Verbose
+    # Compile a study with detailed, real-time output for debugging.
+    .\compile_study.ps1 -StudyDirectory "output/studies/My_Full_Study" -Verbose
 #>
 [CmdletBinding()]
 param (
@@ -224,11 +224,11 @@ function Invoke-PythonScript {
 $LogFilePath = $null
 try {
     if (-not $NoLog.IsPresent) {
-        $LogFilePath = Join-Path -Path $StudyDirectory -ChildPath "study_evaluation_log.txt"
+        $LogFilePath = Join-Path -Path $StudyDirectory -ChildPath "study_compilation_log.txt"
         Start-Transcript -Path $LogFilePath -Force | Out-Null
         
         Write-Host ""
-        Write-Host "The evaluation log will be saved to:" -ForegroundColor Gray
+        Write-Host "The compilation log will be saved to:" -ForegroundColor Gray
         $relativePath = Resolve-Path -Path $LogFilePath -Relative
         Write-Host $relativePath -ForegroundColor Gray
     }
@@ -239,7 +239,7 @@ try {
     $headerLine = "#" * 80
     $relativePath = Resolve-Path -Path $StudyDirectory -Relative
     Write-Host "`n$headerLine" -ForegroundColor Green
-    Write-Host (Format-Banner "Starting Study Evaluation for:") -ForegroundColor Green
+    Write-Host (Format-Banner "Starting Study Compilation for:") -ForegroundColor Green
     Write-Host (Format-Banner "'$($relativePath)'") -ForegroundColor Green
     Write-Host "$headerLine" -ForegroundColor Green
 
@@ -260,7 +260,7 @@ try {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n--- Audit Report on Failure ---" -ForegroundColor Yellow
         $auditOutput | Write-Host # Display the captured report from the audit script
-        throw "Pre-analysis audit failed. See report above. Evaluation cannot continue."
+        throw "Pre-analysis audit failed. See report above. Study compilation cannot continue."
     }
     Write-Host "Step '1/5: Pre-Analysis Audit' completed successfully." -ForegroundColor Green
 
@@ -283,11 +283,11 @@ try {
             Write-Host "  - Automatically re-running..." -ForegroundColor Cyan
         }
         else {
-            Write-Host "  - WARNING: This study has already been evaluated, and the results are up to date. ✨" -ForegroundColor Yellow
+            Write-Host "  - WARNING: This study has already been compiled, and the results are up to date. ✨" -ForegroundColor Yellow
             Write-Host "  - If you choose to proceed, a backup of the existing results will be created first." -ForegroundColor Yellow
-            $choice = Read-Host "  - Do you wish to re-run the evaluation? (Y/N)"
+            $choice = Read-Host "  - Do you wish to re-run the compilation? (Y/N)"
             if ($choice.Trim().ToLower() -ne 'y') {
-                Write-Host "`nEvaluation aborted by user.`n" -ForegroundColor Yellow
+                Write-Host "`nCompilation aborted by user.`n" -ForegroundColor Yellow
                 Write-Host "[3/5: Backup Previous Results] SKIPPED" -ForegroundColor Cyan
                 Write-Host "[4/5: Compile Study Results] SKIPPED" -ForegroundColor Cyan
                 Write-Host "[5/5: Run Final Analysis (ANOVA)] SKIPPED" -ForegroundColor Cyan
@@ -334,14 +334,14 @@ try {
 
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Green
-    Write-Host (Format-Banner "Study Evaluation Finished Successfully!") -ForegroundColor Green
+    Write-Host (Format-Banner "Study Compilation Finished Successfully!") -ForegroundColor Green
     Write-Host "$headerLine" -ForegroundColor Green
 
 }
 catch {
     $headerLine = "#" * 80
     Write-Host "`n$headerLine" -ForegroundColor Red
-    Write-Host (Format-Banner "STUDY EVALUATION FAILED") -ForegroundColor Red
+    Write-Host (Format-Banner "STUDY COMPILATION FAILED") -ForegroundColor Red
     Write-Host "$headerLine" -ForegroundColor Red
     Write-Host "`nERROR: $($_.Exception.Message)`n" -ForegroundColor Red # Print the captured exception message cleanly
     # Exit with a non-zero status code to indicate failure to other automation tools
@@ -361,7 +361,7 @@ finally {
             Write-Warning "Could not clean the transcript log file: $($_.Exception.Message)"
         }
 
-        Write-Host "`nThe evaluation log has been saved to:" -ForegroundColor Gray
+        Write-Host "`nThe compilation log has been saved to:" -ForegroundColor Gray
         $relativePath = Resolve-Path -Path $LogFilePath -Relative
         Write-Host $relativePath -ForegroundColor Gray
         Write-Host "" # Add a final blank line for spacing

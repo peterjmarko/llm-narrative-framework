@@ -373,6 +373,8 @@ This section details the specific models, parameters, and design choices used in
 | OCEAN Scoring (LLM B) | Anthropic Claude 4.5 Sonnet | `anthropic/claude-sonnet-4.5` |
 | Neutralization (LLM C) | Google Gemini 2.5 Pro | `google/gemini-2.5-pro` |
 
+*Note on Data Generation Models: The models listed above were accessed by the researchers in mid-2025 during a pre-release or early access phase. Their names reflect their designation at the time the study's foundational data was generated.*
+
 **Evaluation Models (All Independent from Data Generation):**
 
 **United States (4 models):**
@@ -397,7 +399,10 @@ This section details the specific models, parameters, and design choices used in
 | :--- | :--- | :--- | :--- | :--- |
 | Evaluation 7 (LLM D7) | Mistral Large 2 2411 | `mistralai/mistral-large-2411` | Mistral AI | 98% |
 
-*Access Dates for LLMs: October 16-19, 2025*
+*Original Study Timeframe Reference:*
+- *Data Generation Pipeline Execution: October 16, 2025*
+- *Main Experimental Runs: October 18-22, 2025*
+- *Final Statistical Analysis: October 22-23, 2025*
 
 **Model Selection Rationale:**
 
