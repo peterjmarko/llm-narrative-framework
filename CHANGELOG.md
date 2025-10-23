@@ -2,6 +2,32 @@
 
 # Changelog
 
+## 16.0.0 (2025-10-23)
+
+### Bump
+
+- **version 15.3.0 → 16.0.0**
+
+### Features
+
+- **implement stability overhaul and finalize publication manuscript**
+  Finalizes the research article for publication by incorporating peer review feedback and overhauls the framework's stability and user experience.
+  
+  *   **Manuscript and Analysis Enhancements (Publication Readiness):**
+      *   Corrected all statistical discrepancies in the main article to align with analysis logs, including F-values, p-values, effect sizes, and the Bayesian analysis.
+      *   Reframed the paper's core narrative to be more nuanced, using the tension between frequentist and Bayesian results to motivate the multi-level decomposition.
+      *   Added a detailed, step-by-step description of the multi-level decomposition strategy to the Methods section for full transparency.
+      *   Enhanced the Open Science documentation with statements on pre-registration, software environment, and data availability.
+      *   Added the precise dates for data generation, experiments, and analysis to the manuscript and replication guide to ensure temporal reproducibility.
+  
+  *   **Framework Stability and UX Overhaul:**
+      *   Solved a critical flaw causing indefinite hangs by implementing a multi-layered, configurable timeout system in `replication_manager.py` and `config.ini`.
+      *   Implemented an intelligent "stall detection" repair logic that allows the framework to recover from large-scale transient API issues without premature failure.
+      *   Introduced a new `analyze_study_subsets.ps1` script to enable the powerful multi-level decomposition analysis required for the revised manuscript.
+      *   Greatly improved the user experience by adding a pre-launch confirmation, enabling real-time progress feedback, providing context-aware audit summaries, and offering actionable guidance on how to resume failed experiments.
+  
+  BREAKING CHANGE: BREAKING CHANGE: The `config.ini` file has been updated with a new `[Timeouts]` section to support the stability overhaul. Older versions of the framework scripts may not be compatible. The analysis workflow has been extended with the new `analyze_study_subsets.ps1` script, altering the end-to-end analysis procedure.
+
 ## 15.3.0 (2025-10-21)
 
 ### Bump
