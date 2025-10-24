@@ -6,35 +6,15 @@ This document outlines planned development tasks and tracks known issues for the
 
 ### 1. Final Data Generation and Study Execution
 
-- [ ] **Organize and Compile Final Study**
-  - [x] Manually create a final study directory (e.g., `output/studies/publication_run/`).
-  - [ ] Move all generated experiment folders into the study directory.
-  - [ ] Run `compile_study.ps1` to produce the definitive analysis and plots for the manuscript.
-- [ ] **Perform and Report Correction for Multiple Comparisons**
-  - [ ] Add a footnote or supplementary note to the article reporting the Benjamini-Hochberg FDR-corrected p-values to demonstrate statistical rigor.
-- [ ] **Tag Publication Commit**
-  - [ ] Create a permanent Git tag (e.g., `v1.0-publication`) to mark the exact version of the code used to generate the paper's results.
+  - [ ] Final GraphPad validation
 
 ### 2. Final Documentation Polish
 
-- [ ] **Update All Documents with Final Results**
-  - [ ] Consolidate documentation: justify each document and sharply define scope and relationships.
-  - [ ] Replace placeholder LLM names in `article_main_text.md` with the specific, versioned models used in the final study.
-  - [ ] Update all dates (October 16 to ...), tables, figures, counts, and statistical results in the article and documentation to reflect the final generated data.
-  - [ ] Replace the text placeholder in `article_main_text.md` with the final, generated interaction plot (`interaction_plot_mean_rank.png`).
-  - [ ] Address Research Article inconsistencies identified in documentation alignment:
-    - [ ] Clarify statistical analysis - either report Three-Way ANOVA results consistent with 2×3×3 design or explain why Two-Way was used
-    - [ ] Update model descriptions - specify all three evaluation LLMs or clarify scope of reported results
-    - [ ] Correct statistical reporting - ensure degrees of freedom match experimental design
-    - [ ] Add access dates - include October 2025 access dates for all LLMs
-    - [ ] Add specific references - reference Framework Manual and Replication Guide in Supplementary Materials
-    - [ ] Expand replication path descriptions - briefly describe each path with references to detailed guides
-    - [ ] Verify figure references - ensure all figures have proper descriptions and clear references
-  - [ ] After main study completion, compare: Performance with Flash Lite vs. other 3 models. If Flash Lite shows anomalously better performance → potential contamination flag. If similar or worse → validates independence claim.
-    - [ ] Report in Results: "Sensitivity analysis showed no significant performance advantage for Gemini 2.5 Flash Lite compared to fully independent models (p > .05), supporting the assumption that minimal contamination occurred despite shared model family."
 - [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
+  - [ ] Double-check for recent publications that should be cited.
   - [ ] Check all tables and diagrams.
   - [ ] Check counts and dates.
+  - [ ] Create a permanent Git tag (e.g., `v1.0-publication`) to mark the exact version of the code used to generate the paper's results.
 
 ## Final Review and Preprint Publication
 
@@ -52,11 +32,13 @@ This document outlines planned development tasks and tracks known issues for the
 ## Journal Submission and Peer Review
 
 - [ ] **Solicit Pre-Submission Expert Feedback**
-  - [ ] Identify and contact key field experts (e.g., Currey, Godbout) for friendly pre-submission reviews.
+  - [ ] Identify and contact key field experts (e.g., Currey, Godbout) for friendly pre-submission (courtesy) reviews.
   - [ ] Incorporate feedback into the final manuscript draft.
 - [ ] **Final Co-Author Approval**
   - [ ] Secure final approval from the co-author on the revised manuscript before submission.
 - [ ] **Manuscript Finalization**
+  - [ ] Add ORCID iDs for all authors (if applicable)
+  - [ ] Verify all figures render correctly in final manuscript
   - [ ] Prepare the final version of the manuscript with numbered lines.
 - [ ] **Compliance & Disclosure**
   - [ ] Complete the TOP (Transparency and Openness Promotion) disclosure table and add it as an appendix.
@@ -66,12 +48,15 @@ This document outlines planned development tasks and tracks known issues for the
   - [ ] Prepare the PCI Psychology submission form.
 - [ ] **Submission**
   - [ ] Submit the completed package to PCI Psychology.
-  - [ ] IF RECOMMENDED (PATH A): Submit the manuscript to Meta-Psychology.
-    - [ ] If needed, submit to Collabra: Psychology
-    - [ ] If needed, submit to Royal Society Open Science
-  - [ ] IF REJECTED (PATH B): Revise Manuscript using the PCI feedback. Submit the improved manuscript for a fresh review at AMPPS
-    - [ ] If needed, submit to Behavior Research Methods
-    - [ ] If needed, submit to PLOS One
+  - [ ] IF RECOMMENDED (PATH A): Submit with PCI recommendation
+    - [ ] Meta-Psychology (first choice: free, methodological focus)
+    - [ ] Collabra: Psychology (second choice: free, PCI-friendly)
+    - [ ] Behavior Research Methods (third choice: methodology focus)
+    - [ ] PLOS ONE (fourth choice: broad scope)
+  - [ ] IF REJECTED (PATH B): Revise using PCI feedback, submit directly to journals
+    - [ ] Behavior Research Methods (first choice: methodology papers)
+    - [ ] AMPPS (second choice: methods/practices focus)
+    - [ ] PLOS ONE (third choice: broad acceptance)
 
 ## Future Work: Potential Enhancements After Publication
 
