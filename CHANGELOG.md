@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 16.1.0 (2025-10-23)
+
+### Bump
+
+- **version 16.0.0 → 16.1.0**
+
+### Features
+
+- **finalize manuscript for publication with peer review prebuttals**
+  Finalizes the research article for publication by incorporating a rigorous self-review to preempt common peer-reviewer questions and enhance scholarly rigor.
+  
+  *   **Strengthened Statistical Reporting and Clarity:**
+      *   Added a footnote to the Methods section to accurately document the use of the Benjamini-Hochberg (FDR) correction, resolving a contradiction between the text and analysis logs.
+      *   Enhanced figure captions (Figs. 3 & 4) to be self-contained by embedding key statistical findings, improving readability.
+      *   Clarified the "lift" metrics in the Methods section with a simple, intuitive example to improve accessibility for a broader audience.
+  
+  *   **Fortified Discussion and Scholarly Context:**
+      *   Added a new paragraph to the Discussion hypothesizing a potential "mechanism" (e.g., architectural differences) to explain the observed model heterogeneity.
+      *   Strengthened the rebuttal to the "cultural confound" argument by explicitly contrasting simple Sun signs with the complex, algorithmically-derived "Balance" configurations.
+      *   Clarified the "practical significance" of GPT-4o's large effect size by connecting it to a tangible improvement in Top-3 Accuracy Lift.
+  
+  *   **Broadened Literature Review:**
+      *   Incorporated three new categories of essential citations into the Introduction and References to ground the work in foundational psychometrics (Cronbach & Meehl, 1955), contemporary LLM methodology (Gilardi et al., 2023), and comprehensive case study research (Dean & Kelly, 2003).
+
 ## 16.0.0 (2025-10-23)
 
 ### Bump
