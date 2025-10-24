@@ -2,6 +2,67 @@
 
 # Changelog
 
+## 16.1.1 (2025-10-24)
+
+### Bump
+
+- **version 16.1.0 → 16.1.1**
+
+### Documentation
+
+- **complete documentation alignment and restructuring for publication readiness**
+  Comprehensive documentation suite restructuring to align all four core documents with clear roles, cross-references, and complete content coverage.
+  
+  **Document Structure & Navigation:**
+  - Add consistent "Document Navigation" sections to all four documents with links to each other
+  - Add "What Is This Framework?" elevator pitch to README, Replication Guide, and Framework Manual
+  - Add "Purpose of This Document" statements clarifying audience, scope, and specific role
+  - Add Reader Navigation Guide to Framework Manual with audience matrix
+  
+  **README Updates:**
+  - Change subtitle to "A Case Study in Astrology" for transparency
+  - Add framework definition explaining LLM matching task methodology
+  - Add explicit statement that README serves as entry point for all user types
+  - Clarify domain-agnostic design despite astrology case study
+  - Add Documentation Map and Quick Start sections
+  
+  **Research Article Updates:**
+  - Add framework definition in Introduction section
+  - Add repository URL to abstract
+  - Add repository documentation overview in Methods section
+  - Consolidate duplicate "Open Data and Code Availability" sections
+  - Remove redundant section from Methods, keep enhanced version after Acknowledgements
+  - Update "Supplementary Materials" references to clarify they're in online repository
+  - Reduce repository URL mentions from 5 to 2 (abstract + consolidated section)
+  - Add comprehensive repository contents list with data formats and file descriptions
+  
+  **Replication Guide Updates:**
+  - Move complete Data Preparation Pipeline content from Framework Manual (belongs here for procedural replication)
+  - Add Stages 3-5 detailed procedures (LLM-based Candidate Selection, Solar Fire Processing, Profile Generation)
+  - Add comprehensive diagram coverage: architecture, workflow, data flow, and logic diagrams
+  - Add detailed Personality Assembly Algorithm with 5-step process and balance thresholds table
+  - Add Solar Fire manual procedures (chart export and delineations library export)
+  - Add Pipeline Summary Report section
+  - Maintain clear positioning as "step-by-step procedural guide"
+  
+  **Framework Manual Updates:**
+  - Refocus as pure technical reference (remove procedural workflows that belong in Replication Guide)
+  - Add Quick Reference Card with essential commands, parameters, file paths, and troubleshooting
+  - Keep appropriate technical content: script specifications, data formats, architecture diagrams, API references
+  - Add explicit statement directing users to Replication Guide for procedural guidance
+  - Maintain Reader Navigation Guide for different audience types
+  
+  **Cross-Reference Improvements:**
+  - Research article now clearly references all three repository documents
+  - All documents properly point to each other with specific use cases
+  - Clear separation: Article (findings)  README (overview)  Replication Guide (procedures)  Framework Manual (technical specs)
+  
+  All four documents now have clear, distinct roles with no content duplication or gaps.
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 16.1.0 (2025-10-23)
 
 ### Bump
