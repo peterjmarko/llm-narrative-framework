@@ -5,7 +5,7 @@ date: "[Date]"
 abstract: |
   **Background:** Psychology has struggled to empirically validate complex, holistic systems that produce narrative-based claims. This methodological gap highlights the need for new, more rigorous, and transparent research paradigms.
   **Objective:** This paper introduces and validates a novel, fully automated, and open-source framework for testing for weak signals in complex narratives. Using astrology as a challenging case study, we demonstrate a reproducible method for assessing the construct validity of a symbolic system against biographical data.
-  **Methods:** A library of astrological descriptions was programmatically neutralized by a Large Language Model (LLM) to remove all esoteric terminology. A cohort of 10,707 historically eminent individuals was sourced from a public database and subjected to a rigorous, multi-stage filtering process, yielding 5,736 "eligible" candidates. This cohort was then rank-ordered by an LLM-generated eminence score, and the final subject pool was determined by a data-driven cutoff based on the variance of their LLM-generated OCEAN scores. An independent LLM was then used as an impartial arbiter to perform a series of matching tasks, pairing biographies from a final pool of 4,987 individuals with their corresponding personality descriptions. All code, data, and materials are publicly available.
+  **Methods:** A library of astrological descriptions was programmatically neutralized by a Large Language Model (LLM) to remove all esoteric terminology. A cohort of 10,707 historically eminent individuals was sourced from a public database and subjected to a rigorous, multi-stage filtering process, yielding 5,736 "eligible" candidates. This cohort was then rank-ordered by an LLM-generated eminence score, and the final subject pool was determined by a data-driven cutoff based on the variance of their LLM-generated OCEAN scores. An independent LLM was then used as an impartial arbiter to perform a series of matching tasks, pairing biographies from a final pool of 4,987 individuals with their corresponding personality descriptions. All code, data, and materials are publicly available in an open-source repository at https://github.com/peterjmarko/llm-narrative-framework.git.
   **Results:** A multi-level analysis revealed statistically significant signal detection across multiple evaluation models. Aggregate analysis showed a very small but highly significant main effect for the matching condition (*F*(1, 1218) = 18.22, *p* < .001, η² = .003), with optimal signal exposure occurring at medium task difficulty (k=10: η² = 1.25%). Individual model analysis revealed extreme heterogeneity in signal detection capability, ranging from 0.03% to 17.23% (575× variation). Trajectory analysis identified two distinct patterns: framework-compatible models (GPT-4o, DeepSeek) showing Goldilocks patterns peaking at k=10, and framework-incompatible models (Claude, Llama) showing consistently minimal detection across all difficulty levels. These findings demonstrate that framework effectiveness requires both compatible model architecture and optimal task difficulty calibration.
   **Conclusion:** This study's primary contribution is a new, open-science paradigm for psychological research. By demonstrating its utility on a difficult and controversial topic, we provide a robust, computationally reproducible, and scalable framework for future investigations into complex narrative systems.
 ---
@@ -14,7 +14,7 @@ abstract: |
 
 ### Introduction
 
-The replication crisis has spurred a fierce and ongoing debate within psychological science about methodological reform (van Dongen & van Grootel, 2025). A key challenge in this landscape is establishing the **construct validity** (i.e., whether a system measures what it claims to measure) of complex, holistic systems that generate narrative-based claims (Cronbach & Meehl, 1955). Astrology serves as a prime example, where landmark empirical studies have faced significant methodological debate (Carlson, 1985; Eysenck & Nias, 1982; Ertel, 2009) and where comprehensive meta-analyses of quantitative research have consistently shown null results (Dean & Kelly, 2003). While modern "whole-chart" matching tests show promise (Currey, 2022; Godbout, 2020), even recent computational explorations have been limited by a reliance on opaque "black-box" tools and manual processes (Marko, 2018). This history highlights the need for a fully automated, transparent, and scalable testing framework.
+The replication crisis has spurred a fierce and ongoing debate within psychological science about methodological reform (van Dongen & van Grootel, 2025). A key challenge in this landscape is establishing the **construct validity** (i.e., whether a system measures what it claims to measure) of complex, holistic systems that generate narrative-based claims (Cronbach & Meehl, 1955). This paper introduces and validates the **LLM Narrative Framework**—an automated testing methodology that uses Large Language Models as pattern-detection engines to perform matching tasks, determining whether systematic signals in narrative descriptions can be detected at rates significantly greater than chance. Astrology serves as a prime example, where landmark empirical studies have faced significant methodological debate (Carlson, 1985; Eysenck & Nias, 1982; Ertel, 2009) and where comprehensive meta-analyses of quantitative research have consistently shown null results (Dean & Kelly, 2003). While modern "whole-chart" matching tests show promise (Currey, 2022; Godbout, 2020), even recent computational explorations have been limited by a reliance on opaque "black-box" tools and manual processes (Marko, 2018). This history highlights the need for a fully automated, transparent, and scalable testing framework.
 
 The advent of Large Language Models (LLMs) presents an opportunity to develop such a framework. Prior research on construct validity has often employed matching tests, where judges attempt to pair descriptions with their corresponding subjects (e.g., Carlson, 1985; Godbout, 2020). LLMs, as powerful pattern-recognition engines (Google, 2024; Wei et al., 2022), are uniquely suited to automate this process. Unlike human judges, who are susceptible to cognitive biases, LLMs can be deployed as **agnostic arbiters**, executing a matching task at a massive scale. Recent research has shown that modern LLMs can meet or even exceed the reliability of human annotators for complex text-classification tasks (Gilardi et al., 2023) and can be used to simulate human samples for social science research (Argyle et al., 2023). This study introduces and validates such an LLM-based framework, using astrology as a challenging case study.
 
@@ -26,7 +26,7 @@ The primary goal is to determine if a fully automated pipeline can serve as a se
 
 The framework is designed to support three distinct research paths. For **direct replication**, researchers can use the static data files and randomization seeds included in the project's public repository to ensure computational reproducibility of the original findings. For **methodological replication**, the framework's automated tools can be used to generate a fresh dataset from the live Astro-Databank (ADB) to test the robustness of the findings. Finally, for **conceptual replication**, researchers can modify the framework itself (e.g., by using a different LLM or analysis script) to extend the research.
 
-The final study sample was derived from a multi-stage data preparation pipeline, as illustrated in Figure 1. This section provides a conceptual overview of the workflow; a detailed, step-by-step guide for the entire data preparation pipeline and experiment workflow is available in the **Supplementary Materials**. The first stage, **Data Sourcing**, involved an initial query of the Astro-Databank (ADB) which selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**.
+The final study sample was derived from a multi-stage data preparation pipeline, as illustrated in Figure 1. This section provides a conceptual overview of the workflow; a detailed, step-by-step guide for the entire data preparation pipeline and experiment workflow is available in the **Supplementary Materials** (see Replication Guide in the online repository). The first stage, **Data Sourcing**, involved an initial query of the Astro-Databank (ADB) which selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**.
 
 {{grouped_figure:docs/diagrams/flow_sample_derivation.mmd | scale=2.5 | width=45% | caption=Figure 1: Flowchart of the sample derivation process, showing the number of subjects retained at each stage of the data preparation pipeline.}}
 
@@ -104,12 +104,6 @@ Each ANOVA was treated as a separate, pre-specified test of the core hypothesis 
 
 **Pre-registration and Exploratory Analysis:** The core hypothesis—that the framework can distinguish between correct and random mappings—was pre-specified. However, the multi-level decomposition approach represents exploratory framework validation, with specific analyses (optimal difficulty identification, model heterogeneity characterization, trajectory patterns) emerging from data inspection rather than a priori hypotheses. This hybrid approach is appropriate for novel framework validation studies, where the primary goal is methodological demonstration rather than theory testing. Future confirmatory studies employing this framework should pre-register specific hypotheses about signal strength, model performance, and task difficulty effects.
 
-#### Open Data and Code Availability
-
-In accordance with the principles of open science and computational reproducibility (The Turing Way Community, 2022), all data, analysis scripts, and supplementary materials necessary to reproduce the findings reported in this article are permanently and publicly available. The complete project repository can be accessed on GitHub at https://github.com/peterjmarko/llm-narrative-framework.git. This includes: (1) the neutralized component library (CSV format with component IDs and neutralized text); (2) the final subject database (CSV format with biographical and astrological metadata); (3) raw experimental results (JSON format with trial-level data and model responses); and (4) compiled study-level analysis results (CSV format with summary statistics). All data files include accompanying data dictionaries documenting variable names, types, and meanings. The repository also contains analysis scripts (Python/PowerShell), configuration files, and complete documentation for data preparation, experiment execution, and statistical analysis workflows.
-
-Comprehensive data dictionaries for all datasets are provided in the repository documentation, specifying variable names, data types, valid ranges, and missing data codes. Example data structures and loading scripts are included to facilitate immediate data access and reuse.
-
 **Software and Computational Environment:** All analyses were conducted using Python 3.11+ with the following core packages: NumPy (numerical computing), Pandas (data manipulation), SciPy and Statsmodels (statistical analysis), Pingouin (ANOVA and effect sizes), Seaborn and Matplotlib (visualization), and python-dotenv (configuration management). Data preparation and experiment orchestration scripts were implemented in PowerShell 7.x for cross-platform compatibility. The complete computational environment, including all package versions and dependencies, is specified in the project's `pyproject.toml` and can be reproduced using PDM (Python Dependency Manager). All code is version-controlled via Git, ensuring transparent tracking of methodological decisions and modifications.
 
 ### Results
@@ -126,9 +120,9 @@ While most interactions were not significant, the `mapping_strategy × k` intera
 
 | Dependent Variable | *F*(1, 1218) | *p*-value | η² | 95% CI for η² |
 | :--- | :---: | :---: | :---: | :---: |
-| MRR Lift | 18.22 | < .001 | .003 | [Recalculate] |
-| Top-1 Accuracy Lift | 10.73 | .001 | .001 | [Recalculate] |
-| Top-3 Accuracy Lift | 7.54 | .006 | .001 | [Recalculate] |
+| MRR Lift | 18.22 | < .001 | .003 | [.000, .007] |
+| Top-1 Accuracy Lift | 10.73 | .001 | .001 | [.000, .004] |
+| Top-3 Accuracy Lift | 7.54 | .006 | .001 | [.000, .003] |
 
 A Bayesian analysis of the primary metric (MRR Lift) yielded BF₁₀ ≈ 0.35, providing anecdotal evidence *for the null hypothesis* (i.e., against signal existence) according to conventional standards (Jeffreys, 1961). This creates a statistical tension: the frequentist analysis yielded a significant p-value, while the Bayesian analysis suggests the data are more likely under the null. This apparent contradiction suggests the aggregate effect may not be robust and strongly motivates the multi-level decomposition to investigate whether heterogeneity is being masked by averaging across models.
 
@@ -286,14 +280,32 @@ The authors declare that they have no known competing financial interests or per
 
 The authors wish to thank Vincent Godbout for generously sharing his pioneering thoughts, drafts, and procedures on automated matching tests, which provided a valuable foundation for this work. The authors are independent researchers and received no specific funding for this study.
 
-### Supplementary Materials
+### Open Data and Code Availability
 
-Supplementary materials for this article, including a detailed description of the astrological weighting system ("Settings for Balances Report") and a pilot study on LLM selection, are available in the project's public repository at [Insert GitHub Repository URL Here].
+In accordance with the principles of open science and computational reproducibility (The Turing Way Community, 2022), all data, analysis scripts, supplementary materials, and documentation necessary to reproduce the findings reported in this article are permanently and publicly available at https://github.com/peterjmarko/llm-narrative-framework.git.
+
+**Repository Contents:**
+
+- **Replication Guide** (Supplementary Material): Complete step-by-step procedures for all three replication paths, including detailed descriptions of the data preparation pipeline, astrological weighting system, pilot study on LLM selection, and experiment workflow
+- **Framework Manual**: Technical specifications, data formats, and API references
+- **README**: Quick start guide and framework overview
+- **Source Code**: Complete Python and PowerShell codebase with comprehensive test suite
+- **Data Files**: Static datasets for direct replication, including:
+  - Neutralized component library (CSV format with component IDs and neutralized text)
+  - Final subject database (CSV format with biographical and astrological metadata)
+  - Raw experimental results (JSON format with trial-level data and model responses)
+  - Compiled study-level analysis results (CSV format with summary statistics)
+- **Configuration Files**: Exact parameter settings used in the original study
+- **Data Dictionaries**: Complete documentation of variable names, data types, valid ranges, and missing data codes for all datasets
+
+Example data structures and loading scripts are included to facilitate immediate data access and reuse.
+
+**Licensing:** The framework is released under dual licensing: source code under GNU GPL v3.0, and data/documentation under CC BY-SA 4.0.
 
 ---
-[^1]: The naming of the data generation models reflects the latest versions available at the time of the study. For provider details and release context, see Appendix C of the Supplementary Materials.
+[^1]: The naming of the data generation models reflects the latest versions available at the time of the study. For provider details and release context, see Appendix C of the Supplementary Materials (Replication Guide).
 
-[^2]: To control the false discovery rate across the multiple ANOVAs conducted, a Benjamini-Hochberg (FDR) correction was automatically applied to the p-values for all main and interaction effects. The primary statistical results in the main text are reported using uncorrected p-values for clarity, as is conventional for pre-specified hypotheses. However, it is noted that all statistically significant findings reported in this paper remained significant after the FDR correction was applied, demonstrating the robustness of the results.
+[^2]: To control the false discovery rate across the multiple ANOVAs conducted, a Benjamini-Hochberg (FDR) correction was automatically applied to the p-values for all main and information effects. The primary statistical results in the main text are reported using uncorrected p-values for clarity, as is conventional for pre-specified hypotheses. However, it is noted that all statistically significant findings reported in this paper remained significant after the FDR correction was applied, demonstrating the robustness of the results.
 
 ### References
 

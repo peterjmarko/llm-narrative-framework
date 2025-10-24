@@ -1,8 +1,25 @@
 # A Framework for Testing Complex Narrative Systems
- 
-This project provides a framework for the resilient and reproducible testing of large-scale LLM experiments with complex narrative systems. It offers a fully automated, end-to-end pipeline that manages the entire experimental workflow, from data preparation to final statistical analysis.
 
-This README provides a high-level overview of the framework and guides new users to the detailed documentation that best suits their needs.
+**A Case Study in Astrology**
+
+## 📑 Document Navigation
+
+This project includes four interconnected documents:
+
+- **📄 Research Article** (`docs/article_main_text.md`) - Scientific findings and validation of the framework using astrology as a test case
+- **📖 README** (this document) - Quick start guide and feature overview
+- **🔬 Replication Guide** (`docs/REPLICATION_GUIDE.md`) - Step-by-step procedures for reproducing or extending the study
+- **🔧 Framework Manual** (`docs/FRAMEWORK_MANUAL.md`) - Technical specifications, data formats, and API references
+
+---
+
+## What Is This Framework?
+
+The **LLM Narrative Framework** is an automated testing methodology that uses Large Language Models as pattern-detection engines to perform matching tasks between narrative personality descriptions and biographical profiles. The framework determines whether LLMs can detect systematic signals and pair descriptions at rates significantly greater than chance.
+
+Using astrology as a challenging case study, this fully automated, end-to-end pipeline manages the entire experimental workflow—from data preparation through statistical analysis. While validated using astrological personality descriptions, the framework is designed to be domain-agnostic and extensible to other complex narrative systems.
+
+**Purpose of This Document:** This README serves as the **entry point for all users**—whether you're a researcher evaluating the framework for your own work, a developer exploring the codebase, or a first-time user getting started. It provides a high-level overview of the framework's capabilities, philosophy, and key features, then guides you to the appropriate detailed documentation based on your specific needs and role.
 
 ## 📚 Documentation Map
 
@@ -54,6 +71,10 @@ The framework prioritizes **transparency and auditability** over black-box autom
 
 **Bottom line:** If you can read the CSV files and understand the log files, you can trust the results.
 
+### Domain Applicability
+
+While this framework was developed and validated using astrology as a challenging test case, its architecture is **domain-agnostic**. The framework treats the astrological system as an arbitrary algorithm that generates narrative descriptions, then tests whether LLMs can detect patterns in its output. This same approach can be applied to any complex system that produces narrative-based claims—personality typologies, diagnostic frameworks, or other classification systems. The primary contribution is the methodology itself: a reproducible paradigm for testing construct validity in narrative systems at scale.
+
 {{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=75% | caption=Project Architecture: A high-level overview of the main functional components.}}
 
 ## ✨ Key Features
@@ -71,48 +92,72 @@ The framework uses an **interactive wizard** that guides you through selecting e
 
 1. **Define Study Parameters** in `config.ini`:
 ```ini
-   [Study]
-   # Study-level experimental design parameters
-   mapping_strategy = correct, random
-   group_size = 7, 10, 14
-   model_name = meta-llama/llama-3.3-70b-instruct, google/gemini-2.5-flash-lite
-   
-   [Experiment]
-   num_replications = 30
-   num_trials = 80
+  [Study]
+  mapping_strategy = correct, random
+  group_size = 7, 10, 14
+  model_name = anthropic/claude-sonnet-4, google/gemini-2.0-flash-lite-001, meta-llama/llama-3.3-70b-instruct, openai/gpt-4o, deepseek/deepseek-chat-v3.1, qwen/qwen-2.5-72b-instruct, mistralai/mistral-large-2411
+  num_replications = 30
+  num_trials = 80
+  temperature = 0.0
+  max_tokens = 2048
+
+  [Experiment]
+  num_replications = 2
+  num_trials = 3
+  group_size = 5
+  mapping_strategy = random
 ```
 
 2. **Run the Interactive Wizard**:
 ```powershell
-   ./new_experiment.ps1
+  ./new_experiment.ps1
 ```
    
-   The script displays available options and prompts for selection:
+  The script displays available options and prompts for selection:
 ```
-   Study Experimental Design
-   ================================================================================
-   
-   Mapping Strategies:
-     [1] correct
-     [2] random
-   
-   Group Sizes:
-     [1] 7
-     [2] 10
-     [3] 14
-   
-   Models:
-     [1] meta-llama/llama-3.3-70b-instruct
-     [2] google/gemini-2.5-flash-lite
-   
-   Select Mapping Strategy [1-2]: 1
-   Select Group Size [1-3]: 2
-   Select Model [1-2]: 1
-   
-   Selected Configuration:
-     Mapping Strategy: correct
-     Group Size: 10
-     Model: meta-llama/llama-3.3-70b-instruct
+  ################################################################################
+  ###                           NEW EXPERIMENT SETUP                           ###
+  ################################################################################
+
+                                                                                                                          
+  Study Experimental Design
+  ================================================================================
+
+  Mapping Strategies:
+    [1] correct
+    [2] random
+
+  Group Sizes:
+    [1] 7
+    [2] 10
+    [3] 14
+
+  Models:
+    [1] anthropic/claude-sonnet-4
+    [2] google/gemini-2.0-flash-lite-001
+    [3] meta-llama/llama-3.3-70b-instruct
+    [4] openai/gpt-4o
+    [5] deepseek/deepseek-chat-v3.1
+    [6] qwen/qwen-2.5-72b-instruct
+    [7] mistralai/mistral-large-2411
+
+  Select Mapping Strategy [1-2] or 'e' to use [Experiment] defaults: 1
+  Select Group Size [1-3]: 2
+  Select Model [1-7]: 3
+```
+
+  After making the selections:
+```
+  Selected Configuration:
+    Mapping Strategy: correct
+    Group Size: 10
+    Model: meta-llama/llama-3.3-70b-instruct
+    Number of Replications: 30
+    Number of Trials: 80
+    Temperature: 0.0
+    Max Tokens: 2048
+
+  Proceed with this configuration? (Y/N, Ctrl+C to exit):
 ```
 
 3. **Automatic Configuration**: Your selections are automatically written to `[Experiment]` and `[LLM]` sections before experiment creation. Each experiment's parameters are logged to `output/studies/study_creation_log.txt` for tracking your complete study design.
