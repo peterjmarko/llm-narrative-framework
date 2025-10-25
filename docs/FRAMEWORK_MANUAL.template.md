@@ -538,6 +538,87 @@ Based on the combined results from both audits, it presents a consolidated summa
 
 {{grouped_figure:docs/diagrams/flow_main_5_audit_study.mmd | scale=2.5 | width=70% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
 
+#### Workflow 6: Analyzing Study Subsets
+
+The `analyze_study_subsets.ps1` script enables flexible subset analysis by filtering the master `STUDY_results.csv` and running statistical analysis on specific data subsets. This is useful for examining results within specific conditions (e.g., analyzing only one model, one k-value, or one mapping strategy).
+
+**Key Features:**
+- **Interactive Mode**: Default guided filter builder when no filter is provided
+- **Direct Filter Mode**: Supports pandas query syntax for custom filtering
+- **Reuses Existing Infrastructure**: Uses the standard `analyze_study_results.py` without requiring new Python code
+- **Organized Output**: Creates separate subdirectories in `anova_subsets/` for each analysis
+
+**Usage Examples:**
+````powershell
+# Interactive mode (default) - guided filter builder
+.\analyze_study_subsets.ps1
+
+# Analyze only k=10 experiments
+.\analyze_study_subsets.ps1 -Filter "k == 10"
+
+# Analyze specific model at specific k-value
+.\analyze_study_subsets.ps1 -Filter "model == 'anthropic/claude-sonnet-4' and k == 14"
+
+# Custom output name for easy identification
+.\analyze_study_subsets.ps1 -Filter "k == 10" -OutputName "k10_analysis"
+````
+
+**Filter Syntax:**
+The script accepts pandas query expressions:
+- **Equality**: `k == 10`, `model == 'anthropic/claude-sonnet-4'`
+- **Comparison**: `k >= 10`, `k < 14`
+- **Multiple conditions**: `k == 10 and mapping_strategy == 'correct'`
+- **Advanced queries**: `model.isin(['anthropic/claude-sonnet-4', 'meta-llama/llama-3.3-70b-instruct'])`
+
+**Output Structure** (`<StudyDirectory>/anova_subsets/<OutputName>/`):
+- `STUDY_results.csv`: Filtered data subset
+- `subset_metadata.txt`: Filter parameters and timestamp
+- `anova/STUDY_analysis_log.txt`: Statistical analysis report
+- `anova/boxplots/`: Visualization plots
+- `anova/diagnostics/`: Q-Q plots
+
+#### Workflow 7: Rerunning All Subset Analyses
+
+The `rerun_all_anova_subsets.ps1` script automatically reruns all existing subset analyses found in `anova_subsets/`. This is particularly useful after updating analysis code or display names in `config.ini`.
+
+**Key Features:**
+- **Automatic Discovery**: Scans `anova_subsets/` to identify all existing analyses
+- **Filter Parsing**: Reconstructs filters from directory naming conventions
+- **Consolidated Reporting**: Generates summary logs and concatenated detailed logs
+- **Archive Management**: Archives previous results with timestamps
+- **Dry-Run Mode**: Preview execution without making changes
+
+**Usage Examples:**
+````powershell
+# Rerun all subset analyses
+.\rerun_all_anova_subsets.ps1 -StudyDirectory "output/studies/publication_run"
+
+# Preview what would be run (no execution)
+.\rerun_all_anova_subsets.ps1 -StudyDirectory "output/studies/publication_run" -DryRun
+
+# Only compile existing logs (no reanalysis)
+.\rerun_all_anova_subsets.ps1 -StudyDirectory "output/studies/publication_run" -CompileOnly
+````
+
+**Naming Convention Recognition:**
+
+| Directory Name | Reconstructed Filter |
+|----------------|---------------------|
+| `1.1_k7_analysis` | `k == 7` |
+| `2.1_claude_k10` | `model contains 'claude' and k == 10` |
+| `3.1_traj_gpt4o_k7` | `mapping_strategy == 'correct' and model contains 'gpt4o' and k == 7` |
+
+**Output Artifacts:**
+- `anova_subsets/ANOVA_SUBSETS_SUMMARY.txt`: High-level summary
+- `anova_subsets/CONSOLIDATED_ANALYSIS_LOG.txt`: All detailed logs concatenated
+- `anova/archive/`: Previous summary logs with timestamps
+
+**Use Cases:**
+- Regenerate plots after display name changes in `config.ini`
+- Apply updated analysis methodology to all existing subsets
+- Refresh results after statistical code improvements
+- Create consolidated documentation of all subset findings
+
 {{pagebreak}}
 #### Data Flow Diagram
 

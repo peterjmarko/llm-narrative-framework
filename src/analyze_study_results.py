@@ -218,7 +218,7 @@ def create_diagnostic_plot(model, display_metric_name, output_dir, metric_key):
         logging.warning(f"-> Could not generate Q-Q plot for '{display_metric_name}': No residuals found.")
 
 
-def create_and_save_plot(df, metric_key, display_metric_name, factor, p_value, output_dir, factor_display_map, project_root):
+def create_and_save_plot(df, metric_key, display_metric_name, factor, p_value, output_dir, factor_display_map):
     """Creates and saves a boxplot, and copies it to the docs/images/boxplots directory."""
     # Suppress the specific PendingDeprecationWarning from seaborn's internal call to matplotlib
     with warnings.catch_warnings():
@@ -250,18 +250,11 @@ def create_and_save_plot(df, metric_key, display_metric_name, factor, p_value, o
         boxplot_subdir = os.path.join(output_dir, 'boxplots', factor)
         full_plot_path = os.path.join(boxplot_subdir, plot_filename)
         plt.savefig(full_plot_path)
-        logging.info(f"-> Plot saved successfully to: {full_plot_path}")
-
-        # 2. Copy the plot to the docs/images/boxplots directory for easy access
-        docs_images_dir = os.path.join(project_root, 'docs', 'images', 'boxplots')
-        os.makedirs(docs_images_dir, exist_ok=True)
-        dest_plot_path = os.path.join(docs_images_dir, plot_filename)
-        shutil.copy2(full_plot_path, dest_plot_path)
-        logging.info(f"-> Copied plot to: {dest_plot_path}")
+        logging.info(f"-> Plot saved to: {full_plot_path}")
 
         plt.close(fig)
 
-def create_and_save_interaction_plot(df, metric_key, display_metric_name, factors, p_value, output_dir, factor_display_map, project_root):
+def create_and_save_interaction_plot(df, metric_key, display_metric_name, factors, p_value, output_dir, factor_display_map):
     """Creates and saves a line plot to visualize an interaction effect."""
     fig = plt.figure(figsize=(12, 8))
     ax = plt.gca()
@@ -314,7 +307,7 @@ def create_and_save_interaction_plot(df, metric_key, display_metric_name, factor
 
     plt.close(fig)
 
-def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized_to_display_map, metric_display_map, factor_display_map, project_root):
+def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized_to_display_map, metric_display_map, factor_display_map):
     """Performs a full statistical analysis for a single metric."""
     display_metric_name = metric_display_map.get(metric_key, metric_key)
     
@@ -334,7 +327,7 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
         if not df.empty and all_possible_factors:
             grouping_factor = all_possible_factors[0]
             logging.info(f"--- Generating Performance Plot (grouped by '{grouping_factor}') ---")
-            create_and_save_plot(df, metric_key, display_metric_name, grouping_factor, float('nan'), output_dir, factor_display_map, project_root)
+            create_and_save_plot(df, metric_key, display_metric_name, grouping_factor, float('nan'), output_dir, factor_display_map)
         return
     
     logging.info(f"Detected {len(active_factors)} active factor(s) with variation: {', '.join(active_factors)}")
@@ -471,7 +464,7 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
         for factor in active_factors:
             key = f"C({factor})"
             p_val = anova_table.loc[key, 'PR(>F)'] if key in anova_table.index else float('nan')
-            create_and_save_plot(df, metric_key, display_metric_name, factor, p_val, output_dir, factor_display_map, project_root)
+            create_and_save_plot(df, metric_key, display_metric_name, factor, p_val, output_dir, factor_display_map)
             
         # Plot interaction effects (for 2-way ANOVA)
         if len(active_factors) == 2:
@@ -480,7 +473,7 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
                 p_val = anova_table.loc[interaction_term, 'PR(>F)']
                 logging.info(f"\n--- Generating Interaction Plot for '{interaction_term}' ---")
                 # Assuming the first factor is the hue and the second is the x-axis
-                create_and_save_interaction_plot(df, metric_key, display_metric_name, active_factors, p_val, output_dir, factor_display_map, project_root)
+                create_and_save_interaction_plot(df, metric_key, display_metric_name, active_factors, p_val, output_dir, factor_display_map)
 
     except Exception as e:
         logging.error(f"\nERROR: Could not perform analysis for metric '{display_metric_name}'. Reason: {e}")
@@ -505,7 +498,6 @@ def main():
         """)
     )
     parser.add_argument("study_directory", help="Path to the top-level study directory containing the master CSV.")
-    parser.add_argument('--verbose', action='store_true', help="Enable verbose console output")
     parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
     args = parser.parse_args()
 
@@ -517,7 +509,7 @@ def main():
         from config_loader import APP_CONFIG as RELOADED_APP_CONFIG
         APP_CONFIG = RELOADED_APP_CONFIG
 
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    # project_root removed - plots now referenced directly from analysis directories
     base_dir = os.path.abspath(args.study_directory)
     output_dir = os.path.join(base_dir, 'anova')
     os.makedirs(output_dir, exist_ok=True)
@@ -526,15 +518,14 @@ def main():
     log_filename = 'STUDY_analysis_log.txt'
     log_filepath = os.path.join(output_dir, log_filename)
     
-    # Configure logging with both file and console handlers from the start
+    # Set up logging configuration early to capture all messages
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     
-    # Clear any handlers added by this script in a previous run to avoid duplication.
-    # This is important for testing scenarios where main() might be called multiple times.
+    # Clear ALL existing handlers to prevent duplicate output
+    # This removes both custom handlers from previous runs and Python's default handler
     for handler in root_logger.handlers[:]:
-        if hasattr(handler, '_is_study_analyzer_handler'):
-            root_logger.removeHandler(handler)
+        root_logger.removeHandler(handler)
 
     # --- Single-level Backup of Previous Run (before opening log for writing) ---
     try:
@@ -567,22 +558,8 @@ def main():
     # 1. Add a handler for the log file that uses the custom formatter to strip color codes.
     file_handler = logging.FileHandler(log_filepath, mode='w', encoding='utf-8')
     file_handler.setFormatter(ColorStrippingFormatter('%(message)s'))
-    file_handler._is_study_analyzer_handler = True  # Custom attribute for identification
+    file_handler._is_study_analyzer_handler = True
     root_logger.addHandler(file_handler)
-
-    # 2. Add a handler for the console only if verbose mode is enabled
-    if args.verbose:
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(ColorFormatter('%(message)s'))
-        console_handler._is_study_analyzer_handler = True  # Custom attribute for identification
-        root_logger.addHandler(console_handler)
-    else:
-        # In quiet mode, show only essential progress messages
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.WARNING)  # Only show warnings/errors
-        console_handler.setFormatter(logging.Formatter('%(message)s'))
-        console_handler._is_study_analyzer_handler = True
-        root_logger.addHandler(console_handler)
 
     # Now log the archiving results
     if items_to_archive:
@@ -631,6 +608,7 @@ def main():
     logging.info("\n" + "="*80) # Separator after intro
     logging.info(f"Full analysis log is being saved to: {log_filepath}") # Re-add this existing log line
     logging.info("="*80 + "\n") # Another separator
+
 
     try:
         master_csv_path = find_master_csv(base_dir)
@@ -707,7 +685,7 @@ def main():
         # Perform analysis for each metric
         for metric_key in metrics:
             if metric_key in df.columns:
-                perform_analysis(df, metric_key, factors, output_dir, sanitized_to_display, metric_display_map, factor_display_map, project_root)
+                perform_analysis(df, metric_key, factors, output_dir, sanitized_to_display, metric_display_map, factor_display_map)
             else:
                 logging.warning(f"\nWarning: Metric column '{metric_key}' not found. Skipping analysis.")
     finally:

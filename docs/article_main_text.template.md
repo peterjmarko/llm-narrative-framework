@@ -61,7 +61,7 @@ Each individual's complete personality profile was then programmatically assembl
 
 #### Experimental Design and Procedure
 
-All data generation, experiments, and analysis were conducted in October 2025. Specifically, the data preparation pipeline was executed on October 16; the main experimental runs were conducted between October 18-22; and the final analysis was performed on October 22-23. Documenting this specific timeframe is critical for computational reproducibility, as the behavior of the LLMs used in both data generation and evaluation is specific to their versions and states during this period.
+All data generation, experiments, and analysis were conducted in October 2025. Specifically, the data preparation pipeline was executed on October 16; the main experimental runs were conducted between October 18-22; and the final analysis was performed on October 22-25. Documenting this specific timeframe is critical for computational reproducibility, as the behavior of the LLMs used in both data generation and evaluation is specific to their versions and states during this period.
 
 The study employed a 2 × 3 × 7 factorial design, as detailed in Table 2. The end-to-end research workflow, from generating data for individual experimental conditions to compiling the final study analysis, is illustrated in Figure 2.
 
@@ -113,7 +113,7 @@ The analysis employed a multi-level decomposition approach to comprehensively as
 
 #### Aggregate Findings: Framework Baseline Signal Detection
 
-Aggregate three-way ANOVA revealed statistically significant main effects for both `mapping_strategy` and `k` on key performance metrics, with small effect sizes indicating subtle signal detection. For the primary metric (MRR Lift), the main effect of `mapping_strategy` was highly significant (*F*(1, 1218) = 18.22, *p* < .001, η² = .003), demonstrating that evaluation models collectively performed better when assessed against correct mappings than random mappings, though the effect size was very small. The main effect of group size `k` was also highly significant (*F*(2, 1218) = 127.45, *p* < .001, η² = .173), confirming that task difficulty substantially impacts signal detectability.
+Aggregate three-way ANOVA revealed statistically significant main effects for both `mapping_strategy` and `k` on key performance metrics, with small effect sizes indicating subtle signal detection. For the primary metric (MRR Lift), the main effect of `mapping_strategy` was highly significant (*F*(1, 1218) = 18.22, *p* < .001, η² = .003), demonstrating that evaluation models collectively performed better when assessed against correct mappings than random mappings, though the effect size was very small. The main effect of group size `k` was also highly significant (*F*(2, 1218) = 667.48, *p* < .001, η² = .200), confirming that task difficulty substantially impacts signal detectability.
 
 While most interactions were not significant, the `mapping_strategy × k` interaction approached significance for the primary metric, MRR Lift (*F*(2, 1218) = 2.81, *p* = .061). This suggested that the strength of the detected signal might depend on the task difficulty, providing a statistical motivation for the planned multi-level decomposition to investigate each `k` level independently. Other interactions were not significant (`mapping_strategy × model`: *F*(6, 1218) = 2.09, *p* = .052; `k × model`: *F*(12, 1218) = 82.74, *p* < .001; `mapping_strategy × k × model`: *F*(12, 1218) = 1.29, *p* = .218). Table 3 summarizes the aggregate main effect of `mapping_strategy` across performance metrics.
 
@@ -127,7 +127,7 @@ While most interactions were not significant, the `mapping_strategy × k` intera
 
 A Bayesian analysis of the primary metric (MRR Lift) yielded BF₁₀ ≈ 0.35, providing anecdotal evidence *for the null hypothesis* (i.e., against signal existence) according to conventional standards (Jeffreys, 1961). This creates a statistical tension: the frequentist analysis yielded a significant p-value, while the Bayesian analysis suggests the data are more likely under the null. This apparent contradiction suggests the aggregate effect may not be robust and strongly motivates the multi-level decomposition to investigate whether heterogeneity is being masked by averaging across models.
 
-{{grouped_figure:docs/images/boxplots/boxplot_mapping_strategy_mean_mrr_lift.png | caption=Figure 3: Aggregate comparison of MRR Lift between correct and random mapping strategies across all models. The 'correct' mapping condition showed a statistically significant but very small increase in performance over the 'random' condition (*F*(1, 1218) = 18.22, *p* < .001, η² = .003).}}
+{{grouped_figure:output/studies/publication_run/anova/boxplots/mapping_strategy/boxplot_mapping_strategy_mean_mrr_lift.png | caption=Figure 1: Aggregate comparison of MRR Lift between correct and random mapping strategies across all models and k-values. The 'correct' mapping condition showed a statistically significant but very small increase in performance over the 'random' condition (*F*(1, 1218) = 18.22, *p* < .001, η² = .003).}}
 
 #### Optimal Difficulty Analysis: Identifying the Goldilocks Zone
 
@@ -137,7 +137,7 @@ At k=7 (easiest condition), the main effect of `mapping_strategy` on MRR Lift wa
 
 This Goldilocks pattern demonstrates that the framework requires optimal task calibration: when the task is too easy (k=7), the signal-to-noise ratio may be insufficient to reveal meaningful differences; when too difficult (k=14), noise overwhelms the signal. The k=10 condition represents the optimal difficulty level for this framework and dataset.
 
-{{grouped_figure:docs/images/boxplots/boxplot_k_mean_mrr_lift.png | caption=Figure 4: MRR Lift across different group sizes, showing a Goldilocks pattern. Signal detection peaked at the medium difficulty condition (k=10), where the effect was strongest and highly significant (*F*(1, 406) = 20.77, *p* < .001, η² = 1.25%).}}
+{{grouped_figure:output/studies/publication_run/anova/boxplots/k/boxplot_k_mean_mrr_lift.png | caption=Figure 4: MRR Lift across different group sizes, showing a Goldilocks pattern. Signal detection peaked at the medium difficulty condition (k=10), where the effect was strongest and highly significant (*F*(1, 406) = 20.77, *p* < .001, η² = 1.25%).}}
 
 #### Model Heterogeneity: Extreme Variation in Signal Detection Capability
 
@@ -156,6 +156,8 @@ Individual model analyses at the optimal difficulty level (k=10) revealed extrem
 | Claude Sonnet 4 | 60 | .890 | 0.03% | 0.265 | Minimal (NS) |
 
 This heterogeneity reveals that aggregate findings substantially underestimate framework effectiveness for compatible models while overestimating it for incompatible models. The framework successfully exposes signals through GPT-4o and DeepSeek with large effect sizes, moderately through Gemini, and minimally or not at all through Qwen, Llama, Mistral, and Claude. These findings demonstrate that model architecture significantly moderates framework effectiveness.
+
+{{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/model/boxplot_model_mean_mrr_lift.png | caption=Figure 2: Model heterogeneity in signal detection at k=10. Effect sizes range from 0.03% (Claude Sonnet 4) to 17.23% (GPT-4o)—a 575-fold variation in sensitivity to correct personality mapping.}}
 
 #### Signal Detection Trajectories: Goldilocks vs. Flat Patterns
 
@@ -187,6 +189,8 @@ Table 5 summarizes complete trajectories for these representative models.
 *Note: NS = not significant; * p < .05; ** p < .01; *** p < .001*
 
 These trajectory analyses reveal that framework effectiveness requires both optimal difficulty calibration (k=10) and compatible model architecture (GPT-4o, DeepSeek). Having only one requirement satisfied is insufficient: compatible models at suboptimal difficulty show minimal detection (GPT-4o at k=7 or k=14), while incompatible models show minimal detection regardless of difficulty (Claude, Llama at all k levels).
+
+{{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/interaction_plot_mapping_strategy_x_model_mean_mrr_lift_k_10.png | caption=Figure 3: Model × mapping strategy interaction at k=10, revealing two distinct trajectory patterns. GPT-4o and DeepSeek V3 show pronounced "Goldilocks" sensitivity (large separation between correct and random conditions), while Claude Sonnet 4, Llama 3.3, and Mistral Large exhibit "flat" patterns with minimal discrimination.}}
 
 #### Analysis of Presentation Order Bias
 
