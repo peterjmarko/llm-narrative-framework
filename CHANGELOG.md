@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 16.2.0 (2025-10-25)
+
+### Bump
+
+- **version 16.1.2 → 16.2.0**
+
+### Features
+
+- **add subset analysis scripts and fix plot handling**
+  Add new analysis capabilities and fix plot file path handling.
+  
+  - Add analyze_study_subsets.ps1 for automated subset analysis execution
+  - Add rerun_all_anova_subsets.ps1 for batch reanalysis of existing subsets
+  - Update Framework Manual with descriptions of both new scripts
+  - Remove plot copying from analyze_study_results.py to docs/images/boxplots/
+  - Update article figures to use direct paths to analysis directories
+  - Add Figure 2 (model heterogeneity at k=10) and Figure 3 (interaction plot)
+  - Correct k main effect statistics in article (F=667.48, η=.200)
+
 ## 16.1.2 (2025-10-24)
 
 ### Bump
