@@ -2,6 +2,29 @@
 
 # Changelog
 
+## 16.1.2 (2025-10-24)
+
+### Bump
+
+- **version 16.1.1 → 16.1.2**
+
+### Fixes
+
+- **fix subset analysis pipeline and improve documentation clarity**
+  Fix critical ANOVA subset analysis issues and enhance research article clarity.
+  
+  - Fix model name mapping to use slash notation (anthropic/claude-sonnet-4)
+  - Fix quote escaping by switching from df.query() to df.eval()
+  - Add rerun_all_anova_subsets.ps1 with -CompileOnly flag for log compilation
+  - Standardize all paths to forward slashes throughout scripts
+  - Remove significance filter for interaction plots (copy all plots unconditionally)
+  - Add constant factor values to interaction plot filenames to prevent overwrites between subsets
+  - Generate CONSOLIDATED_ANALYSIS_LOG.txt aggregating all 18 subset analysis logs
+  - Improve research article clarity and accuracy
+  - Update sample derivation flow diagram for better accuracy
+  
+  All 18 subset analyses now execute successfully. Consolidated logs enable comprehensive review of all analysis results.
+
 ## 16.1.1 (2025-10-24)
 
 ### Bump
