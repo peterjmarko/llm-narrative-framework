@@ -1,7 +1,8 @@
 graph TD
-    A["Raw ADB Query<br>(N = 10,707)"] --> B{"Stage 1: Deterministic Filtering<br>(Wikipedia Validation, Year Range, Hemisphere, etc.)"};
+    A["Stage 1: Data Sourcing<br>(N = 10,707)"];
+    A --> B["Stage 2: Candidate Qualification<br>(Wikipedia page, birth year, death date, hemisphere, etc.)"];
     B --> C["Eligible Candidates<br>(N = 5,736)"];
-    C --> D{"Stage 2: LLM-based Selection<br>(Smoothed Slope Analysis of OCEAN Score Variance)"};
+    C --> D["Stage 3: LLM-Based Candidate Selection<br>(Smoothed slope analysis of OCEAN score variance)"];
     D --> E["Final Study Sample<br>(N = 4,987)"];
 
     style A fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px

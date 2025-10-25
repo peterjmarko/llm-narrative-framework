@@ -283,7 +283,21 @@ def create_and_save_interaction_plot(df, metric_key, display_metric_name, factor
     
     plt.tight_layout()
     
-    plot_filename = f"interaction_plot_{factors[0]}_x_{factors[1]}_{metric_key}.png"
+    # Build filename with constant factors to avoid overwriting subset analyses
+    # Factor order in filenames: k, mapping_strategy, model
+    # E.g., "interaction_plot_mapping_strategy_x_model_mean_mrr_k_7.png"
+    factor_order = ['k', 'mapping_strategy', 'model']
+    constant_factors = []
+    for factor in factor_order:
+        if factor in df.columns and factor not in factors and df[factor].nunique() == 1:
+            value = df[factor].iloc[0]
+            constant_factors.append(f"{factor}_{value}")
+    
+    # Sort interaction factors by canonical order for consistent filenames
+    sorted_factors = sorted(factors, key=lambda f: factor_order.index(f) if f in factor_order else 999)
+    
+    suffix = f"_{'_'.join(constant_factors)}" if constant_factors else ""
+    plot_filename = f"interaction_plot_{sorted_factors[0]}_x_{sorted_factors[1]}_{metric_key}{suffix}.png"
     
     # 1. Save to the anova results directory
     boxplot_subdir = os.path.join(output_dir, 'boxplots') # Save in the main boxplots dir
@@ -459,15 +473,14 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
             p_val = anova_table.loc[key, 'PR(>F)'] if key in anova_table.index else float('nan')
             create_and_save_plot(df, metric_key, display_metric_name, factor, p_val, output_dir, factor_display_map, project_root)
             
-        # Plot significant interaction effects (for 2-way ANOVA)
+        # Plot interaction effects (for 2-way ANOVA)
         if len(active_factors) == 2:
             interaction_term = f"C({active_factors[0]}):C({active_factors[1]})"
             if interaction_term in anova_table.index:
                 p_val = anova_table.loc[interaction_term, 'PR(>F)']
-                if p_val < 0.05:
-                    logging.info(f"\n--- Generating Interaction Plot for '{interaction_term}' ---")
-                    # Assuming the first factor is the hue and the second is the x-axis
-                    create_and_save_interaction_plot(df, metric_key, display_metric_name, active_factors, p_val, output_dir, factor_display_map, project_root)
+                logging.info(f"\n--- Generating Interaction Plot for '{interaction_term}' ---")
+                # Assuming the first factor is the hue and the second is the x-axis
+                create_and_save_interaction_plot(df, metric_key, display_metric_name, active_factors, p_val, output_dir, factor_display_map, project_root)
 
     except Exception as e:
         logging.error(f"\nERROR: Could not perform analysis for metric '{display_metric_name}'. Reason: {e}")
@@ -523,8 +536,34 @@ def main():
         if hasattr(handler, '_is_study_analyzer_handler'):
             root_logger.removeHandler(handler)
 
+    # --- Single-level Backup of Previous Run (before opening log for writing) ---
+    try:
+        archive_dir = os.path.join(output_dir, 'archive')
+        # List items in the anova/ directory, excluding only the 'archive' subdir
+        items_to_archive = [item for item in os.listdir(output_dir) if item != 'archive']
+        
+        if items_to_archive:
+            logging.info(f"Archiving {len(items_to_archive)} file(s) from previous analysis run...")
+            os.makedirs(archive_dir, exist_ok=True)
+            for item_name in items_to_archive:
+                source_path = os.path.join(output_dir, item_name)
+                destination_path = os.path.join(archive_dir, item_name)
+                
+                # Overwrite existing item in archive to ensure a clean, single-level backup
+                if os.path.exists(destination_path):
+                    if os.path.isdir(destination_path):
+                        shutil.rmtree(destination_path)
+                    else:
+                        os.remove(destination_path)
+                
+                shutil.move(source_path, destination_path)
+            # Archiving done before logging starts, so no message logged here
+    except Exception as e:
+        pass  # Will log warning after handlers are set up
+    # --- End of Backup ---
+
     # Set up the final logging configuration with two distinct handlers.
-    # This must be done BEFORE any logging calls that need to be captured (like archiving).
+    # This must be done AFTER archiving to ensure the old log is backed up.
     # 1. Add a handler for the log file that uses the custom formatter to strip color codes.
     file_handler = logging.FileHandler(log_filepath, mode='w', encoding='utf-8')
     file_handler.setFormatter(ColorStrippingFormatter('%(message)s'))
@@ -545,33 +584,10 @@ def main():
         console_handler._is_study_analyzer_handler = True
         root_logger.addHandler(console_handler)
 
-    # --- Single-level Backup of Previous Run ---
-    try:
-        archive_dir = os.path.join(output_dir, 'archive')
-        # List items in the anova/ directory, excluding the 'archive' subdir and the new log file
-        items_to_archive = [item for item in os.listdir(output_dir) if item not in ['archive', log_filename]]
-        
-        if items_to_archive:
-            logging.info(f"Archiving {len(items_to_archive)} file(s) from previous analysis run...")
-            os.makedirs(archive_dir, exist_ok=True)
-            for item_name in items_to_archive:
-                source_path = os.path.join(output_dir, item_name)
-                destination_path = os.path.join(archive_dir, item_name)
-                
-                # Overwrite existing item in archive to ensure a clean, single-level backup
-                if os.path.exists(destination_path):
-                    if os.path.isdir(destination_path):
-                        shutil.rmtree(destination_path)
-                    else:
-                        os.remove(destination_path)
-                
-                shutil.move(source_path, destination_path)
-            logging.info(f"Previous results moved to: {archive_dir}\n")
-    except Exception as e:
-        logging.warning(f"Could not archive previous results. Reason: {e}")
-    # --- End of Backup ---
-
-    # Logging handlers are now configured earlier in this function.
+    # Now log the archiving results
+    if items_to_archive:
+        logging.info(f"Archiving {len(items_to_archive)} file(s) from previous analysis run...")
+        logging.info(f"Previous results moved to: {archive_dir}\n")
 
     # --- Create Output Subdirectories ---
     factors_from_config = get_config_list(APP_CONFIG, 'Schema', 'factors')

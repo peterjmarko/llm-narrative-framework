@@ -166,7 +166,7 @@ if ([string]::IsNullOrWhiteSpace($OutputName)) {
     $OutputName = "filtered_" + (Get-Date -Format 'yyyyMMdd_HHmmss')
 }
 
-$outputDir = Join-Path $StudyDir "anova_subsets" $OutputName
+$outputDir = (Join-Path $StudyDir "anova_subsets" $OutputName) -replace '\\', '/'
 
 Write-Host "`n================================================" -ForegroundColor Cyan
 Write-Host "Flexible Subset Analysis" -ForegroundColor Cyan
@@ -189,11 +189,14 @@ $filterScript = @"
 import pandas as pd
 import sys
 
+filter_expr = sys.argv[1]
+
 try:
     df = pd.read_csv(r'$masterCsv')
     print(f'\nLoaded: {len(df)} observations', file=sys.stderr)
     
-    filtered = df.query('$Filter')
+    # Evaluate filter expression using df.eval (has access to column names)
+    filtered = df[df.eval(filter_expr)]
     print(f'Filtered to: {len(filtered)} observations ({len(filtered)/len(df)*100:.1f}%)', file=sys.stderr)
     
     if len(filtered) == 0:
@@ -208,7 +211,7 @@ try:
             print(f'  {factor}: {len(unique)} levels - {unique}', file=sys.stderr)
     
     # Save filtered data
-    output_csv = r'$outputDir\STUDY_results.csv'
+    output_csv = r'$outputDir/STUDY_results.csv'
     filtered.to_csv(output_csv, index=False)
     print(f'\nSaved to: {output_csv}', file=sys.stderr)
     
@@ -219,8 +222,8 @@ except Exception as e:
     sys.exit(1)
 "@
 
-# Execute Python script
-$filterScript | pdm run python -
+# Execute Python script - pass filter as argument to avoid quoting issues
+$filterScript | pdm run python - $Filter
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host " FAILED" -ForegroundColor Red
@@ -261,10 +264,10 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "================================================" -ForegroundColor Green
     Write-Host ""
     Write-Host "Results saved to:" -ForegroundColor White
-    Write-Host "  $anovaDir\STUDY_analysis_log.txt" -ForegroundColor Yellow
+    Write-Host "  $($anovaDir -replace '\\', '/')/STUDY_analysis_log.txt" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Boxplots:" -ForegroundColor White
-    Write-Host "  $anovaDir\boxplots\" -ForegroundColor Yellow
+    Write-Host "  $($anovaDir -replace '\\', '/')/boxplots/" -ForegroundColor Yellow
     Write-Host ""
 } else {
     Write-Host ""

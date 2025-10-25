@@ -1,17 +1,12 @@
 # Project Roadmap
 
-This document outlines planned development tasks and tracks known issues for the project. The framework is designed to support two key research activities: the **direct replication** of the original study's findings by using the static data files included in the repository, and the **conceptual replication** of the methodology by generating new data from live sources. All development tasks are categorized by work stream below.
+This document outlines planned tasks categorized by work stream and tracks known issues for the project.
 
 ## Tasks Prior to Publication
 
-### 1. Final Data Generation and Study Execution
-
-  - [ ] Final GraphPad validation
-
-### 2. Final Documentation Polish
+### Final Documentation Polish
 
 - [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
-  - [ ] Double-check for recent publications that should be cited.
   - [ ] Check all tables and diagrams.
   - [ ] Check counts and dates.
   - [ ] Create a permanent Git tag (e.g., `v1.0-publication`) to mark the exact version of the code used to generate the paper's results.
@@ -20,14 +15,18 @@ This document outlines planned development tasks and tracks known issues for the
 
 - [ ] **Establish Public Repository**
   - [ ] Create a public GitHub repository for the project.
-  - [ ] Push all final code, data, and documentation to the repository.
+  - [ ] Create the 'production' branch, 'checkout' the publication version, and 'cherry-pick' the latest 'development' release.
+  - [ ] Tag the latest release as 'public' and push all final code, data, and documentation to the repository. 
+  - [ ] Set the default branch to 'production'.
 - [ ] **Final Co-Author Review**
   - [ ] Provide the co-author with the final manuscript, the live repository link, and a summary of the final results.
   - [ ] Incorporate any final revisions from the co-author and push updates to the repository.
-- [ ] **Update Author Profiles**
-  - [ ] Update ORCID profile with the new publication/project.
+- [ ] **Update Online Author Profiles**
+    - [ ] Update GitHub profile.
+    - [ ] Update ORCID profile with the new publication/project.
 - [ ] **Preprint Publication**
   - [ ] Post the final manuscript to a preprint server like PsyArXiv.
+  - [ ] Tag the latest release as 'preprint'.
 
 ## Journal Submission and Peer Review
 
@@ -47,8 +46,8 @@ This document outlines planned development tasks and tracks known issues for the
   - [ ] Identify suitable Recommenders whose research interests align with the paper.
   - [ ] Prepare the PCI Psychology submission form.
 - [ ] **Submission**
-  - [ ] Submit the completed package to PCI Psychology.
-  - [ ] IF RECOMMENDED (PATH A): Submit with PCI recommendation
+  - [ ] Submit the completed package to PCI Psychology. Tag the latest release as 'pci-submission'.
+  - [ ] IF RECOMMENDED (PATH A): Submit with PCI recommendation. Tag the latest release as 'publication'.
     - [ ] Meta-Psychology (first choice: free, methodological focus)
     - [ ] Collabra: Psychology (second choice: free, PCI-friendly)
     - [ ] Behavior Research Methods (third choice: methodology focus)
