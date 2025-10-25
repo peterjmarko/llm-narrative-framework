@@ -2,6 +2,65 @@
 
 # Changelog
 
+## 16.2.1 (2025-10-25)
+
+### Bump
+
+- **version 16.2.0 → 16.2.1**
+
+### Documentation
+
+- **establish clear document roles, cross-references, and audience guidance across all documentation**
+  Comprehensive documentation alignment establishing clear roles, eliminating duplication, and providing complete cross-references across all core documents.
+  
+  **Cross-Reference Improvements:**
+  - Add "Related Documentation" sections to Replication Guide, Developer's Guide, Testing Guide, Framework Manual, and both data dictionaries
+  - Add data dictionaries to Framework Manual Document Navigation section
+  - Create dedicated "Data Dictionaries" section in Framework Manual with detailed coverage descriptions
+  - Establish bidirectional references between Framework Manual and data dictionaries
+  - Fix path inconsistencies and ensure correct document titles throughout
+  
+  **Audience Clarity:**
+  - Add "Who Should Read This" sections to Replication Guide, Developer's Guide, and Testing Guide
+  - Clearly define primary audiences, use cases, and navigation paths to other documents
+  - Distinguish between researcher, developer, and contributor needs
+  - Provide explicit guidance on when to read each document vs. alternatives
+  
+  **Interactive Learning Tools:**
+  - Add comprehensive "Interactive Learning Tools" section to Replication Guide
+  - Document Layer 3 (Data Preparation Pipeline) and Layer 4 (Experiment Lifecycle) interactive tours
+  - Provide clear commands, learning objectives, duration, and prerequisites for each tour
+  - Position tours as optional educational resources for researchers
+  - Update Testing Guide to acknowledge dual audience (researchers for learning, developers for validation)
+  - Establish clear ownership: Testing Guide owns implementation, Replication Guide references appropriately
+  
+  **Content Deduplication:**
+  - Remove duplicate testing procedures from Developer's Guide
+  - Consolidate testing architecture, philosophy, and procedures into Testing Guide as single source of truth
+  - Replace detailed content in Developer's Guide with concise summaries and Testing Guide references
+  - Maintain essential quick-start info while eliminating redundant explanations
+  
+  **Research Article Clarifications:**
+  - Add framework definition to Introduction section
+  - Add repository URL to abstract for immediate access
+  - Consolidate duplicate "Open Data and Code Availability" sections
+  - Remove redundant section from Methods, enhance final section after Acknowledgements
+  - Reduce repository URL mentions from 5 to 2 (abstract + consolidated section)
+  - Add comprehensive repository contents list with data formats and file descriptions
+  - Clarify "Supplementary Materials" refers to Replication Guide in online repository
+  
+  **Document Structure Standardization:**
+  - Establish consistent structure: Document Navigation  Related Documentation  Who Should Read This  Main content
+  - Clear separation of concerns across all documents
+  - No content duplication, all references bidirectional
+  - Comprehensive navigation paths for all user types (researchers, developers, contributors)
+  
+  All documents now have clear, distinct roles with complete cross-references and no gaps.
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 16.2.0 (2025-10-25)
 
 ### Bump
