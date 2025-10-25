@@ -2,6 +2,41 @@
 
 This document outlines the testing philosophy, procedures, and coverage strategy for the framework. It serves as a guide for developers and a record of the project's quality assurance standards.
 
+## 📚 Related Documentation
+
+- **[👨‍💻 Developer's Guide](../DEVELOPERS_GUIDE.md)** - Development environment setup and contribution workflows (start here if you're new)
+- **[🔬 Replication Guide](REPLICATION_GUIDE.md)** - Step-by-step procedures that these tests validate
+- **[🔧 Framework Manual](FRAMEWORK_MANUAL.md)** - Technical specifications for the system being tested
+- **[📖 README](../README.md)** - Project overview and quick start
+
+---
+
+## 👥 Who Should Read This Document
+
+**Primary Audience:**
+- **Developers** contributing code to the framework
+- **QA Engineers** validating framework correctness
+- **Researchers** wanting to understand validation methodology
+
+**You should read this if you want to:**
+- Understand the testing philosophy and architecture
+- Run the test suite and interpret results
+- Add new tests for new functionality
+- Use interactive tours to learn the framework's workflows
+- Validate statistical analyses against external tools
+
+**You should also read this if you're a researcher who wants:**
+- Educational walkthroughs of the data preparation and experiment workflows (see interactive test modes)
+
+**You should read something else if you want to:**
+- Set up development environment → See **[👨‍💻 Developer's Guide](../DEVELOPERS_GUIDE.md)**
+- Run experiments or replicate the study → See **[🔬 Replication Guide](REPLICATION_GUIDE.md)**
+- Technical specifications → See **[🔧 Framework Manual](FRAMEWORK_MANUAL.md)**
+
+**Note for Researchers**: The interactive test modes (Layer 3 & Layer 4) provide educational walkthroughs of the procedures described in the Replication Guide. While designed as validation tools, they serve as excellent learning resources for understanding the framework's workflows.
+
+---
+
 {{toc}}
 
 ## Testing Philosophy and Architecture
@@ -807,14 +842,21 @@ This category includes end-to-end tests that validate complete workflows from st
 
 ### Interactive Testing Mode
 
-Several integration tests offer an interactive mode that transforms automated validation into educational guided tours. These interactive modes are designed for:
+Several integration tests offer an interactive mode that transforms automated validation into educational guided tours. These interactive modes serve dual purposes:
 
-- **Learning the Framework**: New users can understand how each component works
-- **Documentation Purposes**: Live demonstrations of framework capabilities  
-- **Debugging Workflows**: Step-by-step inspection of complex processes
-- **Training Materials**: Hands-on education for team members
+**For Researchers (Learning):**
+- Understanding how the framework works before running experiments
+- Following along with procedures described in the Replication Guide
+- Hands-on exploration of data preparation and experiment workflows
+- See the **[🔬 Replication Guide](REPLICATION_GUIDE.md)** "Interactive Learning Tools" section for research-focused guidance
 
-Interactive tests pause before each major step, provide detailed explanations of what will happen, and allow users to inspect intermediate results. This makes them invaluable for understanding the framework's internal operations while maintaining the same technical validation as automated tests.
+**For Developers (Validation):**
+- Debugging complex workflows step-by-step
+- Training new team members on framework internals
+- Live demonstrations of framework capabilities
+- Understanding test infrastructure and validation logic
+
+Interactive tests pause before each major step, provide detailed explanations of what will happen, and allow users to inspect intermediate results. This makes them invaluable for both learning the framework's workflows (researchers) and understanding its internal operations (developers), while maintaining the same technical validation as automated tests.
 
 {{diagram:docs/diagrams/test_sandbox_architecture.mmd | scale=2.5 | width=100% | caption=The Integration Test Sandbox Architecture: All integration tests run in a temporary, isolated environment.}}
 

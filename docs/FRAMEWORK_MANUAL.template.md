@@ -12,6 +12,8 @@ This manual is intended for developers, contributors, and researchers who need t
 - **📖 README** (`README.md`) - Quick start guide and feature overview  
 - **🔬 Replication Guide** (`docs/REPLICATION_GUIDE.md`) - Step-by-step procedures for reproducing or extending the study
 - **🔧 Framework Manual** (this document) - Technical specifications and API references
+- **📊 Data Preparation Data Dictionary** (`docs/DATA_PREPARATION_DATA_DICTIONARY.md`) - Detailed file specifications for `data/` directory
+- **📈 Experiment and Study Workflow Data Dictionary** (`docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md`) - Detailed file specifications for `output/` directory
 
 {{toc}}
 
@@ -383,7 +385,23 @@ This logical hierarchy is reflected in the physical layout of the repository:
 
 {{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
 
-Data dictionaries provide detailed explanations for all files: [📁 Data Preparation Data Dictionary](../docs/DATA_PREPARATION_DATA_DICTIONARY.md) covers the `data/` directory, and [📊 Experiment and Study Workflow Data Dictionary](../output/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md) covers the `output/` directory structure and experimental results.
+## Data Dictionaries
+
+For comprehensive file-by-file documentation of all data structures, see the data dictionaries:
+
+- **[📊 Data Preparation Data Dictionary](DATA_PREPARATION_DATA_DICTIONARY.md)** - Complete specifications for the `data/` directory:
+  - Source files (`adb_raw_export.txt`)
+  - Intermediate processing files (`adb_eligible_candidates.txt`, `adb_final_candidates.txt`)
+  - Foundational assets (`point_weights.csv`, `balance_thresholds.csv`, neutralized delineations)
+  - Reports and validation files
+
+- **[📈 Experiment and Study Workflow Data Dictionary](EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md)** - Complete specifications for the `output/` directory:
+  - Experiment hierarchy (Study → Experiment → Replication → Trial)
+  - Result files at each level (`REPLICATION_results.csv`, `EXPERIMENT_results.csv`, `STUDY_results.csv`)
+  - Statistical analysis outputs (`anova/` directory contents)
+  - Log files and metadata
+
+These dictionaries provide the detailed file format specifications that complement the architectural overview presented in this manual.
 
 ## Technical Overview
 

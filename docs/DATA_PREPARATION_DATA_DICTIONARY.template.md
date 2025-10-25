@@ -2,6 +2,15 @@
 
 This document is the **Data Preparation Data Dictionary** for the project. Its purpose is to describe the contents and structure of the `data/` directory, explaining the role of each file in the data preparation and analysis pipelines.
 
+## 📑 Related Documentation
+
+- **[🔧 Framework Manual](FRAMEWORK_MANUAL.md)** - System architecture and technical specifications (see this dictionary for detailed file formats)
+- **[📈 Experiment and Study Workflow Data Dictionary](EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md)** - Specifications for `output/` directory (the next stage after data preparation)
+- **[🔬 Replication Guide](REPLICATION_GUIDE.md)** - Procedures that use these files
+- **[📖 README](../README.md)** - Project overview
+
+---
+
 The `data/` directory provides the foundational inputs for the project's core logic and stores the intermediate artifacts generated during the data preparation phase, as illustrated in the overall project architecture below.
 
 {{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=100% | caption=Project Architecture: The `data/` directory serves as the primary input for the core framework logic.}}

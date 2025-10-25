@@ -16,7 +16,37 @@ This project includes four interconnected documents:
 
 ---
 
-This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers who wish to replicate or extend the original study's findings. For technical specifications, data formats, and API references, please refer to the **[🔧 Framework Manual](docs/FRAMEWORK_MANUAL.md)**.
+This document is the **Replication Guide** that provides supplementary material to the main article, "A Framework for the Computationally Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology." Its purpose is to serve as a detailed, step-by-step guide for researchers who wish to replicate or extend the original study's findings.
+
+## 📚 Related Documentation
+
+- **[🔧 Framework Manual](docs/FRAMEWORK_MANUAL.md)** - Technical specifications, data formats, and API references
+- **[🧪 Testing Guide](docs/TESTING_GUIDE.md)** - Interactive learning tools and validation procedures (see "Interactive Learning Tools" section for educational walkthroughs)
+- **[👨‍💻 Developer's Guide](DEVELOPERS_GUIDE.md)** - For those extending the framework or contributing code
+- **[📊 Data Dictionaries](docs/DATA_PREPARATION_DATA_DICTIONARY.md)** - Detailed file format specifications
+
+For technical specifications, data formats, and API references, please refer to the **[🔧 Framework Manual](docs/FRAMEWORK_MANUAL.md)**.
+
+## 👥 Who Should Read This Document
+
+**Primary Audience:**
+- **Researchers** attempting to reproduce the original study (direct replication)
+- **Researchers** testing robustness with fresh data (methodological replication)
+- **Researchers** extending the framework to new domains (conceptual replication)
+
+**You should read this if you want to:**
+- Understand the complete data preparation pipeline step-by-step
+- Run experiments using the framework
+- Compile and analyze study results
+- Learn the framework's workflows through interactive tours
+
+**You should read something else if you want to:**
+- Quick overview of the project → See **[📖 README](../README.md)**
+- Technical specifications and data formats → See **[🔧 Framework Manual](FRAMEWORK_MANUAL.md)**
+- Contribute code or extend the framework → See **[👨‍💻 Developer's Guide](../DEVELOPERS_GUIDE.md)**
+- Understand the testing strategy → See **[🧪 Testing Guide](TESTING_GUIDE.md)**
+
+---
 
 **What Is This Framework?** The LLM Narrative Framework is an automated testing methodology that uses Large Language Models as pattern-detection engines to perform matching tasks between narrative personality descriptions and biographical profiles, determining whether systematic signals can be detected at rates significantly greater than chance.
 
@@ -133,11 +163,64 @@ The following table summarizes key differences to help you select the appropriat
 - **Choose Methodological** if you want to test whether findings hold with fresh data
 - **Choose Conceptual** if you want to test new hypotheses or apply the framework to new domains
 
+## Interactive Learning Tools
+
+Before diving into the detailed procedures, researchers may benefit from interactive walkthroughs of the framework's workflows. These guided tours provide educational demonstrations of the data preparation and experiment lifecycles.
+
+### Available Interactive Tours
+
+**Data Preparation Pipeline Tour (Layer 3 Interactive)**
+
+A step-by-step walkthrough of the complete data pipeline from raw data to final personality profiles.
+
+**Command:**
+```powershell
+pdm run test-l3-interactive
+```
+
+**What you'll learn:**
+- How the 4-stage pipeline processes data
+- What each script does and how they connect
+- Intermediate file formats and validation checks
+- LLM interaction patterns and candidate selection logic
+
+**Duration:** ~10-15 minutes  
+**Prerequisites:** Configured `.env` file with OpenRouter API key
+
+**Experiment Lifecycle Tour (Layer 4 Interactive)**
+
+A comprehensive demonstration of creating, auditing, corrupting, and repairing experiments.
+
+**Command:**
+```powershell
+pdm run test-l4-interactive
+```
+
+**What you'll learn:**
+- How to create and run experiments
+- How the audit system detects problems
+- How the repair system fixes common issues
+- Complete "Create → Check → Fix → Compile" workflow
+
+**Duration:** ~5-7 minutes  
+**Prerequisites:** Basic framework setup
+
+### Using Interactive Tours
+
+These tours are **optional but highly recommended** for first-time users. They transform validation tests into educational experiences by:
+
+- Pausing before each major step with explanations
+- Allowing inspection of intermediate results
+- Demonstrating the procedures described in this guide
+- Providing hands-on understanding of framework operations
+
+**Note:** These tours are part of the testing infrastructure and run in isolated sandbox environments. They will not modify your production data or experiments. For complete technical details about the testing architecture, see the **[🧪 Testing Guide](docs/TESTING_GUIDE.md)**.
+
+---
+
 ## Production Codebase
 
 The production codebase implements two principal workflows that form the backbone of the research process: the Data Preparation Pipeline and the Experiment & Study Workflow. These workflows are sequentially dependent but architecturally distinct, with the data preparation pipeline creating the foundational datasets that the experiment workflow consumes.
-
-> **Note on Interactive Learning:** A step-by-step "guided tour" of these workflows is available as part of the project's testing harness. These walkthroughs are an excellent way to learn how the various scripts work together. Full instructions for running the tours can be found in the project's **[🧪 Testing Guide](docs/TESTING_GUIDE.md)**.
 
 ### Data Preparation Pipeline
 
@@ -1197,7 +1280,7 @@ This section details the specific models, parameters, and design choices used in
 *Original Study Timeframe Reference:*
 - *Data Generation Pipeline Execution: October 16, 2025*
 - *Main Experimental Runs: October 18-22, 2025*
-- *Final Statistical Analysis: October 22-23, 2025*
+- *Final Statistical Analysis: October 22-25, 2025*
 
 **Model Selection Rationale:**
 

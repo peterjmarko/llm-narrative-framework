@@ -90,15 +90,16 @@ This document outlines planned tasks categorized by work stream and tracks known
   - [ ] Mirror the new `src/` structure in the `tests/` directory to create a parallel test suite.
   - [ ] Move tests for developer utility scripts from `tests/` to a self-contained `scripts/tests/` directory.
   - [ ] Systematically update all import statements and script paths across the entire project to reflect the new structure.
-
+  - [ ] **Known Issue:** `analyze_study_results.py` outputs verbose logging to console even without console handler, likely due to Python's `lastResort` handler. Multiple suppression attempts (NullHandler, CRITICAL+1 level, clearing handlers) have failed. Low priority as analysis completes correctly and logs save properly. May require stderr redirection or fundamental logging redesign.
+  
 - [ ] **Implement Shared Progress Bar Utility**
   - [ ] Create a new utility in `src/utils/` to provide a standardized, shared `tqdm` progress bar.
   - [ ] Refactor `generate_eminence_scores.py` and `generate_ocean_scores.py` to use this shared utility for a consistent user experience during long-running LLM calls.
-- [x] **Implement Interactive Study Parameter Selection**
+- [ ] **Implement Interactive Study Parameter Selection**
   - [x] Restructure `config.ini` to accommodate [Study] parameters
   - [x] Enhance `new_experiment.ps1` to present interactive selection from study design matrix
   - [x] Implement study creation logging for tracking experimental conditions
-  - [x] Update Layer 4 test suite for compatibility
+  - [ ] Update Layer 4 test suite for compatibility
 
 - [ ] **Implement Automated Study Lifecycle Management**
   - [ ] Implement a `new_study.ps1` orchestrator to automate batch creation of all experimental conditions from study design matrix

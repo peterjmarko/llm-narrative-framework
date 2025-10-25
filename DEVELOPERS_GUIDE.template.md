@@ -2,6 +2,36 @@
 
 This document serves as the **Developer's Guide** for the project. Its purpose is to provide clear and comprehensive guidelines for anyone wishing to contribute, covering development environment setup, project standards, and the full contribution workflow.
 
+## 📚 Related Documentation
+
+- **[🧪 Testing Guide](docs/TESTING_GUIDE.md)** - Testing philosophy, test suite details, and validation procedures (essential for contributors)
+- **[🔧 Framework Manual](docs/FRAMEWORK_MANUAL.md)** - Technical specifications and system architecture
+- **[🔬 Replication Guide](docs/REPLICATION_GUIDE.md)** - Step-by-step procedures for running experiments (useful context for understanding workflows)
+- **[📖 README](README.md)** - Quick start and project overview
+
+---
+
+## 👥 Who Should Read This Document
+
+**Primary Audience:**
+- **Contributors** adding new features or fixing bugs
+- **Developers** extending the framework for new use cases
+- **Maintainers** managing releases and project infrastructure
+
+**You should read this if you want to:**
+- Set up a development environment
+- Understand the contribution workflow and code standards
+- Add new dependencies or modify the build process
+- Submit pull requests to the project
+
+**You should read something else if you want to:**
+- Reproduce the original study → See **[🔬 Replication Guide](docs/REPLICATION_GUIDE.md)**
+- Understand the testing strategy → See **[🧪 Testing Guide](docs/TESTING_GUIDE.md)**
+- Technical specifications → See **[🔧 Framework Manual](docs/FRAMEWORK_MANUAL.md)**
+- Quick project overview → See **[📖 README](README.md)**
+
+---
+
 ## Getting Started: Development Environment Setup
 
 This guide provides comprehensive setup instructions for developers. Following these steps ensures your environment is correctly configured with all necessary tools and hooks.
@@ -25,7 +55,7 @@ Before cloning the project, ensure these essential tools are installed on your s
     ```bash
     git clone <repository-url>
     cd <repository-directory>
-    ````
+    ```
 
 2.  **Set the Project's Python Interpreter (Crucial Step)**:
     You must explicitly tell PDM which Python interpreter to use for this project. This prevents conflicts and ensures the local `.venv` is created correctly.
@@ -86,13 +116,13 @@ python -m pdm add new-package-name
 python -m pdm add -G dev new-dev-package-name
 ```
 
-## Getting Acquainted: The Interactive Guided Tours
+## Getting Acquainted with the Codebase
 
-For new contributors, the best way to understand the framework is to use the **Interactive Guided Tours**. These provide step-by-step walkthroughs of the main workflows and are highly recommended first steps for any developer.
+For new contributors, the best way to understand the framework is through a combination of documentation and hands-on exploration:
 
-**Data Preparation Pipeline Tour**: Learn how the framework processes raw data into experimental stimuli. Detailed instructions are available in the **[🧪 Testing Guide (TESTING_GUIDE.md)](TESTING_GUIDE.md)** under the "Data Preparation Pipeline" integration testing section.
-
-**Experiment Lifecycle Tour**: Learn how the framework creates, audits, corrupts, and repairs experiments through the Layer 4 integration test. This demonstrates the complete "Create -> Check -> Fix -> Compile" workflow with 4 distinct corruption scenarios and automated repair. Run with `pdm run test-l4-interactive`.
+1. **Start with the Architecture**: Review the [🔧 Framework Manual](docs/FRAMEWORK_MANUAL.md) to understand system components and data flow
+2. **Explore Interactive Tours**: The [🧪 Testing Guide](docs/TESTING_GUIDE.md) provides interactive walkthroughs of key workflows (Layer 3 & Layer 4 tests)
+3. **Review the Test Suite**: See "Run the Test Suite" section below to understand validation strategies
 
 ## Developer Utilities (`scripts/` folder)
 
@@ -236,16 +266,20 @@ The project's documentation is managed through three distinct methods. For a com
 
 This project includes tests that must pass before a pull request will be merged. The pre-commit hooks do not run these tests automatically, so you must run them manually.
 
-The test suite is organized into four complementary pillars that work together to ensure both scientific validity and software reliability. For a complete overview of the testing strategy, see the Testing Guide.
+The test suite is organized into four complementary pillars: Unit Testing, Integration Testing, Algorithm Validation, and Statistical Validation. For complete details on testing philosophy, procedures, and all available test commands, see the **[🧪 Testing Guide](docs/TESTING_GUIDE.md)**.
 
-{{grouped_figure:docs/diagrams/test_strategy_overview.mmd | scale=2.0 | width=75% | caption=The Four Pillars of the Testing Strategy.}}
-
-*   **Python Tests (Pytest)**: These tests cover the core data processing, analysis, and utility functions in the `src/` directory.
-
-    Use the PDM script shortcut:
-    ````bash
+**Quick Test Commands:**
+    ```bash
+    # Run all tests (Python + PowerShell)
     pdm run test
-    ````
+
+    # Run specific test categories
+    pdm run test-data-prep        # Data preparation unit tests
+    pdm run test-experiment        # Experiment lifecycle unit tests
+    pdm run test-l4-interactive    # Interactive experiment workflow tour
+    ```
+
+For comprehensive testing documentation including test architecture, validation procedures, and all available commands, refer to the Testing Guide.
 
 #### Operation Runner & Audit Logging
 
@@ -277,32 +311,18 @@ The audit logs use JSONL format (one JSON object per line):
 | `pdm run test-l4-interactive` | Experiment Lifecycle Integration (guided tour) |
 | `pdm run test-stats-reporting` | Statistical Analysis Pipeline (GraphPad Prism validation) |
 
-#### How to Write a New Test (Best Practices)
+#### Writing New Tests
 
-Most modules in `src/` are designed as executable scripts. The standard testing pattern for these modules is to **import them directly and call their `main()` function**, rather than running them as a subprocess. This ensures that code coverage is collected reliably.
+When adding tests for new functionality, follow the established patterns in the test suite. For detailed guidance on test structure, best practices, and coverage requirements, see the **[🧪 Testing Guide](docs/TESTING_GUIDE.md)** section on "Writing New Tests".
 
-**All new tests for scripts must follow this pattern:**
-
-1.  **Structure the Script:** Ensure the target script (e.g., `src/my_script.py`) has its core logic inside a `main()` function that returns an exit code (`0` for success, non-zero for failure). The call to `main()` must be protected by an `if __name__ == "__main__":` block.
-
-    ````python
-    # src/my_script.py
-    import sys
-
-    def main():
-        # ... logic for parsing args and running the script ...
-        print("Script finished successfully.")
-        return 0 # Return 0 for success
-
-    if __name__ == "__main__":
-        # This code only runs when the script is executed directly
-        # It does NOT run when the script is imported by a test
-        sys.exit(main())
-    ````
+**Quick Reference:**
+- Unit tests: Use pytest in `tests/` matching `src/` structure
+- Import scripts and call `main()` (not subprocess) for coverage
+- Follow existing test patterns for consistency
 
 2.  **Structure the Test:** In your test file, import the script module and use `unittest.mock.patch` to simulate command-line arguments (`sys.argv`).
 
-    ````python
+    ```python
     # tests/test_my_script.py
     import unittest
     from unittest.mock import patch
@@ -321,7 +341,7 @@ Most modules in `src/` are designed as executable scripts. The standard testing 
             
             # 3. Assert that the script created the expected files or side effects
             # ... your file-based assertions here ...
-    ````
+    ```
 
 This approach is the required standard for maintaining test quality and coverage across the project.
 
