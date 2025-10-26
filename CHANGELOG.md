@@ -2,6 +2,26 @@
 
 # Changelog
 
+## 16.3.0 (2025-10-25)
+
+### Bump
+
+- **version 16.2.1 → 16.3.0**
+
+### Features
+
+- **add config-driven effect size chart system with Goldilocks visualization**
+  Add config-driven effect size chart generation system that produces study-level and consolidated subset visualizations, including the Goldilocks chart showing optimal signal detection at medium task difficulty.
+  
+  - Add generate_consolidated_effect_charts.py to parse CONSOLIDATED_ANALYSIS_LOG.txt and generate cross-subset charts
+  - Update analyze_study_results.py with config-driven filtering to only generate meaningful study-level charts
+  - Add [EffectSizeCharts] configuration section to control chart generation at both levels
+  - Fix console output to accurately report unique chart files created (not operation count)
+  - Fix parsing to skip interaction terms and use subset headers for reliable detection
+  - Add numeric sorting for k values to ensure correct bar order (7, 10, 14)
+  - Document effect size chart generation workflow in Framework Manual
+  - Generate Goldilocks chart showing inverted-U pattern: k=7 (0.25%, ns), k=10 (1.25%, ***), k=14 (0.10%, ns)
+
 ## 16.2.1 (2025-10-25)
 
 ### Bump
