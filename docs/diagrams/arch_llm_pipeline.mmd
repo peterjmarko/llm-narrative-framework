@@ -1,0 +1,61 @@
+graph TB
+    subgraph "Stage 1: Data Sourcing"
+        ADB[("Astro-DatabankRaw Queryn=10,707")]
+    end
+
+    subgraph "Stage 2: Candidate Qualification"
+        QUAL["Automated Filtering• Birth data validation• Wikipedia/Wikidata checks• Hemisphere filtering"]
+        ELIG[("Eligible Candidatesn=5,736")]
+    end
+
+    subgraph "Stage 3: LLM-Based Candidate Selection"
+        LLMA["LLM AGPT-5Eminence Scoring"]
+        LLMB["LLM BClaude 4.5 SonnetOCEAN Scoring"]
+        CUTOFF["Data-Driven CutoffAlgorithmVariance Analysis"]
+        FINAL[("Final Subject Pooln=4,987")]
+    end
+
+    subgraph "Stage 4: Profile Generation"
+        LLMC["LLM CGemini 2.5 ProText Neutralization"]
+        SF["Solar Fire v9.0.3Astrological Export"]
+        ASSEMBLY["Profile AssemblyAlgorithm"]
+        PROFILES[("Neutralized Profilesn=4,987")]
+    end
+
+    subgraph "Stage 5: Evaluation"
+        EVAL["7 Evaluation Models• GPT-4o• DeepSeek Chat v3.1• Gemini 2.0 Flash Lite• Qwen 2.5 72B• Llama 3.3 70B• Mistral Large• Claude Sonnet 4"]
+        EXP["Experimental Runs42 conditions × 30 reps= 1,260 experiments= 100,800 LLM queries"]
+    end
+
+    subgraph "Stage 6: Analysis"
+        RESULTS[("Raw ResultsSimilarity Matrices")]
+        ANALYSIS["Statistical AnalysisMulti-level ANOVABayesian Analysis"]
+        FINDINGS["Published Findings"]
+    end
+
+    ADB --> QUAL
+    QUAL --> ELIG
+    ELIG --> LLMA
+    LLMA --> LLMB
+    LLMB --> CUTOFF
+    CUTOFF --> FINAL
+    FINAL --> SF
+    FINAL --> LLMC
+    SF --> ASSEMBLY
+    LLMC --> ASSEMBLY
+    ASSEMBLY --> PROFILES
+    PROFILES --> EVAL
+    EVAL --> EXP
+    EXP --> RESULTS
+    RESULTS --> ANALYSIS
+    ANALYSIS --> FINDINGS
+
+    classDef dataNode fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    classDef llmNode fill:#fff4e1,stroke:#ff9900,stroke-width:2px
+    classDef processNode fill:#f0f0f0,stroke:#666,stroke-width:1px
+    classDef evalNode fill:#ffe1f5,stroke:#cc0066,stroke-width:2px
+
+    class ADB,ELIG,FINAL,PROFILES,RESULTS dataNode
+    class LLMA,LLMB,LLMC,EVAL llmNode
+    class QUAL,CUTOFF,SF,ASSEMBLY,EXP,ANALYSIS processNode
+    class EVAL evalNode

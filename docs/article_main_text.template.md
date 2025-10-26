@@ -28,11 +28,13 @@ The framework employs distinct LLMs for different stages of data preparation and
 
 To minimize potential data contamination, the seven evaluation models used for the core matching task were selected to be independent from data generation models where possible. Four evaluation models (DeepSeek Chat v3.1, Qwen 2.5 72B, Mistral Large, Llama 3.3 70B) had no prior role in the pipeline. GPT-4o shares a provider with the eminence scoring model but represents a different model entirely. Claude Sonnet 4 is from the same model family as the OCEAN scoring model (Claude 4.5 Sonnet) but differs in version and capabilities. Gemini 2.0 Flash Lite is from the same family as the neutralization model (Gemini 2.5 Pro) but differs substantially in both version and architecture—the 2.0 generation optimizes for speed and structured output while 2.5 Pro emphasizes complex reasoning. These architectural differences and separation in pipeline stages minimize contamination risk. All evaluation models used temperature = 0.0 to maximize response consistency across trials.
 
+{{grouped_figure:docs/diagrams/arch_llm_pipeline.mmd | scale=2.5 | width=70% | caption=Figure 1: System architecture showing distinct LLM roles across the six pipeline stages. LLM A (GPT-5) performs eminence scoring, LLM B (Claude 4.5 Sonnet) generates OCEAN scores, LLM C (Gemini 2.5 Pro) neutralizes astrological text, and seven independent evaluation models perform the matching task. This separation minimizes data contamination risk.}}
+
 #### Sample Population
 
 The framework is designed to support three distinct research paths. For **direct replication**, researchers can use the static data files and randomization seeds included in the project's public repository to ensure computational reproducibility of the original findings. For **methodological replication**, the framework's automated tools can be used to generate a fresh dataset from the live Astro-Databank (ADB) to test the robustness of the findings. Finally, for **conceptual replication**, researchers can modify the framework itself (e.g., by using a different LLM or analysis script) to extend the research.
 
-The final study sample was derived from a multi-stage data preparation pipeline, as illustrated in Figure 1. This section provides a conceptual overview of the workflow; a detailed, step-by-step guide for the entire data preparation pipeline and experiment workflow is available in the **Supplementary Materials** (see Replication Guide in the online repository). The first stage of the pipeline, **Data Sourcing**, involved an initial query of the Astro-Databank (ADB) which selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**. The rationale for these filters is as follows:
+The final study sample was derived from a multi-stage data preparation pipeline, as illustrated in Figure 2. This section provides a conceptual overview of the workflow; a detailed, step-by-step guide for the entire data preparation pipeline and experiment workflow is available in the **Supplementary Materials** (see Replication Guide in the online repository). The first stage of the pipeline, **Data Sourcing**, involved an initial query of the Astro-Databank (ADB) which selected subjects based on three source-level criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the specific **Personal > Death** category to ensure the subject is deceased, and inclusion in the specific eminence category of **Notable > Famous > Top 5% of Profession**. The rationale for these filters is as follows:
 
 *   Accurate birth date and time are required for the astrology program to generate reliable personality descriptions
 *   The use of publicly available data of deceased historical individuals obviates privacy concerns
@@ -40,7 +42,7 @@ The final study sample was derived from a multi-stage data preparation pipeline,
 
 ---
 
-{{grouped_figure:docs/diagrams/flow_sample_derivation.mmd | scale=2.5 | width=65% | caption=Figure 1: Flowchart of the sample derivation process, showing the number of subjects retained at each stage of the data preparation pipeline.}}
+{{grouped_figure:docs/diagrams/flow_sample_derivation.mmd | scale=2.5 | width=60% | caption=Figure 2: Flowchart of the sample derivation process, showing the number of subjects retained at each stage of the data preparation pipeline.}}
 
 The second stage, **Candidate Qualification**, subjected this initial set to a more rigorous automated filtering pass. This pass applied several additional data quality rules, retaining only individuals who: had a death date recorded on their Wikidata page; had passed an automated validation against their English Wikipedia page; were classified as a `Person` and not a `Research` entry; had a birth year between 1900-1999 to minimize cohort-specific confounds (Ryder, 1965), a step which excluded only 0.6% of the raw dataset; had a validly formatted birth time; were not duplicates; and were born in the Northern Hemisphere, which excluded approximately 5% of the remaining records. Checking Wikidata life status of each person was done for two reasons: first, the 'death' attribute in ADB might be incorrect or perhaps indicating the death of another, related individual; second, the aggressive filtering avoids the accidental inclusion of living individuals. The final filter was applied to control for the potential confounding variable of a 180-degree zodiacal shift for Southern Hemisphere births, a well-documented open question in astrology (Lewis, 1994). This multi-step process produced a clean cohort of "eligible candidates."
 
@@ -63,6 +65,12 @@ The lines marked with an asterisk (e.g., `*Moon in Taurus`) are the unique ident
 | :--- | :--- |
 | "Your Sun is in the zodiac sign of Aries indicating that you're an assertive and freedom-loving individual, with a strong need for independence. Others may call you headstrong, but you simply believe that everyone has a right to assert themselves in any situation. Life presents many challenges which you enjoy meeting head-on regardless of the obstacles along the way. You're a natural-born leader.  The ability to focus on one's own goals to the exclusion of others is a healthy trait, but like all things a balance is needed, and you must make sure that you take the time to include others' points of views and modus operandi. On the whole though you handle yourself with aplomb as, astrologically speaking, the Sun is exalted in Aries emphasising the strengths rather than the weaknesses." | "Assertive and freedom-loving, with a strong need for independence. A headstrong quality, coupled with a firm belief in the right to self-assertion. An enjoyment of meeting challenges head-on, regardless of the obstacles. Natural leadership ability. An ability to focus on goals to the exclusion of others, which requires balance and the inclusion of others' points of view and methods. On the whole, a sense of aplomb, with strengths emphasized over weaknesses." |
 
+{{pagebreak}}
+
+The neutralization process is depicted on Figure 3 below.
+
+{{grouped_figure:docs/diagrams/logic_prep_neutralization_simple.mmd | scale=2.0 | width=50% | caption=Figure 3: Text neutralization pipeline implemented via neutralize_delineations.py. The process parses the raw astrological library, processes each component through LLM C (Gemini 2.5 Pro), validates removal of esoteric terminology, and outputs neutralized descriptions while preserving lookup keys for profile assembly.}}
+
 ##### Profile Assembly
 
 For each of the 4,987 test subjects in the final study database, a foundational set of astrological placements was exported from Solar Fire. This structured data included the factors necessary to generate two reports: the "Balances" (Planetary Dominance) report, covering signs, elements, modes (qualities), quadrants, and hemispheres; and the "Chart Points" report, covering the sign placements of the 12 key chart points (Sun through Pluto, Ascendant, and Midheaven). The specific weighting and threshold settings used for the "Balances" report (based on default values) are detailed in the **Supplementary Materials** available in the project's online repository. This foundational set of factors was chosen deliberately to test for a primary signal while minimizing the confounding variables that could arise from more complex astrological techniques, such as planetary aspects or midpoints.
@@ -73,7 +81,9 @@ Each test subject's complete, neutralized personality profile was then programma
 
 All data generation, experiments, and analysis were conducted in October 2025. Specifically, the data preparation pipeline was executed on October 16; the main experimental runs were conducted between October 18-22; and the final analysis was performed on October 22-25. Documenting this specific timeframe is critical for computational reproducibility, as the behavior of the LLMs used in both data generation and evaluation is specific to their versions and states during this period.
 
-The study employed a 2 × 3 × 7 factorial design, as detailed in Table 2. The end-to-end research workflow, from generating data for individual experimental conditions to compiling the final study analysis, is illustrated in Figure 2.
+{{grouped_figure:docs/diagrams/timeline_study_execution.mmd | scale=2.0 | width=100% | caption=Figure 4: Study execution timeline (October 2025). Data preparation completed October 16, experimental runs conducted October 18-22 (1,260 experiments, 100,800 LLM queries), and statistical analysis performed October 22-25. This temporal documentation is critical for computational reproducibility given the time-specific behavior of LLM models.}}
+
+The study employed a 2 × 3 × 7 factorial design, as detailed in Table 2. The end-to-end research workflow, from generating data for individual experimental conditions to compiling the final study analysis, is illustrated in Figure 5.
 
 *Table 2: Experimental Design*
 
@@ -83,7 +93,13 @@ The study employed a 2 × 3 × 7 factorial design, as detailed in Table 2. The e
 | **`k` (Group Size)** | Within-Groups | 3 (`7`, `10`, `14`) |
 | **`model`** | Within-Groups | 7 (Claude Sonnet 4, Gemini 2.0 Flash Lite, Llama 3.3 70B, GPT-4o, DeepSeek Chat v3.1, Qwen 2.5 72B, Mistral Large) |
 
-{{grouped_figure:docs/diagrams/flow_research_workflow.mmd | scale=2.5 | width=85% | caption=Figure 2: The end-to-end research workflow, showing the generation of individual experiments and their final compilation into a study.}}
+The experimentatl design is shown on Figure 5 below.
+
+{{grouped_figure:docs/diagrams/design_factorial_experiment.mmd | scale=2.5 | width=100% | caption=Figure 5: Experimental design structure showing the 2×3×7 factorial arrangement: 2 mapping strategies (correct vs. random) × 3 group sizes (k=7, 10, 14) × 7 evaluation models = 42 conditions, each with 30 replications.}}
+
+Figure 6 below shows an example for generating two experiments and compiling them into a study. 
+
+{{grouped_figure:docs/diagrams/flow_research_workflow.mmd | scale=2.5 | width=75% | caption=Figure 6: The end-to-end research workflow, showing the generation of individual experiments and their final compilation into a study.}}
 
 The factor **`mapping_strategy`** is the core experimental manipulation: a `correct` value means the matching test is evaluated against the true mappings between test subjects and their astrologically derived, neutralized peronality descriptions while a `random` value corresponds to arbitrary mappings between the paired lists, effectively creating a control group for each scenario. The LLMs are blinded to the true mappings.
 
@@ -141,7 +157,7 @@ While most interactions were not significant, the `mapping_strategy × k` intera
 
 A Bayesian analysis of the primary metric (MRR Lift) yielded BF₁₀ ≈ 0.35, providing anecdotal evidence *for the null hypothesis* (i.e., against signal existence) according to conventional standards (Jeffreys, 1961). This creates a statistical tension: the frequentist analysis yielded a significant p-value, while the Bayesian analysis suggests the data are more likely under the null. This apparent contradiction suggests the aggregate effect may not be robust and strongly motivates the multi-level decomposition to investigate whether heterogeneity is being masked by averaging across models (explored further below).
 
-{{grouped_figure:output/studies/publication_run/anova/boxplots/mapping_strategy/boxplot_mapping_strategy_mean_mrr_lift.png | scale=2.5 | width=100% | caption=Figure 3: Aggregate comparison of MRR Lift between correct and random mapping strategies across all models and k-values. The 'correct' mapping condition showed a statistically significant but very small increase in performance over the 'random' condition (*F*(1, 1218) = 18.22, *p* < .001, η² = .003).}}
+{{grouped_figure:output/studies/publication_run/anova/boxplots/mapping_strategy/boxplot_mapping_strategy_mean_mrr_lift.png | scale=2.5 | width=100% | caption=Figure 7: Aggregate comparison of MRR Lift between correct and random mapping strategies across all models and k-values. The 'correct' mapping condition showed a statistically significant but very small increase in performance over the 'random' condition (*F*(1, 1218) = 18.22, *p* < .001, η² = .003).}}
 
 #### Optimal Difficulty Analysis: Identifying the Goldilocks Zone
 
@@ -151,9 +167,9 @@ At k=7 (easiest condition), the main effect of `mapping_strategy` on MRR Lift wa
 
 This Goldilocks pattern demonstrates that the framework requires optimal task calibration: when the task is too easy (k=7), the signal-to-noise ratio may be insufficient to reveal meaningful differences; when too difficult (k=14), noise overwhelms the signal. The k=10 condition represents the optimal difficulty level for this framework and dataset.
 
-{{grouped_figure:output/studies/publication_run/anova/boxplots/k/boxplot_k_mean_mrr_lift.png | scale=2.5 | width=100% | caption=Figure 4: Distribution of MRR Lift values across different group sizes (k). While all three difficulty levels cluster near chance performance (1.0), subsequent subset analyses revealed that k=10 showed the strongest signal detection effect when comparing correct vs. random mappings, demonstrating a Goldilocks pattern where medium difficulty optimizes signal exposure.}}
+{{grouped_figure:output/studies/publication_run/anova/boxplots/k/boxplot_k_mean_mrr_lift.png | scale=2.5 | width=100% | caption=Figure 8: Distribution of MRR Lift values across different group sizes (k). While all three difficulty levels cluster near chance performance (1.0), subsequent subset analyses revealed that k=10 showed the strongest signal detection effect when comparing correct vs. random mappings, demonstrating a Goldilocks pattern where medium difficulty optimizes signal exposure.}}
 
-{{grouped_figure:output/studies/publication_run/anova_subsets/effect_sizes/mapping_strategy_x_k.png | scale=2.5 | width=100% | caption=Figure 5: Goldilocks Effect in LLM Signal Detection. Mapping strategy shows optimal effect size at medium task difficulty (k=10, η²=1.25%, p<.001), with significantly weaker effects at easy (k=7, η²=0.25%, ns) and hard (k=14, η²=0.10%, ns) conditions.}}
+{{grouped_figure:output/studies/publication_run/anova_subsets/effect_sizes/mapping_strategy_x_k.png | scale=2.5 | width=90% | caption=Figure 9: Goldilocks Effect in LLM Signal Detection. Mapping strategy shows optimal effect size at medium task difficulty (k=10, η²=1.25%, p<.001), with significantly weaker effects at easy (k=7, η²=0.25%, ns) and hard (k=14, η²=0.10%, ns) conditions.}}
 
 #### Model Heterogeneity: Extreme Variation in Signal Detection Capability
 
@@ -173,7 +189,13 @@ Individual LLM model analyses at the optimal difficulty level (k=10) revealed ex
 
 This heterogeneity reveals that aggregate findings substantially underestimate framework effectiveness for compatible models while overestimating it for incompatible models. The framework successfully exposes signals through GPT-4o and DeepSeek with large effect sizes, moderately through Gemini, and minimally or not at all through Qwen, Llama, Mistral, and Claude. These findings demonstrate that model architecture significantly moderates framework effectiveness.
 
-{{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/model/boxplot_model_mean_mrr_lift.png | scale=2.5 | width=100% | caption=Figure 6: Model heterogeneity in signal detection at k=10. Effect sizes range from 0.03% (Claude Sonnet 4) to 17.23% (GPT-4o)—a 575-fold variation in sensitivity to correct personality mapping.}}
+{{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/model/boxplot_model_mean_mrr_lift.png | scale=2.5 | width=100% | caption=Figure 10: Model heterogeneity in signal detection at k=10. Effect sizes range from 0.03% (Claude Sonnet 4) to 17.23% (GPT-4o)—a 575-fold variation in sensitivity to correct personality mapping.}}
+
+{{pagebreak}}
+
+Figure 11 below shows the extreme difference in signal detection capability across the models.
+
+{{grouped_figure:docs/diagrams/viz_model_heterogeneity.mmd | scale=2.5 | width=100% | caption=Figure 11: Model heterogeneity summary showing 575-fold variation in signal detection capability at optimal difficulty (k=10). Models demonstrate three tiers: strong detection (GPT-4o, DeepSeek), moderate detection (Gemini), and minimal/no detection (Qwen, Llama, Mistral, Claude). Framework effectiveness requires both compatible architecture (Goldilocks pattern) and optimal task difficulty.}}
 
 #### Signal Detection Trajectories: Goldilocks vs. Flat Patterns
 
@@ -206,7 +228,7 @@ Table 5 summarizes complete trajectories for these representative models.
 
 These trajectory analyses reveal that framework effectiveness requires both optimal difficulty calibration (k=10) and compatible model architecture (GPT-4o, DeepSeek). Having only one requirement satisfied is insufficient: compatible models at suboptimal difficulty show minimal detection (GPT-4o at k=7 or k=14), while incompatible models show minimal detection regardless of difficulty (Claude, Llama at all k levels).
 
-{{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/interaction_plot_mapping_strategy_x_model_mean_mrr_lift_k_10.png | scale=2.5 | width=100% | caption=Figure 7: Model × mapping strategy interaction at k=10, revealing two distinct trajectory patterns. GPT-4o and DeepSeek V3 show pronounced "Goldilocks" sensitivity (large separation between correct and random conditions), while Claude Sonnet 4, Llama 3.3, and Mistral Large exhibit "flat" patterns with minimal discrimination.}}
+{{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/interaction_plot_mapping_strategy_x_model_mean_mrr_lift_k_10.png | scale=2.5 | width=100% | caption=Figure 12: Model × mapping strategy interaction at k=10, revealing two distinct trajectory patterns. GPT-4o and DeepSeek V3 show pronounced "Goldilocks" sensitivity (large separation between correct and random conditions), while Claude Sonnet 4, Llama 3.3, and Mistral Large exhibit "flat" patterns with minimal discrimination.}}
 
 #### Analysis of Presentation Order Bias
 

@@ -1,0 +1,48 @@
+graph TB
+    DESIGN["Experimental Design2 × 3 × 7 Factorial= 42 Conditions30 Replications Each= 1,260 Experiments"]
+    
+    subgraph FACTOR1["Factor 1: Mapping Strategy (Between-Groups)"]
+        CORRECT["✓ Correct Mapping(Test Condition)"]
+        RANDOM["✗ Random Mapping(Control Condition)"]
+    end
+    
+    subgraph FACTOR2["Factor 2: Group Size k (Within-Groups)"]
+        K7["k = 7(Easy)"]
+        K10["k = 10(Medium)"]
+        K14["k = 14(Hard)"]
+    end
+    
+    subgraph FACTOR3["Factor 3: Evaluation Model (Within-Groups)"]
+        M1["GPT-4o"]
+        M2["DeepSeek Chat v3.1"]
+        M3["Gemini 2.0 Flash Lite"]
+        M4["Qwen 2.5 72B"]
+        M5["Llama 3.3 70B"]
+        M6["Mistral Large"]
+        M7["Claude Sonnet 4"]
+    end
+    
+    subgraph OUTPUT["Experimental Output"]
+        TRIALS["80 Trials/Replication× 30 Replications× 42 Conditions= 100,800 LLM Queries"]
+        METRICS["Performance Metrics• MRR Lift• Top-1 Accuracy Lift• Top-3 Accuracy Lift"]
+    end
+    
+    DESIGN ==> FACTOR1
+    DESIGN ==> FACTOR2
+    DESIGN ==> FACTOR3
+    FACTOR1 --> OUTPUT
+    FACTOR2 --> OUTPUT
+    FACTOR3 --> OUTPUT
+    TRIALS --> METRICS
+    
+    classDef designNode fill:#ffffcc,stroke:#cccc00,stroke-width:3px
+    classDef factor1Node fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+    classDef factor2Node fill:#e1e1ff,stroke:#0000cc,stroke-width:2px
+    classDef factor3Node fill:#e1ffe1,stroke:#00cc00,stroke-width:2px
+    classDef outputNode fill:#f0f0f0,stroke:#666,stroke-width:2px
+    
+    class DESIGN designNode
+    class CORRECT,RANDOM factor1Node
+    class K7,K10,K14 factor2Node
+    class M1,M2,M3,M4,M5,M6,M7 factor3Node
+    class TRIALS,METRICS outputNode

@@ -1,0 +1,47 @@
+graph LR
+    TITLE["Model Heterogeneityat k=100.03% to 17.23%575× Variation"]
+    
+    GPT["GPT-4oη² = 17.23%p = .001BF₁₀ = 31.627VERY STRONG"]
+    
+    DEEP["DeepSeek V3.1η² = 11.16%p = .009BF₁₀ = 5.076STRONG"]
+    
+    GEM["Gemini 2.0 Flashη² = 7.63%p = .033BF₁₀ = 1.689MODERATE"]
+    
+    QWEN["Qwen 2.5 72Bη² = 3.93%p = .129 (NS)BF₁₀ = 0.705Weak"]
+    
+    LLAMA["Llama 3.3 70Bη² = 2.77%p = .204 (NS)BF₁₀ = 0.524Minimal"]
+    
+    MISTRAL["Mistral Largeη² = 0.38%p = .590 (NS)BF₁₀ = 0.284Minimal"]
+    
+    CLAUDE["Claude Sonnet 4η² = 0.03%p = .890 (NS)BF₁₀ = 0.265Minimal"]
+    
+    GOLD["Goldilocks PatternPeak at k=10Dropoff at k=7, k=14GPT-4o, DeepSeek"]
+    
+    FLAT["Flat PatternMinimal across all kNo calibration responseClaude, Llama"]
+    
+    TITLE --> GPT
+    TITLE --> DEEP
+    TITLE --> GEM
+    TITLE --> QWEN
+    TITLE --> LLAMA
+    TITLE --> MISTRAL
+    TITLE --> CLAUDE
+    
+    GPT --> GOLD
+    DEEP --> GOLD
+    CLAUDE --> FLAT
+    LLAMA --> FLAT
+    
+    classDef titleNode fill:#ffffcc,stroke:#cccc00,stroke-width:3px,color:#000
+    classDef strongNode fill:#00cc66,stroke:#006633,stroke-width:3px,color:#000
+    classDef moderateNode fill:#99dd99,stroke:#669966,stroke-width:2px,color:#000
+    classDef weakNode fill:#ffdd99,stroke:#cc9933,stroke-width:2px,color:#000
+    classDef minimalNode fill:#ffcccc,stroke:#cc6666,stroke-width:2px,color:#000
+    classDef patternNode fill:#e1e1ff,stroke:#6666cc,stroke-width:2px,color:#000
+    
+    class TITLE titleNode
+    class GPT,DEEP strongNode
+    class GEM moderateNode
+    class QWEN,LLAMA weakNode
+    class MISTRAL,CLAUDE minimalNode
+    class GOLD,FLAT patternNode
