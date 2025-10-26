@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 16.4.0 (2025-10-26)
+
+### Bump
+
+- **version 16.3.0 → 16.4.0**
+
+### Features
+
+- **add missing diagrams for article publication**
+  Add comprehensive diagram suite to complete article documentation and improve visual clarity.
+  
+  - Create arch_llm_pipeline.mmd showing 6-stage pipeline with distinct LLM roles
+  - Create design_factorial_experiment_v2.mmd with portrait layout for 237 factorial design
+  - Create timeline_study_execution.mmd showing October 2025 execution timeline
+  - Create viz_model_heterogeneity.mmd with portrait layout showing 575 variation
+  - Create logic_prep_neutralization_simple.mmd with simplified 4-step neutralization flow
+  - Update article figure numbering from 1-7 to 1-12 to accommodate new diagrams
+  - Add Figure 2: System architecture (arch_llm_pipeline.mmd)
+  - Add Figure 3: Text neutralization pipeline (logic_prep_neutralization_simple.mmd)
+  - Add Figure 4: Study execution timeline (timeline_study_execution.mmd)
+  - Add Figure 5: Experimental design structure (design_factorial_experiment_v2.mmd)
+  - Add Figure 11: Model heterogeneity summary (viz_model_heterogeneity.mmd)
+  - Renumber existing figures 2-7 to figures 6-12
+
 ## 16.3.0 (2025-10-25)
 
 ### Bump
