@@ -597,7 +597,7 @@ The script accepts pandas query expressions:
 
 #### Workflow 7: Rerunning All Subset Analyses
 
-The `rerun_all_anova_subsets.ps1` script automatically reruns all existing subset analyses found in `anova_subsets/`. This is particularly useful after updating analysis code or display names in `config.ini`.
+The `rerun_all_study_subsets.ps1` script automatically reruns all existing subset analyses found in `anova_subsets/`. This is particularly useful after updating analysis code or display names in `config.ini`.
 
 **Key Features:**
 - **Automatic Discovery**: Scans `anova_subsets/` to identify all existing analyses
@@ -609,13 +609,13 @@ The `rerun_all_anova_subsets.ps1` script automatically reruns all existing subse
 **Usage Examples:**
 ````powershell
 # Rerun all subset analyses
-.\rerun_all_anova_subsets.ps1 -StudyDirectory "output/studies/publication_run"
+.\rerun_all_study_subsets.ps1 -StudyDirectory "output/studies/publication_run"
 
 # Preview what would be run (no execution)
-.\rerun_all_anova_subsets.ps1 -StudyDirectory "output/studies/publication_run" -DryRun
+.\rerun_all_study_subsets.ps1 -StudyDirectory "output/studies/publication_run" -DryRun
 
 # Only compile existing logs (no reanalysis)
-.\rerun_all_anova_subsets.ps1 -StudyDirectory "output/studies/publication_run" -CompileOnly
+.\rerun_all_study_subsets.ps1 -StudyDirectory "output/studies/publication_run" -CompileOnly
 ````
 
 **Naming Convention Recognition:**
@@ -636,6 +636,40 @@ The `rerun_all_anova_subsets.ps1` script automatically reruns all existing subse
 - Apply updated analysis methodology to all existing subsets
 - Refresh results after statistical code improvements
 - Create consolidated documentation of all subset findings
+
+#### Workflow 8: Effect Size Chart Generation
+
+The framework generates effect size visualizations at two levels: study-level (main effects) and consolidated subset charts (cross-subset patterns like the Goldilocks effect).
+
+**Configuration** (`config.ini`):
+````ini
+[EffectSizeCharts]
+study_level_main_effects = model
+subset_consolidated_charts = mapping_strategy:k
+subset_chart_metric = mean_mrr_lift
+````
+
+**Study-Level Charts:**
+- **Purpose**: Main effects from full study ANOVA
+- **Location**: `anova/effect_sizes/`
+- **Generation**: Automatic during `compile_study.ps1` or via `--charts-only` flag
+- **Output**: One chart per configured factor (e.g., `model.png`)
+
+**Consolidated Subset Charts:**
+- **Purpose**: Visualize patterns across subsets (e.g., Goldilocks effect showing inverted-U pattern)
+- **Location**: `anova_subsets/effect_sizes/`
+- **Generation**: `pdm run python src/generate_consolidated_effect_charts.py <subsets_dir>`
+- **Input**: Parses `CONSOLIDATED_ANALYSIS_LOG.txt`
+- **Output**: `mapping_strategy_x_k.png` (Goldilocks chart), `mapping_strategy_x_model.png` (model heterogeneity)
+
+**Chart Properties**: Effect size (η²), significance indicators (*** p<.001, ** p<.01, * p<.05), 300 DPI publication-ready
+
+**Scripts Reference:**
+
+| Script | Purpose | Input | Output |
+|--------|---------|-------|--------|
+| `analyze_study_results.py` | Study analysis + charts | STUDY_results.csv | anova/effect_sizes/*.png |
+| `generate_consolidated_effect_charts.py` | Consolidated subset charts | CONSOLIDATED_ANALYSIS_LOG.txt | anova_subsets/effect_sizes/*.png |
 
 {{pagebreak}}
 #### Data Flow Diagram

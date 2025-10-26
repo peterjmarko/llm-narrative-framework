@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Filename: rerun_all_anova_subsets.ps1
+# Filename: rerun_all_study_subsets.ps1
 
 <#
 .SYNOPSIS
@@ -389,4 +389,4 @@ if ($DryRun) {
 
 exit $(if ($failed -gt 0) { 1 } else { 0 })
 
-# === End of rerun_all_anova_subsets.ps1 ===
+# === End of rerun_all_study_subsets.ps1 ===

@@ -307,6 +307,354 @@ def create_and_save_interaction_plot(df, metric_key, display_metric_name, factor
 
     plt.close(fig)
 
+# ==============================================================================
+# EFFECT SIZE CHART GENERATION FUNCTIONS
+# Add these functions after the existing plotting functions (after line ~308)
+# ==============================================================================
+
+def get_stratified_chart_rules(config):
+    """
+    Get stratified chart rules from config.
+    
+    Returns:
+        list of tuples: [(primary_factor, stratify_by_factor), ...]
+    """
+    if not config or 'EffectSizeCharts' not in config:
+        return []
+    
+    rules_str = config.get('EffectSizeCharts', 'stratified_charts', fallback='')
+    if not rules_str.strip():
+        return []
+    
+    rules = []
+    for rule in rules_str.split(','):
+        rule = rule.strip()
+        if ':' in rule:
+            primary, stratify = rule.split(':', 1)
+            rules.append((primary.strip(), stratify.strip()))
+    
+    return rules
+
+def generate_main_effect_chart(factor_name, stats, output_path, factor_display_map):
+    """Generate a bar chart for a single main effect."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    eta_sq = stats['eta_sq']
+    p_value = stats['p_value']
+    
+    # Color based on significance
+    if p_value < 0.001:
+        color = '#4472C4'  # Blue
+    elif p_value < 0.05:
+        color = '#70AD47'  # Green
+    else:
+        color = '#d3d3d3'  # Gray
+    
+    fig, ax = plt.subplots(figsize=(6, 6))
+    
+    # Create bar
+    ax.bar([0], [eta_sq], color=color, edgecolor='black', linewidth=1.5, width=0.4)
+    
+    # Add value label
+    ax.text(0, eta_sq + eta_sq * 0.05, f'η² = {eta_sq:.2f}%', 
+            ha='center', va='bottom', fontsize=12, fontweight='bold')
+    
+    # Add significance
+    if p_value < 0.001:
+        sig = '***'
+    elif p_value < 0.01:
+        sig = '**'
+    elif p_value < 0.05:
+        sig = '*'
+    else:
+        sig = 'ns'
+    ax.text(0, eta_sq * 0.05, sig, ha='center', va='bottom', fontsize=13, fontweight='bold')
+    
+    # Add p-value
+    p_text = f'p < .001' if p_value < 0.001 else f'p = {p_value:.3f}'
+    ax.text(0, -eta_sq * 0.15, p_text, ha='center', va='top', fontsize=10, style='italic')
+    
+    # Formatting
+    display_name = factor_display_map.get(factor_name, factor_name.replace('_', ' ').title())
+    ax.set_ylabel('Effect Size (η²)', fontsize=12, fontweight='bold')
+    ax.set_title(f'Main Effect: {display_name}', fontsize=13, fontweight='bold', pad=15)
+    ax.set_xticks([0])
+    ax.set_xticklabels([display_name])
+    ax.set_xlim(-0.5, 0.5)
+    ax.set_ylim(-eta_sq * 0.2, eta_sq * 1.3)
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    ax.axhline(y=0, color='black', linewidth=0.8)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def extract_stratified_statistics(df, metric_key, primary_factor, stratify_by):
+    """
+    Extract effect sizes for primary_factor at each level of stratify_by.
+    Re-runs ANOVA for each stratum.
+    """
+    import pandas as pd
+    import statsmodels.api as sm
+    from statsmodels.formula.api import ols
+    
+    # Get unique strata values
+    # Get unique strata values with proper sorting
+    strata_raw = df[stratify_by].unique()
+
+    # For numeric columns (like k), ensure numeric sorting
+    if stratify_by == 'k' or all(str(x).replace('.','',1).replace('-','',1).isdigit() for x in strata_raw):
+        strata = sorted(strata_raw, key=lambda x: float(x))
+    else:
+        strata = sorted(strata_raw)
+    
+    if len(strata) < 2:
+        return None
+    
+    results = {}
+    
+    for stratum_value in strata:
+        # Filter data for this stratum
+        stratum_df = df[df[stratify_by] == stratum_value].copy()
+        
+        # Check if primary_factor has variation in this stratum
+        if stratum_df[primary_factor].nunique() <= 1:
+            continue
+        
+        # Determine other factors with variation (for model formula)
+        all_factors = [primary_factor]
+        
+        # Check if 'model' exists and has variation
+        if 'model' in stratum_df.columns and stratum_df['model'].nunique() > 1 and primary_factor != 'model':
+            all_factors.append('model')
+        
+        # Build ANOVA formula
+        formula_factors = ' + '.join([f'C({f})' for f in all_factors])
+        # Use mean_mrr_lift if available, otherwise use the provided metric_key
+        analysis_metric = metric_key
+        if 'mean_mrr_lift' in stratum_df.columns and metric_key == 'mean_mrr':
+            analysis_metric = 'mean_mrr_lift'
+
+        formula = f"Q('{analysis_metric}') ~ {formula_factors}"
+        
+        try:
+            # Fit the model
+            model = ols(formula, data=stratum_df).fit()
+            anova_table = sm.stats.anova_lm(model, typ=2)
+            
+            # Calculate effect sizes (eta-squared)
+            anova_table['eta_sq'] = anova_table['sum_sq'] / anova_table['sum_sq'].sum()
+            
+            # Extract stats for primary factor
+            primary_key = f'C({primary_factor})'
+            if primary_key in anova_table.index:
+                results[stratum_value] = {
+                    'eta_sq': float(anova_table.loc[primary_key, 'eta_sq']) * 100,
+                    'p_value': float(anova_table.loc[primary_key, 'PR(>F)']),
+                    'f_stat': float(anova_table.loc[primary_key, 'F'])
+                }
+        
+        except Exception as e:
+            logging.warning(f"  Warning: Stratified ANOVA failed for {stratify_by}={stratum_value}: {e}")
+            continue
+    
+    if not results:
+        return None
+    
+    return results
+
+def generate_stratified_chart(primary_factor, stratify_by, stratified_stats, 
+                              output_path, factor_display_map):
+    """Generate a comparison chart showing effect sizes across strata."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    # Sort strata
+    # Sort strata (ensure numeric sorting for k values)
+    if all(str(k).replace('.','',1).replace('-','',1).isdigit() for k in stratified_stats.keys()):
+        strata = sorted(stratified_stats.keys(), key=float)
+    else:
+        strata = sorted(stratified_stats.keys())
+    eta_squared = [stratified_stats[s]['eta_sq'] for s in strata]
+    p_values = [stratified_stats[s]['p_value'] for s in strata]
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    # Determine colors - highlight the peak
+    peak_idx = eta_squared.index(max(eta_squared))
+    colors = ['#d3d3d3'] * len(strata)
+    colors[peak_idx] = '#4472C4'
+    
+    # Override with significance colors for non-peak bars
+    for i, p in enumerate(p_values):
+        if i != peak_idx:
+            if p < 0.001:
+                colors[i] = '#4472C4'
+            elif p < 0.05:
+                colors[i] = '#70AD47'
+    
+    # Create bars
+    x_pos = np.arange(len(strata))
+    bars = ax.bar(x_pos, eta_squared, color=colors, edgecolor='black', 
+                  linewidth=1.5, width=0.6)
+    
+    # Add value labels on bars
+    for i, (stratum, eta, p) in enumerate(zip(strata, eta_squared, p_values)):
+        # Add eta-squared value
+        label_y = eta + max(eta_squared) * 0.03
+        ax.text(i, label_y, f'η² = {eta:.2f}%', ha='center', va='bottom', 
+                fontsize=11, fontweight='bold')
+        
+        # Add significance indicator
+        if p < 0.001:
+            sig = '***'
+        elif p < 0.01:
+            sig = '**'
+        elif p < 0.05:
+            sig = '*'
+        else:
+            sig = 'ns'
+        ax.text(i, max(eta_squared) * 0.02, sig, ha='center', va='bottom', 
+                fontsize=12, fontweight='bold')
+    
+    # Formatting
+    primary_display = factor_display_map.get(primary_factor, primary_factor.replace('_', ' ').title())
+    stratify_display = factor_display_map.get(stratify_by, stratify_by.replace('_', ' ').title())
+    
+    ax.set_xlabel(stratify_display, fontsize=12, fontweight='bold')
+    ax.set_ylabel(f'Effect Size (η²) for {primary_display}', fontsize=12, fontweight='bold')
+    ax.set_title(f'{primary_display} Effect Across {stratify_display}', 
+                 fontsize=13, fontweight='bold', pad=15)
+    
+    ax.set_xticks(x_pos)
+    
+    # Format x-axis labels
+    labels = []
+    for s in strata:
+        if stratify_by == 'k':
+            # Convert to int for comparison if numeric
+            k_val = int(float(s)) if str(s).replace('.','',1).isdigit() else s
+            if k_val == 7:
+                labels.append('k=7\n(Easy)')
+            elif k_val == 10:
+                labels.append('k=10\n(Medium)')
+            elif k_val == 14:
+                labels.append('k=14\n(Hard)')
+            else:
+                labels.append(f'k={k_val}')
+        elif stratify_by == 'model':
+            # For model labels, get display name
+            display_name = factor_display_map.get(s, str(s))
+            # Truncate very long names
+            if len(display_name) > 18:
+                display_name = display_name[:16] + '...'
+            labels.append(display_name)
+        else:
+            labels.append(str(s))
+
+    # Rotate labels if stratifying by model (many labels)
+    if stratify_by == 'model':
+        ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=9)
+    else:
+        ax.set_xticklabels(labels)
+    
+    y_max = max(eta_squared) * 1.25
+    ax.set_ylim(0, y_max)
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    ax.axhline(y=0, color='black', linewidth=0.8)
+    
+    # Add note about significance
+    fig.text(0.99, 0.01, '*** p < .001, ** p < .01, * p < .05, ns = not significant', 
+             ha='right', va='bottom', fontsize=9, style='italic')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def generate_effect_size_charts(df, anova_table, metric_key, active_factors, output_dir, factor_display_map):
+    """
+    Generate effect size charts for all factors.
+    Called after ANOVA is complete.
+    """
+    # Create output directory
+    effect_sizes_dir = os.path.join(output_dir, 'effect_sizes')
+    os.makedirs(effect_sizes_dir, exist_ok=True)
+    
+    logging.info("\n--- Generating Effect Size Charts ---")
+    
+    # Extract effect sizes from ANOVA table
+    factor_stats = {}
+    for factor in active_factors:
+        key = f'C({factor})'
+        if key in anova_table.index:
+            factor_stats[factor] = {
+                'eta_sq': float(anova_table.loc[key, 'eta_sq']) * 100,  # Convert to percentage
+                'p_value': float(anova_table.loc[key, 'PR(>F)']),
+                'f_stat': float(anova_table.loc[key, 'F'])
+            }
+    
+    if not factor_stats:
+        logging.info("  No effect sizes to visualize.")
+        return
+    
+    # 1. Generate main effect charts (only for configured factors)
+    allowed_factors = get_config_list(APP_CONFIG, 'EffectSizeCharts', 'study_level_main_effects')
+    if not allowed_factors:
+        allowed_factors = []  # Generate none if not configured
+    
+    charts_generated = 0
+    
+    for factor, stats in factor_stats.items():
+        if factor not in allowed_factors:
+            logging.info(f"  -> Skipping main effect chart for '{factor}' (not in study_level_main_effects)")
+            continue
+        
+        output_path = os.path.join(effect_sizes_dir, f'{factor}.png')
+        try:
+            generate_main_effect_chart(factor, stats, output_path, factor_display_map)
+            logging.info(f"  -> Main effect chart saved: {factor}.png")
+            charts_generated += 1
+        except Exception as e:
+            logging.warning(f"  Warning: Could not generate chart for {factor}: {e}")
+    
+    # 2. Generate stratified charts (if configured for study level)
+    stratified_rules_str = APP_CONFIG.get('EffectSizeCharts', 'study_level_stratified_charts', fallback='')
+    stratified_rules = []
+    if stratified_rules_str.strip():
+        for rule in stratified_rules_str.split(','):
+            rule = rule.strip()
+            if ':' in rule:
+                primary, stratify = rule.split(':', 1)
+                stratified_rules.append((primary.strip(), stratify.strip()))
+    
+    if stratified_rules:
+        for primary, stratify in stratified_rules:
+            # Check if both factors are present
+            if primary not in active_factors or stratify not in active_factors:
+                continue
+            
+            try:
+                # Extract stratified statistics by re-analyzing data
+                stratified_stats = extract_stratified_statistics(df, metric_key, primary, stratify)
+                
+                if stratified_stats:
+                    output_filename = f'{primary}_x_{stratify}.png'
+                    output_path = os.path.join(effect_sizes_dir, output_filename)
+                    
+                    generate_stratified_chart(primary, stratify, stratified_stats, 
+                                            output_path, factor_display_map)
+                    
+                    logging.info(f"  -> Stratified chart saved: {output_filename}")
+                else:
+                    logging.info(f"  -> Skipped {primary}_x_{stratify}.png (insufficient variation in strata)")
+            
+            except Exception as e:
+                logging.warning(f"  Warning: Could not generate stratified chart {primary}_x_{stratify}: {e}")
+    
+    return charts_generated
+
+
 def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized_to_display_map, metric_display_map, factor_display_map):
     """Performs a full statistical analysis for a single metric."""
     display_metric_name = metric_display_map.get(metric_key, metric_key)
@@ -474,9 +822,142 @@ def perform_analysis(df, metric_key, all_possible_factors, output_dir, sanitized
                 logging.info(f"\n--- Generating Interaction Plot for '{interaction_term}' ---")
                 # Assuming the first factor is the hue and the second is the x-axis
                 create_and_save_interaction_plot(df, metric_key, display_metric_name, active_factors, p_val, output_dir, factor_display_map)
+        
+        # Generate effect size charts
+        generate_effect_size_charts(df, anova_table, metric_key, active_factors, output_dir, factor_display_map)
 
     except Exception as e:
         logging.error(f"\nERROR: Could not perform analysis for metric '{display_metric_name}'. Reason: {e}")
+
+def regenerate_charts_only(base_dir, output_dir):
+    """Regenerate effect size charts from existing ANOVA log."""
+    import re
+    import pandas as pd
+    
+    print("\n" + "="*80)
+    print("REGENERATING EFFECT SIZE CHARTS ONLY")
+    print("="*80 + "\n")
+    
+    # Load the existing analysis log
+    log_path = os.path.join(output_dir, 'STUDY_analysis_log.txt')
+    if not os.path.exists(log_path):
+        print(f"ERROR: Analysis log not found at {log_path}")
+        print("Run full analysis first (without --charts-only)")
+        sys.exit(1)
+    
+    # Load STUDY_results.csv
+    csv_path = find_master_csv(base_dir)
+    if not csv_path:
+        print("ERROR: STUDY_results.csv not found")
+        sys.exit(1)
+    
+    df = pd.read_csv(csv_path)
+    print(f"Loaded {len(df)} rows from {csv_path}")
+    
+    # Load config
+    print("Loading configuration and parsing analysis log...")
+    try:
+        normalization_map = get_config_section_as_dict(APP_CONFIG, 'ModelNormalization')
+        display_name_map = get_config_section_as_dict(APP_CONFIG, 'ModelDisplayNames')
+        metric_display_map = get_config_section_as_dict(APP_CONFIG, 'MetricDisplayNames')
+        factor_display_map = get_config_section_as_dict(APP_CONFIG, 'FactorDisplayNames')
+        factors = get_config_list(APP_CONFIG, 'Schema', 'factors')
+        metrics = get_config_list(APP_CONFIG, 'Schema', 'metrics')
+    except Exception as e:
+        print(f"ERROR: Could not load config: {e}")
+        sys.exit(1)
+    
+    # Normalize model names (same as main analysis)
+    keyword_to_canonical_map = {kw.strip(): can for can, kws in normalization_map.items() for kw in kws.split(',')}
+    if 'model' in df.columns:
+        df['model_canonical'] = df['model'].apply(lambda name: next((can for kw, can in keyword_to_canonical_map.items() if kw in str(name)), str(name)))
+        df['model_display'] = df['model_canonical'].map(display_name_map).fillna(df['model_canonical'])
+        df['model'] = df['model_canonical'].str.replace(r'[/.-]', '_', regex=True)
+    
+    for factor in factors:
+        if factor in df.columns:
+            df[factor] = df[factor].astype(str)
+    
+    # Parse the log to extract ANOVA results for each metric
+    with open(log_path, 'r') as f:
+        log_content = f.read()
+    
+    # Find all metric sections
+    metric_pattern = r'ANALYSIS FOR METRIC: \'([^\']+)\''
+    metric_matches = list(re.finditer(metric_pattern, log_content))
+    
+    print(f"Found {len(metric_matches)} metrics in analysis log\n")
+    
+    charts_generated_set = set()  # Track unique chart files
+    metrics_processed = 0
+    
+    for i, match in enumerate(metric_matches):
+        metric_display_name = match.group(1)
+        
+        # Find the corresponding metric_key
+        metric_key = None
+        for key, display in metric_display_map.items():
+            if display == metric_display_name:
+                metric_key = key
+                break
+        
+        if not metric_key or metric_key not in df.columns:
+            continue
+        
+        metrics_processed += 1
+        
+        # Extract the ANOVA section for this metric
+        start_pos = match.end()
+        end_pos = metric_matches[i + 1].start() if i + 1 < len(metric_matches) else len(log_content)
+        section = log_content[start_pos:end_pos]
+        
+        # Parse ANOVA table to get effect sizes
+        anova_pattern = r'C\((\w+)\)\s+[\d.]+\s+[\d.]+\s+[\d.]+\s+([\d.eE+-]+)\s+([\d.]+)'
+        
+        anova_matches = re.findall(anova_pattern, section)
+        if not anova_matches:
+            continue
+        
+        # Build anova_table-like structure
+        active_factors = []
+        anova_data = {}
+        
+        for factor, p_value, eta_sq in anova_matches:
+            if factor in factors:  # Only include actual factors, not interactions
+                active_factors.append(factor)
+                factor_key = f'C({factor})'
+                anova_data[factor_key] = {
+                    'eta_sq': float(eta_sq),  # Already as decimal (0.0125 not 1.25%)
+                    'PR(>F)': float(p_value),
+                    'F': 0.0,  # Not needed for chart generation
+                    'sum_sq': 0.0,  # Not needed but expected by some code paths
+                    'df': 0.0
+                }
+        
+        # Create ANOVA table with proper structure (Series for each column)
+        anova_table = pd.DataFrame(anova_data).T  # Transpose to get factors as rows
+        
+        # Generate charts
+        try:
+            num_charts = generate_effect_size_charts(df, anova_table, metric_key, active_factors, output_dir, factor_display_map)
+            if num_charts and num_charts > 0:
+                # Track which chart files were created
+                allowed_factors = get_config_list(APP_CONFIG, 'EffectSizeCharts', 'study_level_main_effects')
+                for factor in allowed_factors:
+                    if factor in active_factors:
+                        charts_generated_set.add(f"{factor}.png")
+                print(f"  ✓ {metric_display_name}")
+            else:
+                print(f"  → {metric_display_name} (skipped)")
+        except Exception as e:
+            print(f"  ✗ {metric_display_name}: {e}")
+    
+    print("\n" + "="*80)
+    print(f"COMPLETE: Processed {metrics_processed} metrics, generated {len(charts_generated_set)} unique chart file(s)")
+    print(f"Chart files: {', '.join(sorted(charts_generated_set))}")
+    print(f"Location: {output_dir}/effect_sizes/")
+    print("="*80 + "\n")
+
 
 def main():
     """Main entry point for the ANOVA analysis script."""
@@ -499,6 +980,8 @@ def main():
     )
     parser.add_argument("study_directory", help="Path to the top-level study directory containing the master CSV.")
     parser.add_argument('--config-path', type=str, default=None, help=argparse.SUPPRESS) # For testing
+    parser.add_argument('--charts-only', action='store_true', 
+                       help='Regenerate effect size charts only (skips ANOVA re-analysis)')
     args = parser.parse_args()
 
     if args.config_path:
@@ -513,6 +996,11 @@ def main():
     base_dir = os.path.abspath(args.study_directory)
     output_dir = os.path.join(base_dir, 'anova')
     os.makedirs(output_dir, exist_ok=True)
+    
+    # If charts-only mode, regenerate charts and exit
+    if args.charts_only:
+        regenerate_charts_only(base_dir, output_dir)
+        return
 
     # Set up logging configuration early to capture all messages
     log_filename = 'STUDY_analysis_log.txt'
