@@ -2,6 +2,41 @@
 
 # Changelog
 
+## 16.4.1 (2025-10-26)
+
+### Bump
+
+- **version 16.4.0 → 16.4.1**
+
+### Fixes
+
+- **correct computational reproducibility claims and address reviewer concerns**
+  Correct false reproducibility claims and enhance methodological transparency across all documentation.
+  
+  Major corrections:
+  - Remove false claims about randomization seeds (base_seed=42, qgen_base_seed=123) - seeds were not used in original study
+  - Change "computational reproducibility" to "methodologically reproducible" throughout documentation
+  - Remove claims of "bit-for-bit" or "exact" reproducibility - LLM APIs are inherently non-deterministic at temperature=0.0
+  - Add honest limitations section explaining LLM response variance and appropriate reproducibility standards
+  - Simplify article title from "Computationally Reproducible" to "Reproducible"
+  
+  Reviewer concern enhancements:
+  - Add Barnum effect validation script with TF-IDF diversity analysis (mean cosine similarity: 0.029)
+  - Document complete pilot model selection table (42 models tested)
+  - Enhance multi-level decomposition explanation for aggregate statistics
+  - Expand LLM contamination risk discussion with empirical evidence
+  - Clarify temperature=0.0 justification for evaluation benchmarks
+  - Document objective cutoff procedure independence from experimental outcomes
+  - Add FDR-corrected p-values and multiple comparisons documentation
+  
+  Files affected:
+  - Article: 10 fixes (title, abstract, methods, discussion, conclusion, data availability)
+  - Replication Guide: 8 fixes including major section replacement (lines 1113-1220)
+  - Framework Manual: 2 terminology corrections
+  - New validation assets: Barnum diversity script, pilot models table
+  
+  This establishes honest, scientifically accurate reproducibility claims appropriate for LLM-based research while maintaining methodological validity.
+
 ## 16.4.0 (2025-10-26)
 
 ### Bump
