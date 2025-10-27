@@ -184,6 +184,13 @@ test-ps-all = {shell = "python scripts/maintenance/operation_runner.py test-ps-a
 test-ps-exp = {composite = ["test-ps-new-exp", "test-ps-audit-exp", "test-ps-fix-exp"], help = "Run all PowerShell tests for the experiment workflow."}
 test-exp-all = {composite = ["test-exp-lc", "test-ps-exp"], help = "Run all Python and PowerShell tests for the experiment workflow."}
 
+# ==========================================
+# === POST-PRODUCTION DIVERSITY ANALYSIS ===
+# ==========================================
+validate-diversity = "python scripts/analysis/analyze_neutralized_library_diversity.py"
+
+# ---
+
 [dependency-groups]
 dev = [
     "pytest",

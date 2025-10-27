@@ -45,8 +45,8 @@ np.random.seed(42)
 
 # Project paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-OUTPUT_DIR = PROJECT_ROOT / "output" / "validation_reports"
-DATA_DIR = PROJECT_ROOT / "data" / "archive" / "neutralized_delineations"
+OUTPUT_DIR = PROJECT_ROOT / "data" / "reports"
+DATA_DIR = PROJECT_ROOT / "data" / "foundational_assets" / "neutralized_delineations"
 
 
 def load_all_components():

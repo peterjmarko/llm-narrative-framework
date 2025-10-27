@@ -1085,6 +1085,30 @@ The two workflows are connected through well-defined data interfaces, with the o
 
 {{grouped_figure:docs/diagrams/flow_experiment_study_workflow.mmd | scale=2.0 | width=35% | caption=Figure S3: Experiment & Study Workflow. The workflow uses personalities_db.txt to run experiments and compile study results.}}
 
+#### Statistical Analysis and Visualization
+
+The final step of the research workflow is orchestrated by the `compile_study.ps1` script, which automates the aggregation of all experiment data and the execution of the final statistical analysis via `analyze_study_results.py`. This process consumes the individual `EXPERIMENT_results.csv` files from each experimental condition and produces a comprehensive set of publication-ready artifacts in a new `anova/` subdirectory within your study folder.
+
+The key outputs include:
+
+*   **`STUDY_results.csv`**: A master CSV file aggregating all trial data from every experiment in the study.
+*   **`STUDY_analysis_log.txt`**: A detailed text file containing descriptive statistics, full ANOVA tables, post-hoc test results (e.g., Tukey HSD), and Bayesian analysis for each performance metric.
+*   **Diagnostic Plots**: Q-Q plots of residuals for each ANOVA model are saved to the `anova/diagnostics/` directory to allow for visual inspection of statistical assumptions.
+*   **Boxplots and Interaction Plots**: A series of boxplots visualizing main effects and interaction plots for significant two-way interactions are saved to the `anova/boxplots/` directory.
+
+##### Automated Effect Size Chart Generation
+
+A crucial output of the analysis pipeline is the automated generation of **Effect Size Charts**. These charts visualize the magnitude of each factor's influence on the performance metrics, providing a more intuitive understanding of the results than p-values alone. The charts are designed to clearly communicate the practical significance of the findings by plotting the **Eta-squared (η²)** value, which represents the proportion of variance in the outcome that can be explained by a given factor.
+
+The generation of these charts is controlled by the `[EffectSizeCharts]` section in `config.ini`, allowing you to specify which charts are relevant for your study. Two types of charts can be generated:
+
+1.  **Main Effect Charts**: A simple bar chart showing the overall effect size for a single factor (e.g., the effect of `mapping_strategy` across all conditions).
+2.  **Stratified Charts**: A more detailed comparison chart that shows how the effect size of a primary factor changes across the different levels of a second factor (e.g., showing the effect of `model` stratified by each `k` value).
+
+All generated effect size charts are saved to the `output/studies/<Your_Study_Name>/anova/effect_sizes/` directory.
+
+{{grouped_figure:docs/images/effect_size_chart_example.png | scale=1.0 | width=50% | caption=Figure S4: Example of an Automated Effect Size Chart. This chart visualizes the main effect of a fa
+
 ## Replication Procedures
 
 ### Direct Replication Procedure
@@ -1541,7 +1565,7 @@ This section details the specific models, parameters, and design choices used in
 | Purpose | Model Name | API Identifier | Provider | Parsing |
 | :--- | :--- | :--- | :--- | :--- |
 | Evaluation 1 (LLM D1) | Claude Sonnet 4 | `anthropic/claude-sonnet-4` | Anthropic | High |
-| Evaluation 2 (D2) | Gemini 2.5 Flash Lite | `google/gemini-2.5-flash-lite` | Google | ⚠️ Partial* |
+| Evaluation 2 (D2) | Gemini 2.0 Flash Lite | `google/gemini-2.0-flash-lite-001` | Google | High |
 | Evaluation 3 (LLM D3) | Llama 3.3 70B Instruct | `meta-llama/llama-3.3-70b-instruct` | Meta | High |
 | Evaluation 4 (LLM D4) | GPT-4o | `openai/gpt-4o` | OpenAI | High |
 

@@ -298,15 +298,15 @@ def process_markdown_content(content, project_root, template_path_str, flavor='v
                     key, value = pair.split('=', 1)
                     attr_dict[key.strip().lower()] = value.strip()
 
+        # Generate a standard Pandoc attributes string (e.g., {width="50%"})
         pandoc_attr_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
-        # Prepend the class for centering directly into the attributes block
-        pandoc_attributes_string = "{.CenteredImage " + " ".join(pandoc_attr_parts) + "}"
+        pandoc_attributes_string = "{" + " ".join(pandoc_attr_parts) + "}" if pandoc_attr_parts else ""
 
         if raw_pandoc_info_only:
             return pandoc_image_path, pandoc_attributes_string
 
         if current_flavor == 'pandoc':
-            # Apply the attributes directly to the image element
+            # Generate clean, standard Markdown. Styling is now fully handled by the reference doc.
             return f"![]({pandoc_image_path}){pandoc_attributes_string}"
         else: # 'viewer' flavor
             html_attrs_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k != 'scale']
@@ -338,12 +338,11 @@ def process_markdown_content(content, project_root, template_path_str, flavor='v
         diagram_specific_attrs = '|'.join([f'{k}={v}' for k, v in attr_dict.items() if k not in ['caption']])
         
         # Call _render_single_diagram with the new flag to get path and attributes string.
-        # The helper function now correctly includes the .CenteredImage class.
         diagram_image_path, diagram_attributes_string = _render_single_diagram(diagram_source_rel_path, diagram_specific_attrs, current_flavor='pandoc', raw_pandoc_info_only=True)
 
         if current_flavor == 'pandoc':
-            # For DOCX, use Pandoc's native figure syntax with the attributes applied directly.
-            return f"![{caption_text}]({diagram_image_path}){diagram_attributes_string}"
+            # Wrap the entire captioned figure in the custom-style div.
+            return f'\n::: {{custom-style="CenteredImage"}}\n![{caption_text}]({diagram_image_path}){diagram_attributes_string}\n:::\n'
         else: # viewer flavor
             # For MD viewers, render as an HTML block for center alignment and clarity.
             html_attrs_parts = [f'{k}="{v}"' for k, v in attr_dict.items() if k not in ['scale', 'caption']]
@@ -811,31 +810,38 @@ def main():
                 if do_force_documents or not os.path.exists(output_path) or resolved_source in rebuilt_md_files:
                     should_build = True
                 elif os.path.exists(output_path):
-                    # Check if the source MD file is newer than the DOCX file
                     source_mtime = os.path.getmtime(source_path)
                     docx_mtime = os.path.getmtime(output_path)
-                    # Use >= instead of > to catch files updated in the same second
+                    
+                    # 1. Check if the source MD file is newer
                     if source_mtime >= docx_mtime:
                         should_build = True
                     
-                    # Also check if any diagram images referenced in the MD are newer
-                    try:
-                        with open(source_path, 'r', encoding='utf-8') as f:
-                            md_content = f.read()
-                        
-                        # Check for diagram references
-                        placeholder_regex = r'\{\{(?:diagram|grouped_figure):(.+?)(?:\||\})'
-                        for match in re.finditer(placeholder_regex, md_content):
-                            diagram_source_rel_path = match.group(1).strip()
-                            base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
-                            image_path = os.path.join(project_root, 'docs', 'images', f"{base_name}.png")
+                    # 2. Check if the reference DOCX template is newer
+                    reference_docx_path = os.path.join(project_root, 'docs', 'custom_reference.docx')
+                    if not should_build and os.path.exists(reference_docx_path):
+                        ref_mtime = os.path.getmtime(reference_docx_path)
+                        if ref_mtime > docx_mtime:
+                            print(f"      - Stale: '{os.path.basename(output_path)}' is older than the reference style template.")
+                            should_build = True
+
+                    # 3. Also check if any diagram images referenced in the MD are newer
+                    if not should_build:
+                        try:
+                            with open(source_path, 'r', encoding='utf-8') as f:
+                                md_content = f.read()
                             
-                            if os.path.exists(image_path) and os.path.getmtime(image_path) > docx_mtime:
-                                should_build = True
-                                break
-                    except (OSError, FileNotFoundError):
-                        # If we can't read the source file, rebuild to be safe
-                        should_build = True
+                            placeholder_regex = r'\{\{(?:diagram|grouped_figure):(.+?)(?:\||\})'
+                            for match in re.finditer(placeholder_regex, md_content):
+                                diagram_source_rel_path = match.group(1).strip()
+                                base_name = os.path.splitext(os.path.basename(diagram_source_rel_path))[0]
+                                image_path = os.path.join(project_root, 'docs', 'images', f"{base_name}.png")
+                                
+                                if os.path.exists(image_path) and os.path.getmtime(image_path) > docx_mtime:
+                                    should_build = True
+                                    break
+                        except (OSError, FileNotFoundError):
+                            should_build = True
 
                 if not should_build:
                     print(f"    - Skipping DOCX conversion for {Colors.CYAN}{output_filename}{Colors.RESET} (up-to-date).")

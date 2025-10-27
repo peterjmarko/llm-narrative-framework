@@ -638,6 +638,46 @@ The `rerun_all_study_subsets.ps1` script automatically reruns all existing subse
 
 #### Workflow 8: Effect Size Chart Generation
 
+The framework generates effect size visualizations at two levels: study-level (main effects from the primary ANOVA) and consolidated subset charts (for visualizing patterns across multiple subset analyses, such as the Goldilocks effect).
+
+**Configuration** (`config.ini`):
+The generation of all effect size charts is controlled by the `[EffectSizeCharts]` section.
+```ini
+[EffectSizeCharts]
+# Generate a main effect chart for the 'model' factor from the main study ANOVA
+study_level_main_effects = model
+
+# Define rules for creating consolidated charts from subset analyses.
+# Format is primary_factor:stratifying_factor
+subset_consolidated_charts = mapping_strategy:k, mapping_strategy:model
+
+# Specify the metric to use for the y-axis on consolidated charts
+subset_chart_metric = mean_mrr_lift
+```
+
+**Study-Level Charts:**
+- **Purpose**: Visualize the main effects calculated from the full study's primary ANOVA.
+- **Location**: `output/studies/<StudyName>/anova/effect_sizes/`
+- **Generation**: These charts are generated automatically by `analyze_study_results.py` during the `compile_study.ps1` workflow. They can be regenerated independently by running `analyze_study_results.py` with the `--charts-only` flag.
+- **Output**: One chart per factor configured in `study_level_main_effects` (e.g., `model.png`).
+
+**Consolidated Subset Charts:**
+- **Purpose**: Visualize patterns that emerge across a series of subset analyses. For example, plotting the effect size of `mapping_strategy` at each level of `k` to visualize the Goldilocks effect.
+- **Location**: `output/studies/<StudyName>/anova_subsets/effect_sizes/`
+- **Generation**: These charts are generated on-demand by running `src/generate_consolidated_effect_charts.py` and pointing it at a directory containing the `CONSOLIDATED_ANALYSIS_LOG.txt` produced by the `rerun_all_study_subsets.ps1` workflow.
+- **Input**: The script parses the consolidated analysis log file.
+- **Output**: One chart per rule defined in `subset_consolidated_charts` (e.g., `mapping_strategy_x_k.png`, `mapping_strategy_x_model.png`).
+
+**Chart Properties**: All charts are generated as 300 DPI, publication-ready PNG files. They include the effect size (η²), p-value, and standard significance indicators (*** p<.001, ** p<.01, * p<.05).
+
+**Scripts Reference:**
+
+| Script | Purpose | Input | Output |
+|--------|---------|-------|--------|
+| `analyze_study_results.py` | Runs main study analysis and genera
+
+#### Workflow 8: Effect Size Chart Generation
+
 The framework generates effect size visualizations at two levels: study-level (main effects) and consolidated subset charts (cross-subset patterns like the Goldilocks effect).
 
 **Configuration** (`config.ini`):
@@ -721,6 +761,18 @@ The framework provides external validation against GraphPad Prism 10.6.1 for aca
 For complete validation procedures, see the **[Statistical Analysis & Reporting Validation section in the Testing Guide](TESTING_GUIDE.md#statistical-analysis--reporting-validation)**.
 
 **Academic Citation:** "Statistical analyses were validated against GraphPad Prism 10.6.1"
+
+#### Methodological Validation Scripts
+
+The framework includes standalone scripts for performing targeted validation of key methodological claims.
+
+##### Neutralized Library Diversity Analysis
+
+This script provides a quantitative rebuttal to the "Barnum Effect" concern by analyzing the semantic and lexical diversity of the neutralized component library. It calculates metrics for vocabulary overlap, semantic similarity, and structural coherence to validate that the building blocks of the personality profiles are distinct and not generic.
+
+-   **Command:** `pdm run validate-diversity`
+-   **Input:** Reads all neutralized component files from `data/foundational_assets/neutralized_delineations/`.
+-   **Output:** Generates a detailed report at `output/validation_reports/neutralized_library_diversity_analysis.txt`, which includes key metrics and a pre-formatted text block suitable for inclusion in a research article.
 
 ### Troubleshooting Common Issues
 

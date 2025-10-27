@@ -65,7 +65,9 @@ This document outlines planned tasks categorized by work stream and tracks known
   - [ ] `src/utils/analyze_research_patterns.py`
   - [ ] `src/utils/patch_eminence_scores.py`
   - [ ] `src/utils/validate_country_codes.py`
+  - [ ] `src/generate_consolidated_effect_charts.py`
   - [ ] `scripts/analysis/analyze_cutoff_parameters.py`
+  - [ ] `scripts/analysis/analyze_neutralized_library_diversity.py`
   - [ ] `scripts/analysis/get_docstring_summary.py`
   - [ ] `scripts/analysis/inspect_adb_categories.py`
   - [ ] `scripts/analysis/validate_import_file.py`
@@ -91,7 +93,7 @@ This document outlines planned tasks categorized by work stream and tracks known
   - [ ] Move tests for developer utility scripts from `tests/` to a self-contained `scripts/tests/` directory.
   - [ ] Systematically update all import statements and script paths across the entire project to reflect the new structure.
   - [ ] **Known Issue:** `analyze_study_results.py` outputs verbose logging to console even without console handler, likely due to Python's `lastResort` handler. Multiple suppression attempts (NullHandler, CRITICAL+1 level, clearing handlers) have failed. Low priority as analysis completes correctly and logs save properly. May require stderr redirection or fundamental logging redesign.
-  
+
 - [ ] **Implement Shared Progress Bar Utility**
   - [ ] Create a new utility in `src/utils/` to provide a standardized, shared `tqdm` progress bar.
   - [ ] Refactor `generate_eminence_scores.py` and `generate_ocean_scores.py` to use this shared utility for a consistent user experience during long-running LLM calls.
