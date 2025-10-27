@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 16.5.0 (2025-10-27)
+
+### Bump
+
+- **version 16.4.1 → 16.5.0**
+
+### Features
+
+- **Finalize documentation and build process for publication**
+  This commit delivers a comprehensive set of enhancements and fixes to prepare all documentation for publication. It improves the clarity of the research article, aligns content across all major documents, and hardens the documentation build process against common issues.
+  
+  -   **Refactor Article to Active Voice:** The entire research article has been rewritten to use a more direct, active voice, significantly improving readability and aligning with modern academic style guidelines.
+  -   **Align Documentation:** Added descriptions of the automated effect size chart generation to the Research Article, Replication Guide, and Framework Manual, ensuring this key output is documented consistently.
+  -   **Integrate Diversity Analysis:** A new validation script (`analyze_neutralized_library_diversity.py`) has been integrated. Its quantitative findings have been added to the Research Article to strengthen the rebuttal to "Barnum Effect" concerns, and a task has been added to the Project Roadmap to create unit tests for it.
+  -   **Fix DOCX Build Process:** The `build_docs.py` script has been patched to correctly detect changes in the `custom_reference.docx` style template, forcing documents to rebuild when styles are updated.
+  -   **Resolve Word Styling Issues:** The Word style template (`custom_reference.docx`) was modified to fix image centering and resolve page break conflicts between figures and headings. All custom centering logic was subsequently removed from the build script.
+  -   **Enhance Research Article:** The abstract was updated to more accurately reflect the use of multiple LLMs, and the discussion of model heterogeneity was strengthened with a citation to existing literature on emergent AI capabilities.
+
 ## 16.4.1 (2025-10-26)
 
 ### Bump
