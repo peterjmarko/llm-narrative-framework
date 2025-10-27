@@ -136,7 +136,7 @@ pdm run test
 
 ### Configuration (`config.ini`)
 
-The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results for guaranteed reproducibility.
+The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results to document experimental parameters.
 
 ### Configuration Reference
 
@@ -205,8 +205,7 @@ For single-condition experiments, specify parameters directly:
 3. **Experiment executes** → Uses values from `[Experiment]` section
 4. **Configuration archived** → `config.ini.archived` captures exact parameters used
 
-This two-tier system enables efficient factorial study creation while maintaining 
-complete reproducibility for each individual experiment.
+This two-tier system enables efficient factorial study creation while maintaining complete methodological documentation for each individual experiment.
 
 #### Analysis Settings (`[Analysis]`)
 

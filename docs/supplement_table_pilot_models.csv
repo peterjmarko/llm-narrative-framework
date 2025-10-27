@@ -1,0 +1,43 @@
+model_name,provider,parsing_success_rate,avg_response_time_sec,cost_per_trial_us_cent,exclusion_reason,selected
+Claude Sonnet 4,Anthropic,100,1.95,3.66,-,Yes
+DeepSeek V3.1,DeepSeek,98,4.4,0.29,-,Yes
+Gemini 2.0 Flash Lite,Google,98,1.27,0.09,-,Yes
+GPT-4o,OpenAI,100,1.56,2.86,-,Yes
+Llama 3.3 70B Instruct,Meta,96,3.57,0.04,-,Yes
+Mistral Large 2411,Mistral,100,2.13,2.15,-,Yes
+Qwen2.5 72B Instruct,Qwen2.5 72B Instruct,90,3.31,0.08,-,Yes
+Claude 3.5 Sonnet,Anthropic,100,2.85,3.66,Provider already respresented,No
+Claude 3.7 Sonnet,Anthropic,90,2.56,3.66,Provider already respresented,No
+Claude Opus 4.1,Anthropic,100,4.82,18.28,Per-trial cost >5c,No
+Claude Sonnet 4.5,Anthropic,97,3,3.66,Model conflict with scoring/neautralization,No
+DeepSeek R1 0528,DeepSeek,100,87,0.47,Response time >5 sec,No
+DeepSeek V3 0324,DeepSeek,100,4.67,0.29,Provider already respresented,No
+Gemini 2.0 Flash,Google,64,1.33,0.11,Parsing reliability <90%,No
+Gemini 2.5 Flash,Google,64,1.18,0.44,Parsing reliability <90%,No
+Gemini 2.5 Flash Lite,Google,100,3.99,0.11,Provider already respresented,No
+Gemini 2.5 Flash Lite Preview 06-17,Google,100,1.48,0.11,Model conflict with scoring/neautralization,No
+Gemini 2.5 Flash Preview 09-2025,Google,97,1.72,0.44,Model conflict with scoring/neautralization,No
+Gemini 2.5 Pro,Google,23,20.86,1.8,Parsing reliability <90%,No
+Gemma 3 12B,Google,23,6.74,0.04,Parsing reliability <90%,No
+Gemma 3 27B,Google,80,6.94,0.08,Parsing reliability <90%,No
+GLM 4.5,Z.AI,83,35.03,0.46,Parsing reliability <90%,No
+GLM 4.6,Z.AI,4,7.06,0.55,Parsing reliability <90%,No
+GPT-4.1,OpenAI,100,3.15,2.29,Provider already respresented,No
+GPT-4.1 Mini,OpenAI,100,2.85,0.46,Provider already respresented,No
+GPT-4.1 Nano,OpenAI,100,2.56,0.11,Provider already respresented,No
+GPT-5,OpenAI,97,36.56,1.8,Response time >5 sec,No
+GPT-5 Chat,OpenAI,100,3.25,1.8,Model conflict with scoring/neautralization,No
+GPT-5 Codex,OpenAI,93,29.52,1.8,Response time >5 sec,No
+GPT-5 Mini,OpenAI,0,12.99,0.36,Parsing reliability <90%,No
+GPT-5 Nano,OpenAI,97,13.38,0.07,Response time >5 sec,No
+gpt-oss-120b,OpenAI,100,8.96,0.06,Response time >5 sec,No
+gpt-oss-20b,OpenAI,63,39.56,0.04,Parsing reliability <90%,No
+Grok 3 Mini,xAI,90,7.23,0.29,Response time >5 sec,No
+Grok 4 Fast,xAI,100,13.53,0.21,Response time >5 sec,No
+Llama 4 Maverick,Meta,100,2.42,0.17,Provider already respresented,No
+Llama 4 Scout,Meta,100,2.13,0.09,Provider already respresented,No
+Mistral Medium 3.1,Mistral,100,2.83,0.49,Provider already respresented,No
+Mistral Small 3.2 24B,Mistral,100,4.23,0.08,Provider already respresented,No
+Qwen3 235B A22B Instruct 2507,Qwen,24,4.81,0.12,Parsing reliability <90%,No
+Qwen3 30B A3B Instruct 2507,Qwen,66,1.8,0.09,Parsing reliability <90%,No
+Qwen3 Next 80B A3B Instruct,Qwen,0,1.36,0.14,Parsing reliability <90%,No
