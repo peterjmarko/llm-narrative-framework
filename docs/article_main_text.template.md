@@ -362,6 +362,8 @@ Correspondence concerning this article should be addressed to Peter J. Marko at 
 
 Peter J. Marko was responsible for the conceptualization, investigation, methodology, software development, formal analysis, documentation, and the original draft of the article. Kenneth McRitchie proposed the idea, assisted with the conceptualization, and reviewed and edited the article.
 
+Portions of this manuscript and the framework's source code were drafted, edited, and structured with assistance from Anthropic Claude Sonnet 4.5 and Google Gemini 2.5 Pro (July-October 2025). All AI-generated content was reviewed, revised, validated, and approved by the authors, who accept full responsibility for the final content and comply with PsyArXiv policies.
+
 **ORCID iDs**
 
 *   Peter J. Marko: https://orcid.org/0000-0001-9108-8789
@@ -370,6 +372,22 @@ Peter J. Marko was responsible for the conceptualization, investigation, methodo
 ### Conflicts of Interest
 
 The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+### Responsible AI Usage Statement
+
+This research adheres to the Principles for Responsible AI Usage in Research and complies with general international responsible use regulations.
+
+**Regulations and Data Security.** The applicable regulations and policies permit AI tool usage in this research context. Our research design addresses data privacy concerns by exclusively selecting deceased individuals as subjects, obviating the need for anonymization while maintaining full compatibility with data privacy and security regulations. We opted out of data usage and storage in all AI applications used.
+
+**Quality Control.** The framework employs fully automated validation procedures with predefined quality criteria for correctness, reasoning, relevance, and professional quality embedded throughout the data preparation and experimental pipeline. All quality checks were performed algorithmically to eliminate human error in response validation. The parsing and response validation procedures described in the Methods section (Component Library Neutralization and Validation, Profile Assembly validation, and experimental result parsing) constitute the complete quality control system. Human oversight was limited to designing validation criteria and reviewing final aggregated results. The framework's comprehensive test suite (147 scripts, 41,000+ lines) underwent extensive validation by the authors to ensure technical correctness and methodological integrity.
+
+**Originality.** This research represents entirely novel work introducing a new methodological paradigm. All components are original, with proper accreditation for all referenced materials and methodologies.
+
+**Bias Mitigation.** We systematically addressed presentation bias by analyzing positional ordering effects in the experimental results. The Analysis of Presentation Order Bias (Results section) demonstrates that observed signal detection effects reflect genuine content-based discrimination rather than positional artifacts.
+
+**Accountability and Transparency.** We accept full accountability for all AI-generated content in this research. The AI outputs are fully documented: eminence scores (LLM A/GPT-5), OCEAN personality scores (LLM B/Claude 4.5 Sonnet), neutralized astrological text (LLM C/Gemini 2.5 Pro), and similarity score matrices (seven evaluation LLMs). Complete documentation of tools, versions, parameters, and procedures is provided throughout the article and in the public repository. LLM assistance in manuscript preparation is disclosed in the Author Contributions section.
+
+**Broader Impact.** This research addresses the replication crisis in psychological science by providing the scientific community with an open-source, automated, and methodologically rigorous framework for investigating complex narrative systems. As an uncompensated research project, this work focuses specifically on researching LLM technology capabilities—a goal integral to the research question itself.
 
 ### Acknowledgements
 
