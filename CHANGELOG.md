@@ -2,6 +2,23 @@
 
 # Changelog
 
+## 16.6.0 (2025-10-31)
+
+### Bump
+
+- **version 16.5.0 → 16.6.0**
+
+### Features
+
+- **add search utility and synchronize documentation**
+  This commit introduces a new analysis script and performs a comprehensive update and alignment of project documentation, scripts, and diagrams.
+  
+  - Adds a new analysis script, `search_astrological_terms.py`, to find whole-word occurrences of terms within the second column of CSV files.
+  - Updates all figures and tables in the `REPLICATION_GUIDE` and `FRAMEWORK_MANUAL` with a consistent, sequential numbering scheme (S1, S2, etc.).
+  - Corrects and rewrites docstrings for `analyze_cutoff_parameters.py` and `select_final_candidates.py` to accurately reflect their roles and dependencies.
+  - Refines the main research article by removing a redundant paragraph and justifying the LLM model choice for eminence scoring.
+  - Updates and corrects multiple project diagrams, including splitting workflows, adding missing pipeline steps, and fixing Gantt chart milestone placements.
+
 ## 16.5.0 (2025-10-27)
 
 ### Bump
