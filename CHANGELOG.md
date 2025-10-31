@@ -2,6 +2,28 @@
 
 # Changelog
 
+## 16.6.1 (2025-10-31)
+
+### Bump
+
+- **version 16.6.0 → 16.6.1**
+
+### Documentation
+
+- **add Responsible AI Usage Statement and LLM assistance disclosure**
+  Add comprehensive disclosure of AI usage in research and manuscript preparation to comply with PsyArXiv policies.
+  
+  - Add new "Responsible AI Usage Statement" section after Conflicts of Interest covering all Principles for Responsible AI Usage in Research
+  - Disclose LLM assistance (Claude Sonnet 4.5, Gemini 2.5 Pro) in manuscript drafting, editing, and code development in Author Contributions
+  - Document regulatory compliance, data security approach, quality control procedures, originality, bias mitigation, accountability, transparency, and broader impact
+  - Reference Analysis of Presentation Order Bias section for bias analysis documentation
+  - Clarify that all AI-generated content was reviewed, revised, validated, and approved by authors
+  - Add cross-reference from Responsible AI Usage Statement to Author Contributions for LLM assistance details
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 16.6.0 (2025-10-31)
 
 ### Bump
