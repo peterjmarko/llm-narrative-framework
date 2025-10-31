@@ -20,34 +20,46 @@
 # Filename: src/select_final_candidates.py
 
 """
-Determines the final subject pool size and performs final transformations.
+Determines the final subject pool size using pre-calibrated parameters and
+performs final data transformations.
 
 This script is the final, decisive step in the "LLM-based Candidate Selection"
-stage. It can operate in two modes based on the `bypass_candidate_selection`
-flag in `config.ini`:
+stage. It consumes the stable `start_point` and `smoothing_window` parameters
+determined by the preceding `analyze_cutoff_parameters.py` script to ensure a
+robust, data-driven cohort size.
+
+It can operate in two modes based on the `bypass_candidate_selection` flag:
 
 -   **Default Mode:** Performs a sophisticated analysis on the full set of
     OCEAN scores. It calculates a cumulative personality variance curve, finds
-    the "point of diminishing returns" using slope analysis, and determines an
-    optimal, data-driven cohort size. It then filters the list to this size.
+    the "point of diminishing returns" using slope analysis with the
+    pre-calibrated parameters, and filters the list to this optimal size. A
+    diagnostic plot of this analysis is generated.
 -   **Bypass Mode:** Skips the LLM-based selection and uses the entire
     "eligible candidates" list as the final subject pool.
 
 In both modes, it performs final data transformations: resolving country codes,
-merging eminence scores for sorting, and re-indexing the final list.
+merging eminence scores for sorting, re-indexing the final list, and ensuring
+a clean, standardized output.
 
 Inputs:
   - `data/intermediate/adb_eligible_candidates.txt`: The full list of subjects
     from the "Candidate Qualification" stage.
   - `data/foundational_assets/ocean_scores.csv`: (Default Mode) The full set of
     OCEAN scores for all eligible candidates.
+  - `data/found-assets/cutoff_parameter_analysis_results.csv`: (Default Mode)
+    The stable parameters for slope analysis.
   - `data/foundational_assets/eminence_scores.csv`: (Default Mode) Used for sorting.
   - `data/foundational_assets/country_codes.csv`: The mapping file for country
     abbreviations.
 
-Output:
+Outputs:
   - `data/intermediate/adb_final_candidates.txt`: The final, sorted list
     of subjects, ready for the "Profile Generation" stage.
+  - `data/foundational_assets/variance_curve_analysis.png`: (Default Mode) A
+    diagnostic plot visualizing the variance curve and cutoff decision. This
+    file is also copied to the `docs/images/` directory.
+
 """
 
 import argparse

@@ -1,15 +1,15 @@
 graph TB
-    DESIGN["Experimental Design2 × 3 × 7 Factorial= 42 Conditions30 Replications Each= 1,260 Experiments"]
+    DESIGN["Experimental Design<br>2 × 3 × 7 Factorial<br>= 42 Conditions<br>30 Replications Each<br>= 1,260 Experiments"]
     
     subgraph FACTOR1["Factor 1: Mapping Strategy (Between-Groups)"]
-        CORRECT["✓ Correct Mapping(Test Condition)"]
-        RANDOM["✗ Random Mapping(Control Condition)"]
+        CORRECT["✓ Correct Mapping<br>(Test Condition)"]
+        RANDOM["✗ Random Mapping<br>(Control Condition)"]
     end
     
     subgraph FACTOR2["Factor 2: Group Size k (Within-Groups)"]
-        K7["k = 7(Easy)"]
-        K10["k = 10(Medium)"]
-        K14["k = 14(Hard)"]
+        K7["k = 7<br>(Easy)"]
+        K10["k = 10<br>(Medium)"]
+        K14["k = 14<br>(Hard)"]
     end
     
     subgraph FACTOR3["Factor 3: Evaluation Model (Within-Groups)"]
@@ -23,8 +23,8 @@ graph TB
     end
     
     subgraph OUTPUT["Experimental Output"]
-        TRIALS["80 Trials/Replication× 30 Replications× 42 Conditions= 100,800 LLM Queries"]
-        METRICS["Performance Metrics• MRR Lift• Top-1 Accuracy Lift• Top-3 Accuracy Lift"]
+        TRIALS["80 Trials/Replication<br>× 30 Replications<br>× 42 Conditions<br>= 100,800 LLM Queries"]
+        METRICS["Performance Metrics<br>• MRR Lift<br>• Top-1 Accuracy Lift<br>• Top-3 Accuracy Lift"]
     end
     
     DESIGN ==> FACTOR1

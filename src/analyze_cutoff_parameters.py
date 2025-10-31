@@ -20,24 +20,34 @@
 # Filename: src/analyze_cutoff_parameters.py
 
 """
-Performs a sensitivity analysis to find the optimal parameters for the
-final candidate selection algorithm.
+Performs a sensitivity analysis as a key step in the candidate selection
+pipeline to determine the most stable parameters for the final cutoff algorithm.
 
-This is a one-off utility script designed to help set the ideal values for
-'cutoff_search_start_point' and 'smoothing_window_size' in config.ini.
+As an integral component of the 'Stage 3: LLM-based Candidate Selection'
+workflow, this script ensures that the final sample size is robust and not
+an artifact of arbitrarily chosen hyperparameters. Its output directly informs
+the subsequent 'select_final_candidates.py' script.
 
-The script operates by:
-1.  Defining a grid of parameter values to test.
-2.  For each combination, it calculates the cutoff point using the standard
-    slope-based algorithm from the main pipeline.
-3.  It then calculates the "ideal" cutoff point. The ideal point is defined
-    as the point on the smoothed variance curve that has the maximum distance
-    from a straight line drawn from the start to the end of the analysis window.
-4.  It measures the "error" as the difference between the algorithm's result
-    and the ideal result.
-5.  Finally, it presents a ranked list of the parameter combinations that
-    produced the lowest error, giving a data-driven recommendation for the
-    best parameters to use in the project configuration.
+The script uses a two-stage evaluation to prioritize stability:
+
+1.  **Grid Search & Error Ranking:**
+    -   It tests a grid of `start_point` and `smoothing_window` combinations.
+    -   For each set, it calculates the algorithm's `Predicted Cutoff` and a
+        geometrically `Ideal Cutoff` (the point of maximum distance from a
+        line connecting the start and end of the curve).
+    -   It calculates an internal `Error` (Predicted vs. Ideal) and ranks all
+        parameter sets by this error.
+
+2.  **Consensus-Based Recommendation:**
+    -   It calculates a `Consensus Cutoff` by averaging the `Ideal Cutoff`
+        values from the top N best-performing parameter sets (e.g., top 50).
+        This consensus represents the most stable and reliable cutoff point.
+    -   It then calculates a `Deviation` for every parameter set, measuring
+        how far its `Predicted Cutoff` is from the stable `Consensus Cutoff`.
+    -   The final recommendation is the parameter set with the **lowest
+        Deviation**, as this set is the most reliable predictor of the true,
+        stable cutoff point, ensuring robustness.
+
 """
 
 import sys

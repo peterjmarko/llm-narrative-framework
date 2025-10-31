@@ -1,9 +1,9 @@
 graph TD
-    A["Stage 1: Data Sourcing<br>(N = 10,707)"];
-    A --> B["Stage 2: Candidate Qualification<br>(Wikipedia page, birth year, death date, hemisphere, etc.)"];
-    B --> C["Eligible Candidates<br>(N = 5,736)"];
+    A["Stage 1: Data Sourcing<br>(n = 10,707)"];
+    A --> B["Stage 2: Candidate Qualification<br>(Wikidata death date, Wikipedia page, birth year, hemisphere, etc.)"];
+    B --> C["Eligible Candidates<br>(n = 5,736)"];
     C --> D["Stage 3: LLM-Based Candidate Selection<br>(Smoothed slope analysis of OCEAN score variance)"];
-    D --> E["Final Study Sample<br>(N = 4,987)"];
+    D --> E["Final Study Sample<br>(n = 4,987)"];
 
     style A fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px
     style C fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px

@@ -2,9 +2,7 @@
 
 **What Is This Framework?** The LLM Narrative Framework is an automated testing methodology that uses Large Language Models as pattern-detection engines to perform matching tasks between narrative personality descriptions and biographical profiles, determining whether systematic signals can be detected at rates significantly greater than chance.
 
-This document is the **Framework Manual** for the project. It serves as the **technical reference** for the framework's architecture, providing specifications for data formats, API interfaces, configuration parameters, and system components. 
-
-This manual is intended for developers, contributors, and researchers who need to understand the technical implementation details. **For step-by-step procedural guidance on running experiments or replicating the study, please refer to the [🔬 Replication Guide](docs/REPLICATION_GUIDE.md).**
+This document is the **Framework Manual** for the project. It serves as the **technical reference** for the framework's architecture, providing specifications for data formats, API interfaces, configuration parameters, and system components. The manual is intended for developers, contributors, and researchers who need to understand the technical implementation details. **For step-by-step procedural guidance on running experiments or replicating the study, please refer to the [🔬 Replication Guide](docs/REPLICATION_GUIDE.md).**
 
 ## 📑 Document Navigation
 
@@ -23,6 +21,8 @@ This manual is intended for developers, contributors, and researchers who need t
 
 ### Essential Commands
 
+*Table 1: Essential Commands*
+
 | Task | Command | Purpose |
 |:-----|:--------|:--------|
 | **Create experiment** | `./new_experiment.ps1` | Generate new experiment for a single condition |
@@ -32,6 +32,8 @@ This manual is intended for developers, contributors, and researchers who need t
 | **Run all tests** | `pdm run test` or `pdm test` | Execute complete test suite |
 
 ### Key Configuration Parameters
+
+*Table 2: Key Configuration Parameters*
 
 | Parameter | Location | Purpose | Example |
 |:----------|:---------|:--------|:--------|
@@ -44,6 +46,8 @@ This manual is intended for developers, contributors, and researchers who need t
 
 ### Critical File Paths
 
+*Table 3: Critical File Paths*
+
 | File | Purpose |
 |:-----|:--------|
 | `config.ini` | Main configuration file |
@@ -53,6 +57,8 @@ This manual is intended for developers, contributors, and researchers who need t
 | `output/studies/` | Compiled study analyses |
 
 ### Quick Troubleshooting
+
+*Table 4: Quick Troubleshooting Guide*
 
 | Issue | Solution |
 |:------|:---------|
@@ -73,6 +79,8 @@ This manual is intended for developers, contributors, and researchers who need t
 ## Reader Navigation Guide
 
 This manual serves multiple audiences. Use this matrix to identify which sections are most relevant to your needs:
+
+*Table 5: Reader Navigation Guide*
 
 | Section | Researcher | Developer | Data Analyst | Page |
 |:--------|:----------:|:---------:|:------------:|:----:|
@@ -139,6 +147,8 @@ pdm run test
 The `config.ini` file is the central hub for defining all parameters for your experiments. The pipeline automatically archives this file with the results to document experimental parameters.
 
 ### Configuration Reference
+
+*Table 6: Configuration (`config.ini`) Reference*
 
 | Section | Parameter | Description | Example Value |
 | :--- | :--- | :--- | :--- |
@@ -215,8 +225,6 @@ This two-tier system enables efficient factorial study creation while maintainin
 
 The framework is designed around a clear "Create -> Check -> Fix -> Compile" model. This separation of concerns ensures that each workflow is simple, predictable, and safe.
 
-{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=50% | caption=Choosing the Right Workflow: A guide for experiment and study tasks.}}
-
 -   **`new_experiment.ps1` (Create)**: Use this to create a new experiment from scratch for a single experimental condition.
 
 -   **`audit_experiment.ps1` (Check - Experiment)**: Use this read-only tool to get a detailed status report on any existing experiment. It is your primary diagnostic tool.
@@ -226,6 +234,8 @@ The framework is designed around a clear "Create -> Check -> Fix -> Compile" mod
 -   **`audit_study.ps1` (Check - Study)**: Use this read-only tool to get a consolidated status report on all experiments in a study directory before final analysis.
 
 -   **`compile_study.ps1` (Compile)**: After creating and validating all experiments, use this script to aggregate the results and run the final statistical analysis.
+
+{{grouped_figure:docs/diagrams/logic_workflow_chooser.mmd | scale=2.5 | width=50% | caption=Figure 1: Choosing the Right Workflow: A guide for experiment and study tasks.}}
 
 ### Core Workflows
 
@@ -376,12 +386,25 @@ The script generates two key outputs:
 
 ## Architecture & Design
 
-{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=100% | caption=Project Architecture: A high-level overview of the project's main functional components and their relationships.}}
+As depicted below, the framework consists of the following main components:
+
+*   Documentation (root and `docs/`)
+*   Diagrams (`docs/diagrams/`)
+*   Validation Suite (`tests/`)
+*   Developer Utilities (`scripts/`)
+*   Orchestration Scripts (`*.ps1` in root)
+*   Production Scripts (`src/`)
+*   Input & Output Data (`data/`)
+*   Generated Experiments & Analysis Reports (`output/`)
+*   Generated Project Reports (`output/project_reports`)
+
+{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=100% | caption=Figure 2: Project Architecture: A high-level overview of the project's main functional components and their relationships.}}
 
 ### Directory Structure
 
 This logical hierarchy is reflected in the physical layout of the repository:
 
+*Figure 3: Directory Structure of the Project Repository*
 {{diagram:docs/diagrams/view_directory_structure.txt | scale=2.5 | width=100%}}
 
 ## Data Dictionaries
@@ -413,6 +436,8 @@ The framework's architecture supports three distinct research paths (direct repl
 The data preparation pipeline transforms raw data from external sources into the curated dataset used in experiments. For detailed procedural guidance on running this pipeline, see the **[🔬 Replication Guide](docs/REPLICATION_GUIDE.md)**.
 
 ### Pipeline Script Reference
+
+*Table 7: Data Preparation Pipeline Script Reference*
 
 | Script | Purpose | Key Outputs |
 |--------|---------|-------------|
@@ -469,7 +494,9 @@ The codebase for the experiment workflow and analysis is organized into a clear 
 4.  **Study-Level Analysis**: Python scripts that operate on the outputs of multiple experiments to perform study-wide aggregation and statistical analysis.
 5.  **Utility & Other Scripts**: Shared modules and standalone utility scripts that provide common functionality (e.g., `config_loader.py`) or perform auxiliary tasks.
 
-{{grouped_figure:docs/diagrams/arch_main_codebase.mmd | scale=2.5 | width=100% | caption=Codebase Architecture: A comprehensive map of the entire Python codebase. PowerShell scripts (blue) are user-facing entry points that execute core Python logic. Solid lines indicate execution, while dotted lines show module imports.}}
+<br>
+
+{{grouped_figure:docs/diagrams/arch_main_codebase.mmd | scale=2.5 | width=100% | caption=Figure 4: Codebase Architecture: A comprehensive map of the entire Python codebase. PowerShell scripts (blue) are user-facing entry points that execute core Python logic. Solid lines indicate execution, while dotted lines show module imports.}}
 
 #### Workflow Diagrams
 The framework's functionality is organized into a clear hierarchy of workflows, initiated by dedicated PowerShell scripts.
@@ -496,19 +523,21 @@ The `replication_manager.py` script executes the full pipeline for a single run,
 5.  **Generate Final Report**: Assembles the final `replication_report.txt` from the analysis results and captured logs.
 6.  **Create Replication Summary**: Creates the final `REPLICATION_results.csv`, marking the run as valid.
 
-{{grouped_figure:docs/diagrams/flow_main_1_new_experiment.mmd | scale=2.5 | width=60% | caption=Workflow 1: Create a New Experiment, showing the main control loop and the internal replication pipeline.}}
+{{grouped_figure:docs/diagrams/flow_main_1_new_experiment.mmd | scale=2.5 | width=60% | caption=Figure 5: Workflow 1: Create a New Experiment, showing the main control loop and the internal replication pipeline.}}
 
 #### Workflow 2: Audit an Experiment
 
 This workflow provides a read-only, detailed completeness report for an experiment without performing any modifications. The `audit_experiment.ps1` wrapper calls the dedicated `experiment_auditor.py` script. The full audit report, including subprocess outputs, is also saved to `experiment_audit_log.txt` within the audited directory.
 
-{{grouped_figure:docs/diagrams/flow_main_2_audit_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.}}
+{{grouped_figure:docs/diagrams/flow_main_2_audit_experiment.mmd | scale=2.5 | width=85% | caption=Figure 6: Workflow 2: Audit an Experiment. Provides a read-only, detailed completeness report for an experiment.}}
 
 ##### Interpreting the Audit Report
 The audit script is the primary diagnostic tool for identifying issues in a failed or incomplete experiment. It uses a simple but robust rule to classify problems: the number of distinct errors found in a single replication run.
 
 **Repairable Issues (Single Error)**
 If a replication run has **exactly one** identifiable problem, it is considered safe to repair in-place. The `Status` column will show a specific, targeted error code:
+
+*Table 8: Audit Report Status Codes for Repairable Issues*
 
 | Status Code | Description | Recommended Action |
 | :--- | :--- | :--- |
@@ -536,13 +565,17 @@ This workflow is the main "fix-it" tool for any existing experiment. The `fix_ex
 -   If the audit finds missing data or outdated analysis files, the script proceeds to automatically apply the correct repair.
 -   If the audit finds the experiment is already complete and valid, it becomes interactive, presenting a menu that allows the user to force a full data repair, an analysis update, or a simple re-aggregation of results.
 
-{{grouped_figure:docs/diagrams/flow_main_3_fix_experiment.mmd | scale=2.5 | width=100% | caption=Workflow 3: Fixing or Updating an Experiment, showing both automatic and interactive repair paths.}}
+<br>
+
+{{grouped_figure:docs/diagrams/flow_main_3_fix_experiment.mmd | scale=2.5 | width=100% | caption=Figure 7: Workflow 3: Fixing or Updating an Experiment, showing both automatic and interactive repair paths.}}
 
 #### Workflow 4: Compile a Study
 
 This workflow is used after all experiments are validated to audit, compile, and analyze the entire study. It performs a robust pre-flight check by calling `audit_study.ps1`. If the study is not ready for processing (or is already complete), it will halt with a clear recommendation. Otherwise, it proceeds to compile all results and run the final statistical analysis.
 
-{{grouped_figure:docs/diagrams/flow_main_4_compile_study.mmd | scale=2.5 | width=90% | caption=Workflow 4: Compile a Study. Audits, compiles, and analyzes all experiments in a study.}}
+<br>
+
+{{grouped_figure:docs/diagrams/flow_main_4_compile_study.mmd | scale=2.5 | width=90% | caption=Figure 8: Workflow 4: Compile a Study. Audits, compiles, and analyzes all experiments in a study.}}
 
 #### Workflow 5: Audit a Study
 
@@ -553,7 +586,9 @@ This script is the primary diagnostic tool for assessing the overall state of a 
 
 Based on the combined results from both audits, it presents a consolidated summary table and provides a final, context-aware recommendation for the correct next step.
 
-{{grouped_figure:docs/diagrams/flow_main_5_audit_study.mmd | scale=2.5 | width=70% | caption=Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
+<br>
+
+{{grouped_figure:docs/diagrams/flow_main_5_audit_study.mmd | scale=2.5 | width=55% | caption=Figure 9: Workflow 5: Audit a Study. Consolidated completeness report for all experiments in a study.}}
 
 #### Workflow 6: Analyzing Study Subsets
 
@@ -715,17 +750,17 @@ subset_chart_metric = mean_mrr_lift
 
 This diagram shows how data artifacts (files) are created and transformed by the experiment workflow and analysis scripts. It traces the flow from initial inputs like `config.ini` and the personalities database, through intermediate query and response files, to the final aggregated results and analysis plots.
 
-{{grouped_figure:docs/diagrams/data_main_flow.mmd | scale=2.5 | width=80% | caption=Data Flow Diagram: Creation and transformation of data artifacts (files) by the experiment workflow and analysis scripts.}}
+{{grouped_figure:docs/diagrams/data_main_flow.mmd | scale=2.5 | width=80% | caption=Figure 10: Data Flow Diagram: Creation and transformation of data artifacts (files) by the experiment workflow and analysis scripts.}}
 
 #### Logic Flowcharts
 
 These diagrams illustrate the scientific and procedural methodology at each level of the experimental hierarchy.
 
-{{grouped_figure:docs/diagrams/logic_main_replication.mmd | scale=2.5 | width=60% | caption=Replication Logic: The scientific methodology for a single replication run.}}
+{{grouped_figure:docs/diagrams/logic_main_replication.mmd | scale=2.5 | width=62% | caption=Figure 11: Replication Logic: The scientific methodology for a single replication run.}}
 
-{{grouped_figure:docs/diagrams/logic_main_experiment.mmd | scale=2.5 | width=100% | caption=Experiment Logic: The aggregation of multiple replication results to produce final experiment-level summaries.}}
+{{grouped_figure:docs/diagrams/logic_main_experiment.mmd | scale=2.5 | width=80% | caption=Figure 12: Experiment Logic: The aggregation of multiple replication results to produce final experiment-level summaries.}}
 
-{{grouped_figure:docs/diagrams/logic_main_study.mmd | scale=2.5 | width=100% | caption=Study Logic: The complete workflow for processing a study, from auditing and aggregation to final statistical analysis.}}
+{{grouped_figure:docs/diagrams/logic_main_study.mmd | scale=2.5 | width=100% | caption=Figure 13: The complete workflow for processing a study, from auditing and aggregation to final statistical analysis.}}
 
 ### Testing
 
@@ -884,6 +919,7 @@ The pipeline generates a consistent, standardized `replication_report.txt` for e
 
 Each report contains a clear header, the base query used, a human-readable analysis summary, and a machine-readable JSON block with all calculated metrics.
 
+*Figure 14: Format for `replication_report.txt`*
 {{diagram:docs/diagrams/format_replication_report.txt}}
 
 **Date Handling by Mode:**
@@ -895,6 +931,7 @@ Each report contains a clear header, the base query used, a human-readable analy
 
 The final analysis script (`analyze_study_results.py`) produces a comprehensive log file detailing the full statistical analysis of the entire study. The report is structured by metric, with each section providing descriptive statistics, the ANOVA summary, post-hoc results (if applicable), and performance groupings.
 
+*Figure 15: Format for `STUDY_analysis_log.txt`*
 {{diagram:docs/diagrams/format_analysis_log.txt}}
 
 ### Key Data Formats
@@ -902,6 +939,8 @@ The final analysis script (`analyze_study_results.py`) produces a comprehensive 
 This section provides a summary reference for the most important data files. For complete format specifications and detailed field descriptions, see the **[📁 Data Preparation Data Dictionary](DATA_PREPARATION_DATA_DICTIONARY.md)** and **[📊 Experiment Workflow Data Dictionary](../output/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md)**.
 
 #### Format Summary Table
+
+*Table 9: Summary of Key Data Formats*
 
 | Category | File | Purpose | Key Fields |
 |:---------|:-----|:--------|:-----------|
@@ -925,13 +964,13 @@ For most use cases, the summary table above is sufficient. However, three format
 
 ##### Final Personality Database Format
 
-{{diagram:docs/diagrams/format_data_personalities_db.txt | caption=Format for `personalities_db.txt` - The definitive input to all experiments}}
+{{diagram:docs/diagrams/format_data_personalities_db.txt | caption=Figure 16: Format for `personalities_db.txt` - The definitive input to all experiments}}
 
 ##### Configuration Files
 
-{{diagram:docs/diagrams/format_data_point_weights.txt | caption=Format for `point_weights.csv` - Defines algorithmic weights}}
+{{diagram:docs/diagrams/format_data_point_weights.txt | caption=Figure 17: Format for `point_weights.csv` - Defines algorithmic weights}}
 
-{{diagram:docs/diagrams/format_data_balance_thresholds.txt | caption=Format for `balance_thresholds.csv` - Sets classification rules}}
+{{diagram:docs/diagrams/format_data_balance_thresholds.txt | caption=Figure 18: Format for `balance_thresholds.csv` - Sets classification rules}}
 
 **For complete format specifications:** See the data dictionaries linked above.
 
@@ -948,6 +987,8 @@ This file contains the final prompt template used for the LLM matching task. It 
 #### country_codes.csv
 
 This file provides a mapping from the country/state abbreviations used in the Astro-Databank to their full, standardized names. A sample is shown below. The complete file can be found at `data/foundational_assets/country_codes.csv`.
+
+*Table 10: Sample from `country_codes.csv`*
 
 | Abbreviation | Country |
 | :--- | :--- |

@@ -1,0 +1,43 @@
+graph TB
+    subgraph "Stage 1: Data Sourcing"
+        ADB[("Astro-Databank<br>Raw Query<br>n=10,707")]
+    end
+
+    subgraph "Stage 2: Candidate Qualification"
+        QUAL["Automated Filtering<br>• Birth data validation<br>• Wikipedia/Wikidata checks<br>• Hemisphere filtering"]
+        ELIG[("Eligible Candidates<br>n=5,736")]
+    end
+
+    subgraph "Stage 3: LLM-Based Candidate Selection"
+        LLMA["LLM A<br>GPT-5<br>Eminence Scoring"]
+        LLMB["LLM B<br>Claude 4.5 Sonnet<br>OCEAN Scoring"]
+        CUTOFF["Data-Driven Cutoff<br>Algorithm<br>Variance Analysis"]
+        FINAL[("Final Subject Pool<br>n=4,987")]
+    end
+
+    subgraph "Stage 4: Profile Generation"
+        LLMC["LLM C<br>Gemini 2.5 Pro<br>Text Neutralization"]
+        SF["Solar Fire v9.0.3<br>Astrological Export"]
+        ASSEMBLY["Profile Assembly<br>Algorithm"]
+        PROFILES[("Neutralized Profiles<br>n=4,987")]
+    end
+
+    ADB --> QUAL
+    QUAL --> ELIG
+    ELIG --> LLMA
+    LLMA --> LLMB
+    LLMB --> CUTOFF
+    CUTOFF --> FINAL
+    FINAL --> SF
+    FINAL --> LLMC
+    SF --> ASSEMBLY
+    LLMC --> ASSEMBLY
+    ASSEMBLY --> PROFILES
+
+    classDef dataNode fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    classDef llmNode fill:#fff4e1,stroke:#ff9900,stroke-width:2px
+    classDef processNode fill:#f0f0f0,stroke:#666,stroke-width:1px
+
+    class ADB,ELIG,FINAL,PROFILES dataNode
+    class LLMA,LLMB,LLMC llmNode
+    class QUAL,CUTOFF,SF,ASSEMBLY processNode

@@ -291,11 +291,7 @@ The project uses `scripts/maintenance/operation_runner.py` to wrap all PDM opera
   - `data_prep_summary.jsonl` - Data preparation pipeline runs
   - `workflow_summary.jsonl` - Experiment and study workflow operations
 
-The audit logs use JSONL format (one JSON object per line):
-
-```json
-The audit logs use JSONL format (one JSON object per line):
-```
+The audit logs use JSONL format (one JSON object per line).
 
 **Category Detection**: The runner parses `pyproject.toml` section headers (marked with `===`) to automatically classify operations. When adding new PDM commands, ensure they're under the appropriate section header.
 
@@ -357,7 +353,7 @@ The framework includes comprehensive validation of its statistical analysis pipe
 
 This project uses a standardized workflow to ensure all code is clean, documented, and properly formatted before being committed.
 
-{{grouped_figure:docs/diagrams/flow_contribution_workflow.mmd | scale=1.5 | width=50% | caption=The Contribution Workflow.}}
+{{grouped_figure:docs/diagrams/flow_contribution_workflow.mmd | scale=1.5 | width=40% | caption=The Contribution Workflow.}}
 
 #### Pre-Commit Checklist
 

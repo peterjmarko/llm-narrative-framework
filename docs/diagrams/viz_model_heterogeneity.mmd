@@ -1,23 +1,23 @@
 graph LR
-    TITLE["Model Heterogeneityat k=100.03% to 17.23%575× Variation"]
+    TITLE["Model Heterogeneity<br>at k=10<br>0.03% to 17.23%<br>575× Variation"]
     
-    GPT["GPT-4oη² = 17.23%p = .001BF₁₀ = 31.627VERY STRONG"]
+    GPT["GPT-4o<br>η² = 17.23%<br>p = .001<br>BF₁₀ = 31.627<br>VERY STRONG"]
     
-    DEEP["DeepSeek V3.1η² = 11.16%p = .009BF₁₀ = 5.076STRONG"]
+    DEEP["DeepSeek V3.1<br>η² = 11.16%<br>p = .009<br>BF₁₀ = 5.076<br>STRONG"]
     
-    GEM["Gemini 2.0 Flashη² = 7.63%p = .033BF₁₀ = 1.689MODERATE"]
+    GEM["Gemini 2.0 Flash<br>η² = 7.63%<br>p = .033<br>BF₁₀ = 1.689<br>MODERATE"]
     
-    QWEN["Qwen 2.5 72Bη² = 3.93%p = .129 (NS)BF₁₀ = 0.705Weak"]
+    QWEN["Qwen 2.5 72B<br>η² = 3.93%<br>p = .129 (NS)<br>BF₁₀ = 0.705<br>Weak"]
     
-    LLAMA["Llama 3.3 70Bη² = 2.77%p = .204 (NS)BF₁₀ = 0.524Minimal"]
+    LLAMA["Llama 3.3 70B<br>η² = 2.77%<br>p = .204 (NS)<br>BF₁₀ = 0.524<br>Minimal"]
     
-    MISTRAL["Mistral Largeη² = 0.38%p = .590 (NS)BF₁₀ = 0.284Minimal"]
+    MISTRAL["Mistral Large<br>η² = 0.38%<br>p = .590 (NS)<br>BF₁₀ = 0.284<br>Minimal"]
     
-    CLAUDE["Claude Sonnet 4η² = 0.03%p = .890 (NS)BF₁₀ = 0.265Minimal"]
+    CLAUDE["Claude Sonnet 4<br>η² = 0.03%<br>p = .890 (NS)<br>BF₁₀ = 0.265<br>Minimal"]
     
-    GOLD["Goldilocks PatternPeak at k=10Dropoff at k=7, k=14GPT-4o, DeepSeek"]
+    GOLD["Goldilocks Pattern<br>Peak at k=10<br>Dropoff at k=7, k=14<br>GPT-4o, DeepSeek"]
     
-    FLAT["Flat PatternMinimal across all kNo calibration responseClaude, Llama"]
+    FLAT["Flat Pattern<br>Minimal across all k<br>No calibration response<br>Claude, Llama, Mistral"]
     
     TITLE --> GPT
     TITLE --> DEEP
@@ -33,15 +33,15 @@ graph LR
     LLAMA --> FLAT
     
     classDef titleNode fill:#ffffcc,stroke:#cccc00,stroke-width:3px,color:#000
-    classDef strongNode fill:#00cc66,stroke:#006633,stroke-width:3px,color:#000
-    classDef moderateNode fill:#99dd99,stroke:#669966,stroke-width:2px,color:#000
-    classDef weakNode fill:#ffdd99,stroke:#cc9933,stroke-width:2px,color:#000
-    classDef minimalNode fill:#ffcccc,stroke:#cc6666,stroke-width:2px,color:#000
+    classDef strongNode fill:#d9ead3,stroke:#006633,stroke-width:3px,color:#000
+    classDef moderateNode fill:#d0e0e3,stroke:#669966,stroke-width:2px,color:#000
+    classDef weakNode fill:#fce5cd,stroke:#cc9933,stroke-width:2px,color:#000
+    classDef minimalNode fill:#f4cccc,stroke:#cc6666,stroke-width:2px,color:#000
     classDef patternNode fill:#e1e1ff,stroke:#6666cc,stroke-width:2px,color:#000
     
     class TITLE titleNode
     class GPT,DEEP strongNode
     class GEM moderateNode
-    class QWEN,LLAMA weakNode
-    class MISTRAL,CLAUDE minimalNode
+    class QWEN weakNode
+    class LLAMA,MISTRAL,CLAUDE minimalNode
     class GOLD,FLAT patternNode

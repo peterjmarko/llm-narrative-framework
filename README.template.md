@@ -23,7 +23,7 @@ Using astrology as a challenging case study, this fully automated, end-to-end pi
 
 ## 📚 Documentation Map
 
-{{grouped_figure:docs/diagrams/documentation_map.mmd | scale=2.0 | width=80% | caption=Navigate to the documentation that best matches your needs.}}
+{{grouped_figure:docs/diagrams/documentation_map.mmd | scale=2.0 | width=90% | caption=Navigate to the documentation that best matches your needs.}}
 
 ## 🚀 Quick Start
 
@@ -75,7 +75,7 @@ The framework prioritizes **transparency and auditability** over black-box autom
 
 While this framework was developed and validated using astrology as a challenging test case, its architecture is **domain-agnostic**. The framework treats the astrological system as an arbitrary algorithm that generates narrative descriptions, then tests whether LLMs can detect patterns in its output. This same approach can be applied to any complex system that produces narrative-based claims—personality typologies, diagnostic frameworks, or other classification systems. The primary contribution is the methodology itself: a reproducible paradigm for testing construct validity in narrative systems at scale.
 
-{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=75% | caption=Project Architecture: A high-level overview of the main functional components.}}
+{{grouped_figure:docs/diagrams/arch_project_overview.mmd | scale=2.5 | width=85% | caption=Project Architecture: A high-level overview of the main functional components.}}
 
 ## ✨ Key Features
 
@@ -198,8 +198,6 @@ Study
 
 ### The Research Workflow
 
-{{grouped_figure:docs/diagrams/flow_research_workflow.mmd | scale=2.5 | width=70% | caption=The End-to-End Research Workflow.}}
-
 The framework follows a two-stage process:
 
 **Stage 1: Create Experiments**
@@ -212,6 +210,8 @@ The framework follows a two-stage process:
 - Run `compile_study.ps1` to aggregate data and perform statistical analysis
 
 For a comprehensive interactive tutorial demonstrating the complete workflow with real failure scenarios and automated repair, see the [Testing Guide](docs/TESTING_GUIDE.md) (`pdm run test-l4-interactive`).
+
+{{grouped_figure:docs/diagrams/flow_research_workflow.mmd | scale=2.5 | width=70% | caption=The End-to-End Research Workflow.}}
 
 ## 🎯 What's Next?
 

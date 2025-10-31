@@ -24,29 +24,45 @@ Our primary goal is to determine if a fully automated pipeline can serve as a se
 
 #### Tool Selection Across Pipeline Stages
 
-The framework employs distinct LLMs for different stages of data preparation and evaluation, each selected to optimize performance, cost, and methodological independence (see Figure 1 for system architecture). For the LLM-based candidate selection stage, **LLM A (OpenAI's GPT-5)** performed eminence scoring in batches of 100 subjects, while **LLM B (Anthropic's Claude 4.5 Sonnet)** generated OCEAN personality scores with a batch size of 50, chosen for its strong performance on nuanced psychological assessment tasks. For profile generation, **LLM C (Google's Gemini 2.5 Pro)** handled the neutralization of 149 astrological delineations, selected for its superior instruction-following capabilities and large context window. For the core matching task, seven independent evaluation models were deployed (see Table 2 for the complete experimental design). For the LLM-based candidate selection stage, **LLM A** used a calibrated eminence scoring prompt with fixed historical anchors (Jesus Christ = 100.0, Plato/Newton = 99.5, Einstein = 99.0) to establish an absolute scale, with explicit instructions to distinguish "lasting historical eminence" from "transient celebrity." **LLM B** used a structured prompt requesting Big Five personality traits rated on a 1.0-7.0 scale with JSON output format for automated parsing. Complete prompt texts for all LLM stages are available in the project repository.
+The framework employs distinct LLMs for different stages of data preparation and evaluation, each selected to optimize performance, cost, and methodological independence (see Figures 1a and 1b at the end of this section for system architecture). For the LLM-based candidate selection stage, **LLM A (OpenAI's GPT-5)**[^1] performed eminence scoring in batches of 100 subjects, leveraging its superior contextual understanding to score individuals against a fixed, absolute scale of historical impact. Subsequently, **LLM B (Anthropic's Claude 4.5 Sonnet)** generated OCEAN personality scores with a batch size of 50, chosen for its strong performance on nuanced psychological assessment tasks. For profile generation, **LLM C (Google's Gemini 2.5 Pro)** handled the neutralization of 149 astrological delineations, selected for its superior instruction-following capabilities and large context window. For the core matching task, seven independent evaluation models were deployed (see Table 2 in Experimental Design and Procedure for the complete experimental design). For the LLM-based candidate selection stage, **LLM A** used a calibrated eminence scoring prompt with fixed historical anchors (Jesus Christ = 100.0, Plato/Newton = 99.5, Einstein = 99.0) to establish an absolute scale, with explicit instructions to distinguish "lasting historical eminence" from "transient celebrity." **LLM B** used a structured prompt requesting Big Five personality traits rated on a 1.0-7.0 scale with JSON output format for automated parsing. Complete prompt texts for all LLM stages are available in the project repository.
 
 To minimize potential data contamination, we selected evaluation models to be independent from data generation models where possible; we present a full discussion of this contamination risk in the Limitations section. We used a temperature of 0.0 for all evaluation models to maximize response consistency, a standard practice in LLM evaluation. While temperature=0.0 minimizes sampling variance, it does not eliminate it, as LLM APIs exhibit inherent non-determinism. Therefore, exact computational reproducibility is not achievable. Instead, our framework provides methodological reproducibility through transparent documentation and open-source code. We did not use randomization seeds in the original study, but future work could use them to enable exact replication of experimental stimuli. The consistency of our findings across 1,260 experiments demonstrates methodological stability despite this variance.
 
-{{grouped_figure:docs/diagrams/arch_llm_pipeline.mmd | scale=2.5 | width=73% | caption=Figure 1: System architecture showing distinct LLM roles across the six pipeline stages. LLM A (GPT-5) performs eminence scoring, LLM B (Claude 4.5 Sonnet) generates OCEAN scores, LLM C (Gemini 2.5 Pro) neutralizes astrological text, and seven independent evaluation models perform the matching task. This separation of roles is designed to minimize data contamination risk.}}
+{{grouped_figure:docs/diagrams/arch_llm_pipeline_a.mmd | scale=2.5 | width=36% | caption=Figure 1a: The first four stages of the system architecture showing distinct LLM roles across the data preparation pipeline. LLM A (GPT-5) performs eminence scoring, LLM B (Claude 4.5 Sonnet) generates OCEAN scores, and LLM C (Gemini 2.5 Pro) neutralizes astrological text. This separation of roles is designed to minimize data contamination risk.}}
+
+{{grouped_figure:docs/diagrams/arch_llm_pipeline_b.mmd | scale=2.5 | width=33% | caption=Figure 1b: The last two stages of the ystem architecture showing distinct LLM roles across the experiment & study workflow. Following the data the three preparation LLMs, seven independent evaluation models perform the matching task. This separation of roles is designed to minimize data contamination risk.}}
+
+<br>
 
 #### Sample Population
 
 We designed the framework to support three distinct research paths. For **direct replication**, researchers can use the static data files included in the project's public repository. While the framework employs temperature=0.0 to minimize LLM response variance, exact computational reproducibility is not achievable due to inherent API non-determinism. Researchers should expect methodological reproducibility: statistically equivalent results using the same experimental design. For **methodological replication**, researchers can use the framework's automated tools to generate a fresh dataset from the live Astro-Databank (ADB) to test the robustness of the findings. Finally, for **conceptual replication**, researchers can modify the framework itself (e.g., by using a different LLM or analysis script) to extend the research.
 
-We derived the final study sample from a multi-stage data preparation pipeline, as illustrated in Figure 2. This section provides a conceptual overview of the workflow; the **Supplementary Materials** contain a detailed, step-by-step guide for the entire pipeline (see Replication Guide in the online repository). In the first stage, **Data Sourcing**, we queried the Astro-Databank (ADB) for subjects based on three criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the **Personal > Death** category to ensure the subject is deceased, and inclusion in the eminence category of **Notable > Famous > Top 5% of Profession**. We chose these filters because:
+We derived the final study sample from a multi-stage data preparation pipeline, as illustrated in Figure 2 below. This section provides a conceptual overview of the workflow; the **Supplementary Materials** (Replication Guide) contain a detailed, step-by-step guide for the entire pipeline (see Replication Guide in the online repository). In the first stage, **Data Sourcing**, we queried the Astro-Databank (ADB) for subjects based on three criteria: high-quality birth data (Rodden Rating 'A' or 'AA'), inclusion in the **Personal > Death** category to ensure the subject is deceased, and inclusion in the eminence category of **Notable > Famous > Top 5% of Profession**. We chose these filters because:
 
 *   Accurate birth date and time are required for the astrology program to generate reliable personality descriptions.
 *   The use of publicly available data of deceased historical individuals obviates privacy concerns.
 *   Focusing on famous people at the top of their profession ensures the general availability of ample biographical data.
 
----
+<br>
+
+In the second stage, **Candidate Qualification**, we subjected this initial set to a more rigorous automated filtering pass. We applied several additional data quality rules, retaining only individuals who:
+
+*   Were classified as a `Person`;
+*   Had a death date recorded on their Wikidata page to verify the 'death' attribute in ADB and to avoid the accidental inclusion of living individuals;
+*   Had a birth year between 1900-1999 to minimize cohort-specific confounds (Ryder, 1965);
+*   Had a validly formatted birth time;
+*   Were not duplicates;
+*   Passed an automated validation against their English Wikipedia page; and
+*   Were born in the Northern Hemisphere to control for the potential confounding variable of a 180-degree zodiacal shift for Southern Hemisphere births (Lewis, 1994).
+
+This multi-step process produced a clean cohort of "eligible candidates."
 
 {{grouped_figure:docs/diagrams/flow_sample_derivation.mmd | scale=2.5 | width=60% | caption=Figure 2: Flowchart of the sample derivation process, showing the number of subjects we retained at each stage of the data preparation pipeline.}}
 
-In the second stage, **Candidate Qualification**, we subjected this initial set to a more rigorous automated filtering pass. We applied several additional data quality rules, retaining only individuals who: had a death date recorded on their Wikidata page; passed an automated validation against their English Wikipedia page; were classified as a `Person`; had a birth year between 1900-1999 to minimize cohort-specific confounds (Ryder, 1965); had a validly formatted birth time; were not duplicates; and were born in the Northern Hemisphere. We checked Wikidata life status to verify the 'death' attribute in ADB and to avoid the accidental inclusion of living individuals. We applied the final hemisphere filter to control for the potential confounding variable of a 180-degree zodiacal shift for Southern Hemisphere births (Lewis, 1994). This multi-step process produced a clean cohort of "eligible candidates."
+<br>
 
-We then subjected this "eligible" cohort to the third stage, **LLM-Based Candidate Selection**, to determine the final sample. First, **LLM A (OpenAI's GPT-5)**[^1] generated a static eminence score for each candidate, sorting the cohort by historical prominence. Second, **LLM B (Anthropic's Claude 4.5 Sonnet)** generated Big Five (OCEAN) personality scores for the entire eminence-ranked cohort. Finally, we applied an algorithmic cutoff procedure to determine the optimal cohort size based on psychological diversity, operationalized as the average variance across the five OCEAN traits. The algorithm calculated cumulative personality variance as we added subjects in eminence-descending order, smoothed the curve using a 1,500-point moving average, and performed slope analysis to identify the plateau—the point where additional subjects contributed negligible diversity. This objective procedure yielded a cutoff at 4,987 subjects. Our sensitivity analysis across 412 parameter combinations confirmed the robustness of this cutoff. This approach maximizes sample diversity while excluding subjects with sparse biographical data that would add measurement noise. We executed this procedure during data preparation, ensuring sample size determination was independent of experimental outcomes.
+We then subjected this "eligible" cohort to the third stage, **LLM-Based Candidate Selection**, to determine the final sample. First, **LLM A (OpenAI's GPT-5)** generated a static eminence score for each candidate, sorting the cohort by historical prominence. Second, **LLM B (Anthropic's Claude 4.5 Sonnet)** generated Big Five (OCEAN) personality scores for the entire eminence-ranked cohort. Finally, we applied an algorithmic cutoff procedure to determine the optimal cohort size based on psychological diversity, operationalized as the average variance across the five OCEAN traits. The algorithm calculated cumulative personality variance as we added subjects in eminence-descending order, smoothed the curve using a 1,500-point moving average, and performed slope analysis to identify the plateau—the point where additional subjects contributed negligible diversity. This objective procedure yielded a cutoff at 4,987 subjects. Our sensitivity analysis across 412 parameter combinations confirmed the robustness of this cutoff. This approach maximizes sample diversity while excluding subjects with sparse biographical data that would add measurement noise. We executed this procedure during data preparation, ensuring sample size determination was independent of experimental outcomes.
 
 #### Profile Generation
 
@@ -54,11 +70,13 @@ We generated the personality descriptions used as test interventions in the four
 
 ##### Component Library Neutralization and Validation
 
-To create a robust, double-blind experimental design, we systematically "neutralized" the entire library of interpretive delineations within the **Solar Fire v9.0.3** expert system (Astrolabe Inc., n.d.). Our primary goal was to remove all astrological terminology while preserving core descriptive meaning. We processed this library of components using **LLM C (Google's Gemini 2.5 Pro)**, breaking down the set into 149 individual API calls. We rewrote each snippet using a structured prompt that instructed the model to remove astrological terminology, shift to an impersonal third-person style, and preserve core psychological meaning. This process created a master database of neutralized components. To validate the neutralization, we performed an automated keyword search for over 150 astrological terms, which confirmed that no explicit terminology remained. Table 1 provides an example of this process. We acknowledge that this neutralization results in a loss of nuance, a necessary trade-off for a robust blinding procedure.
+To create a robust, double-blind experimental design, we systematically "neutralized" the entire library of interpretive delineations within the **Solar Fire v9.0.3** expert system (Astrolabe Inc., n.d.). Our primary goal was to remove all astrological terminology while preserving core descriptive meaning. We processed this library of components using **LLM C (Google's Gemini 2.5 Pro)**, breaking down the set into 149 individual API calls. We rewrote each snippet using a structured prompt that instructed the model to remove astrological terminology, shift to an impersonal third-person style, and preserve core psychological meaning. This process created a master database of neutralized components. To validate the neutralization, we performed an automated keyword search for 42 astrological terms present in the origina library, which confirmed that no explicit terminology remained. Table 1 below provides an example of this process. We acknowledge that this neutralization results in a loss of nuance, a necessary trade-off for a robust blinding procedure.
 
 **Component-Level Validation of Discriminability:** To validate that neutralization preserved description discriminability, we analyzed semantic diversity across the 178 neutralized delineation components that serve as building blocks for profile generation. TF-IDF vectorization with pairwise cosine similarity analysis revealed mean similarity of 0.029 (SD = 0.056), indicating components are meaningfully distinct rather than generic variants. Vocabulary analysis showed mean pairwise overlap (Jaccard similarity) of 0.093 (SD = 0.050), with the component library utilizing 1,917 unique terms (type-token ratio = 0.329). Within-category components showed higher semantic similarity (M = 0.033) than between-category components (M = 0.023), confirming the neutralization process preserved the system's semantic structure. Component length varied substantially (M = 32.7 words, SD = 26.2, CV = 0.802), demonstrating the algorithm utilized diverse building blocks rather than template-like patterns. These metrics confirm that neutralization maintained discriminability at the component level, which is then preserved through deterministic assembly into complete profiles.
 
 **Profile-Level Validation via Random Control:** The experimental design itself provides functional validation through the random control condition. If neutralization had created generic, Barnum-like descriptions lacking discriminating power, performance on random mappings would equal performance on correct mappings (since generic descriptions would "match" any biography equally well). The significant correct-vs-random difference at optimal difficulty (k=10: η²=1.25%, *p*<.001) demonstrates that assembled profiles retain sufficient specificity to support above-chance discrimination. Together, the component-level diversity metrics and profile-level discrimination performance provide converging evidence that neutralization maintained rather than eliminated discriminating power.
+
+<br>
 
 *Table 1: Example of Text Neutralization*
 
@@ -70,7 +88,11 @@ To create a robust, double-blind experimental design, we systematically "neutral
 
 The neutralization process is depicted on Figure 3 below.
 
-{{grouped_figure:docs/diagrams/logic_prep_neutralization_simple.mmd | scale=2.0 | width=50% | caption=Figure 3: Text neutralization pipeline implemented via neutralize_delineations.py. The process parses the raw astrological library, processes each component through LLM C (Gemini 2.5 Pro), validates removal of esoteric terminology, and outputs neutralized descriptions while preserving lookup keys for profile assembly.}}
+<br>
+
+{{grouped_figure:docs/diagrams/logic_prep_neutralization_simple.mmd | scale=2.0 | width=40% | caption=Figure 3: Text neutralization pipeline implemented via neutralize_delineations.py. The process parses the raw astrological library, processes each component through LLM C (Gemini 2.5 Pro), validates removal of esoteric terminology, and outputs neutralized descriptions while preserving lookup keys for profile assembly.}}
+
+<br>
 
 ##### Profile Assembly
 
@@ -80,9 +102,9 @@ We then programmatically assembled each test subject's complete, neutralized per
 
 #### Experimental Design and Procedure
 
-We conducted all data generation, experiments, and analysis in October 2025 (see Figure 4 for complete timeline). Specifically, we executed the data preparation pipeline on October 16, conducted the main experimental runs between October 18-22, and performed the final analysis on October 22-25.
+{{grouped_figure:docs/diagrams/timeline_study_execution.mmd | scale=2.0 | width=100% | caption=Figure 4: Study execution timeline (October 2025). Data preparation completed October 16, experimental runs conducted October 18-22 (1,260 experiments, 100,800 LLM queries), and statistical analysis performed October 22-26. This temporal documentation provides critical methodological context given the time-specific behavior and inherent response variability of LLM models.}}
 
-{{grouped_figure:docs/diagrams/timeline_study_execution.mmd | scale=2.0 | width=100% | caption=Figure 4: Study execution timeline (October 2025). Data preparation completed October 16, experimental runs conducted October 18-22 (1,260 experiments, 100,800 LLM queries), and statistical analysis performed October 22-25. This temporal documentation provides critical methodological context given the time-specific behavior and inherent response variability of LLM models.}}
+We conducted all data generation, experiments, and analysis in October 2025 (see Figure 4 for complete timeline). Specifically, we executed the data preparation pipeline on October 16, conducted the main experimental runs between October 18-22, and performed the final analysis on October 22-26.
 
 The study employed a 2 × 3 × 7 factorial design, as detailed in Table 2. The end-to-end research workflow, from generating data for individual experimental conditions to compiling the final study analysis, is illustrated in Figure 5.
 
@@ -94,17 +116,23 @@ The study employed a 2 × 3 × 7 factorial design, as detailed in Table 2. The e
 | **`k` (Group Size)** | Within-Groups | 3 (`7`, `10`, `14`) |
 | **`model`** | Within-Groups | 7 (Claude Sonnet 4, Gemini 2.0 Flash Lite, Llama 3.3 70B, GPT-4o, DeepSeek Chat v3.1, Qwen 2.5 72B, Mistral Large) |
 
-The experimental design is shown on Figure 5 below.
+<br>
 
-{{grouped_figure:docs/diagrams/design_factorial_experiment.mmd | scale=2.5 | width=100% | caption=Figure 5: Experimental design structure showing the 2×3×7 factorial arrangement: 2 mapping strategies (correct vs. random) × 3 group sizes (k=7, 10, 14) × 7 evaluation models = 42 conditions, each with 30 replications.}}
+{{grouped_figure:docs/diagrams/design_factorial_experiment.mmd | scale=2.5 | width=90% | caption=Figure 5: Experimental design structure showing the 2×3×7 factorial arrangement: 2 mapping strategies (correct vs. random) × 3 group sizes (k=7, 10, 14) × 7 evaluation models = 42 conditions, each with 30 replications.}}
 
-Figure 6 below shows an example for generating two experiments and compiling them into a study. 
+<br>
+
+Figure 6 below shows an example for generating two experiments and compiling them into a study.
+
+<br>
 
 {{grouped_figure:docs/diagrams/flow_research_workflow.mmd | scale=2.5 | width=75% | caption=Figure 6: The end-to-end research workflow, showing the generation of individual experiments and their final compilation into a study.}}
 
+<br>
+
 The factor **`mapping_strategy`** is the core experimental manipulation: a `correct` value means the matching test is evaluated against the true mappings between test subjects and their astrologically derived, neutralized peronality descriptions while a `random` value corresponds to arbitrary mappings between the paired lists, effectively creating a control group for each scenario. The LLMs are blinded to the true mappings.
 
-The factor `k` is the size of the test group: the number of test subjects and their corresponding personality descriptions. This factor directly influences the difficulty of the matching task: `k=7` is considered 'easy', `k=10` 'medium-level', and `k=14` 'hard' on the task difficulty scale.
+The factor `k` is the size of the test group: the number of test subjects and their corresponding personality descriptions. This factor directly influences the difficulty of the matching task: `k=7` is considered 'easy', `k=10` 'medium', and `k=14` 'hard' on the task difficulty scale.
 
 We executed the core matching task using seven evaluation models: Claude Sonnet 4, Gemini 2.0 Flash Lite, Llama 3.3 70B, GPT-4o, DeepSeek Chat v3.1, Qwen 2.5 72B, and Mistral Large. For each trial, we provided the LLM with a group of `k` neutralized personality descriptions and a corresponding group of `k` subject names with birth years. We randomly shuffled the presentation order of both lists for each trial to control for position effects. We instructed the model to: (1) independently source biographical information for each individual, (2) assess similarity between each biography and each personality description, and (3) return results as a tab-delimited table of similarity scores (0.00-1.00).
 
@@ -142,9 +170,11 @@ Finally, to facilitate the interpretation of effect sizes, the analysis pipeline
 
 ### Results
 
-The analysis employed a multi-level decomposition approach to comprehensively assess framework effectiveness, moving from an ambiguous aggregate baseline to a clear characterization of model-specific signal detection capabilities. An initial three-way ANOVA on the full dataset revealed a statistical tension: a highly significant main effect for `mapping_strategy` (*F*(1, 1218) = 18.22, *p* < .001) was contrasted by a practically negligible effect size (η² = .003) and a Bayesian analysis that provided anecdotal evidence *for the null hypothesis* (BF₁₀ ≈ 0.35). This apparent contradiction—where the data are simultaneously statistically significant yet more likely under the null—strongly suggests that aggregate statistics are masking substantial underlying heterogeneity. This finding motivates the subsequent multi-level decomposition, which is necessary to identify the specific conditions (i.e., model architecture and task difficulty) under which a robust signal becomes detectable. To control for false discovery rate across 21 primary statistical tests, Benjamini-Hochberg FDR correction was applied; all statistically significant results reported hereafter remained significant after correction (see Supplementary Materials Table S1). For clarity, uncorrected p-values are reported in the main text.
+The analysis employed a multi-level decomposition approach to comprehensively assess framework effectiveness, moving from an ambiguous aggregate baseline to a clear characterization of model-specific signal detection capabilities. An initial three-way ANOVA on the full dataset revealed a statistical tension: a highly significant main effect for `mapping_strategy` (*F*(1, 1218) = 18.22, *p* < .001) was contrasted by a practically negligible effect size (η² = .003) and a Bayesian analysis that provided anecdotal evidence *for the null hypothesis* (BF₁₀ ≈ 0.35). This apparent contradiction—where the data are simultaneously statistically significant yet more likely under the null—strongly suggests that aggregate statistics are masking substantial underlying heterogeneity. This finding motivates the subsequent multi-level decomposition, which is necessary to identify the specific conditions (i.e., model architecture and task difficulty) under which a robust signal becomes detectable. To control for false discovery rate across 21 primary statistical tests, Benjamini-Hochberg FDR correction was applied; all statistically significant results reported hereafter remained significant after correction (see Supplementary Materials Table S7). For clarity, uncorrected p-values are reported in the main text.
 
 Table 3 summarizes the main effect of `mapping_strategy` across all performance metrics at the aggregate level, while Figure 7 visualizes the small difference between conditions. The aggregate analysis also revealed a highly significant main effect for group size `k` (*F*(2, 1218) = 667.48, *p* < .001, η² = .200), confirming that task difficulty substantially impacts performance. The `mapping_strategy × k` interaction approached significance (*F*(2, 1218) = 2.81, *p* = .061), providing further statistical justification for investigating each `k` level independently to pinpoint where the signal was strongest.
+
+<br>
 
 *Table 3: Aggregate ANOVA Results for Main Effect of `mapping_strategy`*
 
@@ -154,7 +184,11 @@ Table 3 summarizes the main effect of `mapping_strategy` across all performance 
 | Top-1 Accuracy Lift | 10.73 | .001 | .001 | [.000, .004] |
 | Top-3 Accuracy Lift | 7.54 | .006 | .001 | [.000, .003] |
 
+<br>
+
 {{grouped_figure:output/studies/publication_run/anova/boxplots/mapping_strategy/boxplot_mapping_strategy_mean_mrr_lift.png | scale=2.5 | width=100% | caption=Figure 7: Aggregate comparison of MRR Lift between correct and random mapping strategies across all models and k-values. While the 'correct' condition showed a statistically significant increase (*F*(1, 1218) = 18.22, *p* < .001), the negligible effect size (η² = .003) creates a statistical tension, motivating the multi-level analysis needed to uncover underlying heterogeneity.}}
+
+<br>
 
 #### Optimal Difficulty Analysis: Identifying the Goldilocks Zone
 
@@ -164,13 +198,19 @@ At k=7 (easiest condition), the main effect of `mapping_strategy` on MRR Lift wa
 
 This Goldilocks pattern demonstrates that the framework requires optimal task calibration: when the task is too easy (k=7), the signal-to-noise ratio may be insufficient to reveal meaningful differences; when too difficult (k=14), noise overwhelms the signal. The k=10 condition represents the optimal difficulty level for this framework and dataset.
 
-{{grouped_figure:output/studies/publication_run/anova/boxplots/k/boxplot_k_mean_mrr_lift.png | scale=2.5 | width=90% | caption=Figure 8: Distribution of MRR Lift values across different group sizes (k). While all three difficulty levels cluster near chance performance (1.0), subsequent subset analyses revealed that k=10 showed the strongest signal detection effect when comparing correct vs. random mappings, demonstrating a Goldilocks pattern where medium difficulty optimizes signal exposure.}}
+<br>
 
-{{grouped_figure:output/studies/publication_run/anova_subsets/effect_sizes/mapping_strategy_x_k.png | scale=2.5 | width=90% | caption=Figure 9: Goldilocks Effect in LLM Signal Detection. Mapping strategy shows optimal effect size at medium task difficulty (k=10, η²=1.25%, p<.001), with significantly weaker effects at easy (k=7, η²=0.25%, ns) and hard (k=14, η²=0.10%, ns) conditions.}}
+{{grouped_figure:output/studies/publication_run/anova/boxplots/k/boxplot_k_mean_mrr_lift.png | scale=2.5 | width=85% | caption=Figure 8: Distribution of MRR Lift values across different group sizes (k). While all three difficulty levels cluster near chance performance (1.0), subsequent subset analyses revealed that k=10 showed the strongest signal detection effect when comparing correct vs. random mappings, demonstrating a Goldilocks pattern where medium difficulty optimizes signal exposure.}}
+
+{{grouped_figure:output/studies/publication_run/anova_subsets/effect_sizes/mapping_strategy_x_k.png | scale=2.5 | width=85% | caption=Figure 9: Goldilocks Effect in LLM Signal Detection. Mapping strategy shows optimal effect size at medium task difficulty (k=10, η²=1.25%, p<.001), with significantly weaker effects at easy (k=7, η²=0.25%, ns) and hard (k=14, η²=0.10%, ns) conditions.}}
+
+<br>
 
 #### Model Heterogeneity: Extreme Variation in Signal Detection Capability
 
-Individual LLM model analyses at the optimal difficulty level (k=10) revealed extreme heterogeneity in signal detection capability, with effect sizes ranging from 0.03% to 17.23%—a 575-fold variation. For each model at k=10, the analysis included 60 observations (30 replications × 2 mapping strategies: correct and random). Table 4 presents signal detection metrics for each evaluation model, with Figures 10 and 11 visualizing this heterogeneity
+Individual LLM model analyses at the optimal difficulty level (k=10) revealed extreme heterogeneity in signal detection capability, with effect sizes ranging from 0.03% to 17.23%—a 575-fold variation. For each model at k=10, the analysis included 60 observations (30 replications × 2 mapping strategies: correct and random). Table 4 presents signal detection metrics for each evaluation model, with Figures 10 and 11 visualizing this heterogeneity.
+
+{{pagebreak}}
 
 *Table 4: Model-Specific Signal Detection at Optimal Difficulty (k=10)*
 
@@ -184,15 +224,23 @@ Individual LLM model analyses at the optimal difficulty level (k=10) revealed ex
 | Mistral Large | 60 | .590 | 0.38% | 0.284 | Minimal (NS) |
 | Claude Sonnet 4 | 60 | .890 | 0.03% | 0.265 | Minimal (NS) |
 
-This heterogeneity reveals that aggregate findings substantially underestimate framework effectiveness for compatible models while overestimating it for incompatible models. The framework successfully exposes signals through GPT-4o and DeepSeek with large effect sizes, moderately through Gemini, and minimally or not at all through Qwen, Llama, Mistral, and Claude. These findings demonstrate that model architecture significantly moderates framework effectiveness.
+<br>
 
-{{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/model/boxplot_model_mean_mrr_lift.png | scale=2.5 | width=100% | caption=Figure 10: Model heterogeneity in signal detection at k=10. Effect sizes range from 0.03% (Claude Sonnet 4) to 17.23% (GPT-4o)—a 575-fold variation in sensitivity to correct personality mapping.}}
+This heterogeneity reveals that aggregate findings substantially underestimate framework effectiveness for compatible models while overestimating it for incompatible models. The framework successfully exposes signals through GPT-4o and DeepSeek with large effect sizes, moderately through Gemini, and minimally or not at all through Qwen, Llama, Mistral, and Claude. These findings demonstrate that model architecture significantly impacts framework effectiveness.
+
+<br>
+
+{{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/model/boxplot_model_mean_mrr_lift.png | scale=2.5 | width=85% | caption=Figure 10: Model heterogeneity in signal detection at k=10. Effect sizes range from 0.03% (Claude Sonnet 4) to 17.23% (GPT-4o)—a 575-fold variation in sensitivity to correct personality mapping.}}
 
 {{pagebreak}}
 
 Figure 11 below shows the extreme difference in signal detection capability across the models.
 
-{{grouped_figure:docs/diagrams/viz_model_heterogeneity.mmd | scale=2.5 | width=100% | caption=Figure 11: A conceptual summary of the 575-fold variation in signal detection capability at optimal difficulty (k=10). Models demonstrate three tiers: strong detection (GPT-4o, DeepSeek), moderate detection (Gemini), and minimal/no detection (Qwen, Llama, Mistral, Claude). This illustrates that framework effectiveness requires both a compatible architecture and optimal task difficulty.}}
+<br>
+
+{{grouped_figure:docs/diagrams/viz_model_heterogeneity.mmd | scale=2.5 | width=55% | caption=Figure 11: A conceptual summary of the 575-fold variation in signal detection capability at optimal difficulty (k=10). Models demonstrate three tiers: strong detection (GPT-4o, DeepSeek), moderate detection (Gemini), and weak/minimal detection (Qwen, Llama, Mistral, Claude). This illustrates that framework effectiveness requires both a compatible architecture and optimal task difficulty.}}
+
+<br>
 
 #### Signal Detection Trajectories: Goldilocks vs. Flat Patterns
 
@@ -213,6 +261,8 @@ Llama similarly showed a flat pattern: k=7 (*p* = .367, η² = 1.41%), k=10 (*p*
 
 Table 5 summarizes complete trajectories for these representative models, with Figure 12 illustrating the distinct patterns at the optimal difficulty level.
 
+<br>
+
 *Table 5: Signal Detection Trajectories Across Difficulty Levels*
 
 | Model | k=7 η² | k=10 η² | k=14 η² | Pattern Type |
@@ -223,6 +273,8 @@ Table 5 summarizes complete trajectories for these representative models, with F
 | Llama | 1.41% (NS) | 2.77% (NS) | 0.24% (NS) | Flat |
 
 *Note: NS = not significant; * p < .05; ** p < .01; *** p < .001*
+
+<br>
 
 These trajectory analyses reveal that framework effectiveness requires both optimal difficulty calibration (k=10) and compatible model architecture (GPT-4o, DeepSeek). Having only one requirement satisfied is insufficient: compatible models at suboptimal difficulty show minimal detection (GPT-4o at k=7 or k=14), while incompatible models show minimal detection regardless of difficulty (Claude, Llama at all k levels).
 
@@ -247,8 +299,6 @@ The identification of k=10 as the optimal difficulty level (η² = 1.25%) demons
 The most critical discovery is the extreme model-to-model variation in signal detection capability, ranging from 0.03% to 17.23%—a 575-fold difference. This heterogeneity fundamentally reframes our understanding of framework effectiveness: the framework does not work uniformly across models but instead reveals which model architectures are compatible with the task of detecting weak signals in complex narratives.
 
 GPT-4o and DeepSeek demonstrated strong signal detection (17.23% and 11.16% respectively), with effect sizes far exceeding the aggregate (see Table 4). The magnitude of GPT-4o's effect is substantial; in practical terms, this 17.23% variance explained corresponds to a nearly 18% improvement in its Top-3 Accuracy Lift at the optimal difficulty (k=10) compared to its baseline performance at suboptimal difficulties. These models successfully function as sensitive instruments for exposing subtle patterns in narrative-biographical matching tasks. In contrast, Claude, Llama, and Mistral showed minimal to no signal detection (0.03%, 2.77%, and 0.38%), suggesting fundamental incompatibility with this framework regardless of task calibration (see Table 5 for complete trajectory patterns).
-
-**Addressing Contamination Concerns:** Three evaluation models share providers with data generation models, raising potential contamination concerns: GPT-4o (same provider as eminence scoring model GPT-5), Claude Sonnet 4 (same family as OCEAN scoring model Claude 4.5 Sonnet), and Gemini 2.0 Flash Lite (same family as neutralization model Gemini 2.5 Pro). If contamination explained the observed signals, we would expect these three models to show consistently elevated performance. Instead, they demonstrate opposite patterns: GPT-4o shows the strongest signal detection (η²=17.23%, *p*<.001), Gemini shows moderate detection (η²=7.63%, *p*=.033), and Claude shows essentially no detection (η²=0.03%, *p*=.890). This 575-fold variation within the "contaminated" set mirrors the variation across all models, suggesting that architectural differences—not training data overlap—drive signal detection capability. Furthermore, DeepSeek V3.1 (the second-strongest performer with η²=11.16%) has zero overlap with data generation models, demonstrating that strong signal detection occurs in fully independent architectures. While contamination risk cannot be definitively excluded with closed-source models, the empirical patterns are inconsistent with contamination as a primary explanation for the observed heterogeneity.
 
 This heterogeneity also explains the apparent contradiction between the significant frequentist result and the Bayesian analysis, which favored the null hypothesis (BF₁₀ ≈ 0.35). The Bayesian analysis correctly concluded that there was no consistent signal *at the aggregate level*. This finding was not a statistical artifact but an accurate reflection of the data: the strong positive signals from the few compatible models (GPT-4o, DeepSeek) were overwhelmed by the null results from the majority of incompatible models. The aggregate statistics, therefore, masked rather than revealed the framework's true performance with specific, compatible architectures.
 
@@ -278,11 +328,9 @@ This study embodies open science principles through fully automated, publicly av
 
 Several alternative explanations merit consideration. **The Barnum Effect:** The concern that neutralized descriptions might be generic statements that apply universally is addressed by four key findings: (1) The random control condition provides the critical test—if descriptions were Barnum-like (vague, universally applicable), models would show equivalent performance on correct and random mappings since generic descriptions would "match" anyone equally well. Instead, models at k=10 showed significantly better performance with correct mappings (η²=1.25%, *p*<.001), demonstrating that descriptions contain discriminating information. (2) The extreme model heterogeneity (575× variation) argues against a universal-match explanation—if descriptions applied to everyone, all models would perform similarly. (3) The neutralization process was validated to preserve lookup-key integrity while removing jargon (automated keyword search confirmed zero residual astrological terminology), maintaining the deterministic structure-content relationship. (4) The Goldilocks pattern across k-values demonstrates that task difficulty (number of profiles to discriminate among) systematically affects performance—this pattern would not emerge if descriptions lacked discriminating power. However, a formal validation study measuring description specificity (e.g., using semantic diversity metrics or human rater discriminability tests) would provide stronger evidence that neutralization preserved rather than eliminated uniqueness.
 
-Demographic confounds, such as the "birth season effect" or a self-fulfilling prophecy based on cultural stereotypes (e.g., an "assertive Aries"), are unlikely to explain the findings. The personality descriptions are a composite signal derived from two distinct sources: (1) the simple placements of 12 chart points in their respective signs (as opposed to just the Sun sign), and (2) five different algorithmic balance configurations based on the distribution of these points across elements, modes, quadrants, hemispheres, and signs. While a person may be aware of their Sun sign, the 12 chart-point placements combined with the balance configurations (which are the output of a specific, non-obvious weighting algorithm, resulting in classifications like "Element Fire Weak" or "Quadrant 3 Strong") produce a complex esoteric signal that is impossible to confound culturally. Furthermore, the extreme model heterogeneity argues against a simple cultural confound, which one would expect to be detected more uniformly across different LLM architectures.
+Demographic confounds, such as the "birth season effect" or a self-fulfilling prophecy based on **cultural stereotypes** (e.g., an "assertive Aries"), are unlikely to explain the findings. The personality descriptions are a composite signal derived from two distinct sources: (1) the simple placements of 12 chart points in their respective signs (as opposed to just the Sun sign), and (2) five different algorithmic balance configurations based on the distribution of these points across elements, modes, quadrants, hemispheres, and signs. While a person may be aware of their Sun sign, the 12 chart-point placements combined with the balance configurations (which are the output of a specific, non-obvious weighting algorithm, resulting in classifications like "Element Fire Weak" or "Quadrant 3 Strong") produce a complex esoteric signal that is impossible to confound culturally. Furthermore, the extreme model heterogeneity argues against a simple cultural confound, which one would expect to be detected more uniformly across different LLM architectures.
 
-While neutralization removed astrological terminology, subtle era-specific biographical patterns may persist. Future research comparing biography sources could help isolate signal types.
-
-Model heterogeneity itself suggests the signal requires specific architectural features: top-performing general-purpose models (Claude, Llama) show minimal detection while others (GPT-4o, Gemini) show strong detection, indicating detection capability is not correlated with overall model performance.
+While neutralization removed astrological terminology, subtle era-specific **biographical patterns** may persist. Future research comparing biography sources could help isolate signal types.
 
 #### Philosophical Implications
 
@@ -312,7 +360,7 @@ Correspondence concerning this article should be addressed to Peter J. Marko at 
 
 ### Author Contributions
 
-Peter J. Marko was responsible for the conceptualization, methodology, software, formal analysis, investigation, and writing the original draft of the article. Kenneth McRitchie was responsible for supervision, assisted with the conceptualization, and reviewed and edited the article.
+Peter J. Marko was responsible for the conceptualization, investigation, methodology, software development, formal analysis, documentation, and the original draft of the article. Kenneth McRitchie proposed the idea, assisted with the conceptualization, and reviewed and edited the article.
 
 **ORCID iDs**
 
@@ -333,17 +381,17 @@ In accordance with the principles of open science and methodological reproducibi
 
 **Repository Contents:**
 
-- **Replication Guide** (Supplementary Material): Complete step-by-step procedures for all three replication paths, including detailed descriptions of the data preparation pipeline, astrological weighting system, pilot study on LLM selection, and experiment workflow
-- **Framework Manual**: Technical specifications, data formats, and API references
-- **README**: Quick start guide and framework overview
-- **Source Code**: Complete Python and PowerShell codebase (147 scripts, 41,000+ lines) with comprehensive test suite and 40 technical diagrams
+- **README**: Quick start guide and framework overview.
+- **Replication Guide** (Supplementary Material): Project overview, description of interactive tools and production codebase, complete step-by-step procedures for all three replication paths, including detailed descriptions of the data preparation pipeline, validation procedures, and experiment workflow.
+- **Framework Manual**: Technical specifications, data formats, and API references.
+- **Source Code**: Complete Python and PowerShell codebase (147 scripts, 41,000+ lines) with comprehensive test suite and 40 technical diagrams.
 - **Data Files**: Static datasets for direct replication (34 files total), including:
   - Neutralized component library (CSV format with component IDs and neutralized text)
   - Final subject database (CSV format with biographical and astrological metadata)
   - Raw experimental results (JSON format with trial-level data and model responses)
   - Compiled study-level analysis results (CSV format with summary statistics)
-- **Configuration Files**: Exact parameter settings used in the original study
-- **Data Dictionaries**: Complete documentation of variable names, data types, valid ranges, and missing data codes for all datasets
+- **Configuration Files**: Exact parameter settings used in the original study.
+- **Data Dictionaries**: Complete documentation of variable names, data types, valid ranges, and missing data codes for all datasets.
 
 Example data structures and loading scripts are included to facilitate immediate data access and reuse.
 
@@ -352,7 +400,7 @@ Example data structures and loading scripts are included to facilitate immediate
 ---
 [^1]: The naming of the data generation models reflects the latest versions available at the time of the study. For provider details and release context, see Appendix C of the Supplementary Materials (Replication Guide).
 
-[^2]: Complete FDR-corrected p-values for all 21 primary statistical tests are provided in Supplementary Materials Table S1. The corrected values confirm that all findings reported as "statistically significant" in the main text remain significant after controlling for multiple comparisons (smallest corrected p = .000037 for aggregate mapping_strategy effect on MRR Lift).
+[^2]: Complete FDR-corrected p-values for all 21 primary statistical tests are provided in Supplementary Materials (Replication Guide) Table S7. The corrected values confirm that all findings reported as "statistically significant" in the main text remain significant after controlling for multiple comparisons (smallest corrected p = .000037 for aggregate mapping_strategy effect on MRR Lift).
 
 ### References
 
@@ -393,6 +441,8 @@ Lewis, J. R. (1994). Southern Hemisphere. In *The Astrology Encyclopedia* (p. 48
 Marko, P. J. (2018). Boomers and the lunar defect. *The Astrological Journal, 60*(1), 35-39.
 
 McRitchie, K. (2022). How to think about the astrology research program: An essay considering emergent effects. *Journal of Scientific Exploration*, *36*(4), 706-716. https://doi.org/10.31275/20222641
+
+McRitchie, K., & Marko, P. J. (n.d.). Is astrology relevant to what consciousness is like? (manuscript in preparation)
 
 Open Science Collaboration. (2015). Estimating the reproducibility of psychological science. *Science*, *349*(6251), aac4716.
 

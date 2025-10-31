@@ -59,6 +59,14 @@ This document outlines planned tasks categorized by work stream and tracks known
 
 ## Future Work: Potential Enhancements After Publication
 
+### Pipeline Robustness and Reporting
+- [ ] **Correct the reporting logic in `analyze_cutoff_parameters.py`** to align with its stability-focused selection algorithm.
+  - [ ] Sort the `cutoff_parameter_stability_report.txt` by `Deviation from Consensus` instead of by `Error`.
+  - [ ] Add the `Deviation` column to the final `cutoff_parameter_analysis_results.csv` to provide context for the recommendation.
+- [ ] **Implement consistent artifact backup mechanism** for key data preparation scripts.
+  - [ ] `select_final_candidates.py`: Add backup for the `variance_curve_analysis.png` file before it is overwritten.
+  - [ ] `analyze_cutoff_parameters.py`: Add backup for its three output files (`.csv`, `.txt`) before they are overwritten.
+
 ### Code Development
 
 - [ ] **Create Unit Tests for Developer Utility Scripts**

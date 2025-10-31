@@ -1,0 +1,31 @@
+graph TB
+    subgraph "Input from Stage 4"
+        PROFILES[("Neutralized Profiles<br>n=4,987")]
+    end
+
+    subgraph "Stage 5: Evaluation"
+        EVAL["7 Evaluation Models<br>• GPT-4o<br>• DeepSeek Chat v3.1<br>• Gemini 2.0 Flash Lite<br>• Qwen 2.5 72B<br>• Llama 3.3 70B<br>• Mistral Large<br>• Claude Sonnet 4"]
+        EXP["Experimental Runs<br>42 conditions × 30 reps<br>= 1,260 experiments<br>= 100,800 LLM queries"]
+    end
+
+    subgraph "Stage 6: Analysis"
+        RESULTS[("Raw Results<br>Similarity Matrices")]
+        ANALYSIS["Statistical Analysis<br>Multi-level ANOVA<br>Bayesian Analysis"]
+        FINDINGS["Published Findings"]
+    end
+
+    PROFILES --> EVAL
+    EVAL --> EXP
+    EXP --> RESULTS
+    RESULTS --> ANALYSIS
+    ANALYSIS --> FINDINGS
+
+    classDef dataNode fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    classDef llmNode fill:#fff4e1,stroke:#ff9900,stroke-width:2px
+    classDef processNode fill:#f0f0f0,stroke:#666,stroke-width:1px
+    classDef evalNode fill:#ffe1f5,stroke:#cc0066,stroke-width:2px
+
+    class PROFILES,RESULTS dataNode
+    class EVAL llmNode
+    class EXP,ANALYSIS processNode
+    class EVAL evalNode

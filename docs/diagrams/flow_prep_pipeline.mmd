@@ -21,6 +21,7 @@ graph TD
     subgraph "Stage 3: LLM-based Candidate Selection"
         D["Generate Eminence Scores<br>src/generate_eminence_scores.py<br>(Uses LLM)"]
         E["Generate OCEAN Scores<br>src/generate_ocean_scores.py<br>(Uses LLM)"]
+        E2["Analyze Cutoff Parameters<br>src/analyze_cutoff_parameters.py"]
         F["Select Final Candidates<br>src/select_final_candidates.py"]
     end
 
@@ -37,14 +38,14 @@ graph TD
     end
 
     %% --- Main Workflow Connections ---
-    StartDB --> A --> B --> B2 --> C --> D --> E --> F --> G --> H
+    StartDB --> A --> B --> B2 --> C --> D --> E --> E2 --> F --> G --> H
     H --> J
     I --> K
     J --> K
     K --> FinalDB
 
     %% --- Styling ---
-    class A,B,B2,C,D,E,F,G,I,J,K scriptStyle
+    class A,B,B2,C,D,E,E2,F,G,I,J,K scriptStyle
     class H manualStyle
     class StartDB sourceStyle
     class FinalDB finalProductStyle
