@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 16.6.3 (2025-11-02)
+
+### Bump
+
+- **version 16.6.2 → 16.6.3**
+
+### Documentation
+
+- **add final project README**
+  Adds the final, generated README.md file to the repository. This file will be displayed on the main GitHub project page, providing an essential overview for visitors and users.
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 16.6.2 (2025-11-02)
 
 ### Bump
