@@ -2,41 +2,10 @@
 
 This document outlines planned tasks categorized by work stream and tracks known issues for the project.
 
-## Tasks Prior to Publication
-
-### Final Documentation Polish
-
-- [ ] **Perform a final review of all documents** to ensure they are clean, consistent, and easy for an external researcher to understand.
-  - [ ] Check all tables and diagrams.
-  - [ ] Check counts and dates.
-  - [ ] Create a permanent Git tag (e.g., `v1.0-publication`) to mark the exact version of the code used to generate the paper's results.
-
-## Final Review and Preprint Publication
-
-- [ ] **Establish Public Repository**
-  - [ ] Create a public GitHub repository for the project.
-  - [ ] Create the 'production' branch, 'checkout' the publication version, and 'cherry-pick' the latest 'development' release.
-  - [ ] Tag the latest release as 'public' and push all final code, data, and documentation to the repository. 
-  - [ ] Set the default branch to 'production'.
-- [ ] **Final Co-Author Review**
-  - [ ] Provide the co-author with the final manuscript, the live repository link, and a summary of the final results.
-  - [ ] Incorporate any final revisions from the co-author and push updates to the repository.
-- [ ] **Update Online Author Profiles**
-    - [ ] Update GitHub profile.
-    - [ ] Update ORCID profile with the new publication/project.
-- [ ] **Preprint Publication**
-  - [ ] Post the final manuscript to a preprint server like PsyArXiv.
-  - [ ] Tag the latest release as 'preprint'.
-
 ## Journal Submission and Peer Review
 
-- [ ] **Solicit Pre-Submission Expert Feedback**
-  - [ ] Identify and contact key field experts (e.g., Currey, Godbout) for friendly pre-submission (courtesy) reviews.
-  - [ ] Incorporate feedback into the final manuscript draft.
-- [ ] **Final Co-Author Approval**
-  - [ ] Secure final approval from the co-author on the revised manuscript before submission.
 - [ ] **Manuscript Finalization**
-  - [ ] Add ORCID iDs for all authors (if applicable)
+  - [ ] Add ORCID iDs for all authors
   - [ ] Verify all figures render correctly in final manuscript
   - [ ] Prepare the final version of the manuscript with numbered lines.
 - [ ] **Compliance & Disclosure**
