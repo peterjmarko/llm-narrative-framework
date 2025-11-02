@@ -79,12 +79,18 @@ docs/FRAMEWORK_MANUAL.md
 docs/PROJECT_ROADMAP.md
 docs/REPLICATION_GUIDE.md
 docs/TESTING_GUIDE.md
-docs/images/
+# Exclude image files
+docs/images/*
+# Explicitly allow README diagrams
+!docs/images/documentation_map.png
+!docs/images/arch_project_overview.png
+!docs/images/flow_research_workflow.png
+# Exclude PDF and DOCX files
 docs/pdf_copies/
 docs/word_docs/
 *.docx
-!docs/custom_reference.docx # Explicitly allow the custom reference document
-
+# Explicitly allow the custom reference document
+!docs/custom_reference.docx
 
 # ==============================================================================
 # --- Data Pipeline Artifacts ---
