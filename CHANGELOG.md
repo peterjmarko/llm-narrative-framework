@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 16.6.2 (2025-11-02)
+
+### Bump
+
+- **version 16.6.1 → 16.6.2**
+
+### Documentation
+
+- **add git history log for archival**
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 16.6.1 (2025-10-31)
 
 ### Bump
