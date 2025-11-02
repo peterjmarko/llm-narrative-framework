@@ -1,0 +1,643 @@
+f93c21f 2025-10-31  (HEAD -> development, tag: v16.6.1) bump: version 16.6.0 → 16.6.1
+dafa378 2025-10-31  (tag: v1.4-preprint-2) fix(release): bump version for latest updates
+0ac27a2 2025-10-31  docs(article): add Responsible AI Usage Statement and LLM assistance disclosure
+87faa1d 2025-10-31  (tag: v16.6.0) bump: version 16.5.0 → 16.6.0
+a7b4faf 2025-10-31  (tag: v1.3-preprint) feat(project): add search utility and synchronize documentation
+e8b8d06 2025-10-27  (tag: v16.5.0) bump: version 16.4.1 → 16.5.0
+24ebf8a 2025-10-27  feat(publication): Finalize documentation and build process for publication
+1244557 2025-10-26  (tag: v16.4.1) bump: version 16.4.0 → 16.4.1
+8c1eb4c 2025-10-26  fix(reproducibility): correct computational reproducibility claims and address reviewer concerns
+e966727 2025-10-26  (tag: v16.4.0) bump: version 16.3.0 → 16.4.0
+0b5d04a 2025-10-26  feat(diagrams): add missing diagrams for article publication
+7df48ea 2025-10-25  (tag: v16.3.0) bump: version 16.2.1 → 16.3.0
+250a7e2 2025-10-25  feat(charts): add config-driven effect size chart system with Goldilocks visualization
+7ed8c7e 2025-10-25  (tag: v16.2.1) bump: version 16.2.0 → 16.2.1
+9ecd1bb 2025-10-25  fix(release): bump version for latest updates
+bf1dcae 2025-10-25  docs(documentation-alignment): establish clear document roles, cross-references, and audience guidance across all documentation
+223a6d5 2025-10-25  (tag: v16.2.0) bump: version 16.1.2 → 16.2.0
+4290244 2025-10-25  feat(analysis): add subset analysis scripts and fix plot handling
+6a00e30 2025-10-24  (tag: v16.1.2) bump: version 16.1.1 → 16.1.2
+02c68da 2025-10-24  fix(anova-analysis): fix subset analysis pipeline and improve documentation clarity
+45a9f2d 2025-10-24  (tag: v16.1.1) bump: version 16.1.0 → 16.1.1
+968d8eb 2025-10-24  fix(release): bump version for latest updates
+648beec 2025-10-23  docs(documentation-suite): complete documentation alignment and restructuring for publication readiness
+93a063b 2025-10-23  (tag: v16.1.0) bump: version 16.0.0 → 16.1.0
+5bcde52 2025-10-23  feat(manuscript): finalize manuscript for publication with peer review prebuttals
+19d7785 2025-10-23  (tag: v16.0.0) bump: version 15.3.0 → 16.0.0
+1914a8b 2025-10-23  feat(framework): implement stability overhaul and finalize publication manuscript
+7fa525d 2025-10-21  (tag: v15.3.0) bump: version 15.2.1 → 15.3.0
+d0b12b6 2025-10-21  (tag: v1.2-stats) feat(workflow): enhance workflow resiliency and overhaul documentation
+2e8aeb9 2025-10-19  (tag: v15.2.1) bump: version 15.2.0 → 15.2.1
+8fa0ef1 2025-10-19  fix(release): bump version for latest updates
+42248ae 2025-10-19  docs(framework-manual): enhance Framework Manual with navigation aids and cross-reference standardization
+10a5d70 2025-10-18  (tag: v15.2.0) bump: version 15.1.2 → 15.2.0
+44ae52d 2025-10-18  (tag: v1.1-exp-run) feat(experiment-config): enahnce interactive study parameter selection with multi-parameter support
+8a93b68 2025-10-18  (tag: v15.1.2) bump: version 15.1.1 → 15.1.2
+d1768eb 2025-10-18  fix(release): bump version for latest updates
+5146f9d 2025-10-18  docs(replication-guide): finalize 7-model experimental design with tri-continental representation
+af94916 2025-10-17  (tag: v15.1.1) bump: version 15.1.0 → 15.1.1
+8ff4ed9 2025-10-17  fix(docs): resolve DOCX rebuild issue and streamline README for first-time users
+f06908d 2025-10-17  (tag: v15.1.0) bump: version 15.0.3 → 15.1.0
+235a354 2025-10-17  feat(experiment-workflow): add interactive study parameter selection to new_experiment.ps1
+433408e 2025-10-17  (tag: v15.0.3) bump: version 15.0.2 → 15.0.3
+48796eb 2025-10-17  fix(data-prep): Correct paths and configs after assembly logic refactor
+ffac90e 2025-10-16  (tag: v15.0.2) bump: version 15.0.1 → 15.0.2
+6938d0a 2025-10-16  (tag: v1.0-data-prep) refactor(data-prep): Relocate and refactor assembly logic workflow, fix pipeline bugs
+992a8f8 2025-10-16  (tag: v15.0.1) bump: version 15.0.0 → 15.0.1
+5ceb005 2025-10-16  fix(data-prep): Refine cutoff analysis, fix scoring bugs, and improve docs
+1f722ae 2025-10-15  (tag: v15.0.0) bump: version 14.0.0 → 15.0.0
+266d4e6 2025-10-15  fix(data-prep): harden subject validator and align all tests
+570671d 2025-10-15  (tag: v14.0.0) bump: version 13.2.4 → 14.0.0
+6757617 2025-10-15  feat(data-prep): refactor qualification, add Wikidata, and fix scoring logic
+0034f3f 2025-10-15  (tag: v13.2.4) bump: version 13.2.3 → 13.2.4
+3cc4db7 2025-10-15  refactor(data-prep): standardize reports and improve orchestration logic
+6acc3a5 2025-10-15  (tag: v13.2.3) bump: version 13.2.2 → 13.2.3
+fffdb73 2025-10-15  fix(docs,-testing,-orchestrator): align all documentation and tests with name sanitization refactor
+fe86b4d 2025-10-14  (tag: v13.2.2) bump: version 13.2.1 → 13.2.2
+faef197 2025-10-14  refactor(data-prep): overhaul name sanitization and fix L3 test harness
+fe6ee5c 2025-10-14  (tag: v13.2.1) bump: version 13.2.0 → 13.2.1
+a9ea387 2025-10-14  fix(data-prep): overhaul test suites and harden data pipeline
+c72e32f 2025-10-14  (tag: v13.2.0) bump: version 13.1.1 → 13.2.0
+c17c621 2025-10-14  feat(reporting,-tests,-deps): overhaul data prep summary and add validation tests
+f5ef8fd 2025-10-13  (tag: v13.1.1) bump: version 13.1.0 → 13.1.1
+d5ab80e 2025-10-13  fix(testing): Resolve cascading test failures and overhaul testing workflow
+ec5bc42 2025-10-12  (tag: v13.1.0) bump: version 13.0.0 → 13.1.0
+478cf39 2025-10-12  feat(testing): implement comprehensive audit logging system for all operations
+870edff 2025-10-12  (tag: v13.0.0) bump: version 12.16.0 → 13.0.0
+c875cc7 2025-10-12  refactor(data-prep): reorganize data directory structure and improve report management
+2a63e4d 2025-10-11  (tag: v12.16.0) bump: version 12.15.2 → 12.16.0
+fad7793 2025-10-11  feat(core): add global lock mechanism to prevent race conditions in PDM operations
+c814dbd 2025-10-11  (tag: v12.15.2) bump: version 12.15.1 → 12.15.2
+ab8b634 2025-10-11  fix(data-prep): fix Layer 3 test hang and improve small dataset handling
+bd23e16 2025-10-11  (tag: v12.15.1) bump: version 12.15.0 → 12.15.1
+7ed37b4 2025-10-11  fix(data-prep): fix StopAfterStep parameter not halting pipeline correctly
+cd75106 2025-10-11  (tag: v12.15.0) bump: version 12.14.1 → 12.15.0
+dbec14e 2025-10-11  feat(data-prep): integrate cutoff parameter analysis as automated Step 7 in data pipeline
+e66b9dc 2025-10-10  (tag: v12.14.1) bump: version 12.14.0 → 12.14.1
+6524e90 2025-10-10  fix(layer3): fix integration test execution flow and file isolation
+d5eee63 2025-10-10  (tag: v12.14.0) bump: version 12.13.0 → 12.14.0
+760e927 2025-10-10  feat(data-prep): add data preparation summary report and fix testing infrastructure
+ec54709 2025-10-08  (tag: v12.13.0) bump: version 12.12.0 → 12.13.0
+104767a 2025-10-08  feat(data-prep): Enhance pipeline state machines with configurable Solar Fire integration and comprehensive documentation
+846841d 2025-10-07  (tag: v12.12.0) bump: version 12.11.0 → 12.12.0
+120a288 2025-10-07  feat(data-preparation): Implement tiered approach for handling missing subjects in LLM scoring steps
+4f1bc59 2025-10-06  (tag: v12.11.0) bump: version 12.10.0 → 12.11.0
+74af7b7 2025-10-06  feat(data-prep): Data preparation pipeline and interactive mode
+704189b 2025-10-06  (tag: v12.10.0) bump: version 12.9.0 → 12.10.0
+6c1715d 2025-10-06  feat(prepare_data.ps1): enhance parameter reporting and user experience
+56d9caa 2025-10-06  (tag: v12.9.0) bump: version 12.8.2 → 12.9.0
+05857df 2025-10-06  feat(docs): Align documentation structure and content across Framework Manual, Replication Guide, and Research Article
+53d3a13 2025-10-05  (tag: v12.8.2) bump: version 12.8.1 → 12.8.2
+9e8d1cb 2025-10-05  fix(release): bump version for latest updates
+2797b5f 2025-10-05  docs(docs): Align Replication Guide and Framework Manual
+773b977 2025-10-05  (tag: v12.8.1) bump: version 12.8.0 → 12.8.1
+73f73fb 2025-10-05  fix(testing): fix test configuration section name
+45df4db 2025-10-05  (tag: v12.8.0) bump: version 12.7.0 → 12.8.0
+30dd7cf 2025-10-05  feat(all): Standardize terminology to "workflow" and improve build system
+7e70a0a 2025-10-05  (tag: v12.7.0) bump: version 12.6.0 → 12.7.0
+e2d9909 2025-10-05  feat(all): refactor config section and improve documentation
+1be9ba2 2025-10-04  (tag: v12.6.0) bump: version 12.5.4 → 12.6.0
+b434c90 2025-10-04  feat(core): automate solar fire file transfer operations
+0b05311 2025-10-04  (tag: v12.5.4) bump: version 12.5.3 → 12.5.4
+aa2e51b 2025-10-04  fix(tests): fix test suite issues and improve output formatting
+4259e9d 2025-10-04  (tag: v12.5.3) bump: version 12.5.2 → 12.5.3
+ace300c 2025-10-04  fix(tests,-docs): Fix Layer 4 test configuration and add CHANGELOG header
+aed3831 2025-10-04  (tag: v12.5.2) bump: version 12.5.1 → 12.5.2
+25ee56b 2025-10-04  fix(tests): Fix experiment auditor tests after metrics update
+3a4f925 2025-10-04  (tag: v12.5.1) bump: version 12.5.0 → 12.5.1
+c215ad9 2025-10-04  fix(experiment-lifecycle): Fix infinite reprocess loop after creating new replications
+6abebce 2025-10-04  (tag: v12.5.0) bump: version 12.4.0 → 12.5.0
+5c06431 2025-10-04  feat(testing): enhance test output formatting with colored banners
+1555d29 2025-10-04  (tag: v12.4.0) bump: version 12.3.1 → 12.4.0
+58e3ba2 2025-10-04  feat(assembly): automate file transfers between project and Solar Fire directories
+5b2bf87 2025-10-04  (tag: v12.3.1) bump: version 12.3.0 → 12.3.1
+0da283c 2025-10-04  fix(build-system): Fix DOCX generation duplicates and exclusions
+b78085f 2025-10-04  docs(replication-guide): Fix and restructure Replication Guide with separate workflow diagrams
+9dfebc1 2025-10-04  (tag: v12.3.0) bump: version 12.2.3 → 12.3.0
+73a64f3 2025-10-04  feat(testing): enhance testing framework with 4-pillar architecture and improved assembly logic workflow
+42e6e59 2025-10-03  (tag: v12.2.3) bump: version 12.2.2 → 12.2.3
+1ae2875 2025-10-03  fix(release): bump version for latest updates
+5f0ebb1 2025-10-03  docs(TESTING_GUIDE): restructure Testing Guide with comprehensive 4-pillar architecture
+6a0e1bc 2025-10-03  (tag: v12.2.2) bump: version 12.2.1 → 12.2.2
+ef06f3e 2025-10-03  fix(tests): fix failing unit tests in experiment lifecycle modules
+3664834 2025-10-02  (tag: v12.2.1) bump: version 12.2.0 → 12.2.1
+2dd8c04 2025-10-02  fix(testing): Fix analyze_llm_performance.py coverage and process_llm_responses.py validation logic
+4a3f14d 2025-10-02  (tag: v12.2.0) bump: version 12.1.0 → 12.2.0
+1258d5b 2025-10-02  feat(validation): add median metrics and complete validation suite formatting
+e8acaf0 2025-10-01  (tag: v12.1.0) bump: version 12.0.0 → 12.1.0
+3aad421 2025-10-01  feat(bias-methodology): document rank-based approach for bias detection and update validation to use mean_rank
+f8f203b 2025-10-01  (tag: v12.0.0) bump: version 11.7.1 → 12.0.0
+4279d52 2025-10-01  fix(release): bump version for latest updates
+8a594e6 2025-10-01  docs(study-design): optimize sample size and model selection for main study
+b96611d 2025-10-01  (tag: v11.7.1) bump: version 11.7.0 → 11.7.1
+fa63aef 2025-10-01  fix(validation): correct MRR chance levels and update validation framework to K=[8,12]
+cf9418a 2025-10-01  (tag: v11.7.0) bump: version 11.6.2 → 11.7.0
+2c794d5 2025-10-01  feat(validation): update statistical validation framework for K=[8,12] design with dynamic K-value detection
+21d8774 2025-09-30  (tag: v11.6.2) bump: version 11.6.1 → 11.6.2
+a3e5a22 2025-09-30  fix(validation): fix ANOVA validation parser for GraphPad Prism exports
+2048759 2025-09-30  (tag: v11.6.1) bump: version 11.6.0 → 11.6.1
+b71b10a 2025-09-30  fix(validation): Fix statistical validation workflow filtering and implement honest validation methodology
+89f5b94 2025-09-30  (tag: v11.6.0) bump: version 11.5.2 → 11.6.0
+88bc21c 2025-09-30  feat(validation): implement dual-methodology statistical validation with representative sampling
+450f498 2025-09-29  (tag: v11.5.2) bump: version 11.5.1 → 11.5.2
+f22e559 2025-09-29  fix(validation): correct MRR chance levels and hypothesis testing logic
+7584dd1 2025-09-29  (tag: v11.5.1) bump: version 11.5.0 → 11.5.1
+d18092c 2025-09-29  fix(validation): resolve correctness issues in GraphPad validation scripts
+411e029 2025-09-28  (tag: v11.5.0) bump: version 11.4.0 → 11.5.0
+513879b 2025-09-28  feat(validation): enhance statistical validation scripts with improved UX and reliability
+c1fb572 2025-09-28  (tag: v11.4.0) bump: version 11.3.0 → 11.4.0
+6ea8b26 2025-09-28  feat(error-handling): enhance error reporting and repair reliability across LLM pipeline
+c0f355b 2025-09-27  (tag: v11.3.0) bump: version 11.2.3 → 11.3.0
+bf92a29 2025-09-27  feat(experiment-lifecycle-robustness): implement comprehensive parsing diagnostics and enhanced error handling
+c8582fc 2025-09-26  (tag: v11.2.3) bump: version 11.2.2 → 11.2.3
+063add9 2025-09-26  fix(experiment-lifecycle): resolve crashes, infinite loops, and parsing failures across LLM framework
+b4fcc9f 2025-09-26  (tag: v11.2.2) bump: version 11.2.1 → 11.2.2
+5ac0299 2025-09-26  fix(validation): resolve statistical validation pipeline blocking issues
+a30f5a9 2025-09-25  (tag: v11.2.1) bump: version 11.2.0 → 11.2.1
+ce6f496 2025-09-25  fix(validation): complete GraphPad Prism statistical validation workflow (Step 4/4)
+e91d067 2025-09-25  (tag: v11.2.0) bump: version 11.1.0 → 11.2.0
+d296936 2025-09-25  feat(validation): implement comprehensive GraphPad Prism validation with bias regression analysis
+d7da8b2 2025-09-25  (tag: v11.1.0) bump: version 11.0.1 → 11.1.0
+ca19594 2025-09-25  feat(graphpad-validation): add GraphPad Prism validation workflow with proper data formats
+c80474e 2025-09-24  (tag: v11.0.1) bump: version 11.0.0 → 11.0.1
+fb79731 2025-09-24  refactor(validation): rename GraphPad validation files for clarity
+87fc889 2025-09-24  (tag: v11.0.0) bump: version 10.12.0 → 11.0.0
+371c7ba 2025-09-24  feat(validation): implement complete 4-step GraphPad validation workflow for academic publication
+1a79773 2025-09-24  (tag: v10.12.0) bump: version 10.11.2 → 10.12.0
+6fb7c47 2025-09-24  feat(validation): implement GraphPad Prism validation with production function reuse
+43d5d34 2025-09-23  docs(roadmap): defer provenance capture post-publication
+1d8f69b 2025-09-23  (tag: v10.11.2) bump: version 10.11.1 → 10.11.2
+0f3a91b 2025-09-23  fix(test): complete Step 4 Phase A GraphPad validation workflow
+19225a7 2025-09-23  (tag: v10.11.1) bump: version 10.11.0 → 10.11.1
+9cefe6c 2025-09-23  fix(validation): restructure statistical validation study generator for proper factorial design
+239b323 2025-09-22  (tag: v10.11.0) bump: version 10.10.0 → 10.11.0
+2663861 2025-09-22  feat(algorithm_validation): complete step 4 graphpad prism validation implementation
+e5fc293 2025-09-22  (tag: v10.10.0) bump: version 10.9.0 → 10.10.0
+90f7ed2 2025-09-22  feat(validation): implement statistical analysis validation mock study generator
+07efd0c 2025-09-22  (tag: v10.9.0) bump: version 10.8.0 → 10.9.0
+c1a43ab 2025-09-22  feat(analysis): analysis scripts with validation improvements
+986e711 2025-09-22  (tag: v10.8.0) bump: version 10.7.0 → 10.8.0
+35b196e 2025-09-22  feat(testing): implement Layer 4 audit fix and statistical validation framework
+929a147 2025-09-22  (tag: v10.7.0) bump: version 10.6.0 → 10.7.0
+600a997 2025-09-22  feat(testing): complete Layer 5 integration test with extensive debugging and documentation updates
+3aeefc4 2025-09-21  (tag: v10.6.0) bump: version 10.5.0 → 10.6.0
+0fed1c0 2025-09-21  feat(docs): add comprehensive Experiment Lifecycle Data Dictionary
+5b74ec7 2025-09-21  docs(project): Complete systematic documentation refactoring for publication readiness
+956a543 2025-09-21  (tag: v10.5.0) bump: version 10.4.0 → 10.5.0
+891d96d 2025-09-21  feat(testing): complete Layer 4 integration test enhancement with sandbox configuration
+edb4f6d 2025-09-20  (tag: v10.4.0) bump: version 10.3.0 → 10.4.0
+75d8528 2025-09-20  feat(testing): enhance testing infrastructure and add development tools
+b066993 2025-09-19  (tag: v10.3.0) bump: version 10.2.0 → 10.3.0
+28760e5 2025-09-19  feat(test): add interactive guided tour for Layer 4 experiment lifecycle test
+75b8ab1 2025-09-19  (tag: v10.2.0) bump: version 10.1.1 → 10.2.0
+6c9f208 2025-09-19  feat(testing): implement Layer 4 integration testing with enhanced UX
+50adceb 2025-09-19  (tag: v10.1.1) bump: version 10.1.0 → 10.1.1
+3048e25 2025-09-19  fix(test-harness): resolve interactive mode display bugs
+6265880 2025-09-18  (tag: v10.1.0) bump: version 10.0.0 → 10.1.0
+b4b448e 2025-09-18  feat(test): add query generation validation test
+11ae209 2025-09-18  (tag: v10.0.0) bump: version 9.7.0 → 10.0.0
+9ac8f5b 2025-09-18  refactor(analysis): Remove invalid MWU test and harden schema validation
+9be72f9 2025-09-17  (tag: v9.7.0) bump: version 9.6.3 → 9.7.0
+dce4a56 2025-09-17  feat(testing): Complete unit testing for data prep pipeline
+871b6b5 2025-09-17  (tag: v9.6.3) bump: version 9.6.2 → 9.6.3
+0e17d5a 2025-09-17  fix(experiment_lifecycle): stabilize experiment lifecycle and complete unit tests
+aa912ba 2025-09-16  (tag: v9.6.2) bump: version 9.6.1 → 9.6.2
+e8dac07 2025-09-16  refactor(docs): Consolidate and overhaul project documentation
+647fc77 2025-09-15  (tag: v9.6.1) bump: version 9.6.0 → 9.6.1
+16ad6d2 2025-09-15  refactor(project): Streamline and refactor project for publication
+1ba5364 2025-09-14  (tag: v9.6.0) bump: version 9.5.2 → 9.6.0
+cd126c4 2025-09-14  feat(testing): complete unit tests for core utils and improve workflow
+28ab9e0 2025-09-14  (tag: v9.5.2) bump: version 9.5.1 → 9.5.2
+bc6162b 2025-09-14  fix(build_queries,-compile_results): Increase coverage and fix bugs
+890be36 2025-09-14  (tag: v9.5.1) bump: version 9.5.0 → 9.5.1
+fde574d 2025-09-14  fix(analysis,-data_prep): Increase test coverage for analysis and DB generation
+cfce68a 2025-09-14  test(experiment_manager): increase test coverage to 95%
+c38324c 2025-09-14  (tag: v9.5.0) bump: version 9.4.1 → 9.5.0
+764a320 2025-09-14  feat(testing): harden critical modules with focused testing campaign
+9c609ac 2025-09-14  (tag: v9.4.1) bump: version 9.4.0 → 9.4.1
+271bad9 2025-09-14  refactor(tests): Relocate and enhance experiment lifecycle tests
+50ad6b5 2025-09-13  (tag: v9.4.0) bump: version 9.3.3 → 9.4.0
+0e955b7 2025-09-13  feat(scripts): Enhance project structure report script
+f7a0c5e 2025-09-13  chore(repo): Untrack generated data files and align scope report with Git
+fcdf14d 2025-09-13  chore(repo): Untrack generated data, artifacts, and redundant config
+5a69018 2025-09-13  (tag: v9.3.3) bump: version 9.3.2 → 9.3.3
+3e9dde2 2025-09-13  refactor(Standardize-test-harnesses-and-documentation-build-system): This commit introduces a major refactoring of the developer utility scripts and the test harness to improve organization, clarity, and robustness.
+7c51eb6 2025-09-12  (tag: v9.3.2) bump: version 9.3.1 → 9.3.2
+5a6da2c 2025-09-12  fix(scripts): Apply consistent formatting to all utility scripts
+631d3b3 2025-09-12  (tag: v9.3.1) bump: version 9.3.0 → 9.3.1
+976a94d 2025-09-12  refactor(scripts): Reorganize all utility scripts into functional subdirectories
+cae2741 2025-09-12  (tag: v9.3.0) bump: version 9.2.3 → 9.3.0
+245ef3b 2025-09-12  feat(devtools): add project cleanup utility and enhance testing architecture
+38159df 2025-09-11  (tag: v9.2.3) bump: version 9.2.2 → 9.2.3
+1d652a4 2025-09-11  bump: version 9.2.1 → 9.2.2
+448520c 2025-09-11  refactor(test): Refactor testing architecture to separate workflow and algorithm validation
+202836d 2025-09-11  (tag: v9.2.2) bump: version 9.2.1 → 9.2.2
+0bcc4af 2025-09-11  refactor(test): Separate Layer 3 workflow and algorithm validation tests
+7861836 2025-09-11  (tag: v9.2.1) bump: version 9.2.0 → 9.2.1
+7aec70a 2025-09-11  refactor(data-prep): Standardize console output and finalize L3 interactive test
+3f75c1d 2025-09-10  (tag: v9.2.0) bump: version 9.1.3 → 9.2.0
+b9103fb 2025-09-10  feat(data-prep): Improve candidate filtering and stabilize L3 interactive test
+1e7b376 2025-09-10  (tag: v9.1.3) bump: version 9.1.2 → 9.1.3
+dc4b585 2025-09-10  fix(release): bump version for test suite and documentation updates
+fe07387 2025-09-10  docs(project): align all documentation with refactored test suite
+c7e4f4e 2025-09-09  (tag: v9.1.2) bump: version 9.1.1 → 9.1.2
+1c90b43 2025-09-09  refactor(tests): Overhaul test suite for controlled execution and accuracy
+c53efbd 2025-09-08  (tag: v9.1.1) bump: version 9.1.0 → 9.1.1
+a443526 2025-09-08  fix(data-prep): overhaul test suite and fix latent bugs
+d83df62 2025-09-08  (tag: v9.1.0) bump: version 9.0.0 → 9.1.0
+6fa2a4a 2025-09-08  feat(docs): Finalize documentation build system and enhance analysis scripts
+c3aa803 2025-09-07  (tag: v9.0.0) bump: version 8.0.0 → 9.0.0
+369e4d0 2025-09-07  feat(data-prep): Redesign candidate selection and harden data pipeline
+35e47ac 2025-09-07  bump: version 7.0.1 → 8.0.0
+0fd1872 2025-09-07  (tag: v8.0.0) bump: version 7.0.1 → 8.0.0
+064f317 2025-09-07  feat(data-prep): decouple candidate selection and overhaul data prep tests
+ed5e433 2025-09-07  (tag: v7.0.1) bump: version 7.0.0 → 7.0.1
+3f3b8d9 2025-09-07  refactor(data-prep): standardize file backup utility and fix orchestration tests
+89a5577 2025-09-06  (tag: v7.0.0) bump: version 6.15.1 → 7.0.0
+299c29f 2025-09-06  feat(testing): complete data preparation pipeline testing
+abef760 2025-09-06  (tag: v6.15.1) bump: version 6.15.0 → 6.15.1
+630cc89 2025-09-06  fix(tests): resolve unit test failure and enhance interactive UI
+a602931 2025-09-06  (tag: v6.15.0) bump: version 6.14.0 → 6.15.0
+4cb9617 2025-09-06  feat(test-harness): overhaul Layer 2 and refactor Layer 3 test harness
+47218f3 2025-09-06  (tag: v6.14.0) bump: version 6.13.2 → 6.14.0
+bb346b7 2025-09-06  feat(test-harness): add profile-driven architecture and automated workflows
+a79869d 2025-09-03  (tag: v6.13.2) bump: version 6.13.1 → 6.13.2
+fd6cd8b 2025-09-03  refactor(data-preparation): standardize terminology and refactor bypass flag
+4fd1610 2025-09-02  (tag: v6.13.1) bump: version 6.13.0 → 6.13.1
+aeb2e5b 2025-09-02  refactor(project): standardize data preparation terminology and refactor bypass flag
+dc4c614 2025-09-02  (tag: v6.13.0) bump: version 6.12.0 → 6.13.0
+736cb44 2025-09-02  feat(data-prep): add option to bypass LLM-based scoring
+d6f4968 2025-09-02  (tag: v6.12.0) bump: version 6.11.1 → 6.12.0
+b4ed70d 2025-09-02  feat(data-prep): add Northern Hemisphere filter and update documentation
+69df353 2025-09-01  (tag: v6.11.1) bump: version 6.11.0 → 6.11.1
+b880ec1 2025-09-01  refactor(testing): reorganize test suite for modularity and add PDM shortcut
+8bfb9e4 2025-09-01  (tag: v6.11.0) bump: version 6.10.0 → 6.11.0
+3a58b32 2025-09-01  feat(testing): add assembly logic verification workflow and fix algorithm bugs
+680629f 2025-08-31  (tag: v6.10.0) bump: version 6.9.0 → 6.10.0
+2233c8d 2025-08-31  feat(testing): add utility scripts for assembly logic verification
+e1ce806 2025-08-31  (tag: v6.9.0) bump: version 6.8.10 → 6.9.0
+b6a8f8c 2025-08-31  feat(testing): add gold standard selection tools and fix assembly bugs
+e8faed6 2025-08-30  (tag: v6.8.10) bump: version 6.8.9 → 6.8.10
+561bbe8 2025-08-30  refactor(data-prep): complete sandbox refactoring and fix assembly logic
+ceb510c 2025-08-30  (tag: v6.8.9) bump: version 6.8.8 → 6.8.9
+6fbd361 2025-08-30  refactor(testing): improve test harness interactivity and resolve sandboxing bugs
+8fd1cea 2025-08-30  (tag: v6.8.8) bump: version 6.8.7 → 6.8.8
+87c688a 2025-08-30  refactor(data-prep): refactor data integration pipeline and improve documentation
+bb60e31 2025-08-30  (tag: v6.8.7) bump: version 6.8.6 → 6.8.7
+9c3026a 2025-08-30  refactor(data-prep): refactor selection and import scripts for sandbox awareness
+6a24fba 2025-08-30  (tag: v6.8.6) bump: version 6.8.5 → 6.8.6
+114490b 2025-08-30  refactor(data-prep): refactor scoring scripts and standardize console logs
+f31f244 2025-08-29  (tag: v6.8.5) bump: version 6.8.4 → 6.8.5
+bfad25a 2025-08-29  fix(data-prep): fix research entry filter and harden integration test
+0b00253 2025-08-29  (tag: v6.8.4) bump: version 6.8.3 → 6.8.4
+55d8d66 2025-08-29  fix(release): trigger release for documentation updates
+ffb6bd0 2025-08-29  docs(data-prep): restructure and enhance data prep diagrams
+3ff1dee 2025-08-24  (tag: v6.8.3) bump: version 6.8.2 → 6.8.3
+b6467ba 2025-08-24  refactor(data-prep): refactor candidate selection for sandboxing
+507a39d 2025-08-24  (tag: v6.8.2) bump: version 6.8.1 → 6.8.2
+8b42d3a 2025-08-24  refactor(data-prep): refactor validation script and improve log cosmetics
+1bab28e 2025-08-24  (tag: v6.8.1) bump: version 6.8.0 → 6.8.1
+9c92909 2025-08-24  fix(logging): standardize relative paths in test logs
+9247600 2025-08-24  (tag: v6.8.0) bump: version 6.7.0 → 6.8.0
+f646e3d 2025-08-24  feat(testing): implement live, chdir-based Layer 3 integration test
+33674b5 2025-08-23  (tag: v6.7.0) bump: version 6.6.1 → 6.7.0
+3a887dc 2025-08-23  feat(testing): establish sandbox-aware architecture for data pipeline tests
+1234a25 2025-08-23  (tag: v6.6.1) bump: version 6.6.0 → 6.6.1
+263c10d 2025-08-23  refactor(scripts): standardize all PowerShell wrapper interfaces and calls
+5b26908 2025-08-22  (tag: v6.6.0) bump: version 6.5.0 → 6.6.0
+1a258ac 2025-08-22  feat(testing): implement live, limited-scope data pipeline integration test
+71de9db 2025-08-22  (tag: v6.5.0) bump: version 6.4.0 → 6.5.0
+8125c16 2025-08-22  feat(testing): automate and optimize Layer 3 data pipeline test
+1dceb2e 2025-08-22  (tag: v6.4.0) bump: version 6.3.0 → 6.4.0
+c601be2 2025-08-22  feat(testing): complete sandboxing refactor for all test layers
+797f72a 2025-08-22  (tag: v6.3.0) bump: version 6.2.0 → 6.3.0
+75d2d2c 2025-08-22  feat(sandbox): Implement sandboxed testing framework & rename study script
+60ef00c 2025-08-21  (tag: v6.2.0) bump: version 6.1.5 → 6.2.0
+d063bbe 2025-08-21  feat(testing): add scripted test harnesses and standardize testing framework
+8e578cf 2025-08-21  (tag: v6.1.5) bump: version 6.1.4 → 6.1.5
+01a1aa2 2025-08-21  fix(testing): resolve query generator bugs and complete unit tests
+aebd277 2025-08-21  (tag: v6.1.4) bump: version 6.1.3 → 6.1.4
+b0c6745 2025-08-21  refactor(utility): streamline utility scripts and associated tests
+e323adb 2025-08-21  (tag: v6.1.3) bump: version 6.1.2 → 6.1.3
+eb66425 2025-08-21  refactor(framework): align utility naming with repair and migration workflows
+1ffa171 2025-08-21  (tag: v6.1.2) bump: version 6.1.1 → 6.1.2
+4e74590 2025-08-21  refactor(framework): align architecture, add tests for core utilities
+dfbcc12 2025-08-21  (tag: v6.1.1) bump: version 6.1.0 → 6.1.1
+40024b7 2025-08-21  refactor(framework): align script and artifact naming for consistency
+64bcc3c 2025-08-21  (tag: v6.1.0) bump: version 6.0.0 → 6.1.0
+2e7337a 2025-08-21  feat(analyzer): add full test suite and fixes for study analyzer
+afcc232 2025-08-20  (tag: v6.0.0) bump: version 5.9.1 → 6.0.0
+6d2a830 2025-08-20  refactor(cli): standardize parameter naming and fix reporter
+b7a935e 2025-08-20  (tag: v5.9.1) bump: version 5.9.0 → 5.9.1
+48b1c72 2025-08-20  refactor(workflow): refactor entire study evaluation workflow
+c193ba6 2025-08-20  (tag: v5.9.0) bump: version 5.8.0 → 5.9.0
+e9d98d0 2025-08-20  feat(compiler): add test suites for experiment and study compilers
+b4a4cb3 2025-08-20  (tag: v5.8.0) bump: version 5.7.0 → 5.8.0
+f4df3b1 2025-08-20  feat(testing): add test suites for bias, reporter, and compiler
+50c8fb3 2025-08-19  (tag: v5.7.0) bump: version 5.6.4 → 5.7.0
+7750ef4 2025-08-19  feat(testing): add full test suite and fixes for performance analyzer
+e558e42 2025-08-19  (tag: v5.6.4) bump: version 5.6.3 → 5.6.4
+e88fcc5 2025-08-19  fix(parser,-testing): fix parser column reordering and add full test suite
+43020ef 2025-08-19  (tag: v5.6.3) bump: version 5.6.2 → 5.6.3
+feff1d3 2025-08-19  fix(testing,-build_queries): add full unit test suite and refactor for testability
+63ce3f8 2025-08-19  (tag: v5.6.2) bump: version 5.6.1 → 5.6.2
+3ab7563 2025-08-19  fix(testing,-logging): add orchestrator tests and standardize logging
+2617bf7 2025-08-19  (tag: v5.6.1) bump: version 5.6.0 → 5.6.1
+5a25f41 2025-08-19  fix(logging,-testing): standardize logging and improve test harness
+778f2c1 2025-08-18  (tag: v5.6.0) bump: version 5.5.0 → 5.6.0
+a14fc0c 2025-08-18  feat(framework): Overhaul and validate core experiment workflow
+9aa6d9b 2025-08-17  (tag: v5.5.0) bump: version 5.4.5 → 5.5.0
+7a2a934 2025-08-17  feat(data-prep): Enhance and validate data preparation orchestrator
+00f7fc1 2025-08-17  (tag: v5.4.5) bump: version 5.4.4 → 5.4.5
+8f24286 2025-08-17  refactor(data-prep): test suites and align UX for remaining data prep scripts
+0ccb16b 2025-08-16  (tag: v5.4.4) bump: version 5.4.3 → 5.4.4
+4059504 2025-08-16  fix(data-prep): Add test suite for final candidate selection and fix linter
+7b2d1ef 2025-08-16  (tag: v5.4.3) bump: version 5.4.2 → 5.4.3
+ec7d5ba 2025-08-16  test(data-prep): Add test suite for OCEAN scoring and align UX
+9fd666e 2025-08-16  (tag: v5.4.2) bump: version 5.4.1 → 5.4.2
+f82d10c 2025-08-16  test(data-prep): Add test suite for eminence scoring and update docs
+d83c3b4 2025-08-16  (tag: v5.4.1) bump: version 5.4.0 → 5.4.1
+bcbdceb 2025-08-16  refactor(testing): Establish test suite and refactor core scripts
+6f6fe83 2025-08-16  (tag: v5.4.0) bump: version 5.3.0 → 5.4.0
+c95e2c3 2025-08-16  feat(data-prep): Refactor validation pipeline and add master orchestrator
+9bc562e 2025-08-15  (tag: v5.3.0) bump: version 5.2.3 → 5.3.0
+3236213 2025-08-15  feat(validation): Refactor validation pipeline into modular scripts
+be2071d 2025-08-14  (tag: v5.2.3) bump: version 5.2.2 → 5.2.3
+3770c40 2025-08-14  fix(workflows): Refine study-level workflow UX and logging
+cd21be4 2025-08-14  (tag: v5.2.2) bump: version 5.2.1 → 5.2.2
+3ddf5ab 2025-08-14  fix(workflow): improve robustness of repair, migration, and build workflows
+466d6b3 2025-08-14  (tag: v5.2.1) bump: version 5.2.0 → 5.2.1
+91c9d1f 2025-08-14  refactor(core): centralize audit logic into single source of truth
+b59dda9 2025-08-13  (tag: v5.2.0) bump: version 5.1.4 → 5.2.0
+c76bc55 2025-08-13  feat(workflows): Improve study processing and audit UX
+30550bb 2025-08-13  (tag: v5.1.4) bump: version 5.1.3 → 5.1.4
+8d9b174 2025-08-13  refactor(workflows): Rename 'repair' scripts to 'fix' for clarity
+ed4d4c0 2025-08-13  (tag: v5.1.3) bump: version 5.1.2 → 5.1.3
+5b18293 2025-08-13  fix(migrate): Fix and harden experiment migration workflow
+72f095c 2025-08-13  (tag: v5.1.2) bump: version 5.1.1 → 5.1.2
+112fce3 2025-08-13  fix(repair): Fix repair workflow and improve console UI
+f0b73e6 2025-08-13  (tag: v5.1.1) bump: version 5.1.0 → 5.1.1
+dfecfa3 2025-08-13  fix(repair): Fix repair workflow and enhance console logging
+a1e09ea 2025-08-13  (tag: v5.1.0) bump: version 5.0.4 → 5.1.0
+6c7df5e 2025-08-13  feat(audit): Enhance experiment audit workflow and UI
+dfa55c1 2025-08-12  (tag: v5.0.4) bump: version 5.0.3 → 5.0.4
+993d02b 2025-08-12  refactor(experiment): separate audit logic into dedicated script
+a86cfaa 2025-08-12  (tag: v5.0.3) bump: version 5.0.2 → 5.0.3
+c6ceef1 2025-08-12  refactor(pipeline): harden error handling and standardize user experience
+1b68414 2025-08-12  (tag: v5.0.2) bump: version 5.0.1 → 5.0.2
+48baea8 2025-08-12  fix(data-prep): Finalize pipeline scripts and documentation
+1e24eed 2025-08-11  (tag: v5.0.1) bump: version 5.0.0 → 5.0.1
+0518239 2025-08-11  refactor(data-prep): Overhaul and harden data generation scripts
+a01ada2 2025-08-11  (tag: v5.0.0) bump: version 4.4.0 → 5.0.0
+cbac969 2025-08-11  feat(data): Overhaul data prep pipeline for efficiency and automation
+07c771d 2025-08-10  (tag: v4.4.0) bump: version 4.3.0 → 4.4.0
+e32a4ad 2025-08-10  feat(data-prep): OCEAN scoring and dynamic cutoff to data pipeline
+b88f438 2025-08-10  (tag: v4.3.0) bump: version 4.2.0 → 4.3.0
+152ca4b 2025-08-10  feat(data_prep): complete eminence score generation script
+0cf1950 2025-08-09  (tag: v4.2.0) bump: version 4.1.0 → 4.2.0
+960914b 2025-08-09  feat(data-prep): replace name-matching with robust idADB pass-through
+711df86 2025-08-09  (tag: v4.1.0) bump: version 4.0.0 → 4.1.0
+699431d 2025-08-09  feat(data_prep): finalize data preparation pipeline
+6d70dbb 2025-08-09  (tag: v4.0.0) bump: version 3.18.0 → 4.0.0
+d430eae 2025-08-09  feat(data): Overhaul and stabilize the data preparation pipeline
+6cbba4d 2025-08-07  (tag: v3.18.0) bump: version 3.17.1 → 3.18.0
+57ecddb 2025-08-07  feat(data-prep): automate data fetching and enhance validation pipeline
+4f0d0d7 2025-08-06  (tag: v3.17.1) bump: version 3.17.0 → 3.17.1
+fb27ae7 2025-08-06  fix(data): Correct pagination logic to fetch unique pages
+de391f8 2025-08-06  (tag: v3.17.0) bump: version 3.16.0 → 3.17.0
+1837a40 2025-08-06  feat(docs): Establish comprehensive documentation and CI workflow
+76f541b 2025-08-05  (tag: v3.16.0) bump: version 3.15.0 → 3.16.0
+067ffc6 2025-08-05  feat(data-prep): add automated adb data fetching script
+d7dff2a 2025-08-05  (tag: v3.15.0) bump: version 3.14.0 → 3.15.0
+e968015 2025-08-05  feat(data): add data integration script and fix encoding
+d3d058f 2025-08-05  (tag: v3.14.0) bump: version 3.13.0 → 3.14.0
+c59ab98 2025-08-05  feat(data): Refactors `generate_database.py` to be more robust and user-friendly
+ea42f9d 2025-08-05  (tag: v3.13.0) bump: version 3.12.0 → 3.13.0
+23cb1d6 2025-08-05  feat(data-prep): architect data prep pipeline with master subject database
+aa7a52d 2025-08-04  (tag: v3.12.0) bump: version 3.11.0 → 3.12.0
+fbad3b8 2025-08-04  feat(data-prep): Enhance data preparation scripts and documentation
+68cc29c 2025-08-04  docs(diagrams): Update diagrams to reflect removal of run_llm_sessions.py
+94e5174 2025-08-04  (tag: v3.11.0) bump: version 3.10.0 → 3.11.0
+bec3740 2025-08-04  feat(data-prep): Add validation script and overhaul candidate filtering
+6b4b59f 2025-08-04  (tag: v3.10.0) bump: version 3.9.0 → 3.10.0
+7c5dcc2 2025-08-04  feat(data-prep): Harden and automate data preparation pipeline
+d56f025 2025-08-03  (tag: v3.9.0) bump: version 3.8.0 → 3.9.0
+06a2888 2025-08-03  feat(tooling): add docstring linter and enhance header linter
+15f82bb 2025-08-03  (tag: v3.8.0) bump: version 3.7.1 → 3.8.0
+6588088 2025-08-03  feat(data): add data preparation and documentation pipeline
+a31e042 2025-07-31  (tag: v3.7.1) bump: version 3.7.0 → 3.7.1
+094c9ae 2025-07-31  fix(release): Revert release process to original stable state
+63a6272 2025-07-31  fix(release): Ensure correct changelog formatting via release script
+0546bea 2025-07-31  fix(release): Ensure correct changelog formatting via release script
+cd6caef 2025-07-31  fix(changelog): Add blank line between release entries via changelog hook
+768f332 2025-07-31  fix(changelog): Add blank line between release entries
+048293f 2025-07-31  (tag: v3.7.0) bump: version 3.6.2 → 3.7.0
+52c7a80 2025-07-31  feat(workflow,-docs): Enhance study-level workflows and align all documentation
+de011c2 2025-07-30  (tag: v3.6.2) bump: version 3.6.1 → 3.6.2
+285ea06 2025-07-30  fix(ux): Prevent double confirmation prompt in migrate_study.ps1
+5be8b6d 2025-07-30  (tag: v3.6.1) bump: version 3.6.0 → 3.6.1
+12117a6 2025-07-30  fix(migrate): Correct file copy logic in migrate_experiment.ps1
+ac9a465 2025-07-30  (tag: v3.6.0) bump: version 3.5.0 → 3.6.0
+cb4a628 2025-07-30  feat(workflow): Implement and standardize study-level management scripts
+454f5cf 2025-07-29  (tag: v3.5.0) bump: version 3.4.0 → 3.5.0
+04a2179 2025-07-29  feat(workflows): introduce study-level scripts and refactor LLM concurrency
+0fa515a 2025-07-29  (tag: v3.4.0) bump: version 3.3.2 → 3.4.0
+7808df0 2025-07-29  feat(workflow): overhaul migration workflow and standardize audit engine
+802b6a4 2025-07-28  (tag: v3.3.2) bump: version 3.3.1 → 3.3.2
+9f7fe5f 2025-07-28  fix(ui): refine migration workflow and audit report UI
+a8314dc 2025-07-28  (tag: v3.3.1) bump: version 3.3.0 → 3.3.1
+7d8a300 2025-07-28  fix(workflow): harden powershell wrappers and improve messaging
+6d05aa4 2025-07-28  (docs/update-contribution-guidelines) docs(workflow): update contribution and release guidelines
+15c647d 2025-07-28  (tag: v3.3.0) bump: version 3.2.0 → 3.3.0
+9d085e9 2025-07-28  feat(workflow): standardize audit banners and streamline repair workflow
+bc2bac4 2025-07-28  (tag: v3.2.0) bump: version 3.1.0 → 3.2.0
+1467fd5 2025-07-28  feat(workflow): Introduce new Create/Check/Fix user interface
+ef498a2 2025-07-27  (tag: v3.1.0) bump: version 3.0.3 → 3.1.0
+973b423 2025-07-27  feat(workflow): introduce new_experiment.ps1 and refactor manager
+c4f861a 2025-07-26  (tag: v3.0.3) bump: version 3.0.2 → 3.0.3
+fea33bf 2025-07-26  fix(workflows): resolve critical audit bug and standardize UI
+472f646 2025-07-26  (tag: v3.0.2) bump: version 3.0.1 → 3.0.2
+95cc172 2025-07-26  refactor(project): organize utility scripts into a dedicated scripts/ directory
+96c1142 2025-07-26  (tag: v3.0.1) bump: version 3.0.0 → 3.0.1
+946c59a 2025-07-26  fix(workflow): resolve bugs in migration and repair workflows
+8b38cdf 2025-07-26  style(project): enforce standard script header and footer format
+5573a06 2025-07-26  (tag: v3.0.0) bump: version 2.14.0 → 3.0.0
+1c78630 2025-07-26  feat(pipeline): add header linter and refactor compilation workflow
+63eb3c5 2025-07-26  (tag: v2.14.0) bump: version 2.13.0 → 2.14.0
+6be6d9f 2025-07-26  feat(project): overhaul pipeline, clean data, and expand documentation
+3abb110 2025-07-24  (tag: v2.13.0) bump: version 2.12.0 → 2.13.0
+b341dbf 2025-07-24  feat(workflow): automate release process and simplify commit workflow
+189ef00 2025-07-24  (tag: v2.12.0) bump: version 2.10.0 → 2.12.0
+7276f02 2025-07-24  feat(analysis, core): enhance analysis workflow and standardize filenames
+5b33b1d 2025-07-24  (feature/manifest-architecture) chore(wip): Preserve current manifest-architecture changes before reset
+294c9c7 2025-07-21  (tag: v2.11.0) bump: version 2.10.0 → 2.11.0
+e7198dd 2025-07-21  feat: Implement manifest-driven architecture
+872e04c 2025-07-21  (tag: v2.10.0) bump: version 2.9.1 → 2.10.0
+73428e9 2025-07-21  feat(analysis-pipeline): consolidate analysis stage for clarity
+feabd01 2025-07-21  bump: version 2.9.0 → 2.9.1
+d5bc9f4 2025-07-21  (tag: v2.9.1) bump: version 2.9.0 → 2.9.1
+d1035a5 2025-07-21  fix(workflows): Resolve critical bugs and refine contribution process
+bf27e9d 2025-07-20  bump: version 2.8.1 → 2.9.0
+79857bb 2025-07-20  (tag: v2.9.0) bump: version 2.8.1 → 2.9.0
+ac9beef 2025-07-20  feat: Implement lift metrics and comprehensive audit workflows
+a47582c 2025-07-20  bump: version 2.8.0 → 2.8.1
+d378306 2025-07-20  (tag: v2.8.1) bump: version 2.8.0 → 2.8.1
+48f3c53 2025-07-20  fix(audit): ensure robust pre-analysis validation
+eadd48d 2025-07-20  (tag: v2.8.0) bump: version 2.7.0 → 2.8.0
+69c4c34 2025-07-20  feat(audit-study): introduce study-level audit and enhance output
+f1e63b2 2025-07-19  bump: version 2.6.0 → 2.7.0
+fb4083d 2025-07-19  (tag: v2.7.0) bump: version 2.6.0 → 2.7.0
+c29820f 2025-07-19  feat(audit-study): introduce study-level audit and enhance output
+092da38 2025-07-19  bump: version 2.5.0 → 2.6.0
+e8b938d 2025-07-19  (tag: v2.6.0) bump: version 2.5.0 → 2.6.0
+5d09d87 2025-07-19  docs: regenerate diagrams and build artifacts
+05d0abb 2025-07-19  (refactor/architecture-consolidation) docs(contributing): clarify release process for commit types
+d3190e4 2025-07-19  feat(framework): overhaul workflows and improve UX
+f72d56c 2025-07-18  bump: version 2.4.3 → 2.5.0
+3ea19bb 2025-07-18  (tag: v2.5.0) bump: version 2.4.3 → 2.5.0
+27a0eb5 2025-07-18  feat(docs): Finalize diagram grouping and reference doc inclusion
+f27123c 2025-07-18  bump: version 2.4.2 → 2.4.3
+d6f1f02 2025-07-18  (tag: v2.4.3) bump: version 2.4.2 → 2.4.3
+5e42b4f 2025-07-18  perf(pipeline): parallelize LLM sessions for new runs
+0c1e635 2025-07-18  bump: version 2.4.1 → 2.4.2
+ba0a187 2025-07-18  (tag: v2.4.2) bump: version 2.4.1 → 2.4.2
+a431b5b 2025-07-18  fix(pipeline): restore correct replication pipeline sequence
+8ce21d7 2025-07-18  (tag: v2.4.1) chore(release): v2.4.1
+05ad9fe 2025-07-18  fix(resilience): implement atomic replications and enhance error recovery
+390ffa9 2025-07-17  bump: version 2.3.2 → 2.4.0
+990b7da 2025-07-17  (tag: v2.4.0) bump: version 2.3.2 → 2.4.0
+6e00e3f 2025-07-17  feat(resilience): enhance repair logic and progress feedback
+79e4a9d 2025-07-17  bump: version 2.3.1 → 2.3.2
+1bc8f50 2025-07-17  (tag: v2.3.2) bump: version 2.3.1 → 2.3.2
+5f48e22 2025-07-17  refactor(output): improve console readability and state handling
+ba31013 2025-07-17  bump: version 2.3.0 → 2.3.1
+72d0b53 2025-07-17  (tag: v2.3.1) bump: version 2.3.0 → 2.3.1
+c7c213d 2025-07-17  fix(migration): enhance robustness and user feedback
+66af9af 2025-07-17  bump: version 2.2.1 → 2.3.0
+66437d5 2025-07-17  (tag: v2.3.0) bump: version 2.2.1 → 2.3.0
+17c5e12 2025-07-17  feat(parser): Enhance response parsing for verbose LLMs
+5ef8173 2025-07-17  bump: version 2.2.0 → 2.2.1
+b6e986f 2025-07-17  (tag: v2.2.1) bump: version 2.2.0 → 2.2.1
+25e9fb9 2025-07-17  fix(migration): handle experiments with zero valid responses
+bf35132 2025-07-17  (tag: v2.2.0) bump: version 2.1.0 → 2.2.0
+ce62ddc 2025-07-17  feat(framework): enhance experiment management and self-healing workflows
+771a6be 2025-07-16  bump: version 2.0.6 → 2.1.0
+c44c4f6 2025-07-16  (tag: v2.1.0) bump: version 2.0.6 → 2.1.0
+5aa553c 2025-07-16  feat(workflow,manager): enhance update workflow with pre-check audit and robust error handling
+e04d65e 2025-07-16  bump: version 2.0.5 → 2.0.6
+70f4da3 2025-07-16  (tag: v2.0.6) bump: version 2.0.5 → 2.0.6
+b787e39 2025-07-16  fix(audit): complete audit logic and improve report readability
+20f9b7b 2025-07-16  bump: version 2.0.4 → 2.0.5
+b7c4521 2025-07-16  (tag: v2.0.5) bump: version 2.0.4 → 2.0.5
+885e265 2025-07-16  fix(audit): finalize audit logic for all file types and outputs
+3d41962 2025-07-16  chore: Untrack commit.txt after adding to .gitignore
+0d1bbc0 2025-07-16  bump: version 2.0.3 → 2.0.4
+7b2ecc1 2025-07-16  (tag: v2.0.4) bump: version 2.0.3 → 2.0.4
+c54550f 2025-07-16  fix(audit): resolve all verification failures for legacy and new data
+9db89eb 2025-07-16  bump: version 2.0.2 → 2.0.3
+0eea89c 2025-07-16  (tag: v2.0.3) bump: version 2.0.2 → 2.0.3
+fe49729 2025-07-16  refactor(audit): harden and isolate config validation logic
+f64abde 2025-07-15  (tag: v2.0.2) bump: version 2.0.1 → 2.0.2
+f653ea5 2025-07-15  fix(migration-and-update): resolve infinite-migration loop and drop STUDY_results.csv
+d2b803c 2025-07-15  (tag: v2.0.1) bump: version 2.0.0 -> 2.0.1
+e6630fd 2025-07-15  (tag: v2.0.0) chore: correct repository state to v2.0.0
+249db1d 2025-07-15  fix(workflow): improve script usability and test reliability
+ff50411 2025-07-15  fix(workflow): improve migration progress display and Ctrl-C handling
+6fd080b 2025-07-14  docs(changelog): correctly associate initial feature set with v1.0.0
+d5b1347 2025-07-14  bump: version 1.1.0 → 2.0.0
+4f21212 2025-07-14  feat(workflow): implement non-destructive migration and --reprocess flag
+7e4fff5 2025-07-14  (tag: v1.1.0) bump: version 1.0.0 → 1.1.0
+7f43e3c 2025-07-14  docs(repo): Sync all documentation and finalize test runner
+0e4f3b9 2025-07-13  Docs: Update workflow diagrams and descriptions for clarity and accuracy
+0e4e0b5 2025-07-13  feat: Add update_experiment script for reprocessing
+9af506e 2025-07-13  feat(testing): Add audit script and finalize test runner
+30250d8 2025-07-13  docs(repo): Sync all documentation and finalize test runner
+a8ecea9 2025-07-13  refactor(project): Consolidate architecture and testing
+9436c99 2025-07-13  build(test): Automate coverage cleanup and update test script paths
+60f85e6 2025-07-13  fix(analysis): Correct test logic and align scripts with docs
+0171ee6 2025-07-13  refactor(analysis): Rename study processing scripts for clarity
+b85d84c 2025-07-13  (tag: v1.0.0) docs(em): Docstring update for Experiment Manager.
+febb464 2025-07-12  Chore: Remove obsolete test for deleted retry_llm_sessions script
+e3318a0 2025-07-12  Refactor: Finalize state machine and fix docs build
+24e5952 2025-07-12  fix(builder): Properly handle doc status check by build_docs.py during commit.
+1ec2e0f 2025-07-12  Refactor: Implement state-machine controller in Experiment Manager
+372b4e7 2025-07-12  docs(build): Add comprehensive docstring to build_docs.py
+abecda7 2025-07-12  fix(docs): Repair diagram rendering and optimize build script
+5baae98 2025-07-11  build(docs): Regenerate documentation from source
+37b3a0b 2025-07-11  fix(scripts): Sync tests and improve build utility
+9be4b86 2025-07-11  feat(tests): Introduce shared harness for PowerShell tests
+3693b39 2025-07-11  Improve LLM Prompter test coverage from 77% to 85%
+13fb682 2025-07-11  🎯 Achieve perfect 304/304 test suite + build_docs improvements
+b916d5c 2025-07-11  🎯 Fix all skipped tests - achieve perfect 304/304 test pass rate
+8c41d07 2025-07-11  Major codebase refactoring and documentation updates
+518104f 2025-07-11  Achieve 86% test coverage with comprehensive test suite
+31de50d 2025-07-08  refactor: All tests passing with overall 60% coverage; test suite not necessarily complete.
+56b88c1 2025-07-08  refactor: Enhance test suite and update documentation
+a306bf1 2025-07-07  Docs: Refine workflow diagrams and add key artifacts
+d1e5ba8 2025-07-07  feat(build): Make docx conversion resilient to locked files
+4a3a303 2025-07-07  feat(testing): Overhaul coverage and refactor compile_results test
+cc988e1 2025-07-07  feat(testing): Overhaul coverage and refactor compile_results test
+3a78c4c 2025-07-07  docs: Add instructions for migration script test suite
+8a0037c 2025-07-07  feat(testing): Implement test suite for migrate_old_experiment.ps1
+8da1eb8 2025-07-07  docs: Update testing instructions in documentation
+ebe8128 2025-07-07  feat(testing): Implement full test suite for process_study.ps1
+40551ca 2025-07-07  Removed lingering Pester snippet from Run Expermiment shell script. Added tester for Process Study shell script.
+916014a 2025-07-07  docs: Update testing strategy in contribution guidelines
+1f3eddd 2025-07-07  feat: Integrate ArgBuilder logic into run_experiment.ps1 and finalize bare-bones, non-Pester testing setup
+e921e5d 2025-07-07  feat: Establish working PowerShell test suite (without Pester) and retain ArgBuilder as production dependency
+391116f 2025-07-07  Fixed PowerShell invocation guard in Run Experiment shell script (to bypass running the script when testing).
+1f54226 2025-07-07  Fixed PowerShell invocation guard in Run Experiment shell script (to bypass running the script when testing).
+ccd82e5 2025-07-07  Also fixed Replication Manager to use config.ini for new experiments but archived config for reprocessing.
+d38f0a9 2025-07-07  Fixed a bug with Run Bias Analaysis: now it determines the correct k value from the data it loads.
+0413247 2025-07-07  Updated test scripts to match code changes. Installed Pester for .ps1 shell script testing. Minor changes to a few main scripts to enable more comprehensive testing. Uopdated Orchestrate Replication to search for run directories using a 3-digit padded replication number.
+8215eb6 2025-07-06  fix(tests): Exclude archive directories from test collection
+d5e4757 2025-07-06  docs(setup): Overhaul and simplify setup instructions
+cd59f3c 2025-07-06  fix(deps): Add missing pytest-cov to dev dependencies
+66433b2 2025-07-06  Updated build_docs.py console message to align with documentation.
+c0647bb 2025-07-06  chore: Stop tracking generated .docx files in gitignore
+54fbd46 2025-07-06  Documentation update.
+c8fe79c 2025-07-06  Updated Git commit sequence to require manual documentation build.
+7cfbd4f 2025-07-06  Modified output path and folder name for new experiments.
+954bdf9 2025-07-06  Modified output path and folder name for new experiments.
+99c3725 2025-07-06  style(docs): Documentation updated with 'astrology as a black box'
+1d71f13 2025-07-06  style(docs): Final document versions
+271ae9a 2025-07-06  style(docs): Center diagrams and finalize layouts
+27697b0 2025-07-06  style(docs): Layout tweaks and readability polish
+0fcca1b 2025-07-06  style(docs): Refine diagram layouts for final clarity
+00b0b2d 2025-07-05  style(docs): Adjust diagram layouts for RTF output
+6223df4 2025-07-05  style(docs): Adjust diagram layouts for RTF output
+d8b67b8 2025-07-05  feat(build): Automate documentation and diagram generation
+41b5e40 2025-07-05  docs: Trigger documentation build
+cbbe726 2025-07-05  docs: Rebuild docs with correct gitignore settings, installed pypandoc, and updated pyproject tool.pdm.scripts section
+67b9b4c 2025-07-05  docs: Trigger new build-docs hook
+8dd0feb 2025-07-05  Added auto-conversion of *.md files to *.rtf (README, CONTRIBUTING) using pandoc with pypandoc. build_readme.py replaced with more generic build_docs.py.
+ba3f040 2025-07-05  Added rebuilt README.
+9e3ee6c 2025-07-05  Added rebuilt README.
+9a0259d 2025-07-04  Updated *.ps1 shell scripts to auto-detect execution environment and adapt python command usage ('python' vs 'pdm run python').
+c713aba 2025-07-04  docs: Update contribution guide and ignore build artifacts
+81ec822 2025-07-04  chore: Migrate to PDM for dependency management
+1e88717 2025-07-04  feat: Enhance final analysis workflow and reporting
+998acbf 2025-07-04  chore: Update pre-commit configuration
+31a0665 2025-07-04  feat: Enhance analysis and untrack generated code files
+ef97e50 2025-07-03  Updated positional bias analysis for inclusion in ANOVA.
+64e0ff8 2025-07-03  Integrated number of valid responses (LLM reliability) to ANOVA.
+08d5b8e 2025-07-03  Fixed mean_rank_of_correct_id metric missing from analysis.
+7dfa9ef 2025-07-03  Solidified LLM response parsing, the result of which is recorded in replication reports. Added bias analysis of experiments, revealing strong positional bias. Added metadata column injection for CSV files.
+6f01aac 2025-07-02  Ctrl+C execution interrupt is fianlly working.
+e884ec1 2025-07-02  Further fixes for batch run log, console output. Ctrl+C still hangs execution.
+4ff19ff 2025-07-02  Batch log writing restores, replication report fixed.
+fdcca06 2025-07-02  Fixed pipeline bugs introduced by prior fixes to reprocessing. Workflow gets to Stage 2 spinner display.
+9deb133 2025-07-02  Documentation update.
+9fd4b09 2025-07-02  Pipeline restored after long debugging session.
+fbcccbd 2025-07-01  Further fleshed out test scripts to improve coverage. Improved the restoration of experimental artifacts. Fixed final results CSV column layout. Updated ANOVA processing.
+29a43fa 2025-06-29  Added starting and ending replication numbers as arguments to Run Replications; added replication-level time estimates to and improved formatting of console output.
+583aa83 2025-06-29  Random mapping functionality added; new script allows for injection of metadata into existing reports.
+fcefa86 2025-06-28  Batch run log creation functionality restored, console output streamlined.
+28f9384 2025-06-18  refactor: Centralize batch logic in Python and update config
+44842df 2025-06-18  feat: Implement docs-as-code and finalize utilities
+2b84afa 2025-06-12  Fixed test cases, added continuous and final verification of pipeline.
+ea8eb29 2025-06-12  Documentation update.
+c2a035a 2025-06-12  Further fixes for Windows encoding issue in LLM Prompter, LLM Sessions Runner, and Replications Runner.
+6d392a0 2025-06-11  Fixed Windows encoding issue in LLM Prompter and LLM Sessions Runner.
+27fa13c 2025-06-11  Fixed bugs in Retrier, Reprocessor, and LLM scripts. Updated Replications Runner to inlcude automatic repair.
+5ecdc57 2025-06-11  Initial commit of LLM personality matching pipeline
