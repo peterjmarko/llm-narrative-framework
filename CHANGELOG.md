@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 16.6.4 (2025-11-02)
+
+### Bump
+
+- **version 16.6.3 → 16.6.4**
+
+### Documentation
+
+- **add project images for README display**
+  Adds the three diagrams required by the main README.md. These files were previously untracked due to a broad .gitignore rule and are now explicitly included to ensure the README renders correctly on GitHub.
+
+### Fixes
+
+- **bump version for latest updates**
+
 ## 16.6.3 (2025-11-02)
 
 ### Bump
