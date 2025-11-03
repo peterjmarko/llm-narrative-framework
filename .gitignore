@@ -85,7 +85,8 @@ docs/images/*
 !docs/images/documentation_map.png
 !docs/images/arch_project_overview.png
 !docs/images/flow_research_workflow.png
-# Exclude PDF and DOCX files
+# Exclude guidelines, PDF files, and Word (DOCX) files
+docs/guidelines/
 docs/pdf_copies/
 docs/word_docs/
 *.docx

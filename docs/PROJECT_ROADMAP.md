@@ -4,13 +4,6 @@ This document outlines planned tasks categorized by work stream and tracks known
 
 ## Journal Submission and Peer Review
 
-- [ ] **Manuscript Finalization**
-  - [ ] Add ORCID iDs for all authors
-  - [ ] Verify all figures render correctly in final manuscript
-  - [ ] Prepare the final version of the manuscript with numbered lines.
-- [ ] **Compliance & Disclosure**
-  - [ ] Complete the TOP (Transparency and Openness Promotion) disclosure table and add it as an appendix.
-  - [ ] Complete the "Self-Assessment Questionnaire" from the PCI Psychology guide to ensure the project meets all standards.
 - [ ] **Submission Preparation**
   - [ ] Identify suitable Recommenders whose research interests align with the paper.
   - [ ] Prepare the PCI Psychology submission form.

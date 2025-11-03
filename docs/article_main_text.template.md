@@ -360,7 +360,7 @@ Correspondence concerning this article should be addressed to Peter J. Marko at 
 
 ### Author Contributions
 
-Peter J. Marko was responsible for the conceptualization, investigation, methodology, software development, formal analysis, documentation, and the original draft of the article. Kenneth McRitchie proposed the idea, assisted with the conceptualization, and reviewed and edited the article.
+Peter J. Marko was responsible for the conceptualization, data curation, formal analysis, investigation, methodology, project administration, resources, software, validation, visualization, and writing (original draft, review & editing). Kenneth McRitchie participated in the conceptualization, data curation, investigation, methodology, and writing (review & editing).
 
 Portions of this manuscript and the framework's source code were drafted, edited, and structured with assistance from Anthropic Claude Sonnet 4.5 and Google Gemini 2.5 Pro (July-October 2025). All AI-generated content was reviewed, revised, validated, and approved by the authors, who accept full responsibility for the final content and comply with PsyArXiv policies.
 
@@ -475,3 +475,19 @@ The Turing Way Community. (2022). *The Turing Way: A handbook for reproducible, 
 van Dongen, N., & van Grootel, L. (2025). Overview on the Null Hypothesis Significance Test: A Systematic Review on Essay Literature on its Problems and Solutions in Present Psychological Science. *Meta-Psychology*, *9*, MP.2021.2927. https://doi.org/10.15626/MP.2021.2927
 
 Wei, J., Tay, Y., Bommasani, R., Raffel, C., Zoph, B., Borgeaud, S., Chowdhery, A., Narang, S., & Le, Q. V. (2022). Emergent abilities of large language models. *Transactions on Machine Learning Research*. https://arxiv.org/abs/2206.07682
+
+### Appendix A: Transparency and Openness Promotion (TOP) Guidelines Disclosure
+
+This study has been conducted in accordance with the principles of the Transparency and Openness Promotion (TOP) Guidelines. The following table provides a detailed disclosure of the open science practices implemented in this research.
+
+*Table A1: TOP Guidelines Disclosure Statement*
+
+| TOP Guideline | Disclosure |
+| :--- | :--- |
+| **Study Registration** | This study was not formally preregistered in a public repository. As stated in the "Pre-registration and Exploratory Analysis" section, the core hypothesis was pre-specified, but the multi-level decomposition approach used for framework validation was exploratory in nature. |
+| **Study Protocol** | **Level 2: Shared and Cited.** The complete study protocol, including detailed step-by-step procedures for the data preparation pipeline, validation, and experimental workflow, is publicly available in the "Replication Guide" and "Framework Manual" within the project repository: https://github.com/peterjmarko/llm-narrative-framework.git. |
+| **Analysis Plan** | **Level 2: Shared and Cited.** The analysis plan is described in the "Dependent Variables and Statistical Analysis" section of the manuscript. The complete analysis scripts used to generate the results are publicly available in the project repository: https://github.com/peterjmarko/llm-narrative-framework.git. |
+| **Reporting Transparency** | **Level 2: Shared and Cited.** This manuscript adheres to transparent reporting standards. The "Methods" section provides a comprehensive description of the experimental design, sample derivation, stimuli generation, and procedures, ensuring that all aspects of the study are clearly documented. |
+| **Materials Transparency** | **Level 2: Shared and Cited.** All research materials required to replicate the study, including the neutralized component library and the final subject database, are publicly available in the project repository: https://github.com/peterjmarko/llm-narrative-framework.git. |
+| **Data Transparency** | **Level 2: Shared and Cited.** All raw and processed data generated and analyzed during this study are publicly available. This includes raw experimental results from all LLM queries and the compiled study-level analysis datasets. The data can be accessed at: https://github.com/peterjmarko/llm-narrative-framework.git. |
+| **Analytic Code Transparency** | **Level 2: Shared and Cited.** The complete source code used for data preparation, experiment orchestration, statistical analysis, and visualization (147 scripts, 41,000+ lines) is publicly available in the project repository, ensuring full computational reproducibility at the methodological level: https://github.com/peterjmarko/llm-narrative-framework.git. |

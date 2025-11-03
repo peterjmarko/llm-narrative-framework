@@ -626,6 +626,7 @@ def main():
             ('docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.template.md', 'docs/EXPERIMENT_WORKFLOW_DATA_DICTIONARY.md'),
             ('docs/FRAMEWORK_MANUAL.template.md', 'docs/FRAMEWORK_MANUAL.md'),
             ('docs/PROJECT_ROADMAP.md', 'docs/PROJECT_ROADMAP.md'),
+            ('docs/article_cover_letter.template.md', 'docs/article_cover_letter.md'),
             ('docs/article_main_text.template.md', 'docs/article_main_text.md'),
             ('docs/REPLICATION_GUIDE.template.md', 'docs/REPLICATION_GUIDE.md'),
             ('docs/TESTING_GUIDE.template.md', 'docs/TESTING_GUIDE.md')
@@ -715,6 +716,7 @@ def main():
         ('README.template.md', 'README.md', 'README.md'),
         ('DEVELOPERS_GUIDE.template.md', 'DEVELOPERS_GUIDE.md', 'DEVELOPERS_GUIDE.md'),
         ('docs/FRAMEWORK_MANUAL.template.md', 'docs/FRAMEWORK_MANUAL.md', 'FRAMEWORK_MANUAL.md'),
+        ('docs/article_cover_letter.template.md', 'docs/article_cover_letter.md', 'article_cover_letter.md'),
         ('docs/article_main_text.template.md', 'docs/article_main_text.md', 'article_main_text.md'),
         ('docs/REPLICATION_GUIDE.template.md', 'docs/REPLICATION_GUIDE.md', 'REPLICATION_GUIDE.md'),
         ('docs/DATA_PREPARATION_DATA_DICTIONARY.template.md', 'docs/DATA_PREPARATION_DATA_DICTIONARY.md', 'DATA_PREPARATION_DATA_DICTIONARY.md'),
@@ -727,7 +729,6 @@ def main():
         'LICENSE.md',
         'CHANGELOG.md',
         'docs/changelog_template.md',
-        'docs/article_cover_letter.md',
         'docs/PROJECT_ROADMAP.md',
         'output/project_reports/project_scope_report.md',
         'output/project_reports/SYNC_MANIFEST.md',
