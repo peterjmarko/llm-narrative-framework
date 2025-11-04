@@ -208,6 +208,41 @@ To maintain the quality and consistency of the codebase, all contributions shoul
 
 ## Contribution Workflow
 
+### Simplified Merge Workflow (Solo Developer, Pre-Submission)
+
+For the initial development phase leading up to the first public release and article submission, a simplified, direct merge process is used. This workflow is suitable for a solo developer when the overhead of a formal pull request is not necessary. The `development` branch is treated as a long-lived working branch, and `main` is updated to reflect stable milestones.
+
+**This process will be retired post-submission**, at which point the formal Pull Request workflow (described below) will become standard practice to facilitate collaboration and automated quality checks.
+
+The pre-submission workflow is as follows:
+
+1.  **Commit all changes on the `development` branch.**
+
+2.  **Switch to the `main` branch and ensure it is up-to-date:**
+    ```bash
+    git checkout main
+    git pull origin main
+    ```
+
+3.  **Merge `development` into `main`:**
+    This brings all the new work into your stable `main` branch.
+    ```bash
+    git merge development
+    ```
+
+4.  **Push the updated `main` branch to GitHub:**
+    This publishes the new stable version.
+    ```bash
+    git push origin main
+    ```
+
+5.  **Switch back to `development` to continue working:**
+    Your working branch is preserved for the next set of changes.
+    ```bash
+    git checkout development
+    ```
+---
+
 ### 1. Create a Branch
 
 Before making any changes, create a new branch from the `main` branch. Use a descriptive name that reflects the nature of your work.
@@ -511,6 +546,8 @@ After these steps, your repository is clean. You can now make any additional cha
     ```
 
 ### 6. Submit a Pull Request
+
+> **Note:** This formal pull request process is the standard for all contributions **after the initial article submission**. For the current pre-submission phase, please refer to the "Simplified Merge Workflow" at the top of this section.
 
 1.  Push your branch to your fork on GitHub.
 2.  Open a pull request against the `main` branch of the original repository.

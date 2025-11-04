@@ -32,8 +32,6 @@ To minimize potential data contamination, we selected evaluation models to be in
 
 {{grouped_figure:docs/diagrams/arch_llm_pipeline_b.mmd | scale=2.5 | width=33% | caption=Figure 1b: The last two stages of the ystem architecture showing distinct LLM roles across the experiment & study workflow. Following the data the three preparation LLMs, seven independent evaluation models perform the matching task. This separation of roles is designed to minimize data contamination risk.}}
 
-<br>
-
 #### Sample Population
 
 We designed the framework to support three distinct research paths. For **direct replication**, researchers can use the static data files included in the project's public repository. While the framework employs temperature=0.0 to minimize LLM response variance, exact computational reproducibility is not achievable due to inherent API non-determinism. Researchers should expect methodological reproducibility: statistically equivalent results using the same experimental design. For **methodological replication**, researchers can use the framework's automated tools to generate a fresh dataset from the live Astro-Databank (ADB) to test the robustness of the findings. Finally, for **conceptual replication**, researchers can modify the framework itself (e.g., by using a different LLM or analysis script) to extend the research.
@@ -43,8 +41,6 @@ We derived the final study sample from a multi-stage data preparation pipeline, 
 *   Accurate birth date and time are required for the astrology program to generate reliable personality descriptions.
 *   The use of publicly available data of deceased historical individuals obviates privacy concerns.
 *   Focusing on famous people at the top of their profession ensures the general availability of ample biographical data.
-
-<br>
 
 In the second stage, **Candidate Qualification**, we subjected this initial set to a more rigorous automated filtering pass. We applied several additional data quality rules, retaining only individuals who:
 
@@ -70,17 +66,17 @@ We generated the personality descriptions used as test interventions in the four
 
 ##### Component Library Neutralization and Validation
 
-To create a robust, double-blind experimental design, we systematically "neutralized" the entire library of interpretive delineations within the **Solar Fire v9.0.3** expert system (Astrolabe Inc., n.d.). Our primary goal was to remove all astrological terminology while preserving core descriptive meaning. We processed this library of components using **LLM C (Google's Gemini 2.5 Pro)**, breaking down the set into 149 individual API calls. We rewrote each snippet using a structured prompt that instructed the model to remove astrological terminology, shift to an impersonal third-person style, and preserve core psychological meaning. This process created a master database of neutralized components. To validate the neutralization, we performed an automated keyword search for 42 astrological terms present in the origina library, which confirmed that no explicit terminology remained. Table 1 below provides an example of this process. We acknowledge that this neutralization results in a loss of nuance, a necessary trade-off for a robust blinding procedure.
+To create a robust, double-blind experimental design, we systematically "neutralized" the entire library of interpretive delineations within the **Solar Fire v9.0.3** expert system (Astrolabe Inc., n.d.). Our primary goal was to remove all astrological terminology while preserving core descriptive meaning. We processed this library of components using **LLM C (Google's Gemini 2.5 Pro)**, breaking down the set into 149 individual API calls. We rewrote each snippet using a structured prompt that instructed the model to remove astrological terminology, shift to an impersonal third-person style, and preserve core psychological meaning. This process created a master database of neutralized components. To validate the neutralization, we performed an automated keyword search for 42 astrological terms present in the original library, which confirmed that no explicit terminology remained. Table 1 below provides an example of this process. We acknowledge that this neutralization results in a loss of nuance, a necessary trade-off for a robust blinding procedure.
 
 **Component-Level Validation of Discriminability:** To validate that neutralization preserved description discriminability, we analyzed semantic diversity across the 178 neutralized delineation components that serve as building blocks for profile generation. TF-IDF vectorization with pairwise cosine similarity analysis revealed mean similarity of 0.029 (SD = 0.056), indicating components are meaningfully distinct rather than generic variants. Vocabulary analysis showed mean pairwise overlap (Jaccard similarity) of 0.093 (SD = 0.050), with the component library utilizing 1,917 unique terms (type-token ratio = 0.329). Within-category components showed higher semantic similarity (M = 0.033) than between-category components (M = 0.023), confirming the neutralization process preserved the system's semantic structure. Component length varied substantially (M = 32.7 words, SD = 26.2, CV = 0.802), demonstrating the algorithm utilized diverse building blocks rather than template-like patterns. These metrics confirm that neutralization maintained discriminability at the component level, which is then preserved through deterministic assembly into complete profiles.
 
 **Profile-Level Validation via Random Control:** The experimental design itself provides functional validation through the random control condition. If neutralization had created generic, Barnum-like descriptions lacking discriminating power, performance on random mappings would equal performance on correct mappings (since generic descriptions would "match" any biography equally well). The significant correct-vs-random difference at optimal difficulty (k=10: η²=1.25%, *p*<.001) demonstrates that assembled profiles retain sufficient specificity to support above-chance discrimination. Together, the component-level diversity metrics and profile-level discrimination performance provide converging evidence that neutralization maintained rather than eliminated discriminating power.
 
-<br>
+{{pagebreak}}
 
 *Table 1: Example of Text Neutralization*
 
-| Original Astrological Text (Sun in Aries) | Neutralized Text |
+| **Original Astrological Text (Sun in Aries)** | **Neutralized Text** |
 | :--- | :--- |
 | "Your Sun is in the zodiac sign of Aries indicating that you're an assertive and freedom-loving individual, with a strong need for independence. Others may call you headstrong, but you simply believe that everyone has a right to assert themselves in any situation. Life presents many challenges which you enjoy meeting head-on regardless of the obstacles along the way. You're a natural-born leader.  The ability to focus on one's own goals to the exclusion of others is a healthy trait, but like all things a balance is needed, and you must make sure that you take the time to include others' points of views and modus operandi. On the whole though you handle yourself with aplomb as, astrologically speaking, the Sun is exalted in Aries emphasising the strengths rather than the weaknesses." | "Assertive and freedom-loving, with a strong need for independence. A headstrong quality, coupled with a firm belief in the right to self-assertion. An enjoyment of meeting challenges head-on, regardless of the obstacles. Natural leadership ability. An ability to focus on goals to the exclusion of others, which requires balance and the inclusion of others' points of view and methods. On the whole, a sense of aplomb, with strengths emphasized over weaknesses." |
 
@@ -92,11 +88,9 @@ The neutralization process is depicted on Figure 3 below.
 
 {{grouped_figure:docs/diagrams/logic_prep_neutralization_simple.mmd | scale=2.0 | width=40% | caption=Figure 3: Text neutralization pipeline implemented via neutralize_delineations.py. The process parses the raw astrological library, processes each component through LLM C (Gemini 2.5 Pro), validates removal of esoteric terminology, and outputs neutralized descriptions while preserving lookup keys for profile assembly.}}
 
-<br>
-
 ##### Profile Assembly
 
-For each of the 4,987 test subjects, we exported a foundational set of astrological placements from Solar Fire. This structured data included the factors necessary to generate two reports: the "Balances" (Planetary Dominance) report and the "Chart Points" report. We deliberately chose this foundational set of factors to test for a primary signal while minimizing potential confounds from more complex astrological techniques.
+For each of the 4,987 test subjects, we exported a foundational set of astrological placements from Solar Fire. This structured data included the factors necessary to generate two reports: the "Balances" (Planetary Dominance) report and the "Chart Points" report, both utilizing the standard tropical zodiac. We deliberately chose this foundational set of factors to test for a primary signal while minimizing potential confounds from more complex ("whole-chart") astrological techniques that professional astrologers use.
 
 We then programmatically assembled each test subject's complete, neutralized personality profile. We used their specific set of astrological placements as a key to look up and concatenate the corresponding pre-neutralized description components from the master database. **We rigorously validated this personality assembly algorithm for technical correctness: using the original, non-neutralized delineations, our implementation produced an output that was bit-for-bit identical to a ground-truth dataset generated by the source expert system.** This validation confirms our code faithfully reproduces the source system's logic. This process resulted in a unique, composite personality profile for each individual, expressed in neutral language, which formed the basis of the stimuli we used in the matching task.
 
@@ -224,8 +218,6 @@ Individual LLM model analyses at the optimal difficulty level (k=10) revealed ex
 | Mistral Large | 60 | .590 | 0.38% | 0.284 | Minimal (NS) |
 | Claude Sonnet 4 | 60 | .890 | 0.03% | 0.265 | Minimal (NS) |
 
-<br>
-
 This heterogeneity reveals that aggregate findings substantially underestimate framework effectiveness for compatible models while overestimating it for incompatible models. The framework successfully exposes signals through GPT-4o and DeepSeek with large effect sizes, moderately through Gemini, and minimally or not at all through Qwen, Llama, Mistral, and Claude. These findings demonstrate that model architecture significantly impacts framework effectiveness.
 
 <br>
@@ -274,15 +266,13 @@ Table 5 summarizes complete trajectories for these representative models, with F
 
 *Note: NS = not significant; * p < .05; ** p < .01; *** p < .001*
 
-<br>
-
 These trajectory analyses reveal that framework effectiveness requires both optimal difficulty calibration (k=10) and compatible model architecture (GPT-4o, DeepSeek). Having only one requirement satisfied is insufficient: compatible models at suboptimal difficulty show minimal detection (GPT-4o at k=7 or k=14), while incompatible models show minimal detection regardless of difficulty (Claude, Llama at all k levels).
 
 {{grouped_figure:output/studies/publication_run/anova_subsets/1.2_k10_analysis/anova/boxplots/interaction_plot_mapping_strategy_x_model_mean_mrr_lift_k_10.png | scale=2.5 | width=100% | caption=Figure 12: Model × mapping strategy interaction at k=10, revealing two distinct patterns of signal sensitivity. GPT-4o and DeepSeek V3 show pronounced sensitivity (a large separation between correct and random conditions), while Claude Sonnet 4, Llama 3.3, and Mistral Large exhibit "flat" patterns with minimal discrimination.}}
 
 #### Analysis of Presentation Order Bias
 
-Finally, to ensure the integrity of these findings, we conducted a formal analysis of potential procedural confounds. The metric Top-1 Prediction Bias (Std Dev) measures whether evaluation models consistently favor items based on ordinal position rather than content. ANOVA showed a significant effect for group size `k` (*F*(2, 1218) = 8.45, *p* < .001) but not for `mapping_strategy` (*F*(1, 1218) = 0.85, *p* = .357), indicating that while `k` influenced response consistency, this behavior did not differ between correct and random conditions. Further analyses for simple linear position (presentation) bias showed no statistically significant effects for either `mapping_strategy` or `k`, reinforcing that the observed signal detection effects reflect genuine content-based discrimination rather than positional artifacts.
+Finally, to ensure the integrity of these findings, we conducted a formal analysis of potential procedural confounds. The metric Top-1 Prediction Bias (Std Dev) measures whether evaluation models consistently favor items based on ordinal position rather than content. ANOVA showed a significant effect for group size `k` (*F*(2, 1218) = 8.45, *p* < .001) but not for `mapping_strategy` (*F*(1, 1218) = 0.85, *p* = .357), indicating that while `k` influenced response consistency, this behavior did not differ between correct and random conditions. Further analyses for simple linear position bias showed no statistically significant effects for either `mapping_strategy` or `k`, reinforcing that the observed signal detection effects reflect genuine content-based discrimination rather than positional artifacts.
 
 ### Discussion
 
@@ -476,6 +466,8 @@ van Dongen, N., & van Grootel, L. (2025). Overview on the Null Hypothesis Signif
 
 Wei, J., Tay, Y., Bommasani, R., Raffel, C., Zoph, B., Borgeaud, S., Chowdhery, A., Narang, S., & Le, Q. V. (2022). Emergent abilities of large language models. *Transactions on Machine Learning Research*. https://arxiv.org/abs/2206.07682
 
+<br>
+
 ### Appendix A: Transparency and Openness Promotion (TOP) Guidelines Disclosure
 
 This study has been conducted in accordance with the principles of the Transparency and Openness Promotion (TOP) Guidelines. The following table provides a detailed disclosure of the open science practices implemented in this research.
@@ -485,9 +477,9 @@ This study has been conducted in accordance with the principles of the Transpare
 | TOP Guideline | Disclosure |
 | :--- | :--- |
 | **Study Registration** | This study was not formally preregistered in a public repository. As stated in the "Pre-registration and Exploratory Analysis" section, the core hypothesis was pre-specified, but the multi-level decomposition approach used for framework validation was exploratory in nature. |
-| **Study Protocol** | **Level 2: Shared and Cited.** The complete study protocol, including detailed step-by-step procedures for the data preparation pipeline, validation, and experimental workflow, is publicly available in the "Replication Guide" and "Framework Manual" within the project repository: https://github.com/peterjmarko/llm-narrative-framework.git. |
-| **Analysis Plan** | **Level 2: Shared and Cited.** The analysis plan is described in the "Dependent Variables and Statistical Analysis" section of the manuscript. The complete analysis scripts used to generate the results are publicly available in the project repository: https://github.com/peterjmarko/llm-narrative-framework.git. |
+| **Study Protocol** | **Level 2: Shared and Cited.** The complete study protocol, including detailed step-by-step procedures for the data preparation pipeline, validation, and experimental workflow, is publicly available in the "Replication Guide" and "Framework Manual" within the project repository at https://github.com/peterjmarko/llm-narrative-framework.git. |
+| **Analysis Plan** | **Level 2: Shared and Cited.** The analysis plan is described in the "Dependent Variables and Statistical Analysis" section of the manuscript. The complete analysis scripts used to generate the results are publicly available in the project repository. |
 | **Reporting Transparency** | **Level 2: Shared and Cited.** This manuscript adheres to transparent reporting standards. The "Methods" section provides a comprehensive description of the experimental design, sample derivation, stimuli generation, and procedures, ensuring that all aspects of the study are clearly documented. |
-| **Materials Transparency** | **Level 2: Shared and Cited.** All research materials required to replicate the study, including the neutralized component library and the final subject database, are publicly available in the project repository: https://github.com/peterjmarko/llm-narrative-framework.git. |
-| **Data Transparency** | **Level 2: Shared and Cited.** All raw and processed data generated and analyzed during this study are publicly available. This includes raw experimental results from all LLM queries and the compiled study-level analysis datasets. The data can be accessed at: https://github.com/peterjmarko/llm-narrative-framework.git. |
-| **Analytic Code Transparency** | **Level 2: Shared and Cited.** The complete source code used for data preparation, experiment orchestration, statistical analysis, and visualization (147 scripts, 41,000+ lines) is publicly available in the project repository, ensuring full computational reproducibility at the methodological level: https://github.com/peterjmarko/llm-narrative-framework.git. |
+| **Materials Transparency** | **Level 2: Shared and Cited.** All research materials required to replicate the study, including the neutralized component library and the final subject database, are publicly available in the project repository. |
+| **Data Transparency** | **Level 2: Shared and Cited.** All raw and processed data generated and analyzed during this study are publicly available in the project repository. This includes raw experimental results from all LLM queries and the compiled study-level analysis datasets. |
+| **Analytic Code Transparency** | **Level 2: Shared and Cited.** The complete source code used for data preparation, experiment orchestration, statistical analysis, and visualization (147 scripts, 41,000+ lines) is publicly available in the project repository, ensuring full computational reproducibility at the methodological level. |
