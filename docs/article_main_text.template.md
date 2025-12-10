@@ -354,7 +354,7 @@ Correspondence concerning this article should be addressed to Peter J. Marko at 
 
 Peter J. Marko was responsible for the conceptualization, data curation, formal analysis, investigation, methodology, project administration, resources, software, validation, visualization, and writing (original draft, review & editing). Kenneth McRitchie participated in the conceptualization, data curation, investigation, methodology, and writing (review & editing).
 
-In preparing this manuscript and the framework’s source code, we used AI assistants (Anthropic's Claude 4.5 and Google's Gemini 2.5 Pro between July and October 2025) to help with drafting, editing, and structuring. As the authors, we thoroughly reviewed, revised, and validated all content. We take full responsibility for the final work in accordance with COPE guidelines.
+In preparing this manuscript and the framework’s source code, we used AI assistants (Anthropic's Claude 4.5 and Google's Gemini 2.5 Pro / Gemini 3 Pro Preview between July and December 2025) to help with drafting, editing, and structuring. As the authors, we thoroughly reviewed, revised, and validated all content. We take full responsibility for the final work in accordance with COPE guidelines.
 
 **ORCID iDs**
 
@@ -387,7 +387,7 @@ The authors wish to thank Vincent Godbout for generously sharing his pioneering 
 
 ### Open Data and Code Availability
 
-In the spirit of open science and methodological reproducibility (The Turing Way Community, 2022), we have made all data, analysis scripts, supplementary materials, and documentation from this study permanently and publicly available. The active codebase is hosted on GitHub (https://github.com/peterjmarko/llm-narrative-framework.git), and a permanent, versioned archive of the code and data used for this publication is available on Zenodo (DOI pending).
+In the spirit of open science and methodological reproducibility (The Turing Way Community, 2022), we have made all data, analysis scripts, supplementary materials, and documentation from this study permanently and publicly available. The active codebase is hosted on GitHub (https://github.com/peterjmarko/llm-narrative-framework.git), and a permanent, versioned archive of the code and data used for this publication is available on Zenodo (https://doi.org/10.5281/zenodo.17882829).
 
 **Repository Contents:**
 
