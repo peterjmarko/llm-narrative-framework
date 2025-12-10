@@ -5,6 +5,7 @@ This document serves as the **Developer's Guide** for the project. Its purpose i
 ## 📚 Related Documentation
 
 - **[🧪 Testing Guide](docs/TESTING_GUIDE.md)** - Testing philosophy, test suite details, and validation procedures (essential for contributors)
+- **[💻 Software Paper](paper.md)** - Engineering architecture and software design (JOSS submission)
 - **[🔧 Framework Manual](docs/FRAMEWORK_MANUAL.md)** - Technical specifications and system architecture
 - **[🔬 Replication Guide](docs/REPLICATION_GUIDE.md)** - Step-by-step procedures for running experiments (useful context for understanding workflows)
 - **[📖 README](README.md)** - Quick start and project overview
@@ -275,7 +276,8 @@ The project's documentation is managed through three distinct methods. For a com
 **2. Template-Driven Documents**
 
 -   **Description:** These are the project's core documents. Their final `.md` versions are **generated** from a corresponding `*.template.md` source file, which allows for the dynamic insertion of diagrams and other content.
--   **Development Tools:** Use `sync_project_assets.py` for efficient synchronization of documentation changes during Claude development workflows.
+-   **Dynamic Discovery:** The build script automatically detects any `*.template.md` file in the project (excluding system directories) and generates the corresponding `.md` and `.docx` output.
+-   **Special Handling:** The build script includes special logic for the JOSS `paper.md`, automatically detecting `paper.bib` and using Pandoc's citation processor to generate a bibliography in the final DOCX.
 -   **The Golden Rule:** **Always edit the `*.template.md` file, never the generated `.md` file.** The generated files are set to read-only as a safety measure.
 -   **Workflow:**
 
@@ -404,7 +406,7 @@ pdm lint-fix
 # 2. Build documentation with diagrams and Word documents  
 pdm build-docs
 
-# 3. Sync project assets (Claude development only)
+# 3. Sync project assets (optional)
 pdm sync-project
 
 # 4. Review and stage changes
@@ -566,6 +568,7 @@ The CI pipeline performs the following key validation steps:
     *   `pdm run python scripts/lint_docstrings.py`: Performs a high-level check for the presence of module docstrings.
 3.  **Validates Documentation:** It runs `pdm run build-docs --check` to confirm that any changes to diagrams or templates have been correctly compiled into the final documentation.
 4.  **Statistical Validation:** The framework's statistical analysis pipeline is validated against GraphPad Prism 10.6.1 for academic publication standards.
+5.  **JOSS Paper PDF:** If changes are detected in `paper.md` or `paper.bib`, a specialized workflow automatically compiles a draft PDF using the Open Journals toolchain. You can download this artifact from the "Actions" tab to verify formatting and citations.
 
 You can—and should—run these same checks locally before committing your code to ensure your pull request will pass.
 

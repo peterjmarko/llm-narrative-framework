@@ -14,9 +14,10 @@ To make changes, please edit the template file and then run 'pdm run build-docs'
 
 ## 📑 Document Navigation
 
-This project includes four interconnected documents:
+This project includes five interconnected documents:
 
 - **📄 Research Article** (`docs/article_main_text.md`) - Scientific findings and validation of the framework using astrology as a test case
+- **💻 Software Paper** (`paper.md`) - Engineering architecture and software design (JOSS submission)
 - **📖 README** (this document) - Quick start guide and feature overview
 - **🔬 Replication Guide** (`docs/REPLICATION_GUIDE.md`) - Step-by-step procedures for reproducing or extending the study
 - **🔧 Framework Manual** (`docs/FRAMEWORK_MANUAL.md`) - Technical specifications, data formats, and API references

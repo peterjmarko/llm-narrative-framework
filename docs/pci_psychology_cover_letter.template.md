@@ -1,0 +1,27 @@
+[Date]
+
+The Managing Board,
+Peer Community in Psychology
+
+**Subject: Submission of a preprint for evaluation and recommendation: "A Framework for Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology"**
+
+Dear Drs. Bottesini, Howard, Moore, Syed, and Tackett,
+
+We are excited to submit our preprint for evaluation and potential recommendation by Peer Community in Psychology (https://doi.org/10.31234/osf.io/ctjfh_v2). This manuscript introduces the *LLM Narrative Framework*, an open-source, fully automated methodology we designed to tackle a persistent challenge in our field: how to bring empirical rigor to complex, narrative-based systems that have long resisted quantitative testing.
+
+We are submitting this to PCI Psychology specifically because our work was designed from the ground up to embody your mission of promoting transparent, verifiable, and reproducible science. The entire research workflow—all data, documentation, and over 40,000 lines of source code—is publicly available in a comprehensive repository (https://github.com/peterjmarko/llm-narrative-framework). To facilitate a transparent and efficient review, we have also completed the PCI Psychology self-assessment and included a TOP disclosure table in the manuscript.
+
+We demonstrate the framework's power using a rigorous case study on the challenging and contentious topic of astrology. While we did find a faint but statistically significant signal, the *real* story is methodological. Our analysis uncovered two critical (and, to us, surprising) findings:
+
+1.  A **"Goldilocks effect,"** where the signal only became detectable at a specific, medium level of task difficulty.
+2.  An **extreme 575-fold variation** in the capabilities of different AI models to detect it.
+
+This demonstrates that the framework isn't just a simple tool, but a sensitive instrument that requires careful calibration.
+
+We believe this work is an ideal fit for PCI Psychology. It offers a practical, scalable, and transparent toolbox for future research into the narrative systems that are central to so many areas of the field. We are proud of this work's commitment to open science and are confident it will be of significant interest to the psychological science community.
+
+Thank you for considering our manuscript for recommendation.
+
+Sincerely,\
+Peter J. Marko (peter.j.marko@gmail.com) and Kenneth McRitchie\
+Independent, Unaffiliated Researchers

@@ -7,6 +7,7 @@ This document is the **Framework Manual** for the project. It serves as the **te
 ## 📑 Document Navigation
 
 - **📄 Research Article** (`docs/article_main_text.md`) - Scientific findings and validation
+- **💻 Software Paper** (`paper.md`) - Engineering architecture and software design (JOSS submission)
 - **📖 README** (`README.md`) - Quick start guide and feature overview  
 - **🔬 Replication Guide** (`docs/REPLICATION_GUIDE.md`) - Step-by-step procedures for reproducing or extending the study
 - **🔧 Framework Manual** (this document) - Technical specifications and API references

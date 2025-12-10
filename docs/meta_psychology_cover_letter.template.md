@@ -1,0 +1,40 @@
+[Date]
+
+The Editorial Board,
+Meta-Psychology
+
+**Subject: Submission of "A Framework for Reproducible Testing of Complex Narrative Systems: A Case Study in Astrology"**
+
+Dear Editors,
+
+We are excited to submit our manuscript for consideration as an Original Article in *Meta-Psychology*. This paper introduces the *LLM Narrative Framework*, a fully automated, open-source pipeline designed to bring rigorous empirical testing to complex, narrative-based systems that have historically resisted quantitative analysis.
+
+**Fit for Meta-Psychology**
+We believe this work is uniquely suited to *Meta-Psychology* because it addresses the intersection of **reproducibility**, **methodological rigor**, and **computational social science**. In an era where Large Language Models (LLMs) are increasingly used as "proxy human subjects," our work provides a standardized, transparent protocol for validating their ability to detect faint signals in high-dimensional qualitative data.
+
+**Addressing Methodological Challenges**
+We developed this framework using **astrology** as a specific "stress test" case study. We chose this domain precisely because it represents a "high-noise" narrative system often dismissed without rigorous empirical audit. By applying strict controls—text neutralization, double-blinding, and randomization—we demonstrate how to test such systems objectively.
+
+Our analysis yielded two findings of significant methodological interest:
+1.  **A "Goldilocks Effect" in Signal Detection:** The signal only became detectable at a specific, medium level of task difficulty, suggesting that task calibration is critical for LLM-based research.
+2.  **Extreme Model Heterogeneity:** We observed a 575-fold variation in effect sizes across different AI models, highlighting that "LLM capability" is highly architecture-dependent and not a monolith.
+
+**Methodological Validity (Pre-empting Common Concerns)**
+A previous version of this manuscript was desk-rejected by a general psychology journal for being "insufficiently grounded in psychological science" and raising questions about the validity of using LLMs to generate personality scores for historical figures. We have significantly revised the manuscript to address these points, which we believe are central to the methodological focus of *Meta-Psychology*:
+
+*   **Historiometric Validity:** We explicitly frame the LLM-based scoring not as "divining" personality, but as **automated historiometry**. We argue (citing Argyle et al., 2023; Gilardi et al., 2023) that LLMs act as reliable engines for extracting "biographical consensus" from training data, equivalent to aggregating human expert ratings of historical biographies.
+*   **The Framework as the Subject:** We clarify that the primary contribution is the **methodology itself**—a reusable, open-source toolbox (40,000+ lines of code)—rather than a validation of the specific case study used to demonstrate it.
+
+**Open Science and Transparency**
+In accordance with your values:
+*   **Code:** The full codebase is public (GitHub) and licensed under GPL-3.0.
+*   **Data:** All datasets are available for direct replication.
+*   **Software Publication:** The software architecture itself is currently under concurrent review at the *Journal of Open Source Software (JOSS)*. This submission to *Meta-Psychology* focuses exclusively on the empirical findings and methodological implications of the case study.
+
+We believe this paper contributes a vital tool to the "file drawer" of rigorous negative/weak-signal results and offers a roadmap for future investigations into narrative systems.
+
+Sincerely,
+
+Peter J. Marko (peter.j.marko@gmail.com) and Kenneth McRitchie
+Independent, Unaffiliated Researchers
+Repository: https://github.com/peterjmarko/llm-narrative-framework
