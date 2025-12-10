@@ -2,6 +2,40 @@
 
 # Changelog
 
+## 16.7.0 (2025-12-10)
+
+### Build
+
+- **finalize submission package for PCI Psychology**
+  This commit prepares all necessary materials for the initial submission to PCI Psychology.
+  
+  - Finalizes the cover letter content and converts it to a template (`.template.md`) to auto-populate the date.
+  - Adds a TOP Guidelines disclosure table as Appendix A to the main article template.
+  - Updates the `build_docs.py` script to handle the new cover letter template and its build dependencies.
+  - Fixes a single-page formatting issue in DOCX output by modifying paragraph styles in `custom_reference.docx`.
+  - Updates `.gitignore` to exclude the newly generated cover letter markdown file.```
+
+### Bump
+
+- **version 16.6.4 → 16.7.0**
+
+### Documentation
+
+- **final update after co-author approval**
+  Minor updates to the article from co-author final review. This version is slated for submission to PCI Psychology. The Developer's Guide was updated to include a special workflow for solo developers before article submission.
+- **update remaining steps before publication**
+
+### Features
+
+- **prepare JOSS and Meta-Psychology submission packages**
+  This commit finalizes the artifacts required for simultaneous submission to the Journal of Open Source Software (JOSS) and Meta-Psychology.
+  
+  - **Manuscript Refactoring:** Overhauled `article_main_text.md` to address construct validity and historiometric methodology, addressing prior peer review feedback.
+  - **JOSS Integration:** Added `paper.md` and `paper.bib` templates. Implemented a GitHub Action (`draft-pdf.yml`) to automatically compile the software paper PDF.
+  - **Build System Upgrade:** Refactored `scripts/build/build_docs.py` to support dynamic template discovery (removing hardcoded lists) and added Pandoc `citeproc` support for bibliography generation in `.docx` files.
+  - **Submission Artifacts:** Created specific cover letter templates for JOSS and Meta-Psychology. Renamed the legacy `article_cover_letter` to `pci_psychology_cover_letter` to distinguish submission history.
+  - **Documentation Sync:** Updated README, Developer's Guide, and Framework Manual to cross-reference the new software paper and build workflows.
+
 ## 16.6.4 (2025-11-02)
 
 ### Bump
