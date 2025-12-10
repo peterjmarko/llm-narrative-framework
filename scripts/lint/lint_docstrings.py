@@ -192,6 +192,12 @@ def main():
     print("\nLinting complete.\n")
 
 if __name__ == "__main__":
+    # Force UTF-8 encoding to handle emojis on Windows CI environments
+    if sys.stdout.encoding != 'utf-8':
+        sys.stdout.reconfigure(encoding='utf-8')
+    if sys.stderr.encoding != 'utf-8':
+        sys.stderr.reconfigure(encoding='utf-8')
+
     main()
 
 # === End of scripts/lint/lint_docstrings.py ===
