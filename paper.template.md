@@ -10,15 +10,15 @@ tags:
   - computational social science
 authors:
   - name: Peter J. Marko
-    orcid: 0000-0001-9108-8789
+    orcid: '0000-0001-9108-8789'
     affiliation: 1
   - name: Kenneth McRitchie
-    orcid: 0000-0001-8971-8091
+    orcid: '0000-0001-8971-8091'
     affiliation: 1
 affiliations:
- - name: Independent Researcher
-   index: 1
-date: [Date]
+  - name: Independent Researcher
+    index: 1
+date: '[Date]'
 bibliography: paper.bib
 ---
  
