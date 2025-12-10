@@ -707,10 +707,15 @@ def main():
             # This logic must perfectly mirror the build process.
             # First, build the body content.
             viewer_content = build_doc_content(project_root, template_path, flavor='viewer')
-            # Then, generate the corresponding warning header.
-            header = generate_warning_header(final_rel_path, f"/{template_rel_path}")
-            # The final expected content is the combination of both.
-            expected_content = header + '\n' + viewer_content
+            
+            # YAML headers must be at the very top of the file.
+            if os.path.basename(final_rel_path) == 'paper.md':
+                expected_content = viewer_content
+            else:
+                # Then, generate the corresponding warning header.
+                header = generate_warning_header(final_rel_path, f"/{template_rel_path}")
+                # The final expected content is the combination of both.
+                expected_content = header + '\n' + viewer_content
             
             
             try:
@@ -788,8 +793,14 @@ def main():
             return False
         else:
             viewer_content = build_doc_content(project_root, template_path, flavor='viewer')
-            header = generate_warning_header(final_rel_path, f'/{template_rel_path}')
-            final_content = header + '\n' + viewer_content
+            
+            # YAML headers must be at the very top of the file. 
+            # We cannot add the warning header to paper.md or it breaks Pandoc parsing.
+            if os.path.basename(final_rel_path) == 'paper.md':
+                final_content = viewer_content
+            else:
+                header = generate_warning_header(final_rel_path, f'/{template_rel_path}')
+                final_content = header + '\n' + viewer_content
             
             make_writable(final_path)
             with open(final_path, 'w', encoding='utf-8') as f:

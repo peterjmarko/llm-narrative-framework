@@ -21,7 +21,7 @@ affiliations:
 date: '[Date]'
 bibliography: paper.bib
 ---
- 
+
 # Summary
 
 Psychology has long struggled to empirically validate complex, holistic systems that produce narrative-based claims. To address this methodological gap, we developed the **LLM Narrative Framework**, an open-source, fully automated pipeline that uses Large Language Models (LLMs) as pattern-detection engines.
